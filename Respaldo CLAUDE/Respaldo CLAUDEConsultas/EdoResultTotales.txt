@@ -1,0 +1,63 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="EdoResultDet"
+    Name ="CostoOrd"
+End
+Begin OutputColumns
+    Expression ="EdoResultDet.IdEdoResult"
+    Alias ="ImporteTot"
+    Expression ="Sum([cantvendida]*[precioventa])"
+    Alias ="CostoTotal"
+    Expression ="Sum(costobueno([costo],[costoviejo])*[cantvendida])"
+End
+Begin Joins
+    LeftTable ="EdoResultDet"
+    RightTable ="CostoOrd"
+    Expression ="EdoResultDet.IdCostoOrd = CostoOrd.IdCostoOrd"
+    Flag = 2
+End
+Begin Groups
+    Expression ="EdoResultDet.IdEdoResult"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="-1"
+Begin
+    Begin
+        dbText "Name" ="ImporteTot"
+        dbText "Format" ="$#,##0.00;-$#,##0.00"
+    End
+End
+Begin
+    State = 0
+    Left = 37
+    Top = 181
+    Right = 1248
+    Bottom = 494
+    Left = -1
+    Top = -1
+    Right = 1200
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 120
+        Top = 0
+        Name ="EdoResultDet"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 120
+        Top = 0
+        Name ="CostoOrd"
+    End
+End

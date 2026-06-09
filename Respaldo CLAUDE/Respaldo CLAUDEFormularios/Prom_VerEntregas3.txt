@@ -1,0 +1,260 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1502506542
+Begin Form
+    RecordSelectors = NotDefault
+    NavigationButtons = NotDefault
+    OrderByOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14796
+    DatasheetFontHeight = 10
+    ItemSuffix = 17
+    Left = 600
+    Top = 330
+    Right = 16185
+    Bottom = 9225
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x34998eef3c28e440
+    End
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 16711935
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 56
+                    Width = 2490
+                    Height = 225
+                    FontWeight = 700
+                    Name ="Etiqueta8"
+                    Caption ="Ver Entregas"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8560
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 56
+                    Top = 450
+                    Height = 6382
+                    Name ="QueEntrega"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_Entregas.IdProm_Entregas, Prom_Entregas.NumeroEntrega, Prom_Entregas"
+                        ".Fecha FROM Prom_Entregas ORDER BY Prom_Entregas.NumeroEntrega DESC;"
+                    ColumnWidths ="0;369;1134"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 170
+                            Width = 1560
+                            Height = 240
+                            Name ="Etiqueta3"
+                            Caption ="Seleccionar Entrega:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 2097
+                    Top = 789
+                    Height = 6037
+                    TabIndex = 1
+                    Name ="QueTienda"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_EntregasDet.Tienda, Sum(Prom_EntregasDet.CantEnt) AS SumaDeCantEnt, "
+                        "Prom_EntregasDet.IdProm_Entregas FROM Prom_EntregasDet GROUP BY Prom_EntregasDet"
+                        ".Tienda, Prom_EntregasDet.IdProm_Entregas HAVING (((Prom_EntregasDet.IdProm_Entr"
+                        "egas)=[Formularios]![Prom_VerEntregas]![QueEntrega])) ORDER BY Prom_EntregasDet."
+                        "Tienda;"
+                    ColumnWidths ="340;1134"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2100
+                            Top = 165
+                            Width = 690
+                            Height = 240
+                            Name ="Etiqueta5"
+                            Caption ="Tiendas:"
+                        End
+                    End
+                End
+                Begin ToggleButton
+                    OverlapFlags = 85
+                    Left = 2097
+                    Top = 453
+                    Width = 1708
+                    TabIndex = 2
+                    Name ="TodasTdas"
+                    DefaultValue ="-1"
+                    Caption ="TODAS"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 4195
+                    Top = 680
+                    Width = 10371
+                    Height = 5106
+                    TabIndex = 3
+                    Name ="Prom_VerEntregasDet"
+                    SourceObject ="Form.Prom_VerEntregasDet"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4195
+                            Top = 440
+                            Width = 1020
+                            Height = 240
+                            Name ="Etiqueta10"
+                            Caption ="Modelos:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    Left = 6293
+                    Top = 6122
+                    Width = 1341
+                    TabIndex = 4
+                    Name ="CantidadTotal"
+                    ControlSource ="=[Prom_VerEntregasDet].[Form]![CantTot]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5100
+                            Top = 6120
+                            Width = 1155
+                            Height = 240
+                            Name ="Etiqueta12"
+                            Caption ="Cantidad Total:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    Left = 6293
+                    Top = 6484
+                    Width = 1341
+                    TabIndex = 5
+                    Name ="ImporteTotal"
+                    ControlSource ="=[Prom_VerEntregasDet].[Form]![ImporteTot]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5100
+                            Top = 6482
+                            Width = 1155
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Importe Total:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5226
+                    Top = 113
+                    Width = 216
+                    Height = 255
+                    TabIndex = 6
+                    Name ="QueTiendaEs"
+                    DefaultValue ="\"*\""
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueEntrega_AfterUpdate()
+QueTienda.Requery
+Me![Prom_VerEntregasDet].Form.Requery
+
+End Sub
+
+Private Sub QueTienda_AfterUpdate()
+TodasTdas = 0
+QueTiendaEs = QueTienda
+Me![Prom_VerEntregasDet].Form.Requery
+
+End Sub
+
+Private Sub TodasTdas_Click()
+TodasTdas = -1
+QueTienda = ""
+QueTiendaEs = "*"
+Me![Prom_VerEntregasDet].Form.Requery
+End Sub

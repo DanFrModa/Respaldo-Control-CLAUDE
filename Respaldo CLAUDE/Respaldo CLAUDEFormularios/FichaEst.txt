@@ -1,0 +1,708 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1420053539
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 13606
+    DatasheetFontHeight = 10
+    ItemSuffix = 35
+    Left = 2400
+    Top = 285
+    Right = 16005
+    Bottom = 8130
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x480d31e737e9e240
+    End
+    RecordSource ="SELECT FichaEst.IdFichaEst, FichaEst.IdOrdenes, FichaEst.Tecnica, FichaEst.Posic"
+        "ion, FichaEst.Descripcion, FichaEst.Observaciones, Format([Numero])+\"-\"+[exten"
+        "cion] AS Num, Clientes.Cliente, Modelos.Modelo, Modelos.Foto1, Modelos.Foto2, Bo"
+        "rdados.Nombre, Bordados.Foto, FichaEst.IdBordados, Ordenes.Tallas, FichaEst.ColD"
+        "es1, FichaEst.ColDes2, FichaEst.ColDes3, FichaEst.ColDes4 FROM (((FichaEst LEFT "
+        "JOIN Ordenes ON FichaEst.IdOrdenes = Ordenes.IdOrdenes) LEFT JOIN Clientes ON Or"
+        "denes.IdClientes = Clientes.IdClientes) LEFT JOIN Modelos ON Ordenes.IdModelos ="
+        " Modelos.IdModelos) LEFT JOIN Bordados ON FichaEst.IdBordados = Bordados.IdBorda"
+        "dos;"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin FormHeader
+            Height = 435
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 165
+                    Top = 75
+                    Width = 6750
+                    Height = 315
+                    FontSize = 10
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta17"
+                    Caption ="FICHA TECNICA DEL PROCESO (ESTAMPADOS Y BORDADOS)"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7370
+                    Top = 113
+                    Width = 786
+                    Name ="Foto1"
+                    ControlSource ="Foto1"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 8269
+                    Top = 113
+                    Width = 756
+                    TabIndex = 1
+                    Name ="Foto2"
+                    ControlSource ="Foto2"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9467
+                    Top = 113
+                    Width = 516
+                    TabIndex = 2
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 10204
+                    Top = 113
+                    Width = 516
+                    TabIndex = 3
+                    Name ="IdBordados"
+                    ControlSource ="IdBordados"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 10885
+                    Top = 113
+                    Width = 516
+                    TabIndex = 4
+                    Name ="Tallas"
+                    ControlSource ="Tallas"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7426
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3974
+                    Top = 113
+                    Width = 6516
+                    Name ="Tecnica"
+                    ControlSource ="Tecnica"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2948
+                            Top = 113
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Tecnica:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 3974
+                    Top = 680
+                    Width = 6516
+                    Height = 573
+                    TabIndex = 2
+                    Name ="Posicion"
+                    ControlSource ="Posicion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2948
+                            Top = 680
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta2"
+                            Caption ="Posicion:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 3974
+                    Top = 396
+                    Width = 6516
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2948
+                            Top = 396
+                            Width = 960
+                            Height = 240
+                            Name ="Etiqueta3"
+                            Caption ="Descripcion:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 118
+                    Top = 3628
+                    Width = 5841
+                    Height = 1248
+                    TabIndex = 7
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 118
+                            Top = 3344
+                            Width = 1245
+                            Height = 240
+                            Name ="Etiqueta4"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1529
+                    Top = 113
+                    Width = 1086
+                    TabIndex = 8
+                    BorderColor = 4210752
+                    Name ="Numero"
+                    ControlSource ="Num"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 120
+                            Top = 120
+                            Width = 1380
+                            Height = 240
+                            Name ="Etiqueta5"
+                            Caption ="Numero de Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 734
+                    Top = 453
+                    Width = 1881
+                    TabIndex = 9
+                    BorderColor = 4210752
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 453
+                            Width = 600
+                            Height = 240
+                            Name ="Etiqueta6"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 794
+                    Top = 793
+                    Width = 1821
+                    TabIndex = 10
+                    BorderColor = 4210752
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 793
+                            Width = 645
+                            Height = 240
+                            Name ="Etiqueta7"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 10658
+                    Top = 1365
+                    Width = 2820
+                    Height = 2490
+                    Name ="Imagen1"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 10658
+                    Top = 4308
+                    Width = 2820
+                    Height = 2490
+                    Name ="Imagen2"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 6122
+                    Top = 1644
+                    Width = 4365
+                    Height = 3525
+                    Name ="Imagen3"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 11849
+                    Top = 1082
+                    Width = 801
+                    TabIndex = 11
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Texto18"
+                    ControlSource ="Foto1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 10664
+                            Top = 1077
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta37"
+                            Caption ="Foto Modelo 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 11871
+                    Top = 4030
+                    Width = 801
+                    TabIndex = 12
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Texto19"
+                    ControlSource ="Foto2"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 10686
+                            Top = 4025
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta39"
+                            Caption ="Foto Modelo 2:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7612
+                    Top = 1360
+                    Width = 846
+                    TabIndex = 13
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="FotoBord"
+                    ControlSource ="Foto"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6122
+                            Top = 1360
+                            Width = 1470
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta41"
+                            Caption ="Foto Bordado / Est:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    Left = 113
+                    Top = 5223
+                    Width = 10365
+                    Height = 2100
+                    TabIndex = 14
+                    Name ="FichaEstSub"
+                    SourceObject ="Form.FichaEstSub"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 117
+                            Top = 4988
+                            Width = 1560
+                            Height = 240
+                            Name ="FichaEstSubEtiqueta"
+                            Caption ="Colorido del proceso:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 919
+                    Top = 1927
+                    Width = 4071
+                    TabIndex = 3
+                    Name ="ColDes1"
+                    ControlSource ="ColDes1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1933
+                            Width = 690
+                            Height = 240
+                            Name ="Etiqueta25"
+                            Caption ="Color 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 919
+                    Top = 2267
+                    Width = 4071
+                    TabIndex = 4
+                    Name ="ColDes2"
+                    ControlSource ="ColDes2"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 118
+                            Top = 2267
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta26"
+                            Caption ="Color 2:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 919
+                    Top = 2607
+                    Width = 4071
+                    TabIndex = 5
+                    Name ="ColDes3"
+                    ControlSource ="ColDes3"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 118
+                            Top = 2607
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta27"
+                            Caption ="Color 3:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 919
+                    Top = 2947
+                    Width = 4071
+                    TabIndex = 6
+                    Name ="ColDes4"
+                    ControlSource ="ColDes4"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 118
+                            Top = 2947
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta28"
+                            Caption ="Color 4:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 12298
+                    Top = 6913
+                    Width = 1236
+                    Height = 343
+                    FontWeight = 700
+                    TabIndex = 15
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    Enabled = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1882
+                    Top = 1474
+                    Width = 1461
+                    TabIndex = 16
+                    BorderColor = 4210752
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"15\""
+                    Name ="Bordado"
+                    ControlSource ="IdBordados"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Bordados.IdBordados, Bordados.Nombre FROM Bordados;"
+                    ColumnWidths ="0;1701"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Bordados.IdBordados, Bordados.Nombre FROM Bordados;\";\"Bordados\";\"\""
+                        ";\"IdBordados\";\"Nombre\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1470
+                            Width = 1680
+                            Height = 240
+                            Name ="Etiqueta31"
+                            Caption ="Estampado / Bordado:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 11111
+                    Top = 170
+                    Height = 343
+                    TabIndex = 17
+                    Name ="Comando32"
+                    Caption ="Imprimir"
+                End
+                Begin OptionButton
+                    OverlapFlags = 85
+                    Left = 3401
+                    Top = 1560
+                    TabIndex = 18
+                    Name ="Cambiar"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="No"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 3631
+                            Top = 1530
+                            Width = 765
+                            Height = 240
+                            Name ="Etiqueta34"
+                            Caption ="Cambiar"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Bordado_AfterUpdate()
+Call CargarFotos
+End Sub
+
+Private Sub Cambiar_AfterUpdate()
+If Cambiar = True Then
+Bordado.Enabled = True
+Else
+Bordado.Enabled = False
+End If
+End Sub
+
+Private Sub ColDes2_AfterUpdate()
+Call OcultarColores
+End Sub
+
+Private Sub ColDes3_AfterUpdate()
+Call OcultarColores
+End Sub
+
+Private Sub ColDes4_AfterUpdate()
+Call OcultarColores
+End Sub
+
+Private Sub Form_Current()
+Call OcultarColores
+Call CargarFotos
+End Sub
+
+
+Private Sub OcultarColores()
+If IsNull(ColDes2) = True Then
+Me![FichaEstSub].Form![Color2].Visible = False
+Me![FichaEstSub].Form![EtCol2].Visible = False
+Else
+Me![FichaEstSub].Form![Color2].Visible = True
+Me![FichaEstSub].Form![EtCol2].Visible = True
+End If
+'---------------
+If IsNull(ColDes3) = True Then
+Me![FichaEstSub].Form![Color3].Visible = False
+Me![FichaEstSub].Form![EtCol3].Visible = False
+Else
+Me![FichaEstSub].Form![Color3].Visible = True
+Me![FichaEstSub].Form![EtCol3].Visible = True
+End If
+'----------------
+If IsNull(ColDes4) = True Then
+Me![FichaEstSub].Form![Color4].Visible = False
+Me![FichaEstSub].Form![EtCol4].Visible = False
+Else
+Me![FichaEstSub].Form![Color4].Visible = True
+Me![FichaEstSub].Form![EtCol4].Visible = True
+End If
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub CargarFotos()
+On Error GoTo Errorprueba
+
+Dim Nu As Integer
+Me!Imagen1.Picture = ""
+Me!Imagen2.Picture = ""
+Me!Imagen3.Picture = ""
+Me!Imagen1.HyperlinkAddress = ""
+Me!Imagen2.HyperlinkAddress = ""
+Me!Imagen3.HyperlinkAddress = ""
+Nu = 1
+Me!Imagen1.Picture = DirFotos(Foto1)
+Me!Imagen1.HyperlinkAddress = DirFotos(Foto1)
+Nu = 2
+Me!Imagen2.Picture = DirFotos(Foto2)
+Me!Imagen2.HyperlinkAddress = DirFotos(Foto2)
+Nu = 3
+Me!Imagen3.Picture = DirBordados(FotoBord)
+Me!Imagen3.HyperlinkAddress = DirBordados(FotoBord)
+Exit Sub
+
+Errorprueba:
+
+Select Case Nu
+Case 1
+Me!Imagen1.Picture = NoFoto
+Case 2
+Me!Imagen2.Picture = NoFoto
+Case 3
+Me!Imagen3.Picture = NoFoto
+End Select
+Resume Next
+End Sub

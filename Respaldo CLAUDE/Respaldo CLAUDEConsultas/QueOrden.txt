@@ -1,0 +1,278 @@
+Operation = 1
+Option = 0
+Having ="(((Ordenes.Numero) Like [Formularios]![OrdenVer]![QueNoOrdenEs]) AND ((Modelos.M"
+    "odelo) Like [Formularios]![OrdenVer]![QueModeloEs]) AND ((Ordenes.Monarch) Like "
+    "[Formularios]![OrdenVer]![QueMonarchEs]) AND ((First(ceronulo([EstamOrd]![IdMaqu"
+    "ileros]))) Like [Formularios]![OrdenVer]![QueEstampadorEs]) AND ((Year([Ordenes]"
+    "![Fecha]))>=FiltroAno()) AND ((Clientes.IdClientes) Like [Formularios]![OrdenVer"
+    "]![QueClienteEs]) AND ((Format([fechaentregarc],\"mm\")) Like [Formularios]![Ord"
+    "enVer]![QueMesEss]) AND ((First(ceronulo([entregas]![IdMaquileros]))) Like [Form"
+    "ularios]![OrdenVer]![QueMaqEs]))"
+Begin InputTables
+    Name ="Maquileros"
+    Name ="Ordenes"
+    Name ="Modelos"
+    Name ="Clientes"
+    Name ="CantidadCorte"
+    Name ="Entregas"
+    Name ="CantidadOrd"
+    Name ="MaqCantOrd"
+    Name ="EstamOrd"
+    Name ="PedidosDet"
+    Name ="Pedidos"
+    Name ="Empresas"
+    Name ="OrdenProvTelas"
+    Name ="OrdQueMes"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdOrdenes"
+    Alias ="Rie"
+    Expression ="Astecierto([EnRiesgo])"
+    Expression ="Empresas.Identificador"
+    Expression ="Ordenes.Numero"
+    Expression ="Modelos.Modelo"
+    Expression ="Ordenes.Monarch"
+    Expression ="CantidadOrd.CantOrd"
+    Expression ="CantidadCorte.CantCorte"
+    Alias ="NomCorto"
+    Expression ="First(Maquileros.Corto)"
+    Alias ="CantMaqui"
+    Expression ="maqycancel([ordcancelada],[cuentadeidmaquileros])"
+    Alias ="PrimeroDeEstam"
+    Expression ="First(EstamOrd.Estam)"
+    Expression ="Pedidos.NumeroPed"
+    Expression ="OrdenProvTelas.PrimeroDeNumCompra"
+    Expression ="OrdQueMes.Qmes"
+    Expression ="Clientes.Cliente"
+    Alias ="ee"
+    Expression ="First(ceronulo([EstamOrd]![IdMaquileros]))"
+    Alias ="Expr1"
+    Expression ="Year([Ordenes]![Fecha])"
+    Expression ="Clientes.IdClientes"
+    Alias ="qm"
+    Expression ="Format([fechaentregarc],\"mm\")"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="Clientes"
+    Expression ="Ordenes.IdClientes = Clientes.IdClientes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CantidadCorte"
+    Expression ="Ordenes.IdOrdenes = CantidadCorte.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="Entregas"
+    Expression ="Ordenes.IdOrdenes = Entregas.IdOrdenes"
+    Flag = 2
+    LeftTable ="Maquileros"
+    RightTable ="Entregas"
+    Expression ="Maquileros.IdMaquileros = Entregas.IdMaquileros"
+    Flag = 3
+    LeftTable ="Ordenes"
+    RightTable ="CantidadOrd"
+    Expression ="Ordenes.IdOrdenes = CantidadOrd.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="MaqCantOrd"
+    Expression ="Ordenes.IdOrdenes = MaqCantOrd.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="EstamOrd"
+    Expression ="Ordenes.IdOrdenes = EstamOrd.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="PedidosDet"
+    Expression ="Ordenes.IdPedidosDet = PedidosDet.IdPedidosDet"
+    Flag = 2
+    LeftTable ="PedidosDet"
+    RightTable ="Pedidos"
+    Expression ="PedidosDet.IdPedidos = Pedidos.IdPedidos"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="Empresas"
+    Expression ="Ordenes.IdEmpresas = Empresas.IdEmpresas"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="OrdenProvTelas"
+    Expression ="Ordenes.IdOrdenes = OrdenProvTelas.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="OrdQueMes"
+    Expression ="Ordenes.IdOrdenes = OrdQueMes.IdOrdenes"
+    Flag = 2
+End
+Begin OrderBy
+    Expression ="Ordenes.Numero"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="Astecierto([EnRiesgo])"
+    GroupLevel = 0
+    Expression ="Empresas.Identificador"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="Ordenes.Monarch"
+    GroupLevel = 0
+    Expression ="CantidadOrd.CantOrd"
+    GroupLevel = 0
+    Expression ="CantidadCorte.CantCorte"
+    GroupLevel = 0
+    Expression ="maqycancel([ordcancelada],[cuentadeidmaquileros])"
+    GroupLevel = 0
+    Expression ="Pedidos.NumeroPed"
+    GroupLevel = 0
+    Expression ="OrdenProvTelas.PrimeroDeNumCompra"
+    GroupLevel = 0
+    Expression ="OrdQueMes.Qmes"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+    Expression ="Year([Ordenes]![Fecha])"
+    GroupLevel = 0
+    Expression ="Clientes.IdClientes"
+    GroupLevel = 0
+    Expression ="Format([fechaentregarc],\"mm\")"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 62
+    Top = 44
+    Right = 1418
+    Bottom = 452
+    Left = -1
+    Top = -1
+    Right = 1349
+    Bottom = 247
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 98
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 428
+        Top = 115
+        Right = 551
+        Bottom = 207
+        Top = 9
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 98
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 83
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 574
+        Top = 6
+        Right = 670
+        Bottom = 98
+        Top = 0
+        Name ="CantidadCorte"
+    End
+    Begin
+        Left = 156
+        Top = 5
+        Right = 252
+        Bottom = 97
+        Top = 0
+        Name ="Entregas"
+    End
+    Begin
+        Left = 842
+        Top = 6
+        Right = 979
+        Bottom = 68
+        Top = 0
+        Name ="CantidadOrd"
+    End
+    Begin
+        Left = 693
+        Top = -16
+        Right = 832
+        Bottom = 46
+        Top = 0
+        Name ="MaqCantOrd"
+    End
+    Begin
+        Left = 594
+        Top = 116
+        Right = 729
+        Bottom = 193
+        Top = 1
+        Name ="EstamOrd"
+    End
+    Begin
+        Left = 160
+        Top = 72
+        Right = 256
+        Bottom = 179
+        Top = 0
+        Name ="PedidosDet"
+    End
+    Begin
+        Left = 34
+        Top = 85
+        Right = 130
+        Bottom = 192
+        Top = 0
+        Name ="Pedidos"
+    End
+    Begin
+        Left = 708
+        Top = 60
+        Right = 804
+        Bottom = 167
+        Top = 1
+        Name ="Empresas"
+    End
+    Begin
+        Left = 1017
+        Top = 6
+        Right = 1113
+        Bottom = 83
+        Top = 1
+        Name ="OrdenProvTelas"
+    End
+    Begin
+        Left = 1151
+        Top = 6
+        Right = 1298
+        Bottom = 98
+        Top = 0
+        Name ="OrdQueMes"
+    End
+End

@@ -1,0 +1,211 @@
+Operation = 1
+Option = 0
+Where ="(((Ordenes.OrdCancelada)=No))"
+Begin InputTables
+    Name ="RC"
+    Name ="Ordenes"
+    Name ="CP_Procesos"
+    Name ="Modelos"
+    Name ="Clientes"
+    Name ="OrdPedido"
+    Name ="RC_UltimoProceso"
+    Name ="CP_Tiempos"
+    Name ="CP_Articulos"
+    Name ="RC_IP3"
+    Name ="RC_Ant3-4-5"
+End
+Begin OutputColumns
+    Expression ="Ordenes.Numero"
+    Expression ="RC.FechaEst"
+    Expression ="Modelos.Modelo"
+    Expression ="Clientes.Cliente"
+    Expression ="RC.FechaReal"
+    Alias ="Atraso"
+    Expression ="Int(Date()-([quefechaant]+[tiemporc]))"
+    Alias ="FechaObjetivo"
+    Expression ="[quefechaant]+[tiemporc]"
+    Alias ="Moldes-"
+    Expression ="IIf([moldes]=True,\"OK\",\"\")"
+    Alias ="Muestra Fisica"
+    Expression ="IIf([MuestraFisica]=True,\"OK\",\"\")"
+    Alias ="Ficha Tecnica"
+    Expression ="IIf([fichatecnica]=True,\"OK\",\"\")"
+    Alias ="Digitalizacion-"
+    Expression ="IIf([digitalizacion]=True,\"OK\",\"\")"
+    Alias ="Graduacion-"
+    Expression ="IIf([graduacion]=True,\"OK\",\"\")"
+    Alias ="Mandar Modelo"
+    Expression ="IIf([Mandarmodelo]=True,\"OK\",\"\")"
+    Expression ="Ordenes.OrdCancelada"
+End
+Begin Joins
+    LeftTable ="RC"
+    RightTable ="Ordenes"
+    Expression ="RC.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 1
+    LeftTable ="RC"
+    RightTable ="CP_Procesos"
+    Expression ="RC.IdCP_Procesos = CP_Procesos.IdCP_Procesos"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Clientes"
+    Expression ="Ordenes.IdClientes = Clientes.IdClientes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="OrdPedido"
+    Expression ="Ordenes.IdOrdenes = OrdPedido.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="RC_UltimoProceso"
+    Expression ="Ordenes.IdOrdenes = RC_UltimoProceso.IdOrdenes"
+    Flag = 1
+    LeftTable ="RC"
+    RightTable ="CP_Tiempos"
+    Expression ="RC.IdCP_Tiempos = CP_Tiempos.IdCP_Tiempos"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CP_Articulos"
+    Expression ="Ordenes.IdCP_Articulos = CP_Articulos.IdCP_Articulos"
+    Flag = 2
+    LeftTable ="RC"
+    RightTable ="RC_IP3"
+    Expression ="RC.IdRC = RC_IP3.IdRC"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="RC_Ant3-4-5"
+    Expression ="Ordenes.IdOrdenes = [RC_Ant3-4-5].IdOrdenes"
+    Flag = 2
+End
+Begin OrderBy
+    Expression ="Ordenes.Numero"
+    Flag = 0
+    Expression ="RC.FechaEst"
+    Flag = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="Moldes-"
+        dbInteger "ColumnWidth" ="1905"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="Ficha Tecnica"
+        dbInteger "ColumnWidth" ="1905"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="Graduacion-"
+        dbInteger "ColumnWidth" ="1905"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 453
+    Left = -1
+    Top = -1
+    Right = 1185
+    Bottom = 255
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 122
+        Top = 1
+        Name ="RC"
+    End
+    Begin
+        Left = 187
+        Top = 10
+        Right = 283
+        Bottom = 126
+        Top = 16
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 122
+        Top = 1
+        Name ="CP_Procesos"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 122
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 574
+        Top = 6
+        Right = 670
+        Bottom = 107
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 708
+        Top = 6
+        Right = 804
+        Bottom = 92
+        Top = 0
+        Name ="OrdPedido"
+    End
+    Begin
+        Left = 842
+        Top = 6
+        Right = 938
+        Bottom = 92
+        Top = 0
+        Name ="RC_UltimoProceso"
+    End
+    Begin
+        Left = 964
+        Top = 0
+        Right = 1095
+        Bottom = 116
+        Top = 0
+        Name ="CP_Tiempos"
+    End
+    Begin
+        Left = 172
+        Top = 126
+        Right = 268
+        Bottom = 242
+        Top = 0
+        Name ="CP_Articulos"
+    End
+    Begin
+        Left = 360
+        Top = 115
+        Right = 497
+        Bottom = 231
+        Top = 4
+        Name ="RC_IP3"
+    End
+    Begin
+        Left = 708
+        Top = 96
+        Right = 804
+        Bottom = 197
+        Top = 0
+        Name ="RC_Ant3-4-5"
+    End
+End

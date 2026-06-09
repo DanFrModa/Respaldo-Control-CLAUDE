@@ -1,0 +1,274 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1281932215
+Begin Form
+    AutoCenter = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6579
+    DatasheetFontHeight = 10
+    ItemSuffix = 12
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x056f97ffbbaae540
+    End
+    RecordSource ="CortePorCortador"
+    Caption ="CortePorCortador"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 57
+                    Top = 57
+                    Width = 630
+                    Height = 240
+                    Name ="Numero Etiqueta"
+                    Caption ="Numero"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Numero_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 744
+                    Top = 57
+                    Width = 1560
+                    Height = 240
+                    Name ="Cortador Etiqueta"
+                    Caption ="Cortador"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cortador_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2361
+                    Top = 57
+                    Width = 705
+                    Height = 240
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3123
+                    Top = 57
+                    Width = 825
+                    Height = 240
+                    Name ="Fecha Etiqueta"
+                    Caption ="Fecha"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Fecha_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4005
+                    Top = 57
+                    Width = 900
+                    Height = 240
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4962
+                    Top = 57
+                    Width = 1560
+                    Height = 240
+                    Name ="Cliente Etiqueta"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cliente_Etiqueta"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 630
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 744
+                    Top = 57
+                    Width = 1560
+                    Height = 255
+                    ColumnWidth = 1560
+                    TabIndex = 1
+                    Name ="Cortador"
+                    ControlSource ="Cortador"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2361
+                    Top = 57
+                    Width = 705
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 2
+                    Name ="Cantidad"
+                    ControlSource ="Cantidad"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3123
+                    Top = 57
+                    Width = 825
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 3
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4005
+                    Top = 57
+                    Width = 900
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 4
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4962
+                    Top = 57
+                    Width = 1560
+                    Height = 255
+                    ColumnWidth = 1560
+                    TabIndex = 5
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End

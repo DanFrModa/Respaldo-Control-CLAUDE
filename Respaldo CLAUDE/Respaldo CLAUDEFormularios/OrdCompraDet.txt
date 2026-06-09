@@ -1,0 +1,361 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1655615150
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9855
+    DatasheetFontHeight = 10
+    ItemSuffix = 22
+    Left = 1935
+    Top = 1410
+    Right = 12870
+    Bottom = 8820
+    DatasheetGridlinesColor = 12632256
+    AfterInsert ="[Event Procedure]"
+    RecSrcDt = Begin
+        0xa3dbd667fc9be540
+    End
+    RecordSource ="SELECT OrdCompraDet.*, [cantidad]*[precio] AS Importe, OrdCompraDet.IdOrdCompraD"
+        "et FROM OrdCompraDet ORDER BY OrdCompraDet.IdOrdCompraDet;"
+    Caption ="OrdCompraDet"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 8388608
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1089
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2436
+                    Top = 57
+                    Width = 5109
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 7638
+                    Top = 57
+                    Width = 969
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 8641
+                    Top = 60
+                    Width = 1095
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta15"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 1190
+                    Top = 60
+                    Width = 1215
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta17"
+                    Caption ="Unidad"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 340
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 57
+                    Width = 1089
+                    Height = 255
+                    ColumnWidth = 2310
+                    Name ="Cantidad"
+                    ControlSource ="Cantidad"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2436
+                    Top = 57
+                    Width = 5109
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7638
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8659
+                    Top = 57
+                    Width = 1059
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    Left = 1208
+                    Top = 57
+                    Width = 1194
+                    Height = 255
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"10\";\"15\""
+                    Name ="Unidad"
+                    ControlSource ="Unidad"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT OrdCompraDet.Unidad FROM OrdCompraDet GROUP BY OrdCompraDet.Unidad HAVING"
+                        " ((Not (OrdCompraDet.Unidad) Is Null));"
+                    OnLostFocus ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 340
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 1229
+                    Top = 56
+                    Width = 1371
+                    Name ="CantTotal"
+                    ControlSource ="=Sum([Cantidad])"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 56
+                            Width = 1170
+                            Height = 240
+                            Name ="Etiqueta12"
+                            Caption ="Cantidad Total:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 8358
+                    Top = 56
+                    Width = 1371
+                    TabIndex = 1
+                    Name ="Texto13"
+                    ControlSource ="=Sum([importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 7185
+                            Top = 56
+                            Width = 1170
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Importe Total:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5385
+                    Top = 56
+                    Width = 411
+                    TabIndex = 2
+                    Name ="UnidadProv"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3855
+                    Top = 56
+                    Width = 411
+                    TabIndex = 3
+                    Name ="DescripcionProv"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Descripcion_LostFocus()
+If IsNull(Descripcion) = True Then
+Descripcion = DescripcionProv
+End If
+End Sub
+
+Private Sub Form_AfterInsert()
+UnidadProv = Unidad
+DescripcionProv = Descripcion
+End Sub
+
+Private Sub Unidad_LostFocus()
+If IsNull(Unidad) = True Then
+Unidad = UnidadProv
+End If
+End Sub

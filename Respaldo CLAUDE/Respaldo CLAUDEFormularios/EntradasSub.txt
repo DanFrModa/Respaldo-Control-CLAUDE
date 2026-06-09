@@ -1,0 +1,452 @@
+Version = 17
+VersionRequired = 17
+Checksum = -608208650
+Begin Form
+    NavigationButtons = NotDefault
+    AllowEdits = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6916
+    DatasheetFontHeight = 10
+    ItemSuffix = 29
+    Left = 4560
+    Top = 3810
+    Right = 14625
+    Bottom = 6345
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xc022358979b6e240
+    End
+    RecordSource ="SELECT EntradasDet.IdEntradasDet, EntradasDet.IdEntradas, EntradasDet.IdTelasCol"
+        "Alm, EntradasDet.TelaEnt1, EntradasDet.TelaEnt2, EntradasDet.Peso, TelasColAlm.E"
+        "xTela1, TelasColAlm.ExTela2 FROM EntradasDet INNER JOIN TelasColAlm ON EntradasD"
+        "et.IdTelasColAlm = TelasColAlm.IdTelasColAlm;"
+    Caption ="Salidas Detalle"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 0
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 6235
+                    Top = 57
+                    Width = 96
+                    Height = 240
+                    Name ="IdEntradas Detalle Etiqueta"
+                    Caption ="IdEntradas Detalle"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdEntradas_Detalle_Etiqueta"
+                End
+                Begin Label
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 6348
+                    Top = 57
+                    Width = 75
+                    Height = 240
+                    Name ="IdEntradas Etiqueta"
+                    Caption ="IdEntradas"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdEntradas_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 240
+                    Top = 60
+                    Width = 1110
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 13421619
+                    Name ="IdTelas Colores Etiqueta"
+                    Caption ="Colores"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdTelas_Colores_Etiqueta"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 1644
+                    Top = 60
+                    Width = 855
+                    FontWeight = 700
+                    BackColor = 0
+                    ForeColor = 13421619
+                    Name ="Felpa Etiqueta"
+                    ControlSource ="=[Forms]![Entradas]![Texto1]"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Felpa_Etiqueta"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 2607
+                    Top = 57
+                    Width = 930
+                    FontWeight = 700
+                    TabIndex = 1
+                    BackColor = 0
+                    ForeColor = 13421619
+                    Name ="Cardigan1"
+                    ControlSource ="=[Forms]![Entradas]![Texto2]"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 4535
+                    Top = 60
+                    Width = 975
+                    FontWeight = 700
+                    TabIndex = 2
+                    BackColor = 0
+                    ForeColor = 13421619
+                    Name ="Texto17"
+                    ControlSource ="=[Forms]![Entradas]![Texto1]"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    Left = 5612
+                    Top = 57
+                    Width = 900
+                    FontWeight = 700
+                    TabIndex = 3
+                    BackColor = 0
+                    ForeColor = 13421619
+                    Name ="Texto18"
+                    ControlSource ="=[Forms]![Entradas]![Texto2]"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 3628
+                    Top = 57
+                    Width = 795
+                    Height = 240
+                    FontWeight = 700
+                    BackColor = 0
+                    ForeColor = 13421619
+                    Name ="TxtPeso"
+                    Caption ="Peso"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 360
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1659
+                    Top = 57
+                    Width = 825
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="TelaEnt1"
+                    ControlSource ="TelaEnt1"
+                    Format ="Standard"
+                    OnGotFocus ="[Event Procedure]"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2607
+                    Top = 57
+                    Width = 930
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="TelaEnt2"
+                    ControlSource ="TelaEnt2"
+                    Format ="Standard"
+                    OnGotFocus ="[Event Procedure]"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 90
+                    Top = 57
+                    Width = 1500
+                    ColumnWidth = 900
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdTelasColAlm"
+                    ControlSource ="IdTelasColAlm"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT TelasColAlm.IdTelasColAlm, TelasColores.Color, TelasColores.IdTelas, Tela"
+                        "sColAlm.IdAlmacenes FROM TelasColores INNER JOIN TelasColAlm ON TelasColores.IdT"
+                        "elasColores = TelasColAlm.IdTelasColores WHERE (((TelasColores.IdTelas)=[Formula"
+                        "rios]![Entradas]![IdTela]) AND ((TelasColAlm.IdAlmacenes)=[Formularios]![Entrada"
+                        "s]![QueIdAlmacen])) ORDER BY TelasColores.Color;"
+                    ColumnWidths ="0;2835"
+                    BaseInfo ="\"SELECT TelasColAlm.IdTelasColAlm, TelasColores.Color, TelasColores.IdTelas, Te"
+                        "lasColAlm.IdAlmacenes FROM TelasColores INNER JOIN TelasColAlm ON TelasColores.I"
+                        "dTelasColores = TelasColAlm.IdTelasColores WHERE (((TelasColores.IdTelas)=[Formu"
+                        "larios]![Entradas]\";\"TelasColores\";\"TelasColAlm\";\"\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4550
+                    Top = 57
+                    Width = 945
+                    Height = 255
+                    TabIndex = 3
+                    Name ="ExTela1"
+                    ControlSource ="ExTela1"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 5612
+                    Top = 56
+                    Width = 900
+                    Height = 255
+                    TabIndex = 4
+                    Name ="ExTela2"
+                    ControlSource ="ExTela2"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3628
+                    Top = 57
+                    Width = 795
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Peso"
+                    ControlSource ="Peso"
+                    Format ="0.000"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 6471
+                    Top = 56
+                    Width = 186
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 6
+                    Name ="IdEntradasDet"
+                    ControlSource ="IdEntradasDet"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6689
+                    Top = 56
+                    Width = 180
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 7
+                    Name ="IdEntradas"
+                    ControlSource ="IdEntradas"
+                End
+            End
+        End
+        Begin FormFooter
+            Visible = NotDefault
+            Height = 570
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1875
+                    Top = 105
+                    Width = 1080
+                    Name ="TotalTelaEnt1"
+                    ControlSource ="=Sum([telaent1])"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3135
+                    Top = 120
+                    Width = 1080
+                    TabIndex = 1
+                    Name ="TotalTelaEnt2"
+                    ControlSource ="=Sum([TelaEnt2])"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+
+
+
+
+Private Sub Form_Current()
+If IsNull([Cardigan1]) = True Then
+[TelaEnt2].Visible = False
+[ExTela2].Visible = False
+Else
+[TelaEnt2].Visible = True
+[ExTela2].Visible = True
+End If
+IdTelasColAlm.Enabled = True
+End Sub
+
+
+
+Private Sub TelaEnt1_GotFocus()
+'If Me![ExTela1] => 0 Then
+Me![ExTela1] = Me![ExTela1] - Me![TelaEnt1]
+'End If
+End Sub
+
+Private Sub TelaEnt1_LostFocus()
+If IsNull(TelaEnt1) = True Then
+TelaEnt1 = 0
+Else
+Me![ExTela1] = Me![ExTela1] + Me![TelaEnt1]
+End If
+End Sub
+
+Private Sub TelaEnt2_GotFocus()
+'If Me![ExTela2] > 0 Then
+Me![ExTela2] = Me![ExTela2] - Me![TelaEnt2]
+'End If
+End Sub
+
+Private Sub TelaEnt2_LostFocus()
+If IsNull(TelaEnt2) = True Then
+TelaEnt2 = 0
+Else
+Me![ExTela2] = Me![ExTela2] + Me![TelaEnt2]
+End If
+End Sub

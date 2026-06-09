@@ -1,0 +1,78 @@
+Option Compare Database
+Option Explicit
+
+Public Function AWsaldo(opObject, opFLD1, Optional opFLD2 = Null) As Currency
+Dim Rst As DAO.Recordset, valACUM As Currency, fld1, fld2
+On Error GoTo ErrAWsaldo
+Set Rst = opObject.RecordsetClone
+With Rst
+Set fld1 = .Fields(opFLD1)
+If IsNull(opFLD2) Then
+fld2 = 0
+Else
+Set fld2 = .Fields(opFLD2)
+End If
+.Bookmark = opObject.Bookmark
+Do While Not .BOF()
+valACUM = valACUM + fld1 - fld2
+.MoveNext
+Loop
+End With
+Set fld1 = Nothing
+Set fld2 = Nothing
+Set Rst = Nothing
+
+ErrAWsaldo:
+AWsaldo = valACUM
+
+End Function
+Public Function AWsaldoCua(opObject, Reci, Pag, Desc, Abo) As Currency
+Dim Rst As DAO.Recordset, valACUM As Currency, fld1, fld2, fld3, fld4
+On Error GoTo ErrAWsaldo
+Set Rst = opObject.RecordsetClone
+With Rst
+Set fld1 = .Fields(Reci)
+Set fld2 = .Fields(Pag)
+Set fld3 = .Fields(Desc)
+Set fld4 = .Fields(Abo)
+
+
+.Bookmark = opObject.Bookmark
+Do While Not .BOF()
+valACUM = valACUM + fld1 - fld2 - fld3 + fld4
+.MoveNext
+Loop
+End With
+Set fld1 = Nothing
+Set fld2 = Nothing
+Set fld3 = Nothing
+Set fld4 = Nothing
+Set Rst = Nothing
+
+ErrAWsaldo:
+AWsaldoCua = valACUM
+
+End Function
+Public Function AWsaldoInv(opObject, Entr, Sali) As Variant
+Dim Rst As DAO.Recordset, valACUM As Integer, fld1, fld2
+On Error GoTo ErrAWsaldoInv
+Set Rst = opObject.RecordsetClone
+With Rst
+Set fld1 = .Fields(Entr)
+Set fld2 = .Fields(Sali)
+
+.Bookmark = opObject.Bookmark
+Do While Not .BOF()
+valACUM = valACUM + fld1 - fld2
+.MoveNext
+Loop
+End With
+Set fld1 = Nothing
+Set fld2 = Nothing
+Set Rst = Nothing
+
+ErrAWsaldoInv:
+
+AWsaldoInv = valACUM
+
+End Function

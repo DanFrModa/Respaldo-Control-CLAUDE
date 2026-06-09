@@ -1,0 +1,532 @@
+Version = 17
+VersionRequired = 17
+Checksum = 84818913
+Begin Form
+    LayoutForPrint = NotDefault
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DividingLines = NotDefault
+    OrderByOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10261
+    DatasheetFontHeight = 10
+    ItemSuffix = 78
+    Left = 4215
+    Right = 16335
+    Bottom = 8715
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x6578d9449ac3e240
+    End
+    RecordSource ="SELECT Notas.IdNotas, Notas.NumNota, Notas.FechaElaboracion, Notas.Observaciones"
+        ", Notas.IdUsuarios, Notas.FechaEnvio, [maquileros]![nombre]+\" \"+[maquileros]!["
+        "apellidos] AS Maq, [usuarios]![nombre]+\" \"+[usuarios]![apellidos] AS Elaboro F"
+        "ROM (Notas INNER JOIN Maquileros ON Notas.IdMaquileros = Maquileros.IdMaquileros"
+        ") LEFT JOIN Usuarios ON Notas.IdUsuarios = Usuarios.IdUsuarios;"
+    Caption ="OrdenesImpresas"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x530300003702000053030000d002000000000000152800000000000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x4c65786d61726b20333530302d34353030205365726965732028436f70790000 ,
+        0x0104efa49c0090070f9f000201000100ea0a6f08000001000100580202000100 ,
+        0x0000010001000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000001010000010000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x010000000100000001000000e40c0000f6090000010000000100000001000000 ,
+        0x9dffffff02000000010000000100000000000000010100000200000002000000 ,
+        0x0300000005000000000000000000000001000000010100000101000000000000 ,
+        0x0000000000000000000000000000000001000000000000000100000000000000 ,
+        0x0100000001000000000000000200000002000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000002000000 ,
+        0x0100000008000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000001000000010000009dffffff01000000 ,
+        0x01010000010000000000000000000000284e4f4e452900779626c4773cea9a00 ,
+        0xa0038b01752dc477004c190020106d0100004765000000000000000000000000 ,
+        0x0600000000000000000000000000000000000000cce99a002c05880100000000 ,
+        0x6048ff000600000003000000a1e99a00ffffffff38ea9a004000000000000000 ,
+        0x18ee907cf09a917c6048ff006048ff004c004f00a005000000000000c2010000 ,
+        0xc20100009001000000000000e0106d22417269616c00fe00a029ff00ffffffff ,
+        0xd4ea9a008c09fe00a909fe000000000000000000320000000000000000000000 ,
+        0x00000000284e4f4e452900779626c4773cea9a00a0038b01752dc477004c1900 ,
+        0x20106d0100004765000000000000000000000000060000000000000000000000 ,
+        0x0000000000000000cce99a002c058801000000006048ff000600000003000000 ,
+        0xa1e99a00ffffffff38ea9a00400000000000000018ee907cf09a917c6048ff00 ,
+        0x6048ff004c004f00a005000000000000c2010000c20100009001000000000000 ,
+        0xe0106d22417269616c00fe00a029ff00ffffffffd4ea9a008c09fe00a909fe00 ,
+        0x0000000000000000320000000000000000000000efa497bc4c65786d61726b20 ,
+        0x333530302d3435303020536572696573000000000000000038010000efa497bc ,
+        0x9dff580200000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000000800000000000000000000ffff0000 ,
+        0x000000000000000000006300000000000100010001000100000002000000f802 ,
+        0xf6047008e0100000000000000100000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000536f6674776172655c4c6578 ,
+        0x6d61726b496e6b6a657400000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000100010001000100 ,
+        0x0000000000000000000000000000000000000000000004000000010001000100 ,
+        0x0000000000000000000000000100010001000100000000000000000000000000 ,
+        0x00000000000001009dff04009dfffffffefffcff000000000000000000000000 ,
+        0x01005802040058022c0158025802000000000000000000000000010058020400 ,
+        0x58022c015802c012000000000000000000000000010058020400580258025802 ,
+        0xb004000000000000000000000000010006000400060001000200050000000000 ,
+        0x0000000000000000efa497bc
+    End
+    PrtDevNames = Begin
+        0x080012003500010077696e73706f6f6c00004c65786d61726b20333530302d34 ,
+        0x353030205365726965732028436f70792031290000333530302d343530305f53 ,
+        0x65726965735f3134444231355f50310000000000000000000000000000000000
+        0x00
+    End
+    OnDeactivate ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            CanGrow = NotDefault
+            Height = 9127
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextFontFamily = 66
+                    Top = 453
+                    Width = 4531
+                    Height = 460
+                    FontSize = 16
+                    FontWeight = 700
+                    Name ="Etiqueta34"
+                    Caption ="NOTA DE SALIDA"
+                    FontName ="Comic Sans MS"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 9140
+                    Top = 226
+                    Width = 900
+                    Height = 345
+                    FontSize = 14
+                    BorderColor = 4210752
+                    Name ="NumNota"
+                    ControlSource ="NumNota"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            TextAlign = 3
+                            Left = 7530
+                            Top = 225
+                            Width = 1545
+                            Height = 375
+                            FontSize = 14
+                            FontWeight = 700
+                            Name ="Etiqueta21"
+                            Caption ="Salida No."
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 1038
+                    Width = 2655
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 1
+                    Name ="Maq"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 1038
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta19"
+                            Caption ="Enviada a:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 1378
+                    Width = 2670
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 2
+                    Name ="Elaboro"
+                    ControlSource ="Elaboro"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 1378
+                            Width = 1710
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta27"
+                            Caption ="Elaboro la Salida:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8460
+                    Top = 1053
+                    Width = 1575
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 3
+                    Name ="FechaElaboracion"
+                    ControlSource ="FechaElaboracion"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6345
+                            Top = 1050
+                            Width = 2085
+                            Height = 270
+                            FontSize = 10
+                            Name ="Etiqueta29"
+                            Caption ="Fecha de elaboracion:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8445
+                    Top = 1393
+                    Width = 1590
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 4
+                    Name ="FechaEnvio"
+                    ControlSource ="FechaEnvio"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6345
+                            Top = 1393
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta31"
+                            Caption ="Fecha de Envio:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    CanGrow = NotDefault
+                    CanShrink = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Top = 7325
+                    Width = 10101
+                    Height = 150
+                    TabIndex = 5
+                    Name ="Texto32"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 7086
+                            Width = 1560
+                            Height = 240
+                            Name ="Etiqueta33"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    SpecialEffect = 0
+                    Top = 2105
+                    Width = 10101
+                    Height = 4512
+                    TabIndex = 6
+                    Name ="NotasImpDet"
+                    SourceObject ="Form.NotasImpDet"
+                    LinkChildFields ="IdNotas"
+                    LinkMasterFields ="IdNotas"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 1810
+                            Width = 1185
+                            Height = 315
+                            FontSize = 10
+                            Name ="Etiqueta52"
+                            Caption ="Detalles:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4592
+                    Top = 1209
+                    Width = 351
+                    TabIndex = 7
+                    Name ="IdNotas"
+                    ControlSource ="IdNotas"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    BackStyle = 0
+                    Top = -7
+                    Width = 6240
+                    Height = 435
+                    FontSize = 18
+                    FontWeight = 700
+                    TabIndex = 8
+                    Name ="Texto69"
+                    ControlSource ="=empresaact()"
+                    FontName ="Times New Roman"
+                End
+            End
+        End
+        Begin PageHeader
+            DisplayWhen = 1
+            Height = 0
+            Name ="EncabezadoDePágina"
+        End
+        Begin Section
+            Height = 0
+            Name ="Detalle"
+        End
+        Begin PageFooter
+            DisplayWhen = 1
+            Height = 1984
+            Name ="PieDePágina"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 1077
+                    Top = 1700
+                    Width = 2025
+                    Height = 225
+                    Name ="Etiqueta73"
+                    Caption ="Nombre y Firma del Chofer"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 6746
+                    Top = 1700
+                    Width = 2100
+                    Height = 225
+                    Name ="Etiqueta74"
+                    Caption ="Nombre y Firma de Recibido"
+                End
+                Begin Line
+                    BorderWidth = 1
+                    OverlapFlags = 85
+                    SpecialEffect = 0
+                    Left = 510
+                    Top = 1587
+                    Width = 3515
+                    Name ="Línea75"
+                End
+                Begin Line
+                    BorderWidth = 1
+                    OverlapFlags = 85
+                    SpecialEffect = 0
+                    Left = 6066
+                    Top = 1587
+                    Width = 3515
+                    Name ="Línea76"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 390
+                    Top = 60
+                    Width = 7620
+                    Height = 225
+                    Name ="Etiqueta77"
+                    Caption ="Nota: Si estan recibiendo muestras de produccion, las deben de regresar. De lo c"
+                        "ontrario se les cobraran."
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+DoCmd.Restore
+End Sub
+
+Private Sub Form_Deactivate()
+DoCmd.Close
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+DoCmd.Maximize
+End Sub

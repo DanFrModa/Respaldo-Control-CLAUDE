@@ -1,0 +1,225 @@
+Version = 17
+VersionRequired = 17
+Checksum = 819944229
+Begin Form
+    AutoCenter = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6122
+    DatasheetFontHeight = 10
+    ItemSuffix = 6
+    Left = 9615
+    Top = 180
+    Right = 16020
+    Bottom = 9000
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xe733dbc7b802e440
+    End
+    RecordSource ="TelasCategorias"
+    Caption ="TelasCategorias"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 737
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 453
+                    Width = 2310
+                    Height = 240
+                    Name ="CategoriaTela Etiqueta"
+                    Caption ="Categoria Tela"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CategoriaTela_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2423
+                    Top = 453
+                    Width = 3645
+                    Height = 240
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 113
+                    Width = 3795
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta4"
+                    Caption ="METER CATEGORIAS DE LAS TELAS"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    Name ="CategoriaTela"
+                    ControlSource ="CategoriaTela"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2424
+                    Top = 57
+                    Width = 3645
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 623
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4308
+                    Top = 113
+                    Height = 463
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+If EstaCargado("AgregarTelas") = True Then
+ Forms![AgregarTelas]![IdTelasCategorias].Requery
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

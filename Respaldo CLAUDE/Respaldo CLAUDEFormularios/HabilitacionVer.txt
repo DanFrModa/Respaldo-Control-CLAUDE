@@ -1,0 +1,337 @@
+Version = 17
+VersionRequired = 17
+Checksum = 2119186193
+Begin Form
+    PopUp = NotDefault
+    RecordSelectors = NotDefault
+    NavigationButtons = NotDefault
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5190
+    DatasheetFontHeight = 10
+    ItemSuffix = 15
+    Left = 8745
+    Top = 3330
+    Right = 13935
+    Bottom = 7935
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xbe6710d78e02e440
+    End
+    RecordSource ="SELECT Habilitacion.Clave, Habilitacion.Descripcion, [preciohabord]*[canthabord]"
+        " AS Importe, OrdenesHab.IdOrdenes, OrdenesHab.CantHabOrd, OrdenesHab.PrecioHabOr"
+        "d FROM Habilitacion INNER JOIN OrdenesHab ON Habilitacion.IdHabilitacion = Orden"
+        "esHab.IdHabilitacion GROUP BY Habilitacion.Clave, Habilitacion.Descripcion, [pre"
+        "ciohabord]*[canthabord], OrdenesHab.IdOrdenes, OrdenesHab.CantHabOrd, OrdenesHab"
+        ".PrecioHabOrd HAVING (((OrdenesHab.IdOrdenes)=[Formularios]![OrdenVer]![IdOrdene"
+        "s]));"
+    Caption ="HabilitacionVer"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 57
+                    Top = 57
+                    Width = 615
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Clave Etiqueta"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Clave_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 1
+                    Left = 672
+                    Top = 57
+                    Width = 2310
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 2982
+                    Top = 57
+                    Width = 660
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 3
+                    Left = 3642
+                    Top = 57
+                    Width = 705
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="CantFav Etiqueta"
+                    Caption ="Cant."
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantFav_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4440
+                    Top = 57
+                    Width = 660
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta13"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 57
+                    Top = 57
+                    Width = 615
+                    Height = 255
+                    ColumnWidth = 615
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 672
+                    Top = 57
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 2982
+                    Top = 57
+                    Width = 660
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="PrecioHabOrd"
+                    ControlSource ="PrecioHabOrd"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 3642
+                    Top = 57
+                    Width = 705
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="CantHabOrd"
+                    ControlSource ="CantHabOrd"
+                    Format ="#,###.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4440
+                    Top = 57
+                    Width = 660
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 510
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4035
+                    Top = 90
+                    Width = 1011
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Comando8"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 1204
+                    Top = 114
+                    Width = 1281
+                    TabIndex = 1
+                    Name ="Texto11"
+                    ControlSource ="=Sum([importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 125
+                            Top = 113
+                            Width = 1095
+                            Height = 240
+                            Name ="Etiqueta12"
+                            Caption ="Importe Total:"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando8_Click()
+DoCmd.Close
+End Sub

@@ -1,0 +1,493 @@
+Version = 17
+VersionRequired = 17
+Checksum = 761820751
+Begin Form
+    AutoCenter = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 7920
+    DatasheetFontHeight = 10
+    ItemSuffix = 30
+    Left = 870
+    Top = 15
+    Right = 9075
+    Bottom = 8250
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x4ae7af80fa24e440
+    End
+    RecordSource ="SELECT Prom_Codigos.ModeloProm, Prom_Codigos.CodigoProm, Prom_Prenda.Prenda, Pro"
+        "m_Genero.Genero, Prom_Codigos.Consecutivo, Prom_Codigos.IdPartida, Prom_Codigos."
+        "Precio, Prom_Codigos.Foto1, Prom_Codigos.Foto2, Prom_Codigos.CostoUS, Prom_Codig"
+        "os.CantidadRec FROM (Prom_Codigos INNER JOIN Prom_Genero ON Prom_Codigos.IdGener"
+        "o = Prom_Genero.IdGenero) INNER JOIN Prom_Prenda ON Prom_Codigos.IdPrenda = Prom"
+        "_Prenda.IdPrenda;"
+    Caption ="Prom_Cod"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 57
+                    Top = 57
+                    Width = 741
+                    Height = 240
+                    Name ="IdProm_Codigos Etiqueta"
+                    Caption ="IdProm_Codigos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdProm_Codigos_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 855
+                    Top = 57
+                    Width = 399
+                    Height = 240
+                    Name ="ModeloProm Etiqueta"
+                    Caption ="ModeloProm"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="ModeloProm_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1311
+                    Top = 57
+                    Width = 456
+                    Height = 240
+                    Name ="CodigoProm Etiqueta"
+                    Caption ="CodigoProm"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CodigoProm_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1824
+                    Top = 57
+                    Width = 342
+                    Height = 240
+                    Name ="Proveedor Etiqueta"
+                    Caption ="Proveedor"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Proveedor_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2223
+                    Top = 57
+                    Width = 342
+                    Height = 240
+                    Name ="IdPrenda Etiqueta"
+                    Caption ="IdPrenda"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdPrenda_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2622
+                    Top = 57
+                    Width = 342
+                    Height = 240
+                    Name ="IdGenero Etiqueta"
+                    Caption ="IdGenero"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdGenero_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3021
+                    Top = 57
+                    Width = 399
+                    Height = 240
+                    Name ="Consecutivo Etiqueta"
+                    Caption ="Consecutivo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Consecutivo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3477
+                    Top = 57
+                    Width = 285
+                    Height = 240
+                    Name ="IdPartida Etiqueta"
+                    Caption ="IdPartida"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdPartida_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3819
+                    Top = 57
+                    Width = 969
+                    Height = 240
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4845
+                    Top = 57
+                    Width = 342
+                    Height = 240
+                    Name ="Foto1 Etiqueta"
+                    Caption ="Foto1"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Foto1_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 5244
+                    Top = 57
+                    Width = 342
+                    Height = 240
+                    Name ="Foto2 Etiqueta"
+                    Caption ="Foto2"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Foto2_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5643
+                    Top = 57
+                    Width = 969
+                    Height = 240
+                    Name ="CostoUS Etiqueta"
+                    Caption ="CostoUS"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CostoUS_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 6669
+                    Top = 57
+                    Width = 456
+                    Height = 240
+                    Name ="CantidadRec Etiqueta"
+                    Caption ="CantidadRec"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantidadRec_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 7182
+                    Top = 57
+                    Width = 399
+                    Height = 240
+                    Name ="IdUsuarios Etiqueta"
+                    Caption ="IdUsuarios"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdUsuarios_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 7638
+                    Top = 57
+                    Width = 225
+                    Height = 240
+                    Name ="FechaAlta Etiqueta"
+                    Caption ="FechaAlta"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="FechaAlta_Etiqueta"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdProm_Codigos"
+                    ControlSource ="IdProm_Codigos"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 855
+                    Top = 57
+                    Width = 399
+                    Height = 255
+                    ColumnWidth = 675
+                    TabIndex = 1
+                    Name ="ModeloProm"
+                    ControlSource ="ModeloProm"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1311
+                    Top = 57
+                    Width = 456
+                    Height = 255
+                    ColumnWidth = 1035
+                    TabIndex = 2
+                    Name ="CodigoProm"
+                    ControlSource ="CodigoProm"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1824
+                    Top = 57
+                    Width = 342
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 3
+                    Name ="Proveedor"
+                    ControlSource ="Proveedor"
+                    StatusBarText ="3"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2223
+                    Top = 57
+                    Width = 342
+                    Height = 255
+                    ColumnWidth = 225
+                    TabIndex = 4
+                    Name ="IdPrenda"
+                    ControlSource ="IdPrenda"
+                    StatusBarText ="1"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2622
+                    Top = 57
+                    Width = 342
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 5
+                    Name ="IdGenero"
+                    ControlSource ="IdGenero"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3021
+                    Top = 57
+                    Width = 399
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 6
+                    Name ="Consecutivo"
+                    ControlSource ="Consecutivo"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3477
+                    Top = 57
+                    Width = 285
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 7
+                    Name ="IdPartida"
+                    ControlSource ="IdPartida"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3819
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 8
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4845
+                    Top = 57
+                    Width = 342
+                    Height = 255
+                    ColumnWidth = 750
+                    TabIndex = 9
+                    Name ="Foto1"
+                    ControlSource ="Foto1"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5244
+                    Top = 57
+                    Width = 342
+                    Height = 255
+                    ColumnWidth = 750
+                    TabIndex = 10
+                    Name ="Foto2"
+                    ControlSource ="Foto2"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5643
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 11
+                    Name ="CostoUS"
+                    ControlSource ="CostoUS"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6669
+                    Top = 57
+                    Width = 456
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 12
+                    Name ="CantidadRec"
+                    ControlSource ="CantidadRec"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7182
+                    Top = 57
+                    Width = 399
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 13
+                    Name ="IdUsuarios"
+                    ControlSource ="IdUsuarios"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7638
+                    Top = 57
+                    Width = 225
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 14
+                    Name ="FechaAlta"
+                    ControlSource ="FechaAlta"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End

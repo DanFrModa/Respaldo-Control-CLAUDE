@@ -1,0 +1,58 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Accesos"
+    Name ="UsuAccesos"
+End
+Begin OutputColumns
+    Expression ="Accesos.IdAccesos"
+    Expression ="Accesos.Descripcion"
+End
+Begin Joins
+    LeftTable ="Accesos"
+    RightTable ="UsuAccesos"
+    Expression ="Accesos.IdAccesos = UsuAccesos.IdAccesos"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Accesos.IdAccesos"
+    GroupLevel = 0
+    Expression ="Accesos.Descripcion"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1181
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 110
+        Top = 0
+        Name ="Accesos"
+    End
+    Begin
+        Left = 203
+        Top = -2
+        Right = 299
+        Bottom = 114
+        Top = 0
+        Name ="UsuAccesos"
+    End
+End

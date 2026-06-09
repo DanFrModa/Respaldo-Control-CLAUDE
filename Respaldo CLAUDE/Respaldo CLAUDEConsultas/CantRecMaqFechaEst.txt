@@ -1,0 +1,57 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="RecibosEst"
+End
+Begin OutputColumns
+    Expression ="RecibosEst.IdRecibosEst"
+    Expression ="RecibosEst.IdMaquileros"
+    Expression ="RecibosEst.IdOrdenes"
+    Alias ="CantRec"
+    Expression ="Sum(RecibosEst.Cantidad)"
+    Alias ="FechaRec"
+    Expression ="First(RecibosEst.Fecha)"
+    Expression ="RecibosEst.Observaciones"
+    Alias ="Tipo"
+    Expression ="PrimSeg([TipoPrendas])"
+End
+Begin Groups
+    Expression ="RecibosEst.IdRecibosEst"
+    GroupLevel = 0
+    Expression ="RecibosEst.IdMaquileros"
+    GroupLevel = 0
+    Expression ="RecibosEst.IdOrdenes"
+    GroupLevel = 0
+    Expression ="RecibosEst.Observaciones"
+    GroupLevel = 0
+    Expression ="PrimSeg([TipoPrendas])"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 48
+    Right = 1108
+    Bottom = 373
+    Left = -1
+    Top = -1
+    Right = 1061
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 3
+        Name ="RecibosEst"
+    End
+End

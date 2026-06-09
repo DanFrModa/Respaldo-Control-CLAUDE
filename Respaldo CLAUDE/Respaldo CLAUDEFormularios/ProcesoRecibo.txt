@@ -1,0 +1,509 @@
+Version = 17
+VersionRequired = 17
+Checksum = 138183277
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9456
+    DatasheetFontHeight = 10
+    ItemSuffix = 24
+    Left = 5595
+    Top = 4080
+    Right = 15525
+    Bottom = 5955
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x63e2df2e1c5ce240
+    End
+    RecordSource ="Recibos"
+    Caption ="ProcesoRecibo"
+    BeforeInsert ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 1700
+                    Top = 57
+                    Width = 915
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Fecha Etiqueta"
+                    Caption ="Fecha"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Fecha_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3736
+                    Top = 57
+                    Width = 705
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 4536
+                    Top = 57
+                    Width = 2445
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Observaciones Etiqueta"
+                    Caption ="Observaciones"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Observaciones_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 215
+                    Left = 5240
+                    Top = 56
+                    Width = 105
+                    Height = 255
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 215
+                    Left = 5556
+                    Top = 56
+                    Width = 510
+                    Height = 255
+                    TabIndex = 1
+                    Name ="TotalRecibo"
+                    ControlSource ="=Sum([Cantidad])"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1590
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta11"
+                    Caption ="Maquilero"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 6974
+                    Top = 60
+                    Width = 1140
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta14"
+                    Caption ="Tipo Prendas"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 3004
+                    Top = 56
+                    Width = 285
+                    Height = 255
+                    TabIndex = 2
+                    Name ="IdRecibos"
+                    ControlSource ="IdRecibos"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    Left = 8100
+                    Top = 60
+                    Width = 1155
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta22"
+                    Caption ="Inventariado"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 390
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 1700
+                    Top = 57
+                    Width = 915
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 1
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                    OnGotFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3736
+                    Top = 57
+                    Width = 705
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 3
+                    Name ="Cantidad"
+                    ControlSource ="Cantidad"
+                    Format ="#,###"
+                    AfterUpdate ="[Event Procedure]"
+                    OnGotFocus ="[Event Procedure]"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 4535
+                    Top = 57
+                    Width = 2400
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                End
+                Begin ComboBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1590
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"15\""
+                    Name ="Maquilero"
+                    ControlSource ="IdMaquileros"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Maquileros.IdMaquileros, Maquileros.Corto, Ordenes.IdOrdenes, Maquileros."
+                        "Costura FROM (Ordenes INNER JOIN Entregas ON Ordenes.IdOrdenes = Entregas.IdOrde"
+                        "nes) INNER JOIN Maquileros ON Entregas.IdMaquileros = Maquileros.IdMaquileros GR"
+                        "OUP BY Maquileros.IdMaquileros, Maquileros.Corto, Ordenes.IdOrdenes, Maquileros."
+                        "Costura HAVING (((Ordenes.IdOrdenes)=[Formularios]![Proceso]![IdOrdenes]) AND (("
+                        "Maquileros.Costura)=Yes));"
+                    ColumnWidths ="0;2835"
+                    BeforeUpdate ="[Event Procedure]"
+                    OnGotFocus ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Maquileros.IdMaquileros, Maquileros.Corto, Ordenes.IdOrdenes, Maquilero"
+                        "s.Costura FROM (Ordenes INNER JOIN Entregas ON Ordenes.IdOrdenes = Entregas.IdOr"
+                        "denes) INNER JOIN Maquileros ON Entregas.IdMaquileros = Maquileros.IdMaquileros "
+                        "GROUP BY Maquilero\";\"Ordenes\";\"Entregas\";\"Maquileros\";\"\""
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    Enabled = NotDefault
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 6990
+                    Top = 57
+                    Width = 1125
+                    TabIndex = 5
+                    Name ="TipoPrendas"
+                    ControlSource ="TipoPrendas"
+                    RowSourceType ="Value List"
+                    RowSource ="1;\"Primeras\";2;\"Segundas\""
+                    ColumnWidths ="0;2835"
+                    DefaultValue ="1"
+                    OnGotFocus ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 2721
+                    Top = 56
+                    Width = 951
+                    TabIndex = 2
+                    Name ="Cant"
+                    Caption ="Cantidades"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    Locked = NotDefault
+                    OverlapFlags = 93
+                    Left = 8340
+                    Top = 105
+                    TabIndex = 6
+                    Name ="Inventariado"
+                    ControlSource ="Inventariado"
+                End
+                Begin CommandButton
+                    OverlapFlags = 247
+                    Left = 8565
+                    Top = 56
+                    Width = 891
+                    TabIndex = 7
+                    Name ="Comando23"
+                    Caption ="Inventariar"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+Dim Ca As Integer
+
+Private Sub Cant_Click()
+
+If IsNull(Maquilero) = True Then
+ MsgBox "Debes de registrar el maquilero al que se le va a recibir para poder continuar.", vbInformation
+ 
+Else
+
+DoCmd.OpenForm ("OrdDetRecM")
+Forms![OrdDetRecM]![QueIdOrdenes] = IdOrdenes
+Forms![OrdDetRecM]![QueIdRecibos] = IdRecibos
+Forms![OrdDetRecM]![TallasLoc] = Forms![Proceso]![Tallas]
+Forms![OrdDetRecM].BorrarAa
+Forms![OrdDetRecM]![IdOrdenesDet].Requery
+
+End If
+End Sub
+
+Private Sub Cantidad_AfterUpdate()
+If Forms![Proceso]![TotRecibo] + Me!Cantidad - Ca > Forms![Proceso]![TotEntrega] Then
+MsgBox "No puede ser mayor la cantidad recibida que la cantidad entregada!!!. Checa bien el dato."
+End If
+End Sub
+
+Private Sub Cantidad_GotFocus()
+Ca = Me!Cantidad
+End Sub
+
+Private Sub Cantidad_LostFocus()
+If Me!Cantidad = 0 Then
+Me!Cantidad = Forms![Proceso]![Cant]
+End If
+End Sub
+
+
+Private Sub Comando23_Click()
+
+If Inventariado = True Then
+MsgBox "Este movimiento ya esta inventariado"
+Else
+  If MsgBox("Despues de inventariar este movimiento no podras modificar la informacion que hay en el. Estas seguro de querer inventariar el movimiento?", vbYesNo, "INVENTARIAR MOVIMIENTO") = vbYes Then
+
+  DoCmd.OpenForm "IPT_VerifMod"
+
+  Call MeterInventario
+
+  End If
+End If
+End Sub
+
+
+
+Private Sub Fecha_GotFocus()
+If Inventariado = True Then
+Fecha.Locked = True
+Else
+Fecha.Locked = False
+End If
+End Sub
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+Maquilero = Forms![Proceso]![ProcesoEntrega].Form![Maquilero]
+End Sub
+
+Private Sub MeterInventario()
+If IsNull(Fecha) = True Then
+MsgBox "Para poder continuar es necesario que metas una fecha.", vbInformation, "FALTA FECHA"
+Else
+  
+If IsNull(Cantidad) = True Then
+MsgBox "Para poder agregar un modelo es necesario que metas la cantidad.", vbInformation, "FALTA INFORMACION"
+Else
+
+Dim Dbs As Database
+Dim UltMov, QueModOrd, QueModAlm As Recordset
+Dim UltIdMov, QueIdModOrd As Integer
+Set Dbs = CurrentDb
+  Dbs.Execute "INSERT INTO IPT_Movs (Fecha,IdIPT_TipoMov,EnSa,TieneModelos,IdMaquileros,IdIPT_Almacenes,IdUsuarios,IdRecibos) VALUES (#" & Fecha & "#,2,1,1,'" & Maquilero & "','" & TipoPrendas & "','" & IdUsuarioACT & "','" & IdRecibos & "')"
+
+Set QueModOrd = Dbs.OpenRecordset("SELECT IdIPT_Modelos AS ModOrd FROM IPT_Modelos WHERE Idordenes=" & Forms![Proceso]![IdOrdenes])
+QueIdModOrd = QueModOrd!modord
+
+Set QueModAlm = Dbs.OpenRecordset("SELECT IdIPT_Mod_Alm AS Ult FROM IPT_Mod_Alm WHERE IdIPT_Modelos=" & QueIdModOrd & " AND IdIPT_Almacenes= " & TipoPrendas)
+
+
+Set UltMov = Dbs.OpenRecordset("SELECT Max(IdIPT_Movs) AS Ult FROM IPT_Movs")
+ UltIdMov = UltMov!ult
+  Dbs.Execute "INSERT INTO IPT_MovsDet (IdIPT_Movs,IdIPT_Mod_Alm,CantMov) VALUES ('" & UltIdMov & "','" & QueModAlm!ult & "','" & Cantidad & "')"
+  Dbs.Execute "UPDATE IPT_Mod_Alm SET Existencia = Existencia + " & Cantidad & " WHERE IdIPT_Mod_Alm = " & QueModAlm!ult
+  
+  Inventariado = True
+ 
+
+
+QueModOrd.Close
+QueModAlm.Close
+UltMov.Close
+
+
+ Dbs.Close
+End If
+End If
+End Sub
+
+
+
+
+Private Sub Form_Open(Cancel As Integer)
+If NivelAct = 1 Then
+ Inventariado.Locked = False
+End If
+End Sub
+
+Private Sub Maquilero_GotFocus()
+If Inventariado = True Then
+Maquilero.Locked = True
+Else
+Maquilero.Locked = False
+End If
+
+If NivelAct = 1 Then
+ Maquilero.Locked = False
+End If
+End Sub
+
+Private Sub TipoPrendas_GotFocus()
+If Inventariado = True Then
+TipoPrendas.Locked = True
+Else
+TipoPrendas.Locked = False
+End If
+End Sub

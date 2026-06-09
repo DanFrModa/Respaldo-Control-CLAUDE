@@ -1,0 +1,559 @@
+Version = 17
+VersionRequired = 17
+Checksum = -581316450
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6973
+    DatasheetFontHeight = 10
+    ItemSuffix = 35
+    Left = 5805
+    Top = 165
+    Right = 12780
+    Bottom = 7290
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x8a4f4f5cefade140
+    End
+    RecordSource ="Telas"
+    Caption ="Agregar Telas"
+    AfterUpdate ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    OnLoad ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 495
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5272
+                    Top = 56
+                    Width = 1575
+                    Height = 405
+                    Name ="Insertar Tela"
+                    Caption ="Insertar Nueva Tela"
+                    OnClick ="[Event Procedure]"
+                    EventProcPrefix ="Insertar_Tela"
+                End
+                Begin ComboBox
+                    TabStop = NotDefault
+                    OverlapFlags = 87
+                    ColumnCount = 3
+                    ListWidth = 1440
+                    Left = 1028
+                    Top = 114
+                    Width = 2895
+                    Height = 285
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueTela"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW Telas.IdTelas, Telas.Nombre, Telas.Activa AS EstaActiva FROM "
+                        "Telas ORDER BY Telas.Activa, Telas.Nombre;"
+                    ColumnWidths ="0;2268;567"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT DISTINCTROW Telas.IdTelas, Telas.Nombre, Telas.Activa AS EstaActiva FRO"
+                        "M Telas ORDER BY Telas.Activa, Telas.Nombre;\";\"Telas\";\"\";\"IdTelas\";\"Nomb"
+                        "re\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            TextAlign = 1
+                            Left = 56
+                            Top = 113
+                            Width = 975
+                            Height = 240
+                            Name ="NombreEtiqueta_"
+                            Caption ="Buscar Tela:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin Section
+            Height = 6179
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5330
+                    Width = 336
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdTelas"
+                    ControlSource ="IdTelas"
+                    Begin
+                        Begin Label
+                            Visible = NotDefault
+                            OverlapFlags = 85
+                            Left = 5045
+                            Width = 225
+                            Height = 255
+                            Name ="IdTelas Etiqueta"
+                            Caption ="IdTelas"
+                            EventProcPrefix ="IdTelas_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 788
+                    Top = 113
+                    Width = 2430
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Nombre"
+                    ControlSource ="Nombre"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 113
+                            Width = 1005
+                            Height = 255
+                            Name ="Nombre Etiqueta"
+                            Caption ="Nombre:"
+                            EventProcPrefix ="Nombre_Etiqueta"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 3571
+                    Top = 356
+                    Width = 3246
+                    Height = 5697
+                    TabIndex = 10
+                    Name ="AgregarTelasSub"
+                    SourceObject ="Form.AgregarTelasSub"
+                    LinkChildFields ="IdTelas"
+                    LinkMasterFields ="IdTelas"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3571
+                            Top = 56
+                            Width = 1020
+                            Height = 225
+                            Name ="Agrefar Telas Subformulario Etiqueta"
+                            Caption ="Colores:"
+                            EventProcPrefix ="Agrefar_Telas_Subformulario_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 2834
+                    Width = 3225
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 6
+                    ColumnInfo ="\"\";\"\";\"10\";\"50\""
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Telas.Descripcion FROM Telas GROUP BY Telas.Descripcion ORDER BY Telas.De"
+                        "scripcion;"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 2550
+                            Width = 1005
+                            Height = 255
+                            Name ="Descripcion Etiqueta"
+                            Caption ="Descripcion:"
+                            EventProcPrefix ="Descripcion_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1238
+                    Top = 1247
+                    Width = 1335
+                    ColumnWidth = 960
+                    TabIndex = 3
+                    Name ="Medida"
+                    ControlSource ="Medida"
+                    RowSourceType ="Value List"
+                    RowSource ="-1;\"Kilos\";0;\"Metros\""
+                    ColumnWidths ="0;2835"
+                    DefaultValue ="-1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1247
+                            Width = 1005
+                            Height = 255
+                            Name ="Medida Etiqueta"
+                            Caption ="Medida:"
+                            EventProcPrefix ="Medida_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1238
+                    Top = 1743
+                    Width = 1380
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Texto16"
+                    ControlSource ="Texto1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1743
+                            Width = 1020
+                            Height = 255
+                            Name ="Etiqueta17"
+                            Caption ="Texto Tela 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1238
+                    Top = 2047
+                    Width = 1380
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Texto18"
+                    ControlSource ="Texto2"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 2047
+                            Width = 1020
+                            Height = 255
+                            Name ="Etiqueta19"
+                            Caption ="Texto Tela 2:"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 3430
+                    TabIndex = 7
+                    Name ="Favorito"
+                    ControlSource ="Favorito"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 343
+                            Top = 3400
+                            Width = 645
+                            Height = 240
+                            Name ="Etiqueta23"
+                            Caption ="Favorito"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 963
+                    Top = 3854
+                    Width = 786
+                    TabIndex = 9
+                    Name ="PrecioSugerido"
+                    ControlSource ="PrecioSugerido"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 3854
+                            Width = 1200
+                            Height = 240
+                            Name ="Etiqueta28"
+                            Caption ="Precio Base:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 113
+                    Top = 737
+                    Width = 3405
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdTelasCategorias"
+                    ControlSource ="IdTelasCategorias"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT TelasCategorias.IdTelasCategorias, TelasCategorias.CategoriaTela FROM Tel"
+                        "asCategorias ORDER BY TelasCategorias.CategoriaTela;"
+                    ColumnWidths ="0;3969"
+                    BaseInfo ="\"SELECT TelasCategorias.IdTelasCategorias, TelasCategorias.CategoriaTela FROM T"
+                        "elasCategorias ORDER BY TelasCategorias.CategoriaTela;\";\"TelasCategorias\";\"\""
+                        ";\"IdTelasCategorias\";\"CategoriaTela\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 488
+                            Width = 1005
+                            Height = 255
+                            Name ="Etiqueta30"
+                            Caption ="Categoria:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 2609
+                    Top = 1077
+                    Width = 915
+                    Height = 405
+                    TabIndex = 11
+                    Name ="Comando31"
+                    Caption ="Categorias"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 1890
+                    Top = 3435
+                    TabIndex = 8
+                    Name ="Activa"
+                    ControlSource ="Activa"
+                    DefaultValue ="Yes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 2120
+                            Top = 3405
+                            Width = 525
+                            Height = 240
+                            Name ="Etiqueta34"
+                            Caption ="Activa"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 461
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 5789
+                    Top = 56
+                    Width = 1140
+                    Height = 330
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+
+Private Sub Comando10_Click()
+On Error GoTo Err_Comando10_Click
+
+
+    DoCmd.GoToRecord , , acPrevious
+
+Exit_Comando10_Click:
+    Exit Sub
+
+Err_Comando10_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando10_Click
+    
+End Sub
+Private Sub Comando11_Click()
+On Error GoTo Err_Comando11_Click
+
+
+    DoCmd.GoToRecord , , acNext
+
+Exit_Comando11_Click:
+    Exit Sub
+
+Err_Comando11_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando11_Click
+    
+End Sub
+
+Private Sub Form_AfterUpdate()
+QueTela.Requery
+Descripcion.Requery
+
+End Sub
+
+Private Sub Form_Load()
+DoCmd.GoToRecord acForm, "AgregarTelas", acNewRec
+
+End Sub
+
+Private Sub QueTela_AfterUpdate()
+On Error GoTo errores
+
+   Me.RecordsetClone.FindFirst "[IdTelas] = " & Me![QueTela]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+errores:
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub
+
+
+Private Sub Insertar_Tela_Click()
+On Error GoTo Err_Insertar_Tela_Click
+
+
+    DoCmd.GoToRecord , , acNewRec
+
+Exit_Insertar_Tela_Click:
+    Exit Sub
+
+Err_Insertar_Tela_Click:
+    MsgBox Err.Description
+    Resume Exit_Insertar_Tela_Click
+    
+End Sub
+Private Sub Comando31_Click()
+On Error GoTo Err_Comando31_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "TelasCategorias"
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Comando31_Click:
+    Exit Sub
+
+Err_Comando31_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando31_Click
+    
+End Sub

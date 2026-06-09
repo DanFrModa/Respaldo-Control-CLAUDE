@@ -1,0 +1,418 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1382387437
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    OrderByOn = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10629
+    DatasheetFontHeight = 10
+    ItemSuffix = 26
+    Left = 3420
+    Top = 6555
+    Right = 14730
+    Bottom = 8655
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x2b9e2b884415e540
+    End
+    RecordSource ="SELECT EsMa_Recibos.IdEsMa_Recibos, EsMa_Recibos.IdEsMa, EsMa_Recibos.IdOrdenes,"
+        " EsMa_Recibos.CantRecEsMa, EsMa_Recibos.PrecioEsMa, Modelos.Modelo, Clientes.Cli"
+        "ente, [Precioesma]*[cantrecesma] AS Importe, EsMa_Recibos.ObsRecibos, EsMa_Recib"
+        "os.RevisionPendiente, EsMa_Recibos.EsEstampado FROM ((EsMa_Recibos INNER JOIN Or"
+        "denes ON EsMa_Recibos.IdOrdenes = Ordenes.IdOrdenes) LEFT JOIN Modelos ON Ordene"
+        "s.IdModelos = Modelos.IdModelos) LEFT JOIN Clientes ON Ordenes.IdClientes = Clie"
+        "ntes.IdClientes;"
+    Caption ="EsMaRecibosDet"
+    OnCurrent ="[Event Procedure]"
+    BeforeInsert ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 375
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 56
+                    Top = 57
+                    Width = 1065
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="IdOrdenes Etiqueta"
+                    Caption ="Orden"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdOrdenes_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3604
+                    Top = 57
+                    Width = 855
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="CantRecEsMa Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantRecEsMa_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4511
+                    Top = 57
+                    Width = 795
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="PrecioEsMa Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="PrecioEsMa_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 6009
+                    Width = 225
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdEsMa"
+                    ControlSource ="IdEsMa"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 1190
+                    Top = 60
+                    Width = 840
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Modelo"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2089
+                    Top = 60
+                    Width = 1395
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta12"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 247
+                    TextAlign = 1
+                    Left = 5362
+                    Top = 57
+                    Width = 1200
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta14"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 6605
+                    Top = 60
+                    Width = 1140
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta16"
+                    Caption ="Observaciones"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 9459
+                    Top = 56
+                    Width = 1170
+                    Height = 210
+                    ForeColor = 16777215
+                    Name ="Etiqueta24"
+                    Caption ="Revision Pend."
+                End
+            End
+        End
+        Begin Section
+            Height = 340
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3604
+                    Top = 57
+                    Width = 855
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 1
+                    Name ="CantRecEsMa"
+                    ControlSource ="CantRecEsMa"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4511
+                    Top = 57
+                    Width = 795
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="PrecioEsMa"
+                    ControlSource ="PrecioEsMa"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1065
+                    ColumnWidth = 900
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"3\";\"2\""
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes ORDER BY Ordenes.Numero DE"
+                        "SC;"
+                    ColumnWidths ="0;567"
+                    BaseInfo ="\"SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes ORDER BY Ordenes.Numero "
+                        "DESC;\";\"Ordenes\";\"\";\"IdOrdenes\";\"Numero\";\"PrimaryKey\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1280
+                    Top = 57
+                    Width = 750
+                    Height = 255
+                    TabIndex = 3
+                    Name ="Numero"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2074
+                    Top = 57
+                    Width = 1410
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5362
+                    Top = 57
+                    Width = 1200
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6609
+                    Top = 57
+                    Width = 3015
+                    Height = 255
+                    TabIndex = 6
+                    Name ="ObsRecibos"
+                    ControlSource ="ObsRecibos"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 9977
+                    Top = 56
+                    Width = 230
+                    Height = 195
+                    TabIndex = 7
+                    Name ="RevisionPendiente"
+                    ControlSource ="RevisionPendiente"
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 10318
+                    Top = 56
+                    Width = 230
+                    Height = 195
+                    TabIndex = 8
+                    Name ="EsEstampado"
+                    ControlSource ="EsEstampado"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 340
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5103
+                    Top = 61
+                    Width = 1356
+                    Name ="ImpTotal"
+                    ControlSource ="=Sum([Importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3911
+                            Top = 56
+                            Width = 1065
+                            Height = 240
+                            Name ="Etiqueta19"
+                            Caption ="Importe Total:"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando20_Click()
+On Error GoTo errores
+Forms![EsMaRecibos]![EsMaRecibosSem].Form.Requery
+errores:
+End Sub
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+EsEstampado = Forms![EsMaRecibos]![EsEst]
+End Sub
+
+Private Sub Form_Current()
+On Error GoTo errores
+Forms![EsMaRecibos]![EsMaRecibosSem].Form.Requery
+errores:
+End Sub

@@ -1,0 +1,785 @@
+Version = 17
+VersionRequired = 17
+Checksum = 797997679
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DividingLines = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 8760
+    DatasheetFontHeight = 10
+    ItemSuffix = 48
+    Left = 3420
+    Right = 12180
+    Bottom = 7290
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x0c530c26f924e440
+    End
+    RecordSource ="Prom_Codigos"
+    Caption ="Prom_AltaCodigos"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 525
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 60
+                    Width = 5220
+                    Height = 375
+                    FontSize = 14
+                    BackColor = 65280
+                    ForeColor = 16777215
+                    Name ="Etiqueta12"
+                    Caption ="Generar Nuevos Codigos de PROMODA"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5475
+                    Top = 90
+                    Width = 1716
+                    Height = 358
+                    Name ="Nuevo"
+                    Caption ="Meter Otro Modelo"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 6810
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 285
+                    Top = 3483
+                    Width = 4095
+                    Height = 3150
+                    Name ="Imagen1"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 4515
+                    Top = 3480
+                    Width = 4095
+                    Height = 3150
+                    Name ="Imagen2"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1476
+                    Top = 3200
+                    Width = 801
+                    BackColor = -2147483643
+                    BorderColor = 4210752
+                    ForeColor = -2147483640
+                    Name ="QFoto1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 291
+                            Top = 3195
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta37"
+                            Caption ="Foto Modelo 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5730
+                    Top = 3200
+                    Width = 801
+                    TabIndex = 1
+                    BackColor = -2147483643
+                    BorderColor = 4210752
+                    ForeColor = -2147483640
+                    Name ="QFoto2"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4545
+                            Top = 3195
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta39"
+                            Caption ="Foto Modelo 2:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    Left = 1386
+                    Top = 1415
+                    Width = 606
+                    TabIndex = 6
+                    BorderColor = 4210752
+                    Name ="QConsecutivo"
+                    Format ="000"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 1415
+                            Width = 930
+                            Height = 240
+                            Name ="Etiqueta19"
+                            Caption ="Consecutivo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1386
+                    Top = 2055
+                    Width = 1221
+                    TabIndex = 8
+                    Name ="QPrecio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 2055
+                            Width = 495
+                            Height = 240
+                            Name ="Etiqueta21"
+                            Caption ="Precio:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1386
+                    Top = 2385
+                    Width = 1221
+                    TabIndex = 9
+                    Name ="QCostoUS"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 2385
+                            Width = 750
+                            Height = 240
+                            Name ="Etiqueta26"
+                            Caption ="CostoUS:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    RowSourceTypeInt = 1
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 1386
+                    Top = 135
+                    Width = 1296
+                    TabIndex = 2
+                    Name ="QProveedor"
+                    RowSourceType ="Value List"
+                    RowSource ="738"
+                    StatusBarText ="3"
+                    DefaultValue ="738"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 135
+                            Width = 780
+                            Height = 240
+                            Name ="Etiqueta15"
+                            Caption ="Proveedor:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1386
+                    Top = 455
+                    Width = 2181
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"0\""
+                    Name ="QIdPrenda"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_Prenda.IdPrenda, [IdPrenda]+\" - \"+[Prenda] AS Pre FROM Prom_Prenda"
+                        ";"
+                    ColumnWidths ="0;4536"
+                    StatusBarText ="1"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Prom_Prenda.IdPrenda, [IdPrenda]+\"\" - \"\"+[Prenda] AS Pre FROM Prom_"
+                        "Prenda;\";\"Prom_Prenda\";\"\";\"IdPrenda\";\"IdPrenda]+\"\" - \"\"+[Prenda\";\""
+                        "PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 455
+                            Width = 690
+                            Height = 240
+                            Name ="Etiqueta16"
+                            Caption ="Prenda:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    ListRows = 10
+                    Left = 1386
+                    Top = 775
+                    Width = 2181
+                    TabIndex = 4
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"0\""
+                    Name ="QIdGenero"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_Genero.IdGenero, [IdGenero] & +' - '+[Genero] AS Gen FROM Prom_Gener"
+                        "o;"
+                    ColumnWidths ="0;3969"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 775
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta17"
+                            Caption ="IdGenero:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    RowSourceTypeInt = 1
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1386
+                    Top = 1095
+                    Width = 1686
+                    TabIndex = 5
+                    Name ="QVariasM"
+                    RowSourceType ="Value List"
+                    RowSource ="1;1 - Un Modelo;2;2 - Varios Modelos;3;3 - Ensalada"
+                    ColumnWidths ="0;1701"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 1095
+                            Width = 1020
+                            Height = 240
+                            Name ="Etiqueta18"
+                            Caption ="Uno / Varios:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 1386
+                    Top = 1735
+                    Width = 906
+                    TabIndex = 7
+                    ColumnInfo ="\"\";\"\";\"6\";\"4\""
+                    Name ="QIdPartida"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_Partida.IdPartida, Prom_Partida.FechaRecibo, Prom_Partida.PermitidaH"
+                        "acer, Prom_Partida.Actual FROM Prom_Partida WHERE (((Prom_Partida.PermitidaHacer"
+                        ")=Yes)) ORDER BY Prom_Partida.IdPartida;"
+                    DefaultValue ="=partidaact()"
+                    Format ="00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 1735
+                            Width = 675
+                            Height = 240
+                            Name ="Etiqueta20"
+                            Caption ="Partida:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4035
+                    Top = 120
+                    Width = 1971
+                    Height = 583
+                    FontSize = 10
+                    FontWeight = 700
+                    TabIndex = 11
+                    Name ="GenerarCod"
+                    Caption ="Generar y Guardar Codigo"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 4035
+                    Top = 1185
+                    Width = 2346
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    TabIndex = 12
+                    Name ="QCodigo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4035
+                            Top = 795
+                            Width = 945
+                            Height = 285
+                            FontSize = 10
+                            FontWeight = 700
+                            Name ="Etiqueta33"
+                            Caption ="Codigo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1386
+                    Top = 2745
+                    Width = 1221
+                    TabIndex = 10
+                    Name ="QCantidadRec"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 330
+                            Top = 2745
+                            Width = 750
+                            Height = 240
+                            Name ="Etiqueta35"
+                            Caption ="Cantidad:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3765
+                    Top = 2683
+                    Height = 358
+                    TabIndex = 13
+                    Name ="CargarFotosB"
+                    Caption ="Cargar Fotos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4035
+                    Top = 1965
+                    Width = 1341
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    TabIndex = 14
+                    BorderColor = 4210752
+                    Name ="QModelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4035
+                            Top = 1575
+                            Width = 945
+                            Height = 285
+                            FontSize = 10
+                            FontWeight = 700
+                            Name ="Etiqueta40"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 6615
+                    Top = 361
+                    Width = 2076
+                    Height = 3007
+                    TabIndex = 15
+                    Name ="Agregados"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_CodigosTemp.ModeloTemp, Prom_CodigosTemp.CodigoTemp FROM Prom_Codigo"
+                        "sTemp;"
+                    ColumnWidths ="567;1134"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6615
+                            Top = 135
+                            Width = 1425
+                            Height = 240
+                            Name ="Etiqueta44"
+                            Caption ="Agregados Ahorita:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5760
+                    Top = 2325
+                    Width = 276
+                    TabIndex = 16
+                    Name ="ModeloProm"
+                    ControlSource ="ModeloProm"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3741
+                    Top = 2267
+                    Height = 358
+                    TabIndex = 17
+                    Name ="Comando46"
+                    Caption ="SEPP"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 435
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 7365
+                    Top = 45
+                    Width = 1191
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+Private Sub CargarFotosB_Click()
+Call CargarFotos
+
+End Sub
+
+Private Sub Comando46_Click()
+DoCmd.OpenForm "Prom_GenerarCod", acFormDS
+
+End Sub
+
+Private Sub Form_Close()
+CurrentDb.Execute "DELETE * FROM Prom_CodigosTemp"
+End Sub
+
+Private Sub GenerarCod_Click()
+Call VerificarDatos
+Call CargarFotos
+End Sub
+
+
+Private Sub Nuevo_Click()
+QIdPrenda = ""
+QIdGenero = ""
+QVariasM = ""
+QConsecutivo = ""
+QPrecio = ""
+QCostoUS = ""
+QCantidadRec = ""
+QFoto1 = ""
+QFoto2 = ""
+QCodigo = ""
+QModelo = ""
+
+  Me!Imagen1.Picture = ""
+  Me!Imagen2.Picture = ""
+  Me!Imagen1.HyperlinkAddress = ""
+  Me!Imagen2.HyperlinkAddress = ""
+
+End Sub
+
+Private Sub QIdPrenda_AfterUpdate()
+''If ((IsNull(QIdPrenda) = False) Or (QIdPrenda <> "")) And ((IsNull(QVariasM) = False) Or (QVariasM <> "")) Then
+If QVariasM <> "" Then
+
+Dim Dbs As Database
+Dim Rst, Rst2 As Recordset
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT ConsecUNO,ConsecVARIOS, ConsecENSALADA FROM Prom_Prenda WHERE IdPrenda='" & QIdPrenda & "'")
+
+
+If QVariasM = 1 Then
+QConsecutivo = Rst!ConsecUNO + 1
+ElseIf QVariasM = 2 Then
+QConsecutivo = Rst!ConsecVARIOS + 1
+ElseIf QVariasM = 3 Then
+QConsecutivo = Rst!ConsecENSALADA + 1
+End If
+
+Rst.Close
+Dbs.Close
+End If
+End Sub
+
+Private Sub QVariasM_AfterUpdate()
+
+If (IsNull(QIdPrenda) = False) And (IsNull(QVariasM) = False) Then
+
+Dim Dbs As Database
+Dim Rst, Rst2 As Recordset
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT ConsecUNO,ConsecVARIOS, ConsecENSALADA FROM Prom_Prenda WHERE IdPrenda='" & QIdPrenda & "'")
+
+
+If QVariasM = 1 Then
+QConsecutivo = Rst!ConsecUNO + 1
+ElseIf QVariasM = 2 Then
+QConsecutivo = Rst!ConsecVARIOS + 1
+ElseIf QVariasM = 3 Then
+QConsecutivo = Rst!ConsecENSALADA + 1
+End If
+
+Rst.Close
+Dbs.Close
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+Private Sub Verificar_Click()
+If IsNull(QueModelo) = True Then
+MsgBox "Tienes que meter un numero de modelo en el campo", vbExclamation
+Else
+    Me.RecordsetClone.FindFirst "[Modelo] = '" & Me![QueModelo] & "'"
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+    
+    If Me!QueModelo = Me!Modelo Then
+    Call CargarFotos
+    MsgBox "El modelo " & QueModelo & " ya esta dado de alta.", vbInformation, "MODELO YA EXISTENTE"
+    
+    Else
+    If MsgBox("El modelo " & QueModelo & " no esta dado de alta. Quieres darlo de alta automaticamente?", vbYesNo, "MODELO NO EXISTENTE") = vbYes Then
+    Dim Dbs As Database
+    Set Dbs = CurrentDb
+    Dbs.Execute "INSERT INTO Modelos (Modelo) VALUES ('" & QueModelo & "')"
+    Dbs.Close
+    MsgBox "Se dio de alta el modelo " & QueModelo, vbInformation, "ALTA MODELO " & QueModelo
+    QueModelo = ""
+        Me!Imagen1.Picture = ""
+        Me!Imagen2.Picture = ""
+        Me!Imagen1.HyperlinkAddress = ""
+        Me!Imagen2.HyperlinkAddress = ""
+    End If
+    End If
+End If
+QueModelo.SetFocus
+End Sub
+
+Public Sub CargarFotos()
+Dim Nu As Integer
+On Error GoTo Errorprueba
+Me!Imagen1.Picture = ""
+Me!Imagen2.Picture = ""
+Me!Imagen1.HyperlinkAddress = ""
+Me!Imagen2.HyperlinkAddress = ""
+Nu = 1
+Me!Imagen1.Picture = DirPromoda(QFoto1)
+Me!Imagen1.HyperlinkAddress = DirPromoda(QFoto1)
+Nu = 2
+Me!Imagen2.Picture = DirPromoda(QFoto2)
+Me!Imagen2.HyperlinkAddress = DirPromoda(QFoto2)
+Exit Sub
+
+Errorprueba:
+Select Case Nu
+Case 1
+Me!Imagen1.Picture = NoFoto
+Case 2
+Me!Imagen2.Picture = NoFoto
+End Select
+
+Resume Next
+End Sub
+
+
+
+Private Sub VerificarDatos() '' Verifica Datos y genera el codigo y las fotos
+Dim MenErr, Codi As String
+Dim Erro As Boolean
+Erro = False
+MenErr = "Para poder generar el codigo, tienes que corregir los siguientes campos:" & vbCr
+
+If IsNull(QProveedor) = True Then
+MenErr = MenErr & vbCr & "- Debes de seleccionar un numero de Proveedor."
+Erro = True
+End If
+
+If IsNull(QIdPrenda) = True Then
+MenErr = MenErr & vbCr & "- Debes de seleccionar un Tipo de Prenda."
+Erro = True
+End If
+
+If IsNull(QIdGenero) = True Then
+MenErr = MenErr & vbCr & "- Debes de seleccionar un Genero."
+Erro = True
+End If
+
+If IsNull(QVariasM) = True Then
+MenErr = MenErr & vbCr & "- Debes de seleccionar si el codigo corresponde a un solo modelo o a varios modelos."
+Erro = True
+End If
+
+If IsNull(QIdPartida) = True Then
+MenErr = MenErr & vbCr & "- Debes de seleccionar una Partida."
+Erro = True
+End If
+
+If IsNull(QPrecio) = True Then
+MenErr = MenErr & vbCr & "- Debes de meter un precio."
+Erro = True
+End If
+
+
+If Erro = True Then
+MsgBox MenErr, vbExclamation, "FALTA INFORMACION"
+Else
+  
+
+    Codi = QProveedor & Format(QIdPartida, "00") & Format(QPrecio, "000") & QIdPrenda & QIdGenero & Format(QConsecutivo, "000")
+    If Len(Codi) = 13 Then
+    QCodigo = Codi
+    QFoto1 = [QIdPrenda] & [QIdGenero] & Format([QConsecutivo], "000") & "a"
+    QFoto2 = [QIdPrenda] & [QIdGenero] & Format([QConsecutivo], "000") & "b"
+    QModelo = [QIdPrenda] & [QIdGenero] & Format([QConsecutivo], "000")
+  
+    Call AgregarMod
+    Else
+    MsgBox "Hay algun error con el codigo!, no se esta pudiendo generar por alguna razon, por favor verifica la informacion.", vbExclamation, "ERROR EN GENERACION DE CODIGO"
+    End If
+
+End If
+End Sub
+
+
+Private Sub AgregarMod()
+  Me.RecordsetClone.FindFirst "[ModeloProm] = '" & Me![QModelo] & "'"
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+    
+    If Me!QModelo = Me!ModeloProm Then
+   
+    MsgBox "El modelo " & QModelo & " ya esta dado de alta.", vbExclamation, "MODELO YA EXISTENTE"
+    
+    Else
+
+On Error GoTo erss
+Dim Dbs As Database
+Set Dbs = CurrentDb
+    Dbs.Execute "INSERT INTO Prom_Codigos (Proveedor,IdPrenda,IdGenero,Consecutivo,IdPartida,Precio,Foto1,Foto2,CostoUS,CantidadRec,IdUsuarios,CodigoProm,ModeloProm) VALUES ('" & QProveedor & "','" & QIdPrenda & "'," & QIdGenero & "," & QConsecutivo & "," & QIdPartida & "," & QPrecio & ",'" & QFoto1 & "','" & QFoto2 & "'," & QCostoUS & "," & QCantidadRec & "," & IdUsuarioACT & ",'" & QCodigo & "','" & QModelo & "')"
+     
+    Dbs.Execute "INSERT INTO Prom_CodigosTemp (CodigoTemp,ModeloTemp) VALUES ('" & QCodigo & "','" & QModelo & "')"
+     
+     
+     If QVariasM = 1 Then
+     Dbs.Execute "UPDATE Prom_Prenda SET ConsecUNO=ConsecUNO + 1 WHERE IdPrenda='" & QIdPrenda & "'"
+     ElseIf QVariasM = 2 Then
+     Dbs.Execute "UPDATE Prom_Prenda SET ConsecVARIOS=ConsecVARIOS + 1 WHERE IdPrenda='" & QIdPrenda & "'"
+     ElseIf QVariasM = 3 Then
+     Dbs.Execute "UPDATE Prom_Prenda SET ConsecENSALADA=ConsecENSALADA + 1 WHERE IdPrenda='" & QIdPrenda & "'"
+     End If
+Agregados.Requery
+Dbs.Close
+MsgBox "Se ha dado de alta el codigo con exito.", vbInformation, "SE AGREGO CON EXITO"
+ Me.Requery
+ End If
+ Exit Sub
+ 
+erss:
+MsgBox Err.Description
+
+End Sub

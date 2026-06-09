@@ -1,0 +1,350 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1312808648
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 7086
+    DatasheetFontHeight = 10
+    ItemSuffix = 23
+    Left = 5745
+    Top = 1065
+    Right = 14235
+    Bottom = 7665
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x8684c747387ae340
+    End
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin FormHeader
+            Height = 510
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 170
+                    Width = 3240
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta0"
+                    Caption ="MOVIMIENTOS DE ALMACEN"
+                End
+            End
+        End
+        Begin Section
+            Height = 3968
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 87
+                    ColumnCount = 2
+                    Left = 510
+                    Top = 2490
+                    Width = 2211
+                    Height = 1477
+                    FontSize = 12
+                    Name ="QueAlm"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Almacenes.IdIPT_Almacenes, IPT_Almacenes.Almacen FROM IPT_Almacenes;"
+                    ColumnWidths ="0;2835"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin OptionGroup
+                    OverlapFlags = 85
+                    Left = 737
+                    Top = 566
+                    Width = 1804
+                    Height = 1406
+                    TabIndex = 1
+                    Name ="QueTipoMov"
+                    DefaultValue ="0"
+                    Begin
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 923
+                            Top = 816
+                            Width = 1432
+                            Height = 378
+                            FontWeight = 700
+                            OptionValue = 1
+                            ForeColor = 32768
+                            Name ="Alternar8"
+                            Caption ="Entradas"
+                        End
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 923
+                            Top = 1354
+                            Width = 1432
+                            Height = 378
+                            FontWeight = 700
+                            OptionValue = 2
+                            ForeColor = 255
+                            Name ="Alternar9"
+                            Caption ="Salidas"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    Left = 510
+                    Top = 2267
+                    Width = 735
+                    Height = 210
+                    Name ="Etiqueta10"
+                    Caption ="Almacen:"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 85
+                    Left = 120
+                    Top = 225
+                    Width = 6630
+                    Height = 225
+                    Name ="Etiqueta11"
+                    Caption ="Selecciona Tipo de Movimiento y Almacen            O          Transferencia entr"
+                        "e almacenes"
+                    FontName ="Arial"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 85
+                    Left = 3855
+                    Top = 510
+                    Width = 0
+                    Height = 3458
+                    Name ="Línea12"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 4251
+                    Top = 906
+                    Width = 2496
+                    Height = 345
+                    FontSize = 12
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="AlmSal"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Almacenes.IdIPT_Almacenes, IPT_Almacenes.Almacen FROM IPT_Almacenes;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT IPT_Almacenes.IdIPT_Almacenes, IPT_Almacenes.Almacen FROM IPT_Almacenes"
+                        ";\";\"IPT_Almacenes\";\"\";\"IdIPT_Almacenes\";\"Almacen\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4251
+                            Top = 623
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Del Almacen:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 4195
+                    Top = 2777
+                    Width = 2496
+                    Height = 345
+                    FontSize = 12
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="AlmEnt"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Almacenes.IdIPT_Almacenes, IPT_Almacenes.Almacen FROM IPT_Almacenes W"
+                        "HERE (((IPT_Almacenes.IdIPT_Almacenes)<>[Formularios]![IPT_Mov]![AlmSal]));"
+                    ColumnWidths ="0;2835"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4195
+                            Top = 2494
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta16"
+                            Caption ="Al Almacen:"
+                        End
+                    End
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 93
+                    Left = 5499
+                    Top = 1360
+                    Width = 0
+                    Height = 907
+                    Name ="Línea17"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 95
+                    Left = 5102
+                    Top = 2041
+                    Width = 395
+                    Height = 453
+                    Name ="Línea18"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 215
+                    Left = 5497
+                    Top = 2041
+                    Width = 395
+                    Height = 453
+                    Name ="Línea19"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4422
+                    Top = 3401
+                    Width = 1984
+                    Height = 510
+                    FontWeight = 700
+                    TabIndex = 4
+                    Name ="HacerTrans"
+                    Caption ="Hacer Transferencia"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 623
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 5737
+                    Top = 121
+                    Width = 1236
+                    Height = 388
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+Private Sub DelAlm_AfterUpdate()
+AlAlm = ""
+AlAlm.Requery
+End Sub
+
+Private Sub AlmSal_AfterUpdate()
+AlmEnt.Requery
+End Sub
+
+Private Sub HacerTrans_Click()
+If IsNull(AlmSal) = True Or IsNull(AlmEnt) = True Then
+ MsgBox "Debes de seleccionar un almacen de salida y un almacen de entrada para poder hacer la transferencia entre almacenes", vbInformation, "FALTA DETERMINAR ALMACENES"
+Else
+DoCmd.OpenForm "IPT_MovTransfer"
+Forms![IPT_MovTransfer]![QueAlmE] = AlmEnt
+Forms![IPT_MovTransfer]![QueAlmS] = AlmSal
+
+Dim Dbs As Database
+Dim Rst, Rst1 As Recordset
+
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT Almacen FROM IPT_Almacenes WHERE IdIPT_Almacenes=" & AlmSal)
+Set Rst1 = Dbs.OpenRecordset("SELECT Almacen FROM IPT_Almacenes WHERE IdIPT_Almacenes=" & AlmEnt)
+
+Forms![IPT_MovTransfer]![AlmacenSa] = Rst!Almacen
+Forms![IPT_MovTransfer]![AlmacenEn] = Rst1!Almacen
+Rst.Close
+Rst1.Close
+Dbs.Close
+End If
+End Sub
+
+Private Sub QueAlm_DblClick(Cancel As Integer)
+If QueTipoMov = 0 Then
+ MsgBox "Antes de poder hacer un movimiento es necesario que indiques si es de ENTRADA o de SALIDA", vbInformation, "FALTA ESPECIFICAR MOVIMIENTO"
+Else
+DoCmd.OpenForm "IPT_Movimientos", , , , acFormAdd
+Forms![IPT_Movimientos]![QueIdIPT_Almacenes] = QueAlm
+Forms![IPT_Movimientos]![QueEnSa] = QueTipoMov
+Forms![IPT_Movimientos]![IdIPT_TipoMov].Requery
+  If QueTipoMov = 1 Then
+    Forms![IPT_Movimientos]![TituloMov].Caption = "ENTRADA DE ALMACEN"
+    Forms![IPT_Movimientos]![TituloMov].BackColor = 65280
+  ElseIf QueTipoMov = 2 Then
+    Forms![IPT_Movimientos]![TituloMov].Caption = "SALIDA DE ALMACEN"
+    Forms![IPT_Movimientos]![TituloMov].BackColor = 255
+  End If
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

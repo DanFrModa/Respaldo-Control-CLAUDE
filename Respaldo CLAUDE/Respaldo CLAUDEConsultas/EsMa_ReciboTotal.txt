@@ -1,0 +1,77 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="EsMa_Recibos"
+    Name ="Maquileros"
+    Name ="EsMa"
+End
+Begin OutputColumns
+    Expression ="EsMa_Recibos.IdEsMa"
+    Alias ="Importe"
+    Expression ="Sum([cantrecesma]*[precioesma])"
+    Alias ="RR"
+    Expression ="Min(EsMa_Recibos.RevisionPendiente)"
+    Expression ="Maquileros.IdMaquileros"
+    Alias ="IdRecibos"
+    Expression ="First(EsMa_Recibos.IdEsMa_Recibos)"
+End
+Begin Joins
+    LeftTable ="EsMa_Recibos"
+    RightTable ="EsMa"
+    Expression ="EsMa_Recibos.IdEsMa = EsMa.IdEsMa"
+    Flag = 1
+    LeftTable ="Maquileros"
+    RightTable ="EsMa"
+    Expression ="Maquileros.IdMaquileros = EsMa.IdMaquileros"
+    Flag = 1
+End
+Begin Groups
+    Expression ="EsMa_Recibos.IdEsMa"
+    GroupLevel = 0
+    Expression ="Maquileros.IdMaquileros"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1185
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 168
+        Bottom = 122
+        Top = 1
+        Name ="EsMa_Recibos"
+    End
+    Begin
+        Left = 340
+        Top = 6
+        Right = 436
+        Bottom = 122
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 206
+        Top = 6
+        Right = 302
+        Bottom = 122
+        Top = 0
+        Name ="EsMa"
+    End
+End

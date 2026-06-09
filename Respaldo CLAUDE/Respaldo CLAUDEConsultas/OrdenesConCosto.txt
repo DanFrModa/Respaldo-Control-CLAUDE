@@ -1,0 +1,38 @@
+Operation = 1
+Option = 0
+Where ="(((CostoOrd.Costo)<>0))"
+Begin InputTables
+    Name ="CostoOrd"
+End
+Begin OutputColumns
+    Expression ="CostoOrd.IdOrdenes"
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbMemo "OrderBy" ="OrdenesConCosto.IdOrdenes"
+dbBoolean "OrderByOn" ="-1"
+Begin
+End
+Begin
+    State = 0
+    Left = 47
+    Top = 29
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1200
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 529
+        Top = 0
+        Right = 625
+        Bottom = 114
+        Top = 0
+        Name ="CostoOrd"
+    End
+End

@@ -1,0 +1,72 @@
+Operation = 1
+Option = 0
+Having ="(((EsMa_Recibos.PrecioEsMa)<>0) AND ((Sum(EsMa_Recibos.CantRecEsMa))<>0) AND ((E"
+    "sMa_Recibos.CantRecEsMa) Is Not Null) AND ((EsMa_Recibos.EsEstampado)=False))"
+Begin InputTables
+    Name ="Ordenes"
+    Name ="EsMa_Recibos"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdOrdenes"
+    Expression ="EsMa_Recibos.PrecioEsMa"
+    Alias ="CantMaq"
+    Expression ="Sum(EsMa_Recibos.CantRecEsMa)"
+    Alias ="ImporteMaq"
+    Expression ="[PrecioEsMa]*[CantRecEsMa]"
+    Expression ="EsMa_Recibos.CantRecEsMa"
+    Expression ="EsMa_Recibos.EsEstampado"
+End
+Begin Joins
+    LeftTable ="EsMa_Recibos"
+    RightTable ="Ordenes"
+    Expression ="EsMa_Recibos.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="EsMa_Recibos.PrecioEsMa"
+    GroupLevel = 0
+    Expression ="[PrecioEsMa]*[CantRecEsMa]"
+    GroupLevel = 0
+    Expression ="EsMa_Recibos.CantRecEsMa"
+    GroupLevel = 0
+    Expression ="EsMa_Recibos.EsEstampado"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="-1"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 48
+    Right = 1418
+    Bottom = 353
+    Left = -1
+    Top = -1
+    Right = 1367
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 193
+        Top = 6
+        Right = 330
+        Bottom = 113
+        Top = 4
+        Name ="EsMa_Recibos"
+    End
+End

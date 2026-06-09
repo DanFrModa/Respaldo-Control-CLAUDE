@@ -1,0 +1,427 @@
+Version = 17
+VersionRequired = 17
+Checksum = 2002474112
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    FilterOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10316
+    DatasheetFontHeight = 10
+    ItemSuffix = 33
+    Left = 4665
+    Top = 930
+    Right = 16680
+    Bottom = 6960
+    DatasheetGridlinesColor = 12632256
+    Filter ="[IdPedidosReales]=36"
+    RecSrcDt = Begin
+        0xc4ee4f099e59e340
+    End
+    RecordSource ="SELECT PedidosReales.IdPedidosReales, PedidosReales.IdPedidos, PedidosReales.Fec"
+        "haPedPR, PedidosReales.FechaInicioPR, PedidosReales.FechaFinPR, PedidosReales.Nu"
+        "mPedReal, PedidosReales.Cedis, PedidosReales.FechaEntregadaReal, PedidosReales.F"
+        "echaUsuario, PedidosReales.IdUsuarios, Pedidos.NumeroPed FROM PedidosReales INNE"
+        "R JOIN Pedidos ON PedidosReales.IdPedidos = Pedidos.IdPedidos;"
+    Caption ="PedRealEntregados"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 375
+            BackColor = 128
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 60
+                    Width = 5145
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta20"
+                    Caption ="METER DATOS DE ENTREGA DE LOS  PEDIDOS REALES"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 5669
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 682
+                    Width = 900
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="Cedis"
+                    ControlSource ="Cedis"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 682
+                            Width = 1560
+                            Height = 255
+                            Name ="Cedis Etiqueta"
+                            Caption ="Cedis:"
+                            EventProcPrefix ="Cedis_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2211
+                    Width = 540
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 6
+                    Name ="IdUsuarios"
+                    ControlSource ="IdUsuarios"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2835
+                    Width = 450
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 7
+                    Name ="FechaUsuario"
+                    ControlSource ="FechaUsuario"
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 56
+                    Top = 1487
+                    Width = 10260
+                    Height = 3675
+                    TabIndex = 9
+                    Name ="PedRealEntregadosSub"
+                    SourceObject ="Form.PedRealEntregadosSub"
+                    LinkChildFields ="IdPedidosReales"
+                    LinkMasterFields ="IdPedidosReales"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 60
+                            Top = 1245
+                            Width = 3585
+                            Height = 240
+                            Name ="PedRealAgregarSubEtiqueta"
+                            Caption ="Agregar cantidades entregadas reales por modelo"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 692
+                    Top = 56
+                    Width = 786
+                    TabIndex = 8
+                    Name ="NumeroPed"
+                    ControlSource ="NumeroPed"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 56
+                            Width = 630
+                            Height = 240
+                            Name ="Etiqueta21"
+                            Caption ="Pedido:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 9240
+                    Top = 5215
+                    Width = 981
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 10
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1644
+                    Width = 450
+                    Height = 255
+                    TabIndex = 11
+                    Name ="IdPedidos"
+                    ControlSource ="IdPedidos"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7814
+                    Top = 56
+                    Width = 1335
+                    ColumnWidth = 825
+                    TabIndex = 3
+                    Name ="FechaPedPR"
+                    ControlSource ="FechaPedPR"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6194
+                            Top = 56
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaPedPR Etiqueta"
+                            Caption ="Fecha Pedido Real:"
+                            EventProcPrefix ="FechaPedPR_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7814
+                    Top = 398
+                    Width = 1335
+                    ColumnWidth = 825
+                    TabIndex = 4
+                    Name ="FechaInicioPR"
+                    ControlSource ="FechaInicioPR"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6194
+                            Top = 398
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaInicioPR Etiqueta"
+                            Caption ="Fecha Inicio Real:"
+                            EventProcPrefix ="FechaInicioPR_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7814
+                    Top = 740
+                    Width = 1335
+                    ColumnWidth = 825
+                    TabIndex = 5
+                    Name ="FechaFinPR"
+                    ControlSource ="FechaFinPR"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6194
+                            Top = 740
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaFinPR Etiqueta"
+                            Caption ="Fecha Fin Real:"
+                            EventProcPrefix ="FechaFinPR_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 340
+                    Width = 1950
+                    ColumnWidth = 1185
+                    TabIndex = 1
+                    Name ="NumPedReal"
+                    ControlSource ="NumPedReal"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 340
+                            Width = 1560
+                            Height = 255
+                            Name ="NumPedReal Etiqueta"
+                            Caption ="Numero de Pedido:"
+                            EventProcPrefix ="NumPedReal_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7814
+                    Top = 1115
+                    Width = 1335
+                    BackColor = 16777215
+                    Name ="FechaEntregadaReal"
+                    ControlSource ="FechaEntregadaReal"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5952
+                            Top = 1110
+                            Width = 1785
+                            Height = 255
+                            Name ="Etiqueta32"
+                            Caption ="Fecha Entregada REAL:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+If EstaCargado("PedidosRealesVer") = True Then
+  Forms![PedidosRealesVer]![QuePR].Requery
+End If
+End Sub
+
+Private Sub Salir_Click()
+
+DoCmd.Close
+
+End Sub

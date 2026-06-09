@@ -1,0 +1,260 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1706104957
+Begin Form
+    AutoCenter = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5329
+    DatasheetFontHeight = 10
+    ItemSuffix = 11
+    Left = 6450
+    Top = 195
+    Right = 13125
+    Bottom = 8430
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x3ba745055764e340
+    End
+    RecordSource ="PrCo_Clientes"
+    Caption ="PrCo_Clientes"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Top = 57
+                    Width = 1596
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="TipoCliente Etiqueta"
+                    Caption ="Tipo de Cliente"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="TipoCliente_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 1440
+                    Top = 60
+                    Width = 1335
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descuento Etiqueta"
+                    Caption ="Descuento (en %)"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descuento_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2834
+                    Top = 60
+                    Width = 1215
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="MargenBruto Etiqueta"
+                    Caption ="Margen Nuestro"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="MargenBruto_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4081
+                    Top = 57
+                    Width = 1188
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="MargenEllos Etiqueta"
+                    Caption ="Margen de Ellos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="MargenEllos_Etiqueta"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Top = 57
+                    Width = 1596
+                    Height = 255
+                    ColumnWidth = 2310
+                    Name ="TipoCliente"
+                    ControlSource ="TipoCliente"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1653
+                    Top = 57
+                    Width = 1116
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Descuento"
+                    ControlSource ="Descuento"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2870
+                    Top = 57
+                    Width = 1176
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="MargenBruto"
+                    ControlSource ="MargenBruto"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4081
+                    Top = 57
+                    Width = 1188
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="MargenEllos"
+                    ControlSource ="MargenEllos"
+                    Format ="Percent"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 566
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4251
+                    Top = 113
+                    Width = 1011
+                    Height = 328
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

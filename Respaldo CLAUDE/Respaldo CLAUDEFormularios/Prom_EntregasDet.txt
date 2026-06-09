@@ -1,0 +1,509 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1120093773
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9751
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 5745
+    Top = 3270
+    Right = 17790
+    Bottom = 7725
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x7be65cab1229e440
+    End
+    RecordSource ="SELECT Prom_EntregasDet.IdProm_Entregas, Prom_EntregasDet.Tienda, Prom_EntregasD"
+        "et.IdProm_Codigo, Prom_EntregasDet.CantEnt, Prom_EntregasDet.Caja, Prom_Entregas"
+        "Det.Sello1, Prom_EntregasDet.Sello2, Prom_Codigos.CodigoProm, Prom_EntregasDet.I"
+        "dProm_EntregasDet, Prom_Codigos.Precio, [CantEnt]*[precio] AS Importe FROM Prom_"
+        "Codigos INNER JOIN Prom_EntregasDet ON Prom_Codigos.IdProm_Codigos = Prom_Entreg"
+        "asDet.IdProm_Codigo;"
+    Caption ="Prom_EntregasDet"
+    BeforeInsert ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2154
+                    Top = 57
+                    Width = 615
+                    Height = 240
+                    Name ="Tienda Etiqueta"
+                    Caption ="Tienda"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Tienda_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1155
+                    Height = 240
+                    Name ="IdProm_Codigo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdProm_Codigo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 1360
+                    Top = 57
+                    Width = 720
+                    Height = 240
+                    Name ="CantEnt Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantEnt_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2834
+                    Top = 57
+                    Width = 1755
+                    Height = 240
+                    Name ="Etiqueta10"
+                    Caption ="Codigo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4705
+                    Top = 57
+                    Width = 720
+                    Height = 240
+                    Name ="Etiqueta12"
+                    Caption ="Caja"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5499
+                    Top = 57
+                    Width = 825
+                    Height = 240
+                    Name ="Etiqueta14"
+                    Caption ="Sello 1"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 6406
+                    Top = 57
+                    Width = 810
+                    Height = 240
+                    Name ="Etiqueta16"
+                    Caption ="Sello 2"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 7556
+                    Top = 56
+                    Width = 165
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdProm_Entregas"
+                    ControlSource ="IdProm_Entregas"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 7783
+                    Top = 56
+                    Width = 165
+                    Height = 255
+                    TabIndex = 1
+                    Name ="IdProm_EntregasDet"
+                    ControlSource ="IdProm_EntregasDet"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 8010
+                    Width = 165
+                    Height = 255
+                    TabIndex = 2
+                    Name ="cA"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 8236
+                    Width = 165
+                    Height = 255
+                    TabIndex = 3
+                    Name ="sE1"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 8463
+                    Width = 165
+                    Height = 255
+                    TabIndex = 4
+                    Name ="sE2"
+                End
+                Begin Label
+                    OverlapFlags = 247
+                    TextAlign = 1
+                    Left = 7313
+                    Top = 57
+                    Width = 915
+                    Height = 240
+                    Name ="Etiqueta24"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 247
+                    TextAlign = 1
+                    Left = 8350
+                    Top = 57
+                    Width = 1185
+                    Height = 240
+                    Name ="Etiqueta26"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 340
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2154
+                    Top = 57
+                    Width = 615
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 2
+                    Name ="Tienda"
+                    ControlSource ="Tienda"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1360
+                    Top = 57
+                    Width = 720
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 1
+                    Name ="CantEnt"
+                    ControlSource ="CantEnt"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1155
+                    ColumnWidth = 900
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"7\""
+                    Name ="IdProm_Codigo"
+                    ControlSource ="IdProm_Codigo"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_Codigos.IdProm_Codigos, Prom_Codigos.ModeloProm FROM Prom_Codigos;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Prom_Codigos.IdProm_Codigos, Prom_Codigos.ModeloProm FROM Prom_Codigos;"
+                        "\";\"Prom_Codigos\";\"\";\"IdProm_Codigos\";\"ModeloProm\";\"PrimaryKey\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 2834
+                    Top = 57
+                    Width = 1755
+                    Height = 255
+                    TabIndex = 3
+                    Name ="CodigoProm"
+                    ControlSource ="CodigoProm"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4705
+                    Top = 57
+                    Width = 720
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Caja"
+                    ControlSource ="Caja"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5499
+                    Top = 57
+                    Width = 825
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Sello1"
+                    ControlSource ="Sello1"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6406
+                    Top = 57
+                    Width = 810
+                    Height = 255
+                    TabIndex = 6
+                    Name ="Sello2"
+                    ControlSource ="Sello2"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 7313
+                    Top = 57
+                    Width = 975
+                    Height = 255
+                    TabIndex = 7
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 8350
+                    Top = 57
+                    Width = 1245
+                    Height = 255
+                    TabIndex = 8
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 396
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 1303
+                    Top = 56
+                    Width = 1410
+                    Height = 255
+                    Name ="CantTotal"
+                    ControlSource ="=Sum([CantEnt])"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 7547
+                    Top = 113
+                    Width = 1920
+                    Height = 255
+                    TabIndex = 1
+                    Name ="importetotal"
+                    ControlSource ="=Sum([importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Caja_LostFocus()
+If Caja = 0 Then
+Caja = Ca
+Sello1 = sE1
+Sello2 = sE2
+Tienda = Forms![Prom_Entregas]![Tienda]
+DoCmd.GoToRecord , , acNext
+IdProm_Codigo.SetFocus
+
+End If
+End Sub
+
+Private Sub Form_AfterInsert()
+
+End Sub
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+
+End Sub
+
+Private Sub Form_Current()
+
+End Sub
+
+Private Sub IdProm_Codigo_AfterUpdate()
+Call DatosAnt
+
+End Sub
+
+Private Sub Sello1_LostFocus()
+If Sello1 = 0 Then
+Sello1 = sE1
+End If
+
+End Sub
+
+Private Sub Sello2_LostFocus()
+If Sello2 = 0 Then
+Sello2 = sE2
+End If
+End Sub
+
+Private Sub DatosAnt()
+Dim Dbs As Database
+Dim Rst As Recordset
+
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("Select Caja, Sello1, Sello2 FROM Prom_EntregasDet Where IdProm_EntregasDet=" & IdProm_EntregasDet - 1)
+
+Ca = Rst!Caja
+sE1 = Rst!Sello1
+sE2 = Rst!Sello2
+
+Rst.Close
+Dbs.Close
+
+End Sub
+
+Private Sub Tienda_LostFocus()
+If Tienda = 0 Then
+Tienda = Forms![Prom_Entregas]![Tienda]
+End If
+End Sub

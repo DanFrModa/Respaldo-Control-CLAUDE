@@ -1,0 +1,120 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Ordenes"
+    Name ="OrdenesDet"
+    Name ="CantidadCorte"
+    Name ="CantidadEnt"
+    Name ="CantidadRec"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdOrdenes"
+    Expression ="Ordenes.Numero"
+    Alias ="CantOrd"
+    Expression ="Sum([t1]+[t2]+[t3]+[t4]+[t5]+[t6]+[t7]+[t8])"
+    Expression ="CantidadCorte.CantCorte"
+    Expression ="CantidadEnt.CantEnt"
+    Expression ="CantidadRec.CantRec"
+    Expression ="CantidadCorte.FechaCorte"
+    Expression ="CantidadEnt.FechaEnt"
+    Expression ="CantidadEnt.MaqEnt"
+    Expression ="CantidadRec.FechaRec"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="CantidadCorte"
+    Expression ="Ordenes.IdOrdenes = CantidadCorte.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="CantidadEnt"
+    Expression ="Ordenes.IdOrdenes = CantidadEnt.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="CantidadRec"
+    Expression ="Ordenes.IdOrdenes = CantidadRec.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="OrdenesDet"
+    Expression ="Ordenes.IdOrdenes = OrdenesDet.IdOrdenes"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="CantidadCorte.CantCorte"
+    GroupLevel = 0
+    Expression ="CantidadEnt.CantEnt"
+    GroupLevel = 0
+    Expression ="CantidadRec.CantRec"
+    GroupLevel = 0
+    Expression ="CantidadCorte.FechaCorte"
+    GroupLevel = 0
+    Expression ="CantidadEnt.FechaEnt"
+    GroupLevel = 0
+    Expression ="CantidadEnt.MaqEnt"
+    GroupLevel = 0
+    Expression ="CantidadRec.FechaRec"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1002
+    Bottom = 410
+    Left = -1
+    Top = -1
+    Right = 951
+    Bottom = 227
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 191
+        Top = 38
+        Right = 287
+        Bottom = 145
+        Top = 0
+        Name ="OrdenesDet"
+    End
+    Begin
+        Left = 325
+        Top = 6
+        Right = 421
+        Bottom = 98
+        Top = 1
+        Name ="CantidadCorte"
+    End
+    Begin
+        Left = 459
+        Top = 6
+        Right = 555
+        Bottom = 83
+        Top = 2
+        Name ="CantidadEnt"
+    End
+    Begin
+        Left = 593
+        Top = 6
+        Right = 689
+        Bottom = 83
+        Top = 1
+        Name ="CantidadRec"
+    End
+End

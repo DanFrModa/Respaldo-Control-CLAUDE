@@ -1,0 +1,348 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1132592592
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6349
+    DatasheetFontHeight = 10
+    ItemSuffix = 23
+    Left = 5730
+    Top = 3060
+    Right = 15525
+    Bottom = 5895
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x2815b53b9d59e340
+    End
+    RecordSource ="SELECT PedidosRealesDet.*, Modelos.Modelo, PedidosDet.Precio, [cantidadPR]*[prec"
+        "io] AS Importe, PedidosDet.CantPed FROM (PedidosRealesDet INNER JOIN PedidosDet "
+        "ON PedidosRealesDet.IdPedidosDet = PedidosDet.IdPedidosDet) INNER JOIN Modelos O"
+        "N PedidosDet.IdModelos = Modelos.IdModelos;"
+    Caption ="PedRealAgregarSub"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 128
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2205
+                    Top = 60
+                    Width = 930
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="CantidadPR Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantidadPR_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 113
+                    Top = 57
+                    Width = 930
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3291
+                    Top = 60
+                    Width = 1095
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="PrecioEt"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4424
+                    Top = 60
+                    Width = 1575
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="ImporteEt"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 1139
+                    Top = 60
+                    Width = 930
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta20"
+                    Caption ="Cant Ord"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2199
+                    Top = 57
+                    Width = 930
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="CantidadPR"
+                    ControlSource ="CantidadPR"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 113
+                    Top = 57
+                    Width = 930
+                    Height = 255
+                    TabIndex = 1
+                    BackColor = 16777215
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3291
+                    Top = 57
+                    Width = 1095
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4424
+                    Top = 57
+                    Width = 1575
+                    Height = 255
+                    TabIndex = 3
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1133
+                    Top = 57
+                    Width = 930
+                    Height = 255
+                    TabIndex = 4
+                    Name ="CantPed"
+                    ControlSource ="CantPed"
+                    Format ="#,###"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 396
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4424
+                    Top = 56
+                    Width = 1575
+                    Height = 255
+                    Name ="ImporteTotal"
+                    ControlSource ="=Sum([Importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2199
+                    Top = 56
+                    Width = 930
+                    Height = 255
+                    TabIndex = 1
+                    Name ="TotalCant"
+                    ControlSource ="=Sum([CantidadPR])"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1133
+                    Top = 56
+                    Width = 930
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Texto22"
+                    ControlSource ="=Sum([CantPed])"
+                    Format ="#,###"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(2) = True Then
+PrecioEt.Visible = True
+ImporteEt.Visible = True
+Precio.Visible = True
+Importe.Visible = True
+ImporteTotal.Visible = True
+End If
+End Sub

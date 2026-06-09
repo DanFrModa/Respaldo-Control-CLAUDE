@@ -1,0 +1,246 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1674234970
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 4592
+    DatasheetFontHeight = 10
+    ItemSuffix = 25
+    Left = 7110
+    Top = 780
+    Right = 11700
+    Bottom = 6780
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xd801600b4fb6e240
+    End
+    RecordSource ="Almacenes"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 510
+            BackColor = 0
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    BackStyle = 1
+                    OverlapFlags = 85
+                    Left = 453
+                    Top = 56
+                    Width = 3060
+                    Height = 375
+                    FontSize = 14
+                    BackColor = 0
+                    ForeColor = 10092543
+                    Name ="Etiqueta9"
+                    Caption ="SALIDA DE TELA"
+                End
+            End
+        End
+        Begin Section
+            Height = 5499
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 396
+                    Top = 454
+                    Width = 3816
+                    Height = 4192
+                    FontSize = 12
+                    Name ="CualAlmacen"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Almacenes.IdAlmacenes, Almacenes.Almacen, Almacenes.Activo FROM Almacenes"
+                        " WHERE (((Almacenes.Activo)=True)) ORDER BY Almacenes.Almacen;"
+                    ColumnWidths ="0;5670"
+                    AfterUpdate ="[Event Procedure]"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3855
+                    Top = 113
+                    Width = 381
+                    TabIndex = 1
+                    Name ="IdAlmacenes"
+                    ControlSource ="IdAlmacenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3458
+                    Top = 113
+                    Width = 351
+                    TabIndex = 2
+                    Name ="Almacen"
+                    ControlSource ="Almacen"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 396
+                    Top = 170
+                    Width = 2040
+                    Height = 210
+                    Name ="Etiqueta10"
+                    Caption ="Doble Click en el Almacen"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 2777
+                    Top = 4762
+                    Width = 1416
+                    Height = 448
+                    FontWeight = 700
+                    TabIndex = 3
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin OptionGroup
+                    OverlapFlags = 85
+                    Left = 680
+                    Top = 4818
+                    Height = 628
+                    TabIndex = 4
+                    Name ="QueTipoSalida"
+                    DefaultValue ="1"
+                    Begin
+                        Begin Label
+                            BackStyle = 1
+                            OverlapFlags = 223
+                            Left = 800
+                            Top = 4698
+                            Width = 1395
+                            Height = 240
+                            BackColor = -2147483633
+                            Name ="Etiqueta19"
+                            Caption ="Que tipo de salida:"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 95
+                            Left = 1020
+                            Top = 4960
+                            OptionValue = 1
+                            Name ="Opción21"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 255
+                                    Left = 1250
+                                    Top = 4932
+                                    Width = 525
+                                    Height = 240
+                                    Name ="Etiqueta22"
+                                    Caption ="Cortes"
+                                End
+                            End
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 247
+                            Left = 1020
+                            Top = 5187
+                            OptionValue = 2
+                            Name ="Opción23"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 247
+                                    Left = 1250
+                                    Top = 5159
+                                    Width = 495
+                                    Height = 240
+                                    Name ="Etiqueta24"
+                                    Caption ="Notas"
+                                End
+                            End
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+Private Sub CualAlmacen_AfterUpdate()
+   Me.RecordsetClone.FindFirst "[IdAlmacenes] = " & Me![CualAlmacen]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub CualAlmacen_DblClick(Cancel As Integer)
+If QueTipoSalida = 1 Then
+DoCmd.OpenForm "SalidasOrd", , , , acFormAdd
+Forms![SalidasOrd]![QueAlmacen] = Almacen
+Forms![SalidasOrd]![QueIdAlmacenes] = IdAlmacenes
+DoCmd.Close acForm, "QueAlmacenSalida"
+Else
+  If NivelAct <= nivAdminDir Then
+  DoCmd.OpenForm "SalidasNotas"
+  Else
+  DoCmd.OpenForm "SalidasNotas", , , , acFormAdd
+  End If
+Forms![SalidasNotas]![QueAlmacen] = Almacen
+Forms![SalidasNotas]![QueIdAlmacenes] = IdAlmacenes
+DoCmd.Close acForm, "QueAlmacenSalida"
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

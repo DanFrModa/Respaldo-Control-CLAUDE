@@ -1,0 +1,270 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1526304419
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 3231
+    DatasheetFontHeight = 10
+    ItemSuffix = 9
+    Left = 9540
+    Top = 4440
+    Right = 13620
+    Bottom = 6660
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x201cc697d064e240
+    End
+    RecordSource ="SELECT ModelosBor.IdModelos, ModelosBor.IdBordados, Bordados.Descripcion, Bordad"
+        "os.Foto AS FotoBor FROM Bordados INNER JOIN ModelosBor ON Bordados.IdBordados = "
+        "ModelosBor.IdBordados;"
+    Caption ="ModelosBor"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 56
+                    Top = 57
+                    Width = 1425
+                    Height = 240
+                    Name ="IdBordados Etiqueta"
+                    Caption ="Bordado"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdBordados_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 1583
+                    Top = 57
+                    Width = 1590
+                    Height = 240
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 56
+                    Top = 56
+                    Width = 225
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdModelos"
+                    ControlSource ="IdModelos"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    Left = 2835
+                    Top = 60
+                    Width = 390
+                    Height = 240
+                    Name ="Etiqueta8"
+                    Caption ="Foto"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 1583
+                    Top = 57
+                    Width = 1365
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1425
+                    ColumnWidth = 900
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"15\""
+                    Name ="IdBordados"
+                    ControlSource ="IdBordados"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Bordados.IdBordados, Bordados.Nombre FROM Bordados ORDER BY Bordados.Nomb"
+                        "re;"
+                    ColumnWidths ="0;1134"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Bordados.IdBordados, Bordados.Nombre FROM Bordados ORDER BY Bordados.No"
+                        "mbre;\";\"Bordados\";\"\";\"IdBordados\";\"Nombre\";\"PrimaryKey\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 2721
+                    Top = 56
+                    Width = 225
+                    Height = 255
+                    TabIndex = 2
+                    Name ="FotoBor"
+                    ControlSource ="FotoBor"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 2948
+                    Top = 56
+                    Width = 216
+                    Height = 238
+                    TabIndex = 3
+                    Name ="Detalles"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Detalles_Click()
+On Error GoTo errores
+Forms![Modelos]![Imagen].Picture = DirBordados(Me!FotoBor)
+Forms![Modelos]![Imagen].HyperlinkAddress = DirBordados(Me!FotoBor)
+Exit Sub
+
+errores:
+Forms![Modelos]![Imagen].Picture = NoFoto
+Forms![Modelos]![Imagen].HyperlinkAddress = ""
+End Sub
+
+Private Sub IdBordados_AfterUpdate()
+On Error GoTo errores
+Forms![Modelos]![Imagen].Picture = DirBordados(Me!FotoBor)
+Forms![Modelos]![Imagen].HyperlinkAddress = DirBordados(Me!FotoBor)
+Exit Sub
+
+errores:
+Forms![Modelos]![Imagen].Picture = NoFoto
+Forms![Modelos]![Imagen].HyperlinkAddress = ""
+End Sub

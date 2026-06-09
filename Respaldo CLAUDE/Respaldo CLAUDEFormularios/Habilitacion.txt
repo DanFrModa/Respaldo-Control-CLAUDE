@@ -1,0 +1,605 @@
+Version = 17
+VersionRequired = 17
+Checksum = -958218473
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowDeletions = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 8778
+    DatasheetFontHeight = 10
+    ItemSuffix = 40
+    Left = 4755
+    Top = 360
+    Right = 13815
+    Bottom = 6900
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xab985eda3302e440
+    End
+    RecordSource ="SELECT Habilitacion.[Desactivado], Habilitacion.Clave, Habilitacion.Favorito, Ha"
+        "bilitacion.IdHabilitacion, Habilitacion.Descripcion, Habilitacion.Proveedor, Hab"
+        "ilitacion.Precio, Habilitacion.CantFav FROM Habilitacion ORDER BY Habilitacion.["
+        "Desactivado] DESC , Habilitacion.Clave, Habilitacion.Favorito;"
+    Caption ="Habilitacion"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 57
+                    Width = 615
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Clave Etiqueta"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Clave_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 850
+                    Top = 57
+                    Width = 2505
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Nombre Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Nombre_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5263
+                    Top = 57
+                    Width = 840
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3514
+                    Top = 57
+                    Width = 1560
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta8"
+                    Caption ="Proveedor"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 3120
+                    Top = 60
+                    Width = 231
+                    ForeColor = 16777215
+                    Name ="IdHabilitacion"
+                    ControlSource ="IdHabilitacion"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 6975
+                    Top = 60
+                    Width = 840
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta27"
+                    Caption ="Favorito"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 7680
+                    Top = 60
+                    Width = 1020
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta32"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 6150
+                    Top = 75
+                    Width = 975
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta36"
+                    Caption ="Desactivada"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 345
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 56
+                    Top = 57
+                    Width = 615
+                    Height = 255
+                    ColumnWidth = 615
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 850
+                    Top = 57
+                    Width = 2505
+                    Height = 255
+                    ColumnWidth = 1560
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5263
+                    Top = 57
+                    Width = 840
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3514
+                    Top = 57
+                    Width = 1560
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Proveedor"
+                    ControlSource ="Proveedor"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    OldBorderStyle = 0
+                    Left = 7413
+                    Top = 56
+                    TabIndex = 4
+                    Name ="Favorito"
+                    ControlSource ="Favorito"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7860
+                    Top = 57
+                    Width = 840
+                    Height = 255
+                    TabIndex = 5
+                    Name ="CantFav"
+                    ControlSource ="CantFav"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    OldBorderStyle = 0
+                    Left = 6588
+                    Top = 56
+                    TabIndex = 6
+                    Name ="Desactivado1"
+                    ControlSource ="Desactivado"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 1710
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 7809
+                    Top = 1247
+                    Width = 969
+                    Height = 329
+                    FontWeight = 700
+                    TabIndex = 6
+                    ForeColor = 255
+                    Name ="Comando10"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 736
+                    Width = 615
+                    Height = 255
+                    Name ="Clave1"
+                    ControlSource ="Clave"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 907
+                    Top = 736
+                    Width = 2505
+                    Height = 255
+                    TabIndex = 1
+                    Name ="Descripcion1"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5320
+                    Top = 736
+                    Width = 840
+                    Height = 255
+                    TabIndex = 3
+                    Name ="Precio1"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3571
+                    Top = 736
+                    Width = 1560
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Proveedor1"
+                    ControlSource ="Proveedor"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 113
+                    Top = 396
+                    Width = 615
+                    Height = 240
+                    Name ="Etiqueta15"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 907
+                    Top = 396
+                    Width = 2505
+                    Height = 240
+                    Name ="Etiqueta16"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 5320
+                    Top = 396
+                    Width = 840
+                    Height = 240
+                    Name ="Etiqueta17"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3571
+                    Top = 396
+                    Width = 1560
+                    Height = 240
+                    Name ="Etiqueta18"
+                    Caption ="Proveedor"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 56
+                    Width = 4365
+                    Height = 285
+                    FontWeight = 700
+                    ForeColor = 32768
+                    Name ="Etiqueta19"
+                    Caption ="Agregar mas habilitacion o Modificar algun dato:"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3798
+                    Top = 1077
+                    Width = 2445
+                    Height = 510
+                    TabIndex = 5
+                    Name ="Agregar"
+                    Caption ="Agregar Habilitacion"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 1814
+                    Top = 1133
+                    Width = 1874
+                    Height = 287
+                    TabIndex = 7
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"5\""
+                    Name ="QueClave"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Habilitacion.IdHabilitacion, Habilitacion.Clave, Habilitacion.Descripcion"
+                        " FROM Habilitacion ORDER BY Habilitacion.Clave;"
+                    ColumnWidths ="0;455;567"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Habilitacion.IdHabilitacion, Habilitacion.Clave, Habilitacion.Descripci"
+                        "on FROM Habilitacion ORDER BY Habilitacion.Clave;\";\"Habilitacion\";\"\";\"IdHa"
+                        "bilitacion\";\"Clave\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1133
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta24"
+                            Caption ="Buscar Habilitacion:"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 7380
+                    Top = 750
+                    TabIndex = 8
+                    Name ="Verificación29"
+                    ControlSource ="Favorito"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 6990
+                    Top = 390
+                    Width = 840
+                    Height = 240
+                    Name ="Etiqueta31"
+                    Caption ="Favorito"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 7800
+                    Top = 705
+                    Width = 840
+                    Height = 255
+                    TabIndex = 9
+                    Name ="CantFav1"
+                    ControlSource ="CantFav"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 7809
+                    Top = 396
+                    Width = 840
+                    Height = 240
+                    Name ="Etiqueta35"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                End
+                Begin CheckBox
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 6570
+                    Top = 750
+                    TabIndex = 4
+                    Name ="Desactivado"
+                    ControlSource ="Desactivado"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 6045
+                    Top = 390
+                    Width = 975
+                    Height = 240
+                    Name ="Etiqueta39"
+                    Caption ="Desactivada"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando10_Click()
+DoCmd.Close
+End Sub
+
+Private Sub Form_Close()
+If EstaCargado("OrdenHab") = True Then
+Forms![OrdenHab]![QueHabClave].Requery
+Forms![OrdenHab]![QueHabDesc].Requery
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+
+DoCmd.GoToRecord acForm, "Habilitacion", acNewRec
+
+If NivelAct <= nivAdminDir Then
+Me.AllowDeletions = True
+End If
+End Sub
+Private Sub Agregar_Click()
+On Error GoTo Err_Agregar_Click
+
+
+    DoCmd.GoToRecord , , acNewRec
+    Me!Clave1.SetFocus
+    
+Exit_Agregar_Click:
+    Exit Sub
+
+Err_Agregar_Click:
+    MsgBox Err.Description
+    Resume Exit_Agregar_Click
+    
+End Sub
+
+Private Sub QueClave_AfterUpdate()
+ Me.RecordsetClone.FindFirst "[IdHabilitacion] = " & Me![QueClave]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub

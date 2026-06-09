@@ -1,0 +1,1058 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1229614651
+Begin Form
+    LayoutForPrint = NotDefault
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DividingLines = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10261
+    DatasheetFontHeight = 10
+    ItemSuffix = 101
+    Left = 1065
+    Top = 30
+    Right = 14250
+    Bottom = 8385
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x0eda5ca32ea9e240
+    End
+    RecordSource ="SELECT Ordenes.Numero, Modelos.Modelo, Modelos.Descripcion, Ordenes.Fecha, Orden"
+        "es.FechaEntrega, Ordenes.Observaciones, EtiquetasM.EtiquetaM, Clientes.Cliente, "
+        "[maquileros].[nombre]+\" \"+[apellidos] AS Maq, Ordenes.IdOrdenes, Ordenes.IdMod"
+        "elos, Modelos.Foto1, Modelos.Foto2, ModelosBor.IdModelosBor, Ordenes.Tallas, [te"
+        "lasdis].[descripcion]+\" / Proveedor: \"+[telasdis].[proveedor] AS Tela FROM ((("
+        "((Ordenes INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) LEFT JOIN"
+        " EtiquetasM ON Ordenes.IdEtiquetasM = EtiquetasM.IdEtiquetasM) LEFT JOIN Cliente"
+        "s ON Ordenes.IdClientes = Clientes.IdClientes) LEFT JOIN Maquileros ON Ordenes.I"
+        "dMaquileros = Maquileros.IdMaquileros) LEFT JOIN ModelosBor ON Modelos.IdModelos"
+        " = ModelosBor.IdModelos) LEFT JOIN TelasDis ON Ordenes.IdTelasDis = TelasDis.IdT"
+        "elasDis;"
+    Caption ="OrdenesImpresas"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x5303000037020000530300003702000000000000152800000000000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x4c454144544f4f4c5320655072696e74204956204556414c0000000000000000 ,
+        0x010400049c003c03030f04000100010000000000000001000700feff02000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000180000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000089c916a0000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012002c00010077696e73706f6f6c00004c454144544f4f4c532065507269 ,
+        0x6e74204956204556414c00004c454144544f4f4c5320655072696e744549563a ,
+        0x000000000000000000000000000000000000
+    End
+    OnDeactivate ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            CanGrow = NotDefault
+            Height = 11386
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5952
+                    Top = 434
+                    Width = 261
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextFontFamily = 66
+                    Width = 6600
+                    Height = 390
+                    FontSize = 14
+                    FontWeight = 700
+                    Name ="Etiqueta34"
+                    Caption ="ORDEN DE PRODUCCION (Version Corta)"
+                    FontName ="Comic Sans MS"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9105
+                    Width = 900
+                    Height = 315
+                    FontSize = 14
+                    TabIndex = 1
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 7845
+                            Width = 1200
+                            Height = 315
+                            FontSize = 14
+                            FontWeight = 700
+                            Name ="Etiqueta21"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 396
+                    Width = 795
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 2
+                    Name ="Texto18"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Top = 396
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta19"
+                            Caption ="Numero de Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8070
+                    Top = 1091
+                    Width = 1935
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 3
+                    Name ="Maquilero"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6345
+                            Top = 1091
+                            Width = 1755
+                            Height = 315
+                            FontSize = 10
+                            Name ="Etiqueta23"
+                            Caption ="Mquilero Prog.:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 1076
+                    Width = 1665
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 4
+                    Name ="EtiquetaM"
+                    ControlSource ="EtiquetaM"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 1076
+                            Width = 1710
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta25"
+                            Caption ="Etiqueta Marca:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 736
+                    Width = 1665
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 5
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 736
+                            Width = 1710
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta27"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8070
+                    Top = 411
+                    Width = 1260
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 6
+                    Name ="Texto28"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6345
+                            Top = 411
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta29"
+                            Caption ="Fecha:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8070
+                    Top = 751
+                    Width = 1395
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 7
+                    Name ="Texto30"
+                    ControlSource ="FechaEntrega"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6345
+                            Top = 751
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta31"
+                            Caption ="Fecha de Entrega:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    CanGrow = NotDefault
+                    CanShrink = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Top = 5454
+                    Width = 9975
+                    Height = 150
+                    TabIndex = 8
+                    Name ="Texto32"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 5215
+                            Width = 1560
+                            Height = 240
+                            Name ="Etiqueta33"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin Subform
+                    CanShrink = NotDefault
+                    OverlapFlags = 87
+                    SpecialEffect = 0
+                    Top = 1669
+                    Width = 10095
+                    Height = 421
+                    TabIndex = 9
+                    Name ="OrdImpDet"
+                    SourceObject ="Form.OrdImpDet_Cor"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 1417
+                            Width = 2145
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta37"
+                            Caption ="Distribucion del Corte:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5612
+                    Top = 434
+                    Width = 261
+                    Height = 255
+                    TabIndex = 10
+                    Name ="IdModelos"
+                    ControlSource ="IdModelos"
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    SpecialEffect = 0
+                    Top = 2337
+                    Width = 5106
+                    Height = 372
+                    TabIndex = 11
+                    Name ="OrdImpTela"
+                    SourceObject ="Form.OrdImpTela"
+                    LinkChildFields ="IdModelos"
+                    LinkMasterFields ="IdModelos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 2100
+                            Width = 1395
+                            Height = 285
+                            FontSize = 10
+                            Name ="Etiqueta42"
+                            Caption ="Tela Generica:"
+                        End
+                    End
+                End
+                Begin Image
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    SizeMode = 3
+                    Left = 3374
+                    Top = 2777
+                    Width = 3324
+                    Height = 2437
+                    Name ="Imagen2"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4592
+                    Top = 434
+                    Width = 291
+                    TabIndex = 12
+                    Name ="Foto1"
+                    ControlSource ="Foto1"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5045
+                    Top = 434
+                    Width = 351
+                    TabIndex = 13
+                    Name ="Foto2"
+                    ControlSource ="Foto2"
+                End
+                Begin Image
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    SizeMode = 3
+                    Top = 2777
+                    Width = 3324
+                    Height = 2437
+                    Name ="Imagen1"
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    SpecialEffect = 0
+                    Left = 5159
+                    Top = 2337
+                    Width = 4944
+                    Height = 389
+                    TabIndex = 14
+                    Name ="OrdImpBor"
+                    SourceObject ="Form.OrdImpBor"
+                    LinkChildFields ="IdModelos"
+                    LinkMasterFields ="IdModelos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5170
+                            Top = 2098
+                            Width = 2475
+                            Height = 240
+                            FontSize = 10
+                            Name ="Etiqueta50"
+                            Caption ="Bordados / Estampados:"
+                        End
+                    End
+                End
+                Begin Image
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    SizeMode = 3
+                    Left = 6748
+                    Top = 2777
+                    Width = 3324
+                    Height = 2437
+                    Name ="Imagen3"
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 5782
+                    Top = 1417
+                    Width = 4266
+                    TabIndex = 15
+                    Name ="Texto60"
+                    ControlSource ="Descripcion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4592
+                            Top = 1360
+                            Width = 1200
+                            Height = 270
+                            FontSize = 10
+                            Name ="Etiqueta61"
+                            Caption ="Descripcion:"
+                        End
+                    End
+                End
+                Begin Label
+                    Visible = NotDefault
+                    OverlapFlags = 223
+                    Left = 5159
+                    Top = 2321
+                    Width = 4932
+                    Height = 415
+                    FontSize = 10
+                    FontWeight = 700
+                    BackColor = 8421504
+                    Name ="NoBordado"
+                    Caption ="NO LLEVA BORDADO/ESTAMPADO"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4592
+                    Top = 774
+                    Width = 351
+                    TabIndex = 16
+                    Name ="IdModelosBor"
+                    ControlSource ="IdModelosBor"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 87
+                    Left = 4592
+                    Top = 1134
+                    Width = 351
+                    TabIndex = 17
+                    Name ="Tallas"
+                    ControlSource ="Tallas"
+                End
+                Begin Line
+                    BorderWidth = 1
+                    OverlapFlags = 85
+                    SpecialEffect = 0
+                    Left = 56
+                    Top = 5725
+                    Width = 10035
+                    Name ="Línea65"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextFontFamily = 66
+                    Top = 5782
+                    Width = 6600
+                    Height = 390
+                    FontSize = 14
+                    FontWeight = 700
+                    Name ="Etiqueta67"
+                    Caption ="ORDEN DE PRODUCCION (Version Corta)"
+                    FontName ="Comic Sans MS"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9105
+                    Top = 5782
+                    Width = 900
+                    Height = 315
+                    FontSize = 14
+                    TabIndex = 18
+                    Name ="Texto68"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 7845
+                            Top = 5782
+                            Width = 1200
+                            Height = 315
+                            FontSize = 14
+                            FontWeight = 700
+                            Name ="Etiqueta69"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 6178
+                    Width = 795
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 19
+                    Name ="Texto70"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 6178
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta71"
+                            Caption ="Numero de Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8070
+                    Top = 6873
+                    Width = 1935
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 20
+                    Name ="Texto72"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6345
+                            Top = 6873
+                            Width = 1755
+                            Height = 315
+                            FontSize = 10
+                            Name ="Etiqueta73"
+                            Caption ="Mquilero Prog.:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 6858
+                    Width = 1665
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 21
+                    Name ="Texto74"
+                    ControlSource ="EtiquetaM"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 6858
+                            Width = 1710
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta75"
+                            Caption ="Etiqueta Marca:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1815
+                    Top = 6518
+                    Width = 1665
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 22
+                    Name ="Texto76"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 6518
+                            Width = 1710
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta77"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8070
+                    Top = 6193
+                    Width = 1260
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 23
+                    Name ="Texto78"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6345
+                            Top = 6193
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta79"
+                            Caption ="Fecha:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 8070
+                    Top = 6533
+                    Width = 1395
+                    Height = 255
+                    FontSize = 10
+                    TabIndex = 24
+                    Name ="Texto80"
+                    ControlSource ="FechaEntrega"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6345
+                            Top = 6533
+                            Width = 1755
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta81"
+                            Caption ="Fecha de Entrega:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    CanGrow = NotDefault
+                    CanShrink = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Top = 11236
+                    Width = 9975
+                    Height = 150
+                    TabIndex = 25
+                    Name ="Texto82"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 10997
+                            Width = 1560
+                            Height = 240
+                            Name ="Etiqueta83"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin Subform
+                    CanShrink = NotDefault
+                    OverlapFlags = 87
+                    SpecialEffect = 0
+                    Top = 7451
+                    Width = 10095
+                    Height = 421
+                    TabIndex = 26
+                    Name ="Secundario84"
+                    SourceObject ="Form.OrdImpDet_Cor"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 7199
+                            Width = 2145
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta85"
+                            Caption ="Distribucion del Corte:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    SpecialEffect = 0
+                    Top = 8119
+                    Width = 5106
+                    Height = 372
+                    TabIndex = 27
+                    Name ="Secundario87"
+                    SourceObject ="Form.OrdImpTela"
+                    LinkChildFields ="IdModelos"
+                    LinkMasterFields ="IdModelos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 7875
+                            Width = 1395
+                            Height = 285
+                            FontSize = 10
+                            Name ="Etiqueta88"
+                            Caption ="Tela Generica:"
+                        End
+                    End
+                End
+                Begin Image
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    SizeMode = 3
+                    Left = 3374
+                    Top = 8559
+                    Width = 3324
+                    Height = 2437
+                    Name ="Imagen2a"
+                End
+                Begin Image
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    SizeMode = 3
+                    Top = 8559
+                    Width = 3324
+                    Height = 2437
+                    Name ="Imagen1a"
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    SpecialEffect = 0
+                    Left = 5159
+                    Top = 8119
+                    Width = 4944
+                    Height = 389
+                    TabIndex = 28
+                    Name ="Secundario93"
+                    SourceObject ="Form.OrdImpBor"
+                    LinkChildFields ="IdModelos"
+                    LinkMasterFields ="IdModelos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5170
+                            Top = 7880
+                            Width = 2475
+                            Height = 240
+                            FontSize = 10
+                            Name ="Etiqueta94"
+                            Caption ="Bordados / Estampados:"
+                        End
+                    End
+                End
+                Begin Image
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    SizeMode = 3
+                    Left = 6748
+                    Top = 8559
+                    Width = 3324
+                    Height = 2437
+                    Name ="Imagen3a"
+                End
+                Begin TextBox
+                    FontUnderline = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 5782
+                    Top = 7199
+                    Width = 4266
+                    TabIndex = 29
+                    Name ="Texto96"
+                    ControlSource ="Descripcion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4592
+                            Top = 7142
+                            Width = 1200
+                            Height = 270
+                            FontSize = 10
+                            Name ="Etiqueta97"
+                            Caption ="Descripcion:"
+                        End
+                    End
+                End
+                Begin Label
+                    Visible = NotDefault
+                    OverlapFlags = 223
+                    Left = 5159
+                    Top = 8103
+                    Width = 4932
+                    Height = 415
+                    FontSize = 10
+                    FontWeight = 700
+                    BackColor = 8421504
+                    Name ="Etiqueta98"
+                    Caption ="NO LLEVA BORDADO/ESTAMPADO"
+                End
+            End
+        End
+        Begin PageHeader
+            DisplayWhen = 1
+            Height = 0
+            Name ="EncabezadoDePágina"
+        End
+        Begin Section
+            Height = 0
+            Name ="Detalle"
+        End
+        Begin PageFooter
+            DisplayWhen = 1
+            Height = 0
+            Name ="PieDePágina"
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+DoCmd.Restore
+End Sub
+
+Private Sub Form_Deactivate()
+DoCmd.Close
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+DoCmd.Maximize
+If IsNull(IdModelosBor) = True Then
+NoBordado.Visible = True
+End If
+
+On Error Resume Next
+Me!Imagen1.Picture = DirFotos(Foto1)
+Me!Imagen2.Picture = DirFotos(Foto2)
+Me!Imagen3.Picture = DirBordados(Me![OrdImpBor].Form![Foto])
+Me!Imagen1a.Picture = DirFotos(Foto1)
+Me!Imagen2a.Picture = DirFotos(Foto2)
+Me!Imagen3a.Picture = DirBordados(Me![OrdImpBor].Form![Foto])
+
+Exit Sub
+
+
+End Sub

@@ -1,0 +1,405 @@
+Version = 17
+VersionRequired = 17
+Checksum = -401638662
+Begin Form
+    AutoCenter = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9354
+    DatasheetFontHeight = 10
+    ItemSuffix = 21
+    Left = 5730
+    Top = 780
+    Right = 15375
+    Bottom = 8205
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x66f6039a8f36e440
+    End
+    RecordSource ="SELECT IPT_Modelos.IdIPT_Modelos, IPT_Modelos.NumMod, IPT_Modelos.IdOrdenes, IPT"
+        "_Modelos.IdEtiquetasM, IPT_Modelos.IdClientes, Ordenes.Numero, EtiquetasM.Etique"
+        "taM, Clientes.Cliente, IPT_Modelos.IdEmpresas, Empresas.Empresa, IPT_Mod_Alm.Exi"
+        "stencia, IPT_Mod_Alm.IdIPT_Almacenes FROM ((((IPT_Modelos LEFT JOIN Ordenes ON I"
+        "PT_Modelos.IdOrdenes = Ordenes.IdOrdenes) LEFT JOIN EtiquetasM ON IPT_Modelos.Id"
+        "EtiquetasM = EtiquetasM.IdEtiquetasM) LEFT JOIN Clientes ON IPT_Modelos.IdClient"
+        "es = Clientes.IdClientes) LEFT JOIN Empresas ON IPT_Modelos.IdEmpresas = Empresa"
+        "s.IdEmpresas) LEFT JOIN IPT_Mod_Alm ON IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.I"
+        "dIPT_Modelos WHERE (((IPT_Modelos.IdOrdenes)=0) AND ((IPT_Mod_Alm.IdIPT_Almacene"
+        "s)=1));"
+    Caption ="IPT_RelacOrds"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 793
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 8957
+                    Top = 510
+                    Width = 396
+                    Height = 240
+                    Name ="IdIPT_Modelos Etiqueta"
+                    Caption ="IdIPT_Modelos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdIPT_Modelos_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 170
+                    Top = 510
+                    Width = 720
+                    Height = 240
+                    Name ="NumMod Etiqueta"
+                    Caption ="NumMod"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="NumMod_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 1927
+                    Top = 510
+                    Width = 900
+                    Height = 240
+                    Name ="IdOrdenes Etiqueta"
+                    Caption ="Orden"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdOrdenes_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2884
+                    Top = 510
+                    Width = 900
+                    Height = 240
+                    Name ="IdEmpresas Etiqueta"
+                    Caption ="Empresa"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdEmpresas_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3841
+                    Top = 510
+                    Width = 1005
+                    Height = 240
+                    Name ="IdEtiquetasM Etiqueta"
+                    Caption ="Marca"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdEtiquetasM_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4903
+                    Top = 510
+                    Width = 900
+                    Height = 240
+                    Name ="IdClientes Etiqueta"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdClientes_Etiqueta"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 7086
+                    Top = 226
+                    Height = 463
+                    Name ="RelacionarOrds"
+                    Caption ="Relacionar Ords"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 963
+                    Top = 510
+                    Width = 720
+                    Height = 240
+                    Name ="Etiqueta19"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 396
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 8958
+                    Top = 57
+                    Width = 396
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdIPT_Modelos"
+                    ControlSource ="IdIPT_Modelos"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 171
+                    Top = 57
+                    Width = 720
+                    Height = 255
+                    ColumnWidth = 675
+                    TabIndex = 1
+                    Name ="NumMod"
+                    ControlSource ="NumMod"
+                End
+                Begin TextBox
+                    OverlapFlags = 93
+                    Left = 6633
+                    Top = 56
+                    Width = 540
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    OverlapFlags = 95
+                    Left = 7173
+                    Top = 56
+                    Width = 540
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 3
+                    Name ="IdEmpresas"
+                    ControlSource ="IdEmpresas"
+                End
+                Begin TextBox
+                    OverlapFlags = 95
+                    Left = 7713
+                    Top = 56
+                    Width = 645
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 4
+                    Name ="IdEtiquetasM"
+                    ControlSource ="IdEtiquetasM"
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 8358
+                    Top = 56
+                    Width = 540
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 5
+                    Name ="IdClientes"
+                    ControlSource ="IdClientes"
+                    StatusBarText ="Cliente Original"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1943
+                    Top = 56
+                    Width = 900
+                    Height = 255
+                    TabIndex = 6
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2900
+                    Top = 56
+                    Width = 900
+                    Height = 255
+                    TabIndex = 7
+                    Name ="Empresa"
+                    ControlSource ="Empresa"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3857
+                    Top = 56
+                    Width = 1005
+                    Height = 255
+                    TabIndex = 8
+                    Name ="EtiquetaM"
+                    ControlSource ="EtiquetaM"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4919
+                    Top = 56
+                    Width = 900
+                    Height = 255
+                    TabIndex = 9
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    StatusBarText ="Cliente Original"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 964
+                    Top = 57
+                    Width = 720
+                    Height = 255
+                    TabIndex = 10
+                    Name ="Existencia"
+                    ControlSource ="Existencia"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub RelacionarOrds_Click()
+Dim Dbs As Database
+Dim Mismo As Recordset
+Dim QueOrd As Recordset
+Dim strmensaje As String
+Dim Res
+Set Dbs = CurrentDb
+
+
+Set Mismo = Me.RecordsetClone
+        Do While Not Mismo.EOF
+        
+        Set QueOrd = Dbs.OpenRecordset("SELECT Numero, IdOrdenes, IdEtiquetasM, IdClientes, Modelo FROM Ordenes INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos WHERE Modelo Like '" & NumMod & "*'")
+
+
+             If QueOrd.EOF Then
+             
+             Else
+            strmensaje = "Modelo: " & QueOrd!Modelo & ". Orden a Agregar: " & QueOrd!Numero
+            Res = MsgBox(strmensaje, vbYesNoCancel, "AGREGAR ORDEN")
+            
+            If Res = vbCancel Then GoTo OtroMas
+            If Res = vbNo Then GoTo ElSig
+            If Res = vbYes Then
+            IdOrdenes = QueOrd!IdOrdenes
+            IdEtiquetasM = QueOrd!IdEtiquetasM
+            IdClientes = QueOrd!IdClientes
+            End If
+            End If
+ElSig:
+        
+
+          Mismo.MoveNext
+          DoCmd.GoToRecord , , acNext
+        
+        Loop
+
+OtroMas:
+QueOrd.Close
+Mismo.Close
+Dbs.Close
+End Sub

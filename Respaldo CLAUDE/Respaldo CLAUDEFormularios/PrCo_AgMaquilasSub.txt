@@ -1,0 +1,181 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1860570952
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    DefaultView = 2
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5385
+    DatasheetFontHeight = 10
+    ItemSuffix = 8
+    Left = 5640
+    Top = 2310
+    Right = 14490
+    Bottom = 9090
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x660c5fe75964e340
+    End
+    RecordSource ="SELECT PrCo_Modelos.TipoModelo, PrCo_Modelos.Descripcion, PrCo_Maquilas.PrecioMa"
+        "q, PrCo_Modelos.IdPrCo_Familia, PrCo_Maquilas.IdPrCo_Clientes FROM PrCo_Maquilas"
+        " INNER JOIN PrCo_Modelos ON PrCo_Maquilas.IdPrCo_Modelos = PrCo_Modelos.IdPrCo_M"
+        "odelos WHERE (((PrCo_Modelos.IdPrCo_Familia) Like [Formularios]![PrCo_AgMaquilas"
+        "]![QueFamES]));"
+    Caption ="PrCo_AgMaquilasSub"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Height = 255
+                    ColumnWidth = 3045
+                    Name ="Tipo de Modelo"
+                    ControlSource ="TipoModelo"
+                    EventProcPrefix ="Tipo_de_Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 1815
+                    Top = 57
+                    Width = 1245
+                    Height = 255
+                    ColumnWidth = 4575
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3118
+                    Top = 56
+                    Width = 1200
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="Maquila"
+                    ControlSource ="PrecioMaq"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End

@@ -1,0 +1,205 @@
+Operation = 1
+Option = 0
+Having ="(((Modelos.Modelo) Like [Formularios]![RecibosSemanalesMaq]![QueModeloEs]) AND ("
+    "(CantRecMaqFecha.FechaRec)>=([Formularios]![RecibosSemanalesMaq]![FechaDe]) And "
+    "(CantRecMaqFecha.FechaRec)<=([Formularios]![RecibosSemanalesMaq]![FechaHasta])) "
+    "AND ((CantRecMaqFecha.IdMaquileros) Like [Formularios]![RecibosSemanalesMaq]![Qu"
+    "eMaqEs]))"
+Begin InputTables
+    Name ="Ordenes"
+    Name ="CantidadOrd"
+    Name ="CantRecMaqFecha"
+    Name ="Modelos"
+    Name ="Maquileros"
+    Name ="CantidadEntMaq"
+    Name ="CantRecMaq"
+    Name ="CantidadCorte"
+End
+Begin OutputColumns
+    Alias ="Maq"
+    Expression ="[Nombre]+\" \"+[apellidos]"
+    Expression ="Ordenes.Numero"
+    Expression ="Modelos.Modelo"
+    Expression ="CantidadOrd.CantOrd"
+    Expression ="CantRecMaqFecha.CantRec"
+    Expression ="CantRecMaqFecha.FechaRec"
+    Expression ="CantRecMaqFecha.Observaciones"
+    Alias ="Importe"
+    Expression ="[Promediodepreciopactado]*[CantRecMaqFecha].[CantRec]"
+    Alias ="Faltantes"
+    Expression ="[cantent]-[cantrecmaq].[cantrec]"
+    Expression ="CantRecMaqFecha.IdOrdenes"
+    Expression ="CantRecMaqFecha.IdMaquileros"
+    Expression ="CantidadEntMaq.CantEnt"
+    Expression ="CantRecMaq.CantRec"
+    Expression ="CantRecMaqFecha.Tipo"
+    Expression ="CantidadCorte.CantCorte"
+    Alias ="Precio"
+    Expression ="CantidadEntMaq.PromedioDePrecioPactado"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="CantidadOrd"
+    Expression ="Ordenes.IdOrdenes = CantidadOrd.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CantRecMaqFecha"
+    Expression ="Ordenes.IdOrdenes = CantRecMaqFecha.IdOrdenes"
+    Flag = 3
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 2
+    LeftTable ="CantRecMaqFecha"
+    RightTable ="Maquileros"
+    Expression ="CantRecMaqFecha.IdMaquileros = Maquileros.IdMaquileros"
+    Flag = 2
+    LeftTable ="CantRecMaqFecha"
+    RightTable ="CantidadEntMaq"
+    Expression ="CantRecMaqFecha.IdOrdenes = CantidadEntMaq.IdOrdenes"
+    Flag = 2
+    LeftTable ="CantRecMaqFecha"
+    RightTable ="CantidadEntMaq"
+    Expression ="CantRecMaqFecha.IdMaquileros = CantidadEntMaq.IdMaquileros"
+    Flag = 2
+    LeftTable ="CantRecMaqFecha"
+    RightTable ="CantidadCorte"
+    Expression ="CantRecMaqFecha.IdOrdenes = CantidadCorte.IdOrdenes"
+    Flag = 2
+    LeftTable ="CantRecMaqFecha"
+    RightTable ="CantRecMaq"
+    Expression ="CantRecMaqFecha.IdMaquileros = CantRecMaq.IdMaquileros"
+    Flag = 2
+    LeftTable ="CantRecMaqFecha"
+    RightTable ="CantRecMaq"
+    Expression ="CantRecMaqFecha.IdOrdenes = CantRecMaq.IdOrdenes"
+    Flag = 2
+End
+Begin Groups
+    Expression ="[Nombre]+\" \"+[apellidos]"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="CantidadOrd.CantOrd"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.CantRec"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.FechaRec"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.Observaciones"
+    GroupLevel = 0
+    Expression ="[Promediodepreciopactado]*[CantRecMaqFecha].[CantRec]"
+    GroupLevel = 0
+    Expression ="[cantent]-[cantrecmaq].[cantrec]"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.IdOrdenes"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.IdMaquileros"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.CantEnt"
+    GroupLevel = 0
+    Expression ="CantRecMaq.CantRec"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.Tipo"
+    GroupLevel = 0
+    Expression ="CantidadCorte.CantCorte"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.PromedioDePrecioPactado"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="CantRecMaqFecha.CantRec"
+        dbInteger "ColumnWidth" ="1605"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CantRecMaq.CantRec"
+        dbInteger "ColumnWidth" ="2205"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 47
+    Top = 55
+    Right = 1258
+    Bottom = 560
+    Left = -1
+    Top = -1
+    Right = 1204
+    Bottom = 257
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 674
+        Top = 72
+        Right = 770
+        Bottom = 164
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 306
+        Top = 4
+        Right = 402
+        Bottom = 81
+        Top = 0
+        Name ="CantidadOrd"
+    End
+    Begin
+        Left = 30
+        Top = 10
+        Right = 160
+        Bottom = 102
+        Top = 0
+        Name ="CantRecMaqFecha"
+    End
+    Begin
+        Left = 1004
+        Top = 6
+        Right = 1100
+        Bottom = 98
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 180
+        Top = 136
+        Right = 276
+        Bottom = 258
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 412
+        Top = 102
+        Right = 614
+        Bottom = 229
+        Top = 1
+        Name ="CantidadEntMaq"
+    End
+    Begin
+        Left = 323
+        Top = 108
+        Right = 419
+        Bottom = 200
+        Top = 0
+        Name ="CantRecMaq"
+    End
+    Begin
+        Left = 526
+        Top = 119
+        Right = 622
+        Bottom = 226
+        Top = 0
+        Name ="CantidadCorte"
+    End
+End

@@ -1,0 +1,211 @@
+Operation = 1
+Option = 0
+Having ="(((TelasColores.IdTelas)=[Formularios]![Movimientos]![QueTela]) AND ((TelasColor"
+    "es.IdTelasColores) Like [Formularios]![Movimientos]![QueColor]) AND ((Almacenes."
+    "IdAlmacenes) Like [Formularios]![Movimientos]![QueAlmacen]))"
+Begin InputTables
+    Name ="Salidas"
+    Name ="SalidasDet"
+    Name ="TelasColores"
+    Name ="Telas"
+    Name ="Ordenes"
+    Name ="Modelos"
+    Name ="TelasColAlm"
+    Name ="SalidasAlmacenes"
+    Name ="Almacenes"
+    Name ="Clientes"
+End
+Begin OutputColumns
+    Expression ="Telas.Nombre"
+    Expression ="TelasColores.IdTelas"
+    Expression ="TelasColores.IdTelasColores"
+    Expression ="TelasColores.Color"
+    Expression ="Salidas.Fecha"
+    Alias ="TelaMov1"
+    Expression ="SalidasDet.TelaSal1"
+    Alias ="TelaMov2"
+    Expression ="SalidasDet.TelaSal2"
+    Alias ="NumFact"
+    Expression ="Ordenes.Numero"
+    Expression ="Salidas.Referencia"
+    Expression ="Modelos.Modelo"
+    Expression ="Telas.Texto1"
+    Expression ="Telas.Texto2"
+    Expression ="Almacenes.Almacen"
+    Expression ="Almacenes.IdAlmacenes"
+    Expression ="Clientes.Cliente"
+End
+Begin Joins
+    LeftTable ="Salidas"
+    RightTable ="Ordenes"
+    Expression ="Salidas.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 2
+    LeftTable ="Salidas"
+    RightTable ="SalidasDet"
+    Expression ="Salidas.IdSalidas = SalidasDet.IdSalidas"
+    Flag = 1
+    LeftTable ="Telas"
+    RightTable ="TelasColores"
+    Expression ="Telas.IdTelas = TelasColores.IdTelas"
+    Flag = 1
+    LeftTable ="SalidasDet"
+    RightTable ="TelasColAlm"
+    Expression ="SalidasDet.IdTelasColAlm = TelasColAlm.IdTelasColAlm"
+    Flag = 1
+    LeftTable ="TelasColores"
+    RightTable ="TelasColAlm"
+    Expression ="TelasColores.IdTelasColores = TelasColAlm.IdTelasColores"
+    Flag = 1
+    LeftTable ="Salidas"
+    RightTable ="SalidasAlmacenes"
+    Expression ="Salidas.IdSalidas = SalidasAlmacenes.IdSalidas"
+    Flag = 1
+    LeftTable ="TelasColAlm"
+    RightTable ="Almacenes"
+    Expression ="TelasColAlm.IdAlmacenes = Almacenes.IdAlmacenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Clientes"
+    Expression ="Ordenes.IdClientes = Clientes.IdClientes"
+    Flag = 2
+End
+Begin OrderBy
+    Expression ="Salidas.Fecha"
+    Flag = 0
+End
+Begin Groups
+    Expression ="Telas.Nombre"
+    GroupLevel = 0
+    Expression ="TelasColores.IdTelas"
+    GroupLevel = 0
+    Expression ="TelasColores.IdTelasColores"
+    GroupLevel = 0
+    Expression ="TelasColores.Color"
+    GroupLevel = 0
+    Expression ="Salidas.Fecha"
+    GroupLevel = 0
+    Expression ="SalidasDet.TelaSal1"
+    GroupLevel = 0
+    Expression ="SalidasDet.TelaSal2"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Salidas.Referencia"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="Telas.Texto1"
+    GroupLevel = 0
+    Expression ="Telas.Texto2"
+    GroupLevel = 0
+    Expression ="Almacenes.Almacen"
+    GroupLevel = 0
+    Expression ="Almacenes.IdAlmacenes"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 47
+    Top = 29
+    Right = 1258
+    Bottom = 459
+    Left = -1
+    Top = -1
+    Right = 1200
+    Bottom = 261
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 105
+        Top = 1
+        Name ="Salidas"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 105
+        Top = 1
+        Name ="SalidasDet"
+    End
+    Begin
+        Left = 662
+        Top = 45
+        Right = 758
+        Bottom = 144
+        Top = 0
+        Name ="TelasColores"
+    End
+    Begin
+        Left = 812
+        Top = 11
+        Right = 908
+        Bottom = 110
+        Top = 4
+        Name ="Telas"
+    End
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 105
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 329
+        Top = 134
+        Right = 425
+        Bottom = 233
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 471
+        Top = 80
+        Right = 567
+        Bottom = 194
+        Top = 0
+        Name ="TelasColAlm"
+    End
+    Begin
+        Left = 87
+        Top = 134
+        Right = 183
+        Bottom = 218
+        Top = 0
+        Name ="SalidasAlmacenes"
+    End
+    Begin
+        Left = 650
+        Top = 150
+        Right = 746
+        Bottom = 234
+        Top = 0
+        Name ="Almacenes"
+    End
+    Begin
+        Left = 946
+        Top = 6
+        Right = 1042
+        Bottom = 105
+        Top = 0
+        Name ="Clientes"
+    End
+End

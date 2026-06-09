@@ -1,0 +1,1574 @@
+Version = 17
+VersionRequired = 17
+Checksum = -199845581
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10890
+    DatasheetFontHeight = 10
+    ItemSuffix = 63
+    Left = 7125
+    Top = 2775
+    Right = 18495
+    Bottom = 9345
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x8a1e82be5a3be540
+    End
+    RecordSource ="SELECT RC.NumProcesoRC, RC.IdOrdenes, RC.IdCP_Tiempos, RC.IdCP_Procesos, RC.Fech"
+        "aEst, RC.FechaReal, RC.Acumulado, RC.AntecesorRC, CP_Procesos.Proceso, RC.Tiempo"
+        "RC, CP_Procesos.TipoProceso, RC.IdUsuario, RC.FechaUsuarioRC, RC.IdRC, CP_Proces"
+        "os.EsResurtido FROM CP_Procesos INNER JOIN (RC INNER JOIN CP_Tiempos ON RC.IdCP_"
+        "Tiempos = CP_Tiempos.IdCP_Tiempos) ON CP_Procesos.IdCP_Procesos = RC.IdCP_Proces"
+        "os ORDER BY RC.NumProcesoRC;"
+    Caption ="RC_ProgramacionSub"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000201c0000e010000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x42726f74686572204443502d4c32353430445720736572696573000000000000 ,
+        0x010408019c00740c0f93010001000100ea0a6f08640001000700580201000100 ,
+        0x5802010000004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000a88dfecb00000000000000000000020000000000000000000100f604 ,
+        0xfa020100f604fa02000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000100000000000100000000000006000000 ,
+        0x0700070000000000010000000000000002000000020100010001160000000000 ,
+        0x0001000002000000070000000000000000190000e40c000000000000b80b0000 ,
+        0x7017000000000000dc05000058020000000000000000000000000000feff0000 ,
+        0x000000000000000000000000000000000000000000000000370c0000da0c0000 ,
+        0x10270000102700001027000010270000a00a0000c2060000b80600002c040000 ,
+        0x40010000d2000000180000000000102710271027000010270000000000000000 ,
+        0x0000000000000000000000000100000000000200000000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000100000000000001000100010005010000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000ffffffff64000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0xcccccc0000000000000000000000000000000000000000000000000000000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000064000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000cccccc000000000000000000 ,
+        0x000000000000000000000000000000000000000041007200690061006c000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000006400000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000cccccc000000000000000000000000000000000000000000 ,
+        0x000000000000000041007200690061006c000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000100010064000000000000000000fa02f60403010000 ,
+        0x0000000001000100010000000000020001000100010000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x24000000f5ffffff000000000000000000000000000000000000000100000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000ffffff00010000000000000001000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000001010800 ,
+        0x0101300000010000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000001010002000000 ,
+        0x0200000001000100102700000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000020000000000000005350414e495348000000000000000000 ,
+        0x05000000000000000000000000000000000000005052495601ff0043502d4c32 ,
+        0x353430445720736572696573000000000000003f000000000000000000000000 ,
+        0x210000000000f4010000000000000000ff010000891000008910000089100000 ,
+        0x8910000089100000891000008910000089100000000000000000000000000000 ,
+        0x000b000000001027e4040000440061006e00690065006c0020004d0061007300 ,
+        0x7200690000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000005300450052005600450052000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000010000000000006400 ,
+        0x000000000100000000005f00230023004e004f00550053004500230023005f00 ,
+        0x5f00000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000530045005200560045005200 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012002e00010077696e73706f6f6c000042726f74686572204443502d4c32 ,
+        0x35343044572073657269657300003139322e3136382e312e3838000000000000 ,
+        0x000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 1217
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 6257
+                    Top = 977
+                    Width = 1725
+                    Height = 240
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="FechaEst Etiqueta"
+                    Caption ="Fecha Estimada"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="FechaEst_Etiqueta"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3911
+                    Top = 56
+                    Width = 1986
+                    Height = 328
+                    Name ="Programar"
+                    Caption ="<<  PROGRAMAR  >>"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 2825
+                    Top = 780
+                    Width = 225
+                    Height = 255
+                    TabIndex = 1
+                    Name ="QueArt"
+                    ControlSource ="=[Forms]![RC_Programacion]![IdCP_Articulos]"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 737
+                    Top = 752
+                    Width = 750
+                    Height = 465
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta13"
+                    Caption ="Numero Proceso."
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 255
+                    TextAlign = 2
+                    Left = 2132
+                    Top = 974
+                    Width = 2595
+                    Height = 240
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta15"
+                    Caption ="Proceso"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 3080
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 4802
+                    Top = 737
+                    Width = 660
+                    Height = 465
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta17"
+                    Caption ="Tiempo Proceso"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 247
+                    TextAlign = 2
+                    Left = 1487
+                    Top = 749
+                    Width = 795
+                    Height = 465
+                    BorderColor = 4210752
+                    Name ="Etiqueta19"
+                    Caption ="Proceso Antecesor"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 3305
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 3
+                    Name ="IdCP_Tiempos"
+                    ControlSource ="IdCP_Tiempos"
+                End
+                Begin Label
+                    OverlapFlags = 223
+                    TextAlign = 2
+                    Left = 5507
+                    Top = 752
+                    Width = 870
+                    Height = 465
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta21"
+                    Caption ="Tiempo Acumulado"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 2400
+                    Top = 780
+                    Width = 345
+                    Height = 255
+                    TabIndex = 4
+                    Name ="QueFechaRC"
+                    ControlSource ="=[Forms]![RC_Programacion]![FechaEntregaRC]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 3645
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    TabIndex = 5
+                    Name ="IdCP_Procesos"
+                    ControlSource ="IdCP_Procesos"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 226
+                    Top = 396
+                    Width = 1311
+                    Height = 328
+                    TabIndex = 6
+                    Name ="Reacomodar"
+                    Caption ="Reacomodar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 6349
+                    Top = 453
+                    Width = 1311
+                    Height = 328
+                    TabIndex = 7
+                    Name ="Comando36"
+                    Caption ="Borrar Prog."
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 8042
+                    Top = 977
+                    Width = 1725
+                    Height = 240
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta37"
+                    Caption ="Fecha Real"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 9827
+                    Top = 974
+                    Width = 630
+                    Height = 240
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta39"
+                    Caption ="Retrazo"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 4400
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    TabIndex = 8
+                    Name ="FechaUsuarioRC"
+                    ControlSource ="FechaUsuarioRC"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 255
+                    Left = 4115
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    TabIndex = 9
+                    Name ="IdUsuario"
+                    ControlSource ="IdUsuario"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 3905
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    TabIndex = 10
+                    Name ="TipoProceso"
+                    ControlSource ="TipoProceso"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6368
+                    Top = 56
+                    Width = 1986
+                    Height = 328
+                    TabIndex = 11
+                    Name ="Comando46"
+                    Caption ="ReProgramar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    Top = 752
+                    Width = 750
+                    Height = 465
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta47"
+                    Caption ="ID RC"
+                    Tag ="DetachedLabel"
+                End
+                Begin CommandButton
+                    OverlapFlags = 93
+                    Left = 2685
+                    Top = 405
+                    Width = 2256
+                    Height = 298
+                    TabIndex = 12
+                    Name ="Comando49"
+                    Caption ="Agregar Nuevos Procesos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 8423
+                    Top = 56
+                    Width = 1986
+                    Height = 328
+                    TabIndex = 13
+                    Name ="Comando52"
+                    Caption ="Reacomodarr tiempos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 87
+                    ColumnCount = 2
+                    Left = 1751
+                    Top = 114
+                    Width = 1101
+                    TabIndex = 14
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"3\";\"2\""
+                    Name ="QueOrdenCopiar"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes INNER JOIN RC ON Ordenes.I"
+                        "dOrdenes = RC.IdOrdenes GROUP BY Ordenes.IdOrdenes, Ordenes.Numero, Ordenes.SI_R"
+                        "C, Ordenes.RC_Viva HAVING (((Ordenes.SI_RC)=Yes) AND ((Ordenes.RC_Viva)=Yes));"
+                    ColumnWidths ="0;1701"
+                    BaseInfo ="\"SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes INNER JOIN RC ON Ordenes"
+                        ".IdOrdenes = RC.IdOrdenes GROUP BY Ordenes.IdOrdenes, Ordenes.Numero, Ordenes.SI"
+                        "_RC, Ordenes.RC_Viva HAVING (((Ordenes.SI_RC)=Yes) AND ((Ordenes.RC_Viva)=Yes));"
+                        "\";\"Ordenes\";\"RC\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 114
+                            Width = 1680
+                            Height = 240
+                            Name ="Etiqueta54"
+                            Caption ="Copiar RC de la orden:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 2891
+                    Width = 786
+                    Height = 418
+                    TabIndex = 15
+                    Name ="Copiar"
+                    Caption ="Copiar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 10470
+                    Top = 975
+                    Width = 420
+                    Height = 240
+                    FontSize = 6
+                    BorderColor = 4210752
+                    Name ="Etiqueta60"
+                    Caption ="Listo"
+                    Tag ="DetachedLabel"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 8760
+                    Top = 435
+                    Width = 1311
+                    Height = 328
+                    TabIndex = 16
+                    Name ="EsResurtidoBoton"
+                    Caption ="Es Resurtido"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 4620
+                    Top = 780
+                    Width = 195
+                    Height = 255
+                    TabIndex = 17
+                    Name ="EsResurtido"
+                    ControlSource ="EsResurtido"
+                End
+            End
+        End
+        Begin Section
+            Height = 285
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 6227
+                    Top = -3
+                    Width = 1725
+                    Height = 285
+                    ColumnWidth = 825
+                    TabIndex = 5
+                    Name ="FechaEst"
+                    ControlSource ="FechaEst"
+                    Format ="dddd\", \"dd/mmm/yy"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 737
+                    Top = -3
+                    Width = 735
+                    Height = 285
+                    Name ="NumProcesoRC"
+                    ControlSource ="NumProcesoRC"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 2132
+                    Top = -3
+                    Width = 2790
+                    Height = 285
+                    TabIndex = 2
+                    Name ="Proceso"
+                    ControlSource ="Proceso"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 4922
+                    Top = -3
+                    Width = 570
+                    Height = 285
+                    TabIndex = 3
+                    Name ="TiempoRC"
+                    ControlSource ="TiempoRC"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 1472
+                    Width = 660
+                    Height = 285
+                    TabIndex = 1
+                    Name ="AntecesorRC"
+                    ControlSource ="AntecesorRC"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 5492
+                    Top = -3
+                    Width = 735
+                    Height = 285
+                    TabIndex = 4
+                    Name ="Acumulado"
+                    ControlSource ="Acumulado"
+                End
+                Begin TextBox
+                    OverlapFlags = 119
+                    Left = 7952
+                    Top = -3
+                    Width = 1725
+                    Height = 285
+                    TabIndex = 6
+                    BackColor = 16777215
+                    Name ="FechaReal"
+                    ControlSource ="FechaReal"
+                    Format ="dddd\", \"dd/mmm/yy"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 9827
+                    Top = -3
+                    Width = 630
+                    Height = 285
+                    TabIndex = 7
+                    Name ="Retrazo"
+                    ControlSource ="=int([fechareal]-[fechaest])"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Top = -3
+                    Width = 735
+                    Height = 285
+                    TabIndex = 8
+                    Name ="IdRC"
+                    ControlSource ="IdRC"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 10545
+                    Top = 45
+                    Width = 306
+                    Height = 193
+                    TabIndex = 9
+                    Name ="Hecho"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando23_Click()
+
+End Sub
+
+Private Sub Comando24_Click()
+
+End Sub
+
+Private Function ContarReg() As Integer
+Dim Dbs As Database
+Dim pp As Recordset
+
+Set Dbs = CurrentDb
+Set pp = Dbs.OpenRecordset("Select idordenes from  rc where idordenes= " & Forms![RC_Programacion]![IdOrdenes])
+pp.MoveLast
+
+ContarReg = pp.RecordCount
+
+pp.Close
+Dbs.Close
+End Function
+
+
+
+Private Sub Comando36_Click()
+
+
+DoCmd.GoToRecord , , acFirst
+If MsgBox("Estas 100% seguro de querer borrar la programacion de esta orden?. Este proceso es imposible de rehacer!!!", vbOKCancel, "BORRAR PROGRAMACION") = vbOK Then
+
+Dim Dbs As Database
+
+Set Dbs = CurrentDb
+Dbs.Execute ("Delete * From RC where idordenes = " & Forms![RC_Programacion]![IdOrdenes])
+Dbs.Close
+
+Forms![RC_Programacion]![FechaProg] = ""
+Me.Requery
+QueOrdenCopiar.Requery
+Forms![RC_Programacion]![QueOrden].Requery
+End If
+End Sub
+
+
+
+Private Sub Comando46_Click()
+If MsgBox("Con esta accion, se estableceran nuevas fechas y probablemente cambien drasticamente el cumplimiento de cada proceso. Estas seguro de querer REPROGRAMAR esta RC?. ", vbYesNo, "REPROGRAMACION") = vbNo Then
+Exit Sub
+Else
+Call ReprogramarA
+End If
+End Sub
+
+Private Sub Comando49_Click()
+If MsgBox("En caso de haber dado de alta nuevos procesos, se incluiran en la RC. Esto no se puede deshacer. Estas seguro de querer continuar?. ", vbYesNo, "REPROGRAMACION") = vbNo Then
+Exit Sub
+Else
+Call AgregarProcesosA
+End If
+End Sub
+
+Private Sub VerifAntecesor()
+If AntecesorRC <> 0 Then
+UnoMas:
+            Me.RecordsetClone.FindFirst "[numprocesoRC] = " & Me!AntecesorRC
+            If Me.RecordsetClone.NoMatch Then
+              Me!AntecesorRC = Me!AntecesorRC - 1
+              GoTo UnoMas
+            End If
+End If
+End Sub
+
+Private Sub Comando51_Click()
+Call AltaRC_IP2
+Call AltaRC_IP3
+Call AltaRC_IP4
+Call AltaRC_IP5
+End Sub
+
+Private Sub Comando52_Click()
+Call MeterDiasAcumulados
+Call TiemposEnCero
+Retrazo.Requery
+End Sub
+
+Private Sub Comando56_Click()
+Call OrdenViva
+End Sub
+
+Private Sub Comando57_Click()
+Call TiemposEnCero
+End Sub
+
+Private Sub Copiar_Click()
+If IsNull(QueOrdenCopiar) = False Then
+Call CopiarInfoOrd
+Call CopiarPrograma
+Call AltaRC_IP3
+Call AltaRC_IP4
+Call AltaRC_IP5
+Call TiemposEnCero
+Forms![RC_Programacion]![RC_Viva] = True
+ 
+Else
+MsgBox "Necesitas ingresar la orden de produccion que quieres copiar", vbInformation
+
+End If
+ 
+End Sub
+
+
+
+Private Sub EsResurtidoBoton_Click()
+If MsgBox("Estas seguro de querer establecer las fechas de los procesos que incluyen en el resurtido, como completadas, con la fecha de inicio de la RC?", vbYesNo) = vbYes Then
+
+DoCmd.GoToRecord , , acLast
+
+
+Dim i As Integer
+
+            DoCmd.GoToRecord , , acFirst
+                         
+            
+        For i = 1 To ContarReg() - 1
+            DoCmd.GoToRecord , , acNext
+            
+            If EsResurtido = True Then
+             TiempoRC = 0
+            End If
+        Next
+
+Call MeterDiasAcumulados
+Call TiemposEnCero
+Retrazo.Requery
+End If
+
+End Sub
+
+Private Sub FechaEst_AfterUpdate()
+If TipoProceso = "C" Then
+Forms![RC_Programacion]![FechaEntrega] = FechaEst
+End If
+End Sub
+
+Private Sub FechaReal_AfterUpdate()
+IdUsuario = IdUsuarioACT
+FechaUsuarioRC = Now()
+End Sub
+
+Private Sub Hecho_Click()
+TiempoRC = 0
+Call MeterDiasAcumulados
+Call TiemposEnCero
+Retrazo.Requery
+End Sub
+
+Private Sub Programar_Click()
+Call HacerProgramacion
+Call AltaRC_IP2
+Call AltaRC_IP3
+Call AltaRC_IP4
+Call AltaRC_IP5
+Call TiemposEnCero
+
+QueOrdenCopiar.Requery
+Forms![RC_Programacion]![RC_Viva] = True
+QueOrdenCopiar.Requery
+
+End Sub
+
+
+
+Private Sub Reacomodar_Click()
+Me.Requery
+Dim Dbs As Database
+Dim Reg As Recordset
+Dim i As Integer
+
+'Set Dbs = CurrentDb
+'Set Reg = Dbs.OpenRecordset("SELECT idordenes,numprocesorc,antecesorrc from rc where idordenes = " & Forms![RC_Programacion]![IdOrdenes])
+'With Reg
+ 
+ '.MoveLast
+ '.MoveFirst
+           
+            
+'Do While Not .EOF
+ '  If !NumProcesoRC <> 1 Then
+  '    MsgBox "EL primer proceso debe de tener forzosamente el No. 1 en el Numero de Proceso", vbInformation
+
+   ' Else
+    
+        
+
+            
+            
+    '        .MoveNext
+
+     '   Loop
+'End With
+
+'Reg.Close
+'Dbs.Close
+End Sub
+
+Private Function AplicDias() As Integer
+Dim Dbs As Database
+Dim Apli As Recordset
+
+Set Dbs = CurrentDb
+Set Apli = Dbs.OpenRecordset("Select idRC_Aplicaciones, Dias from RC_Aplicaciones where IdRC_Aplicaciones= " & Forms![RC_Programacion]![IdRC_Aplicaciones])
+
+AplicDias = Apli!Dias
+
+
+Apli.Close
+Dbs.Close
+End Function
+Private Function TelasDias() As Integer
+Dim Dbs As Database
+Dim Tel As Recordset
+
+Set Dbs = CurrentDb
+Set Tel = Dbs.OpenRecordset("Select idRC_TipoTelas, Dias from RC_TipoTelas where IdRC_TipoTelas= " & Forms![RC_Programacion]![IdRC_TipoTelas])
+
+TelasDias = Tel!Dias
+
+
+Tel.Close
+Dbs.Close
+End Function
+
+
+Private Function FactCant(TiempoCc As Integer) As Integer
+Dim Dbs As Database
+Dim Cc As Recordset
+Dim Cantid As Long
+Dim TiempoSim As Single
+
+Cantid = Forms![RC_Programacion]![Cantidad]
+Set Dbs = CurrentDb
+Set Cc = Dbs.OpenRecordset("Select DeCant, ACant, FactorCant from CP_Cant")
+With Cc
+ .MoveLast
+ .MoveFirst
+                
+Do While Not .EOF
+  
+   If Cantid >= !decant And Cantid <= !acant Then
+     TiempoSim = ((TiempoCc) * (!factorcant)) + TiempoColchonCostura()
+     FactCant = CInt(TiempoSim)
+      If FactCant = 0 Then
+       FactCant = 1
+      End If
+       
+     GoTo ByeBye
+   End If
+   
+            .MoveNext
+
+       Loop
+
+End With
+MsgBox "No existe rango de cantidad definido, por lo tanto no se aplico el factor", vbInformation
+FactCant = TiempoCc
+
+ByeBye:
+Cc.Close
+Dbs.Close
+
+End Function
+Private Function FactCantAp(TiempoCc As Integer) As Integer
+Dim Dbs As Database
+Dim Cc As Recordset
+Dim Cantid As Long
+Dim TiempoSim As Single
+
+Cantid = Forms![RC_Programacion]![Cantidad]
+Set Dbs = CurrentDb
+Set Cc = Dbs.OpenRecordset("Select DeCant, ACant, FactorCant from CP_Cant")
+With Cc
+ .MoveLast
+ .MoveFirst
+                
+Do While Not .EOF
+  
+   If Cantid >= !decant And Cantid <= !acant Then
+     TiempoSim = (TiempoCc)
+     FactCantAp = CInt(TiempoSim)
+     GoTo ByeBye
+   End If
+   
+            .MoveNext
+
+       Loop
+
+End With
+MsgBox "No existe rango de cantidad definido, por lo tanto no se aplico el factor", vbInformation
+FactCantAp = TiempoCc
+
+ByeBye:
+Cc.Close
+Dbs.Close
+
+End Function
+
+Private Sub HacerProgramacion()
+If IsNull(Forms![RC_Programacion]![FechaProg]) = False Then
+MsgBox "Ya esta programada esta orden de produccion!!!", vbInformation, "YA ESTA PROGRAMADA"
+Exit Sub
+ElseIf IsNull(Forms![RC_Programacion]![Clave]) = True Then
+MsgBox "No esta definido el tipo de producto de esta orden y por lo tanto no se puede programar.", vbInformation, "FALTA TIPO DE PRODUCTO"
+Exit Sub
+ElseIf IsNull(Forms![RC_Programacion]![FechaEntregaRC]) = True Then
+MsgBox "Tienes que definir una Fecha de entrega de la RC, sin esta fecha no se puede programar.", vbInformation, "FALTA FECHA DE LA RC"
+Exit Sub
+ElseIf IsNull(Forms![RC_Programacion]![TipoTela]) = True Then
+MsgBox "Tienes que definir un Tipo de Tela, sin esa informacion no se puede programar.", vbInformation, "FALTA TIPO DE TELA"
+Exit Sub
+ElseIf IsNull(Forms![RC_Programacion]![Aplic]) = True Then
+MsgBox "Tienes que definir un Tipo de Aplicacion, sin esa informacion no se puede programar.", vbInformation, "FALTA APLICACION"
+Exit Sub
+
+
+Else
+
+Me.AllowAdditions = True
+Dim Dbs As Database
+Dim Prog As Recordset
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT CP_Tiempos.IdCP_Tiempos, CP_Tiempos.IdCP_Procesos, CP_Tiempos.IdCP_Articulos, CP_Tiempos.Antecesor, CP_Procesos.NumProceso,CP_Procesos.TipoProceso, CP_Procesos.NoLlevaProceso, CP_Tiempos.Tiempo FROM CP_Procesos INNER JOIN (CP_Articulos INNER JOIN CP_Tiempos ON CP_Articulos.IdCP_Articulos = CP_Tiempos.IdCP_Articulos) ON CP_Procesos.IdCP_Procesos = CP_Tiempos.IdCP_Procesos WHERE CP_Tiempos.IdCP_Articulos = " & QueArt)
+        
+With Prog
+        .MoveLast
+        .MoveFirst
+
+        Do While Not .EOF
+             
+               If Forms![RC_Programacion]![DiasAp] = 0 Then
+                 If !NoLlevaProceso = True Then
+                   GoTo AlSiguiente
+                 End If
+               End If
+             
+             DoCmd.GoToRecord , , acNewRec
+         
+            Me![IdCP_Tiempos] = !IdCP_Tiempos
+            Me![IdCP_Procesos] = !IdCP_Procesos
+            Me![NumProcesoRC] = !NumProceso
+            Me![AntecesorRC] = !Antecesor
+         
+         If IsNull(!TipoProceso) = True Then
+            Me![TiempoRC] = !Tiempo
+         
+         
+         ElseIf !TipoProceso = "T" Then
+                If IsNull(Forms![RC_Programacion]![TipoTela]) = False Then
+                    Me![TiempoRC] = TelasDias()
+                Else
+                    MsgBox "Se esta metiendo la programacion SIN un tipo de telas especifico. Se va a tomar el tiempo predeterminado para este tipo de producto", vbInformation, "NO ESTA ESPECIFICADO EL TIPO DE TELA"
+                    Me![TiempoRC] = !Tiempo
+                End If
+                
+                
+         ElseIf !TipoProceso = "RP" Then
+            
+                If IsNull(Forms![RC_Programacion]![IdRC_Aplicaciones]) = False Then
+                    Me![TiempoRC] = FactCantAp(AplicDias())
+                Else
+                    MsgBox "Se esta metiendo la programacion SIN un Tipo de Aplicacion especifico. Se va a tomar el tiempo predeterminado para este tipo de producto", vbInformation, "NO ESTA ESPECIFICADO LAS APLICACIONES"
+                    Me![TiempoRC] = !Tiempo
+                End If
+                
+         ElseIf !TipoProceso = "EC" Then
+                 If (Forms![RC_Programacion]![DiasAp] = 0) Then
+                 
+                    Me![AntecesorRC] = 22
+                    Me![TiempoRC] = !Tiempo
+                 Else
+                    Me![AntecesorRC] = !Antecesor
+                    Me![TiempoRC] = !Tiempo
+                 End If
+                 
+         
+         ElseIf !TipoProceso = "C" Then
+            Me![TiempoRC] = FactCant(!Tiempo)
+         
+         Else
+            Me![TiempoRC] = !Tiempo
+         End If
+            
+AlSiguiente:
+            .MoveNext
+
+        Loop
+
+
+        .Close
+    End With
+    
+
+Dbs.Close
+Me.AllowAdditions = False
+ Forms![RC_Programacion]![FechaProg] = Now()
+Me.Requery
+Forms![RC_Programacion]![QueOrden].Requery
+Call MeterDiasAcumulados
+
+End If
+End Sub
+
+Private Sub MeterDiasAcumulados()
+If IsNull(Forms![RC_Programacion]![FechaProg]) = True Then
+ MsgBox "Tienes que programar primero para poder establecer el acumulado de dias", vbInformation, "FALTA PROGRAMAR"
+ GoTo Alamak
+End If
+Dim i, queAcum, numReg, QueReg As Integer
+
+
+            DoCmd.GoToRecord , , acFirst
+            Acumulado = TiempoRC
+        For i = 1 To ContarReg() - 1
+
+           
+            DoCmd.GoToRecord , , acNext
+            QueReg = Me.CurrentRecord
+            
+            Me.RecordsetClone.FindFirst "[numprocesoRC] = " & Me!AntecesorRC
+            Me.Bookmark = Me.RecordsetClone.Bookmark
+            queAcum = Me!Acumulado
+            DoCmd.GoToRecord , , acGoTo, QueReg
+            Acumulado = TiempoRC + queAcum
+           
+        Next
+Call EstablecerLasFechas
+Alamak:
+End Sub
+
+Private Sub ReprogramarA()
+'' If Me = True Then
+'' MsgBox "No puedes REPROGRAMAR si nunca has programado nada", vbInformation, "PRIMERO PROGRAMA"
+'' Exit Sub
+
+'' Else
+
+Me.AllowAdditions = True
+Dim Dbs As Database
+Dim Prog As Recordset
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT CP_Tiempos.IdCP_Tiempos, CP_Tiempos.IdCP_Procesos, CP_Tiempos.IdCP_Articulos, CP_Tiempos.Antecesor, CP_Procesos.NumProceso, CP_Procesos.TipoProceso, CP_Tiempos.Tiempo FROM CP_Procesos INNER JOIN (CP_Articulos INNER JOIN CP_Tiempos ON CP_Articulos.IdCP_Articulos = CP_Tiempos.IdCP_Articulos) ON CP_Procesos.IdCP_Procesos = CP_Tiempos.IdCP_Procesos WHERE (((CP_Tiempos.IdCP_Articulos) =" & QueArt & ")) ORDER BY CP_Procesos.NumProceso")
+        
+'' ("SELECT CP_Tiempos.IdCP_Tiempos, CP_Tiempos.IdCP_Procesos, CP_Tiempos.IdCP_Articulos, CP_Tiempos.Antecesor, CP_Procesos.NumProceso, CP_Procesos.TipoProceso, CP_Tiempos.Tiempo FROM CP_Procesos INNER JOIN (CP_Articulos INNER JOIN CP_Tiempos ON CP_Articulos.IdCP_Articulos = CP_Tiempos.IdCP_Articulos) ON CP_Procesos.IdCP_Procesos = CP_Tiempos.IdCP_Procesos WHERE (((CP_Tiempos.IdCP_Articulos) =" & queart & ")) ORDER BY CP_Procesos.NumProceso")
+With Prog
+        .MoveLast
+        .MoveFirst
+DoCmd.GoToRecord , , acFirst
+  Do While Not .EOF
+    If NumProcesoRC <> !NumProceso Then GoTo OtroMas
+         Me![AntecesorRC] = !Antecesor
+         Call VerifAntecesor
+         
+         If IsNull(!TipoProceso) = True Then
+            Me![TiempoRC] = !Tiempo
+         
+         
+         ElseIf !TipoProceso = "T" Then
+                If IsNull(Forms![RC_Programacion]![TipoTela]) = False Then
+                    Me![TiempoRC] = TelasDias()
+                Else
+                    MsgBox "Se esta metiendo la programacion SIN un tipo de telas especifico. Se va a tomar el tiempo predeterminado para este tipo de producto", vbInformation, "NO ESTA ESPECIFICADO EL TIPO DE TELA"
+                    Me![TiempoRC] = !Tiempo
+                End If
+                
+         ElseIf !TipoProceso = "RP" Then
+            
+                If IsNull(Forms![RC_Programacion]![IdRC_Aplicaciones]) = False Then
+                    Me![TiempoRC] = FactCantAp(AplicDias())
+                Else
+                    MsgBox "Se esta metiendo la programacion SIN un Tipo de Aplicacion especifico. Se va a tomar el tiempo predeterminado para este tipo de producto", vbInformation, "NO ESTA ESPECIFICADO LAS APLICACIONES"
+                    Me![TiempoRC] = !Tiempo
+                End If
+         
+         ElseIf !TipoProceso = "C" Then
+            Me![TiempoRC] = FactCant(!Tiempo)
+        
+         Else
+            Me![TiempoRC] = !Tiempo
+         
+         End If
+            DoCmd.GoToRecord , , acNext
+OtroMas:
+            
+            .MoveNext
+        Loop
+        .Close
+    End With
+    
+Dbs.Close
+Me.AllowAdditions = False
+
+Me.Requery
+Forms![RC_Programacion]![QueOrden].Requery
+Call MeterDiasAcumulados
+''End If
+End Sub
+
+Private Sub EstablecerLasFechas()
+Dim totalDias As Integer
+Dim Aa As Boolean
+Aa = True
+DoCmd.GoToRecord , , acLast
+totalDias = Acumulado
+Dim FechaInicio, QueFecha, QueFechaAnt As Date
+
+Dim i, numReg, QueReg, DiasDeMas, DiasDeMas2 As Integer
+FechaInicio = FechaHabiles(QueFechaRC, totalDias)
+OtraVez:
+            DoCmd.GoToRecord , , acFirst
+            FechaReal = Forms![RC_Programacion]![Fecha]
+              If Aa = False Then
+              FechaInicio = FechaInicio - 1
+              Aa = True
+              End If
+            If WeekDay(FechaInicio) = vbSaturday Then
+            FechaEst = FechaInicio - 1
+            ElseIf WeekDay(FechaInicio) = vbSunday Then
+            FechaEst = FechaInicio - 2
+            Else
+            FechaEst = FechaInicio
+            End If
+            
+            
+        For i = 1 To ContarReg() - 1
+            DoCmd.GoToRecord , , acNext
+            QueReg = Me.CurrentRecord
+            
+            Me.RecordsetClone.FindFirst "[numprocesorc] = " & Me!AntecesorRC
+            Me.Bookmark = Me.RecordsetClone.Bookmark
+            QueFechaAnt = FechaEst
+            DoCmd.GoToRecord , , acGoTo, QueReg
+            
+            QueFecha = QueFechaAnt + TiempoRC
+            DiasDeMas = CuantosSabYDom(QueFechaAnt, QueFechaAnt + TiempoRC)
+            
+            DiasDeMas2 = CuantosSabYDom(QueFechaAnt + TiempoRC, QueFechaAnt + TiempoRC + DiasDeMas)
+            
+            QueFecha = QueFecha + DiasDeMas + DiasDeMas2
+            
+            
+            If WeekDay(QueFecha) = vbSaturday Then
+             FechaEst = QueFecha + 2
+            ElseIf WeekDay(QueFecha) = vbSunday Then
+             FechaEst = QueFecha + 1
+            Else
+             FechaEst = QueFecha
+            End If
+            
+               If TipoProceso = "C" Then
+                 Forms![RC_Programacion]![FechaEntrega] = FechaEst
+               End If
+        Next
+        
+        
+ If FechaEst > QueFechaRC Then
+  Aa = False
+  GoTo OtraVez
+ End If
+Forms![RC_Programacion]![QueOrden].Requery
+
+DoCmd.GoToRecord , , acFirst
+Forms![RC_Programacion]![RC_ProgramacionSub].Form![FechaReal].SetFocus
+End Sub
+Private Sub AgregarProcesosA()
+
+Me.AllowAdditions = True
+Dim Dbs As Database
+Dim Prog As Recordset
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT CP_Tiempos.IdCP_Tiempos, CP_Tiempos.IdCP_Procesos, CP_Tiempos.IdCP_Articulos, CP_Tiempos.Antecesor, CP_Procesos.NumProceso, CP_Procesos.TipoProceso, CP_Tiempos.Tiempo FROM CP_Procesos INNER JOIN (CP_Articulos INNER JOIN CP_Tiempos ON CP_Articulos.IdCP_Articulos = CP_Tiempos.IdCP_Articulos) ON CP_Procesos.IdCP_Procesos = CP_Tiempos.IdCP_Procesos WHERE (CP_Tiempos.IdCP_Articulos) =" & QueArt)
+        
+'' ("SELECT CP_Tiempos.IdCP_Tiempos, CP_Tiempos.IdCP_Procesos, CP_Tiempos.IdCP_Articulos, CP_Tiempos.Antecesor, CP_Procesos.NumProceso, CP_Procesos.TipoProceso, CP_Tiempos.Tiempo FROM CP_Procesos INNER JOIN (CP_Articulos INNER JOIN CP_Tiempos ON CP_Articulos.IdCP_Articulos = CP_Tiempos.IdCP_Articulos) ON CP_Procesos.IdCP_Procesos = CP_Tiempos.IdCP_Procesos WHERE (((CP_Tiempos.IdCP_Articulos) =" & queart & ")) ORDER BY CP_Procesos.NumProceso")
+With Prog
+        .MoveLast
+        .MoveFirst
+DoCmd.GoToRecord , , acFirst
+        Do While Not .EOF
+         
+            Me![IdCP_Tiempos] = !IdCP_Tiempos
+            Me![IdCP_Procesos] = !IdCP_Procesos
+            Me![NumProcesoRC] = !NumProceso
+            Me![AntecesorRC] = !Antecesor
+         
+         If IsNull(!TipoProceso) = True Then
+            Me![TiempoRC] = !Tiempo
+         
+         
+         ElseIf !TipoProceso = "T" Then
+                If IsNull(Forms![RC_Programacion]![TipoTela]) = False Then
+                    Me![TiempoRC] = TelasDias()
+                Else
+                    MsgBox "Se esta metiendo la programacion SIN un tipo de telas especifico. Se va a tomar el tiempo predeterminado para este tipo de producto", vbInformation, "NO ESTA ESPECIFICADO EL TIPO DE TELA"
+                    Me![TiempoRC] = !Tiempo
+                End If
+                
+         ElseIf !TipoProceso = "RP" Then
+            
+                If IsNull(Forms![RC_Programacion]![IdRC_Aplicaciones]) = False Then
+                    Me![TiempoRC] = FactCantAp(AplicDias())
+                Else
+                    MsgBox "Se esta metiendo la programacion SIN un Tipo de Aplicacion especifico. Se va a tomar el tiempo predeterminado para este tipo de producto", vbInformation, "NO ESTA ESPECIFICADO LAS APLICACIONES"
+                    Me![TiempoRC] = !Tiempo
+                End If
+         
+         ElseIf !TipoProceso = "C" Then
+            Me![TiempoRC] = FactCant(!Tiempo)
+            
+         Else
+            Me![TiempoRC] = !Tiempo
+         End If
+            DoCmd.GoToRecord , , acNext
+            .MoveNext
+        Loop
+        .Close
+    End With
+Dbs.Execute "UPDATE Ordenes Set Ordenes.RC_Viva=True Where IdOrdenes=" & IdOrdenes
+Dbs.Close
+Me.AllowAdditions = False
+
+Me.Requery
+Forms![RC_Programacion]![QueOrden].Requery
+Call MeterDiasAcumulados
+''End If
+End Sub
+
+Private Sub AltaRC_IP2()
+On Error GoTo Ersu
+Dim Dbs As Database
+Dim Prog As Recordset
+Dim Tp As String
+Tp = "L"
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT IdRC, RC.IdOrdenes, CP_Procesos.TipoProceso FROM RC INNER JOIN CP_Procesos ON RC.IdCP_Procesos = CP_Procesos.IdCP_Procesos WHERE (((RC.IdOrdenes)= " & IdOrdenes & ") AND (CP_Procesos.TipoProceso)= '" & Tp & "')")
+        
+Dbs.Execute "INSERT INTO [RC_IP2] (IdRC) VALUES (" & Prog!IdRC & ")"
+
+Prog.Close
+Dbs.Close
+Ersu:
+
+End Sub
+Private Sub AltaRC_IP3()
+On Error GoTo Ers2
+Dim Dbs As Database
+Dim Prog As Recordset
+Dim Tp As String
+Tp = "M"
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT IdRC, RC.IdOrdenes, CP_Procesos.TipoProceso FROM RC INNER JOIN CP_Procesos ON RC.IdCP_Procesos = CP_Procesos.IdCP_Procesos WHERE (((RC.IdOrdenes)= " & IdOrdenes & ") AND (CP_Procesos.TipoProceso)= '" & Tp & "')")
+        
+Dbs.Execute "INSERT INTO [RC_IP3] (IdRC) VALUES (" & Prog!IdRC & ")"
+
+Prog.Close
+Dbs.Close
+Ers2:
+End Sub
+Private Sub AltaRC_IP4()
+On Error GoTo ErS
+Dim Dbs As Database
+Dim Prog As Recordset
+Dim Tp As String
+Tp = "F"
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT IdRC, RC.IdOrdenes, CP_Procesos.TipoProceso FROM RC INNER JOIN CP_Procesos ON RC.IdCP_Procesos = CP_Procesos.IdCP_Procesos WHERE (((RC.IdOrdenes)= " & IdOrdenes & ") AND (CP_Procesos.TipoProceso)= '" & Tp & "')")
+        
+Dbs.Execute "INSERT INTO [RC_IP4] (IdRC) VALUES (" & Prog!IdRC & ")"
+        
+
+Prog.Close
+Dbs.Close
+ErS:
+End Sub
+Private Sub AltaRC_IP5()
+On Error GoTo Ers1
+Dim Dbs As Database
+Dim Prog As Recordset
+Dim Tp As String
+Tp = "P"
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT IdRC, RC.IdOrdenes, CP_Procesos.TipoProceso FROM RC INNER JOIN CP_Procesos ON RC.IdCP_Procesos = CP_Procesos.IdCP_Procesos WHERE (((RC.IdOrdenes)= " & IdOrdenes & ") AND (CP_Procesos.TipoProceso)= '" & Tp & "')")
+        
+Dbs.Execute "INSERT INTO [RC_IP5] (IdRC) VALUES (" & Prog!IdRC & ")"
+        
+
+Prog.Close
+Dbs.Close
+Ers1:
+End Sub
+
+Private Sub OrdenViva()
+
+Dim Dbs As Database
+
+Set Dbs = CurrentDb
+
+Dbs.Execute "UPDATE Ordenes Set Ordenes.RC_Viva=True Where IdOrdenes=" & Forms![RC_Programacion]![IdOrdenes]
+
+Dbs.Close
+
+End Sub
+
+Private Sub CopiarInfoOrd()
+
+Dim Dbs As Database
+Dim Prog As Recordset
+
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT IdCP_Articulos, IdRC_Aplicaciones, IdRC_TipoTelas FROM Ordenes Where IdOrdenes=" & QueOrdenCopiar)
+        
+   Forms![RC_Programacion]![IdCP_Articulos] = Prog!IdCP_Articulos
+   Forms![RC_Programacion]![IdRC_Aplicaciones] = Prog!IdRC_Aplicaciones
+   Forms![RC_Programacion]![IdRC_TipoTelas] = Prog!IdRC_TipoTelas
+
+   ' Forms![RC_Programacion]![IdRC_TipoTelas] = 3
+Prog.Close
+Dbs.Close
+
+
+End Sub
+
+Private Sub CopiarPrograma()
+If IsNull(Forms![RC_Programacion]![FechaProg]) = False Then
+MsgBox "Ya esta programada esta orden de produccion. Si quieres copiar otra orden, primero borra esta programacion!!!", vbInformation, "YA ESTA PROGRAMADA"
+Exit Sub
+
+
+Else
+
+Me.AllowAdditions = True
+Dim Dbs As Database
+Dim Prog As Recordset
+
+Set Dbs = CurrentDb
+Set Prog = Dbs.OpenRecordset("SELECT IdCP_Tiempos, IdCP_Procesos, NumProcesoRC, TiempoRC, AntecesorRC, FechaEst, Acumulado FROM RC Where IdOrdenes =" & QueOrdenCopiar)
+
+
+        
+With Prog
+        .MoveLast
+        .MoveFirst
+
+        Do While Not .EOF
+             DoCmd.GoToRecord , , acNewRec
+         
+            Me![IdCP_Tiempos] = !IdCP_Tiempos
+            Me![IdCP_Procesos] = !IdCP_Procesos
+            Me![NumProcesoRC] = !NumProcesoRC
+            Me![TiempoRC] = !TiempoRC
+            Me![AntecesorRC] = !AntecesorRC
+            Me![FechaEst] = !FechaEst
+            
+         .MoveNext
+
+        Loop
+
+
+        .Close
+    End With
+    
+
+Dbs.Close
+Me.AllowAdditions = False
+ Forms![RC_Programacion]![FechaProg] = Now()
+Me.Requery
+Forms![RC_Programacion]![QueOrden].Requery
+Call MeterDiasAcumulados
+
+End If
+End Sub
+
+Private Sub TiemposEnCero()
+
+DoCmd.GoToRecord , , acLast
+
+
+Dim i As Integer
+
+            DoCmd.GoToRecord , , acFirst
+                         
+            
+        For i = 1 To ContarReg() - 1
+            DoCmd.GoToRecord , , acNext
+            
+            If (TiempoRC = 0) Then
+             FechaReal = Forms![RC_Programacion]![Fecha]
+            End If
+        Next
+        
+
+DoCmd.GoToRecord , , acFirst
+Forms![RC_Programacion]![RC_ProgramacionSub].Form![FechaReal].SetFocus
+End Sub
+
+
+
+
+Private Function QueAntecesorCO()
+Dim Dbs As Database
+Dim TiempoCol As Recordset
+
+Set Dbs = CurrentDb
+Set TiempoCol = Dbs.OpenRecordset("SELECT NumProceso FROM CP_Procesos WHERE (CP_Procesos.TipoProceso)=12")
+
+QueAntecesorCO = TiempoCol!NumProceso
+
+TiempoCol.Close
+Dbs.Close
+
+End Function

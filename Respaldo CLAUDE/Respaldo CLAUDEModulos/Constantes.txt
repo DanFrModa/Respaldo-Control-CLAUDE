@@ -1,0 +1,27 @@
+Option Compare Database
+Option Explicit
+
+Public NivelAct As Integer
+Public IdUsuarioACT As Integer
+Public IdRC_TipoUsuariosAct As Integer
+Public DesdeQueAnoAct As Integer
+Public FechaInvFisico As Date
+Public FechaInvFisicoPT As Date
+Public QueIdUsuariosLog As Integer
+Public EmpresaFav As Integer
+Public Const HorasBaseAlm As Integer = 9
+Public AlmDefPT As Integer
+
+Option Base 1
+Public PrP(50) As Boolean
+
+Public Const Ubica As String = "S:\AplicacionesMJD\Control\" 'Ubicacion de las fotos
+''"S:\AplicacionesMJD\Control\"
+Public Const VersionAct As Double = 4.41
+
+' Pasos para actualizar:
+' 1. Actualizar vinculos de tablas (borrar y volver a vincular)
+' 2. Cambiar icono en INICIO.
+' 3. Cambiar la ruta de las fotos (aca arribita)
+' 4. Desactivar las referencias que no existan.
+' 5. Alta de accesos a usuarios (en caso de que hayan nuevos accesos).

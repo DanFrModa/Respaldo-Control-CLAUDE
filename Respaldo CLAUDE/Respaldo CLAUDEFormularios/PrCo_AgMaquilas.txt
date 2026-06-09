@@ -1,0 +1,303 @@
+Version = 17
+VersionRequired = 17
+Checksum = -317127036
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 12755
+    DatasheetFontHeight = 10
+    ItemSuffix = 22
+    Left = 3285
+    Top = 675
+    Right = 16680
+    Bottom = 8655
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xfbe98e7f5964e340
+    End
+    RecordSource ="PrCo_Clientes"
+    Caption ="PrCo_AgMaquilas"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 3465
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="METER MAQUILAS DE PRECOSTOS"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7648
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4705
+                    Top = 56
+                    Width = 501
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdPrCo_Clientes"
+                    ControlSource ="IdPrCo_Clientes"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 397
+                    Width = 1440
+                    Height = 3517
+                    TabIndex = 1
+                    Name ="Lista11"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW [PrCo_Clientes].[IdPrCo_Clientes], [PrCo_Clientes].[TipoClien"
+                        "te] FROM [PrCo_Clientes];"
+                    ColumnWidths ="0;1440"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 113
+                            Width = 630
+                            Height = 240
+                            Name ="QueClienteEtiqueta_"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 4252
+                    Width = 1416
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="QueFam"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Familia.IdPrCo_Familia, PrCo_Familia.Familia FROM PrCo_Familia;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT PrCo_Familia.IdPrCo_Familia, PrCo_Familia.Familia FROM PrCo_Familia;\";"
+                        "\"PrCo_Familia\";\"\";\"IdPrCo_Familia\";\"Familia\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 4025
+                            Width = 795
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Familia:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 4592
+                    Width = 501
+                    Height = 255
+                    TabIndex = 3
+                    Name ="QueFamES"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 2441
+                    Top = 113
+                    Width = 1821
+                    TabIndex = 4
+                    Name ="TipoCliente"
+                    ControlSource ="TipoCliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1700
+                            Top = 113
+                            Width = 915
+                            Height = 240
+                            Name ="Etiqueta16"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 2211
+                    Top = 448
+                    Width = 9360
+                    Height = 7200
+                    TabIndex = 5
+                    Name ="PrCo_AgMaquilasSub"
+                    SourceObject ="Form.PrCo_AgMaquilasSub"
+                    LinkChildFields ="IdPrCo_Clientes"
+                    LinkMasterFields ="IdPrCo_Clientes"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 11622
+                    Top = 7143
+                    Width = 1086
+                    Height = 448
+                    FontWeight = 700
+                    TabIndex = 6
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Sub Lista11_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdPrCo_Clientes] = " & Me![Lista11]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub QueFam_AfterUpdate()
+If IsNull(QueFam) = True Then
+ QueFamEs = "*"
+Else
+ QueFamEs = QueFam
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

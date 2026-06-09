@@ -1,0 +1,171 @@
+Option Compare Database
+Option Explicit
+
+
+'*******************************************************************************
+'* ReVinculaTablas
+'* presupone que todas las tablas vinculadas pertenecen a la base de datos
+'* Neptuno
+'* Revincula las tablas remotas
+'* Argumentos: strBaseDatos => Ruta de la base de datos
+'* uso: If Not ComprobarVinculacion(strTabla) Then ReVinculaTablas
+'* ESH 12/02/06 10:55
+'*******************************************************************************
+
+Function ReVinculaTablas()
+Dim i As Long, _
+    strBDRemota As String, _
+    Dbs As DAO.Database, _
+    bytVersion As Byte
+
+On Error GoTo ReVinculaTablas_TratamientoErrores
+
+bytVersion = Val(SysCmd(acSysCmdAccessVer))
+Set Dbs = CurrentDb
+
+
+      strBDRemota = "C:\Aplicaciones\Control\NuevaVersion\Provi"
+
+
+For i = 0 To Dbs.TableDefs.Count - 1
+   ' si dbs.TableDefs(i).connect no está vacio, es por que se trata de una tabla vinculada
+   If (Dbs.TableDefs(i).Connect <> "") Then
+      ' así pues asigno la "nueva" ruta a la tabla vinculada
+      Dbs.TableDefs(i).Connect = ";DATABASE=" & strBDRemota & ";"
+      Dbs.TableDefs(i).RefreshLink
+   End If
+Next i
+
+ReVinculaTablas_Salir:
+Set Dbs = Nothing
+On Error GoTo 0
+Exit Function
+
+ReVinculaTablas_TratamientoErrores:
+If Err.Number = 3024 Or Err.Number = 3078 Or Err.Number = 3011 Then
+   MsgBox "La base de datos FotosBD.mdb no se encuentra en "
+Else
+   MsgBox "Error " & Err.Number & " en proc. ReVinculaTablas de Módulo VinculacionTablas (" & Err.Description & ")", vbOKOnly + vbCritical
+End If
+GoTo ReVinculaTablas_Salir
+
+End Function    ' ReVinculaTablas
+
+
+'*******************************************************************************
+'* ComprobarVinculacion
+'* Verifica la correcta vinculación de una tabla vinculada
+'* Argumentos: strTabla => Tabla que queremos comprobar
+'* uso: ComprobarVinculacion strTabla
+'* ESH 28/08/04 17:47
+'*******************************************************************************
+
+Function ComprobarVinculacion(strTabla As String) As Boolean
+
+Dim Rst As DAO.Recordset, _
+    strSQL As String
+
+On Error GoTo ComprobarVinculacion_TratamientoErrores
+
+' creo un recordset vacio contra una tabla vinculada
+strSQL = "SELECT * " _
+       & "FROM " & strTabla & " " _
+       & "WHERE  0 = 1"
+
+' abro el recordset
+Set Rst = CurrentDb.OpenRecordset(strSQL, dbOpenDynaset)
+
+' si no se produce ningún error, la vinculación es correcta
+If Err = 0 Then ComprobarVinculacion = True
+
+ComprobarVinculacion_Salir:
+   CierraRecordset Rst
+   On Error GoTo 0
+   Exit Function
+
+ComprobarVinculacion_TratamientoErrores:
+   Select Case Err
+      Case 3024, 3043, 3044            ' la base de datos vinculada no existe
+      Case 3078                        ' la tabla no existe
+         MsgBox "La tabla vinculada " & Chr(34) & UCase(strTabla) & Chr(34) & " no existe en " & vbCrLf & CurrentProject.Path & "\" & CurrentProject.Name, vbOKOnly + vbCritical, "ATENCION"
+      Case Else
+         MsgBox "Error " & Err.Number & " en proc. ComprobarVinculacion de Módulo VinculacionTablas (" & Err.Description & ")", vbOKOnly + vbCritical
+   End Select
+   ComprobarVinculacion = False
+   Resume ComprobarVinculacion_Salir
+End Function            ' ComprobarVinculacion
+
+
+'*******************************************************************************
+'* AjustarTamaño
+'* Ajusta el tamaño del formulario pasado como parámetro
+'* Argumentos: frmFormulario => Formulario llamante
+'* uso: AjustarTamaño Me
+'* ESH 06/03/05 12:25
+'* ESH 08/10/05 19:50 incluyo el alto de las distintas secciones
+'* ESH 08/03/06 18:15 me aseguro de ajustar la altura solo en los formularios
+'*                    simples
+'*******************************************************************************
+ 
+Public Sub AjustarTamaño(frmFormulario As Form)
+
+Dim i As Long
+
+On Error GoTo AjustarTamaño_TratamientoErrores
+
+' ajusto el ancho del formulario teniendo en cuenta si tiene o no selector de registros
+If Not frmFormulario.RecordSelectors Then
+    frmFormulario.InsideWidth = frmFormulario.Width
+Else
+    frmFormulario.InsideWidth = frmFormulario.Width + 250
+End If
+
+' si se abre en vista formulario simple
+If frmFormulario.DefaultView = 0 Then
+   ' ajusto el alto incluyendo las distintas secciones, encabezado, pie, grupos...
+   ' como no sé el número de secciones del formulario, me salgo al producirse un error
+   frmFormulario.InsideHeight = 0
+   For i = 0 To 100
+      frmFormulario.InsideHeight = frmFormulario.InsideHeight + frmFormulario.Section(i).Height
+   Next
+End If
+
+AjustarTamaño_Salir:
+   DoCmd.Restore
+   On Error GoTo 0
+   Exit Sub
+   
+AjustarTamaño_TratamientoErrores:
+   If Not Err = 2462 Then  ' "El número de sección que introdujo no es válido."
+      MsgBox "Error " & Err.Number & " en proc.: AjustarTamaño de Módulo: Módulo1 (" & Err.Description & ")"
+   End If
+   Resume AjustarTamaño_Salir
+End Sub         ' AjustarTamaño
+
+
+'*******************************************************************************
+'* CierraRecordset
+'* Cierra el recordset indicado
+'* Argumentos: rst => recordset
+'* uso: CierraRecordset rst
+'* ESH 12/02/06 10:00
+'*******************************************************************************
+
+Sub CierraRecordset(Rst As DAO.Recordset)
+
+On Error GoTo CierraRecordset_TratamientoErrores
+
+If Not Rst Is Nothing Then
+    Rst.Close
+    Set Rst = Nothing
+End If
+
+CierraRecordset_Salir:
+    On Error GoTo 0
+    Exit Sub
+   
+CierraRecordset_TratamientoErrores:
+
+    MsgBox "Error " & Err.Number & " en proc.: CierraRecordset de Módulo: mdlGeneral (" & Err.Description & ")"
+    GoTo CierraRecordset_Salir
+End Sub         ' CierraRecordset

@@ -1,0 +1,583 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1073456674
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9869
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 3990
+    Top = 2820
+    Right = 14250
+    Bottom = 5655
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x804cce2a81ffe340
+    End
+    RecordSource ="SELECT ITelas_Temp.* FROM ITelas_Temp;"
+    Caption ="ITelas_TransferAlmSub"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 668
+            BackColor = 0
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 340
+                    Width = 1596
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="IdTelasColores Etiqueta"
+                    Caption ="Color"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdTelasColores_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4308
+                    Top = 340
+                    Width = 969
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="ExTela1 Etiqueta"
+                    Caption ="Tela1"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="ExTela1_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5335
+                    Top = 340
+                    Width = 969
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="ExTela2 Etiqueta"
+                    Caption ="Tela2"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="ExTela2_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 7370
+                    Top = 340
+                    Width = 969
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta10"
+                    Caption ="Tela1"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 8431
+                    Top = 340
+                    Width = 969
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta11"
+                    Caption ="Tela2"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 1680
+                    Top = 345
+                    Width = 1050
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta16"
+                    Caption ="Tela1"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 2760
+                    Top = 345
+                    Width = 1050
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta18"
+                    Caption ="Tela2"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 1635
+                    Top = 60
+                    Width = 2175
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta22"
+                    Caption ="Cantidad Transferencia"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 4245
+                    Top = 60
+                    Width = 1080
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta24"
+                    Caption ="Existencia: "
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 5329
+                    Top = 56
+                    Width = 1305
+                    FontWeight = 700
+                    BackColor = 0
+                    ForeColor = 16764057
+                    Name ="AlS"
+                    ControlSource ="=[Forms]![ITelas_TransferAlm]![QueAlmSal]"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 7200
+                    Top = 60
+                    Width = 1080
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16764057
+                    Name ="Etiqueta26"
+                    Caption ="Existencia: "
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 8284
+                    Top = 56
+                    Width = 1305
+                    FontWeight = 700
+                    TabIndex = 1
+                    BackColor = 0
+                    ForeColor = 16764057
+                    Name ="Texto27"
+                    ControlSource ="=[Forms]![ITelas_TransferAlm]![QueAlmEnt]"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 345
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 9468
+                    Top = 1
+                    Width = 174
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdTelasColAlmEntT"
+                    ControlSource ="IdTelasColAlmEntT"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4308
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="ExTelSal1"
+                    ControlSource ="ExTelSal1"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5335
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 5
+                    Name ="ExTelSal2"
+                    ControlSource ="ExTelSal2"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7370
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    TabIndex = 6
+                    Name ="ExTelEnt1"
+                    ControlSource ="ExTelEnt1"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8431
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    TabIndex = 7
+                    Name ="ExTelEnt2"
+                    ControlSource ="ExTelEnt2"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 9695
+                    Width = 174
+                    Height = 255
+                    TabIndex = 8
+                    Name ="IdTelasColAlmSalT"
+                    ControlSource ="IdTelasColAlmSalT"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1757
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    TabIndex = 2
+                    Name ="CantTemp1"
+                    ControlSource ="CantTemp1"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 57
+                    Width = 1596
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdTelasColores"
+                    ControlSource ="IdTelasColores"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT TelasColores.IdTelasColores, TelasColores.Color, TelasColores.IdTelas FRO"
+                        "M TelasColores WHERE (((TelasColores.IdTelas)=[Formularios]![ITelas_TransferAlm]"
+                        "![QueTela])) ORDER BY TelasColores.Color;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2834
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    TabIndex = 3
+                    Name ="CantTemp2"
+                    ControlSource ="CantTemp2"
+                End
+                Begin Line
+                    OverlapFlags = 93
+                    SpecialEffect = 0
+                    Left = 6406
+                    Top = 163
+                    Width = 849
+                    Height = 15
+                    Name ="Línea21"
+                End
+                Begin Line
+                    OverlapFlags = 223
+                    SpecialEffect = 0
+                    Left = 6978
+                    Top = 56
+                    Width = 277
+                    Height = 122
+                    Name ="Línea23"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 215
+                    SpecialEffect = 0
+                    Left = 6978
+                    Top = 163
+                    Width = 262
+                    Height = 118
+                    Name ="Línea24"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 623
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5725
+                    Top = 56
+                    Height = 448
+                    FontWeight = 700
+                    Name ="Transferir"
+                    Caption ="Transferir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub IdTelasColores_AfterUpdate()
+Dim Dbs As Database
+Dim rstEnt, rstSal As Recordset
+
+
+Set Dbs = CurrentDb
+
+Set rstSal = Dbs.OpenRecordset("SELECT IdTelasColAlm,ExTela1,ExTela2 FROM TelasColAlm Where IdTelasColores=" & IdTelasColores & " And IdAlmacenes=" & Forms![ITelas_TransferAlm]![QueIdAlmSal])
+Me![ExTelSal1] = rstSal!ExTela1
+Me![ExTelSal2] = rstSal!ExTela2
+IdTelasColAlmSalT = rstSal!IdTelasColAlm
+
+Set rstEnt = Dbs.OpenRecordset("SELECT IdTelasColAlm,ExTela1,ExTela2 FROM TelasColAlm Where IdTelasColores=" & IdTelasColores & " And IdAlmacenes=" & Forms![ITelas_TransferAlm]![QueIdAlmEnt])
+Me![ExTelEnt1] = rstEnt!ExTela1
+Me![ExTelEnt2] = rstEnt!ExTela2
+IdTelasColAlmEntT = rstEnt!IdTelasColAlm
+
+rstSal.Close
+rstEnt.Close
+Dbs.Close
+
+End Sub
+
+Private Sub Transferir_Click()
+
+If IsNull(Forms![ITelas_TransferAlm]![QueFecha]) = True Then
+MsgBox "Para poder continuar es necesario que metas una fecha.", vbInformation, "FALTA FECHA"
+Forms![ITelas_TransferAlm]![QueFecha].SetFocus
+
+ElseIf IsNull(Forms![ITelas_TransferAlm]![QueTela]) = True Then
+ MsgBox "Para poder continuar es necesario que selecciones una Tela.", vbInformation, "FALTA TELA"
+Forms![ITelas_TransferAlm]![QueTela].SetFocus
+Else
+Me.Requery
+Dim Dbs As Database
+Dim rstTemp, rstUltS, rstUltE As Recordset
+
+Set Dbs = CurrentDb
+Set rstTemp = Dbs.OpenRecordset("SELECT IdITelas_Temp, IdTelasColores, CantTemp1, CantTemp2, IdTelasColAlmEntT, IdTelasColAlmSalT, ExTelSal1, ExTelSal2, ExTelEnt1, ExTelEnt2 FROM ITelas_Temp")
+        
+With rstTemp
+
+  If .EOF = True Then
+  MsgBox "Debes de meter por lo menos un color y la cantidad a trasferir.", vbInformation, "FALTA INFORMACION"
+  
+  
+  ElseIf MsgBox("Estas seguro de querer hacer la transferencia de estas telas entre estos almacenes? Una vez realizado, es imposible deshacerlo!", vbYesNo) = vbYes Then
+
+
+
+' Se mete el moviemiento de entrada/salida en la tabla padre.
+      Dbs.Execute "INSERT INTO Salidas (Fecha,IdTela,Referencia) VALUES ('" & Forms![ITelas_TransferAlm]![QueFecha] & "','" & Forms![ITelas_TransferAlm]![QueTela] & "','" & Forms![ITelas_TransferAlm]![QueAlmEnt] & "')"
+      Dbs.Execute "INSERT INTO Entradas (Fecha,IdTela,Factura,Referencia) VALUES ('" & Forms![ITelas_TransferAlm]![QueFecha] & "','" & Forms![ITelas_TransferAlm]![QueTela] & "','Transferencia','" & Forms![ITelas_TransferAlm]![QueAlmSal] & "')"
+      
+' Se saca la ultima salida/entrada para relacionar la tabla __Det
+      Set rstUltS = Dbs.OpenRecordset("SELECT Max(Salidas.IdSalidas) AS UltIdSal FROM Salidas")
+      Set rstUltE = Dbs.OpenRecordset("SELECT Max(Entradas.IdEntradas) AS UltIdEnt FROM Entradas")
+      
+        .MoveLast
+        .MoveFirst
+        
+' Para cada registro se valida que no este en ceros para y que no deje el almacen en negativo:
+        Do While Not .EOF
+            If (IsNull(!CantTemp1) = True Or !CantTemp1 = 0) And (IsNull(!CantTemp2) = True Or !CantTemp2 = 0) Then
+             MsgBox "Los colores que esten en ceros no se agregaran a esta transferencia"
+            GoTo noagregar
+            End If
+            
+            If (!ExTelSal1 - !CantTemp1 < 0) Or (!ExTelSal2 - !CantTemp2 < 0) Then
+             MsgBox "No se puede sacar mas tela de la que hay en el almacen. No se registro el moviemiento de los colores que iban a dejar el almacen de salida con una cantidad en negativo."
+            Dbs.Execute ("DELETE * FROM ITelas_Temp WHERE IdITelas_Temp=" & !IdITelas_Temp)
+            
+            GoTo noagregar
+            End If
+            
+' Meterlo en ls tablas ___Det
+     Dbs.Execute "INSERT INTO SalidasDet (IdSalidas,IdTelasColAlm,TelaSal1,TelaSal2) VALUES ('" & rstUltS!UltIdSal & "','" & !IdTelasColAlmSalT & "','" & !CantTemp1 & "','" & !CantTemp2 & "')"
+     Dbs.Execute "INSERT INTO EntradasDet (IdEntradas,IdTelasColAlm,TelaEnt1,TelaEnt2) VALUES ('" & rstUltE!ultident & "','" & !IdTelasColAlmEntT & "','" & !CantTemp1 & "','" & !CantTemp2 & "')"
+
+' Modificar la existencia en la tabla TelasColAlm, para cada Almacen
+     Dbs.Execute "UPDATE TelasColAlm SET ExTela1 = ExTela1 - " & !CantTemp1 & ", ExTela2 = Extela2 - " & !CantTemp2 & " WHERE IdTelasColAlm = " & !IdTelasColAlmSalT
+     Dbs.Execute "UPDATE TelasColAlm SET ExTela1 = ExTela1 + " & !CantTemp1 & ", ExTela2 = Extela2 + " & !CantTemp2 & " WHERE IdTelasColAlm = " & !IdTelasColAlmEntT
+
+noagregar:
+            .MoveNext
+            
+            
+        Loop
+        .Close
+rstUltS.Close
+rstUltE.Close
+
+MsgBox "La transferencia de telas se realizo con exito.", vbInformation
+
+Forms![ITelas_TransferAlm].ActualizarSalidas
+Forms![ITelas_TransferAlm].ActualizarEntradas
+
+Dbs.Execute ("DELETE * FROM ITelas_Temp")
+Forms![ITelas_TransferAlm]![QueTela] = ""
+Forms![ITelas_TransferAlm]![QueTela].SetFocus
+
+
+End If
+End With
+
+
+Dbs.Close
+Me.Requery
+
+
+End If
+End Sub

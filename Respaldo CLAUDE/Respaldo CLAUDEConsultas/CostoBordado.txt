@@ -1,0 +1,70 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Modelos"
+    Name ="ModelosBor"
+    Name ="Bordados"
+End
+Begin OutputColumns
+    Expression ="Modelos.IdModelos"
+    Alias ="TotalBor"
+    Expression ="Sum(ceronulo([precio]))"
+End
+Begin Joins
+    LeftTable ="Bordados"
+    RightTable ="ModelosBor"
+    Expression ="Bordados.IdBordados = ModelosBor.IdBordados"
+    Flag = 3
+    LeftTable ="Modelos"
+    RightTable ="ModelosBor"
+    Expression ="Modelos.IdModelos = ModelosBor.IdModelos"
+    Flag = 2
+End
+Begin Groups
+    Expression ="Modelos.IdModelos"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1002
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 955
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 98
+        Top = 0
+        Name ="ModelosBor"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 113
+        Top = 2
+        Name ="Bordados"
+    End
+End

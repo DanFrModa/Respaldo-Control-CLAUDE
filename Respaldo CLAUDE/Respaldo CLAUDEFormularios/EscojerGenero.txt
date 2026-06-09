@@ -1,0 +1,201 @@
+Version = 17
+VersionRequired = 17
+Checksum = -523797185
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 3571
+    DatasheetFontHeight = 10
+    ItemSuffix = 18
+    Left = 5700
+    Top = 2145
+    Right = 9270
+    Bottom = 4800
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x09a2153a114de240
+    End
+    Caption ="Listas de Precios"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Section
+            Height = 2664
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ComboBox
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    ListWidth = 1134
+                    Left = 1690
+                    Top = 286
+                    Width = 1418
+                    Height = 284
+                    Name ="QueGenero"
+                    RowSourceType ="Value List"
+                    RowSource ="1;\"Caballero\";2;\"Dama\";4;\"Niño\";6;\"Niña\";0;\"Bebes\""
+                    ColumnWidths ="0;567"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 226
+                            Top = 283
+                            Width = 1395
+                            Height = 240
+                            Name ="QueGeneroEtiqueta_"
+                            Caption ="Lista de Precios:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1917
+                    Top = 1023
+                    Width = 1191
+                    Height = 394
+                    TabIndex = 1
+                    Name ="Boton"
+                    Caption ="Para Imprimir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 2381
+                    Top = 2097
+                    Width = 967
+                    Height = 400
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin OptionGroup
+                    OverlapFlags = 85
+                    Left = 283
+                    Top = 1539
+                    Width = 1322
+                    Height = 898
+                    TabIndex = 3
+                    Name ="QueModelos"
+                    DefaultValue ="-1"
+                    Begin
+                        Begin Label
+                            BackStyle = 1
+                            OverlapFlags = 215
+                            Left = 408
+                            Top = 1417
+                            Width = 1110
+                            Height = 240
+                            BackColor = -2147483633
+                            Name ="Etiqueta7"
+                            Caption ="Que Modelos?"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 469
+                            Top = 1777
+                            Name ="Opción9"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 247
+                                    Left = 699
+                                    Top = 1749
+                                    Width = 600
+                                    Height = 240
+                                    Name ="Etiqueta10"
+                                    Caption ="Activos"
+                                End
+                            End
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 469
+                            Top = 2107
+                            OptionValue = 0
+                            Name ="Opción11"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 247
+                                    Left = 699
+                                    Top = 2079
+                                    Width = 720
+                                    Height = 240
+                                    Name ="Etiqueta12"
+                                    Caption ="Inactivos"
+                                End
+                            End
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1917
+                    Top = 1537
+                    Width = 1191
+                    Height = 394
+                    TabIndex = 4
+                    Name ="Comando17"
+                    Caption ="Para Editar"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Boton_Click()
+DoCmd.OpenReport "ListaPrecios", acViewPreview
+End Sub
+
+Private Sub Comando17_Click()
+DoCmd.OpenQuery "ListaPreciosed"
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

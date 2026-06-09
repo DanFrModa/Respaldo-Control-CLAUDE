@@ -1,0 +1,332 @@
+Version = 17
+VersionRequired = 17
+Checksum = -822274516
+Begin Form
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 7483
+    DatasheetFontHeight = 10
+    ItemSuffix = 14
+    Left = 5400
+    Top = 2025
+    Right = 13170
+    Bottom = 4770
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x8972064d6246e340
+    End
+    RecordSource ="Clientes"
+    Caption ="para borrar"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            Height = 2760
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 114
+                    Width = 3246
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="Dato1"
+                    Format ="Long Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 114
+                            Width = 1560
+                            Height = 255
+                            Name ="IdClientes Etiqueta"
+                            Caption ="IdClientes"
+                            EventProcPrefix ="IdClientes_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 456
+                    Width = 3105
+                    Height = 255
+                    ColumnWidth = 1560
+                    TabIndex = 1
+                    Name ="Dato2"
+                    Format ="Long Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 456
+                            Width = 1560
+                            Height = 255
+                            Name ="Cliente Etiqueta"
+                            Caption ="Cliente"
+                            EventProcPrefix ="Cliente_Etiqueta"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    OverlapFlags = 93
+                    Left = 1677
+                    Top = 798
+                    TabIndex = 2
+                    Name ="Activo"
+                    ControlSource ="Activo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 57
+                            Top = 798
+                            Width = 1560
+                            Height = 255
+                            Name ="Activo Etiqueta"
+                            Caption ="Activo"
+                            EventProcPrefix ="Activo_Etiqueta"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5725
+                    Top = 510
+                    TabIndex = 3
+                    Name ="Comando6"
+                    Caption ="Comando6"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 247
+                    Left = 1677
+                    Top = 831
+                    Width = 3105
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Res"
+                    Format ="General Number"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 57
+                            Top = 831
+                            Width = 1560
+                            Height = 255
+                            Name ="Etiqueta8"
+                            Caption ="Cliente"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 93
+                    Left = 2130
+                    Top = 1455
+                    TabIndex = 5
+                    Name ="Comando9"
+                    Caption ="Comando9"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5725
+                    Top = 913
+                    TabIndex = 6
+                    Name ="Comando10"
+                    Caption ="Comando6"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5286
+                    Top = 1425
+                    TabIndex = 7
+                    Name ="Pas"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 3585
+                            Top = 1425
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta12"
+                            Caption ="Texto11:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4740
+                    Top = 1815
+                    TabIndex = 8
+                    Name ="Comando13"
+                    Caption ="Comando9"
+                    OnDblClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando10_Click()
+Private dd As String
+dd = 10
+End Sub
+
+Private Sub Comando13_DblClick(Cancel As Integer)
+
+End Sub
+
+Private Sub Comando6_Click()
+Res = CuantosSabYDom(Dato1, Dato2)
+End Sub
+
+Private Sub Comando9_Click()
+     Call prue
+End Sub
+
+
+Private Function prue()
+         Dim i As Long
+         Dim db As Database, RS As Recordset
+         Dim RecordCount As Long
+         Dim QueVariable As String
+         'On Error GoTo ErrorHandler
+         Set db = CurrentDb()
+         Set RS = db.OpenRecordset("Usuarios")
+        
+         RS.MoveLast
+         RecordCount = RS.RecordCount
+     
+         RS.MoveFirst
+         For i = 1 To RecordCount
+         QueVariable = CStr(i + 1)
+            PrP(i) = RS![Activo]
+            RS.MoveNext
+         Next i
+     
+         For i = 1 To RecordCount
+            Debug.Print PrP(i)
+         Next i
+         RS.Close
+         db.Close
+         Pas = PrP(3)
+       '  Exit Function
+'ErrorHandler:
+ '        MsgBox Error
+  '       Exit Function
+End Function

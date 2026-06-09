@@ -1,0 +1,154 @@
+Operation = 6
+Option = 0
+Begin InputTables
+    Name ="CP_Tiempos"
+    Name ="CP_Procesos"
+    Name ="CP_Articulos"
+    Name ="CP_Familia"
+End
+Begin OutputColumns
+    Expression ="CP_Articulos.Clave"
+    GroupLevel = 2
+    Expression ="CP_Familia.Familia"
+    GroupLevel = 2
+    Alias ="Proc"
+    Expression ="numeroastring([NumProceso],[Proceso])"
+    GroupLevel = 1
+    Expression ="CP_Articulos.Descripcion"
+    GroupLevel = 2
+    Expression ="CP_Articulos.Costura"
+    GroupLevel = 2
+    Expression ="CP_Familia.IdCP_Familia"
+    GroupLevel = 2
+    Alias ="El Valor"
+    Expression ="Max(CP_Tiempos.Tiempo)"
+    Expression ="CP_Tiempos.IdCP_Articulos"
+    GroupLevel = 2
+End
+Begin Joins
+    LeftTable ="CP_Tiempos"
+    RightTable ="CP_Procesos"
+    Expression ="CP_Tiempos.IdCP_Procesos = CP_Procesos.IdCP_Procesos"
+    Flag = 1
+    LeftTable ="CP_Tiempos"
+    RightTable ="CP_Articulos"
+    Expression ="CP_Tiempos.IdCP_Articulos = CP_Articulos.IdCP_Articulos"
+    Flag = 1
+    LeftTable ="CP_Articulos"
+    RightTable ="CP_Familia"
+    Expression ="CP_Articulos.IdCP_Familia = CP_Familia.IdCP_Familia"
+    Flag = 1
+End
+Begin OrderBy
+    Expression ="CP_Familia.IdCP_Familia"
+    Flag = 0
+End
+Begin Groups
+    Expression ="CP_Articulos.Clave"
+    GroupLevel = 2
+    Expression ="CP_Familia.Familia"
+    GroupLevel = 2
+    Expression ="numeroastring([NumProceso],[Proceso])"
+    GroupLevel = 1
+    Expression ="CP_Articulos.Descripcion"
+    GroupLevel = 2
+    Expression ="CP_Articulos.Costura"
+    GroupLevel = 2
+    Expression ="CP_Familia.IdCP_Familia"
+    GroupLevel = 2
+    Expression ="CP_Familia.IdCP_Familia"
+    GroupLevel = 2
+    Expression ="CP_Tiempos.IdCP_Articulos"
+    GroupLevel = 2
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+Begin
+    Begin
+        dbText "Name" ="Moldes, Muestra Fisica y F_ Tecnica"
+        dbInteger "ColumnWidth" ="3570"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="OC de Habilitaciones"
+        dbInteger "ColumnWidth" ="2145"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="Total de Tiempo"
+        dbInteger "ColumnWidth" ="1710"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="Recibo y Empaque"
+        dbInteger "ColumnWidth" ="1935"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CP_Articulos.Descripcion"
+        dbInteger "ColumnWidth" ="3300"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CP_Articulos.Costura"
+        dbInteger "ColumnWidth" ="2910"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="01Orden de Produccion (OP)"
+        dbInteger "ColumnWidth" ="2850"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="01 - Orden de Produccion (OP)"
+        dbInteger "ColumnWidth" ="3030"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = -25
+    Top = 61
+    Right = 1011
+    Bottom = 374
+    Left = -1
+    Top = -1
+    Right = 1017
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 559
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 107
+        Top = 0
+        Name ="CP_Tiempos"
+    End
+    Begin
+        Left = 182
+        Top = 23
+        Right = 278
+        Bottom = 109
+        Top = 0
+        Name ="CP_Procesos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 107
+        Top = 1
+        Name ="CP_Articulos"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 92
+        Top = 0
+        Name ="CP_Familia"
+    End
+End

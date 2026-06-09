@@ -1,0 +1,473 @@
+Version = 17
+VersionRequired = 17
+Checksum = -728671312
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5612
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 5400
+    Top = 2475
+    Right = 13230
+    Bottom = 8640
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xa962165290b6e240
+    End
+    RecordSource ="SELECT EntradasDet.IdEntradas, TelasColores.Color, EntradasDet.TelaEnt1, Entrada"
+        "sDet.TelaEnt2, EntradasDet.Peso, TelasColores.Precio, ([telaent1]+[telaent2])*[p"
+        "recio] AS Importe FROM (EntradasDet INNER JOIN TelasColAlm ON EntradasDet.IdTela"
+        "sColAlm = TelasColAlm.IdTelasColAlm) INNER JOIN TelasColores ON TelasColAlm.IdTe"
+        "lasColores = TelasColores.IdTelasColores GROUP BY EntradasDet.IdEntradas, TelasC"
+        "olores.Color, EntradasDet.TelaEnt1, EntradasDet.TelaEnt2, EntradasDet.Peso, Tela"
+        "sColores.Precio, ([telaent1]+[telaent2])*[precio];"
+    Caption ="EntSalSub"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 56
+                    Width = 975
+                    Height = 240
+                    Name ="IdTelasColores Etiqueta"
+                    Caption ="Colores"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdTelasColores_Etiqueta"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 1190
+                    Top = 57
+                    Width = 900
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="QueTexto1"
+                    ControlSource ="=[Forms]![TodosMovent]![Texto1]"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2211
+                    Top = 57
+                    Width = 960
+                    TabIndex = 1
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="Etiqueta8"
+                    ControlSource ="=[Forms]![TodosMovent]![Texto2]"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3288
+                    Top = 57
+                    Width = 570
+                    Height = 240
+                    Name ="Etiqueta14"
+                    Caption ="Peso"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3911
+                    Top = 57
+                    Width = 570
+                    Height = 240
+                    Name ="Etiqueta16"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4592
+                    Top = 57
+                    Width = 915
+                    Height = 240
+                    Name ="Etiqueta18"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 57
+                    Top = 57
+                    Width = 165
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdEntradas"
+                    ControlSource ="IdEntradas"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 247
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 113
+                    Top = 57
+                    Width = 975
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Color"
+                    ControlSource ="Color"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1190
+                    Top = 57
+                    Width = 900
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="TelaEnt1"
+                    ControlSource ="TelaEnt1"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2211
+                    Top = 57
+                    Width = 960
+                    Height = 255
+                    TabIndex = 3
+                    Name ="TelaEnt2"
+                    ControlSource ="TelaEnt2"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 3288
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Peso"
+                    ControlSource ="Peso"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 3911
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 4592
+                    Top = 57
+                    Width = 915
+                    Height = 255
+                    TabIndex = 6
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 907
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1020
+                    Top = 113
+                    Width = 900
+                    Height = 255
+                    Name ="TotalTel1"
+                    ControlSource ="=Sum([TelaEnt1])"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2097
+                    Top = 113
+                    Width = 900
+                    Height = 255
+                    TabIndex = 1
+                    Name ="TotalTela2"
+                    ControlSource ="=Sum([TelaEnt2])"
+                    Format ="Standard"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 4369
+                    Top = 56
+                    Width = 1116
+                    TabIndex = 2
+                    Name ="Subtotal"
+                    ControlSource ="=Sum([Importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3568
+                            Top = 56
+                            Width = 810
+                            Height = 225
+                            Name ="Etiqueta21"
+                            Caption ="Subtotal"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 4369
+                    Top = 339
+                    Width = 1116
+                    TabIndex = 3
+                    Name ="IVA"
+                    ControlSource ="=[Subtotal]*0.15"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3568
+                            Top = 339
+                            Width = 810
+                            Height = 225
+                            Name ="Etiqueta23"
+                            Caption ="I.V.A.:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 4369
+                    Top = 622
+                    Width = 1116
+                    TabIndex = 4
+                    Name ="TOTAL"
+                    ControlSource ="=[Subtotal]*1.15"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3568
+                            Top = 622
+                            Width = 810
+                            Height = 225
+                            Name ="Etiqueta25"
+                            Caption ="TOTAL:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 1878
+                    Top = 453
+                    Width = 1116
+                    TabIndex = 5
+                    Name ="Texto26"
+                    ControlSource ="=Sum([TelaEnt1])+Sum([TelaEnt2])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1077
+                            Top = 453
+                            Width = 810
+                            Height = 225
+                            Name ="Etiqueta27"
+                            Caption ="TOTAL:"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End

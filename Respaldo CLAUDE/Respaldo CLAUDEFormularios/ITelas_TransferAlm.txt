@@ -1,0 +1,371 @@
+Version = 17
+VersionRequired = 17
+Checksum = -228477492
+Begin Form
+    RecordSelectors = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 11678
+    DatasheetFontHeight = 10
+    ItemSuffix = 38
+    Left = 3330
+    Top = 255
+    Right = 15015
+    Bottom = 8100
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x01e211a670ffe340
+    End
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin FormHeader
+            Height = 375
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 105
+                    Width = 3585
+                    Height = 270
+                    FontWeight = 700
+                    Name ="Etiqueta2"
+                    Caption ="Transferencia de Telas entre Almacenes"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7483
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 719
+                    Top = 56
+                    Width = 1296
+                    Name ="QueFecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 56
+                            Width = 615
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Fecha:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1613
+                    Top = 510
+                    Width = 1896
+                    TabIndex = 1
+                    Name ="QueAlmSal"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 510
+                            Width = 1440
+                            Height = 240
+                            Name ="Etiqueta4"
+                            Caption ="Almacen de Salida:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7315
+                    Top = 510
+                    Width = 1806
+                    TabIndex = 2
+                    Name ="QueAlmEnt"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5730
+                            Top = 510
+                            Width = 1560
+                            Height = 240
+                            Name ="Etiqueta6"
+                            Caption ="Almacen de Entrada:"
+                        End
+                    End
+                End
+                Begin Rectangle
+                    OverlapFlags = 93
+                    Left = 113
+                    Top = 850
+                    Width = 10821
+                    Height = 4091
+                    Name ="Cuadro9"
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 799
+                    Top = 1020
+                    Width = 1581
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueTela"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Telas.IdTelas, Telas.Nombre, Telas.Activa FROM Telas WHERE (((Telas.Activ"
+                        "a)=Yes)) ORDER BY Telas.Nombre;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 223
+                            Left = 283
+                            Top = 1020
+                            Width = 510
+                            Height = 240
+                            Name ="Etiqueta11"
+                            Caption ="Tela:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3571
+                    Top = 510
+                    Width = 276
+                    Height = 255
+                    TabIndex = 4
+                    Name ="QueIdAlmSal"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9184
+                    Top = 510
+                    Width = 276
+                    Height = 255
+                    TabIndex = 5
+                    Name ="QueIdAlmEnt"
+                End
+                Begin Subform
+                    OverlapFlags = 215
+                    Left = 283
+                    Top = 1600
+                    Width = 10545
+                    Height = 3120
+                    TabIndex = 6
+                    Name ="ITelas_TransferAlmSub"
+                    SourceObject ="Form.ITelas_TransferAlmSub"
+                End
+                Begin Line
+                    OverlapFlags = 93
+                    Left = 4422
+                    Top = 617
+                    Width = 849
+                    Height = 15
+                    Name ="Línea21"
+                End
+                Begin Line
+                    OverlapFlags = 223
+                    Left = 4994
+                    Top = 510
+                    Width = 277
+                    Height = 122
+                    Name ="Línea23"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 215
+                    Left = 4994
+                    Top = 617
+                    Width = 262
+                    Height = 118
+                    Name ="Línea24"
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 6
+                    Left = 61
+                    Top = 5443
+                    Width = 5721
+                    TabIndex = 7
+                    Name ="MovsAlmSalida"
+                    RowSourceType ="Table/Query"
+                    ColumnWidths ="1134;1134;852;851;851;851"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 5160
+                            Width = 3030
+                            Height = 240
+                            Name ="Etiqueta29"
+                            Caption ="Ultimo Movimiento de Salida del Almacen:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3120
+                    Top = 5159
+                    Width = 2661
+                    TabIndex = 8
+                    Name ="AlmSal2"
+                    ControlSource ="=[quealmsal]"
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 6
+                    Left = 5901
+                    Top = 5443
+                    Width = 5721
+                    TabIndex = 9
+                    Name ="MovsAlmEntrada"
+                    RowSourceType ="Table/Query"
+                    ColumnWidths ="1134;1134;853;852;852;852"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5895
+                            Top = 5160
+                            Width = 3150
+                            Height = 240
+                            Name ="Etiqueta36"
+                            Caption ="Ultimo Movimiento de Entrada del Almacen:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9080
+                    Top = 5159
+                    Width = 2541
+                    TabIndex = 10
+                    Name ="amlent2"
+                    ControlSource ="=[quealment]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 10148
+                    Top = 6973
+                    Width = 1461
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 11
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando30_Click()
+ActualizarSalidas
+End Sub
+
+Private Sub Form_Close()
+CurrentDb.Execute ("DELETE * FROM ITelas_Temp")
+End Sub
+
+Private Sub QueTela_AfterUpdate()
+Me![ITelas_TransferAlmSub].Form![IdTelasColores].Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub
+
+
+Public Sub ActualizarSalidas()
+MovsAlmSalida.RowSource = "SELECT Telas.Nombre AS Tela, TelasColores.Color, ITelas_Temp.CantTemp1 AS [Salida Tela1], ITelas_Temp.CantTemp2 AS [Salida Tela2], TelasColAlm.ExTela1 AS [Exist Tela1], TelasColAlm.ExTela2 AS [Exis Tela2], TelasColAlm.IdAlmacenes FROM ((Telas INNER JOIN TelasColores ON Telas.IdTelas = TelasColores.IdTelas) INNER JOIN TelasColAlm ON TelasColores.IdTelasColores = TelasColAlm.IdTelasColores) INNER JOIN ITelas_Temp ON TelasColores.IdTelasColores = ITelas_Temp.IdTelasColores WHERE (((TelasColAlm.IdAlmacenes)=[Formularios]![ITelas_TransferAlm]![QueIdAlmSal]))"
+
+End Sub
+
+Public Sub ActualizarEntradas()
+MovsAlmEntrada.RowSource = "SELECT Telas.Nombre AS Tela, TelasColores.Color, ITelas_Temp.CantTemp1 AS [Entrada Tela1], ITelas_Temp.CantTemp2 AS [Entrada Tela2], TelasColAlm.ExTela1 AS [Exist Tela1], TelasColAlm.ExTela2 AS [Exis Tela2], TelasColAlm.IdAlmacenes FROM ((Telas INNER JOIN TelasColores ON Telas.IdTelas = TelasColores.IdTelas) INNER JOIN TelasColAlm ON TelasColores.IdTelasColores = TelasColAlm.IdTelasColores) INNER JOIN ITelas_Temp ON TelasColores.IdTelasColores = ITelas_Temp.IdTelasColores WHERE (((TelasColAlm.IdAlmacenes)=[Formularios]![ITelas_TransferAlm]![QueIdAlmEnt]))"
+
+End Sub

@@ -1,0 +1,11 @@
+Option Compare Database
+Option Explicit
+
+
+
+Public Function PartidaAct()
+Dim Rst As Recordset
+Set Rst = CurrentDb.OpenRecordset("SELECT IdPartida FROM Prom_Partida WHERE Actual=TRUE")
+PartidaAct = Rst!IdPartida
+Rst.Close
+End Function

@@ -1,0 +1,214 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1032233630
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    FilterOn = NotDefault
+    DefaultView = 0
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5896
+    DatasheetFontHeight = 10
+    ItemSuffix = 8
+    Left = 6450
+    Top = 1980
+    Right = 12345
+    Bottom = 4845
+    DatasheetGridlinesColor = 12632256
+    Filter ="idpedidos=95"
+    RecSrcDt = Begin
+        0x1f1f691f9bd0e240
+    End
+    RecordSource ="SELECT Pedidos.NumeroPed, Pedidos.IdPedidos, Clientes.Cliente, Pedidos.FechaTela"
+        ", Pedidos.IdOrdCompra FROM Pedidos INNER JOIN Clientes ON Pedidos.IdClientes = C"
+        "lientes.IdClientes;"
+    Caption ="Fecha Pedido de Tela"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 396
+            BackColor = 128
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 56
+                    Width = 5730
+                    Height = 255
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta2"
+                    Caption ="FECHA Y ORDEN DE COMPRA DE LA TELA PARA ESTE PEDIDO"
+                End
+            End
+        End
+        Begin Section
+            Height = 2494
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2840
+                    Top = 1020
+                    Width = 1416
+                    Name ="FechaTela"
+                    ControlSource ="FechaTela"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1025
+                            Width = 1935
+                            Height = 240
+                            Name ="Etiqueta0"
+                            Caption ="Fecha que se pidio la tela:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4648
+                    Top = 2040
+                    Width = 1146
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 2855
+                    Top = 1417
+                    Width = 1401
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"3\";\"2\""
+                    Name ="IdOrdCompra"
+                    ControlSource ="IdOrdCompra"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT OrdCompra.IdOrdCompra, OrdCompra.NumCompra, Proveedores.Proveedor FROM Or"
+                        "dCompra INNER JOIN Proveedores ON OrdCompra.IdProveedor = Proveedores.IdProveedo"
+                        "r GROUP BY OrdCompra.IdOrdCompra, OrdCompra.NumCompra, Proveedores.Proveedor ORD"
+                        "ER BY OrdCompra.NumCompra;"
+                    ColumnWidths ="0;567;567"
+                    BaseInfo ="\"SELECT OrdCompra.IdOrdCompra, OrdCompra.NumCompra, Proveedores.Proveedor FROM "
+                        "OrdCompra INNER JOIN Proveedores ON OrdCompra.IdProveedor = Proveedores.IdProvee"
+                        "dor GROUP BY OrdCompra.IdOrdCompra, OrdCompra.NumCompra, Proveedores.Proveedor O"
+                        "RDER BY OrdCompra.\";\"OrdCompra\";\"Proveedores\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 128
+                            Top = 1415
+                            Width = 2745
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Orden de Compra con la que se pidio:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 734
+                    Top = 170
+                    Width = 966
+                    TabIndex = 3
+                    Name ="NumeroPed"
+                    ControlSource ="NumeroPed"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 170
+                            Width = 960
+                            Height = 240
+                            Name ="Etiqueta6"
+                            Caption ="Pedido:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 734
+                    Top = 510
+                    Width = 2271
+                    TabIndex = 4
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 510
+                            Width = 600
+                            Height = 240
+                            Name ="Etiqueta7"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+If EstaCargado("pedidospormes") = True Then
+Forms![PedidosPorMes].Requery
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

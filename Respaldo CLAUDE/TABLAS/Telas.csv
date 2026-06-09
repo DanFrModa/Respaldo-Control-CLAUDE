@@ -1,0 +1,878 @@
+"IdTelas","Nombre","Descripcion","Medida","Texto1","Texto2","Favorito","PrecioSugerido","Activa","IdTelasCategorias"
+1,"Alsatex100","Felpa 100% Poliester",1,"Felpa","Cardigan",1,57.00,0,
+2,"Alsatex Terry 100","French Terry 100% Poliester",1,"Terry","Cardigan",1,54.00,0,
+3,"Alsatex Felpa 50","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,68.00,1,15
+4,"Alsatex Terry 50","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",0,107.00,1,1
+5,"B&S Industrias","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,68.00,0,
+6,"Becktel 50","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,66.00,0,
+7,"Becktel Terry 50","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,64.00,0,
+8,"Cardigan Marilyn","Cardigan",1,"Tela 1","Cardigan",1,0.00,0,
+9,"Chedraui","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,43.00,0,
+10,"Alsatex Chifon 50","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,68.00,0,
+11,"Atletica Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,20.00,0,
+12,"Chifon Becktel","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,66.00,0,
+13,"Chifon Miro","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,64.00,0,
+14,"Chifon Sekine","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,57.00,0,
+15,"Chifon T. Marcos","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,1,64.00,0,
+16,"Miro Terry Alg/Pol","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,77.00,0,1
+17,"Nylon Atletica","Nylon 100 %",0,"Nylon",,1,0.00,0,
+18,"Paraiso 100","Felpa 100% Poliester",1,"Felpa","Cardigan",1,44.50,0,
+19,"Atletica Polar","100 % Poliester",1,"Polar",,1,0.00,0,
+20,"Sekine","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,66.00,0,
+21,"Sekine Terry","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,60.00,0,
+22,"Trevia","Felpa 100% Poliester",1,"Felpa","Cardigan",1,44.34,0,
+23,"Turin","Felpa 100% Poliester",1,"Felpa","Cardigan",1,53.00,0,
+24,"Yarka Textil","Cardigan",1,"Tela 1","Cardigan",1,88.00,0,
+25,"Conpartex","Jersey 100% Poliester",1,"Olimpus","Cardigan",0,62.92,0,
+26,"Armeli","100 % Poliester",0,"Entretela",,0,10.37,0,
+27,"Maja Textil","100 % Poliester",0,"Mesh",,0,23.00,0,
+28,"Razo Parisina","100 % Poliester",0,"Razo",,0,34.90,0,
+29,"Lasetex 100","Felpa 100% Poliester",0,"Felpa","Cardigan",1,22.80,0,
+30,"Chifon Lasetex","100% Algod¢n",0,"Chifon","Cardigan",1,18.29,0,
+31,"Textiles Evelyn","Jersey 100% Poliester",1,"Olimpus","Cardigan",0,62.00,0,
+32,"Emporio Textil","Jersey 100% Poliester",1,"Olimpus","Cardigan",0,64.35,0,
+33,"Lasetex 50","Felpa 50% Poliester 50% Algod¢n",0,"Felpa","Cardigan",1,30.00,0,
+34,"Vision Textil Polar","Polar 100% Poliester",1,"Polar",,1,42.00,0,11
+35,"Textiles Moy","100 % Poliester",1,"Tela 1","Cardigan",0,69.00,0,
+36,"Alsatex Chifon Open","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,60.00,0,
+37,"Alsat TerryOpen 50","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,60.00,0,
+38,"Sekine Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,60.00,0,
+39,"La Leona","Sportec 100% Poliester",1,"Sportec",,1,54.78,0,
+40,"Met","100% Algod¢n",1,"Tela 1","Cardigan",1,38.00,0,
+41,"Gizatex","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,63.00,0,
+42,"Met Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,65.00,0,
+43,"Abadi","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,50.00,0,
+44,"Met Puma","Felpa 100% Poliester",1,"Felpa","Cardigan",1,52.00,0,
+45,"Only","Sportec 100% Poliester",1,"Sportec",,1,58.00,0,
+46,"Chifon Met","100% Algod¢n",1,"Chifon","Cardigan",1,62.00,0,
+47,"Royal M. 50","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,21.00,0,
+48,"Chifon Royal 50","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,50.00,0,
+49,"Royal Terry 50","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,51.00,0,
+50,"Royal Terry","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,57.00,0,
+51,"Varios","Cardigan",1,"Tela","Cardigan",0,75.50,0,
+52,"Kimex Micropique","Micropique 100% Poliester",1,"Micropique",,0,71.00,1,8
+53,"Chifon Ykar","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,1,61.00,0,
+54,"Avante Felpa Negro","Felpa 50% Poliester 50% Algod¢n 290 grs negro",1,"Felpa",,0,0.00,1,15
+55,"Beyda Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,0,50.00,1,15
+56,"Kimex Likra","Likra 94%Poliamida 6%Elastano",1,"Likra",,1,119.00,0,
+57,"Mesh Atenas","Mesh 100% Poliester",1,"Mesh",,1,73.50,0,
+58,"DepTextil","100 % Poliester",0,"Nylon",,1,15.00,0,
+59,"Kimex Kinmax","100 % Poliester",1,"Kinmax",,0,83.00,1,9
+60,"Quimibond",,0,"Entretela",,1,8.00,0,
+61,"Claudia","Sportec 100% Poliester",1,"Sportec",,1,46.00,0,
+62,"Textiles Moy Felpa","78% Algod¢n 22% Poli‚ser",1,"Felpa","Cardigan",1,56.00,0,
+63,"Met Cardigan","Cardigan 100% Algod¢n",1,"Tela 1","Cardigan",1,45.80,0,
+64,"Textiles Moy Sportec","100 % Poliester",1,"Sportec",,1,50.00,0,
+65,"Bamboo Poliester","100 % Poliester",1,"Poliester",,1,68.00,0,
+66,"Alsatex Thermal","100% Algod¢n",1,"Thermal","Cardigan",1,62.00,0,
+67,"Chifon B&S","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,70.00,0,
+68,"Chifon Tex.Moy","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,86.00,0,
+69,"Met Likra","94%Algod¢n 6%Spandex",1,"Likra",,1,85.00,0,
+70,"Chifon Sekine 100","100% Algod¢n",1,"Chifon","Cardigan",1,55.00,0,
+71,"Sekine Likra","94%Algod¢n 6%Spandex",1,"Likra",,1,87.00,0,
+72,"Bamboo","100 % Poliester",1,"Kinmax",,1,68.00,0,
+73,"La leona pique","100 % Poliester",1,"Micropique",,1,82.00,0,
+74,"La leona Kinmax","100 % Poliester",1,"Kinmax",,1,108.00,0,
+75,"Chifon Jahar","100% Algod¢n",1,"Chifon",,1,35.00,0,
+76,"Alsatex Chifon 100","100% Algod¢n",1,"Chifon","Cardigan",1,58.00,0,
+77,"Gaytan Troya","100 % Poliester",1,"Troya",,0,72.00,1,8
+78,"Marilyn Likra","92%Algod¢n 8% Elastano",1,"Likra",,1,0.01,0,
+79,"La leona Microfibra","100 % Poliester",0,"Microfibra",,1,19.00,0,
+80,"La leona forro","100 % Poliester",0,"Forro",,1,16.00,0,
+81,"Danny Textil","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,1,88.00,0,
+82,"Gizatex Terry","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cadigan",1,69.00,0,
+83,"Gizat",,1,"Terry","Cardigan",1,60.00,0,
+84,"La leona Mesh","100 % Poliester",0,"Mesh",,1,18.00,0,
+85,"Textivision Panam","90%Poliester 5%Nylon 5%Spandex",1,"Panam",,0,125.00,1,13
+86,"Textivisio Manchester","100 % Poliester",1,"Manchester",,1,126.50,1,9
+87,"Textivision Onely","100 % Poliester",1,"Onely",,1,125.00,1,6
+88,"Textiles Moy Pique","100 % Poliester",1,"Micropique",,1,74.00,0,
+89,"Danalex","Cardigan 100% Algod¢n",1,"Tela 1","Cardigan",1,70.00,0,
+90,"Esmida Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",1,17.00,0,
+91,"Text.Teresa Forro","100 % Poliester",0,"Tafeta",,1,4.80,0,
+92,"Tex.Teresa Microfibr","100 % Poliester",0,"Microfibra",,1,16.50,0,
+93,"Textiles Asia","100 % Poliester",0,"Tafeta",,1,6.00,0,
+94,"Sportoc (Viejo)","100 % Poliester",1,"Sportec",,1,69.00,0,
+95,"Boulos Textil","100 % Poliester",1,"Tafeta",,1,4.60,0,
+96,"Gaytan Universo","100 % Poliester",1,"Universo",,1,0.00,1,8
+97,"Deportextil Pepito","100 % Poliester",1,"Pepito",,1,185.00,0,9
+98,"Deportextil Microfib","100 % Poliester",0,"Microfibra",,1,46.00,0,
+99,"Deportextil Mesh","100 % Poliester",0,"Mesh",,1,30.00,0,
+100,"Alsatex Baby Rib","100% Algod¢n",1,"Baby Rib",,1,85.00,0,
+101,"Miramar","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,1,62.00,0,
+102,"Telco Textil","100 % Poliester",1,"Sportec",,1,48.00,1,
+103,"Tex Teresa Sportec","100 % Poliester",1,"Sportec",,1,58.00,1,
+104,"Gaytan Dubay","100 % Poliester",1,"Dubay",,1,83.48,1,9
+105,"Alto Impacto","100 % Poliester",0,"Wimbledon",,1,40.00,0,
+106,"Deportextil Mayki","100 % Poliester",1,"Mayki",,1,117.16,0,
+107,"Gaytan Metropoli","100 % Poliester",1,"Metropoli",,1,92.17,1,6
+108,"Alsatex Terry Algodo","100% Algod¢n",1,"Terry","Cardigan",1,65.00,0,
+109,"Chifon Gaytan","100% Algod¢n",1,"Chifon","Cardigan",1,80.01,0,
+110,"Gaytan Terry","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,75.65,0,
+111,"Virgina Textil","100 % Poliester",0,"Inter",,0,18.00,0,
+112,"Ditcsa likra Guzardi","94%Algod¢n 6%Spandex",1,"Lickra",,1,111.00,0,
+113,"Ditecsa likra Kisa","94%Algod¢n 6%Spandex",1,"Lickra",,1,121.70,0,
+114,"Chifon Ditecsa","94%Algod¢n 6%Spandex",1,"Chifon",,1,109.80,0,
+115,"Artex Lickra","94%Algod¢n 6%Spandex",1,"Lickra",,1,106.00,0,
+116,"Licra Trevi","92%Algod¢n 8% Elastano",1,"Licra",,1,105.00,0,
+117,"Chifon Inter","Chifon 50% Poliester 50% Algod¢n",0,"Oro",,1,0.00,0,
+118,"Del San Inter","100 % Poliester",1,"Inter 70",,1,76.00,0,
+119,"Del San Tricot","100 % Poliester",0,"Tricot Red",,1,20.00,0,
+120,"Borcafisa Polar","100 % Poliester",1,"Polar Fleece",,1,51.00,0,
+121,"Gaytan Polar","100 % Poliester",1,"Polar Fleece",,1,56.03,0,
+122,"Vaneto Polirayon","65% Poliester 35%Viscosa",0,"Polirayon Flame",,1,26.00,0,
+123,"Gaytan Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,1,104.31,0,15
+124,"Zagis Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,1,98.00,0,
+125,"Zagis Terry","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",1,86.00,0,
+126,"Tex.Teresa Polyrayon","80%Poli‚ster 18%Viscosa 2%Elastano",0,"Polyrayon",,1,23.00,0,
+127,"Zagis Terry Likra","95%Algod¢n 5%Elastano",1,"Terry",,1,122.00,1,2
+128,"Deportext Rhin Micro","100 % Poliester",0,"Rhin Micro",,1,26.29,1,6
+129,"Iris Forro","100 % Poliester",1,"Forro",,0,11.00,0,
+130,"Silver","100 % Poliester",0,"Silver",,0,11.00,0,
+131,"Sutexmex Gabardina","97%Algod¢n 3% Elastano",0,"Gabardina",,1,40.00,0,
+132,"Verandas Itty Way","92%Algod¢n 8% Elastano",0,"Itty Way",,1,28.00,0,
+133,"Tex Teresa Felpa","100 % Poliester",1,"Felpa",,1,59.00,1,7
+134,"Denimarket Polar","100 % Poliester",1,"Polar",,1,53.70,0,
+135,"Licra Cattan","47% Algod¢n 47%poleister 6% Ealstano",1,"Licra",,1,126.00,0,
+136,"Text Teresa Polar","100 % Poliester",1,"Polar",,0,58.00,1,11
+137,"JD Polar","100 % Poliester",1,"Polar",,0,50.00,1,11
+138,"Only Polar","100 % Poliester",1,"Polar",,0,55.00,1,11
+139,"Alsatex Alg/Licra","96% Algod¢n 4% Elastano",1,"Licra",,0,132.00,1,3
+140,"Alsatex Terry Licra","French terry 96% Algod¢n 4% Elastano",1,"Terry",,0,0.00,0,2
+141,"Windsor Alg/Lic","95%Algod¢n 5%Elastano",1,"Licra",,0,0.00,1,3
+142,"Ditecsa Alg/Lic Kenzi","97%Algod¢n 3% Elastano",1,"Licra",,0,125.00,1,3
+143,"Vaneto Alg/Lic","92%Algod¢n 8% Elastano",1,"Licra",,0,0.00,1,3
+144,"Textivision Alg/Lic Alabama","97%Algod¢n 3% Elastano",1,"Licra",,0,0.00,1,3
+145,"Mundo de las telas Alg/Lic","96% Algod¢n 6% Elastano",1,"Licra",,0,115.00,1,3
+146,"Telco Alg/Licra Karpatos","95%Algod¢n 5%Elastano",1,"Alg. Licra Karpatos",,1,0.00,1,3
+147,"Becitex Alg/Lic","95%Algod¢n 5%Elastano",1,"Licra",,1,0.00,1,3
+148,"CM Alg/Licra Beta","92%Algod¢n 8% Elastano",1,"Licra Beta",,0,0.00,0,3
+149,"Kimex Alg/Lic 3602","92%Algod¢n 8% Elastano",1,"Licra",,0,0.00,1,3
+150,"Premio Textil Alg/Lic","97%Algod¢n 3% Elastano",1,"Licra",,0,0.00,1,3
+151,"Catan Alg/Lic","96% Algod¢n 6% Elastano",1,"Licra",,0,0.00,1,3
+152,"Becktel Chifon 100 Alg","100 % Algod¢n",1,"Chifon","Cardigan",0,175.00,1,5
+153,"Butter Milk","100 % Poliester",1,"Tela",,0,0.00,1,9
+154,"Colombo Gama","100 % Poliester",1,"Tela",,0,98.00,1,9
+155,"Interlook Algod¢n","100% Algod¢n",1,"Interlook",,0,50.00,1,5
+156,"Qualy Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,0,50.00,1,15
+157,"Kimex Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,0,0.00,1,15
+158,"CM Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,0,15
+160,"Miro Terry Licra","French terry 96% Algod¢n 4% Elastano",1,"Terry",,0,80.00,0,2
+161,"Simji Terry Licra","French terry 95% Algod¢n 5% Elastano",1,"Terry",,0,0.00,1,2
+162,"Vaneto Terry Licra","French terry 95% Algod¢n 5% Elastano",1,"Terry",,0,0.00,1,2
+163,"Kimex Terry","French terry 96% Algod¢n 4% Elastano",1,"Terry",,0,0.00,1,2
+164,"Tejidos Mas Jackard","Jackard 100% Poliester",1,"Jackard",,0,0.00,1,10
+165,"Mundo de las Telas Lurex","Lurex 100 % Poliester",1,"Lurex",,0,0.00,1,10
+166,"Textivision Rayon","Rayon 95% Spandex 5%",1,"Rayon",,0,0.00,1,10
+167,"Gama Rayon","95% Rayon 5% Spandex",1,"Rayon",,0,0.00,1,10
+169,"Vaneto Alg/Pol/Lic","80%Poli‚ster 15%Algodon 5%Elastano",1,"Licra",,0,0.00,0,4
+170,"DenimMarket Algo/Pol/Lic","80%Poli‚ster 15% Algodon 5%Elastano",1,"Licra",,0,85.00,1,4
+171,"Brigitex Algo/Pol/Lic","47%Poli‚ster 47%% Algodon 6%Elastano",1,"Licra",,1,0.00,0,4
+173,"Qualy Polar","Polar 100% Poliester",1,"Polar",,0,50.00,1,11
+174,"Allan Textil Polar","Polar 100% Poliester",1,"Polar",,0,55.00,1,11
+175,"Kimex Rayas","100% Poliester",0,"Rayas",,0,28.00,1,10
+176,"CM Rayas","100% Poliester",1,"Rayas",,0,103.00,1,10
+177,"Kimex Rayon","Rayon 90% Spandex 10%",1,"Rayon",,0,102.00,1,10
+178,"Chedrahi RIB Desaujado","Rib Desahujdo 1x1 100% Algod¢n",1,"Rib",,0,85.00,0,12
+179,"Chedraui RIB 1x1","Rib 100% Algod¢n 1x1",1,"Rib",,0,68.00,1,12
+180,"Advantage Red","100 % Poliester",0,"Red",,0,12.00,1,10
+181,"Kimex Skin","100% Poliester",1,"Skin",,0,95.00,1,10
+182,"Assatex Supplex","Supplex 90% Nylon, 10% Elastano",1,"Supplex",,0,190.00,1,10
+183,"Quely Mezclilla","90% Algod¢n 10% elastano",1,"Mezclilla",,0,85.00,1,10
+184,"Kimex Mesh","90%Poliester 5%Nylon 5%Spandex",1,"Mesh",,0,115.00,1,13
+185,"Mesh Beyda","Mesh 100% Poliester",0,"Mesh",,0,25.00,1,13
+186,"American Textil Mesh","Mesh 100% Poliester",1,"Mesh",,0,80.00,1,13
+187,"Qualy Mesh","Mesh 100% Poliester",1,"Mesh",,0,110.00,1,13
+188,"Premio Textil Mesh","90%Poliester 5%Nylon 5%Spandex",1,"Mesh",,0,118.00,1,13
+189,"Kimex Triatlon","Mesh 100% Poliester",1,"Mesh",,0,98.00,1,13
+190,"Textivision Jenifer","Nylon 90% Elastano 10%",1,"Nylon",,0,125.00,1,14
+191,"Mundo de las telas Nylon","Nylon 90% Elastano 10%",1,"Nylon",,0,128.00,1,14
+192,"Kimex Nylon Kintouch","Nylon 90% Elastano 10%",1,"Nylon",,0,150.00,1,14
+193,"Pat Primo Nylon Pacific","Nylon 90% Elastano 10%",1,"Nylon",,0,210.00,1,14
+194,"Gama Nylon","Nylon 90% Elastano 10%",1,"Nylon",,0,115.00,0,14
+196,"Ditecsa Rayon","rayon 90% Spandex 10%",1,"Rayon",,0,0.00,1,10
+197,"Kimex Kumbia",,1,"Kimex",,0,0.00,0,0
+198,"Brigitex alg/licra","80%Poli‚ster 15% Algodon 5%Elastano",1,"Alg/poliester/licra",,1,0.00,0,4
+199,"Joy Textil  alg/pol/licra","80%Poli‚ster 15% Algodon 5%Elastano",1,"Alg/pol/licra",,0,0.00,1,4
+200,"French terry Cattan","80%Poli‚ster 15% Algodon 5%Elastano",1,"Tela 1",,0,0.00,1,2
+201,"Brigitex Poliester/algo/licra","47% Algod¢n 47%poleister 6% Ealstano",1,"Licra",,0,0.00,1,4
+202,"Catta Poliester/algod¢n/licra Cattan","rrrrr",1,"Tela 1",,0,0.00,1,4
+204,"Galatea Poliester/Algod•n/Lycra","80%Poli‚ster 15% Algodon 5%Elastano",1,"Tela1",,1,0.00,1,4
+205,"Brigitex Sportoc","47%Poli‚ster 47%% Algodon 6%Elastano",1,"Tela 1",,0,0.00,1,6
+207,"Poliester/licra Centro","47%Poli‚ster 47%% Algodon 6%Elastano",1,"Tela 1",,1,0.00,1,9
+208,"Vivatex Poliester/elastano","100% Poliester",1,"Poliester/elastano V",,1,0.00,1,8
+209,"Cardigan Poliester","Cardigan",1,"Cardigan",,0,0.00,1,10
+210,"Brigitex Poly/rayon","Polyrayon espandex",1,"Polirayon",,1,0.00,1,4
+211,"Polirayon Textiles Teresa","Polyrayon espandex",1,"Tela 1",,0,0.00,1,8
+212,"Mesh fantastic",,1,"Tela 1",,0,0.00,1,0
+213,"Mesh Fantastic","100 % Poliester",1,"Tela 1",,0,0.00,1,9
+214,"Emperador Tex. Pol/alg./licra","80%Poli‚ster 15% Algodon 5%Elastano",1,"Tela 1",,1,0.00,1,4
+215,"Nulon/Lycra",,1,"Tela 1",,0,0.00,1,0
+217,"Nylon lycra",,1,"Tela 1",,0,0.00,1,0
+218,"Nylon Lycra","90% Nylon 10 Elastano",1,"Tela 1",,0,0.00,1,14
+219,"Alg. Licra Telco textil","95%Algod¢n 5%Elastano",1,"Alg. Licra",,1,118.00,1,3
+220,"Gaytan Dubay","100 % Poliester",1,"Dubay",,1,90.51,1,9
+222,"Deportextil Mercurio","100 % Poliester",1,"Deportextil Mercurio",,0,0.00,0,9
+224,"Deportextil Australia","100 % Poliester",1,"Deportextil Australi",,0,0.00,1,10
+225,"Deportextil Mercurio Mirco",,1,"Tela 1",,0,0.00,1,0
+226,"Deportextil Costa Rica","100% Poliester",1,"Deport. Costa Rica",,0,0.00,1,8
+227,"Pat primo Jabon","87% Poliester 13% Elastano",1,"Pat Primo Jabon",,1,0.00,0,13
+228,"Gaytan Metropoly","100% Poliester",1,"Gaytan Metropoly",,0,0.00,0,6
+229,"Textiles Teresa Magic","100% Poliester",1,"Magic",,0,0.00,1,13
+231,"Virginia Textil Tenaz (Magic)","100% Poliester",1,"Tela 1",,0,0.00,1,9
+232,"Virginia Textil  Tenaz (magic)",,1,"Tela 1",,0,0.00,1,9
+235,"Trevia Alg. Licra Privilegio","97%Algod¢n 3% Elastano",1,"Alg. LicraPrivilegio",,1,0.00,1,3
+236,"Yafa Alg. Licra","97%Algod¢n 3% Elastano",1,"Alg",,0,0.00,1,3
+237,"Deportextil Energica","87% Poliester 13% Elastano",1,"Energica",,0,0.00,1,6
+238,"Trevia alg. Licra moscu","97%Algod¢n 3% Elastano",1,"Alg",,0,0.00,1,3
+239,"Trevia Felpa Arizona","Felpa 50% Poliester 50% Algod¢n",1,"Felpa 50/50",,0,0.00,1,15
+240,"Ron textil  Deskubra","90% Nylon 10 Elastano",1,"Nylon/Licra",,0,0.00,1,14
+241,"Distribuidora Textil Deskubra","90% Nylon 10 Elastano",1,"Nylon/licra",,0,0.00,1,14
+242,"Pat Primo  Energica","87% Poliester 13% Elastano",1,"Energica",,0,0.00,1,6
+244,"Aspetel Nylon/licra","90% Nylon 10 Elastano",1,"Nylon/Licra",,0,0.00,1,14
+245,"Textivision Susan",,1,"Tela 1",,0,0.00,1,0
+246,"Textivision Susan","87% Poliester 13% Elastano",1,"Susan",,0,0.00,1,6
+247,"Juanico Poliester/algod¢n/licra","80%Poli‚ster 15% Algodon 5%Elastano",1,"Tela 1",,0,0.00,1,4
+248,"CM French Terry","French Terry 50% Poliester 50% Algod¢n",1,"French terry","Cardigan",0,0.00,0,1
+249,"CM Cardigan","Cardigan",1,"Cardigan 50/50",,0,0.00,0,10
+250,"Juanico Alg. Licra ligera","92%Algod¢n 8% Elastano",1,"Alg. Licra",,0,0.00,1,3
+251,"Juanico Cardigan","Cardigan",1,"Tela 1",,0,0.00,1,6
+252,"Textivision Kendra estampada","80%Poli‚ster 18%Viscosa 2%Elastano",0,"Kendra Viscosa/Elast",,0,0.00,1,10
+253,"Arttex Nylon Diego Rivera","90% Nylon 10 Elastano",1,"Nylon/licra",,0,0.00,1,14
+254,"Arttex Nylon Botero","90% Nylon 10 Elastano",1,"Nylon licra",,0,0.00,1,14
+255,"C.M Frisia Felpa  290 grms","Felpa 50% Poliester 50% Algod¢n",1,"Felpa 50/50",,0,0.00,0,15
+256,"Sekine Chifon licra","80%Poli‚ster 15% Algodon 5%Elastano",1,"Sekine Alg/Po.licra",,0,0.00,1,4
+257,"Aviance Poliester/Elastano","87% Poliester 13% Elastano",0,"Aviance Poliester",,0,0.00,1,10
+258,"Eliza Estampados","87% Poliester 13% Elastano",1,"Eliza Estampado",,1,0.00,1,10
+259,"Juanico Alg. Licra","78% Algod¢n 22% Poli‚ser",1,"Algod¢n licra",,0,0.00,1,3
+260,"Textivison Beira estampado","95%Algod¢n 5%Elastano",0,"Text.Beira Estamp",,0,0.00,1,3
+261,"C.M Florida","92%Algod¢n 8% Elastano",1,"C.M Florida",,0,0.00,1,3
+262,"Yuri Nylon/Licra","90% Nylon 10 Elastano",1,"Yuri Nylon/Licra",,0,0.00,1,14
+263,"Trevia French Terranova","French Terry 50% Poliester 50% Algod¢n",1,"French Terranova","Cardigan terranova",1,0.00,1,1
+265,"C.M Felpa Napoles","Felpa 50% Poliester 50% Algod¢n",1,"Felpa Napoles","Cardigan",0,0.00,1,15
+267,"Paris Alg. Licra","92%Algod¢n 8% Elastano",1,"Paris Alg. Licra",,0,0.00,1,3
+268,"Juanico Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Juanico Felpa 50/50",,0,0.00,1,15
+269,"Juanico French Terry 50/50","French Terry 50% Poliester 50% Algod¢n",1,"Juanico French terry",,0,0.00,0,1
+270,"C.M Felpa  Frisa 260","Felpa 50% Poliester 50% Algod¢n",1,"C.m Felpa Frisa","Cardigan",0,0.00,1,15
+271,"C.M Cardigan",,1,"Tela 1",,0,0.00,0,0
+272,"Ramakat Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+273,"Ramakat Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+274,"Maritza Vinil","100 % Poliester",0,"Tela 1",,0,0.00,1,10
+275,"Altamirano Gabardina","47% Algod¢n 47%poleister 6% Ealstano",0,"Gabardina",,0,0.00,1,10
+276,"Teresa Azucena","100 % Poliester",1,"Azucena",,0,0.00,1,9
+277,"Deportextil Mayki Plus","100% Poliester",1,"Mayki Plus",,0,0.00,1,9
+278,"Teresa Inter 70","100% Poliester",0,"Inter70",,0,0.00,1,9
+279,"Texere Sportec","100% Poliester",1,"Sportec Poliester",,0,0.00,1,6
+280,"Texere Sportock","100% Poliester",1,"Sportock Oliester",,0,0.00,1,6
+281,"Yuri",,1,"Tela 1",,0,0.00,1,0
+283,"Tibet Textil Azucena","100 % Poliester",1,"Tibet Textil Azucena",,0,0.00,1,9
+284,"Virginia Textil Inter 70","100 % Poliester",0,"Inter 70",,0,0.00,1,9
+285,"Pentex Sportock","100 % Poliester",1,"Sportock",,0,0.00,1,6
+286,"Yuri nylon estampado","90% Nylon 10 Elastano",0,"Nylon estampado",,0,0.00,0,14
+287,"Omi Nylon/Licra estampada","90% Nylon 10 Elastano",1,"Omi Nylon estamp.",,0,0.00,1,14
+288,"Textatil Estamp dos varios","90% Nylon 10 Elastano",1,"Textatil Estampado",,0,0.00,1,14
+289,"Juanico Chifon",,1,"Chifon",,0,0.00,1,4
+290,"Deportextil Jumanji","100 % Poliester",1,"Tela 1",,0,0.00,1,6
+291,"Big Moda Bombay","100% Poliester",0,"Bombay",,0,0.00,1,8
+292,"Trevia French Viena","French Terry 50% Poliester 50% Algod¢n",1,"Frecnh terry Viena","Cardigan Viena",1,0.00,1,1
+293,"C.M Felpa Giovanni 200 grms","Felpa 50% Poliester 50% Algod¢n",1,"Felpa Giovanni","Cardigan Giovanni",0,0.00,0,2
+294,"CM French Cambry","95%Algod¢n 5%Elastano",1,"French cambry","Cardigan",0,0.00,1,2
+295,"27/08/2014",,1,"Tela 1",,0,0.00,1,0
+296,"Trevia French terry Navy Plus","95%Algod¢n 5%Elastano",1,"French terry Navy",,1,0.00,1,2
+297,"Alto Impacto Pepito","100 % Poliester",1,"Pepito",,0,0.00,1,9
+298,"Textiles Zaky cardigan","Cardigan 100% Algod¢n",1,"Cardigan",,0,0.00,1,1
+299,"Nakad French terry","French Terry 50% Poliester 50% Algod¢n",1,"French terry","Cardigan",0,0.00,1,1
+300,"Yardas y metros Devore",,1,"Devore",,0,0.00,1,8
+301,"Textiles Dany, S.A de C.V.","Chifon 50% Poliester 50% Algod¢n",1,"French  terry","Cardigan",0,0.00,1,1
+302,"I Wey Textil, S.A. De C.V.","90% Nylon 10 Elastano",1,"I Wey Nylon",,0,0.00,1,14
+303,"Cm french giovanni","100 % Algod¢n",1,"french",,0,0.00,1,1
+304,"Textivi",,1,"Tela 1",,0,0.00,1,0
+305,"Textivision ( Panam )",,1,"Tela 1",,0,0.00,1,13
+306,"Yardas Y metros Jersey abierto","Chifon 50% Poliester 50% Algod¢n",1,"Jersey abierto",,0,0.00,1,4
+307,"Textiles del Norte Gabardina","100 % Algod¢n",0,"Gabardina",,0,0.00,1,10
+308,"Sanchez Ebasa Poquetin","100 % Algod¢n",0,"Poquetin",,0,0.00,1,10
+309,"Vanitex punto de Roma","80%Poli‚ster 18%Viscosa 2%Elastano",0,"Punto de Roma",,0,0.00,1,10
+311,"Telco Ackor","95%Algod¢n 5%Elastano",1,"Telco Ackor",,0,0.00,1,3
+312,"Telco French terry Platon","French Terry 50% Poliester 50% Algod¢n",1,"French terry Platon","Cardigan Carfe",0,0.00,1,4
+313,"Vivatex Alg. Licra Mario 24","95%Algod¢n 5%Elastano",1,"Alg. Licra Mario 24",,0,0.00,0,3
+314,"Telas del continente Cardigan","Chifon 50% Poliester 50% Algod¢n",1,"Cardigan",,0,0.00,1,5
+315,"Trevia French terry Polary","95%Algod¢n 5%Elastano",1,"French Polary",,0,0.00,1,2
+316,"Trevia Alg. Licra Pamplona","Felpa 50% Poliester 50% Algod¢n",1,"Alg.Licra Pamplona",,0,0.00,1,1
+317,"Teresa French","100% Poliester",1,"French Poliester",,0,0.00,1,6
+318,"Telco French Platon",,1,"Tela 1",,0,0.00,1,0
+319,"Sanchez Ebasa Azucena","100% Poliester",1,"Azucena",,0,0.00,1,8
+320,"Joseph Textil Azucena","100 % Poliester",1,"Azucena",,0,0.00,1,8
+321,"Textiles Moy Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,1
+322,"Teresa Sportoc","Felpa 50% Poliester 50% Algod¢n",1,"Sportoc",,0,0.00,0,15
+323,"Teresa Tenaz","100 % Poliester",1,"Tenaz",,0,0.00,0,9
+324,"Merkurio Vinipiel",,0,"Vinipeil",,0,0.00,1,10
+325,"Trevia Magic estampado","87% Poliester 13% Elastano",0,"Magic estampado",,0,0.00,1,10
+326,"CM Brant  doble","78% Algod¢n 22% Poli‚ser",1,"Brant",,0,0.00,0,4
+327,"Vivatex Estampados algod¢n 100%","100 % Algod¢n",1,"Animal Print coral",,0,0.00,1,5
+328,"Vivatex Alg.licra Niza","92%Algod¢n 8% Elastano",1,"Alg.licra Niza",,0,0.00,1,3
+329,"Trevia Guayna French","French Terry 50% Poliester 50% Algod¢n",1,"Guayna French",,0,0.00,1,1
+330,"Vivatex Alg/licra estampado","94%Algod¢n 6%Spandex",1,"Alg.licra animal pri",,0,0.00,1,3
+331,"Trevia French estampado","French Terry 50% Poliester 50% Algod¢n",0,"Estamp. Bolitas",,0,0.00,1,1
+332,"Avante  Calgary","French Terry 50% Poliester 50% Algod¢n",1,"Hueso/marino","jaspe/coral",0,0.00,0,1
+333,"Elilea Capitonado doble","French Terry 50% Poliester 50% Algod¢n",0,"Capitonado",,0,0.00,1,1
+334,"Evelyne cardigan","Chifon 50% Poliester 50% Algod¢n",1,"Cardigan",,0,0.00,0,4
+335,"Trevia Flam‚ Navarra","100 % Algod¢n",1,"Flam‚ Navarro",,0,0.00,1,5
+336,"Finger print Liverpool Stripe 26","87% Poliester 13% Elastano",0,"Liverpool Stripe6",,0,0.00,1,10
+337,"Finger Bullet","87% Poliester 13% Elastano",0,"Bullet Stripe",,0,0.00,1,10
+338,"Finger Liverpool Du663","87% Poliester 13% Elastano",0,"DU663",,0,0.00,1,10
+340,"Finger Liverpool Rayas","87% Poliester 13% Elastano",1,"Rayas bco/negro",,0,0.00,0,10
+342,"Finger Liverpool Stirpe 37","87% Poliester 13% Elastano",0,"Stripe 37 negro",,0,0.00,1,10
+343,"C.M Zacatecas","78% Algod¢n 22% Poli‚ser",1,"Zacatecas",,0,0.00,1,4
+344,"C.M Beta Tubular","78% Algod¢n 22% Poli‚ser",1,"Beta tubular",,0,0.00,0,5
+345,"Understar Ponti-Roma","78% Algod¢n 22% Poli‚ser",0,"Ponti roma",,0,0.00,0,10
+346,"C.M amarre","Chifon 50% Poliester 50% Algod¢n",1,"Amarre",,0,0.00,1,5
+347,"C.M chifon amarre","Chifon 50% Poliester 50% Algod¢n",1,"Marino",,0,0.00,0,5
+348,"Danny Textil Chifon","78% Algod¢n 22% Poli‚ser",1,"Shifon 90/10","Cardigan",0,0.00,1,4
+349,"Telco Chifon Clio","100 % Algod¢n",1,"Chifon Clio",,0,0.00,1,5
+350,"Protelamex Devore","100 % Algod¢n",0,"Devore",,0,0.00,1,3
+351,"Pat Primo Angelical Nylon","90% Nylon 10 Elastano",1,"Negro",,0,0.00,0,14
+353,"Idami French Bash","80%Poli‚ster 15% Algodon 5%Elastano",1,"French Bash",,0,0.00,1,1
+354,"Sanchez Ebasa Mesh","100 % Poliester",0,"Mesh",,0,0.00,1,13
+355,"Ikar Bicomponente French","78% Algod¢n 22% Poli‚ser",1,"Bicomponente Frenchj",,0,0.00,1,1
+356,"Excel monaco Alg. Licra","95%Algod¢n 5%Elastano",1,"Monaco alg.licra",,0,0.00,1,3
+357,"C.M Potenza","78% Algod¢n 22% Poli‚ser",1,"Potenza",,0,0.00,1,4
+358,"Verandas Bullet","100 % Poliester",1,"Bullet  nv 9892",,0,0.00,1,6
+359,"Verandas Irlanda","100% Poliester",1,"Irlanda",,0,0.00,1,6
+360,"Excel estampados","92%Algod¢n 8% Elastano",1,"Medieval blue",,0,0.00,1,3
+362,"Trevia Stambul","78% Algod¢n 22% Poli‚ser",1,"Stambul",,0,0.00,1,1
+364,"Trevia Chifon nieve","100 % Algod¢n",1,"Chifon nieve",,0,0.00,1,5
+365,"SFIJ  French Berlin","47% Algod¢n 47%poleister 6% Ealstano",1,"Berlin",,0,0.00,0,1
+366,"Pat primo capitonado","100% Poliester",0,"Capitonado",,0,0.00,1,4
+367,"Equilibrium estampados","94%Algod¢n 6%Spandex",0,"Monaco estampado",,0,0.00,0,3
+368,"Absatex Sofia French","80%Poli‚ster 15% Algodon 5%Elastano",1,"Terry",,0,0.00,0,3
+369,"EAD estampados","100 % Algod¢n",1,"Sangria",,0,0.00,1,5
+370,"Hector french","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,0,1
+371,"Trevia Licra Oviedo","96% Algod¢n 4% Elastano",1,"Licra Oviedo",,0,0.00,1,3
+372,"Cardigan Centro","Cardigan 100% Algod¢n",1,"Cardigan",,0,0.00,0,12
+373,"C.M. Gama","100 % Algod¢n",1,"Chifon Gama",,0,0.00,1,5
+374,"Desiree Estampado  Chifon 100%","100 % Algod¢n",0,"Estampado  chifon 10",,0,0.00,1,5
+375,"Navytex French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardgian",0,0.00,1,1
+376,"Kimex French terry","French Terry 50% Poliester 50% Algod¢n",1,"French terry",,0,0.00,0,1
+377,"C.M Nieve","French Terry 50% Poliester 50% Algod¢n",1,"Nieve Negro jaspeado",,0,0.00,0,1
+378,"Idami capitonado","100 % Poliester",1,"Capitonado",,0,0.00,1,10
+380,"C.M San benito french","60% Poliester 40% algodon",1,"San Benito French",,0,0.00,1,6
+381,"Ikar French puntitos","French Terry 50% Poliester 50% Algod¢n",1,"French puntitos","cardigan",0,0.00,1,1
+382,"Qualy Licra Algod¢n","47% Algod¢n 47%poleister 6% Ealstano",1,"Licra algod¢n",,0,0.00,0,4
+383,"Sekine Licra algod¢n","90% Algod¢n 10% elastano",1,"Licra algod¢n",,0,0.00,1,3
+384,"C.M. Extraordinaria","60% Poliester 40% algodon",1,"Extraordinaria",,0,0.00,0,10
+385,"Atree Poliray¢n","90%Poliester 5%Nylon 5%Spandex",0,"Polirayon",,0,0.00,1,8
+386,"Danitey Chifon","50%alg 50%pol",1,"Chifon",,0,,1,5
+387,"Finger print Bolitas","90%Poliester 5%Nylon 5%Spandex",0,"Bolitas negro/blanco",,0,0.00,1,10
+388,"Ikar french moda","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+389,"Ikar Alg. Licra Elite","90% Algod¢n 10% elastano",1,"Alg. Licra Elite",,0,0.00,0,3
+390,"Simji  French con licra treggin","47% Algod¢n 47%poleister 6% Ealstano",1,"French estampada",,0,0.00,1,2
+391,"Simji French Poliester licra","80%Poli‚ster 15% Algodon 5%Elastano",1,"French c/elastano",,0,0.00,1,4
+392,"Telco Flame Jaspeado","Chifon 50% Poliester 50% Algod¢n",1,"Flame jaspeado",,0,0.00,1,9
+393,"Ikar Denim licra","47%Poli‚ster 47%% Algodon 6%Elastano",1,"Demin Licra",,0,0.00,1,4
+394,"C.M  French Extremadura","85%pol.15%alg. 5% elastano",1,"Extremadura",,0,0.00,1,1
+395,"Finger Print Rayas","90%Poliester 5%Nylon 5%Spandex",1,"Rayas",,0,0.00,1,10
+396,"Popelina","100% Algod¢n",1,"Popelina",,0,0.00,1,10
+397,"Verandas Rayas",,1,"Rayas",,0,0.00,1,1
+398,"Verandas Rayon elastano","95% Rayon 5% Spandex",0,"Rayon elastano",,0,0.00,1,5
+399,"Teresa Mesh","100 % Poliester",1,"Mesh",,0,0.00,0,13
+400,"Qualy Cardigan 1","Cardigan",1,"Cardigan 1",,0,0.00,1,10
+402,"Qualy French",,1,"French 50/50","Cardigan",0,0.00,1,1
+403,"Trevia french turquia","French Terry 50% Poliester 50% Algod¢n",1,"Turquia",,0,0.00,0,1
+404,"Ansertex Mesh","100 % Poliester",0,"Mesh",,0,0.00,1,13
+405,"Ikar flame","100 % Algod¢n",1,"Flame  100",,0,0.00,1,5
+406,"Ikar Chifon 100% Algodon","100 % Algod¢n",1,"Chifon 100% alg.",,0,0.00,1,10
+407,"Enda cardigan","Cardigan",1,"Cardigan",,0,0.00,0,10
+408,"CM.Vizcaya","78% Algod¢n 22% Poli‚ser",1,"French Vizcaya",,0,0.00,1,1
+409,"Trevia  French Polonia","French Terry 50% Poliester 50% Algod¢n",1,"French Polonia","Cardigan",0,0.00,1,1
+410,"Vivatex Alg. Barbie","100 % Algod¢n",1,"Algodon Barbie",,0,0.00,0,10
+411,"Ikar Felpa puntitos",,1,"Tela 1",,0,0.00,0,0
+412,"Ikar Felpa Puntitos","Felpa 50% Poliester 50% Algod¢n",1,"Felpa Puntitos",,0,0.00,0,15
+413,"Trevia Chifon caracas","100 % Algod¢n",1,"Chifon",,0,0.00,1,5
+414,"Qualy French Grecia","47% Algod¢n 47%poleister 6% Ealstano",1,"French Grecia",,0,0.00,1,1
+415,"Equilibrium Viscosa","95% Rayon 5% Spandex",1,"Viscosa  estampada",,0,0.00,1,10
+416,"Simji Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon estampado",,0,0.00,1,5
+417,"Telco Rayas Zebrin","60% Poliester 40% algodon",1,"Chifon Zebrin",,0,0.00,1,5
+418,"Simji Jack 699","47% Algod¢n 47%poleister 6% Ealstano",1,"Jack 699",,0,0.00,0,4
+419,"Telco Chifon Nevada","Chifon 50% Poliester 50% Algod¢n",1,"Nevada Marino",,0,0.00,1,5
+420,"Verandas Capitonado","97% Poliester 3% Elastano",1,"Capitonado",,0,0.00,1,6
+421,"Alto inpacto Microfil","100 % Poliester",0,"Microfil",,0,0.00,1,6
+422,"Equilibrium Estampado Shimer","Chifon 50% Poliester 50% Algod¢n",1,"Chifon Shimer",,0,0.00,1,5
+423,"Ikar chifon jaspeado","98% algodon 2% poliester",1,"Chifon jaspeado","Cardigan",0,0.00,1,5
+424,"C.M  rayas pond","60% Poliester 40% algodon",1,"Rayas pond",,0,0.00,0,5
+427,"Ikar Cardigan","47% Algod¢n 47%poleister 6% Ealstano",1,"Cardigan",,0,0.00,1,4
+428,"Ikar French ligeros",,1,"Tela 1",,0,0.00,1,0
+429,"Ikar felpa","90% algodon 10% poliester",1,"Felpa","Cardigan",0,0.00,1,4
+430,"Deportextil mesh","100% Algod¢n",0,"Mesh",,0,0.00,0,13
+431,"Ole Deportex","100 % Poliester",0,"Mesh",,0,0.00,1,13
+432,"Telco Felpa con elastano","47% Algod¢n 47%poleister 6% Ealstano",1,"Felpa",,0,0.00,1,15
+433,"Surticentro Jackard capitonado","100% Poliester",0,"Jackard capitonado",,0,0.00,1,6
+434,"Simjis chifon 621","97%Algod¢n 3% Elastano",1,"Chifon con licra",,0,0.00,1,3
+435,"Studio Emme rib","79% poliester 19% rayon 2% elastano",1,"Rib",,0,0.00,1,10
+436,"Simjis Maquila French","French Terry 50% Poliester 50% Algod¢n",0,"French Viena",,0,0.00,1,10
+437,"Simjis Terry 870 con licra.","96.2 Algodon 3.8 Elastano",1,"French con licra",,0,0.00,1,2
+438,"simjis",,1,"Tela 1",,0,0.00,1,0
+440,"Simjis Alg.licra Maquila","80% algodon 15% poliester 5% elastano",1,"Alg. Licra estamp.",,0,0.00,1,4
+441,"Lua Jacquard bullet","96 Poliester 4% Elastano",0,"Jacquard bullet",,0,0.00,1,10
+442,"Textilles Evelyne","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+443,"Ely felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,0,0.00,1,15
+444,"Navytex","92%Algod¢n 8% Elastano",1,"Flame",,0,0.00,1,5
+445,"Evelyne French","French Terry 50% Poliester 50% Algod¢n",1,"French terry",,0,0.00,1,1
+446,"Verandas Encaje","97% Poliester 3% Elastano",1,"Encaje",,0,0.00,1,10
+447,"Elilea capitonado","60% Poliester 40% algodon",0,"Capitonado",,0,0.00,1,5
+448,"Trevia Viena Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French viena",,0,0.00,0,1
+449,"Ikar",,1,"Tela 1",,0,0.00,1,
+450,"Ikar Copo de Nieve","French Terry 50% Poliester 50% Algod¢n",1,"Copo de Nieve","Cardigan",0,0.00,0,1
+451,"Telco felpa escocia","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+453,"Cm French Lumina","78% Algod¢n 22% Poli‚ser",1,"French","Cardigan",0,0.00,1,1
+454,"Said french con licra","95%Algod¢n 5%Elastano",1,"French",,0,0.00,0,2
+455,"Evelyne felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+456,"Hanono Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+457,"Verandas Rayon","85%pol.15%alg. 5% elastano",0,"Rayon",,0,0.00,1,5
+458,"Casandra Hacci","97% Poliester 3% Elastano",0,"Hacci",,0,0.00,1,10
+459,"Casandra Capitonado","100 % Poliester",0,"Capitonado",,0,0.00,1,10
+461,"Telco Felpa Tripoli","Felpa 50% Poliester 50% Algod¢n",1,"Felpa Tripoli","Cardigan",0,0.00,1,15
+462,"Ikar Capitonado","96 Poliester 4% Elastano",1,"Capitonado",,0,0.00,1,10
+463,"Rivera mundial chifon 50/50","95%Algod¢n 5%Elastano",1,"Algodon/licra",,0,0.00,1,3
+464,"Casandra french terry","78% Algod¢n 22% Poli‚ser",1,"French terry",,0,0.00,1,1
+465,"C.M  French Giovanni","99% Algodon 1% Poliester",1,"Giovanny","Cardigan",0,0.00,1,1
+468,"C.M Flame trailer","100% Algod¢n",1,"Flame",,0,0.00,1,5
+469,"Qualy Alg. Licra","94%Algod¢n 6%Spandex",1,"Algodon /licra",,0,0.00,1,3
+470,"C.M Parva","84% algodon 16% poliester",1,"Parva","Cadigan Rib suizo",0,0.00,1,1
+471,"C.m: Calama","56% poliester 44% algodon",1,"Calama",,0,0.00,1,1
+472,"Dannytex Cardigan","60% Poliester 40% algodon",1,"Cardigan",,0,0.00,0,10
+473,"Trevia Felpa Olimpia","Felpa 50% Poliester 50% Algod¢n",1,"Felpa Olimpia","Cardigan",0,0.00,1,15
+474,"Trevia",,1,"Tela 1",,0,0.00,1,0
+475,"Trevia Cardigan","French Terry 50% Poliester 50% Algod¢n",1,"Cardigan",,0,0.00,1,1
+477,"Linatex Mesh milenium","100 % Poliester",0,"Milenium",,0,0.00,1,13
+478,"Telco alg. Licra Topacio","80% algodon 15% poliester 5% elastano",1,"Alg. Licra",,0,0.00,1,3
+479,"Verandas Chifon wash","Rayon 90% Spandex 10%",1,"Chifon",,0,0.00,1,5
+480,"Sekine French 50/50","French Terry 50% Poliester 50% Algod¢n",1,"French Terry","Cardigan",0,0.00,1,1
+482,"Dise¤o Textil Ponti Roma",,1,"Ponti Roma",,0,0.00,1,9
+483,"Evelyne Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+484,"Oaxaca Capitonados","French Terry 50% Poliester 50% Algod¢n",0,"Capitonado",,0,0.00,1,1
+485,"Ikar Chifon copo de nieve","56% poliester 44% algodon",1,"Copo de nieve",,0,0.00,0,5
+486,"C.M French burdeos","French Terry 50% Poliester 50% Algod¢n",1,"Burdeos",,0,0.00,1,1
+487,"Trevia Chifon Venezuela","100 % Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+488,"Hilaturas Capitonado Polo","56% poliester 44% algodon",1,"Capitonado",,0,0.00,1,10
+489,"Surtidora Textil","100 % Poliester",0,"Tul brillo",,0,0.00,1,13
+490,"Fariel Tul","100% Poliester",0,"Tul brillo",,0,0.00,1,13
+491,"Texnylon mesh sport","100 % Poliester",1,"Mesh sport",,0,0.00,1,13
+492,"Telco algodon licra esmeralda","96% Algod¢n 6% Elastano",1,"Esmeralda",,0,0.00,1,3
+494,"Hilaturas Felpa 50/50","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,0,15
+495,"CM.Florida estampada","95%Algod¢n 5%Elastano",1,"Hueso estampada",,0,0.00,1,3
+497,"Texnylon Microfil","100 % Poliester",1,"Microfil",,0,0.00,1,10
+498,"Alto impacto Microfil","100 % Poliester",1,"Microfil",,0,0.00,1,10
+499,"Centro Guata","100% Poliester",0,"Guata",,0,0.00,1,10
+501,"Telco french Zircon","94%Algod¢n 6%Spandex",1,"French c/licra",,0,0.00,0,2
+502,"Sekine Cardigan","60% Poliester 40% algodon",1,"Cardigan",,0,0.00,0,10
+504,"Trevia afelpado","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+506,"Krasart French sublimado","84% algodon 16% poliester",1,"Avena Flores",,0,0.00,0,1
+507,"Ponchito rayas","95%Algod¢n 5%Elastano",1,"Alg. Licra rayas",,0,0.00,1,3
+508,"Joy chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+509,"Simon Chifon jaspeado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+510,"Dannytex Chifon Snow","60% Poliester 40% algodon",1,"Chifon",,0,0.00,0,5
+511,"French terry Trevia","Felpa 50% Poliester 50% Algod¢n",1,"French",,0,0.00,0,1
+512,"Yarco cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+513,"Simon Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,12
+514,"express textil french","95%Algod¢n 5%Elastano",1,"french licra","cardigan",0,0.00,1,2
+515,"Surticentro Tul","100 % Poliester",0,"Tul",,0,0.00,1,10
+516,"telas del continente pique","pique",1,"pique",,0,0.00,1,10
+517,"deportextil wimbledon","100 % Poliester",0,"wimbledon",,0,0.00,1,15
+518,"dannytex pique","90% algodon 10% poliester",1,"pique",,0,0.00,1,10
+519,"el vencedor texti sportoc","100 % Poliester",1,"sportoc",,0,0.00,0,15
+520,"Sanatex French Terry","French Terry 50% Poliester 50% Algod¢n",1,"french terry",,0,0.00,1,1
+521,"Lua rayon liso","Rayon 95% Spandex 5%",0,"rayon",,0,0.00,1,10
+522,"Cm  french terry","French Terry 50% Poliester 50% Algod¢n",1,"french terry",,0,0.00,1,1
+523,"simji terry estampados","96 Poliester 4% Elastano",1,"french terry",,0,0.00,0,1
+524,"Simji terry solido","96 Poliester 4% Elastano",1,"french terry",,0,132.00,0,1
+525,"sinatex french terry","French Terry 50% Poliester 50% Algod¢n",1,"french terry",,0,0.00,1,1
+526,"hilaturas capitonado",,1,"Tela 1",,0,0.00,1,0
+527,"sanatex sublimado","French Terry 50% Poliester 50% Algod¢n",1,"french",,0,0.00,1,1
+528,"Cm fre",,1,"Tela 1",,0,0.00,1,0
+529,"Telas del continente chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,1,5
+530,"Yark chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,1,5
+531,"Elilea french","French Terry 50% Poliester 50% Algod¢n",1,"french terry",,0,0.00,0,1
+532,"Texere Mesh","100 % Poliester",0,"Mesh",,0,0.00,1,13
+533,"Teresa calado","100 % Poliester",1,"calado",,0,0.00,1,10
+534,"Sinatex chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,1,5
+535,"Peppetex chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon","Cardigan",0,0.00,1,5
+536,"Yarko chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,1,5
+537,"Joy french","French Terry 50% Poliester 50% Algod¢n",1,"french terry","Cardigan",0,0.00,1,1
+538,"Texere sublimado","100 % Poliester",0,"mesh",,0,0.00,1,13
+539,"Cm chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,0,5
+540,"Deportextil pepito","100 % Poliester",1,"pepito",,0,0.00,0,10
+541,"Texnylon pepito","100 % Poliester",1,"pepito",,0,0.00,1,10
+542,"Qualy chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,1,5
+543,"Qualy french licra","47% Algod¢n 47%poleister 6% Ealstano",1,"french",,0,0.00,1,4
+544,"Sekine french estampado","French Terry 50% Poliester 50% Algod¢n",1,"french",,0,0.00,1,1
+546,"George scooba","96% Algod¢n 4% Elastano",0,"scooba",,0,0.00,1,10
+547,"Lua camuflaje","87% Poliester 13% Elastano",0,"camuflaje",,0,0.00,1,10
+548,"Trevia licra oviedo 1",,1,"oviedo",,0,0.00,0,3
+549,"Ikar chifon","100 % Algod¢n",1,"chifon","160grs",0,0.00,1,5
+550,"ferros y habilitacion scooba","96 Poliester 4% Elastano",1,"Scooba",,0,0.00,1,10
+551,"Hilaturas french terry","French Terry 50% Poliester 50% Algod¢n",1,"french",,0,0.00,0,1
+552,"Gerardo scooba","96 Poliester 4% Elastano",0,"scooba",,0,0.00,1,10
+553,"Casa daniel cardigan","Cardigan",1,"cardigan",,0,0.00,1,10
+554,"Texnylon wimbledon","100 % Poliester",0,"wimbledon",,0,0.00,1,10
+555,"Bombay centro bombay","100 % Poliester",0,"bombay",,0,0.00,1,10
+556,"Texnylon wimbledon sublimado","100 % Poliester",0,"sublimado",,0,0.00,1,10
+557,"Qualy french licra estampado","47% Algod¢n 47%poleister 6% Ealstano",1,"Estampado",,0,0.00,1,4
+558,"Sekine french estampados 1","French Terry 50% Poliester 50% Algod¢n",1,"Estampados",,0,0.00,1,1
+559,"Normandia French terry","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,0,1
+560,"Riviera mundial licra","80% algodon 15% poliester 5% elastano",1,"Licra",,0,0.00,1,3
+561,"Riviera mundial felpa","Felpa 100% Poliester",1,"felpa",,0,0.00,0,7
+562,"Brigitex French","French terry 95% Algod¢n 5% Elastano",1,"French",,0,0.00,0,2
+563,"Sinatex french licra","French terry 96% Algod¢n 4% Elastano",1,"French",,0,0.00,0,2
+564,"Normandia chifon","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,0,5
+565,"Miro chifon vaticano","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+566,"Trevia felpa estampado","100 % Poliester",1,"felpa",,0,0.00,1,7
+567,"Miro chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+569,"Alta  moda scooba","95%Algod¢n 5%Elastano",0,"Scoba",,1,0.00,0,3
+570,"Trevia felpa servia","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+571,"Yarco French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,0,1
+572,"Vivatex alg/licra","90% Algod¢n 10% elastano",1,"algodon licra",,0,0.00,0,3
+573,"Sinatex alg/ licra","95%Algod¢n 5%Elastano",1,"Alg/licra",,0,0.00,1,3
+574,"Riviera mundial french","French terry 96% Algod¢n 4% Elastano",1,"French",,0,0.00,1,2
+575,"Yarco mezclilla",,1,"Mezclilla","Cardigan",0,0.00,1,1
+576,"Normandia flame","56% poliester 44% algodon",1,"Flame",,0,0.00,1,1
+577,"Miro estampado","Chifon 50% Poliester 50% Algod¢n",1,"chifon",,0,0.00,1,5
+578,"Sinatex estampado","90% Algod¢n 10% elastano",1,"Alg/licra",,0,0.00,1,3
+579,"Vivatex estampado","95%Algod¢n 5%Elastano",1,"Alg/licra",,0,0.00,1,3
+580,"Trevia oviedo estampado","100 % Algod¢n",1,"Alg/licra",,0,0.00,1,3
+581,"Cm florida estampado","100 % Algod¢n",1,"Alg/licra",,0,0.00,1,3
+582,"Telas poncho rayas","100 % Poliester",1,"Poliester",,0,0.00,1,9
+583,"Simji sublimado","95%Algod¢n 5%Elastano",1,"Sublimado",,0,0.00,1,3
+585,"Spring felpa viva","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+586,"Telco thermal","56% poliester 44% algodon",1,"Forro",,0,0.00,0,10
+587,"Dise¤os petite flame","100 % Poliester",1,"Flame",,0,0.00,1,10
+588,"Evelyn thermal","100 % Algod¢n",1,"Thermal",,0,0.00,1,3
+589,"SFIJ terry brancy","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,0,1
+590,"Alta moda french","French Terry 50% Poliester 50% Algod¢n",1,"french",,0,0.00,1,1
+591,"Sfij French donato","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+592,"Juanico sweter","100 % Algod¢n",1,"Sweter",,0,0.00,0,3
+593,"Miro felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","cardigan",0,0.00,1,15
+594,"Cm borgo¤a","56% poliester 44% algodon",1,"French","Cardigan",0,0.00,0,10
+595,"Cm caceres","French Terry 50% Poliester 50% Algod¢n",1,"french","Cardigan",0,0.00,0,1
+596,"Telco french","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+598,"Telco flame","56% poliester 44% algodon",1,"Flame",,0,0.00,1,10
+599,"Navytex licra","100% Algod¢n",1,"Licra",,0,0.00,1,3
+600,"Evelyn licra","90% Algod¢n 10% elastano",1,"Licra",,0,0.00,1,3
+601,"Telas del continente licra","80% algodon 15% poliester 5% elastano",1,"licra",,0,0.00,1,3
+602,"Alta moda cowboy","60% Poliester 40% algodon",0,"Prete¤ido",,0,0.00,0,10
+603,"Sekine Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+604,"Sfij french","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+605,"Deportextil azucena","100 % Algod¢n",1,"Azucena",,0,0.00,1,10
+606,"Virginia azucena","100 % Algod¢n",1,"Azucena",,0,0.00,1,10
+607,"Evelyn azucena","100 % Algod¢n",1,"Azucena",,0,0.00,1,3
+608,"Reussir licra","90% Algod¢n 10% elastano",1,"Licra",,0,0.00,1,3
+609,"Evelyn cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+610,"Windsor chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+611,"Sekine ca","Cardigan 50 POLIESTER 50 ALGODON",1,"Cardigan",,0,165.00,1,10
+612,"Spring felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,19
+613,"Said Polirayon","79% poliester 19% rayon 2% elastano",1,"Polirayon",,0,0.00,1,10
+614,"Joaquin Zarate Licra","90% Nylon 10 Elastano",1,"Licra",,0,0.00,1,3
+615,"Telco Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+616,"negr","100 % Algod¢n",1,"Tela 1",,0,0.00,1,3
+617,"Joy Estampado","Chifon 50% Poliester 50% Algod¢n",0,"Chifon",,0,0.00,1,5
+618,"Spring French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+619,"Avante French","90% algodon 10% poliester",1,"French",,0,0.00,1,1
+620,"Sfij estampados","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+621,"Elilea scuba","100 % Poliester",0,"scuba",,0,0.00,1,10
+622,"Elilea Estampados","100 % Poliester",0,"Scuba",,0,0.00,1,10
+623,"Gaytan Wafle","100 % Poliester",1,"Wafle","Cardigan",0,0.00,1,10
+624,"Spring Estampados","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+625,"Gaytan French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,0,1
+626,"Surticentro Capitonado","100 % Poliester",0,"Capitonado",,0,0.00,1,10
+627,"Sinatex polirayon","87% Poliester 13% Elastano",1,"Polirayon",,0,0.00,1,10
+628,"Jelly flame","100 % Poliester",0,"Flame",,0,0.00,1,10
+629,"True Colors Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+630,"Casandra Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+631,"Trevia French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+632,"texlan cardigan","100 % Poliester",1,"Cardigan",,0,0.00,1,0
+633,"Dannytex Felpa",,1,"Felpa",,0,0.00,1,15
+635,"Dannytex Felpa","56% poliester 44% algodon",1,"Tela 1",,0,0.00,1,15
+636,"Sekine felpa estampado","90% algodon 10% poliester",1,"Tela 1",,0,0.00,1,0
+637,"Telco Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+638,"Navytex Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+639,"Telco Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,0,0.00,1,15
+640,"Kaltex gabardina","100 % Poliester",0,"Gabardina",,0,0.00,1,10
+641,"Simjis French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+642,"Gerardo cuadros","100% Poliester",0,"Jackard",,0,0.00,1,10
+643,"Navytex Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+644,"Texnylon Popelina","100 % Poliester",0,"Popelina",,0,0.00,1,10
+645,"Dartex Repelente","100 % Poliester",0,"Repelente",,0,0.00,1,10
+646,"Sinatex sublimado","100 % Poliester",0,"Sublimado",,0,0.00,1,10
+647,"Spring Aletia Afelpado","Felpa 50% Poliester 50% Algod¢n",1,"Aletia","Cardigan",0,0.00,1,15
+648,"Textiles Martin French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+649,"Ikar French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+650,"Ikar Estampado","French Terry 50% Poliester 50% Algod¢n",0,"French",,0,0.00,1,1
+652,"Equilibrium Estampado",,1,"Tela 1",,0,0.00,0,3
+654,"Equilibrium Estampado","100 % Algod¢n",1,"Tela",,0,0.00,1,3
+655,"Telco Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,1
+656,"Himesa Manhatan","100 % Poliester",0,"Manhattan",,0,0.00,1,10
+657,"True colors French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+658,"Ponti Roma","47% Algod¢n 47%poleister 6% Ealstano",1,"Ponti Roma",,0,0.00,1,10
+659,"Trevia Licra","92%Algod¢n 8% Elastano",1,"Licra",,0,0.00,1,3
+660,"Ponchito French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+661,"Sinatex Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+662,"Briguitex french","French Terry 50% Poliester 50% Algod¢n",1,"Briguitex french",,0,0.00,1,1
+663,"Juanico rayas","47% Algod¢n 47%poleister 6% Ealstano",1,"rayas",,0,0.00,1,5
+664,"Trevia chifon estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+665,"Sinatex Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+666,"Spring Pique","pique",1,"Pique","Cardigan",0,0.00,1,10
+667,"Massa Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+668,"Sinatex French Estampado",,1,"Tela 1",,0,0.00,1,0
+669,"Massa Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+670,"Satex Tul","96 Poliester 4% Elastano",0,"Tul",,0,0.00,1,10
+671,"Pegaso French Terry","French Terry 50% Poliester 50% Algod¢n",1,"French Terry","Cardigan",0,70.00,1,1
+672,"said chifon","80%Poli‚ster 15% Algodon 5%Elastano",1,"Tela 1",,0,0.00,1,5
+673,"Elilea French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+674,"Spring Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+675,"Evelyn Estampados","French Terry 50% Poliester 50% Algod¢n",1,"Drench",,0,0.00,1,1
+676,"ol","Cardigan",1,"Cardigan",,0,0.00,1,10
+677,"Telas Internacionales Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+678,"Texiles Moy","Felpa 50% Poliester 50% Algod¢n",1,"Tela 1",,0,0.00,1,1
+679,"Textiles Moy French","French Terry 50% Poliester 50% Algod¢n",1,"Tela 1",,0,0.00,1,1
+680,"Windsor French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+681,"Krasart Sublimado","Chifon 50% Poliester 50% Algod¢n",1,"Sublimado",,0,0.00,1,5
+682,"Said Flame","100 % Poliester",1,"Flame",,0,0.00,1,10
+683,"Ole Sport Scooba","100 % Poliester",1,"Scooba",,0,0.00,1,10
+684,"Yuri Licra","Likra 94%Poliamida 6%Elastano",0,"Licra",,0,0.00,0,3
+685,"Evelyn Pique","pique",1,"Pique","Cardigan",0,0.00,0,3
+686,"Pegaso estampado","Felpa 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+687,"Teresa Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+688,"Boneteria Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+689,"Distribuidora Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+690,"Pat Primo Red","100 % Poliester",0,"Mesh",,0,0.00,1,13
+691,"Pegaso Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+692,"Sinatex Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,12
+693,"Alta Moda Poliester","100 % Poliester",0,"Poliester",,0,0.00,0,10
+694,"Windsor Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+695,"Telas Centro","100 % Poliester",0,"Poliester",,0,0.00,1,10
+696,"Alta moda Sublimado","100 % Poliester",0,"Poliester",,0,0.00,1,10
+697,"Pantera Scooba","100 % Poliester",1,"Scooba",,0,0.00,1,10
+698,"Windsor Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+699,"Surticentro Felpa","47% Algod¢n 47%poleister 6% Ealstano",1,"Felpa",,0,0.00,1,4
+700,"Textivision French","French Terry 50% Poliester 50% Algod¢n",0,"French",,0,0.00,1,1
+701,"Eratex Tul","100 % Poliester",0,"Tul",,0,0.00,1,10
+703,"Nahui chifon","100 % Algod¢n",1,"Chifon",,0,0.00,1,5
+704,"California french","47% Algod¢n 47%poleister 6% Ealstano",1,"French terry",,0,0.00,1,1
+705,"Kamafil French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+706,"Juanico French","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+707,"Yarco Pique","Pique",1,"Pique",,0,0.00,1,10
+708,"Texnylon Repelente","87% Poliester 13% Elastano",0,"Repelente",,0,0.00,1,10
+710,"Estela mesch","100 % Poliester",0,"Mesch",,0,0.00,0,13
+711,"Sekine French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+712,"Sinatex flame","60% Poliester 40% algodon",1,"Flame",,0,0.00,1,10
+713,"Sinatex Borrega","Polar 100% Poliester",1,"Borrega",,0,0.00,1,11
+714,"Deportextil Estampado","100 % Poliester",0,"Wimbledon",,0,0.00,1,10
+716,"Alta Moda Polirayon","79% poliester 19% rayon 2% elastano",1,"Polirayon",,0,0.00,1,10
+717,"Pegaso chifon","Chifon 50% Poliester 50% Algod¢n",1,"Pegaso chifon","Cardigan",0,0.00,1,5
+718,"Bravo textiles chifon","100 % Algod¢n",1,"Bravo chifon",,0,0.00,1,5
+719,"Garcia licra",,1,"Garcia licra",,0,0.00,1,3
+721,"Sanatex Bombay","100 % Poliester",0,"Sanatex Bombay",,0,0.00,1,10
+722,"Distribuidora chifon","100 % Algod¢n",1,"distribuidora chifon",,0,0.00,1,5
+723,"Sartex Tul","100 % Poliester",0,"Sartex tul",,0,0.00,1,10
+724,"Sinatex Rayon","90% Algod¢n 10% elastano",1,"Rayon",,0,0.00,1,3
+725,"Hector Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+726,"Alfredo Acrilan","100 % Poliester",1,"Acrilan",,0,0.00,0,10
+727,"Satex Denim","47% Algod¢n 47%poleister 6% Ealstano",1,"Denim",,0,0.00,1,10
+728,"Centro Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",1,0.00,1,5
+729,"Texlan Acrilan","100 % Poliester",1,"Acrilan",,0,0.00,1,10
+730,"Smartex",,1,"Tela 1",,0,0.00,1,10
+731,"Smartex Capitonado","100 % Poliester",1,"Capitonado",,0,0.00,1,10
+732,"wind",,1,"Tela 1",,0,0.00,1,0
+733,"Sinatex Flame",,1," Flame",,0,0.00,0,3
+734,"Sinatex Flame","47% Algod¢n 47%poleister 6% Ealstano",1,"Flame",,0,0.00,1,10
+735,"Fito textil Tul","100 % Poliester",0,"Tul",,0,0.00,1,10
+736,"Opertel Bombay","100 % Poliester",0,"Bombay",,0,0.00,1,10
+737,"Scherezada Bombay","100 % Poliester",0,"Bombay",,0,0.00,1,10
+739,"sinatex f",,1,"Tela 1",,0,0.00,0,0
+741,"Centro Tul","100 % Poliester",1,"Tul",,0,0.00,1,10
+742,"Surticentro Bombay","100 % Poliester",1,"Bombay",,0,0.00,1,11
+743,"Ponchio chifon","47%Poli‚ster 47%% Algodon 6%Elastano",1,"Chifon",,0,0.00,1,3
+744,"Pantera Saludable","100 % Poliester",1,"Saludable",,0,0.00,1,11
+745,"Alto impactoo micro fibra",,1,"Tela 1",,0,0.00,1,0
+746,"Alto impacto microfibra","100 % Poliester",1,"Microfibra",,0,0.00,1,9
+747,"Spring Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+748,"Deportextil Bandon","100 % Poliester",1,"Bandon",,0,0.00,1,10
+749,"sp",,1,"Tela 1",,0,0.00,1,0
+750,"Linking entretala",,0,"Linking entretela","entretela",0,15.00,1,10
+751,"Centro Mesch","100 % Poliester",0,"Mesch",,0,0.00,1,13
+752,"Grayontex entretela","100 % Algod¢n",0,"Entretela",,0,0.00,1,10
+753,"Centro capitonado","Jackard 100% Poliester",0,"Capitonado",,0,0.00,1,10
+754,"Centro licra algodon",,1,"Licra algodon",,0,0.00,1,3
+755,"Yarco Pique 1","pique",1,"Pique",,0,0.00,1,10
+757,"Kamafil french Lizzy","100 % Poliester",1,"French Terry",,0,0.00,1,10
+758,"Satex french","French Terry 50% Poliester 50% Algod¢n",1,"French terry","Cardigan",0,0.00,1,1
+759,"Yarnko chifon","100 % Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+760,"Centro cardigan","Cardigan",1,"Cardigan",,0,0.00,1,12
+761,"Centro french","80%Poli‚ster 15%Algodon 5%Elastano",1,"French","Cardigan",0,0.00,1,1
+762,"VisionTex Scooba","100 % Poliester",0,"Scooba",,0,0.00,1,10
+763,"Centro felpa","Felpa 100% Poliester",1,"Felpa","Cardigan",0,0.00,1,15
+764,"Kamafil Chifon","Chifon 50% Poliester 50% Algod¢n",1,,,0,0.00,1,10
+765,"Centro microfibra","100 % Poliester",1,"Microfibra",,0,0.00,1,10
+766,"Chinconcuac french","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+767,"Fulartex Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+768,"Spring French Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,70.00,1,1
+769,"Kamafil Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+770,"Kamafil French Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+771,"Cm Puntada","60% Poliester 40% algodon",1,"Puntada","Cardigan",0,0.00,1,10
+772,"Grayontex French","French Terry 50% Poliester 50% Algod¢n",1,"Terry","Cardigan",0,0.00,1,1
+774,"Centro S",,1,,,0,0.00,1,0
+775,"Centro sportoc",,1,,,0,0.00,1,0
+776,"Grayontex Felpa",,1,"Felpa","Cardigan",0,0.00,1,0
+777,"Fulartex French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,162.00,1,1
+778,"Riviera Mundial Felpa",,1,"Felpa","French",0,0.00,1,0
+779,"Dannytex",,1,,,0,0.00,1,12
+780,"Danny Tex cardigan",,1,,,0,0.00,1,12
+781,"Lucky Textil",,0,"french",,0,0.00,1,1
+782,"Lucky textil french","French Terry 50% Poliester 50% Algod¢n",0,,,0,0.00,1,1
+783,"Chinconcuac c",,1,"Felpa","Cardigan",0,0.00,1,15
+784,"Fulartex felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,172.00,1,15
+785,"Spring Felpa Estampada",,1,"Felpa","Cardigan",0,0.00,1,15
+786,"Centro Felpa Estampada",,1,"Felpa","Cardigan",0,0.00,1,15
+787,"Pegaso Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,10
+788,"Grayontex chifon",,1,"Chifon","Cardigan",0,0.00,1,0
+789,"Grayontex Felpa Estampada",,1,"Felpa",,0,0.00,1,0
+790,"Fulartex Felpa Estampada",,1,"Felpa","Cardigan",0,0.00,1,15
+791,"Ansertex felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,0.00,1,15
+792,"Del valle chifon",,1,"chifon","cardigan",0,0.00,1,5
+793,"Centro vinipiel",,0,"Vinipiel",,0,0.00,1,10
+794,"Joaquin Cardigan","Cardigan 100% Algod¢n",1,"Cardigan",,0,0.00,1,12
+795,"Pegaso French Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+796,"Didesma Discovery Strech","100 % Poliester",1,"Discovery Strech","Cardigan",0,0.00,1,10
+797,"Didesma Long Gabanna","100 % Poliester",1,"Long Gabanna",,0,0.00,1,6
+798,"Didesma Victor","87% Poliester 13% Elastano",1,"Victor",,0,0.00,1,10
+799,"Satex Flame","56% poliester 44% algodon",1,"Flame","Cardigan",0,0.00,1,10
+800,"Ely Tex Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa",,0,0.00,1,15
+801,"Chinconcuac Licra","Likra 94%Poliamida 6%Elastano",1,"Licra",,0,0.00,1,3
+802,"Satex Chifon","100 % Algod¢n",1,"Chifon","Cardigan",0,0.00,1,17
+803,"Surticentro Scooba","100 % Poliester",0,"Scobba",,0,0.00,1,10
+804,"Pegaso Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+805,"Becktel French Joseph","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+806,"Becktel French","French Terry 50% Poliester 50% Algod¢n",1,"French","Cardigan",0,0.00,1,1
+807,"Spring Frida","100 % Poliester",1,"Frida",,0,0.00,1,10
+809,"Dartex Mesh","100 % Poliester",0,"Mesh",,0,0.00,1,13
+810,"Texticlase Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+811,"Pantera Velur","100 % Poliester",1,"Velur",,0,0.00,1,10
+812,"Becktel French Estampado","French Terry 50% Poliester 50% Algod¢n",1,"French",,0,0.00,1,1
+813,"Becktel Chifon Estampado","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,0.00,1,5
+814,"Spring Cardigan","Cardigan",1,"Cardigan",,0,0.00,1,3
+815,"Oggi Mezclilla","100 % Poliester",0,"Mezclilla",,0,0.00,1,10
+816,"Vivatex Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,0.00,1,5
+817,"Satex Licra","86% Poliester 14% Elastano",1,"Licra",,0,0.00,1,4
+818,"Satex Nitro","100 % Poliester",1,"Nitro",,0,0.00,1,10
+819,"Spring Pu¤os","100 % Algod¢n",1,"Pu¤os",,0,148.00,1,3
+820,"Spring Cuello","Cardigan",1,"Cuellos",,0,70.00,1,3
+821,"Centro Yumangi","100 % Poliester",1,"Yumangi",,0,0.00,1,13
+822,"Centro Micro","100 % Poliester",1,"Micro",,0,0.00,1,10
+823,"Centro Micro Nike","100 % Poliester",1,"MicroNike",,0,0.00,1,10
+825,"Fibrasan Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon",,0,135.00,1,5
+826,"Fibrasan French Terry","French Terry 50% Poliester 50% Algod¢n",1,"French terry","Cardigan",0,140.00,1,1
+827,"spring",,1,,,0,0.00,1,0
+828,"Spring Manchester estampado","100 % Poliester",1,"Manchester",,0,70.00,1,10
+829,"Spring Barcelona estampado","100 % Poliester",1,"Barcelona",,0,70.00,1,10
+830,"FIBRASAN",,1,,,0,0.00,1,0
+831,"Texticlase Cardigan","47% Algod¢n 47%poleister 6% Ealstano",1,"Cardigan",,0,155.00,1,12
+832,"Pegaso French Terry","French Terry 50% Poliester 50% Algod¢n",1,"French Terry","Cardigan",0,163.00,1,
+834,"Spring Chifon",,1,,,0,0.00,1,5
+835,"Del Valle Chif¢n","Chifon 50% Poliester 50% Algod¢n",1,"Chif¢n","C rdigan",0,157.00,1,5
+839,"Yarnco Chifon","Chifon 50% Poliester 50% Algod¢n",1,"Chifon","Cardigan",0,164.00,1,5
+840,"Ikar Chifon Licra ELITE","95%Algod¢n 5%Elastano",1,"Chifon",,0,220.00,1,3
+843,"Surticentro Chif¢n","Chifon 50% Poliester 50% Algod¢n",1,"Chif¢n","Cardigan",0,166.00,1,5
+846,"Fibrasan Cardigan","50% alg. 50% pol.",1,"Cardigan","CHI",0,0.00,1,12
+847,"Navitex Chif¢n Lycra","95%Algod¢n 5%Elastano",1,"Chif¢n",,0,0.00,1,3
+848,"Fibrasan Felpa","Felpa 50% Poliester 50% Algod¢n",1,"Felpa","Cardigan",0,134.00,1,15
+849,"FIBRASAN CARDIGAN","Cardigan 50 POLIESTER 50 ALGODON",0,"cardigan",,0,0.00,1,10
+850,"Joseph t",,1,,,0,0.00,1,0
+851,"Joseph Textil Milenium","100% Poliester",0,"Milenium",,0,20.00,1,13
+852,"FIBRASAN CARDIGAN","50%alg 50%pol",1,"Pique",,0,0.00,1,
+853,"Becktel cullos /pu¤os","50%alg 50%pol",1,"Pu¤os","cuellos",0,0.00,1,12
+854,"FIBRASAN","Cardigan 50 POLIESTER 50 ALGODON",1,"CARDIGAN",,0,0.00,1,10
+855,"chifon","47% Algod¢n 47%poleister 6% Ealstano",1,"Chifon",,0,0.00,1,5
+856,"Becktel Felpa","50%alg 50%pol",1,"Felpa","Cardigan",0,0.00,1,15
+857,"becktel Cardigan","50%alg 50%pol",1,"Cardigan",,0,0.00,1,4
+858,"Becktel Pique",,1,,,0,0.00,0,0
+859,"Nano Textil rey micro","100% Poliester",0,"Rey micro",,0,0.00,1,6
+860,"nano textil cardigan rey micro","100 % Poliester",1,,,0,0.00,1,6
+861,"nano textil",,1,,,0,0.00,1,11
+864,"humtex rib brush","92%poliester8%spandex",0,"RIB",,0,0.00,1,10
+865,"Ikar chifon Licra ELITE","84% algodon 10% poliester 6% licra",1,"chifon",,0,220.00,1,4
+866,"yeskan rib brush liso","100 % Poliester",0,"rib",,0,0.00,1,10
+867,"LAYLA TEXTIL RIB BRUSH","95%Poliester 5%elastano",0,"RIB",,0,0.00,1,10
+868,"becktel chifon 50/50","50%alg 50%pol",1,"chifon","cardigan",0,0.00,1,5
+869,"Becktel felpa","83.58% algodon 16.42% poliester",1,"felpa","cardigan",0,0.00,1,10
+870,"becktel chifon 90/10","90% Algod¢n 10% elastano",1,"chifon",,0,0.00,1,10
+871,"Becitex Chifon Viscosa","94%viscosa 6% elastano",1,"chifon",,0,0.00,1,5
+872,"TELAS TONY Capitonado","100% Poliester",0,"Capitonado",,0,0.00,1,10
+873,"TELAS TONY Tafeta","100 % Poliester",0,"Tafeta",,0,0.00,1,12
+874,"TEXTILES TOBA FRENCH","90% Algod¢n 10% poliester",1,"French",,0,0.00,1,10
+875,"Yei-ei textil Rib Brush","95%Poliester 5%elastano",0,,,0,0.00,1,10
+876,"Textiles Irlamda rib brush","95%Poliester 5%elastano",0,"rib",,0,0.00,1,10
+877,"Del Valle cardigan","50%alg 50%pol",1,"cardigan",,0,0.00,1,10
+878,"LéA Telas rib brush","92%Algod¢n 8% Elastano",1,"rib",,0,0.00,1,10
+879,"Fibrasan Cardigan MISSOURI","48%algodon 48% poliester 4% elastano",1,"cardigan",,0,0.00,1,10
+880,"surtidora del centro","50%alg 50%pol",1,"chifon",,0,0.00,1,5
+881,"Skytex  rib","80% algodon 15% poliester 5% elastano",0,"azul",,0,0.00,1,10
+882,"Yei Ei  popotillo","50% alg. 50% pol.",1,"Popotillo",,0,0.00,1,3
+883,"Inter nevado acrilico avena","80% poliester 20% acrilico",1,"Avena",,0,0.00,1,10
+884,"Surtidora del centro acrilico","80% poliester 20% acrilico",1,"Chifon",,0,0.00,1,5
+885,"Avante chifon",,1,,,0,0.00,1,16
+886,"Avante chifon stresa","50% alg. 50% pol.",1,"Chifon","Cardigan",0,0.00,1,5
+887,"Avante chifon miramar","50% alg. 50% pol.",1,"Chifon","Cardigan",0,0.00,1,5
+889,"cardigan","Cardigan 50 POLIESTER 50 ALGODON",1,"cardigan",,0,0.00,1,16
+890,"Newen felpa","Felpa 70% poliester 30% algodon",1,"Felpa","Cardigan",1,0.00,1,19
+891,"Shengtex felpa","65% Poliester 35%Viscosa",1,"Felpa","Cardigan",0,0.00,1,18
+892,"Shengtex Brush","100% Poliester",1,"Brush",,0,0.00,1,5
+893,"Shengtex Cardigan Rib","80%Poli‚ster 18%Viscosa 2%Elastano",1,"Cardigan",,0,0.00,1,4
+894,"Shengtex","60% Poliester 40% algodon",1,"Felpa",,0,0.00,1,10
+895,"Lucy felpa   300 grs.",,1,"Felpa",,0,0.00,1,19
+896,"Lucy Cardigan rib",,1,"Cardigan",,0,0.00,1,4
+898,"Del valle Felpa","50% alg. 50% pol.",1,"Felpa",,0,0.00,1,15
+900,"Texticlase Felpa","60% Poliester 40% algodon",1,"Felpa",,0,0.00,1,19
+903,"Sekine Chifon","50% alg. 50% pol.",1,"Chifon","Crdigan",0,0.00,1,5
+905,"Shengtex parachute","65% Poliester 35%Viscosa",0,"Parachute",,0,0.00,1,10
+907,"Rayon challie Rosa","Rayon Challie estampado base Rosa",0,,,0,0.00,1,
+908,"Ansertex Dublin normal","100% Poliester Sesame",1,"Dublin",,1,0.00,1,20
+909,"Ansertex Dublin normal","100 % Poliester Black iris",1,"Dublin",,1,0.00,1,20
+910,"Sekine Chifon peinado Super Black","50% alg. 50% pol.",1,"Cardigan",,1,0.00,1,17
+911,"Texticlase Felpa Regia Gris oxford","Felpa Regia 300grs. 60% algod¢n 40% poli‚ster gris",1,"Felpa","Cardigan 2x1",0,0.00,1,19
+912,"Skytex Rayon Challie",,1,,,0,0.00,1,0
+913,"Skytex Rayon challie Hueso","Rayon Callie estampado base hueso 11-0701 tcx",0,,,1,0.00,1,21
+914,"SkytexRayon Challie Rosa","Rayon Challie estampado base Rosa 14-1911",0,,,1,0.00,1,0
+915,"Antonie capitonado","100 % Poliester",1,"Capitonado",,0,0.00,1,6
+916,"Antonie tafeta","100 % Poliester",1,"tafeta",,0,0.00,1,6
+917,"Newen Terry","60%Poli‚ster 40%% Algod¢n",1,"Terry",,0,0.00,1,10
+918,"newen",,1,,,0,0.00,1,0
+919,"Sekine Intelock","50% alg. 50% pol.",1,"Interlock",,0,0.00,1,10
+920,"Sekine Interlock","50% alg. 50% pol.",1,"Interlock",,0,0.00,1,10
+921,"Cardigan Forli","50% alg. 50% pol.",1,"cardigan",,0,0.00,1,16
+922,"Newen Interlock","Jaquard Interlock",1,"Jaquard Interlock",,0,,1,10
+923,"Ikar Chifon",,1,,,0,0.00,1,0
+924,"Ikar Chifon Ligero","50%alg 50%pol",1,"Chifon Ligero","Cardigan",0,0.00,1,10
+925,"Ikar Chifon","50%alg 50%pol",1,"Chifon Ligero",,0,0.00,1,5
+926,"Avante Felpa Juventus","50% alg. 50% pol.",1,"felpa",,0,0.00,1,15
+927,"Avante Cardigan","50% alg. 50% pol.",1,"cardigan",,0,0.00,1,16
+929,"Kamafil Kamali","52% Poliester 48% Algod¢n",1,"Kamali","cardigan",0,0.00,1,10
+931,"Avante French Terry -Florencia",,1,"French",,0,0.00,1,1
+932,"Sekine Rib 2x2","48%algodon 48% poliester 4% elastano",1,"Rib 2x2",,0,0.00,1,12
+933,"Spring  interloock","52% Poliester 48% Algod¢n",1,"Interloock",,0,0.00,1,6
+934,"Bloom terry ibiza","52% Poliester 48% Algod¢n",1,"Terry ibiza","Cardigan",0,0.00,1,1
+935,"Bloom chifon Kioto","92%Algod¢n 8% Elastano",1,"Chifon kioto",,0,0.00,1,3
+936,"bloom chifon Suiza","50% alg. 50% pol.",1,"chifon Suiza","Cardigan 1x1",0,0.00,1,5
+937,"Bloom rib Espa¤a","50% alg. 50% pol.",1,"Rib Espa¤a",,0,0.00,1,16
+939,"Bloom chifon gallego","50% alg. 50% pol.",1,"Chifon gallego","Cardigan",0,0.00,1,5
+940,"Bloom Rib cardigan eapa¤a","50% alg. 50% pol.",1,"Rib","cuellos",0,0.00,1,16
+941,"bloom cardigan Portugal","50% alg. 50% pol.",1,"Cardigan",,0,0.00,1,16
+942,"Blomm cargidan estambul","50% alg. 50% pol.",1,"Cardian",,0,0.00,1,16
+943,"Bloom terry Espa¤a","50% alg. 50% pol.",1,"Teery","Cardigan",0,0.00,1,1
+945,"felpa","97%Algod¢n 3% Elastano",1,"popelina lisa",,0,43.10,1,19
+947,"sinotex",,1,"FELPA","CARDIGAN",0,0.00,1,19
+948,"felpa",,1,,,0,0.00,1,19
+949,"BM JO lulu lemon p","95%Poliester 5%elastano",1,,,0,0.00,1,21
+950,"Bloom chifon paula",,1,"chifon","cardigan",0,0.00,1,17
+951,"lucky textil poly spun scuba","95%Poliester 5%elastano",1,"poly spun scuba",,0,0.00,1,10
+952,"peppetex terry","50% alg. 50% pol.",1,"terry","cardigan",0,0.00,1,1
+953,"bloom terry italia","52% Poliester 48% Algod¢n",1,"terry italia","cardigan",0,0.00,1,10
+954,"bloom jacquard thermal","50% alg. 50% pol.",1,"jacquard","cardigan",0,0.00,1,10

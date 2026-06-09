@@ -1,0 +1,492 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1686285611
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9637
+    DatasheetFontHeight = 10
+    ItemSuffix = 29
+    Left = 2475
+    Top = 510
+    Right = 12390
+    Bottom = 6825
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xda589d84fa62e240
+    End
+    RecordSource ="SELECT Modelos.Activo, Modelos.Modelo, Modelos.Descripcion, Temporadas.Temporada"
+        ", dee([modelo]) AS [desc], Modelos.IdModelos FROM Temporadas INNER JOIN Modelos "
+        "ON Temporadas.IdTemporadas = Modelos.IdTemporadas GROUP BY Modelos.Activo, Model"
+        "os.Modelo, Modelos.Descripcion, Temporadas.Temporada, dee([modelo]), Modelos.IdM"
+        "odelos HAVING (((Mid(([modelo]),2,1)) Like [Formularios]![TodosModelos]![QueGene"
+        "roOculto])) ORDER BY Modelos.Activo, Modelos.Modelo;"
+    Caption ="Modelos"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 57
+                    Top = 57
+                    Width = 900
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1014
+                    Top = 57
+                    Width = 525
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Activo Etiqueta"
+                    Caption ="Activo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Activo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3174
+                    Top = 57
+                    Width = 2160
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1700
+                    Top = 57
+                    Width = 1425
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta12"
+                    Caption ="Temporada"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 7267
+                    Top = 56
+                    Width = 1020
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta14"
+                    Caption ="Foto"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 8401
+                    Top = 56
+                    Width = 1035
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta17"
+                    Caption ="Bordados"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    Left = 6236
+                    Top = 60
+                    Width = 1035
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta23"
+                    Caption ="Detalles"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 341
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 57
+                    Top = 57
+                    Width = 900
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 1133
+                    Top = 56
+                    TabIndex = 1
+                    Name ="Activo"
+                    ControlSource ="Activo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3174
+                    Top = 57
+                    Width = 3000
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1700
+                    Top = 57
+                    Width = 1425
+                    Height = 255
+                    TabIndex = 3
+                    Name ="Temporada"
+                    ControlSource ="Temporada"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 247
+                    Left = 737
+                    Top = 56
+                    Width = 225
+                    Height = 255
+                    TabIndex = 4
+                    BackColor = 16777215
+                    Name ="IdModelos"
+                    ControlSource ="IdModelos"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 7653
+                    Top = 56
+                    Width = 300
+                    Height = 225
+                    TabIndex = 5
+                    Name ="VerFoto"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 8787
+                    Top = 56
+                    Width = 300
+                    Height = 225
+                    TabIndex = 6
+                    Name ="VerBordados"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6633
+                    Top = 56
+                    Width = 300
+                    Height = 225
+                    TabIndex = 7
+                    Name ="Comando24"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 453
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 7540
+                    Top = 56
+                    Width = 914
+                    Height = 337
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 87
+                    ColumnCount = 2
+                    ListWidth = 1440
+                    Left = 4819
+                    Top = 56
+                    Width = 1196
+                    Height = 284
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"10\""
+                    Name ="QueModelo"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW [Modelos].[IdModelos], [Modelos].[Modelo] FROM [Modelos];"
+                    ColumnWidths ="0;1440"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT DISTINCTROW [Modelos].[IdModelos], [Modelos].[Modelo] FROM [Modelos];\""
+                        ";\"Modelos\";\"\";\"IdModelos\";\"Modelo\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3630
+                            Top = 60
+                            Width = 1185
+                            Height = 240
+                            Name ="ModeloEtiqueta_"
+                            Caption ="Buscar Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    Left = 3344
+                    Top = 113
+                    Width = 225
+                    Height = 255
+                    TabIndex = 2
+                    BackColor = 16777215
+                    Name ="QueGeneroOculto"
+                    DefaultValue ="\"*\""
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 87
+                    ColumnCount = 2
+                    Left = 1918
+                    Top = 63
+                    Width = 1417
+                    TabIndex = 3
+                    Name ="QueGenero"
+                    RowSourceType ="Value List"
+                    RowSource ="1;\"Caballero\";2;\"Dama\";4;\"Niño\";6;\"Niña\";0;\"Bebes\""
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 56
+                            Width = 1845
+                            Height = 240
+                            ForeColor = 0
+                            Name ="Etiqueta45"
+                            Caption ="Filtrar la Lista por genero:"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando24_Click()
+DoCmd.OpenForm "Modelos"
+ Forms![Modelos].RecordsetClone.FindFirst "[IdModelos] = " & Me![IdModelos]
+ Forms![Modelos].Bookmark = Forms![Modelos].RecordsetClone.Bookmark
+ 
+ Forms![Modelos]![ModelosHab].Visible = True
+ Forms![Modelos]![ModelosTela].Visible = True
+ Forms![Modelos]![ModelosBor].Visible = True
+
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+DoCmd.ShowAllRecords
+End Sub
+
+Private Sub QueGenero_AfterUpdate()
+If IsNull(QueGenero) = True Then
+QueGeneroOculto = "*"
+Else
+QueGeneroOculto = QueGenero
+End If
+Forms!todosmodelos.Requery
+End Sub
+
+Private Sub QueModelo_AfterUpdate()
+  Me.RecordsetClone.FindFirst "[IdModelos] = " & Me![QueModelo]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub VerFoto_Click()
+On Error GoTo Err_VerFoto_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "ModelosFotos"
+    
+    stLinkCriteria = "[IdModelos]=" & Me![IdModelos]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_VerFoto_Click:
+    Exit Sub
+
+Err_VerFoto_Click:
+    MsgBox Err.Description
+    Resume Exit_VerFoto_Click
+    
+End Sub
+Private Sub VerBordados_Click()
+On Error GoTo Err_VerBordados_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "BordadosFotos"
+    
+    stLinkCriteria = "[IdModelos]=" & Me![IdModelos]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_VerBordados_Click:
+    Exit Sub
+
+Err_VerBordados_Click:
+    MsgBox Err.Description
+    Resume Exit_VerBordados_Click
+    
+End Sub

@@ -1,0 +1,1278 @@
+Version = 17
+VersionRequired = 17
+Checksum = 934306728
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    OrderByOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14400
+    DatasheetFontHeight = 10
+    ItemSuffix = 86
+    Left = 6960
+    Top = 1800
+    Right = 21360
+    Bottom = 10470
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x1481d7c4187be340
+    End
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 56
+                    Width = 4350
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta0"
+                    Caption ="EXISTENCIA DE MODELOS POR CLASIFICACION"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 12120
+                    Top = 30
+                    Name ="Act"
+                    Caption ="Actualizar Datos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7950
+                    Top = 45
+                    Width = 261
+                    Height = 255
+                    TabIndex = 1
+                    Name ="QueIdOrdenes"
+                    ControlSource ="=[IPT_ExisSub].[Form]![IdOrdenes]"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8333
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ComboBox
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 2664
+                    Width = 1686
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueEmpresa"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Empresas.IdEmpresas, Empresas.Empresa, Empresas.ParaIPT FROM Empresas WHE"
+                        "RE (((Empresas.ParaIPT)=Yes));"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 2664
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta4"
+                            Caption ="Empresa:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 3024
+                    Width = 1686
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="QueGenero"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Generos.IdIPT_Generos, IPT_Generos.Genero FROM IPT_Generos;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT IPT_Generos.IdIPT_Generos, IPT_Generos.Genero FROM IPT_Generos;\";\"IPT"
+                        "_Generos\";\"\";\"IdIPT_Generos\";\"Genero\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 3024
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta6"
+                            Caption ="Genero:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 3384
+                    Width = 1686
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"15\""
+                    Name ="QueMarca"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT EtiquetasM.IdEtiquetasM, EtiquetasM.EtiquetaM FROM EtiquetasM;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT EtiquetasM.IdEtiquetasM, EtiquetasM.EtiquetaM FROM EtiquetasM;\";\"Etiq"
+                        "uetasM\";\"\";\"IdEtiquetasM\";\"EtiquetaM\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 3384
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta8"
+                            Caption ="Marca:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 3744
+                    Width = 1686
+                    TabIndex = 4
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="QueTipoProd"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_TipoProd.IdTipoProd, IPT_TipoProd.TipoProducto FROM IPT_TipoProd WHER"
+                        "E (((IPT_TipoProd.IdIPT_TipoPiezas) Like [Formularios]![IPT_Exis]![QueTipoPiezas"
+                        "Es]));"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 3744
+                            Width = 1245
+                            Height = 240
+                            Name ="Etiqueta10"
+                            Caption ="Tipo Producto:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 4104
+                    Width = 1686
+                    TabIndex = 5
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueCliente"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Clientes.IdClientes, Clientes.Cliente FROM Clientes;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Clientes.IdClientes, Clientes.Cliente FROM Clientes;\";\"Clientes\";\"\""
+                        ";\"IdClientes\";\"Cliente\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 4104
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta12"
+                            Caption ="Cliente Original:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 4464
+                    Width = 1686
+                    TabIndex = 6
+                    Name ="QueMarcaImpresa"
+                    RowSourceType ="Value List"
+                    RowSource ="1;Si;2;No"
+                    ColumnWidths ="0;1134"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 4464
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Marca Impresa:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 2664
+                    Width = 111
+                    TabIndex = 7
+                    Name ="QueEmpresaEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 3024
+                    Width = 111
+                    TabIndex = 8
+                    Name ="QueGeneroEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 3384
+                    Width = 111
+                    TabIndex = 9
+                    Name ="QueMarcaEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 3744
+                    Width = 111
+                    TabIndex = 10
+                    Name ="QueTipoProdEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 4104
+                    Width = 111
+                    TabIndex = 11
+                    Name ="QueClienteEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 4464
+                    Width = 111
+                    TabIndex = 12
+                    Name ="QueMarcaImpresaEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 3401
+                    Top = 187
+                    Width = 10995
+                    Height = 5550
+                    TabIndex = 13
+                    Name ="IPT_ExisSub"
+                    SourceObject ="Form.IPT_ExisSub"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 793
+                    Height = 1252
+                    FontSize = 10
+                    TabIndex = 14
+                    Name ="QueAlmacen"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Almacenes.IdIPT_Almacenes, IPT_Almacenes.Almacen FROM IPT_Almacenes;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 165
+                            Width = 735
+                            Height = 240
+                            Name ="Etiqueta29"
+                            Caption ="Almacen:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1077
+                    Top = 170
+                    Width = 336
+                    TabIndex = 15
+                    Name ="QueAlmacenEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin ToggleButton
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 453
+                    Width = 1693
+                    TabIndex = 16
+                    Name ="Todos"
+                    DefaultValue ="Yes"
+                    Caption ="TODOS"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 5215
+                    Width = 3288
+                    Name ="Línea34"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 1534
+                    Top = 6122
+                    Width = 1236
+                    FontWeight = 700
+                    TabIndex = 17
+                    Name ="CanT"
+                    ControlSource ="=[IPT_ExisSub].[Form]![CantTot]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 6123
+                            Width = 1485
+                            Height = 240
+                            Name ="Etiqueta36"
+                            Caption ="Cantidad de Piezas:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1714
+                    Top = 6405
+                    Width = 1056
+                    FontWeight = 700
+                    TabIndex = 18
+                    Name ="CuentaT"
+                    ControlSource ="=[IPT_ExisSub].[Form]![CuentaTot]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 6408
+                            Width = 1620
+                            Height = 240
+                            Name ="Etiqueta38"
+                            Caption ="Cantidad de Modelos:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 12925
+                    Top = 7823
+                    Width = 1131
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 19
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 6065
+                    Width = 3288
+                    Name ="Línea43"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1593
+                    Top = 5328
+                    Width = 786
+                    TabIndex = 20
+                    Name ="QueNum1"
+                    Format ="#,###"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 5335
+                            Width = 1200
+                            Height = 240
+                            Name ="Etiqueta45"
+                            Caption ="Mayor o igual a:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1593
+                    Top = 5688
+                    Width = 786
+                    TabIndex = 21
+                    Name ="QueNum2"
+                    Format ="#,###"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 5695
+                            Width = 1215
+                            Height = 240
+                            Name ="Etiqueta47"
+                            Caption ="Menor o igual a:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2492
+                    Top = 5328
+                    Width = 111
+                    TabIndex = 22
+                    Name ="QueNum1Es"
+                    DefaultValue ="-100000"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2492
+                    Top = 5688
+                    Width = 111
+                    Height = 255
+                    TabIndex = 23
+                    Name ="QueNum2Es"
+                    DefaultValue ="1000000"
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    OverlapFlags = 93
+                    ColumnCount = 2
+                    Left = 1592
+                    Top = 2324
+                    Width = 1686
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="QueTipoPiezas"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_TipoPiezas.IdIPT_TipoPiezas, IPT_TipoPiezas.TipoPiezas FROM IPT_TipoP"
+                        "iezas;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT IPT_TipoPiezas.IdIPT_TipoPiezas, IPT_TipoPiezas.TipoPiezas FROM IPT_Tip"
+                        "oPiezas;\";\"IPT_TipoPiezas\";\"\";\"IdIPT_TipoPiezas\";\"TipoPiezas\";\"Primary"
+                        "Key\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 2324
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta51"
+                            Caption ="Tipo de Piezas:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 3291
+                    Top = 2324
+                    Width = 111
+                    Height = 255
+                    TabIndex = 24
+                    Name ="QueTipoPiezasEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 2040
+                    Top = 453
+                    Width = 1251
+                    TabIndex = 25
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"7\""
+                    Name ="QueModelo"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Modelos.IdIPT_Modelos, IPT_Modelos.NumMod, Empresas.Identificador FRO"
+                        "M IPT_Modelos INNER JOIN Empresas ON IPT_Modelos.IdEmpresas = Empresas.IdEmpresa"
+                        "s ORDER BY IPT_Modelos.NumMod;"
+                    ColumnWidths ="0;681;286"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT IPT_Modelos.IdIPT_Modelos, IPT_Modelos.NumMod, Empresas.Identificador F"
+                        "ROM IPT_Modelos INNER JOIN Empresas ON IPT_Modelos.IdEmpresas = Empresas.IdEmpre"
+                        "sas ORDER BY IPT_Modelos.NumMod;\";\"IPT_Modelos\";\"Empresas\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2040
+                            Top = 170
+                            Width = 1245
+                            Height = 240
+                            Name ="Etiqueta54"
+                            Caption ="Buscar Modelo:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1870
+                    Top = 793
+                    Width = 1446
+                    Height = 343
+                    TabIndex = 26
+                    Name ="Clasificar"
+                    Caption ="Clasificar Modelo"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 3458
+                    Top = 6022
+                    Width = 2820
+                    Height = 2265
+                    Name ="Imagen1"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 6491
+                    Top = 6022
+                    Width = 2820
+                    Height = 2265
+                    Name ="Imagen2"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 9524
+                    Top = 6022
+                    Width = 2820
+                    Height = 2265
+                    Name ="Imagen3"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 4649
+                    Top = 5782
+                    Width = 801
+                    TabIndex = 27
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Foto1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 3464
+                            Top = 5782
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta37"
+                            Caption ="Foto Modelo 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 7704
+                    Top = 5782
+                    Width = 801
+                    TabIndex = 28
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Foto2"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 6519
+                            Top = 5782
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta39"
+                            Caption ="Foto Modelo 2:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 11059
+                    Top = 5782
+                    Width = 846
+                    TabIndex = 29
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="FotoBord"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 9569
+                            Top = 5782
+                            Width = 1470
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta41"
+                            Caption ="Foto Bordado / Est:"
+                        End
+                    End
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 6689
+                    Width = 3288
+                    Name ="Línea56"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1870
+                    Top = 1700
+                    Width = 1446
+                    Height = 343
+                    TabIndex = 30
+                    Name ="CargarFotos"
+                    Caption ="Ver Fotos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1870
+                    Top = 1256
+                    Width = 1446
+                    Height = 343
+                    TabIndex = 31
+                    Name ="VerOrd"
+                    Caption ="Ver Orden"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 1980
+                    Top = 6746
+                    Width = 786
+                    FontWeight = 700
+                    TabIndex = 32
+                    Name ="Texto61"
+                    ControlSource ="=[IPT_ExisSub].[Form]![CantTot]/[IPT_ExisSub].[Form]![CuentaTot]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 6749
+                            Width = 1920
+                            Height = 240
+                            Name ="Etiqueta62"
+                            Caption ="Promedio Piezas x modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2199
+                    Top = 4818
+                    Width = 1041
+                    TabIndex = 33
+                    Name ="QueNumMod"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 4821
+                            Width = 1890
+                            Height = 240
+                            Name ="Etiqueta64"
+                            Caption ="Filtrar Numero de Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 3291
+                    Top = 4824
+                    Width = 111
+                    TabIndex = 34
+                    Name ="QueNumModEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin ListBox
+                    OverlapFlags = 87
+                    ColumnCount = 3
+                    Left = 12585
+                    Top = 6009
+                    Width = 1761
+                    Height = 1807
+                    TabIndex = 35
+                    Name ="ExisAlm"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Mod_Alm.IdIPT_Mod_Alm, IPT_Almacenes.Almacen, IPT_Mod_Alm.Existencia,"
+                        " IPT_Mod_Alm.IdIPT_Modelos FROM IPT_Mod_Alm INNER JOIN IPT_Almacenes ON IPT_Mod_"
+                        "Alm.IdIPT_Almacenes = IPT_Almacenes.IdIPT_Almacenes WHERE (((IPT_Mod_Alm.IdIPT_M"
+                        "odelos)=[Formularios]![IPT_Exis]![IPT_ExisSub].[Formulario]![IdIPT_Modelos]));"
+                    ColumnWidths ="0;1134;567"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 12585
+                            Top = 5775
+                            Width = 1770
+                            Height = 240
+                            Name ="Etiqueta67"
+                            Caption ="Existencia por Almacen:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 56
+                    Top = 7369
+                    Width = 3291
+                    Height = 915
+                    TabIndex = 36
+                    BorderColor = 4210752
+                    Name ="QueUbica"
+                    ControlSource ="=[IPT_ExisSub].[Form]![Ubicacion]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 60
+                            Top = 7143
+                            Width = 840
+                            Height = 240
+                            Name ="Etiqueta69"
+                            Caption ="Ubicacion:"
+                        End
+                    End
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 7086
+                    Width = 3288
+                    Name ="Línea70"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1300
+                    Top = 2324
+                    Width = 231
+                    Height = 223
+                    TabIndex = 37
+                    Name ="Comando73"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1300
+                    Top = 2683
+                    Width = 231
+                    Height = 223
+                    TabIndex = 38
+                    Name ="Comando74"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1300
+                    Top = 3042
+                    Width = 231
+                    Height = 223
+                    TabIndex = 39
+                    Name ="Comando75"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1303
+                    Top = 3401
+                    Width = 231
+                    Height = 223
+                    TabIndex = 40
+                    Name ="Comando76"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1303
+                    Top = 3760
+                    Width = 231
+                    Height = 223
+                    TabIndex = 41
+                    Name ="Comando77"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1303
+                    Top = 4119
+                    Width = 231
+                    Height = 223
+                    TabIndex = 42
+                    Name ="Comando78"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1303
+                    Top = 4478
+                    Width = 231
+                    Height = 223
+                    TabIndex = 43
+                    Name ="Comando79"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1927
+                    Top = 4818
+                    Width = 231
+                    Height = 223
+                    TabIndex = 44
+                    Name ="Comando80"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1303
+                    Top = 5329
+                    Width = 231
+                    Height = 223
+                    TabIndex = 45
+                    Name ="Comando81"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1320
+                    Top = 5685
+                    Width = 231
+                    Height = 223
+                    TabIndex = 46
+                    Name ="Comando82"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Function OrdenarA() As Boolean
+    DoCmd.RunCommand acCmdSortAscending
+    OrdenarA = True
+
+
+End Function
+Private Sub Comando42_Click()
+OrderByOn = True
+Me.OrderBy = "Me![IPT_ExisSub].Form![Modelo]"
+
+End Sub
+
+Private Sub Act_Click()
+Me![IPT_ExisSub].Form.Requery
+End Sub
+
+Private Sub CargarFotos_Click()
+On Error GoTo errores
+If IsNull(Me![IPT_ExisSub].Form![IdOrdenes]) = False Then
+ Dim Dbs As Database
+ Dim Rst As Recordset
+ 
+ Set Dbs = CurrentDb
+ Set Rst = Dbs.OpenRecordset("SELECT Modelos.Foto1, Modelos.Foto2, Bordados.Foto, Ordenes.IdOrdenes FROM Bordados RIGHT JOIN ((Modelos INNER JOIN Ordenes ON Modelos.IdModelos = Ordenes.IdModelos) LEFT JOIN ModelosBor ON Modelos.IdModelos = ModelosBor.IdModelos) ON Bordados.IdBordados = ModelosBor.IdBordados WHERE (Ordenes.IdOrdenes)=" & QueIdOrdenes)
+    Foto1 = Rst!Foto1
+    Foto2 = Rst!Foto2
+    FotoBord = Rst!Foto
+Rst.Close
+Dbs.Close
+errores:
+Call CargarFot
+Else
+MsgBox "No hay ninguna orden relacionada a ese modelo. Solo se podran ver las fotos con una orden relacionada.", vbInformation, "NO HAY ORDEN RELACIONADA"
+End If
+End Sub
+
+Private Sub Clasificar_Click()
+If PrP(26) = True Then
+DoCmd.OpenForm "IPT_Modelos"
+  Forms![IPT_Modelos].RecordsetClone.FindFirst "[IdIPT_Modelos] =" & Me![IPT_ExisSub].Form![IdIPT_Modelos]
+  Forms![IPT_Modelos].Bookmark = Forms![IPT_Modelos].RecordsetClone.Bookmark
+Else
+DoCmd.OpenForm "IPT_ExisUbica"
+End If
+End Sub
+
+Private Sub Comando73_Click()
+QueTipoPiezas = ""
+QueTipoPiezasEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando74_Click()
+QueEmpresa = ""
+QueEmpresaEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando75_Click()
+QueGenero = ""
+QueGeneroEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando76_Click()
+QueMarca = ""
+QueMarcaEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando77_Click()
+QueTipoProd = ""
+QueTipoProdEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando78_Click()
+QueCliente = ""
+QueClienteEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando79_Click()
+QueMarcaImpresa = ""
+QueMarcaImpresaEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando80_Click()
+QueNumMod = ""
+QueNumModEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando81_Click()
+QueNum1 = ""
+QueNum1Es = -100000
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Comando82_Click()
+QueNum2 = ""
+QueNum2Es = 1000000
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+ If PrP(27) = False Then
+  MsgBox "No estas autorizado para accesar a esta pantalla. Si necesitas acceso pidele a Daniel Masri", vbInformation, "ACCESO NEGADO"
+  DoCmd.Close
+  Exit Sub
+ End If
+ 
+If PrP(26) = False Then
+Clasificar.Caption = "Ubicacion"
+Else
+Clasificar.Caption = "Clasificar Modelo"
+End If
+
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Ordenar_Click()
+Dim ddd
+'' OrderByOn = True
+''Me.OrderBy = "Numero DESC"
+ddd = Me.ActiveControl
+MsgBox ddd
+End Sub
+
+Private Sub QueAlmacen_AfterUpdate()
+QueAlmacenEs = QueAlmacen
+Todos = False
+IPT_ExisSub.Requery
+
+End Sub
+
+Private Sub QueCliente_AfterUpdate()
+If IsNull(QueCliente) = True Then
+ QueClienteEs = "*"
+Else
+ QueClienteEs = QueCliente
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueEmpresa_AfterUpdate()
+If IsNull(QueEmpresa) = True Then
+ QueEmpresaEs = "*"
+Else
+ QueEmpresaEs = QueEmpresa
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueGenero_AfterUpdate()
+If IsNull(QueGenero) = True Then
+ QueGeneroEs = "*"
+Else
+ QueGeneroEs = QueGenero
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueMarca_AfterUpdate()
+If IsNull(QueMarca) = True Then
+ QueMarcaEs = "*"
+Else
+ QueMarcaEs = QueMarca
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueMarcaImpresa_AfterUpdate()
+If IsNull(QueMarcaImpresa) = True Then
+ QueMarcaImpresaEs = "*"
+ElseIf QueMarcaImpresa = 1 Then
+ QueMarcaImpresaEs = True
+ElseIf QueMarcaImpresa = 2 Then
+ QueMarcaImpresaEs = False
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueModelo_AfterUpdate()
+If IsNull(QueModelo) = False Then
+    
+    Me![IPT_ExisSub].Form.RecordsetClone.FindFirst "[IdIPT_Modelos] = " & Me![QueModelo]
+  Me![IPT_ExisSub].Form.Bookmark = Me![IPT_ExisSub].Form.RecordsetClone.Bookmark
+End If
+End Sub
+
+Private Sub QueNum1_AfterUpdate()
+If IsNull(QueNum1) = True Or QueNum1 = "" Then
+ QueNum1Es = -100000
+Else
+ QueNum1Es = QueNum1
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueNum2_AfterUpdate()
+If IsNull(QueNum2) = True Or QueNum2 = "" Then
+ QueNum2Es = 1000000
+Else
+ QueNum2Es = QueNum2
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueNumMod_AfterUpdate()
+If IsNull(QueNumMod) = True Then
+ QueNumModEs = "*"
+Else
+ QueNumModEs = QueNumMod
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub QueTipoPiezas_AfterUpdate()
+If IsNull(QueTipoPiezas) = True Then
+ QueTipoPiezasEs = "*"
+Else
+ QueTipoPiezasEs = QueTipoPiezas
+End If
+IPT_ExisSub.Requery
+Me![QueTipoProd].Requery
+End Sub
+
+Private Sub QueTipoProd_AfterUpdate()
+If IsNull(QueTipoProd) = True Then
+ QueTipoProdEs = "*"
+Else
+ QueTipoProdEs = QueTipoProd
+End If
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+
+
+Private Sub Todos_Click()
+Todos = True
+QueAlmacen = ""
+QueAlmacenEs = "*"
+IPT_ExisSub.Requery
+End Sub
+
+Private Sub CargarFot()
+On Error GoTo Errorprueba
+Dim Nu As Integer
+Me!Imagen1.Picture = ""
+Me!Imagen2.Picture = ""
+Me!Imagen3.Picture = ""
+Me!Imagen1.HyperlinkAddress = ""
+Me!Imagen2.HyperlinkAddress = ""
+Me!Imagen3.HyperlinkAddress = ""
+Nu = 1
+Me!Imagen1.Picture = DirFotos(Foto1)
+Me!Imagen1.HyperlinkAddress = DirFotos(Foto1)
+Nu = 2
+Me!Imagen2.Picture = DirFotos(Foto2)
+Me!Imagen2.HyperlinkAddress = DirFotos(Foto2)
+Nu = 3
+Me!Imagen3.Picture = DirBordados(FotoBord)
+Me!Imagen3.HyperlinkAddress = DirBordados(FotoBord)
+Exit Sub
+
+Errorprueba:
+If Err.Number <> 94 Then
+MsgBox Err.Description
+Else
+Select Case Nu
+Case 1
+Me!Imagen1.Picture = NoFoto
+Case 2
+Me!Imagen2.Picture = NoFoto
+Case 3
+Me!Imagen3.Picture = NoFoto
+End Select
+End If
+Resume Next
+End Sub
+
+Private Sub VerOrd_Click()
+If IsNull(Me![IPT_ExisSub].Form![IdOrdenes]) = False Then
+DoCmd.OpenForm "OrdenVer", , , "idordenes=" & Me![IPT_ExisSub].Form![IdOrdenes]
+Forms![OrdenVer]![QueOrden] = Me![IPT_ExisSub].Form![IdOrdenes]
+Else
+MsgBox "No hay ninguna orden relacionada a ese modelo.", vbInformation, "NO HAY ORDEN RELACIONADA"
+End If
+End Sub

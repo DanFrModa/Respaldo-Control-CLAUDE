@@ -1,0 +1,335 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1012277327
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 7653
+    DatasheetFontHeight = 10
+    ItemSuffix = 16
+    Left = 5535
+    Top = 3435
+    Right = 15510
+    Bottom = 5295
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x6962bb801b5ce240
+    End
+    RecordSource ="Corte"
+    Caption ="ProcesoCorte"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 57
+                    Top = 57
+                    Width = 915
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Fecha Etiqueta"
+                    Caption ="Fecha"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Fecha_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2267
+                    Top = 57
+                    Width = 705
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 4701
+                    Top = 57
+                    Width = 2895
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Observaciones Etiqueta"
+                    Caption ="Observaciones"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Observaciones_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 215
+                    Left = 6783
+                    Top = 56
+                    Width = 225
+                    Height = 255
+                    ForeColor = 0
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 215
+                    Left = 7081
+                    Top = 56
+                    Width = 285
+                    Height = 255
+                    TabIndex = 1
+                    ForeColor = 0
+                    Name ="TotalCorte"
+                    ControlSource ="=Sum([Cantidad])"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3056
+                    Top = 57
+                    Width = 1530
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta11"
+                    Caption ="Cortador"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 215
+                    Left = 6287
+                    Top = 56
+                    Width = 225
+                    Height = 255
+                    TabIndex = 2
+                    ForeColor = 0
+                    Name ="IdCorte"
+                    ControlSource ="IdCorte"
+                End
+            End
+        End
+        Begin Section
+            Height = 330
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 915
+                    Height = 255
+                    ColumnWidth = 825
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2267
+                    Top = 57
+                    Width = 705
+                    Height = 225
+                    ColumnWidth = 600
+                    TabIndex = 2
+                    Name ="Cantidad"
+                    ControlSource ="Cantidad"
+                    Format ="#,###"
+                    AfterUpdate ="[Event Procedure]"
+                    OnGotFocus ="[Event Procedure]"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 4700
+                    Top = 57
+                    Width = 2850
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                End
+                Begin ComboBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 3056
+                    Top = 57
+                    Width = 1530
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="IdCortadores"
+                    ControlSource ="IdCortadores"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Cortadores.IdCortadores, Cortadores.Cortador, Cortadores.Activo FROM Cort"
+                        "adores WHERE (((Cortadores.Activo)=Yes)) ORDER BY Cortadores.Cortador;"
+                    ColumnWidths ="0;2835"
+                    Format ="#,###"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1077
+                    Top = 56
+                    Width = 1056
+                    Height = 268
+                    TabIndex = 1
+                    Name ="Cant"
+                    Caption ="Cantidades"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+Dim Ca As Integer
+
+
+Private Sub Cant_Click()
+DoCmd.OpenForm ("OrdDetCorte")
+Forms![OrdDetCorte]![QueIdOrdenes] = IdOrdenes
+Forms![OrdDetCorte]![QueIdCorte] = IdCorte
+Forms![OrdDetCorte]![TallasLoc] = Forms![Proceso]![Tallas]
+Forms![OrdDetCorte].BorrarAa
+Forms![OrdDetCorte]![IdOrdenesDet].Requery
+
+End Sub
+
+Private Sub Cantidad_AfterUpdate()
+If Forms![Proceso]![TotCortada] + Me!Cantidad - Ca > Forms![Proceso]![Cant] Then
+MsgBox "Te aviso que cortaron mas prendas de las que se ordenaron!!!"
+End If
+End Sub
+
+Private Sub Cantidad_GotFocus()
+Ca = Me!Cantidad
+End Sub
+
+Private Sub Cantidad_LostFocus()
+If Me!Cantidad = 0 Then
+Me!Cantidad = Forms![Proceso]![Cant]
+End If
+End Sub

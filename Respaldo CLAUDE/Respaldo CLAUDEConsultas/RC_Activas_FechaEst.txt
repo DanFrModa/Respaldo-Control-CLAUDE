@@ -1,0 +1,120 @@
+Operation = 6
+Option = 0
+Begin InputTables
+    Name ="RC_Activas"
+    Name ="Pedidos"
+    Name ="Ordenes"
+    Name ="PedidosDet"
+End
+Begin OutputColumns
+    Expression ="RC_Activas.Numero"
+    GroupLevel = 2
+    Expression ="RC_Activas.Modelo"
+    GroupLevel = 2
+    Expression ="RC_Activas.Cliente"
+    GroupLevel = 2
+    Expression ="RC_Activas.CantOrd"
+    GroupLevel = 2
+    Expression ="RC_Activas.Clave"
+    GroupLevel = 2
+    Expression ="RC_Activas.TipoTela"
+    GroupLevel = 2
+    Expression ="RC_Activas.ClaveAplicacion"
+    GroupLevel = 2
+    Expression ="RC_Activas.NumProceso"
+    GroupLevel = 1
+    Expression ="Pedidos.NumeroPed"
+    GroupLevel = 2
+    Alias ="PrimeroDeFechaEst"
+    Expression ="First(RC_Activas.FechaEst)"
+End
+Begin Joins
+    LeftTable ="RC_Activas"
+    RightTable ="Ordenes"
+    Expression ="RC_Activas.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="PedidosDet"
+    Expression ="Ordenes.IdPedidosDet = PedidosDet.IdPedidosDet"
+    Flag = 2
+    LeftTable ="PedidosDet"
+    RightTable ="Pedidos"
+    Expression ="PedidosDet.IdPedidos = Pedidos.IdPedidos"
+    Flag = 2
+End
+Begin Groups
+    Expression ="RC_Activas.Numero"
+    GroupLevel = 2
+    Expression ="RC_Activas.Modelo"
+    GroupLevel = 2
+    Expression ="RC_Activas.Cliente"
+    GroupLevel = 2
+    Expression ="RC_Activas.CantOrd"
+    GroupLevel = 2
+    Expression ="RC_Activas.Clave"
+    GroupLevel = 2
+    Expression ="RC_Activas.TipoTela"
+    GroupLevel = 2
+    Expression ="RC_Activas.ClaveAplicacion"
+    GroupLevel = 2
+    Expression ="RC_Activas.NumProceso"
+    GroupLevel = 1
+    Expression ="Pedidos.NumeroPed"
+    GroupLevel = 2
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+Begin
+    Begin
+        dbText "Name" ="RC_Activas.TipoTela"
+        dbInteger "ColumnWidth" ="2715"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 2
+    Left = -10
+    Top = -30
+    Right = 1286
+    Bottom = 656
+    Left = -1
+    Top = -1
+    Right = 1277
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 559
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 107
+        Top = 4
+        Name ="RC_Activas"
+    End
+    Begin
+        Left = 586
+        Top = 8
+        Right = 694
+        Bottom = 124
+        Top = 0
+        Name ="Pedidos"
+    End
+    Begin
+        Left = 227
+        Top = 10
+        Right = 323
+        Bottom = 126
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 361
+        Top = 6
+        Right = 457
+        Bottom = 122
+        Top = 0
+        Name ="PedidosDet"
+    End
+End

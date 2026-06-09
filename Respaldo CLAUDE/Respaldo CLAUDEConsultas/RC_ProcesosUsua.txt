@@ -1,0 +1,75 @@
+Operation = 1
+Option = 0
+Where ="(((Usuarios.IdUsuarios)=idusuarioactf()))"
+Begin InputTables
+    Name ="RC_TipoUsuarios"
+    Name ="RC_ProcUsua"
+    Name ="Usuarios"
+End
+Begin OutputColumns
+    Expression ="Usuarios.IdUsuarios"
+    Expression ="RC_ProcUsua.IdCP_Procesos"
+End
+Begin Joins
+    LeftTable ="RC_TipoUsuarios"
+    RightTable ="RC_ProcUsua"
+    Expression ="RC_TipoUsuarios.IdRC_TipoUsuarios = RC_ProcUsua.IdRC_TipoUsuarios"
+    Flag = 1
+    LeftTable ="RC_TipoUsuarios"
+    RightTable ="Usuarios"
+    Expression ="RC_TipoUsuarios.IdRC_TipoUsuarios = Usuarios.IdRC_TipoUsuarios"
+    Flag = 1
+End
+Begin OrderBy
+    Expression ="RC_ProcUsua.IdCP_Procesos"
+    Flag = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="RC_ProcUsua.IdCP_Procesos"
+        dbInteger "ColumnWidth" ="1560"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1181
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 38
+        Top = 6
+        Right = 165
+        Bottom = 122
+        Top = 0
+        Name ="RC_TipoUsuarios"
+    End
+    Begin
+        Left = 222
+        Top = 22
+        Right = 337
+        Bottom = 123
+        Top = 0
+        Name ="RC_ProcUsua"
+    End
+    Begin
+        Left = 371
+        Top = 6
+        Right = 467
+        Bottom = 122
+        Top = 7
+        Name ="Usuarios"
+    End
+End

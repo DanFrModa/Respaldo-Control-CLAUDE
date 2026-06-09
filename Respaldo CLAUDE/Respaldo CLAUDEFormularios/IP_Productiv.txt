@@ -1,0 +1,574 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1866039189
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    DataEntry = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 11622
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 3330
+    Top = 210
+    Right = 15240
+    Bottom = 8385
+    DatasheetGridlinesColor = 12632256
+    AfterInsert ="[Event Procedure]"
+    RecSrcDt = Begin
+        0xe9d63011246be340
+    End
+    RecordSource ="SELECT IP_Productiv.Fecha, IP_Productiv.IdIp_Personal, IP_Productiv.IdIp_Activid"
+        "ades, IP_Productiv.CantidadAct, IP_Productiv.HorasTrabajadas, IP_Personal.Nombre"
+        "IP, IP_Personal.Puesto, IP_Personal.HorasBase, ([PorcentajeD]*[cantidadact])*([h"
+        "orasbase]/[horastrabajadas]) AS Por FROM (IP_Productiv INNER JOIN IP_Personal ON"
+        " IP_Productiv.IdIp_Personal = IP_Personal.IdIP_Personal) LEFT JOIN IP_Actividade"
+        "s ON IP_Productiv.IdIp_Actividades = IP_Actividades.IdIP_Actividades;"
+    Caption ="IP_Productiv"
+    BeforeInsert ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 1303
+            BackColor = 26367
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 56
+                    Top = 1020
+                    Width = 1170
+                    Height = 240
+                    ForeColor = 0
+                    Name ="Fecha Etiqueta"
+                    Caption ="Fecha"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Fecha_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1283
+                    Top = 1020
+                    Width = 2505
+                    Height = 240
+                    ForeColor = 0
+                    Name ="IdIp_Personal Etiqueta"
+                    Caption ="Nombre"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdIp_Personal_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 5726
+                    Top = 1020
+                    Width = 2205
+                    Height = 240
+                    ForeColor = 0
+                    Name ="IdIp_Actividades Etiqueta"
+                    Caption ="Actividad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdIp_Actividades_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 7993
+                    Top = 1020
+                    Width = 945
+                    Height = 240
+                    ForeColor = 0
+                    Name ="CantidadAct Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantidadAct_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 9621
+                    Top = 795
+                    Width = 870
+                    Height = 465
+                    ForeColor = 0
+                    Name ="HorasTrabajadas Etiqueta"
+                    Caption ="Horas Trabajadas"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="HorasTrabajadas_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3855
+                    Top = 1020
+                    Width = 1785
+                    Height = 240
+                    ForeColor = 0
+                    Name ="Etiqueta12"
+                    Caption ="Puesto"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 9014
+                    Top = 795
+                    Width = 555
+                    Height = 465
+                    ForeColor = 0
+                    Name ="Etiqueta16"
+                    Caption ="Hora Base"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 120
+                    Top = 120
+                    Width = 4920
+                    Height = 210
+                    FontWeight = 700
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Etiqueta18"
+                    Caption ="ACTIVIDADES DIARIAS DEL PERSONAL DE IP"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 7484
+                    Top = 169
+                    Width = 2841
+                    ForeColor = 0
+                    Name ="QueFecha"
+                    Format ="Long Date"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6803
+                            Top = 169
+                            Width = 705
+                            Height = 240
+                            ForeColor = 0
+                            Name ="Etiqueta20"
+                            Caption ="Fecha:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 10432
+                    Top = 56
+                    Width = 1095
+                    Height = 510
+                    TabIndex = 1
+                    Name ="Alta"
+                    Caption ="Alta de Personal"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5329
+                    Top = 53
+                    Width = 1431
+                    Height = 343
+                    TabIndex = 2
+                    Name ="Ayer"
+                    Caption ="Ayer"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 10530
+                    Top = 1020
+                    Width = 975
+                    Height = 240
+                    ForeColor = 0
+                    Name ="Etiqueta24"
+                    Caption ="Porcentaje"
+                    Tag ="DetachedLabel"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5329
+                    Top = 453
+                    Width = 1431
+                    Height = 343
+                    TabIndex = 3
+                    Name ="Hoya"
+                    Caption ="Hoy"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6916
+                    Top = 453
+                    Width = 1431
+                    Height = 343
+                    TabIndex = 4
+                    Name ="Sabado"
+                    Caption ="Sabado"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 57
+                    Top = 57
+                    Width = 1170
+                    Height = 255
+                    ColumnWidth = 825
+                    BackColor = 16777215
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7994
+                    Top = 57
+                    Width = 945
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 3
+                    Name ="CantidadAct"
+                    ControlSource ="CantidadAct"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 9622
+                    Top = 57
+                    Width = 750
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 4
+                    Name ="HorasTrabajadas"
+                    ControlSource ="HorasTrabajadas"
+                    DefaultValue ="=[HorasBase]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3856
+                    Top = 57
+                    Width = 1785
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Puesto"
+                    ControlSource ="Puesto"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 5727
+                    Top = 57
+                    Width = 2205
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdIp_Actividades"
+                    ControlSource ="IdIp_Actividades"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IP_Actividades.IdIP_Actividades, IP_Actividades.Actividad FROM IP_Activid"
+                        "ades;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT IP_Actividades.IdIP_Actividades, IP_Actividades.Actividad FROM IP_Activ"
+                        "idades;\";\"IP_Actividades\";\"\";\"IdIP_Actividades\";\"Actividad\";\"PrimaryKe"
+                        "y\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9015
+                    Top = 57
+                    Width = 555
+                    Height = 255
+                    TabIndex = 6
+                    Name ="HorasBase"
+                    ControlSource ="HorasBase"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1284
+                    Top = 57
+                    Width = 2505
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    BackColor = 16777215
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"30\""
+                    Name ="IdIp_Personal"
+                    ControlSource ="IdIp_Personal"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IP_Personal.IdIP_Personal, IP_Personal.NombreIP, IP_Personal.Activo FROM "
+                        "IP_Personal WHERE (((IP_Personal.Activo)=True));"
+                    ColumnWidths ="0;2835"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 10545
+                    Top = 57
+                    Width = 945
+                    Height = 255
+                    TabIndex = 7
+                    Name ="Porcen"
+                    ControlSource ="Por"
+                    Format ="Percent"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 510
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 9300
+                    Top = 113
+                    Width = 1146
+                    Height = 328
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Alta_Click()
+Dim QFecha As Date
+QFecha = QueFecha
+Call AgregarActividades
+End Sub
+
+Private Sub AgregarActividades()
+Dim Dbs As Database
+Dim Rst As Recordset
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT IdIP_Personal, Activo FROM IP_Personal WHERE Activo=True")
+
+Rst.MoveLast
+Rst.MoveFirst
+  
+ Do While Not Rst.EOF
+ DoCmd.GoToRecord , , acNewRec
+       ' Dbs.Execute "INSERT INTO IP_Productiv (IdIP_Personal,Fecha) VALUES (" & Rst!IdIp_Personal & "," & QFecha & ")"
+Me.Fecha = QueFecha
+Me.IdIp_Personal = Rst!IdIp_Personal
+
+            Rst.MoveNext
+     Loop
+
+
+Rst.Close
+Dbs.Close
+
+End Sub
+
+Private Sub Ayer_Click()
+If WeekDay(Date) = 2 Then
+ QueFecha = Date - 3
+Else
+ QueFecha = Date - 1
+End If
+Alta.Enabled = True
+Me.AllowAdditions = True
+
+End Sub
+
+Private Sub Form_AfterInsert()
+
+End Sub
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+Fecha = QueFecha
+End Sub
+
+
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(17) = False Then
+ MsgBox "No estas autorizado para ingresar en esta pantalla. Si necesitas acceso, habla con Daniel Masri."
+ DoCmd.Close
+ Exit Sub
+End If
+
+If WeekDay(Date) = 2 Then
+ Sabado.Visible = True
+End If
+
+If PrP(16) = True Then
+QueFecha.Enabled = True
+QueFecha.Locked = False
+End If
+
+End Sub
+
+Private Sub Hoya_Click()
+QueFecha = Date
+Alta.Enabled = True
+Me.AllowAdditions = True
+End Sub
+
+Private Sub IdIp_Actividades_AfterUpdate()
+HorasTrabajadas = HorasBase
+
+End Sub
+
+Private Sub QueFecha_AfterUpdate()
+If IsNull(QueFecha) = False Then
+  Alta.Enabled = True
+  Me.AllowAdditions = True
+Else
+  Alta.Enabled = False
+
+End If
+End Sub
+
+Private Sub Sabado_Click()
+ QueFecha = Date - 2
+Alta.Enabled = True
+Me.AllowAdditions = True
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

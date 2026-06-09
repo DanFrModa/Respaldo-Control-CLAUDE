@@ -1,0 +1,221 @@
+Version = 17
+VersionRequired = 17
+Checksum = -93606580
+Begin Form
+    RecordSelectors = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6009
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 5985
+    Top = 1215
+    Right = 12000
+    Bottom = 5505
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xc001198a79ffe340
+    End
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 453
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 113
+                    Width = 2835
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta9"
+                    Caption ="Transferencia entre Almacenes"
+                End
+            End
+        End
+        Begin Section
+            Height = 3855
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 2437
+                    Top = 223
+                    Height = 315
+                    FontSize = 10
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"15\""
+                    Name ="AlmSal"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Almacenes.IdAlmacenes, Almacenes.Almacen, Almacenes.Activo FROM Almacenes"
+                        " WHERE (((Almacenes.Activo)=Yes));"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 736
+                            Top = 223
+                            Width = 1545
+                            Height = 315
+                            FontSize = 10
+                            Name ="Etiqueta1"
+                            Caption ="Del Almacen:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 2438
+                    Top = 2211
+                    Height = 315
+                    FontSize = 10
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"15\""
+                    Name ="AlmEnt"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Almacenes.IdAlmacenes, Almacenes.Almacen, Almacenes.Activo FROM Almacenes"
+                        " WHERE (((Almacenes.IdAlmacenes)<>[Formularios]![ITelas_QueAlmTransfer]![AlmSal]"
+                        ") AND ((Almacenes.Activo)=Yes));"
+                    ColumnWidths ="0;2835"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 737
+                            Top = 2211
+                            Width = 1545
+                            Height = 315
+                            FontSize = 10
+                            Name ="Etiqueta3"
+                            Caption ="Al Almacen:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 2324
+                    Top = 2834
+                    Width = 1821
+                    Height = 718
+                    FontSize = 10
+                    FontWeight = 700
+                    TabIndex = 2
+                    Name ="Transferir"
+                    Caption ="Transferir Tela"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 93
+                    Left = 3174
+                    Top = 743
+                    Width = 0
+                    Height = 1353
+                    Name ="Línea5"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 95
+                    Left = 2891
+                    Top = 1530
+                    Width = 282
+                    Height = 567
+                    Name ="Línea6"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 87
+                    Left = 3174
+                    Top = 1530
+                    Width = 288
+                    Height = 567
+                    Name ="Línea7"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4592
+                    Top = 3344
+                    Width = 1296
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 3
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub AlmSal_AfterUpdate()
+AlmEnt.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub
+
+Private Sub Transferir_Click()
+If IsNull(AlmSal) = True Or IsNull(AlmEnt) = True Then
+ MsgBox "Debes de seleccionar un almacen de salida y un almacen de entrada para poder hacer la transferencia entre almacenes", vbInformation, "FALTA DETERMINAR ALMACENES"
+Else
+DoCmd.OpenForm ("ITelas_TransferAlm")
+Forms![ITelas_TransferAlm]![QueIdAlmSal] = AlmSal
+Forms![ITelas_TransferAlm]![QueIdAlmEnt] = AlmEnt
+
+Dim Dbs As Database
+Dim Rst, Rst1 As Recordset
+
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT Almacen FROM Almacenes WHERE IdAlmacenes=" & AlmSal)
+Set Rst1 = Dbs.OpenRecordset("SELECT Almacen FROM Almacenes WHERE IdAlmacenes=" & AlmEnt)
+
+Forms![ITelas_TransferAlm]![QueAlmSal] = Rst!Almacen
+Forms![ITelas_TransferAlm]![QueAlmEnt] = Rst1!Almacen
+Rst.Close
+Rst1.Close
+Dbs.Close
+End If
+
+
+End Sub

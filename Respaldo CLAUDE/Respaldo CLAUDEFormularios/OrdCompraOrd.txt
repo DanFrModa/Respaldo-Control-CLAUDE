@@ -1,0 +1,334 @@
+Version = 17
+VersionRequired = 17
+Checksum = 33025996
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 4290
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 870
+    Top = 15
+    Right = 11205
+    Bottom = 8040
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x17398075997de340
+    End
+    RecordSource ="SELECT [OrdCom-Ord].[IdOrdCom-Ord], [OrdCom-Ord].IdOrdenes, [OrdCom-Ord].IdOrdCo"
+        "mpra, Ordenes.Numero, Modelos.Modelo, Clientes.Cliente, OrdPedido.NumeroPed FROM"
+        " ((([OrdCom-Ord] INNER JOIN Ordenes ON [OrdCom-Ord].IdOrdenes = Ordenes.IdOrdene"
+        "s) INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) INNER JOIN Clien"
+        "tes ON Ordenes.IdClientes = Clientes.IdClientes) INNER JOIN OrdPedido ON Ordenes"
+        ".IdOrdenes = OrdPedido.IdOrdenes;"
+    Caption ="OrdenVerOrd"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 636
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 3420
+                    Top = 396
+                    Width = 681
+                    Height = 240
+                    Name ="IdOrdCom-Ord Etiqueta"
+                    Caption ="Pedido"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdOrdCom_Ord_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 56
+                    Top = 396
+                    Width = 735
+                    Height = 240
+                    Name ="IdOrdenes Etiqueta"
+                    Caption ="Orden"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdOrdenes_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 945
+                    Top = 396
+                    Width = 780
+                    Height = 240
+                    Name ="Etiqueta6"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 1725
+                    Top = 396
+                    Width = 1695
+                    Height = 240
+                    Name ="Etiqueta7"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 340
+                    Top = 396
+                    Width = 285
+                    Height = 180
+                    ColumnWidth = 900
+                    Name ="IdOrdCompra"
+                    ControlSource ="IdOrdCompra"
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    OverlapFlags = 87
+                    ColumnCount = 2
+                    Left = 2329
+                    Top = 46
+                    Width = 756
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"4\";\"4\""
+                    Name ="QuePed"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Pedidos.IdPedidos, Pedidos.NumeroPed FROM Pedidos ORDER BY Pedidos.Numero"
+                        "Ped DESC;"
+                    ColumnWidths ="0;2835"
+                    BaseInfo ="\"SELECT Pedidos.IdPedidos, Pedidos.NumeroPed FROM Pedidos ORDER BY Pedidos.Nume"
+                        "roPed DESC;\";\"Pedidos\";\"\";\"IdPedidos\";\"NumeroPed\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 45
+                            Width = 2310
+                            Height = 240
+                            Name ="Etiqueta17"
+                            Caption ="Relacionar Ordenes del pedido:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3165
+                    Top = 15
+                    Width = 1101
+                    Height = 328
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 16711680
+                    Name ="Agregar"
+                    Caption ="Relacionar"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 285
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 3420
+                    Width = 681
+                    Height = 285
+                    ColumnWidth = 1701
+                    Name ="NumeroPed"
+                    ControlSource ="NumeroPed"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 945
+                    Width = 780
+                    Height = 285
+                    TabIndex = 2
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 1725
+                    Width = 1695
+                    Height = 285
+                    TabIndex = 3
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 60
+                    Top = 45
+                    Width = 795
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"3\";\"2\""
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes ORDER BY Ordenes.Numero DE"
+                        "SC;"
+                    ColumnWidths ="0;567"
+                    BaseInfo ="\"SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes ORDER BY Ordenes.Numero "
+                        "DESC;\";\"Ordenes\";\"\";\"IdOrdenes\";\"Numero\";\"PrimaryKey\""
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Agregar_Click()
+Dim Dbs As Database
+Dim QueOrd As Recordset
+Dim strmensaje As String
+
+Set Dbs = CurrentDb
+Set QueOrd = Dbs.OpenRecordset("SELECT IdOrdenes, Numero FROM Ordenes INNER JOIN PedidosDet ON Ordenes.IdPedidosDet = PedidosDet.IdPedidosDet WHERE (PedidosDet.IdPedidos)=" & QuePed & " ORDER BY Ordenes.Numero")
+With QueOrd
+        .MoveLast
+        .MoveFirst
+
+        Do While Not .EOF
+             DoCmd.GoToRecord , , acNewRec
+            strmensaje = "Orden a Agregar:" & !Numero & vbCr & "(Orden " & (.AbsolutePosition + 1) & " de " & .RecordCount & ")"
+            If MsgBox(strmensaje, vbOKCancel, "AGREGAR ORDEN") = vbCancel _
+                Then GoTo OtroMas
+        
+            Me![IdOrdenes] = !IdOrdenes
+           
+OtroMas:
+            .MoveNext
+
+        Loop
+
+        .Close
+    End With
+    
+Dbs.Close
+End Sub

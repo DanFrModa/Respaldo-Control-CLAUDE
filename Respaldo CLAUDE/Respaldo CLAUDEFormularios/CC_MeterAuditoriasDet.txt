@@ -1,0 +1,294 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1848736670
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6345
+    DatasheetFontHeight = 10
+    ItemSuffix = 26
+    Left = 8535
+    Top = 450
+    Right = 17100
+    Bottom = 6240
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xbf1037159c53e340
+    End
+    RecordSource ="SELECT CC_AuditoriasDet.IdCC_AuditoriasDet, CC_AuditoriasDet.IdCC_Auditorias, CC"
+        "_AuditoriasDet.NumFallas, CC_Catalogo.Clave, CC_Catalogo.Descripcion, CC_Catalog"
+        "o.Pag, CC_Catalogo.AQL, [numfallas]/[Formularios]![CC_MeterAuditorias]![TamanoMu"
+        "estra] AS Porcen FROM CC_AuditoriasDet LEFT JOIN CC_Catalogo ON CC_AuditoriasDet"
+        ".IdCC_Catalogo = CC_Catalogo.IdCC_Catalogo;"
+    Caption ="CC_AltaAuditDet"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Top = 57
+                    Width = 696
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Clave Etiqueta"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Clave_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 1
+                    Left = 696
+                    Top = 57
+                    Width = 3582
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 4081
+                    Width = 171
+                    Height = 255
+                    Name ="IdCC_Auditorias"
+                    ControlSource ="IdCC_Auditorias"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 4278
+                    Top = 57
+                    Width = 696
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta18"
+                    Caption ="AQL"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 5016
+                    Top = 57
+                    Width = 591
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta20"
+                    Caption ="Fallas"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 5685
+                    Top = 57
+                    Width = 591
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta22"
+                    Caption ="% Falla"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 285
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 696
+                    Width = 3567
+                    Height = 285
+                    ColumnWidth = 3000
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Width = 696
+                    Height = 285
+                    ColumnWidth = 600
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 4263
+                    Width = 696
+                    Height = 285
+                    TabIndex = 2
+                    Name ="AQL"
+                    ControlSource ="AQL"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5685
+                    Width = 591
+                    Height = 285
+                    TabIndex = 3
+                    Name ="Porcen"
+                    ControlSource ="Porcen"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5010
+                    Top = 45
+                    Width = 591
+                    TabIndex = 4
+                    Name ="Texto24"
+                    ControlSource ="NumFallas"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Borrar_Click()
+DoCmd.DeleteObject
+End Sub
+
+Private Sub Comando17_Click()
+
+    DoCmd.DoMenuItem acFormBar, acEditMenu, 8, , acMenuVer70
+    DoCmd.DoMenuItem acFormBar, acEditMenu, 6, , acMenuVer70
+Forms![CC_AltaAuditorias]![CC_AltaAudCat].Form.Requery
+    
+End Sub

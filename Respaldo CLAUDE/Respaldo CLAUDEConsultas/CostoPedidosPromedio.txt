@@ -1,0 +1,98 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Pedidos"
+    Name ="Ordenes"
+    Name ="PedidosDet"
+    Name ="CostoOrd"
+    Name ="OrdenesConCosto"
+End
+Begin OutputColumns
+    Expression ="Pedidos.IdPedidos"
+    Alias ="PromMargen"
+    Expression ="Avg((([costo]/[precio])-1)*-1)"
+    Alias ="MargenPonderado"
+    Expression ="(Sum([CantPed]*((([costo]/[precio])-1)*-1)))/Sum([cantPed])"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="PedidosDet"
+    Expression ="Ordenes.IdPedidosDet = PedidosDet.IdPedidosDet"
+    Flag = 1
+    LeftTable ="Pedidos"
+    RightTable ="PedidosDet"
+    Expression ="Pedidos.IdPedidos = PedidosDet.IdPedidos"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="CostoOrd"
+    Expression ="Ordenes.IdOrdenes = CostoOrd.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="OrdenesConCosto"
+    Expression ="Ordenes.IdOrdenes = OrdenesConCosto.IdOrdenes"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Pedidos.IdPedidos"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 47
+    Top = 29
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1204
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 162
+        Bottom = 120
+        Top = 0
+        Name ="Pedidos"
+    End
+    Begin
+        Left = 372
+        Top = 2
+        Right = 494
+        Bottom = 116
+        Top = 1
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 228
+        Top = 4
+        Right = 324
+        Bottom = 118
+        Top = 1
+        Name ="PedidosDet"
+    End
+    Begin
+        Left = 532
+        Top = 6
+        Right = 628
+        Bottom = 120
+        Top = 7
+        Name ="CostoOrd"
+    End
+    Begin
+        Left = 666
+        Top = 6
+        Right = 762
+        Bottom = 75
+        Top = 0
+        Name ="OrdenesConCosto"
+    End
+End

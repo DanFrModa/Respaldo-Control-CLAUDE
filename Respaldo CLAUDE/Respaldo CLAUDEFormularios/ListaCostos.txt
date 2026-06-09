@@ -1,0 +1,642 @@
+Version = 17
+VersionRequired = 17
+Checksum = 662787374
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9070
+    DatasheetFontHeight = 10
+    ItemSuffix = 37
+    Left = 1920
+    Top = 645
+    Right = 11280
+    Bottom = 7710
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x448de08a717de240
+    End
+    RecordSource ="SELECT Modelos.Modelo, Ordenes.Numero, CostoOrd.TelaCost, CostoOrd.HabCost, Cost"
+        "oOrd.BordCost, CostoOrd.MaquilaCost, CostoOrd.Otros, CostoOrd.Costo, Clientes.Cl"
+        "iente, Ordenes.IdOrdenes, Clientes.IdClientes, Sum([t1]+[t2]+[t3]+[t4]+[t5]+[t6]"
+        "+[t7]+[t8]) AS Prendas FROM ((Modelos RIGHT JOIN (CostoOrd LEFT JOIN Ordenes ON "
+        "CostoOrd.IdOrdenes = Ordenes.IdOrdenes) ON Modelos.IdModelos = Ordenes.IdModelos"
+        ") LEFT JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) LEFT JOIN Orde"
+        "nesDet ON Ordenes.IdOrdenes = OrdenesDet.IdOrdenes GROUP BY Modelos.Modelo, Orde"
+        "nes.Numero, CostoOrd.TelaCost, CostoOrd.HabCost, CostoOrd.BordCost, CostoOrd.Maq"
+        "uilaCost, CostoOrd.Otros, CostoOrd.Costo, Clientes.Cliente, Ordenes.IdOrdenes, C"
+        "lientes.IdClientes HAVING (((CostoOrd.Costo)<>0) AND ((Clientes.IdClientes) Like"
+        " [Formularios]![ListaCostos]![Fijo]) AND ((Mid(([modelo]),2,1)) Like [Formulario"
+        "s]![ListaCostos]![QueGeneroOculto])) ORDER BY Modelos.Modelo;"
+    Caption ="ListaCostos"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    OnLoad ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 65535
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 57
+                    Top = 57
+                    Width = 675
+                    Height = 240
+                    Name ="txtModelo"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3174
+                    Top = 57
+                    Width = 735
+                    Height = 240
+                    Name ="IdOrdenes Etiqueta"
+                    Caption ="Orden"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdOrdenes_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4019
+                    Top = 57
+                    Width = 621
+                    Height = 240
+                    Name ="TelaCost Etiqueta"
+                    Caption ="Tela"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="TelaCost_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4700
+                    Top = 57
+                    Width = 741
+                    Height = 240
+                    Name ="HabCost Etiqueta"
+                    Caption ="Habilit."
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="HabCost_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5493
+                    Top = 57
+                    Width = 741
+                    Height = 240
+                    Name ="BordCost Etiqueta"
+                    Caption ="Bord/Estt"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="BordCost_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 6339
+                    Top = 60
+                    Width = 690
+                    Height = 240
+                    Name ="MaquilaCost Etiqueta"
+                    Caption ="Maquila"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="MaquilaCost_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 7137
+                    Top = 57
+                    Width = 741
+                    Height = 240
+                    Name ="Otros Etiqueta"
+                    Caption ="Otros"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Otros_Etiqueta"
+                End
+                Begin Label
+                    BackStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 793
+                    Top = 57
+                    Width = 861
+                    Height = 240
+                    FontWeight = 700
+                    BackColor = 0
+                    ForeColor = 65535
+                    Name ="Costo Etiqueta"
+                    Caption ="Costo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Costo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7993
+                    Top = 57
+                    Width = 741
+                    Height = 240
+                    Name ="Etiqueta21"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 1700
+                    Top = 57
+                    Width = 630
+                    Height = 240
+                    Name ="Etiqueta24"
+                    Caption ="Det..."
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 2235
+                    Top = 60
+                    Width = 885
+                    Height = 240
+                    Name ="Etiqueta35"
+                    Caption ="Prendas"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 340
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 57
+                    Top = 57
+                    Width = 675
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3174
+                    Top = 57
+                    Width = 735
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4019
+                    Top = 57
+                    Width = 621
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="TelaCost"
+                    ControlSource ="TelaCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4700
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="HabCost"
+                    ControlSource ="HabCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5493
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="BordCost"
+                    ControlSource ="BordCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 6287
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 5
+                    Name ="MaquilaCost"
+                    ControlSource ="MaquilaCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7137
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 6
+                    Name ="Otros"
+                    ControlSource ="Otros"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 793
+                    Top = 57
+                    Width = 861
+                    Height = 255
+                    ColumnWidth = 2310
+                    FontWeight = 700
+                    TabIndex = 7
+                    BackColor = 0
+                    ForeColor = 65535
+                    Name ="Costo"
+                    ControlSource ="Costo"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 7993
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    TabIndex = 8
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1870
+                    Top = 56
+                    Width = 276
+                    Height = 223
+                    TabIndex = 9
+                    Name ="Detalles"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 119
+                    Left = 8730
+                    Top = 56
+                    Width = 276
+                    Height = 255
+                    TabIndex = 10
+                    BackColor = 16777215
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 247
+                    Left = 8390
+                    Top = 56
+                    Width = 276
+                    Height = 255
+                    TabIndex = 11
+                    BackColor = 16777215
+                    Name ="IdClientes"
+                    ControlSource ="IdClientes"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2381
+                    Top = 57
+                    Width = 735
+                    Height = 255
+                    TabIndex = 12
+                    Name ="Prendas"
+                    ControlSource ="Prendas"
+                    Format ="#,###"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 510
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 7993
+                    Top = 56
+                    Width = 921
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 1424
+                    Top = 113
+                    Width = 1476
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueCliente"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Clientes.IdClientes, Clientes.Cliente, Sum(CostoOrd.Costo) AS SumaDeCosto"
+                        " FROM (Clientes INNER JOIN Ordenes ON Clientes.IdClientes = Ordenes.IdClientes) "
+                        "INNER JOIN CostoOrd ON Ordenes.IdOrdenes = CostoOrd.IdOrdenes GROUP BY Clientes."
+                        "IdClientes, Clientes.Cliente HAVING (((Sum(CostoOrd.Costo))<>0)) ORDER BY Client"
+                        "es.Cliente;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Clientes.IdClientes, Clientes.Cliente, Sum(CostoOrd.Costo) AS SumaDeCos"
+                        "to FROM (Clientes INNER JOIN Ordenes ON Clientes.IdClientes = Ordenes.IdClientes"
+                        ") INNER JOIN CostoOrd ON Ordenes.IdOrdenes = CostoOrd.IdOrdenes GROUP BY Cliente"
+                        "s.IdClientes, Clie\";\"Clientes\";\"Ordenes\";\"CostoOrd\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 113
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta32"
+                            Caption ="Filtrar por Cliente:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    Left = 3457
+                    Top = 113
+                    Width = 276
+                    Height = 255
+                    TabIndex = 2
+                    BackColor = 16777215
+                    Name ="Fijo"
+                    DefaultValue ="\"*\""
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 247
+                    ColumnCount = 2
+                    Left = 4481
+                    Top = 120
+                    Width = 1237
+                    TabIndex = 3
+                    Name ="QueGenero"
+                    RowSourceType ="Value List"
+                    RowSource ="1;\"Caballero\";2;\"Dama\";4;\"Niño\";6;\"Niña\";0;\"Bebes\""
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 255
+                            Left = 3174
+                            Top = 113
+                            Width = 1845
+                            Height = 240
+                            ForeColor = 0
+                            Name ="Etiqueta45"
+                            Caption ="Filtrar por Género:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 6916
+                    Top = 113
+                    Width = 276
+                    Height = 270
+                    TabIndex = 4
+                    BackColor = 16777215
+                    Name ="QueGeneroOculto"
+                    DefaultValue ="\"*\""
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Detalles_Click()
+DoCmd.OpenForm "CostoOrd", , , "IdOrdenes=" & Me!IdOrdenes
+Forms![CostoOrd]![QueModelos].Visible = False
+Forms![CostoOrd]![CostoOrdSub].SetFocus
+Forms![CostoOrd]![QueOrden].Visible = False
+Forms![CostoOrd]![CostoOrdSub].Locked = True
+End Sub
+
+Private Sub Form_Load()
+Fijo = "*"
+End Sub
+
+
+
+Private Sub Form_Open(Cancel As Integer)
+DoCmd.ShowAllRecords
+End Sub
+
+Private Sub QueCliente_AfterUpdate()
+If IsNull(QueCliente) = True Then
+Fijo = "*"
+Else
+Fijo = QueCliente
+End If
+Me.Requery
+End Sub
+
+Private Sub QueGenero_AfterUpdate()
+If IsNull(QueGenero) = True Then
+QueGeneroOculto = "*"
+Else
+QueGeneroOculto = QueGenero
+End If
+Me.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

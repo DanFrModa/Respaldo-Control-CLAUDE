@@ -1,0 +1,290 @@
+Version = 17
+VersionRequired = 17
+Checksum = -8209469
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DividingLines = NotDefault
+    OrderByOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6066
+    DatasheetFontHeight = 10
+    ItemSuffix = 14
+    Left = 6315
+    Top = 585
+    Right = 12375
+    Bottom = 6795
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xf569b30d13bee240
+    End
+    RecordSource ="Modelos"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 453
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 4425
+                    Height = 315
+                    FontSize = 14
+                    BackColor = 65280
+                    ForeColor = 16777215
+                    Name ="Etiqueta12"
+                    Caption ="Verificar la existencia de Modelos"
+                End
+            End
+        End
+        Begin Section
+            Height = 5782
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin CommandButton
+                    Default = NotDefault
+                    OverlapFlags = 85
+                    Left = 793
+                    Top = 453
+                    Height = 568
+                    TabIndex = 1
+                    Name ="Verificar"
+                    Caption ="Verificar Modelo"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 1424
+                    Top = 113
+                    Width = 1071
+                    Name ="QueModelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 116
+                            Width = 2070
+                            Height = 240
+                            Name ="Etiqueta2"
+                            Caption ="Modelo a Buscar:"
+                        End
+                    End
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 113
+                    Top = 2555
+                    Width = 2820
+                    Height = 2490
+                    Name ="Imagen1"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 3146
+                    Top = 2555
+                    Width = 2820
+                    Height = 2490
+                    Name ="Imagen2"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1304
+                    Top = 2272
+                    Width = 801
+                    TabIndex = 2
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Foto1"
+                    ControlSource ="Foto1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 119
+                            Top = 2267
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta37"
+                            Caption ="Foto Modelo 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4359
+                    Top = 2277
+                    Width = 801
+                    TabIndex = 3
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Foto2"
+                    ControlSource ="Foto2"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3174
+                            Top = 2272
+                            Width = 1140
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta39"
+                            Caption ="Foto Modelo 2:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4762
+                    Top = 5272
+                    Width = 1191
+                    Height = 343
+                    FontWeight = 700
+                    TabIndex = 4
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Sub Cuadro_combinado3_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdModelos] = " & Me![Cuadro combinado3]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Form_Close()
+If EstaCargado("Pedidos") = True Then
+Forms![pedidos]![PedidosDet].Form![IdModelos].Requery
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+Private Sub Verificar_Click()
+If IsNull(QueModelo) = True Then
+MsgBox "Tienes que meter un numero de modelo en el campo", vbExclamation
+Else
+    Me.RecordsetClone.FindFirst "[Modelo] = '" & Me![QueModelo] & "'"
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+    
+    If Me!QueModelo = Me!Modelo Then
+    Call CargarFotos
+    MsgBox "El modelo " & QueModelo & " ya esta dado de alta.", vbInformation, "MODELO YA EXISTENTE"
+    
+    Else
+    If MsgBox("El modelo " & QueModelo & " no esta dado de alta. Quieres darlo de alta automaticamente?", vbYesNo, "MODELO NO EXISTENTE") = vbYes Then
+    Dim Dbs As Database
+    Set Dbs = CurrentDb
+    Dbs.Execute "INSERT INTO Modelos (Modelo) VALUES ('" & QueModelo & "')"
+    Dbs.Close
+    MsgBox "Se dio de alta el modelo " & QueModelo, vbInformation, "ALTA MODELO " & QueModelo
+    QueModelo = ""
+        Me!Imagen1.Picture = ""
+        Me!Imagen2.Picture = ""
+        Me!Imagen1.HyperlinkAddress = ""
+        Me!Imagen2.HyperlinkAddress = ""
+    End If
+    End If
+End If
+QueModelo.SetFocus
+End Sub
+
+Public Sub CargarFotos()
+Dim Nu As Integer
+On Error GoTo Errorprueba
+Me!Imagen1.Picture = ""
+Me!Imagen2.Picture = ""
+Me!Imagen1.HyperlinkAddress = ""
+Me!Imagen2.HyperlinkAddress = ""
+Nu = 1
+Me!Imagen1.Picture = DirFotos(Foto1)
+Me!Imagen1.HyperlinkAddress = DirFotos(Foto1)
+Nu = 2
+Me!Imagen2.Picture = DirFotos(Foto2)
+Me!Imagen2.HyperlinkAddress = DirFotos(Foto2)
+Exit Sub
+
+Errorprueba:
+Select Case Nu
+Case 1
+Me!Imagen1.Picture = NoFoto
+Case 2
+Me!Imagen2.Picture = NoFoto
+End Select
+
+Resume Next
+End Sub
+
+Public Sub AltaMod()
+Dim Dbs As Database
+
+Set Dbs = CurrentDb
+Dbs.Execute "INSERT INTO Modelos (Modelo) VALUES ('" & QueModelo & "')"
+Dbs.Close
+
+End Sub

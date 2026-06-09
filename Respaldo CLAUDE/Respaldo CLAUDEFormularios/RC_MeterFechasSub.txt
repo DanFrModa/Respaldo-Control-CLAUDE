@@ -1,0 +1,746 @@
+Version = 17
+VersionRequired = 17
+Checksum = 202123388
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowDeletions = NotDefault
+    AllowAdditions = NotDefault
+    OrderByOn = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 12570
+    DatasheetFontHeight = 10
+    ItemSuffix = 58
+    Left = 7305
+    Top = 5055
+    Right = 20310
+    Bottom = 10995
+    DatasheetGridlinesColor = 12632256
+    OrderBy ="Estatus DESC,     Numero"
+    RecSrcDt = Begin
+        0x8cebf2f03a5ee540
+    End
+    RecordSource ="SELECT QueActiva([QueProcAnt]) AS Estatus, Ordenes.Numero, OrdPedido.NumeroPed, "
+        "RC.FechaEst, RC.IdCP_Procesos, Modelos.Modelo, Clientes.Cliente, RC.FechaReal, R"
+        "C.IdUsuario, RC.FechaUsuarioRC, RC.TiempoRC, RC_UltimoProceso.MáxDeNumProceso, R"
+        "C.IdRC, CP_Tiempos.Antecesor, RC_Antecesor.QueFechaAnt, Int(Date()-([quefechaant"
+        "]+[tiemporc])) AS Atraso, [quefechaant]+[tiemporc] AS FechaNuev, CP_Articulos.Cl"
+        "ave, Ordenes.SI_RC, Ordenes.OrdCancelada, Ordenes.IdOrdenes, Int(Date()-[FechaEs"
+        "t]) AS Retraso, Ordenes.RC_Viva FROM ((((((((RC INNER JOIN Ordenes ON RC.IdOrden"
+        "es = Ordenes.IdOrdenes) INNER JOIN CP_Procesos ON RC.IdCP_Procesos = CP_Procesos"
+        ".IdCP_Procesos) INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) INN"
+        "ER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) INNER JOIN OrdPedi"
+        "do ON Ordenes.IdOrdenes = OrdPedido.IdOrdenes) INNER JOIN RC_UltimoProceso ON Or"
+        "denes.IdOrdenes = RC_UltimoProceso.IdOrdenes) LEFT JOIN CP_Tiempos ON RC.IdCP_Ti"
+        "empos = CP_Tiempos.IdCP_Tiempos) LEFT JOIN RC_Antecesor ON RC.IdOrdenes = RC_Ant"
+        "ecesor.IdOrdenes) LEFT JOIN CP_Articulos ON Ordenes.IdCP_Articulos = CP_Articulo"
+        "s.IdCP_Articulos WHERE (((RC.FechaReal) Is Null) AND ((Ordenes.SI_RC)=Yes) AND ("
+        "(Ordenes.OrdCancelada)=No) AND ((Ordenes.RC_Viva)=True)) ORDER BY QueActiva([Que"
+        "ProcAnt]) DESC , Ordenes.Numero, OrdPedido.NumeroPed, RC.FechaEst;"
+    Caption ="RC_MeterFechasSub"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000201c0000e010000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x5072696d6f504446000000000000000000000000000000000000000000000000 ,
+        0x010402059c00c40253ef800101000100ea0a6f08640001000f00580202000100 ,
+        0x5802030001004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000010000000000000001000000 ,
+        0x0200000001000000000000000000000000000000000000000000000050524956 ,
+        0xe230000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000180000000000102710271027 ,
+        0x0000102700000000000000000000c40200000000000000000000000000000000 ,
+        0x00000000000000000300000000000000000010005c4b03006843040000000000 ,
+        0x00000000000000000000000000000000000000000000000044b57f4d05000000 ,
+        0x04000000ff00ff00010000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012001c00010077696e73706f6f6c00005072696d6f50444600005072696d ,
+        0x6f506f72743a000000000000000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 585
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Top = 341
+                    Width = 570
+                    Height = 240
+                    Name ="IdOrdenes Etiqueta"
+                    Caption ="Orden"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdOrdenes_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 4230
+                    Top = 345
+                    Width = 765
+                    Height = 240
+                    Name ="NumProcesoRC Etiqueta"
+                    Caption ="Num Ped"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="NumProcesoRC_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 9585
+                    Top = 345
+                    Width = 945
+                    Height = 240
+                    Name ="FechaEst Etiqueta"
+                    Caption ="F. Estimada"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="FechaEst_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 570
+                    Top = 345
+                    Width = 795
+                    Height = 240
+                    Name ="Etiqueta14"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 2910
+                    Top = 345
+                    Width = 1320
+                    Height = 240
+                    Name ="Etiqueta16"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 11475
+                    Top = 345
+                    Width = 1005
+                    Height = 225
+                    Name ="Etiqueta21"
+                    Caption ="Seleccionar"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 5850
+                    Top = 345
+                    Width = 780
+                    Height = 240
+                    Name ="Etiqueta23"
+                    Caption ="Estatus"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 6630
+                    Top = 345
+                    Width = 1020
+                    Height = 240
+                    Name ="Etiqueta25"
+                    Caption ="Fecha Ant."
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 4995
+                    Top = 345
+                    Width = 855
+                    Height = 240
+                    Name ="Etiqueta27"
+                    Caption ="Tiempo"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 7650
+                    Top = 345
+                    Width = 945
+                    Height = 240
+                    Name ="Etiqueta29"
+                    Caption ="Fecha Nva."
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 8595
+                    Top = 150
+                    Width = 990
+                    Height = 435
+                    Name ="Etiqueta31"
+                    Caption ="Atraso en Cumplimiento"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 223
+                    Left = 2337
+                    Top = 285
+                    Width = 1071
+                    Height = 255
+                    Name ="IdRC"
+                    ControlSource ="IdRC"
+                End
+                Begin Label
+                    OverlapFlags = 247
+                    TextAlign = 2
+                    Left = 2085
+                    Top = 345
+                    Width = 855
+                    Height = 240
+                    Name ="Etiqueta44"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 45
+                    Top = 30
+                    TabIndex = 1
+                    Name ="Comando49"
+                    Caption ="Por Orden"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 9240
+                    Top = 45
+                    TabIndex = 2
+                    Name ="Comando50"
+                    Caption ="Por Fecha Est"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 247
+                    Left = 2445
+                    Top = 30
+                    TabIndex = 3
+                    Name ="Comando52"
+                    Caption ="Por Cliente"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 10530
+                    Top = 345
+                    Width = 945
+                    Height = 240
+                    Name ="Etiqueta53"
+                    Caption ="Retraso"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    Left = 1350
+                    Top = 345
+                    Width = 705
+                    Height = 240
+                    Name ="Etiqueta55"
+                    Caption ="Ver Ord"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 315
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    BackStyle = 0
+                    Width = 570
+                    Height = 315
+                    ColumnWidth = 900
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 4230
+                    Width = 720
+                    Height = 315
+                    ColumnWidth = 465
+                    TabIndex = 1
+                    Name ="NumeroPed"
+                    ControlSource ="NumeroPed"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 9480
+                    Width = 1020
+                    Height = 315
+                    ColumnWidth = 825
+                    TabIndex = 2
+                    Name ="FechaEst"
+                    ControlSource ="FechaEst"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 570
+                    Width = 795
+                    Height = 315
+                    TabIndex = 3
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 2910
+                    Width = 1320
+                    Height = 315
+                    TabIndex = 4
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin CommandButton
+                    TabStop = NotDefault
+                    OverlapFlags = 93
+                    Left = 11751
+                    Top = 90
+                    Width = 306
+                    Height = 165
+                    TabIndex = 5
+                    Name ="Hoy"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 12288
+                    Width = 231
+                    TabIndex = 6
+                    Name ="IdUsuario"
+                    ControlSource ="IdUsuario"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 12057
+                    Width = 231
+                    TabIndex = 7
+                    Name ="FechaUsuarioRC"
+                    ControlSource ="FechaUsuarioRC"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 5790
+                    Width = 780
+                    Height = 315
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Estatus"
+                    ControlSource ="Estatus"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 6570
+                    Width = 1035
+                    Height = 315
+                    TabIndex = 9
+                    ForeColor = 255
+                    Name ="FechAnt"
+                    ControlSource ="QueFechaAnt"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 4950
+                    Width = 840
+                    Height = 315
+                    TabIndex = 10
+                    ForeColor = 0
+                    Name ="TiempoRC"
+                    ControlSource ="TiempoRC"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 7605
+                    Width = 1035
+                    Height = 315
+                    TabIndex = 11
+                    ForeColor = 6723891
+                    Name ="FechaNva"
+                    ControlSource ="FechaNuev"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 8640
+                    Width = 840
+                    Height = 315
+                    TabIndex = 12
+                    ForeColor = 255
+                    Name ="DiasAtraso"
+                    ControlSource ="Atraso"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 11520
+                    Width = 231
+                    TabIndex = 13
+                    Name ="Antecesor"
+                    ControlSource ="Antecesor"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 2115
+                    Width = 795
+                    Height = 315
+                    TabIndex = 14
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 11895
+                    Width = 171
+                    TabIndex = 15
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 10500
+                    Width = 1020
+                    Height = 315
+                    TabIndex = 16
+                    Name ="Retraso"
+                    ControlSource ="Retraso"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1485
+                    Top = 30
+                    Width = 351
+                    Height = 238
+                    TabIndex = 17
+                    Name ="VerOrden"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub FechaReal_AfterUpdate()
+IdUsuario = IdUsuarioACT
+FechaUsuarioRC = Now()
+End Sub
+
+
+Private Sub Comando49_Click()
+OrderByOn = True
+Me.OrderBy = "Estatus DESC,Numero ASC"
+
+End Sub
+
+Private Sub Comando50_Click()
+OrderByOn = True
+Me.OrderBy = "Estatus DESC,FechaEst ASC"
+End Sub
+
+Private Sub Comando51_Click()
+Me.Requery
+
+End Sub
+
+Private Sub Comando52_Click()
+OrderByOn = True
+Me.OrderBy = "Estatus DESC,Cliente ASC"
+End Sub
+
+Private Sub Form_Current()
+On Error GoTo ErS
+Call Hoy_Click
+ErS:
+End Sub
+
+Private Sub Hoy_Click()
+Select Case Forms![RC_MeterFechas]![TipoProceso]
+ Case "L"
+  Forms![RC_MeterFechas]![RC_IP2].Form.Requery
+ Case "M"
+  Forms![RC_MeterFechas]![RC_IP3].Form.Requery
+ Case "F"
+  Forms![RC_MeterFechas]![RC_IP4].Form.Requery
+ Case "P"
+  Forms![RC_MeterFechas]![RC_IP5].Form.Requery
+     
+ Case Else
+   Forms![RC_MeterFechas]![RC_MeterDatosDet].Form.Requery
+End Select
+End Sub
+Private Sub AbrirDatos_Click()
+On Error GoTo Err_AbrirDatos_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "RC_MeterDatosDet"
+    
+    stLinkCriteria = "[IdRC]=" & Me![IdRC]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_AbrirDatos_Click:
+    Exit Sub
+
+Err_AbrirDatos_Click:
+    MsgBox Err.Description
+    Resume Exit_AbrirDatos_Click
+    
+End Sub
+Private Sub Comando36_Click()
+On Error GoTo Err_Comando36_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "RC_MeterDatosDet"
+    
+    stLinkCriteria = "[IdRC]=" & Me![IdRC]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Comando36_Click:
+    Exit Sub
+
+Err_Comando36_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando36_Click
+    
+End Sub
+Private Sub AbiriRC2_Click()
+DoCmd.OpenForm "RC_IP2", , , "idrc=" & Me!IdRC
+
+
+''Me.RecordsetClone.FindFirst "[Idusuarios] = " & IdUsuarioACT
+''Me.Bookmark = Me.RecordsetClone.Bookmark
+''MsgBox Me.IdRC
+
+    
+End Sub
+Private Sub VerOrden_Click()
+On Error GoTo Err_VerOrden_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "OrdenVer"
+    
+    stLinkCriteria = "[IdOrdenes]=" & Me![IdOrdenes]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+    Forms![OrdenVer]![QueOrden] = IdOrdenes
+    
+Exit_VerOrden_Click:
+    Exit Sub
+
+Err_VerOrden_Click:
+    MsgBox Err.Description
+    Resume Exit_VerOrden_Click
+    
+End Sub

@@ -1,0 +1,466 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1379662593
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 11565
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 3510
+    Top = 585
+    Right = 15075
+    Bottom = 8790
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xf54214869ac3e240
+    End
+    RecordSource ="SELECT Notas.IdNotas, Notas.NumNota, Notas.FechaElaboracion, Notas.Observaciones"
+        ", Notas.FechaEnvio, [maquileros]![nombre]+\" \"+[maquileros]![apellidos] AS Maq,"
+        " [usuarios]![nombre]+\" \"+[usuarios]![apellidos] AS Usua FROM (Notas INNER JOIN"
+        " Maquileros ON Notas.IdMaquileros = Maquileros.IdMaquileros) LEFT JOIN Usuarios "
+        "ON Notas.IdUsuarios = Usuarios.IdUsuarios WHERE (((Notas.IdNotas)=[Formularios]!"
+        "[NotasVer]![QueNota]));"
+    Caption ="Notas"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 453
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 53
+                    Width = 4365
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta14"
+                    Caption ="CONSULTA DE NOTAS DE SALIDA"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 7540
+                    Top = 56
+                    Width = 1986
+                    Name ="Modificar"
+                    Caption ="Modificar"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7766
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 5216
+                    Top = 283
+                    Width = 186
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 2
+                    Name ="IdNotas"
+                    ControlSource ="IdNotas"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3815
+                    Width = 510
+                    Height = 255
+                    ColumnWidth = 600
+                    FontWeight = 700
+                    TabIndex = 3
+                    Name ="NumNota"
+                    ControlSource ="NumNota"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2154
+                            Width = 1635
+                            Height = 255
+                            FontWeight = 700
+                            Name ="NumNota Etiqueta"
+                            Caption ="Numero de Salida:"
+                            EventProcPrefix ="NumNota_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7856
+                    Top = 283
+                    Width = 1155
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 4
+                    Name ="FechaElaboracion"
+                    ControlSource ="FechaElaboracion"
+                    Format ="Medium Date"
+                    DefaultValue ="=Now()"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6236
+                            Top = 283
+                            Width = 1560
+                            Height = 255
+                            Name ="Fecha Etiqueta"
+                            Caption ="Fecha Elaboracion:"
+                            EventProcPrefix ="Fecha_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 3288
+                    Top = 6916
+                    Width = 7035
+                    Height = 750
+                    ColumnWidth = 3000
+                    TabIndex = 7
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2154
+                            Top = 6916
+                            Width = 1125
+                            Height = 255
+                            Name ="Observaciones Etiqueta"
+                            Caption ="Observaciones"
+                            EventProcPrefix ="Observaciones_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 5499
+                    Top = 283
+                    Width = 150
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 5
+                    Name ="IdUsuarios"
+                    ControlSource ="IdUsuarios"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7856
+                    Top = 567
+                    Width = 1155
+                    Height = 255
+                    TabIndex = 1
+                    Name ="FechaEnvio"
+                    ControlSource ="FechaEnvio"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6236
+                            Top = 567
+                            Width = 1560
+                            Height = 255
+                            Name ="Etiqueta11"
+                            Caption ="Fecha Envio:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    SpecialEffect = 0
+                    Left = 2154
+                    Top = 860
+                    Width = 9300
+                    Height = 6015
+                    TabIndex = 6
+                    Name ="NotasVerSub"
+                    SourceObject ="Form.NotasVerSub"
+                    LinkChildFields ="IdNotas"
+                    LinkMasterFields ="IdNotas"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 10374
+                    Top = 7313
+                    Width = 906
+                    Height = 328
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 56
+                    Top = 56
+                    Width = 2031
+                    Height = 7657
+                    TabIndex = 9
+                    Name ="QueNota"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Notas.IdNotas, Notas.NumNota, Maquileros.Corto FROM Notas INNER JOIN Maqu"
+                        "ileros ON Notas.IdMaquileros = Maquileros.IdMaquileros GROUP BY Notas.IdNotas, N"
+                        "otas.NumNota, Maquileros.Corto ORDER BY Notas.NumNota DESC;"
+                    ColumnWidths ="0;539;1134"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 5783
+                    Top = 283
+                    Width = 186
+                    Height = 255
+                    TabIndex = 10
+                    Name ="QueNotaEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 3065
+                    Top = 567
+                    Width = 3030
+                    BackColor = 16777215
+                    Name ="Usua"
+                    ControlSource ="Usua"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2154
+                            Top = 567
+                            Width = 900
+                            Height = 255
+                            Name ="Etiqueta13"
+                            Caption ="Elaboro:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 9466
+                    Top = 340
+                    Width = 1986
+                    TabIndex = 11
+                    Name ="Imprimir"
+                    Caption ="Imprimir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 247
+                    BackStyle = 0
+                    Left = 3065
+                    Top = 283
+                    Width = 3030
+                    TabIndex = 12
+                    BackColor = 16777215
+                    Name ="Maq"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2154
+                            Top = 283
+                            Width = 900
+                            Height = 255
+                            Name ="Etiqueta26"
+                            Caption ="Enviado a:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub UltimoNumero()
+On Error GoTo errores
+Dim Dbs As Database
+Dim Rst As Recordset
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT Max(IdNotas) AS UltNum FROM Notas")
+QueNota = Rst!ultnum
+Rst.Close
+Dbs.Close
+Exit Sub
+errores:
+MsgBox Err.Description
+End Sub
+
+
+
+
+Private Sub Form_Open(Cancel As Integer)
+If NivelAct > nivAdminDir Then
+Modificar.Visible = False
+End If
+Call UltimoNumero
+Me.Requery
+End Sub
+
+Private Sub Imprimir_Click()
+On Error GoTo errores
+DoCmd.OpenForm "notasimp", acPreview, , "idnotas=" & IdNotas
+Exit Sub
+errores:
+MsgBox Err.Description
+End Sub
+
+Private Sub Modificar_Click()
+DoCmd.OpenForm "notas", , , "idnotas=" & IdNotas
+End Sub
+
+Private Sub QueNota_AfterUpdate()
+Me.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

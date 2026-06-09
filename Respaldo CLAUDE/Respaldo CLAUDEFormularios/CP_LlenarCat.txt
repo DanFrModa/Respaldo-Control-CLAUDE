@@ -1,0 +1,406 @@
+Version = 17
+VersionRequired = 17
+Checksum = -34017337
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9694
+    DatasheetFontHeight = 10
+    ItemSuffix = 25
+    Left = 4440
+    Top = 315
+    Right = 14130
+    Bottom = 8190
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x2c265dcd4d46e340
+    End
+    RecordSource ="SELECT CP_Articulos.IdCP_Articulos, CP_Articulos.Clave, CP_Familia.Familia, CP_A"
+        "rticulos.Descripcion, CP_Articulos.Costura, CP_Articulos.IdCP_Familia FROM CP_Ar"
+        "ticulos INNER JOIN CP_Familia ON CP_Articulos.IdCP_Familia = CP_Familia.IdCP_Fam"
+        "ilia;"
+    Caption ="CP_LlenarCat"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7880
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7653
+                    Top = 566
+                    Width = 366
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdCP_Articulos"
+                    ControlSource ="IdCP_Articulos"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3094
+                    Top = 566
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1474
+                            Top = 566
+                            Width = 1560
+                            Height = 255
+                            Name ="Clave Etiqueta"
+                            Caption ="Clave"
+                            EventProcPrefix ="Clave_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3094
+                    Top = 850
+                    Width = 1665
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="Familia"
+                    ControlSource ="Familia"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 1474
+                            Top = 850
+                            Width = 1560
+                            Height = 255
+                            Name ="IdCP_Familia Etiqueta"
+                            Caption ="Familia"
+                            EventProcPrefix ="IdCP_Familia_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3094
+                    Top = 1190
+                    Width = 4275
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 1474
+                            Top = 1190
+                            Width = 1560
+                            Height = 255
+                            Name ="Descripcion Etiqueta"
+                            Caption ="Descripcion"
+                            EventProcPrefix ="Descripcion_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3094
+                    Top = 1532
+                    Width = 4275
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="Costura"
+                    ControlSource ="Costura"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 1474
+                            Top = 1532
+                            Width = 1560
+                            Height = 255
+                            Name ="Costura Etiqueta"
+                            Caption ="Costura"
+                            EventProcPrefix ="Costura_Etiqueta"
+                        End
+                    End
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 85
+                    SpecialEffect = 5
+                    Left = 1474
+                    Top = 1814
+                    Width = 6635
+                    Name ="Línea15"
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 1474
+                    Top = 2110
+                    Width = 8055
+                    Height = 5040
+                    TabIndex = 6
+                    Name ="CP_LlenarCatSub"
+                    SourceObject ="Form.CP_LlenarCatSub"
+                    LinkChildFields ="IdCP_Articulos"
+                    LinkMasterFields ="IdCP_Articulos"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 2151
+                    Width = 1206
+                    Height = 5002
+                    TabIndex = 5
+                    Name ="QueClave"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW CP_Articulos.IdCP_Articulos, CP_Articulos.Clave, CP_Articulos"
+                        ".IdCP_Familia FROM CP_Articulos WHERE (((CP_Articulos.IdCP_Familia) Like [Formul"
+                        "arios]![CP_LlenarCat]![QueFam]));"
+                    ColumnWidths ="0;1440"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 1870
+                            Width = 570
+                            Height = 240
+                            Name ="ClaveEtiqueta_"
+                            Caption ="Clave:"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 3810
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta20"
+                    Caption ="ALIMENTAR EL CATALOGO DE TIEMPOS"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7710
+                    Top = 1020
+                    Width = 366
+                    Height = 255
+                    TabIndex = 8
+                    Name ="QueFam"
+                    DefaultValue ="\"*\""
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 113
+                    Top = 567
+                    Width = 1206
+                    TabIndex = 7
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"10\""
+                    Name ="QueFamilia"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CP_Familia.IdCP_Familia, CP_Familia.Familia FROM CP_Familia;"
+                    ColumnWidths ="0;1701"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT CP_Familia.IdCP_Familia, CP_Familia.Familia FROM CP_Familia;\";\"CP_Fam"
+                        "ilia\";\"\";\"IdCP_Familia\";\"Familia\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 223
+                            Left = 113
+                            Top = 340
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta22"
+                            Caption ="Familia:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 8333
+                    Top = 7366
+                    Width = 1191
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 9
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+Private Sub QueClave_AfterUpdate()
+' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdCP_Articulos] = " & Me![QueClave]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub QueFamilia_AfterUpdate()
+If IsNull(QueFamilia) = True Then
+QueFam = "*"
+Else
+QueFam = QueFamilia
+End If
+
+QueClave.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub Form_Open(Cancel As Integer)
+If IdRC_TipoUsuariosAct <> 1 Then
+MsgBox "Solo el Administrador de la RC puede ver esta pantalla. Si necesitas ver algo de esto, comentaselo a Daniel Masri.", vbInformation, "SOLO PARA ADMINISTRADORES DE LA RC"
+DoCmd.Close
+End If
+End Sub

@@ -1,0 +1,60 @@
+Operation = 1
+Option = 0
+Having ="(((CP_Procesos.Critico)=Yes))"
+Begin InputTables
+    Name ="CP_Procesos"
+    Name ="CP_Tiempos"
+End
+Begin OutputColumns
+    Expression ="CP_Tiempos.IdCP_Articulos"
+    Alias ="TiempoTotal"
+    Expression ="Sum(CP_Tiempos.Tiempo)"
+End
+Begin Joins
+    LeftTable ="CP_Procesos"
+    RightTable ="CP_Tiempos"
+    Expression ="CP_Procesos.IdCP_Procesos = CP_Tiempos.IdCP_Procesos"
+    Flag = 1
+End
+Begin Groups
+    Expression ="CP_Tiempos.IdCP_Articulos"
+    GroupLevel = 0
+    Expression ="CP_Procesos.Critico"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1181
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 122
+        Top = 3
+        Name ="CP_Procesos"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 291
+        Bottom = 122
+        Top = 1
+        Name ="CP_Tiempos"
+    End
+End

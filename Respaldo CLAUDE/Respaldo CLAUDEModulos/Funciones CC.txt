@@ -1,0 +1,41 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function QueTipoAudit(TipoAuditor As Integer) As String
+If TipoAuditor = 1 Then
+ QueTipoAudit = "En Piso"
+ElseIf TipoAuditor = 2 Then
+QueTipoAudit = "Final"
+Else
+QueTipoAudit = "No Definida"
+End If
+End Function
+
+Public Function QueResultado(Res As Integer) As String
+If Res = 1 Then
+ QueResultado = "Aprobado"
+ElseIf Res = 2 Then
+ QueResultado = "Reprobado"
+Else
+ QueResultado = "No Calificado"
+End If
+End Function
+
+Public Function QueResul(Res As Integer) As String
+If Res = 1 Then
+ QueResul = "A"
+ElseIf Res = 2 Then
+ QueResul = "R"
+Else
+ QueResul = "--"
+End If
+End Function
+
+Public Function SignoCancel(QueCancel As Boolean) As String
+If QueCancel = True Then
+ SignoCancel = "+"
+Else
+ SignoCancel = ""
+End If
+End Function

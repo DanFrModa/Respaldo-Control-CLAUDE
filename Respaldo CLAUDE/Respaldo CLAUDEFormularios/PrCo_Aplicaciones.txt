@@ -1,0 +1,248 @@
+Version = 17
+VersionRequired = 17
+Checksum = 341869420
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5952
+    DatasheetFontHeight = 10
+    ItemSuffix = 8
+    Left = 3720
+    Top = 495
+    Right = 11850
+    Bottom = 8730
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xd73dee625a64e340
+    End
+    RecordSource ="PrCo_Aplicaciones"
+    Caption ="PrCo_Aplicaciones"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 580
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 340
+                    Width = 2310
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Aplicacion Etiqueta"
+                    Caption ="Aplicacion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Aplicacion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2423
+                    Top = 340
+                    Width = 2310
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4790
+                    Top = 340
+                    Width = 1050
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 120
+                    Top = 120
+                    Width = 3975
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta6"
+                    Caption ="APLICACIONES PARA PRECOSTOS"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    Name ="Aplicacion"
+                    ControlSource ="Aplicacion"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2424
+                    Top = 57
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4791
+                    Top = 57
+                    Width = 1050
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 510
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4592
+                    Top = 113
+                    Width = 1251
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

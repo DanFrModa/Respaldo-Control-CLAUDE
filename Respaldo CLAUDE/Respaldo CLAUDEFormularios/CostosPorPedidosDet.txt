@@ -1,0 +1,760 @@
+Version = 17
+VersionRequired = 17
+Checksum = 145434480
+Begin Form
+    FastLaserPrinting = NotDefault
+    ShortcutMenu = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowDeletions = NotDefault
+    ScrollBars = 2
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 0
+    Width = 9467
+    DatasheetFontHeight = 10
+    ItemSuffix = 228
+    Left = 2655
+    Top = 840
+    Right = 11610
+    Bottom = 5880
+    HelpContextId = 410
+    RecSrcDt = Begin
+        0xdec34c2597ebe240
+    End
+    RecordSource ="CostosPorPedidoCon"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000373200000e01000001000000 ,
+        0x010000006801000000000000a10700000000000001000000
+    End
+    PrtDevMode = Begin
+        0x414746412d416363755365742031303030000000000000000000000000000000 ,
+        0x000403049400b8021f67000002000100ea0a6f08640001000700600901000100 ,
+        0x6009030000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000008000000004b000020670000010000000000000001000000 ,
+        0x020000000000000000000000000000000000000028a219e5871517c8f0dd7301 ,
+        0x0100010000000000010000000000020002000100e8030000c201000000000000 ,
+        0x00006400000000000000ffff0000ffff0000ffff0000ffff0300ffff0000ffff ,
+        0x0000ffff0000ffff0100ffff0000ffff0000ffff0100ffff0100ffff0000ffff ,
+        0x0100ffff0000ffff0000ffff0000ffff0100ffff000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000000000000000000000000000ffff50e167696e61 ,
+        0x20706572736f6e616c697a616461203100000000000000000000000000000000 ,
+        0x00000000000000000000000000000000000000000000000000000000c8420000 ,
+        0xc84200000000000050e167696e6120706572736f6e616c697a61646120320000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000c8420000c84200000000000050e167696e6120706572 ,
+        0x736f6e616c697a61646120330000000000000000000000000000000000000000 ,
+        0x000000000000000000000000000000000000000000000000c8420000c8420000 ,
+        0x0000000000000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080011002300010077696e73706f6f6c00414746412d41636375536574203130 ,
+        0x3030004c5054313a000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000000000000000000000000000
+    End
+    OnLoad ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            FontWeight = 700
+            FontName ="Arial"
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin CommandButton
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            AutoLabel = NotDefault
+            OldBorderStyle = 0
+        End
+        Begin TextBox
+            FontName ="Arial"
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ToggleButton
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin FormHeader
+            DisplayWhen = 2
+            Height = 557
+            BackColor = 65535
+            Name ="EncabezadoDeFormulario"
+            Begin
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    Left = 680
+                    Top = 188
+                    Width = 1131
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="Nombre Cliente Etiqueta"
+                    Caption ="Cliente"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Nombre_Cliente_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    TextFontFamily = 18
+                    Left = 1927
+                    Top = 188
+                    Width = 570
+                    Height = 285
+                    FontWeight = 400
+                    BorderColor = 4210752
+                    Name ="Fecha de Cancelación Etiqueta"
+                    Caption ="Hasta:"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Fecha_de_Cancelación_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 2551
+                    Top = 188
+                    Width = 561
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 3911
+                    Top = 195
+                    Width = 570
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Cant."
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 4478
+                    Top = 188
+                    Width = 741
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    TextFontFamily = 18
+                    Left = 7725
+                    Top = 47
+                    Width = 570
+                    Height = 480
+                    BorderColor = 4210752
+                    Name ="SumaDeCantidad Etiqueta"
+                    Caption ="Cant. Total"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="SumaDeCantidad_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 8345
+                    Top = 47
+                    Width = 1080
+                    Height = 495
+                    BorderColor = 4210752
+                    Name ="SumaDeImporte Etiqueta"
+                    Caption ="Importe Total"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="SumaDeImporte_Etiqueta"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    Top = 188
+                    Width = 630
+                    Height = 270
+                    BorderColor = 4210752
+                    Name ="Etiqueta31"
+                    Caption ="Pedido"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    Left = 1927
+                    Width = 900
+                    Height = 270
+                    BorderColor = 4210752
+                    Name ="Etiqueta44"
+                    Caption ="Vigencia:"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 5215
+                    Top = 188
+                    Width = 741
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="CostoEt"
+                    Caption ="Costo"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 6006
+                    Top = 195
+                    Width = 690
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="Etiqueta197"
+                    Caption ="Margen"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 223
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 3438
+                    Top = 195
+                    Width = 585
+                    Height = 300
+                    BorderColor = 4210752
+                    Name ="Etiqueta202"
+                    Caption ="Corte"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 737
+                    Width = 255
+                    Name ="CantidadTotal"
+                    ControlSource ="=Sum([cantped])"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 1587
+                    Width = 255
+                    TabIndex = 1
+                    Name ="ImporteTot"
+                    ControlSource ="=Sum([Importe])"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 1303
+                    Width = 255
+                    TabIndex = 2
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin Label
+                    FontItalic = NotDefault
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    TextFontFamily = 18
+                    Left = 6859
+                    Top = 47
+                    Width = 750
+                    Height = 480
+                    BorderColor = 4210752
+                    Name ="Etiqueta210"
+                    Caption ="PromedioMargen"
+                    FontName ="Times New Roman"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3174
+                    Width = 225
+                    TabIndex = 3
+                    Name ="MargenTotPromedio"
+                    ControlSource ="=Avg([Margen])"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 3628
+                    Width = 225
+                    TabIndex = 4
+                    Name ="IdModelos"
+                    ControlSource ="IdModelos"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 4422
+                    Width = 255
+                    Height = 255
+                    TabIndex = 5
+                    Name ="IdPedidosDet"
+                    ControlSource ="IdPedidosDet"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 5782
+                    Width = 240
+                    TabIndex = 6
+                    Name ="MargenTotalPonderado"
+                    ControlSource ="=(((Sum([costoPorMod]))/(Sum([importepormod]))-1)*-1)"
+                    Format ="Percent"
+                End
+            End
+        End
+        Begin Section
+            KeepTogether = NotDefault
+            Height = 285
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 680
+                    Width = 1251
+                    Height = 270
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 1984
+                    Width = 570
+                    Height = 270
+                    TabIndex = 1
+                    ForeColor = 255
+                    Name ="FechaHasta"
+                    ControlSource ="FechaHasta"
+                    Format ="dd-mm"
+                    StatusBarText ="El mismo que Fecha de Vigencia Hasta de Pedidos"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 7650
+                    Width = 636
+                    Height = 270
+                    TabIndex = 2
+                    Name ="CantTotal"
+                    ControlSource ="CantTotal"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8354
+                    Width = 1065
+                    Height = 270
+                    TabIndex = 3
+                    Name ="ImporteTotal"
+                    ControlSource ="ImporteTotal"
+                End
+                Begin TextBox
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Width = 591
+                    Height = 270
+                    TabIndex = 4
+                    Name ="NumeroPed"
+                    ControlSource ="NumeroPed"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 2559
+                    Width = 546
+                    Height = 270
+                    FontWeight = 700
+                    TabIndex = 5
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 3911
+                    Width = 570
+                    Height = 270
+                    TabIndex = 6
+                    Name ="CantPed"
+                    ControlSource ="CantPed"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 4478
+                    Width = 741
+                    Height = 270
+                    TabIndex = 7
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;($#,##0.00)"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Width = 255
+                    TabIndex = 8
+                    Name ="IdPedidos"
+                    ControlSource ="IdPedidos"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 5271
+                    Top = 15
+                    Width = 741
+                    Height = 270
+                    TabIndex = 9
+                    Name ="Costo"
+                    ControlSource ="Costo"
+                    Format ="$#,##0.00;($#,##0.00)"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 680
+                    Width = 0
+                    Height = 284
+                    Name ="Línea178"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 119
+                    Left = 1927
+                    Width = 0
+                    Height = 284
+                    Name ="Línea179"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 2551
+                    Width = 0
+                    Height = 284
+                    Name ="Línea180"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 93
+                    Left = 3458
+                    Width = 0
+                    Height = 284
+                    Name ="Línea182"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 119
+                    Left = 5952
+                    Width = 0
+                    Height = 284
+                    Name ="Línea183"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 4478
+                    Width = 0
+                    Height = 284
+                    Name ="Línea184"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 5215
+                    Width = 0
+                    Height = 284
+                    Name ="Línea185"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 85
+                    Left = 8291
+                    Width = 0
+                    Height = 284
+                    Name ="Línea189"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 87
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 6021
+                    Width = 666
+                    Height = 270
+                    FontWeight = 700
+                    TabIndex = 10
+                    Name ="Margen"
+                    ControlSource ="Margen"
+                    Format ="Percent"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 93
+                    Left = 6746
+                    Width = 0
+                    Height = 284
+                    Name ="Línea199"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3118
+                    Top = 47
+                    Width = 285
+                    Height = 195
+                    TabIndex = 11
+                    Name ="Comando201"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 3466
+                    Width = 456
+                    Height = 270
+                    TabIndex = 12
+                    ForeColor = 16711680
+                    Name ="Texto203"
+                    ControlSource ="Numero"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 3911
+                    Width = 0
+                    Height = 284
+                    Name ="Línea204"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 6919
+                    Width = 666
+                    Height = 270
+                    TabIndex = 13
+                    Name ="MargenPromedio"
+                    ControlSource ="MargenPonderado"
+                    Format ="Percent"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 6746
+                    Width = 0
+                    Height = 284
+                    Name ="Línea212"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 87
+                    Left = 7653
+                    Width = 0
+                    Height = 284
+                    Name ="Línea213"
+                End
+            End
+        End
+        Begin FormFooter
+            DisplayWhen = 2
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDeFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub FiltroMeses_AfterUpdate()
+If FiltroMeses = 13 Then
+QueMes = "*"
+Else
+QueMes = FiltroMeses
+End If
+Me.Requery
+End Sub
+
+Private Sub Form_Current()
+On Error GoTo errores
+Forms![CostosPorPedidos]![CostosPorPedDes].Requery
+Forms![CostosPorPedidos]![CostosPorPedDes].Form![BordLista].Requery
+Modelo.SetFocus
+errores:
+
+End Sub
+
+Private Sub Form_Load()
+On Error GoTo errores
+DoCmd.ShowAllRecords
+If EstaCargado("pedidospormes") = True Then
+    Me.RecordsetClone.FindFirst "[Idpedidosdet] = " & Forms![PedidosPorMes]![IdPedidosDet]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End If
+
+If EstaCargado("EdoResultPorMes") = True Then
+    Me.RecordsetClone.FindFirst "[Idpedidosdet] = " & Forms![EdoResultPorMes]![EdoResultPorMesSub].Form![IdPedidosDet]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End If
+errores:
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+
+
+End Sub
+
+Private Sub ListaClientes_AfterUpdate()
+If IsNull(ListaClientes) = True Then
+QueCliente = "*"
+Else
+QueCliente = ListaClientes
+End If
+Me.Requery
+End Sub
+
+
+
+Private Sub QueAno_AfterUpdate()
+Me.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

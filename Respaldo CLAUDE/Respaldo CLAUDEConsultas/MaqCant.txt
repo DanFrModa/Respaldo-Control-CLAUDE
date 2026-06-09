@@ -1,0 +1,72 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Maquileros"
+    Name ="Entregas"
+    Name ="Ordenes"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdPedidosDet"
+    Alias ="CantidadMaq"
+    Expression ="Entregas.IdMaquileros"
+End
+Begin Joins
+    LeftTable ="Maquileros"
+    RightTable ="Entregas"
+    Expression ="Maquileros.IdMaquileros = Entregas.IdMaquileros"
+    Flag = 1
+    LeftTable ="Entregas"
+    RightTable ="Ordenes"
+    Expression ="Entregas.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdPedidosDet"
+    GroupLevel = 0
+    Expression ="Entregas.IdMaquileros"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1002
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 955
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 228
+        Top = -1
+        Right = 324
+        Bottom = 106
+        Top = 0
+        Name ="Entregas"
+    End
+    Begin
+        Left = 393
+        Top = 7
+        Right = 489
+        Bottom = 114
+        Top = 0
+        Name ="Ordenes"
+    End
+End

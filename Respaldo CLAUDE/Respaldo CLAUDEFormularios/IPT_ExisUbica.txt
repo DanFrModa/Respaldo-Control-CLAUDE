@@ -1,0 +1,234 @@
+Version = 17
+VersionRequired = 17
+Checksum = 961591407
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5040
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 6645
+    Top = 1560
+    Right = 11685
+    Bottom = 4500
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x1df300211983e340
+    End
+    RecordSource ="SELECT IPT_Modelos.IdIPT_Modelos, IPT_Modelos.NumMod, IPT_Modelos.Ubicacion FROM"
+        " IPT_Modelos WHERE (((IPT_Modelos.IdIPT_Modelos)=[Formularios]![IPT_Exis]![IPT_E"
+        "xisSub].[Formulario]![IdIPT_Modelos]));"
+    Caption ="IPT_ExisUbica"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 390
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 45
+                    Top = 90
+                    Width = 3300
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 0
+                    Name ="Etiqueta7"
+                    Caption ="MODIFICAR UBICACION"
+                End
+            End
+        End
+        Begin Section
+            Height = 2565
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 56
+                    Width = 765
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="NumMod"
+                    ControlSource ="NumMod"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 56
+                            Width = 1560
+                            Height = 255
+                            Name ="Numero Etiqueta"
+                            Caption ="Numero de Modelo:"
+                            EventProcPrefix ="Numero_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 675
+                    Width = 4860
+                    Height = 1275
+                    ColumnWidth = 3000
+                    TabIndex = 1
+                    Name ="Ubicacion"
+                    ControlSource ="Ubicacion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 396
+                            Width = 1560
+                            Height = 255
+                            Name ="Observaciones Etiqueta"
+                            Caption ="Observaciones:"
+                            EventProcPrefix ="Observaciones_Etiqueta"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 3780
+                    Top = 2085
+                    Width = 1146
+                    Height = 343
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

@@ -1,0 +1,235 @@
+
+
+' MODULO: Conversor a Pesos.
+' DECLARACION DE VARIABLES
+
+Option Compare Database
+Option Explicit
+Global Const FEMENINO = 0 ' Definición de Genero Femenino
+Global Const MASCULINO = 1 ' Definición de Genero Masculino
+Global Const NEUTRO = 2 ' Definición de Genero Neutro
+Global Const Titulo = "Conversor Euros"
+'********************************************************
+' Función: Convertidor
+' Descripción: Convierte un número a Texto (Control de la moneda y los decimales).
+' (C) Angel Pérez Díaz. Año 2006. Todos los Derechos Reservados.
+'********************************************************
+
+Function Convertidor(Cantidad) As String
+Dim Genero
+Dim Moneda
+Dim Decimales
+
+Genero = MASCULINO
+Moneda = "Peso"
+Decimales = 2
+
+On Error GoTo Error_Convertidor
+Dim ParteEntera As Long, ParteDecimal As Long
+ParteEntera = Fix(Cantidad)
+If ParteEntera > 999999999 Then
+MsgBox "Este Conversor solo admite hasta 999.999.999,99 Euros.", 16, "Conversor Euros"
+Exit Function
+End If
+Convertidor = RTrim(ConvertidorMatricial(ParteEntera, Genero)) & " " & Moneda
+If Fix(Cantidad) > 1 Then
+Convertidor = Convertidor & "s"
+End If
+If InStr(1, Cantidad, ",") <> 0 Then
+ParteDecimal = CStr(Right(Cantidad, Len(Cantidad) - InStr(1, Cantidad, ","))) & "000000"
+ParteDecimal = Left(ParteDecimal, Decimales)
+Convertidor = Convertidor & " con " & ConvertidorMatricial(ParteDecimal, Genero) & " centimos."
+End If
+Convertidor = UCase(Convertidor)
+Exit Function
+Error_Convertidor:
+MsgBox Error$, 48, Titulo
+Exit Function
+Resume
+End Function
+'********************************************************
+' Función: ConvertidorMatricial
+' Descripción: Convierte un número a Texto (Función Auxiliar de traducción a Texto).
+' (C) Angel Pérez Díaz. Año 2006. Todos los Derechos Reservados.
+'********************************************************
+Function ConvertidorMatricial(Cantidad, Genero) As String
+On Error GoTo Error_ConvertidorMatricial
+Static Convertir1(16) As String
+Static Convertir2(10) As String
+Static Convertir3(10) As String
+Dim TextoObtenido As String
+
+Convertir1(1) = "UNO"
+Convertir1(2) = "DOS"
+Convertir1(3) = "TRES"
+Convertir1(4) = "CUATRO"
+Convertir1(5) = "CINCO"
+Convertir1(6) = "SEIS"
+Convertir1(7) = "SIETE"
+Convertir1(8) = "OCHO"
+Convertir1(9) = "NUEVE"
+Convertir1(10) = "DIEZ"
+Convertir1(11) = "ONCE"
+Convertir1(12) = "DOCE"
+Convertir1(13) = "TRECE"
+Convertir1(14) = "CATORCE"
+Convertir1(15) = "QUINCE"
+Convertir2(1) = "DIECI"
+Convertir2(2) = "VEINTI"
+Convertir2(3) = "TREINTA"
+Convertir2(4) = "CUARENTA"
+Convertir2(5) = "CINCUENTA"
+Convertir2(6) = "SESENTA"
+Convertir2(7) = "SETENTA"
+Convertir2(8) = "OCHENTA"
+Convertir2(9) = "NOVENTA"
+Convertir3(1) = "CIENTO"
+Convertir3(2) = "DOS"
+Convertir3(3) = "TRES"
+Convertir3(4) = "CUATRO"
+Convertir3(5) = "QUINIEN"
+Convertir3(6) = "SEIS"
+Convertir3(7) = "SETE"
+Convertir3(8) = "OCHO"
+Convertir3(9) = "NOVE"
+If Genero = 0 Then
+Convertir1(1) = "UNA"
+Else
+Convertir1(1) = "UN"
+End If
+Dim Unidad, Decena, Centena
+Dim CantidadConvertir
+CalculoUnidad:
+Unidad = Len(Cantidad)
+CantidadConvertir = Left(Cantidad, 1)
+
+CalcularUnidades:
+If Unidad = 1 Then ' ** unidades
+TextoObtenido = TextoObtenido & Convertir1(Val(CantidadConvertir))
+GoTo Exit_ConvertidorMatricial
+Else
+If Unidad = 4 Or Unidad = 7 Or Unidad = 10 Then ' ** Unidades Superiores
+Select Case Unidad
+Case 4
+If CantidadConvertir = 1 And TextoObtenido = "" Then
+TextoObtenido = TextoObtenido & "MIL "
+Else
+TextoObtenido = TextoObtenido & Convertir1(CantidadConvertir) & " MIL "
+End If
+Case 7
+If TextoObtenido = "" Then
+If CantidadConvertir = 1 Then
+TextoObtenido = TextoObtenido & Convertir1(CantidadConvertir) & " MILLON "
+If Right(Cantidad, 6) = 0 Then
+TextoObtenido = TextoObtenido & "DE"
+GoTo Exit_ConvertidorMatricial
+End If
+Else
+TextoObtenido = TextoObtenido & Convertir1(CantidadConvertir) & " MILLONES "
+End If
+End If
+Case 10
+If TextoObtenido = "" Then
+TextoObtenido = TextoObtenido & Convertir1(CantidadConvertir) & " MIL "
+End If
+End Select
+Cantidad = Right(Cantidad, Len(Cantidad) - 1)
+GoTo CalculoUnidad
+End If
+End If
+
+CalcularDecenas:
+If Unidad = 2 Or Unidad = 5 Or Unidad = 8 Then ' ** decenas
+Decena = Left(Cantidad, 2)
+Select Case Decena
+Case 10
+TextoObtenido = TextoObtenido & "DIEZ"
+If Len(Cantidad) = 2 Then GoTo Exit_ConvertidorMatricial
+Case 20
+TextoObtenido = TextoObtenido & "VEINTE"
+If Len(Cantidad) = 2 Then GoTo Exit_ConvertidorMatricial
+Case Else
+If Left(Cantidad, 2) <= 15 Then
+TextoObtenido = TextoObtenido & Convertir1(Decena)
+If Len(Cantidad) = 2 Then GoTo Exit_ConvertidorMatricial
+Else
+TextoObtenido = TextoObtenido & Convertir2(Left(Decena, 1))
+If CantidadConvertir <> 1 And CantidadConvertir <> 2 And Right(Decena, 1) <> 0 Then
+TextoObtenido = TextoObtenido & " Y " & Convertir1(Right(Decena, 1))
+Else
+TextoObtenido = TextoObtenido & Convertir1(Right(Decena, 1))
+End If
+If Len(Cantidad) = 2 Then GoTo Exit_ConvertidorMatricial
+End If
+End Select
+Select Case Unidad
+Case 5
+TextoObtenido = TextoObtenido & " MIL "
+Case 8
+TextoObtenido = TextoObtenido & " MILLONES "
+If Right(Cantidad, 7) = 0 Then
+TextoObtenido = TextoObtenido & "DE"
+GoTo Exit_ConvertidorMatricial
+End If
+End Select
+Cantidad = Right(Cantidad, Len(Cantidad) - 2)
+GoTo CalculoUnidad
+End If
+
+CalcularCentenas:
+If Unidad = 3 Or Unidad = 6 Or Unidad = 9 Then ' ** centenas
+Centena = Left(Cantidad, 3)
+If Centena = 100 Then
+TextoObtenido = TextoObtenido & "CIEN"
+Else
+If Left(Centena, 1) <> 1 Then
+If Genero = 0 Then
+TextoObtenido = TextoObtenido & Convertir3(CantidadConvertir) & "CIENTAS "
+Else
+TextoObtenido = TextoObtenido & Convertir3(CantidadConvertir) & "CIENTOS "
+End If
+Else
+TextoObtenido = TextoObtenido & Convertir3(CantidadConvertir) & " "
+End If
+End If
+Select Case Unidad
+Case 3
+If Right(Centena, 2) = 0 And Len(Cantidad) = 3 Then
+GoTo Exit_ConvertidorMatricial
+Else
+Cantidad = Right(Cantidad, Len(Cantidad) - 1)
+End If
+Case 6
+If Right(Cantidad, 5) = 0 Then
+TextoObtenido = TextoObtenido & " MIL "
+GoTo Exit_ConvertidorMatricial
+End If
+If Right(Centena, 2) = 0 Then
+TextoObtenido = TextoObtenido & " MIL "
+Cantidad = Right(Cantidad, Len(Cantidad) - 3)
+Else
+Cantidad = Right(Cantidad, Len(Cantidad) - 1)
+End If
+Case 9
+If Right(Cantidad, 8) = 0 Then
+TextoObtenido = TextoObtenido & " MILLONES DE"
+GoTo Exit_ConvertidorMatricial
+End If
+If Right(Centena, 2) = 0 Then
+TextoObtenido = TextoObtenido & " MILLONES "
+Cantidad = Right(Cantidad, Len(Cantidad) - 3)
+Else
+Cantidad = Right(Cantidad, Len(Cantidad) - 1)
+End If
+End Select
+GoTo CalculoUnidad
+End If
+
+Exit_ConvertidorMatricial:
+ConvertidorMatricial = TextoObtenido
+Exit Function
+Error_ConvertidorMatricial:
+MsgBox Error$, 48, Titulo
+Exit Function
+Resume
+End Function

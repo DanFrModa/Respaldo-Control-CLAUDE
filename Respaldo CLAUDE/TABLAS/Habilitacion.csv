@@ -1,0 +1,630 @@
+"IdHabilitacion","Clave","Descripcion","Proveedor","Precio","Favorito","CantFav","Desactivado"
+1,"E01","Etiqueta de lavado",,$0.14,1,1.00,0
+2,"B08",,,,0,1.00,0
+3,"E03","Etiqueta de Mca. Cherokee","GMB",$0.24,1,1.00,0
+4,"EH02","ETIQUETA HANG TAN CCP",,,0,1.00,0
+5,"G01","Gancho 18""",,$0.88,0,1.00,0
+6,"G02","Gancho 16""",,$1.07,0,1.00,0
+7,"G03","Gancho Pinza 12""",,$1.55,0,1.00,0
+8,"G04","Gancho Pinza 10""",,$1.46,0,1.00,0
+9,"G05","Gancho Conector 12""  Conj.",,$1.82,0,1.00,0
+10,"G06","Gancho Conector 10"" Conj.",,$1.20,0,1.00,0
+11,"G07","Gancho 14""",,$0.73,0,1.00,0
+13,"A01","Elastico 1 1/2"" con Jareta",,$2.50,0,,0
+14,"A02","Elastico 1 1/2"" ref. liso",,$2.45,0,0.00,0
+15,"A03","Elastico 2""","CHINCONCUAC",$1.98,0,0.90,0
+16,"A04","Elastico 1""  liso",,$1.12,0,0.00,0
+17,"J01","Jareta Poliester",,$0.60,0,0.00,0
+18,"J02","Jareta algod¢n",,$0.50,0,0.00,0
+19,"C01","Cierre Nycast sep. 30 cm",,$3.77,0,1.00,0
+20,"C02","Cierre Nycast sep. 35 cm",,$3.97,0,1.00,0
+21,"C03","Cierre Nycast sep. 40 cm",,$2.10,0,1.00,0
+22,"C04","Cierre Nycast sep. 45 cm",,$2.30,0,1.00,0
+23,"C05","Cierre Nycast sep 50 cm",,$2.50,0,1.00,0
+24,"C06","Cierre Nycast sep. 55 cm",,$2.70,0,1.00,0
+25,"C07","Cierre Nycast sep. 60 cm",,$2.90,0,1.00,0
+26,"C08","Cierre Nycast sep. 65 cm",,$3.10,0,1.00,0
+27,"C08","Cierre Nycast sep. 70 cm",,$3.69,0,1.00,0
+28,"C08","Cierre Nycast sep. 75 cm",,$3.50,0,1.00,0
+29,"C09","Cierre Nycast sep. 80 cm",,$7.07,0,1.00,0
+30,"C10","Cierre Nycast Fijo 15 cm",,$2.01,0,1.00,0
+31,"C11","Cierre Nycast Fijo  18 cm",,$2.33,0,1.00,0
+32,"C12","Cierre Nycast Fijo 20 cm",,$2.50,0,1.00,0
+33,"C13","Cierre Nycast Fijo 25 cm",,$1.85,0,1.00,0
+34,"C14","Cierre Nycast Fijo 30 cm",,$3.19,0,1.00,0
+35,"C15","Cierre Venus sep. 30 cm",,$2.00,0,1.00,0
+36,"C16","Cierre Venus sep. 35 cm",,$1.85,0,1.00,0
+37,"C17","Cierre Venus sep. 40 cm",,$1.91,0,1.00,0
+38,"C18","Cierre Venus sep. 45 cm",,$2.30,0,1.00,0
+39,"C19","Cierre Venus sep. 50 cm",,$1.55,0,1.00,0
+40,"C20","Cierre Venus sep. 55 cm",,$3.05,0,1.00,0
+41,"C21","Cierre Venus sep. 60 cm",,$3.13,0,1.00,0
+42,"C22","Cierre Venus sep. 65 cm",,$1.90,0,1.00,0
+43,"C23","Cierre Venus sep. 70 cm",,$3.69,0,1.00,0
+44,"C24","Cierre Venus sep. 75 cm",,$2.00,0,1.00,0
+45,"C25","Cierre Venu sep. 80 cm",,$3.70,0,1.00,0
+47,"C26","Cierre Venus F. 20 cm.",,$2.10,0,0.00,0
+48,"C27","Cierre  Venus F. 15 cm.",,$1.92,0,0.00,0
+49,"C28","Cierre Venus F. 18 cm.",,$2.22,0,0.00,0
+50,"C29","Cierre Venus F. 25 cm.",,$2.20,0,0.00,0
+51,"C30","Cierre Venus F. 30 cm.",,$3.04,0,0.00,0
+52,"C31","Cierre Venus F. 35 cm.",,$1.85,0,0.00,0
+53,"C32","Cierre Venus F. 40 cm.",,$1.91,0,0.00,0
+54,"EP02","ETIQUETA DE PRECIO",,,0,0.00,0
+55,"P01","Piola",,$0.00,0,0.00,0
+56,"CAJN5","CIERRE ALUM. CAL.5 JN 20CM","CIERRES TECH",,0,0.00,0
+57,"E06","Etiqueta de Mca. Szass","Disart",$0.00,0,0.00,0
+58,"MNC&A","MONARCH LAVADO C&A",,,0,0.00,0
+59,"E08","Etiqueta de carton Cherokee","GMB",$0.19,0,0.00,0
+60,"EPG","ETIQUETA DE PRECIO GOSSIP GIR",,,0,0.00,0
+61,"E10","Etiqueta de carton X-tend","Global",$0.19,0,0.00,0
+62,"EPN","ETIQUETA DE PRECIO NASA",,,0,0.00,0
+63,"JN","JARETA NEGRA",,,0,0.00,0
+64,"G08","Gancho Negro 01 Caball",,$1.00,0,0.00,0
+65,"G09","Gancho Negro CB Ni¤o",,$0.70,0,0.00,0
+66,"G10","Gancho Avion 14"" Bebe",,$1.10,0,1.00,0
+67,"G11","Gancho 484 Sud.Sears/Suburbia",,$2.31,0,0.00,0
+68,"G12","Gancho 2012 Pant Sears/Suburbi",,$2.58,0,0.00,0
+69,"G13","Gancho 17"" Polar Cab/Dam",,$1.40,0,0.00,0
+70,"J03","Cinta Palmita",,$1.90,0,0.00,0
+71,"C33","Cierre Venus Retrofox 70 cm",,$7.95,0,0.00,0
+72,"E13","Etiqueta bordada York",,$0.00,0,0.00,0
+73,"E14","Etiqueta de carton York",,$0.00,0,0.00,0
+74,"C34","Cierre Niluminio 25 cm",,$0.00,0,0.00,0
+75,"C35","Cierre Niluminio 18 cm",,$0.00,0,0.00,0
+76,"T02","Corredera  York",,$0.00,0,0.00,0
+77,"E15","Etiqueta Mca  Fubu C/Talla","Paxar",$0.15,0,0.00,0
+78,"E16","Etiqueta de carton Fubu","Paxar",$0.26,0,0.00,0
+80,,,,,0,0.00,0
+81,"E17","Etiqueta Mca Fubu P/Pantalon","Paxar",$0.15,0,0.00,0
+82,"E18","Etiqueta Mca 725 Cab","AlVicza",$0.22,0,1.00,0
+83,"E19","Etiqueta de talla 725 Cab","Al Vicza",$0.06,0,1.00,0
+84,"E20","Etiqueta de Carton 725 Cab","Imagen Impresa",$0.00,0,1.00,0
+85,"E21","Etiq Mca  AthleticWork Chamarr","Globalid",$0.56,0,1.00,0
+86,"E22","Etiqet de carton Athletic Work","Globalid",$0.31,0,1.00,0
+87,"E23","Etiqueta d talla Athletic Work","Globalid",$0.10,0,1.00,0
+88,"E24","Etiqueta  Tap Cherokee Ni¤a","Paxar",$0.00,0,0.00,0
+89,"E25","Etiqueta  Tap Cherokee Ni¤os","Paxar",$0.00,0,0.00,0
+90,,,,,0,,0
+91,"TMG","TRANSFER DE MARCA GOSSIP GIR",,,0,,0
+92,,,,,0,,0
+93,,,,,0,,0
+94,,,,,0,,0
+95,"G14","Gancho Negro George","Abadimex",$1.45,0,1.00,0
+96,,,,,0,,0
+97,"E31","Etiqueta Bordad  Head Naranja",,$0.30,0,1.00,0
+98,"E32","Etiqueta Tap Head",,$0.11,0,1.00,0
+99,"E33","Etiqueta Carton  Head Naranja",,$0.21,0,1.00,0
+100,"ECC&A","ETIQUETA DE CODIGO C&A",,,0,,0
+101,,,,,0,,0
+102,,,,,1,,0
+103,,,,,1,,0
+104,"E37","Etiq Mca X-tend Playera","Global",$0.35,0,0.00,0
+105,"E38","Etiqueta de tall X-tend","Global",$0.10,0,0.00,0
+106,"E39","Etiqueta bord.Disney Ni¤a","Latin American",$0.14,0,1.00,0
+107,"E40","Etiqueta carton Disney Ni¤a","Imagen Impresa",$0.12,0,1.00,0
+108,"L01","Liston",,$0.45,0,0.00,0
+109,,,,$0.00,0,,0
+110,"B01","Boton",,$0.16,1,0.00,0
+111,"E42","Etiqueta  AS con Folio",,$0.30,0,1.00,0
+112,"E43","Etiq Mca SimlpyBasic Sudadera","Globalid",$0.21,0,1.00,0
+113,"E44","Etiq. Mca SimpyBasic Pantalon","Globalid",$0.12,0,1.00,0
+114,"E45","Etiq. De Talla SimlpyBasic","Globalid",$0.05,0,1.00,0
+115,"E46","Etiq. De carton SimlpyBasic","Globalid",$0.00,0,1.00,0
+116,,,,,0,,0
+117,,,,,0,,0
+118,,,,,0,,0
+119,,,,,0,1.00,0
+120,"C36","Cierre Nylon 5  F. 20 cm",,$2.92,0,0.00,0
+121,,,,,0,,0
+122,,,,,0,,0
+123,,,,,0,,0
+124,,,,,0,,0
+125,"E55","Etiqueta Mca IXSPA",,$0.00,0,0.00,0
+126,"E56","Etiqueta de carton IXSPA",,$0.00,0,0.00,0
+127,"C37","Cierre Nylon de 15 cm",,$0.39,0,0.00,0
+128,"A05","Elastico 4 mm","Cintas y tejidos",$0.22,0,0.00,0
+130,"E57","Etiqueta Tap Polo",,$0.08,1,0.00,0
+131,"E58","Etiqueta Cart•n Polo",,$0.17,1,0.00,0
+132,"E59","Etiqueta bord. Polo",,$0.25,1,0.00,0
+133,,,,,1,0.00,0
+134,,,,,1,0.00,0
+135,"J04","Agujeta 1.2",,$1.15,1,0.00,0
+136,"A06","Elastico artisela  1 1/2"" bco",,$3.08,1,0.00,0
+137,"J05","Jareta elastica",,$1.20,0,0.00,0
+138,,,,,0,0.00,0
+139,"C39","Cierre Invisible de 15 cm",,$1.38,0,0.00,0
+140,"C40","Cierre Invisible de 35 cm",,$1.79,0,0.00,0
+141,"E62","Etiqueta de lavado Satin Head",,$0.29,0,0.00,0
+142,"C41","Cierre Vns sep 60 cm Esp Head",,$6.23,1,0.00,0
+143,"E63","Etiqueta Carton Head/ Liverp.",,$0.64,1,0.00,0
+144,"O01","Ojillo metalico de 1/2",,$0.27,1,2.00,0
+145,,,,,1,0.00,0
+146,"C42","Cierre Vns sep 65 cm Esp Head",,$6.46,1,0.00,0
+147,"A08","Elastico artisela 1 1/2"" ngo.",,$2.21,1,0.00,0
+148,"C43","Cierre Invisible de 25 cm",,$1.58,1,0.00,0
+149,"E64","Etiqueta Carton Head Negra",,$0.19,1,0.00,0
+150,"E65","Etiqueta SportLine Chamarra","Coppel",$0.00,0,0.00,0
+151,"E66","Etiqueta SportLine Pantalon","Coppel",$0.00,0,0.00,0
+152,"E67","Etiqueta tallla SportLine Cham","Latin American L.",$0.11,0,0.00,0
+153,"E68","Etiqueta talla SportLine Pant","Latin American L",$0.13,0,0.00,0
+154,"E69","Etiq. Carton Sup. Sport Line","Coppel",$0.00,0,0.00,0
+155,"E70","Etiq, Carton Inf. Sport Line","Coppel",$0.00,0,0.00,0
+156,"E71","Etiqueta Tap Sport Line","Coppel",$0.00,0,0.00,0
+157,"E72","Etiq. de lavado Satin Nbalance",,$0.30,0,0.00,0
+158,"E73","Etiqueta Mca.New Balance",,$0.00,0,0.00,0
+159,"E74","Etiqueta Carton New Balance",,$0.00,0,0.00,0
+160,,,,,0,0.00,0
+161,"C44","Cierre Vns sep 70 cm Esp Head",,$6.54,0,0.00,0
+162,"J06","Agujeta 1.50",,$1.35,0,0.00,0
+163,"G15","Gancho Sud/Play Transp Suburb",,$1.80,0,0.00,0
+164,"G16","Gancho Pant  12"" Cristl Suburb",,$1.90,0,0.00,0
+166,"E76","Etiquet SouthAfrica c/talla",,$0.34,0,0.00,0
+167,"E77","Etiqueta SouthAfrica Hombro",,$0.52,0,0.00,0
+168,"E78","Etiqueta Escudo Inf. SouthAfri",,$0.55,0,0.00,0
+169,"E79","Tapacostura SouthAfrica Varios",,$1.45,0,0.00,0
+170,"E80","Etiqueta Carton Fifa Roar",,$0.43,0,0.00,0
+171,"E81","Etiqueta Bordada HEAD Negra",,$0.15,0,0.00,0
+172,"E82","Etiqueta Bord. EXXHIST",,$0.23,1,0.00,0
+174,"E83","Etiqueta carton EXXHIST",,$1.17,0,0.00,0
+175,"E84","Etiqueta Estampada Beige Fifa",,$0.07,1,0.00,0
+176,"E85","Etiqueta Bord  32Nations Fifa",,$0.82,0,0.00,0
+177,"E86","Etiqueta Bord Azul Fifa 2010",,$1.37,0,0.00,0
+178,"E87","Tapacostura Be Seen Roar Bco",,$1.45,0,0.00,0
+179,"E88","Tapacostura Fifa Negro/Azul",,$1.45,0,0.00,0
+180,"E89","Etiqueta Carton Fifa Celebrate",,$0.45,0,0.00,0
+181,"E90","Etiqueta estampada FREE R.",,$0.00,0,0.00,0
+182,"E91","Etqueta Bordada Free Ride",,$0.00,0,0.00,0
+183,"E92","Etiqueta lavado Chocolat Soda",,$0.12,1,0.00,0
+184,"G17","Gancho Avion 12"" Bebe",,$0.90,0,0.00,0
+185,"E93","Etiq.Satin  X-TEND BB","F.H.",$0.19,1,10.00,0
+186,"E94","Etiq. Talla Satin X-TEND BB","F.H",$0.06,1,0.00,0
+187,"E95","Etiq. Carton X-TEND BB","F.H",$0.10,1,0.00,0
+188,"E96","Etiqueteta Negra Carton EXHHIS","Top Label",$0.20,1,1.00,0
+191,"G18","Gancho superior de 12"" bbs",,$0.68,0,0.00,0
+192,"C45","Cierre venus sep 55 cm fantasi",,$2.79,1,0.00,0
+194,"C46","Cierre venus sep 70 cm fantasi",,$3.15,1,0.00,0
+195,,,,,1,1.00,0
+196,,,,,0,0.00,0
+197,"A09","Elastico 7mm",,$0.26,1,0.00,0
+198,"A10","Cinta de lino",,$0.17,1,0.00,0
+199,,,,,1,2.00,0
+200,"C47","Cierre v. Sep. 60 cm fantasi",,$2.98,1,0.00,0
+201,"C48","Cierre v. Sep. 65cm fantasi",,$4.66,1,0.00,0
+202,"C49","Cierre v. Sep. 75cm fantasi",,$3.25,1,0.00,0
+203,"T05","Transfer de Mca y talla HEAD",,$0.40,1,0.00,0
+204,"T06","Transfer Logo HEAD",,$0.50,1,0.00,0
+205,"T07","Transfer Palabra HEAD",,$1.50,1,0.00,0
+206,"T08","Transfer HEAD 12 cm",,$2.00,1,0.00,0
+207,"C50","Cierre Nylon  de 12 cm",,$0.36,0,0.00,0
+208,"E98","Etiqueta Bordada Marilyn",,$0.22,1,0.00,0
+209,"A12","Elastico 3./4""",,$0.50,1,0.00,0
+210,"A13","Elastico 1/2""",,$0.41,1,0.00,0
+212,"A14","Elastico 5 mm .",,$0.47,1,0.00,0
+214,,,,,1,0.00,0
+215,,,,,1,0.00,0
+216,"E101","Etiqueta Carton Marilyn",,$0.19,1,0.00,0
+217,"E104","Etiqueta Carton Aerojazz",,$0.20,1,0.00,0
+218,"C51","Cierre v. Sep.  50 cm fantasia",,$2.97,1,0.00,0
+219,"E106","Etiqueta Sensor","Checkpoint",$0.77,1,1.00,0
+220,"A16","Elastico 1 1/4""",,$1.28,1,0.00,0
+221,"002","OJILLO NIQUELADOR NEGRO","ESCAPARATE",$0.27,0,0.00,1
+229,"A20","Elastico de 1 3/4""","Elasticos y cintas",$2.06,0,0.00,0
+234,,,,,1,0.00,0
+235,"E112","Etiq. Carton Ricardo Luevano","Impresos Art Tip",$1.05,0,0.00,0
+237,"A16","Elastico blanco 1 1/2""","Centro",$1.93,1,0.00,0
+238,,,,,0,0.00,0
+239,,,,,1,0.00,0
+240,,,,,0,0.00,0
+241,,,,,0,0.00,0
+242,"A18","Elastico bco. 2"" crochet","Cintas y Elasticos",$1.98,1,0.00,0
+246,,,,,1,0.00,0
+247,"j01",,,$0.00,0,0.00,0
+248,,,,,0,0.00,0
+249,,,,,0,0.00,0
+250,,,,,0,0.00,0
+251,"C53","Cubrepolvo 40x60","Abadimex",$0.22,0,0.00,0
+252,"C54","Cubrepolvo 50x1.20","Abadimex",$0.52,0,0.00,0
+253,"B03","Bolsa celofan","Centro",$0.46,0,0.00,0
+254,"B04","Almas de carton","Papelsa",$0.36,0,0.00,0
+255,,,,,0,0.00,0
+257,"C55","Cierre invisible de  75 cms.","Cierres Best de Mexico",$6.80,0,0.00,0
+258,,,,,0,0.00,0
+259,,,,,0,0.00,0
+260,,,,,0,0.00,0
+261,"E111","Etiqueta Exhhist Sofia","Abenamar Monta¤o",$0.68,1,0.00,0
+263,"E113","Etiqueta Bordada Authentic","Abenamar",$0.39,0,1.00,0
+264,"E114","Etiqueta Carton Brasil","Codigo Viza",$0.45,0,1.00,0
+265,"E115","Etiqueta Carton Holanda","Codigo Viza",$0.45,0,1.00,0
+266,"E117","Etiqueta Carton Francia","Codigo Viza",$0.30,0,1.00,0
+267,"E118","Etiqueta Carton Inglaterra","Codigo Viza",$0.30,0,1.00,0
+268,"A19","Elastico 1 1/4 con jareta","Antava",$2.20,0,0.00,0
+269,"E119","Etiq. Bordada blanca de copa","sports jay",$0.00,0,1.00,0
+270,"E120","Etiq. Bordada verde Fifa talla","Sports Jay",$0.00,0,1.00,0
+271,"E121","Etiqueta Carton Fifa verde","Sports Jay",$0.00,0,1.00,0
+272,"J08","Jareta redonda algod¢n 9mm","Escaparate",$2.00,0,0.00,0
+273,,,,,0,0.00,0
+274,,,,,0,,0
+275,,,,,0,,0
+276,,,,,0,,0
+277,"J09","Jareta redonda algod¢n 7mm","Escaparate",$3.90,0,0.00,0
+278,"O02","Ojillo metalico negro","Escaparate",$0.27,0,2.00,0
+279,"O03","Grapa para punta jareta",,$0.32,0,2.00,0
+280,,,,,0,,0
+281,"E126","Etiqueta Carton KEBO","San Raul",$0.99,0,1.00,0
+282,"C56","Cierre metalico niquel 18 cm",,$9.42,0,1.00,0
+283,"C57","Cierre metalico niquel 15 cm",,$8.81,0,1.00,0
+284,"J10","Ahorcador","Escaparate",$1.55,0,0.00,0
+285,"O04","Ojillo k145 niquel","Escaparate",$0.10,0,0.00,0
+287,"ELS01","Elastico de 2 1/2""","Cintas y elasticos",$3.00,0,0.00,0
+288,"J11","Jareta plana 15mm algod¢n","Escaparate",$4.00,0,0.00,0
+289,"B06","Boton No. 24","Dimaron",$0.48,0,0.00,0
+290,"J12","Cinta Palmita 10 mm te¤ida",,$2.45,0,0.00,0
+291,"E99","Etiqueta bordada Aerojazz","abenamar",$0.28,0,1.00,0
+292,"A17","Elastico blanco 3/8","cintas y elasticos",$0.56,1,0.00,0
+294,"E102","Etiqueta estampada EXHHIST","TOP LABEL",$0.20,0,1.00,0
+295,"J13","Jareta plana 15mm algod¢n","cintas y elasticos",$2.40,0,0.00,0
+296,"B07","Boton num.24","boton CLASS",$0.18,0,0.00,0
+297,"C22","Cierre Venus sep. 65cm","Multicierres",$3.23,0,1.00,0
+298,"C23","Cierre VENUS 10sep 70cm","MULTICIERRES",$3.33,0,1.00,0
+299,,,,,0,1.00,0
+300,,,,,0,0.00,0
+301,,,,,0,0.00,0
+302,,,,$0.00,0,0.00,0
+303,"T10","ETQ DE CARTON LOB",,$0.00,0,0.00,0
+304,"O06","OJILLO NIKEL VIEJO",,$0.10,0,0.00,0
+306,"O07","OJILLO NEGRO # K-19",,$0.27,0,0.00,0
+307,"A22","elastico 1cm","cintas y elasticos",$0.59,0,0.00,0
+309,,,,$0.00,0,0.00,0
+310,,,,$0.00,0,0.00,0
+311,,,,$0.00,0,0.00,0
+312,"E100","ETIQUETA BORDADA CKLASS CABAL","CKLASS",$0.16,1,0.00,0
+313,,,,,0,0.00,0
+314,,,,,1,0.00,0
+315,,,,$0.00,0,0.00,0
+316,"AL","Almas de carton","Cklass",$0.16,0,,0
+317,"E127","Etiqueta carton temporada","Cklass",$0.16,0,0.00,0
+318,"ETC","Etiqueta de carton de cuidado","Cklass",$0.16,0,0.00,0
+319,"A23","Elastico 11mm","Cintas y Elasticos",$0.41,0,0.00,0
+320,"O05","OJILLO K20 NEGRO","HABILITACIONES MARTIAN",$0.35,0,0.00,0
+321,,,,$0.00,0,0.00,0
+322,"J15","Jareta plana tubular",,$2.00,0,0.00,0
+323,"E103","Etiqueta EBCGENERAL16","RPAC",$0.29,0,0.00,0
+324,"E105","Etiqueta EBOUTER16","RPAC",$0.59,0,0.00,0
+325,"E107","Etiqueta EBCASGEN16","RPAC",$0.29,0,0.00,0
+326,"E108","Etiqueta Carton 17PTG-2 CYA","TOP LABEL",$0.10,0,0.00,0
+327,"E109","Etiqueta EBTOPSGEN16","RPAC",$0.22,0,0.00,0
+328,"E128","Etiqueta codigo CYA","Masteredi",$0.16,0,0.00,0
+329,"E129","Etiqueta Dama CYA","Borcom",$0.25,0,0.00,0
+330,"E130","Etiqueta Caballero CYA","Borcom",$0.26,0,0.00,0
+331,"E131","Etiqueta Girls CYA","Borcom",$0.29,0,0.00,0
+332,"E132","Etiqueta Tod CYA","Borcom",$0.29,0,0.00,0
+333,"E133","Etiqueta Boys CYA","Borcom",$0.29,0,0.00,0
+334,"E134","Etiqueta talla CYA","Borcom",$0.13,0,0.00,0
+335,"G20","Gancho 12"" superior",,$0.68,0,0.00,0
+336,,,,$0.00,0,0.00,0
+337,"G19","Gancho pinza 8""",,$1.35,0,0.00,0
+338,"G21","Bolsa","Centro",$0.13,0,0.00,0
+339,"E136","Etiqueta generica Talla",,$0.05,0,0.00,0
+340,"T13","Tallero plastico",,$0.04,0,0.00,0
+341,"E137","Etiqueta Generica Precio",,$0.05,0,0.00,0
+342,"E138","Etiqueta Carton Exhhist Sophia",,$1.17,0,0.00,0
+343,"A24","Tira bordada",,$6.00,0,0.00,0
+344,"C58","Cierre F. Pavonado 16 cm",,$3.80,0,0.00,0
+345,"A25","Elastico 2 1/4""",,$2.62,0,0.00,0
+346,"J14","Jateta redonda combinada",,,0,0.00,0
+347,"E139","Etiqueta precio CYA",,$0.16,0,0.00,0
+348,,,,$0.00,0,0.00,0
+349,"O08","Ojillo Plastico",,$0.28,0,0.00,0
+350,"E140","Etiqueta Redsky Ni¤as 4-10","Etikame",$0.41,0,0.00,0
+351,"E141","Etiqueta carton Redsky ni¤as","Etikame",$0.39,0,0.00,0
+352,"E142","Etiqueta Redsky damas plus","Etkame",$0.41,0,0.00,0
+353,"E143","Etiqueta carton Redsky dama","Etikame",$0.39,0,0.00,0
+354,"E144","Etiqueta bord Gnomos bebo/beba","Etikame",$0.41,0,0.00,0
+355,"E145","Etiqueta carton Gnomos bebo/ba","Etikame",$0.39,0,0.00,0
+356,"E146","Etiq. Paja bord Cozzi bebo/ba","Etikame",$0.41,0,0.00,0
+357,"E147","Etiq.carton paja Cozzi bebo/ba","Etikame",$0.39,0,0.00,0
+358,"E148","Etiqueta bord Fantastic 12-18","Etikame",$0.41,0,0.00,0
+359,"E149","Etiqueta cartonFantastic 12-18","Etikame",$0.39,0,0.00,0
+360,"E150","Etiqueta bord Hummo ni¤os 4-10","Etikame",$0.41,0,0.00,0
+361,"E151","Etiqueta cartonHummo ni¤o 4-10","Etikame",$0.39,0,0.00,0
+362,"E152","Etiqueta bord Redsky Teen12-18","Etikame",$0.41,0,0.00,0
+363,"E153","Etiquet cartonRedsky Teen12-18","Etikame",$0.39,0,0.00,0
+364,"E154","Transfer Cozzi bebo/beba","SGSR",$0.35,0,0.00,0
+365,"E155","Transfer Gnomos bebo/beba","Etikame",$0.35,0,0.00,0
+366,"A26","Cinta latex 6mm",,$0.70,0,0.00,0
+367,"J16","Jareta petatillo",,$2.90,0,0.00,0
+368,"C59","Contactel 19mm",,$2.72,0,0.00,0
+369,"C60","Cierre Aluminio 5 separ  65 cm",,$11.54,0,0.00,0
+370,"C63","Cierre Aluminio Sep. 64cm",,$7.47,0,0.00,0
+371,"B08","Broche Pa¤alero",,$0.53,0,0.00,0
+372,"J17","Jareta plana tubular con punta",,$5.00,0,0.00,0
+373,"C62","Cierre 15cm Nylo3 goma inverti",,$5.93,0,0.00,0
+374,"C64","Cierre Aluminio5  Fijo 15 cm",,$3.21,0,0.00,0
+375,"B05","Broche Niquel",,$0.91,0,0.00,0
+376,"C65","Cierre Nyl5 F. Goma inv 20 cm",,$5.30,0,0.00,0
+377,"C66","Cierre Nylo5 15 cm goma invert",,$5.93,0,0.00,0
+378,"A27","Elastico bco 3""",,$3.26,0,0.00,0
+379,"E156","Etiquet cart Ricardo Luev C&A",,$1.21,0,0.00,0
+380,"E157","Etiqueta  lavado Satin Aramara","Top Label",$0.15,0,0.00,0
+381,"E158","Etiquteta mca Satin Aramara",,$0.17,0,0.00,0
+382,"E159","Tallero satin Aramara",,$0.12,0,0.00,0
+383,"J18","Punta metalica Aramara",,$0.00,0,0.00,0
+384,"E160","Etiqueta leggins Andre Badi",,$0.28,0,0.00,0
+385,"E161","Etiqueta patita Andre Badi",,$0.20,0,0.00,0
+386,"E162","Etiqueta talla Andre badi",,$0.13,0,0.00,0
+387,"E163","Etiqueta carton Andre Badi",,$0.17,0,0.00,0
+388,"E164","Clip seguridad Andre Badi",,$0.45,0,0.00,0
+389,"C67","Cierre Aluminio Sep. 55 cm",,$6.45,0,0.00,0
+390,"J19","Punta metalica negra",,$0.55,0,0.00,0
+391,"E165","Etiquet bord Fantastic 4-10",,$0.41,0,0.00,0
+392,"E166","Etiqueta cart¢n Fantastic 4-10",,$0.39,0,0.00,0
+393,"J20","Jareta Lurex",,$1.78,0,0.00,0
+394,"E167","Etiqueta vinil rectangulo","Hotfix",$1.00,0,0.00,0
+395,"E168","Etiqueta precio especial C&A","Artip",$0.95,0,0.00,0
+396,"C68","Cierre invisible de 8 cm",,$2.08,0,0.00,0
+397,"C69","Cierre nycast 10 cm fijo",,$1.56,0,0.00,0
+398,"E169","Etiqueta estampada GETIT/azul",,$0.15,0,0.00,0
+399,"E170","Etiqueta carton GETIT/ azul",,$0.26,0,0.00,0
+400,"C70","Cinta Popotillo 25 mm",,$2.24,0,0.00,0
+401,"J21","Cinta decorativa tricolor","cyntepsa",$2.35,0,0.00,0
+402,"J22","Caja carton","varios",$19.00,0,0.00,0
+403,"J23","Cinta palmita 20 mm","CYNTEPSA",$2.53,0,0.00,0
+404,"E110","Etiqueta EBOUTER-A16","BORCOM",$0.43,0,0.00,0
+405,"C71","Cierre alum 5 separable 50 cm","varios",$10.00,0,0.00,0
+406,"C72","Cierre pol3 invert15 cm goma","national",$4.68,0,0.00,0
+407,"C73","Cierre pol5 invert15 cm goma","national",$6.82,0,0.00,0
+408,"E122","Transfer TRC&AG16","RPAC",$0.15,0,0.00,0
+409,"E123","Etiq. Estamp EESATINMEN16","RPAC",$0.19,0,0.00,0
+410,"E171","Etiqueta estampada GETIT Gris","Top label",$0.15,0,0.00,0
+411,"E172","Etiqueta carton GETIT Gris","Top label",$0.26,0,0.00,0
+412,"J24","Cinta palmita 25 mm","cyntepsa",$3.25,0,0.00,0
+413,"J25","Cinta satin negra mca C&A","Zalaquett",$2.04,0,0.00,0
+414,"J26","Placa metalica C&A  20 X 10 mm","Hotfix",$1.50,0,0.00,0
+415,"E173","Etiqueta C.con el Perro 002","Bordesti",$0.17,0,0.00,0
+416,"E174","Etiqueta C. Con el Perro 005","Bordesti",$0.27,0,0.00,0
+417,"E175","Etiqu. CartC. Con el Perro001","SGSRAUL",$0.26,0,0.00,0
+418,"C74","Cierre pol3 invertido fantasia","Cierres National",$4.23,0,0.00,0
+419,"C75","Cierre pol. 5 fijo 13 cm","National",$2.70,0,0.00,0
+420,"P02","Pompones","Boton class",$0.21,0,0.00,0
+421,"E176","Etiqueta vinil realce","Hor Fix",$1.90,0,0.00,0
+422,"B09","Broche L-19","IUSA",$0.76,0,0.00,0
+423,"J27","Punta metalica Gunmetal",,$0.00,0,0.00,0
+424,"O09","Ojillo metalico Gunmetal",,$0.30,0,0.00,0
+425,"E177","Etiqueta EBOUTERM&WRL18","Borcom",$1.25,0,0.00,0
+426,"E178","Etiqueta EBTSHR&TRO RL18","Borcom",$0.26,0,0.00,0
+427,"E179","Etiqueta EBOUTERKID RL18","Borcom",$0.72,0,0.00,0
+428,"E180","Etiqueta EBTOP RL18","Borcom",$0.39,0,0.00,0
+429,"E181","Etiqueta carton HTAMORXMEX18","Artip",$0.57,0,0.00,0
+430,"E182","Etiqueta carton HT RL 18","Artip",$0.53,0,0.00,0
+431,"C76","Contactel 1 1/2""","Boton class",$5.48,0,0.00,0
+432,"C10","Broche metalico calota","Boton class",$0.67,0,0.00,0
+433,"A28","1/2 Argolla nylon 1""","Textiles Leon",$0.00,0,0.00,0
+434,"J28","Puntas vulcanizadas","Hot fix",$1.20,0,0.00,0
+435,"J29","Jareta redonda poliester punte","Cintas y elasticos",$2.10,0,0.00,0
+436,"E183","Etiqueta mca Gnomos bb meses","Etikame",$0.39,0,0.00,0
+437,"E184","Etiqueta carton Gnomos bb mese","Etikame",$0.40,0,0.00,0
+438,"E185","Etiqueta marca CCPKDS003","Bordesti",$0.29,0,0.00,0
+439,"E186","Etiqueta marca CCPBAS002","TPD",$0.18,0,0.00,0
+440,"E187","Etiqueta carton BASDCCP012","AZVY",$0.32,0,0.00,0
+441,"A29","Elastico 1 1/2"" negro","Boton class",$2.18,0,0.00,0
+442,"E188","Etiqueta mca Baby Essentials","Tejidos Robin",$0.25,0,0.00,0
+443,"E189","Etiqueta carton Baby Essential","Tejidos Robin",$0.30,0,0.00,0
+444,"E190","Etiqueta tejida CTY005 /Garcia","TPD",$0.22,0,0.00,0
+445,"E191","Etiqueta carton CTY003 /Garcia","Azvy",$0.32,0,0.00,0
+446,"E192","Etiqueta tejida EBOUTROCM&L18","BORCOM",$1.13,0,0.00,0
+447,"E193","Etiqueta carton PRROCA18","TOP LABEL",$0.22,0,0.00,0
+448,"E194","Etiqueta tejida decorativa C&A","Tejidos Robin",$0.08,0,0.00,0
+449,"A30","Elastico 1"" negro",,$1.32,0,0.00,0
+450,"C77","Cierre Nycast 12 cm fijo",,$1.96,0,0.00,0
+451,"E195","Etiq.tejidaHUMMO juvenil 12-18","Etikame",$0.40,0,0.00,0
+452,"E196","Etiq. Carton HUMMO Juv 12-18","Etikame",$0.39,0,0.00,0
+453,"A31","Elastico 1 1/4"" negro",,$0.00,0,0.00,0
+454,"J30","Agujeta con punta","cintepsa",$0.00,0,0.00,0
+455,"J31","Puntera campana metalica","botonclass",$0.00,0,0.00,0
+456,"E197","Etiq.EBOUTERLUM19","Top Label",$0.25,0,0.00,0
+457,"E198","Etiq. ETLUM19","Top Label",$0.17,0,0.00,0
+458,"E199","Etiq. EB-LUM19","Top Label",$0.21,0,0.00,0
+459,"E200","Etiq. Carton HTLUM19","Top Label",$0.30,0,0.00,0
+460,"C78","Cinta popotillo 3 cm","Tripoli",$2.20,0,0.00,0
+461,"E201","Etiq.Cuidado c el perro 003CCP","SGSR",$0.22,0,0.00,0
+462,"B10","Broche negro para mochila","Centro",$0.45,0,0.00,0
+463,"E202","Etiq.Carton CuidadoP. CCP014","SGSR",$0.35,0,0.00,0
+464,"J32","Agujeta redonda 1.30","cintepsa",$2.44,0,0.00,0
+465,"C79","Cinta popotillo bicolor 40 mm","CINTEPSA",$3.35,0,0.00,0
+466,"E203","Transfer LUM C&A",,$1.50,0,0.00,0
+467,"C80","Cierre alumin fijo 20cm argoll",,$0.00,0,0.00,0
+468,"J33","Agujeta redonda algodon 1.35","cintepsa",$2.52,0,0.00,0
+469,"J34","Cinta deportiva 20 mm","cintepsa",$1.93,0,0.00,0
+470,"J35","Agujeta plana tubular 1.45","cintepsa",$2.19,0,0.00,0
+471,"A32","Elastico 1"" con lurex","cintas y elasticos",$2.30,0,0.00,0
+472,"J36","Cinta transparente Latex  6 mm","Boton class",$0.31,0,0.00,0
+473,"J37","Estambre","Centro",$0.09,0,0.00,0
+474,"B11","Broche transp para tirante","Centro",$0.00,0,0.00,0
+475,"E204","Etiq. Tejida Hummo Chavos12-18","Etiakme",$0.00,0,0.00,0
+476,"E205","Etiq. Carton Hummo Chavos12-18","Etikame",$0.00,0,0.00,0
+477,"E206","Transfer Hummo Chavos","Etikame",$0.00,0,0.00,0
+478,"C81","Cinta palmita lurex 10 mm","CINTEPSA",$0.00,0,0.00,0
+479,"B12","Boton gliter No. 20","BOTON CLAS",$0.00,0,0.00,0
+480,"E207","Etiq.tejida cozzi bugamb, a¤os","etikame",$0.00,0,0.00,0
+481,"E208","Etiq. Carton Cozzi bugamb a¤os","ETIKAME",$0.00,0,0.00,0
+482,"A33","Elastico Marino 2"" lineas blca","cyntepsa",$0.00,0,0.00,0
+483,"C82","Cierre metalico 12cm fijo argo","Centro",$0.00,0,0.00,0
+484,"E209","Transfer TRGREYPRIDE2020",,$0.00,0,0.00,0
+485,"E210","Etiqueta Carton HTPRIDE2020","TOPLABEL",$0.00,0,0.00,0
+486,"E211","Etiqueta tejida EBPRIDE2020","BORCOM",$0.00,0,0.00,0
+487,"C83","Cierre metalizado sep. 65 cm","La perfecta",$0.00,0,0.00,0
+488,"C84","Cierre metalizado fijo 15 cm","La perfecta",$0.00,0,0.00,0
+489,"J38","Cinta palmita  12 mm","centro",$0.00,0,0.00,0
+490,"E212","Etiqueta tejida EBC&AFORMEN16","BORCOM",$0.00,0,0.00,0
+491,"J39","Cinta tapacost muticolor 15mm","Etiqs Roque",$0.00,0,0.00,0
+492,"E213","Etiqueta tejida EBTALMXOUT20","Borcom",$1.00,0,0.00,0
+493,"E214","Etiqueta carton HTTALMXPRIS20","Top Label",$0.66,0,0.00,0
+494,"E215","Etiqueta tejida Aeropostale","Borcom",$0.72,0,0.00,0
+495,"E216","Etiqueta carton Aeropsotale","T. Robin",$0.14,0,0.00,0
+496,"E217","Sticker de talla Aeropostale","T. Robin",$0.24,0,0.00,0
+497,"C85","Cinta palmita con pespunte","CINTEPSA",$0.00,0,0.00,0
+498,"E218","Etiq. Carton HTNAVMX2020","Borcom",$0.53,0,0.00,0
+499,"E219","Etiqueta tejida EBJESPSAJ","BORCOM",$0.35,0,0.00,0
+500,"E220","Etiqueta carton 17PTG5","Top Label",$0.35,0,0.00,0
+501,"J40","Jareta tubular jaspeada","cintepsa",$2.90,0,0.00,0
+502,"E221","Sticker talla transparente red","Tejidso Robin",$0.19,0,0.00,0
+503,"E222","Etiqueta EBCASUALTOP20","BORCOM",$0.43,0,0.00,0
+504,"E223","Etiqueta carton HTPLUSSIZZE20","TOPLABEL",$0.00,0,0.00,0
+505,"E224","Etiqueta carton HTPGENERAL20","TOP LABEL",$0.00,0,0.00,0
+506,"C86","Cinta reflejante 16mm",,$0.00,0,0.00,0
+507,"C87","Cinta palmita 15 mm",,$0.00,0,0.00,0
+508,"C88","Contactel 25 mm","centro",$0.00,0,0.00,0
+509,"E225","Etiqueta tejida EBCASUALGEN20","BORCOM",$0.40,0,0.00,0
+510,"E226","Etiqueta tejida EBRESPECTOUTW2","BORCOM",$0.40,0,0.00,0
+511,"E227","Etiqueta carton HTPRESPECT21","TOP LABEL",$0.48,0,0.00,0
+512,"E228","Etiq CARTON HTFORMALMENGEN20","TOPLABEL",$0.49,0,0.00,0
+513,"E229","Etiquet tejid EBRESPECTTOPBOT2","BORCOM",$0.40,0,0.00,0
+514,"E230","Sticker de precio C&A","Masteredi",$0.19,0,0.00,0
+515,"E231","Etiquet tejida EBBOTJOGGER20","BORCOM",$0.40,0,0.00,0
+516,"E232","Etiquet tejida EBFORMENOUTW20","BORCOM",$0.00,0,0.00,0
+517,"E233","Etiqueta Confort (control)","Etiquetas Roque",$0.00,0,0.00,0
+518,"T14","Transger Logo SS",,$0.00,0,0.00,0
+519,"E234","Etiqueta tejida EBOTSKINNY20",,$0.00,0,0.00,0
+520,"E235","EBTOPREGULAR20",,$0.00,0,0.00,0
+521,"C89","Cinta estampada",,$0.95,0,0.00,0
+522,"A34","Elastico blanco  2 3/8",,$3.60,0,0.00,0
+523,"E236","Etiq tejida EBOUTERWEARPRIDE21","BORCOM",$1.22,0,0.00,0
+524,"E237","Etiqueta carton HTPRIDE2021","TOPLABEL",$0.49,0,0.00,0
+525,"E238","Etiq tejida EBTOPBOTTOMPRIDE21","BORCOM",$0.48,0,0.00,0
+526,"E239","Etiqueta estamp decorativa C&A",,$0.27,0,0.00,0
+527,"E240","Etiq tejida EBTOPREGULAR20",,$0.40,0,0.00,0
+528,"E241","Etiq tejida EBHFTOPSLIMFIT20",,$0.40,0,0.00,0
+529,"E242","Etiq cart¢n HTFHTOPSLIMFIT20",,$0.00,0,0.00,0
+530,"E243","Etiq tejida EBCASOUTERW20","BORCOM",$1.00,0,0.00,0
+531,"E244","EBOUTRELAXED20","BORCOM",$1.00,0,0.00,0
+532,,"CINTA PALMITA","BOTONCLASS",$1.68,0,0.35,0
+533,"A21","Monarch Inst. Cuidado",,$0.25,0,0.00,0
+534,"C026","CIERRE VENUS FIJO DE 26 CM","CIERRES LA PERFECTA",$4.68,0,1.00,0
+535,"T05","TRANSFER DECORATIVO","BORDADOS JAY",$3.00,0,0.00,0
+536,"CTE1","CONTACTEL","CIERRES LA PERFECTA",$3.30,0,0.00,0
+537,"CIE1","CIERRE VENUS 55cm SEPARABLE JA","CIERRES LA PERFECTA",$6.80,1,1.00,0
+538,"A16",,,$0.00,0,0.00,0
+539,,"confort",,$0.00,0,0.00,0
+540,,"JARETA",,$0.00,0,0.00,0
+541,,"transfer",,$0.00,0,0.00,0
+542,"EBOG","ETIQUETA DE MARCA OGGI","FINOTEX",$0.69,0,0.00,0
+543,"TCOG","CINTA TAPA COSTURA OGGI","FINOTEX",$4.19,0,0.00,0
+544,"EMOG","MONARCH OGGI","FINOTEX",$0.38,0,0.00,0
+545,"ECOG","CODIGO DE BARRA OGGI","FINOTEX",$0.22,0,0.00,0
+546,"TROG","TRANSFER TALLA OGGI","LESVER A.A.Z",$0.29,0,0.00,0
+547,"HTOG","HANGTAG AZUL SIN DIRECCION","GOLAND",$0.53,0,0.00,0
+548,"HTOGG","HANG TAG GENERICA SIN DIRECCIO","GOLAND",$0.83,0,0.00,0
+549,"PBOGR","PARCHE OGGI ROJO BASICO","SMART BORDADOS",$3.00,0,0.00,0
+550,"PSWOG","PARCHE SPORTWEAR OGGI","SMART BORDADOS",$6.00,0,0.00,0
+551,"BEOG","BOLSA EMPAQUE CAMISA","PLASTICOS KOALA",$0.57,0,0.00,0
+552,"BEOGC","BOLSA EMPAQUE CABALLERO OGGI","JOSE DOMINGO VILLAFUERTE",$0.88,0,0.00,0
+553,"TDOG","TRANSFER DISNEY MF","NORTH AMERICAN PACKAGING",$0.67,0,0.00,0
+554,"EBDOG","ETIQUETA BORDADA DISNEY INTERN","NORTH AMERICAN PACKAGING",$0.94,0,0.00,0
+555,"EPEDO","ETIQUETA PRETINA EXTERNA DISNE","NORTH AMERICAN PACKAGING",$4.62,0,0.00,0
+556,"ECDOG","HANG TAG DISNEY M&F","NORTH AMERICAN PACKAGING",$0.67,0,0.00,0
+557,"MITD","MINNIE TEJIDA A MANO","DIANA ORTIZ",$17.50,0,0.00,0
+558,"TRCH","TRANSFER CHAMPION MARCA","FINOTEX",$1.85,0,0.00,0
+559,"TPCH","TRANSFER PARCHE CHAMPION LOGO","FINOTEX",$1.69,0,0.00,0
+560,"HTCH","HANG TAG CHAMPION","NAVASAN",$0.72,0,0.00,0
+561,"STCH","STICKER TALLA CHAMPION","NAVSAN",$0.82,0,0.00,0
+562,"CDCH","CORDON NEGRO CANDADO CHAMPION","NAVASAN",$0.49,0,0.00,0
+563,,,"FINOTEX",$0.00,0,0.00,0
+564,"COCH","CODIGO CHAMPION PRECIO","FINOTEX",$0.33,0,0.00,0
+565,"GACH","GANCHO AVION DE 14"" DUO","MAINETTI",$4.25,0,0.00,0
+566,"MOCH","MONARCH SATIN CHAMPION","FINOTEX",$0.45,0,0.00,0
+567,"TRHT","TRANSFER HANG TEN TALLA","JESUS VAZQUEZ",$0.60,0,0.00,0
+568,"HTHT","HANG TAG CARTON HANGTEN","MEXTRIM GROUP",$0.49,0,0.00,0
+569,"MOHT","MONARCH RFID SATIN","ETIFLEX",$2.30,0,0.00,0
+570,"SPHT","STICKER PRECIO HANG TEN","ETIFLEX",$0.21,0,0.00,0
+571,"PNHT","PLASTIFLECHA NEGRA DE 3""","BOTON CLASS",$0.12,0,0.00,0
+572,"SCGA","STICKER CAJA GARCIA",,$0.35,0,1.10,0
+573,"CEN01","CORDON ELASTICO","BOTONCLASS",$3.24,0,0.00,0
+574,"EM02","ETIQUETA DEMARCA CCP",,,0,0.00,0
+575,"CV25","CIERRE VENUS DE 25 cm","CIERRES LA PERFECTA",$5.65,0,0.00,0
+576,"CD25","CIERRE DELCAST 25 cm NEGRO",,$5.65,0,0.00,0
+577,"ETD01","ETIQUETA DECORATIVA","ALTIMA",$0.95,0,0.00,0
+578,"LT01","LOGO TRANSFER SS","PODER MEXICANO",$1.40,0,0.00,0
+579,"EMH01","ETIQUETA MARCA HUMMO","ETIKAME",$0.31,0,0.00,0
+580,"ECH01","ETIQUETA DE CARTON HUMMO","ETIKAME",$0.30,0,0.00,0
+581,"EBD01","ETIQUETA BORDADA DISNEY","FINOITEX",$0.60,0,0.00,0
+582,"EBTD0","ETIQUETA BORDADA TALLITA","FINOTEX",$0.35,0,0.00,0
+583,"BMS01","BROCHE MOCHILA SAMSONITE GRAND","GODOY",$10.50,0,0.00,0
+584,"CNG01","CINTA NYLON GRUESA","GODOY",$7.50,0,0.00,0
+585,"BSB01","BIES SATINADO BLANCO","BOTONCLASS",$2.24,0,0.00,0
+586,"APL01","AGUJETA PLANA 1.35 mts","ACOSTA",$4.51,0,0.00,0
+587,"EBHT1","ETIQUETA BORDADA HANG TEN",,$0.75,0,0.00,0
+588,"PFTR1","TRANSFER PLANET FITNESS","JORGE RANGEL",$0.52,1,,0
+589,"PFC01","HANG TAG PLANET FITNESS","JORGE RANGEL",$1.10,0,0.00,0
+590,"MN01","MONARCH DE LAVADO",,$0.32,0,0.00,0
+591,"PRE01","ADHERIBLE DE PRECIO Y CODIGO",,$0.25,0,0.00,0
+592,"PPLA","PUNTAS DE PLASTICO",,$0.70,0,0.00,0
+593,"EMMA","CIERRE VENUS INVERTIDO 70CM","CIERRES LA PERFECTA",$13.44,0,0.00,0
+594,"EMMA1","CIERRE INVERTIDO FIJO 16 CM","CIERRES LA PERFECTA",$4.71,0,0.00,0
+595,"EMMA2","CIERRE INVERTIDO FIJO 25CM","CIERRES LA PERFECTA",$9.25,0,0.00,0
+596,"EMMA3","BELLOTA CAMPANA PLASTICO NEGRO","BOTONCLASS",$0.38,0,0.00,0
+597,"EMMA4","TALLITA GENERICA","BOTONCLASS",$0.11,0,0.00,0
+598,,"BROCHE PA¥ALERO",,$0.00,0,0.00,0
+599,"ECDM","ETIQ DE CARTON DIA DE MUERTOS","ETIQ INDUSTRIALES",$2.20,0,0.00,0
+600,,,,$0.00,0,0.00,0
+601,"PFB","PLASTIFLECHA BLANCA 3""",,$0.00,0,0.00,0
+602,,,,$0.00,0,0.00,0
+603,,,,$0.00,0,0.00,0
+604,,,,$0.00,0,0.00,0
+605,"ON24","OJILLO NIQUEL 24","CONTINENTAL",$0.00,0,,0
+606,"CCCPN","CERILLERA CCP NEGRA",,$0.00,0,0.00,0
+607,"ALF","STIK ALF NEGRO 22X15",,$0.00,0,0.00,0
+608,"EMD","ETIQUETA DE MARCA DISNEY NEGRO",,$0.00,0,0.00,0
+609,,,,$0.00,0,0.00,0
+610,"EHC&A","ETIQUETA HANG TAG",,$0.00,0,0.00,0
+611,"EHD","ETIQUETA HANG TAG DISNEY",,$0.00,0,0.00,0
+612,"EPD","ETIQUETA PRECIO DISNEY",,$0.00,0,0.00,0
+613,"PDC&A","PIEDRA DECORATIVA C&A DISNEY",,$0.00,0,0.00,0
+614,"EGG","ETIQUETA GOSSIP GIR",,$0.00,0,0.00,0
+615,,,,$0.00,0,0.00,0
+616,"TMN","TRANSFER DE MARCA NASA",,$0.00,0,0.00,0
+617,"MNN","MONARCH NASA",,$0.00,0,0.00,0
+618,"JM","JARETA MARINO",,$0.00,0,0.00,0
+619,"PEN","PARCHE ESTAMPADO NASA",,$0.00,0,0.00,0
+620,,,,$0.00,0,0.00,0
+621,"EB40","ELASTICO BLANCO 40MM",,$1.61,0,0.00,0
+622,,,,$0.00,0,0.00,0
+623,,,,$0.00,0,0.00,0
+624,"ECN","ETIQUETA DE CODIGO NASA",,$0.00,0,0.00,0
+625,,,,$0.00,0,0.00,0
+626,"c01",,,$0.00,0,0.00,0
+627,"Trs01","Transfer Marca y Talla",,$0.90,0,0.00,0
+628,"TALL1","Tallita etiq.",,$0.10,0,0.00,0
+629,"PAL01","CINTA PALMITA",,$2.00,0,0.00,0
+630,"TRS01",,,$0.00,0,0.00,0
+631,"MON01","Monarch Instrucciones Cuidado",,$0.25,0,0.00,0
+632,"COLG1","Han Tag",,$0.70,0,0.00,0
+633,"BOT01","Boton  T.18",,$0.16,0,0.00,0
+634,"COD01","Codigo para Costura",,$0.50,0,0.00,0
+635,"STK01","Stiker (mme, epeu, etc.)",,$0.80,0,0.00,0
+636,"TAP01","Tab Distintivo",,$0.10,0,0.00,0
+637,"JAR01","Jareta puntas plasticas","Alberto",$4.00,0,0.00,0
+638,"PAL01",,,$0.00,0,0.00,0
+639,"CAJ01","Caja de Carton",,$26.00,0,0.00,0
+640,"BOL01","Bolsa",,$0.30,0,0.00,0
+641,,,,$0.00,0,0.00,0
+642,"TEJ01","Etiqueta Tejida Marca",,$0.80,0,0.00,0
+643,"TEJ01",,,$0.00,0,0.00,0
+644,"PAVI","Paquete Avios","Cklass",$4.50,0,0.00,0
+645,"HTL01","Hang Tag Licencias",,$1.60,0,0.00,0
+646,"HTL01","Tejida o Transfer",,$2.20,0,0.00,0
+647,"TALL2","Tallita",,$0.05,0,0.00,0
+648,"MAR01","Marca p. Control",,$0.75,0,0.00,0
+649,"TALL2","Tallita",,$0.05,0,0.00,0
+650,"TAG","Colgar Control",,$0.40,0,0.00,0
+651,"TAGLI","Licencia Control",,$1.00,0,0.00,0
+652,"GA14","Gancho y tallero 14""",,$1.10,0,0.00,0
+653,"GAN14","Gancho y Tallero 14""",,$1.10,0,0.00,0
+654,"CUB01","Cubrepolvo control",,$1.00,0,0.00,0
+655,"BOT01","Boton blusa control",,$0.11,0,0.00,0
+656,"TJTRS","Marca o Transf cya",,$2.20,0,0.00,0
+657,"HTL01","Colgar Licencias",,$1.60,0,0.00,0
+658,"COD01","Codigo CyA",,$0.50,0,0.00,0
+659,"PRE01","Precio CyA",,$0.25,0,0.00,0
+660,"BOL01","Bolsa CyA",,$0.30,0,0.00,0
+661,"CAJ01","Caja de Cart¢n",,$26.00,0,0.00,0

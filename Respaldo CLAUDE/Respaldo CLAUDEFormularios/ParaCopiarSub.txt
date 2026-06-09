@@ -1,0 +1,418 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1891569692
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 2
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 11681
+    DatasheetFontHeight = 10
+    ItemSuffix = 30
+    Left = 3870
+    Top = 2865
+    Right = 17370
+    Bottom = 8895
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x75f12e60fc9be540
+    End
+    RecordSource ="ParaCopiarSub"
+    Caption ="ParaCopiarSub"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 150
+                    Top = 57
+                    Width = 285
+                    Height = 240
+                    Name ="Numero Etiqueta"
+                    Caption ="Numero"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Numero_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 492
+                    Top = 57
+                    Width = 456
+                    Height = 240
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2097
+                    Top = 57
+                    Width = 1083
+                    Height = 240
+                    Name ="CantOrd Etiqueta"
+                    Caption ="CantOrd"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantOrd_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3231
+                    Top = 57
+                    Width = 1083
+                    Height = 240
+                    Name ="CantCorte Etiqueta"
+                    Caption ="CantCorte"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantCorte_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4371
+                    Top = 57
+                    Width = 1083
+                    Height = 240
+                    Name ="Maquilero Etiqueta"
+                    Caption ="Maquilero"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Maquilero_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5511
+                    Top = 57
+                    Width = 1083
+                    Height = 240
+                    Name ="CantMaquileros Etiqueta"
+                    Caption ="CantMaquileros"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantMaquileros_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 6651
+                    Top = 57
+                    Width = 1083
+                    Height = 240
+                    Name ="Precio Maquila Etiqueta"
+                    Caption ="Precio Maquila"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Maquila_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7791
+                    Top = 57
+                    Width = 570
+                    Height = 240
+                    Name ="Estampador Etiqueta"
+                    Caption ="Estampador"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Estampador_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 8418
+                    Top = 57
+                    Width = 624
+                    Height = 240
+                    Name ="Cliente Etiqueta"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cliente_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 9114
+                    Top = 60
+                    Width = 810
+                    Height = 240
+                    Name ="Etiqueta18"
+                    Caption ="F. Entrega"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 9966
+                    Top = 60
+                    Width = 810
+                    Height = 240
+                    Name ="Etiqueta22"
+                    Caption ="F. Entrega"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1020
+                    Top = 57
+                    Width = 741
+                    Height = 240
+                    Name ="Etiqueta28"
+                    Caption ="Monarch"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 150
+                    Top = 57
+                    Width = 285
+                    Height = 255
+                    ColumnWidth = 990
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 492
+                    Top = 57
+                    Width = 456
+                    Height = 255
+                    ColumnWidth = 990
+                    TabIndex = 1
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2097
+                    Top = 57
+                    Width = 1083
+                    Height = 255
+                    ColumnWidth = 1470
+                    TabIndex = 3
+                    Name ="CantOrd"
+                    ControlSource ="CantOrd"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3231
+                    Top = 57
+                    Width = 1083
+                    Height = 255
+                    ColumnWidth = 1545
+                    TabIndex = 4
+                    Name ="CantCorte"
+                    ControlSource ="CantCorte"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4371
+                    Top = 57
+                    Width = 1083
+                    Height = 255
+                    ColumnWidth = 1290
+                    TabIndex = 5
+                    Name ="Maquilero"
+                    ControlSource ="Maquilero"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5511
+                    Top = 57
+                    Width = 1083
+                    Height = 255
+                    ColumnWidth = 795
+                    TabIndex = 6
+                    Name ="CantMaquileros"
+                    ControlSource ="CantMaquileros"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6651
+                    Top = 57
+                    Width = 1083
+                    Height = 255
+                    ColumnWidth = 1410
+                    TabIndex = 7
+                    Name ="Precio Maquila"
+                    ControlSource ="Precio Maquila"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    EventProcPrefix ="Precio_Maquila"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7791
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 1035
+                    TabIndex = 8
+                    Name ="Estampador"
+                    ControlSource ="Estampador"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 8418
+                    Top = 57
+                    Width = 624
+                    Height = 255
+                    ColumnWidth = 2145
+                    TabIndex = 9
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 9116
+                    Top = 57
+                    Width = 789
+                    Height = 255
+                    TabIndex = 10
+                    Name ="FechaEntregaRC"
+                    ControlSource ="FechaEntregaRC"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 9981
+                    Top = 60
+                    Width = 789
+                    Height = 255
+                    TabIndex = 11
+                    Name ="FechaOP"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1020
+                    Top = 57
+                    Width = 741
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Monarch"
+                    ControlSource ="Monarch"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End

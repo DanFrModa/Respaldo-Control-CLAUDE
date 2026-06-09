@@ -1,0 +1,135 @@
+Operation = 1
+Option = 0
+Having ="(((Mid(([modelo]),2,1))=[Formularios]![EscojerGenero]![QueGenero]) AND ((Modelos"
+    ".Activo)=[Formularios]![EscojerGenero]![QueModelos]))"
+Begin InputTables
+    Name ="CostoTela"
+    Name ="Modelos"
+    Name ="CostoBordado"
+    Name ="CostoHabilitacion"
+End
+Begin OutputColumns
+    Expression ="Modelos.Modelo"
+    Alias ="Desc"
+    Expression ="dee([modelo])"
+    Expression ="Modelos.Descripcion"
+    Expression ="CostoTela.TotalTela"
+    Expression ="CostoHabilitacion.TotalHab"
+    Expression ="CostoBordado.TotalBor"
+    Expression ="Modelos.Maquila"
+    Alias ="Costo"
+    Expression ="[Totaltela]+[totalhab]+[totalbor]+[maquila]"
+    Alias ="Utilidad"
+    Expression ="([Totaltela]+[totalhab]+[totalbor]+[maquila])*2"
+    Alias ="Regalias"
+    Expression ="((([Totaltela]+[totalhab]+[totalbor]+[maquila])*2)/0.9)-(([Totaltela]+[totalhab]"
+        "+[totalbor]+[maquila])*2)"
+    Alias ="PrecioVenta"
+    Expression ="CInt((([Totaltela]+[totalhab]+[totalbor]+[maquila])*2)/0.9)"
+End
+Begin Joins
+    LeftTable ="Modelos"
+    RightTable ="CostoBordado"
+    Expression ="Modelos.IdModelos = CostoBordado.IdModelos"
+    Flag = 1
+    LeftTable ="Modelos"
+    RightTable ="CostoHabilitacion"
+    Expression ="Modelos.IdModelos = CostoHabilitacion.IdModelos"
+    Flag = 1
+    LeftTable ="CostoTela"
+    RightTable ="Modelos"
+    Expression ="CostoTela.IdModelos = Modelos.IdModelos"
+    Flag = 1
+End
+Begin OrderBy
+    Expression ="Modelos.Modelo"
+    Flag = 0
+End
+Begin Groups
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="dee([modelo])"
+    GroupLevel = 0
+    Expression ="Modelos.Descripcion"
+    GroupLevel = 0
+    Expression ="CostoTela.TotalTela"
+    GroupLevel = 0
+    Expression ="CostoHabilitacion.TotalHab"
+    GroupLevel = 0
+    Expression ="CostoBordado.TotalBor"
+    GroupLevel = 0
+    Expression ="Modelos.Maquila"
+    GroupLevel = 0
+    Expression ="[Totaltela]+[totalhab]+[totalbor]+[maquila]"
+    GroupLevel = 0
+    Expression ="([Totaltela]+[totalhab]+[totalbor]+[maquila])*2"
+    GroupLevel = 0
+    Expression ="((([Totaltela]+[totalhab]+[totalbor]+[maquila])*2)/0.9)-(([Totaltela]+[totalhab]"
+        "+[totalbor]+[maquila])*2)"
+    GroupLevel = 0
+    Expression ="CInt((([Totaltela]+[totalhab]+[totalbor]+[maquila])*2)/0.9)"
+    GroupLevel = 0
+    Expression ="Mid(([modelo]),2,1)"
+    GroupLevel = 0
+    Expression ="gee(Mid(([modelo]),2,1))"
+    GroupLevel = 0
+    Expression ="Modelos.Activo"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="Desc"
+        dbInteger "ColumnWidth" ="3450"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1002
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 951
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 83
+        Top = 0
+        Name ="CostoTela"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 113
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 83
+        Top = 0
+        Name ="CostoBordado"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 83
+        Top = 0
+        Name ="CostoHabilitacion"
+    End
+End

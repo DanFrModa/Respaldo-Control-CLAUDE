@@ -1,0 +1,258 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1177254819
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 4535
+    DatasheetFontHeight = 10
+    ItemSuffix = 6
+    Left = 7020
+    Top = 1320
+    Right = 11550
+    Bottom = 5010
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x51553fba3c48e340
+    End
+    RecordSource ="SELECT CP_Tiempos.IdCP_Articulos, CP_Tiempos.IdCP_Procesos FROM CP_Tiempos ORDER"
+        " BY CP_Tiempos.IdCP_Articulos, CP_Tiempos.IdCP_Procesos;"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Section
+            Height = 3685
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1854
+                    Top = 2154
+                    Width = 921
+                    Name ="IdCP_Articulos"
+                    ControlSource ="IdCP_Articulos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 963
+                            Top = 2154
+                            Width = 1155
+                            Height = 240
+                            Name ="Etiqueta0"
+                            Caption ="Articulos:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 1854
+                    Top = 2437
+                    Width = 921
+                    TabIndex = 1
+                    Name ="IdCP_Procesos"
+                    ControlSource ="IdCP_Procesos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 963
+                            Top = 2437
+                            Width = 1215
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Procesos:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 170
+                    Top = 850
+                    Width = 4191
+                    Height = 403
+                    TabIndex = 2
+                    Name ="Comando2"
+                    Caption ="Alta Nuevos Articulos con TODOS los procesos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 170
+                    Top = 1373
+                    Width = 4191
+                    Height = 403
+                    TabIndex = 3
+                    Name ="Comando3"
+                    Caption ="Agregar nuevos Procesos en TODOS los Articulos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 170
+                    Top = 113
+                    Width = 3690
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta4"
+                    Caption ="AGREGAR PROCESOS Y ARTICULOS"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 3118
+                    Top = 3174
+                    Width = 1251
+                    Height = 343
+                    FontWeight = 700
+                    TabIndex = 4
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando2_Click()
+
+
+Dim Dbs As Database
+Dim Art, Proc, NoProc As Recordset
+
+
+Set Dbs = CurrentDb
+
+Set NoProc = Dbs.OpenRecordset("Select CP_ProcNOAlta.IdCP_Procesos from CP_ProcNOAlta")
+If NoProc.EOF = False Then
+   MsgBox "Tienes que borrar los nuevos procesos antes de seguir con el alta de Nuevos Articulos.", vbInformation, "ERROR DE ALTA DE ARTICULOS"
+ GoTo Adios
+End If
+
+On Error GoTo errores
+
+Set Art = Dbs.OpenRecordset("Select CP_ArtNOAlta.IdCP_Articulos from CP_ArtNoAlta")
+Art.MoveLast
+Art.MoveFirst
+
+
+Set Proc = Dbs.OpenRecordset("Select CP_Procesos.IdCP_Procesos from CP_Procesos")
+Proc.MoveLast
+Proc.MoveFirst
+   
+   Do While Not Art.EOF
+
+        Do While Not Proc.EOF
+             DoCmd.GoToRecord , , acNewRec
+            IdCP_Articulos = Art!IdCP_Articulos
+            IdCP_Procesos = Proc!IdCP_Procesos
+            Proc.MoveNext
+        Loop
+    Proc.MoveFirst
+    Art.MoveNext
+   Loop
+
+Art.Close
+Proc.Close
+
+errores:
+If Err.Number = 3021 Then
+  MsgBox "No hay nuevos articulos para dar de alta", vbExclamation, "NO HAY NUEVOS ARTICULOS"
+End If
+Adios:
+Dbs.Close
+
+
+End Sub
+
+Private Sub Comando3_Click()
+Dim Dbs As Database
+Dim Art, Proc, NoArt As Recordset
+
+
+
+Set Dbs = CurrentDb
+Set NoArt = Dbs.OpenRecordset("Select CP_ArtNOAlta.IdCP_Articulos from CP_ArtNoAlta")
+If NoArt.EOF = False Then
+   MsgBox "Tienes que borrar los nuevos Articulos antes de seguir con el alta de Nuevos Procesos.", vbInformation, "ERROR DE ALTA DE PROCESOS"
+ GoTo Adios
+End If
+
+On Error GoTo errores
+
+Set Art = Dbs.OpenRecordset("Select CP_Articulos.IdCP_Articulos from CP_Articulos")
+Art.MoveLast
+Art.MoveFirst
+
+Set Proc = Dbs.OpenRecordset("Select CP_ProcNOAlta.IdCP_Procesos from CP_ProcNOAlta")
+Proc.MoveLast
+Proc.MoveFirst
+
+   Do While Not Art.EOF
+
+        Do While Not Proc.EOF
+             DoCmd.GoToRecord , , acNewRec
+            IdCP_Articulos = Art!IdCP_Articulos
+            IdCP_Procesos = Proc!IdCP_Procesos
+            Proc.MoveNext
+        Loop
+    Proc.MoveFirst
+    Art.MoveNext
+   Loop
+
+Art.Close
+Proc.Close
+
+errores:
+If Err.Number = 3021 Then
+  MsgBox "No hay nuevos Procesos para dar de alta", vbExclamation, "NO HAY NUEVOS PROCESOS"
+End If
+Adios:
+Dbs.Close
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub Form_Open(Cancel As Integer)
+If IdRC_TipoUsuariosAct <> 1 Then
+MsgBox "Solo el Administrador de la RC puede ver esta pantalla. Si necesitas ver algo de esto, comentaselo a Daniel Masri.", vbInformation, "SOLO PARA ADMINISTRADORES DE LA RC"
+DoCmd.Close
+End If
+End Sub

@@ -1,0 +1,41 @@
+"IdCC_Catalogo","Clave","Descripcion","Pag","AQL","Favorito"
+1,"1-ETM1","Contiene Etiqueta?",6,"2.5",1
+2,"ETM2-3","Visibilidad de la Informaci¢n?",6,"2.5",1
+3,"ETM4","Etiqueta pegada con costura?",7,"2.5",1
+4,"ETM5-6","Etiquetas visibles?",7,"2.5",1
+5,"ETM7","Una sola marca en las etiquetas?",8,"2.5",1
+6,"VC1","Libre de Agujas o piezas punzo cortantes?",18,"1",1
+7,"VC2","Broches con puntas salidas?",18,"1",0
+8,"VC3","Piedras en las bolsas (Critico Infantiles) (Mayor en adultos)?",18,"1",1
+9,"VC4-5","Sin jaladera de cierre da¤ada o Desprendimiento de broches  (Critico Infantiles) (Mayor en adultos)?",19,"1",0
+10,"VC6","Sin Desprendimiento de aplicaci¢n o lentejuela  (Critico Infantiles) (Mayor en adultos)?",19,"1",0
+11,"VM1","Sin Piquetes de aguja",20,"2.5",1
+12,"VM2","Sin Diferencia de tonos en la misma prenda?",20,"2.5",1
+13,"VM4","Botones bien Ubicados?",21,"2.5",0
+14,"VM5","Simetr¡a en el cuello?",21,"2.5",1
+15,"VM6","Sin Cortes de Tijeras?",21,"2.5",1
+16,"VM7","Sin tela Fuera de Costura?",22,"2.5",1
+17,"VM8","Ojales Completos?",22,"2.5",1
+18,"VM10","Sin Costuras Rotas?",23,"2.5",1
+19,"VM13","Producci¢n igual a la aprobada?",24,"2.5",1
+20,"VM14","Sin Lomos de tela para ropa exterior?",25,"2.5",1
+21,"VM17","Torsi¢n no mayor a: Tops 6%  Bottoms 4%?",26,"2.5",1
+22,"VM19","Sin Fruncimiento?",26,"2.5",1
+23,"VM20","Sin residuos de pell¢n que excedan 2cm del contorno?",27,"2.5",0
+24,"VM21","Sin Hoyos en la tela?",27,"2.5",1
+25,"VM22","Sin Hoyos por plasti-flecha?",27,"2.5",1
+26,"VM25","Sin diferencia de tonos entre prendas de la misma caja?",28,"2.5",1
+27,"VME1","Confecci¢n igual a la aprobada?",29,"2.5",1
+28,"VME3","Igual cantidad de botones entre prendas?",30,"2.5",0
+29,"VME4","L¡neas o franjas bien casadas?",31,"2.5",1
+30,"VME6","Color igual entre etiquetas de talla?",31,"2.5",1
+31,"MEDM1","Graduaci¢n correcta (No invade talla anterior o posterior)?",37,"2.5",1
+32,"VM3","Sin manchas de aceite?",20,"10",1
+33,"VM9","Alineaci¢n de Bies sin empalmes visibles?",23,"10",1
+34,"VM12","Sin Sobrantes de Hilos mas de 1/2"" interior Mas de 1"" interior?",24,"10",1
+35,"VM15","Sin Costuras saltadas en costuras de resistencia (overlock, engargoladora, etc.)?",25,"10",1
+36,"VM16","Sin Puntadas rota en costuras de resistencia?",25,"10",1
+37,"VM23","Sin sobrantes de tela (Mal refilado) mayor a 1/4""?",28,"10",1
+38,"VME5","Colocaci¢n correcta del tapa costura?",31,"10",0
+39,"VM26","Buena costura en general?",0,"2.5",1
+40,"VM27","Prendas bien planchadas?",0,"2.5",1

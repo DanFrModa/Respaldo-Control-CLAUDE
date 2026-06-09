@@ -1,0 +1,416 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="RC_Activas_Diferencia"
+    Name ="RC_Activas_FechaEst"
+    Name ="RC_Activas_FechaReal"
+End
+Begin OutputColumns
+    Expression ="RC_Activas_Diferencia.Numero"
+    Expression ="RC_Activas_Diferencia.Modelo"
+    Expression ="RC_Activas_Diferencia.Cliente"
+    Expression ="RC_Activas_Diferencia.CantOrd"
+    Expression ="RC_Activas_FechaEst.NumeroPed"
+    Expression ="RC_Activas_FechaReal.MesInicio"
+    Expression ="RC_Activas_Diferencia.TipoTela"
+    Expression ="RC_Activas_Diferencia.ClaveAplicacion"
+    Alias ="1_FE"
+    Expression ="RC_Activas_FechaEst.[1]"
+    Alias ="1_FR"
+    Expression ="RC_Activas_FechaReal.[1]"
+    Alias ="1_DIF"
+    Expression ="RC_Activas_Diferencia.[1]"
+    Alias ="2_FE"
+    Expression ="RC_Activas_FechaEst.[2]"
+    Alias ="2_FR"
+    Expression ="RC_Activas_FechaReal.[2]"
+    Alias ="2_DIF"
+    Expression ="RC_Activas_Diferencia.[2]"
+    Alias ="3_FE"
+    Expression ="RC_Activas_FechaEst.[3]"
+    Alias ="3_FR"
+    Expression ="RC_Activas_FechaReal.[3]"
+    Alias ="3_DIF"
+    Expression ="RC_Activas_Diferencia.[3]"
+    Alias ="4_FE"
+    Expression ="RC_Activas_FechaEst.[4]"
+    Alias ="4_FR"
+    Expression ="RC_Activas_FechaReal.[4]"
+    Alias ="4_DIF"
+    Expression ="RC_Activas_Diferencia.[4]"
+    Alias ="5_FE"
+    Expression ="RC_Activas_FechaEst.[5]"
+    Alias ="5_FR"
+    Expression ="RC_Activas_FechaReal.[5]"
+    Alias ="5_DIF"
+    Expression ="RC_Activas_Diferencia.[5]"
+    Alias ="6_FE"
+    Expression ="RC_Activas_FechaEst.[6]"
+    Alias ="6_FR"
+    Expression ="RC_Activas_FechaReal.[6]"
+    Alias ="6_DIF"
+    Expression ="RC_Activas_Diferencia.[6]"
+    Alias ="7_FE"
+    Expression ="RC_Activas_FechaEst.[7]"
+    Alias ="7_FR"
+    Expression ="RC_Activas_FechaReal.[7]"
+    Alias ="7_DIF"
+    Expression ="RC_Activas_Diferencia.[7]"
+    Alias ="8_FE"
+    Expression ="RC_Activas_FechaEst.[8]"
+    Alias ="8_FR"
+    Expression ="RC_Activas_FechaReal.[8]"
+    Alias ="8_DIF"
+    Expression ="RC_Activas_Diferencia.[8]"
+    Alias ="9_FE"
+    Expression ="RC_Activas_FechaEst.[9]"
+    Alias ="9_FR"
+    Expression ="RC_Activas_FechaReal.[9]"
+    Alias ="9_DIF"
+    Expression ="RC_Activas_Diferencia.[9]"
+    Alias ="10_FE"
+    Expression ="RC_Activas_FechaEst.[10]"
+    Alias ="10_FR"
+    Expression ="RC_Activas_FechaReal.[10]"
+    Alias ="10_DIF"
+    Expression ="RC_Activas_Diferencia.[10]"
+    Alias ="11_FE"
+    Expression ="RC_Activas_FechaEst.[11]"
+    Alias ="11_FR"
+    Expression ="RC_Activas_FechaReal.[11]"
+    Alias ="11_DIF"
+    Expression ="RC_Activas_Diferencia.[11]"
+    Alias ="12_FE"
+    Expression ="RC_Activas_FechaEst.[12]"
+    Alias ="12_FR"
+    Expression ="RC_Activas_FechaReal.[12]"
+    Alias ="12_DIF"
+    Expression ="RC_Activas_Diferencia.[12]"
+    Expression ="RC_Activas_FechaEst.Clave"
+    Alias ="13_FE"
+    Expression ="RC_Activas_FechaEst.[13]"
+    Alias ="13_FR"
+    Expression ="RC_Activas_FechaReal.[13]"
+    Alias ="13_DIF"
+    Expression ="RC_Activas_Diferencia.[13]"
+    Alias ="14_FE"
+    Expression ="RC_Activas_FechaEst.[14]"
+    Alias ="14_FR"
+    Expression ="RC_Activas_FechaReal.[14]"
+    Alias ="14_DIF"
+    Expression ="RC_Activas_Diferencia.[14]"
+End
+Begin Joins
+    LeftTable ="RC_Activas_Diferencia"
+    RightTable ="RC_Activas_FechaEst"
+    Expression ="RC_Activas_Diferencia.Numero = RC_Activas_FechaEst.Numero"
+    Flag = 1
+    LeftTable ="RC_Activas_FechaEst"
+    RightTable ="RC_Activas_FechaReal"
+    Expression ="RC_Activas_FechaEst.Numero = RC_Activas_FechaReal.Numero"
+    Flag = 1
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="A1"
+        dbInteger "ColumnWidth" ="1200"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="B1"
+        dbInteger "ColumnWidth" ="1170"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="C1"
+        dbInteger "ColumnWidth" ="1125"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_FechaEst.[2]"
+        dbInteger "ColumnWidth" ="2325"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_FechaReal.[2]"
+        dbInteger "ColumnWidth" ="2490"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="1_FR"
+        dbInteger "ColumnWidth" ="2370"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="1_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="1FR"
+        dbInteger "ColumnWidth" ="1170"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="1_DIF"
+        dbInteger "ColumnWidth" ="795"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="2_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="2_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="2_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="3_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="3_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="3_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="4_FE"
+        dbInteger "ColumnWidth" ="1200"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="4_FR"
+        dbInteger "ColumnWidth" ="750"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="4_DIF"
+        dbInteger "ColumnWidth" ="765"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="5_FE"
+        dbInteger "ColumnWidth" ="1200"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="5_FR"
+        dbInteger "ColumnWidth" ="1200"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="5_DIF"
+        dbInteger "ColumnWidth" ="1125"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="6_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="6_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="6_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="7_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="7_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="7_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="8_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="8_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="8_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="9_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="9_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="9_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="10_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="10_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="10_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="11_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="11_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="11_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="12_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="12_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="12_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="13_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_Diferencia.Numero"
+        dbInteger "ColumnOrder" ="1"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_Diferencia.Modelo"
+        dbInteger "ColumnOrder" ="2"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_Diferencia.Cliente"
+        dbInteger "ColumnOrder" ="4"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_Diferencia.CantOrd"
+        dbInteger "ColumnOrder" ="5"
+    End
+    Begin
+        dbText "Name" ="RC_Activas_FechaEst.NumeroPed"
+        dbInteger "ColumnOrder" ="3"
+    End
+    Begin
+        dbText "Name" ="13_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="13_DIF"
+        dbInteger "ColumnWidth" ="675"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="14_FE"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="14_FR"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="14_DIF"
+        dbInteger "ColumnWidth" ="1110"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 371
+    Left = -1
+    Top = -1
+    Right = 1185
+    Bottom = 173
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 699
+        Top = 7
+        Right = 844
+        Bottom = 123
+        Top = 0
+        Name ="RC_Activas_Diferencia"
+    End
+    Begin
+        Left = 210
+        Top = 8
+        Right = 363
+        Bottom = 124
+        Top = 16
+        Name ="RC_Activas_FechaEst"
+    End
+    Begin
+        Left = 417
+        Top = 34
+        Right = 622
+        Bottom = 150
+        Top = 3
+        Name ="RC_Activas_FechaReal"
+    End
+End

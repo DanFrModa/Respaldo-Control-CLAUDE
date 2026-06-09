@@ -1,0 +1,673 @@
+Version = 17
+VersionRequired = 17
+Checksum = 2097604886
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    OrderByOn = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 13889
+    DatasheetFontHeight = 10
+    ItemSuffix = 77
+    Left = 7020
+    Top = 3555
+    Right = 21285
+    Bottom = 7215
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x1039dfb44315e540
+    End
+    Caption ="CONSULTA DE ENTRADAS SEMANALES"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin CustomControl
+            SpecialEffect = 2
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 478
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 630
+                    Top = 225
+                    Width = 609
+                    Height = 240
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 2430
+                    Width = 606
+                    Height = 465
+                    Name ="CantOrd Etiqueta"
+                    Caption ="Cant Ord."
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantOrd_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 3036
+                    Width = 606
+                    Height = 465
+                    Name ="CantCorte Etiqueta"
+                    Caption ="Cant Cort"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantCorte_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 3642
+                    Width = 606
+                    Height = 465
+                    Name ="CantEnt Etiqueta"
+                    Caption ="Cant  Ent"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantEnt_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 4248
+                    Width = 606
+                    Height = 465
+                    Name ="CantRecMaqFecha.CantRec Etiqueta"
+                    Caption ="Cant Rec"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantRecMaqFecha_CantRec_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 4854
+                    Width = 651
+                    Height = 465
+                    Name ="CantRecMaq.CantRec Etiqueta"
+                    Caption ="Total Recib."
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantRecMaq_CantRec_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 5505
+                    Width = 885
+                    Height = 465
+                    Name ="FechaRec Etiqueta"
+                    Caption ="Fecha de Recepcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="FechaRec_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 11994
+                    Top = 226
+                    Width = 1875
+                    Height = 240
+                    Name ="Etiqueta18"
+                    Caption ="OBSERVACIONES"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 7266
+                    Top = 225
+                    Width = 744
+                    Height = 240
+                    Name ="PrecioEt"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 1
+                    Left = 8010
+                    Top = 225
+                    Width = 1074
+                    Height = 240
+                    Name ="ImporteEt"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 6390
+                    Width = 876
+                    Height = 465
+                    Name ="Etiqueta52"
+                    Caption =" Faltantes x Recibir"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 11010
+                    Top = 225
+                    Width = 984
+                    Height = 240
+                    Name ="Etiqueta63"
+                    Caption ="Tipo Prendas"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 87
+                    Left = 12615
+                    Width = 231
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 87
+                    Left = 12955
+                    Width = 231
+                    TabIndex = 1
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 9084
+                    Width = 786
+                    Height = 465
+                    Name ="Etiqueta66"
+                    Caption ="Cantidad Pagadas"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 9870
+                    Width = 786
+                    Height = 465
+                    Name ="Etiqueta68"
+                    Caption ="Faltantes x Pagar"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 1245
+                    Top = 225
+                    Width = 1149
+                    Height = 240
+                    Name ="Etiqueta71"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Top = 195
+                    Width = 615
+                    TabIndex = 2
+                    Name ="OrdNumero"
+                    Caption ="Orden"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 5460
+                    Width = 1020
+                    Height = 478
+                    TabIndex = 3
+                    Name ="OrdFecha"
+                    Caption ="Fecha de Recepcion "
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 288
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 1
+                    Top = -3
+                    Width = 510
+                    Height = 285
+                    ColumnWidth = 600
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 511
+                    Top = -3
+                    Width = 744
+                    Height = 285
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 2430
+                    Top = -3
+                    Width = 606
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="CantOrd"
+                    ControlSource ="CantOrd"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 3036
+                    Top = -3
+                    Width = 606
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="CantCorte"
+                    ControlSource ="CantCorte"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 3642
+                    Top = -3
+                    Width = 606
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="CantEnt"
+                    ControlSource ="CantEnt"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 4248
+                    Top = -3
+                    Width = 606
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 5
+                    ForeColor = 16711680
+                    Name ="CantRec"
+                    ControlSource ="CantRec"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 4854
+                    Top = -3
+                    Width = 651
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 6
+                    ForeColor = 0
+                    Name ="TotalRecibida"
+                    ControlSource ="TotalRecibida"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 5505
+                    Width = 885
+                    Height = 285
+                    ColumnWidth = 825
+                    TabIndex = 7
+                    Name ="FechaRec"
+                    ControlSource ="FechaRec"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 11994
+                    Top = 3
+                    Width = 1890
+                    Height = 285
+                    TabIndex = 8
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 7266
+                    Width = 744
+                    Height = 285
+                    TabIndex = 9
+                    Name ="Precio"
+                    ControlSource ="PromedioDePrecioPactado"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 8010
+                    Width = 1074
+                    Height = 285
+                    TabIndex = 10
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 6390
+                    Top = -3
+                    Width = 876
+                    Height = 285
+                    TabIndex = 11
+                    ForeColor = 255
+                    Name ="Texto51"
+                    ControlSource ="Faltantes"
+                    Format ="#,##0"
+                End
+                Begin CommandButton
+                    OverlapFlags = 247
+                    Left = 6435
+                    Top = 45
+                    Width = 291
+                    Height = 208
+                    TabIndex = 12
+                    Name ="Comando58"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 11010
+                    Width = 984
+                    Height = 285
+                    TabIndex = 13
+                    Name ="Tipo"
+                    ControlSource ="Tipo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 9084
+                    Top = -3
+                    Width = 786
+                    Height = 285
+                    TabIndex = 14
+                    ForeColor = 13209
+                    Name ="CantPagadas"
+                    ControlSource ="CantPagadas"
+                    Format ="#,##0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 9870
+                    Top = -3
+                    Width = 786
+                    Height = 285
+                    TabIndex = 15
+                    ForeColor = 255
+                    Name ="FaltantesPago"
+                    ControlSource ="FaltantesPago"
+                    Format ="#,##0"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 10695
+                    Top = 30
+                    Width = 291
+                    Height = 208
+                    TabIndex = 16
+                    Name ="AgregarOrd"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 1261
+                    Top = -3
+                    Width = 1149
+                    Height = 285
+                    TabIndex = 17
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 247
+                    BackStyle = 0
+                    Left = 9864
+                    Width = 231
+                    Height = 285
+                    TabIndex = 18
+                    ForeColor = 255
+                    Name ="Texto76"
+                    ControlSource ="Pag"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+Private Sub AgregarOrd_Click()
+''Forms![EsMaRecibos]![EsMaRecibosDet].Form
+''DoCmd.GoToRecord acDataForm, "Forms![EsMaRecibos]![EsMaRecibosDet]", acNewRec
+
+
+Forms![EsMaRecibos]![EsMaRecibosDet].Form![IdOrdenes] = IdOrdenes
+Forms![EsMaRecibos]![EsMaRecibosDet].SetFocus
+Forms![EsMaRecibos]![EsMaRecibosDet].Form![CantRecEsMa].SetFocus
+Forms![EsMaRecibos]![EsMaRecibosDet].Form![EsEstampado] = Forms![EsMaRecibos]![EsEst]
+
+End Sub
+
+Private Sub Comando58_Click()
+DoCmd.OpenForm "Proceso", , , "[IdOrdenes]=" & Me![IdOrdenes]
+End Sub
+
+Private Sub Form_Current()
+
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If NivelAct > nivGerencial Then
+[Precio].Visible = False
+[PrecioEt].Visible = False
+[Importe].Visible = False
+[ImporteEt].Visible = False
+[ImporteTot].Visible = False
+End If
+
+End Sub
+
+Private Sub OrdFecha_Click()
+OrderByOn = True
+Me.OrderBy = "FechaRec DESC"
+End Sub
+
+Private Sub OrdNumero_Click()
+OrderByOn = True
+Me.OrderBy = "Numero DESC"
+End Sub

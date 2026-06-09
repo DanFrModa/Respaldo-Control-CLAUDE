@@ -1,0 +1,520 @@
+Version = 17
+VersionRequired = 17
+Checksum = 2111603035
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14670
+    DatasheetFontHeight = 10
+    ItemSuffix = 40
+    Left = 3225
+    Top = 645
+    Right = 17895
+    Bottom = 8160
+    DatasheetGridlinesColor = 12632256
+    Filter ="[EsMa].[IdEsMa]=5059"
+    RecSrcDt = Begin
+        0x48659d945974e340
+    End
+    RecordSource ="SELECT EsMa.FechaEsMa, EsMa.IdMaquileros, EsMa.ObsEsMa, EsMa.IdEsMa, [nombre]+\""
+        " \"+[apellidos] AS Maq FROM (EsMa INNER JOIN Maquileros ON EsMa.IdMaquileros = M"
+        "aquileros.IdMaquileros) LEFT JOIN EsMa_Recibos ON EsMa.IdEsMa = EsMa_Recibos.IdE"
+        "sMa WHERE (((EsMa.IdMaquileros)=[Formularios]![EsMa_EdoCta]![QueMaq])) ORDER BY "
+        "EsMa.FechaEsMa;"
+    Caption ="EsMaRecibos"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 60
+                    Width = 3690
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="RECIBO DE MERCANCIA A MAQUILEROS"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7170
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 93
+                    Left = 3459
+                    Width = 396
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 3
+                    Name ="IdEsMa"
+                    ControlSource ="IdEsMa"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1419
+                    Top = 453
+                    Width = 1140
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 1
+                    Name ="FechaEsMa"
+                    ControlSource ="FechaEsMa"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 114
+                            Top = 453
+                            Width = 1260
+                            Height = 255
+                            Name ="FechaEsMa Etiqueta"
+                            Caption ="Fecha:"
+                            EventProcPrefix ="FechaEsMa_Etiqueta"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 13155
+                    Top = 6300
+                    Width = 1476
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 4
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 105
+                    Top = 4800
+                    Width = 11580
+                    Height = 2370
+                    TabIndex = 2
+                    Name ="EsMaRecibosDet"
+                    SourceObject ="Form.EsMaRecibosDet"
+                    LinkChildFields ="IdEsMa"
+                    LinkMasterFields ="IdEsMa"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 13152
+                    Top = 113
+                    Width = 1425
+                    Height = 540
+                    TabIndex = 5
+                    Name ="Agregar"
+                    Caption ="Agregar Fecha de Recibo"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 105
+                    Top = 780
+                    Width = 14535
+                    Height = 3930
+                    TabIndex = 6
+                    Name ="EsMaRecibosSem"
+                    SourceObject ="Form.EsMaRecibosSem"
+                    LinkChildFields ="IdMaquileros"
+                    LinkMasterFields ="IdMaquileros"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 255
+                    BackStyle = 0
+                    Left = 908
+                    Top = 113
+                    Width = 2955
+                    Height = 255
+                    TabIndex = 7
+                    BackColor = 8421504
+                    Name ="Maq"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 113
+                            Width = 795
+                            Height = 255
+                            Name ="Etiqueta21"
+                            Caption ="Maquilero:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 2721
+                    Width = 390
+                    ColumnWidth = 900
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4648
+                    Top = 113
+                    Width = 1305
+                    Height = 555
+                    TabIndex = 8
+                    Name ="Comando24"
+                    Caption ="Ver Recibos Semanales"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6066
+                    Top = 113
+                    Width = 1305
+                    Height = 555
+                    TabIndex = 9
+                    Name ="Comando25"
+                    Caption ="Ver Ordenes de Produccion"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 12245
+                    Top = 5159
+                    Height = 433
+                    TabIndex = 10
+                    Name ="AgragarPago"
+                    Caption ="Agregar Pago"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 12245
+                    Top = 5712
+                    Height = 433
+                    TabIndex = 11
+                    Name ="AgregarDesc"
+                    Caption ="Agregar Descuento"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 12699
+                    Width = 396
+                    Height = 255
+                    TabIndex = 12
+                    Name ="QuePagEs"
+                    DefaultValue ="False"
+                End
+                Begin OptionGroup
+                    OverlapFlags = 85
+                    Left = 9637
+                    Top = 113
+                    Width = 2783
+                    Height = 618
+                    TabIndex = 13
+                    Name ="VerPag"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="2"
+                    Begin
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 9751
+                            Top = 170
+                            Width = 1307
+                            Height = 513
+                            OptionValue = 2
+                            Name ="Alternar35"
+                            Caption ="Ver solo NO PAGADAS"
+                        End
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 11058
+                            Top = 170
+                            Width = 1307
+                            Height = 513
+                            OptionValue = 1
+                            Name ="Alternar34"
+                            Caption ="Ver Todas"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 12699
+                    Top = 375
+                    Width = 396
+                    Height = 255
+                    TabIndex = 14
+                    Name ="CuantasFaltan"
+                    DefaultValue ="\"a\""
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 7483
+                    Top = 113
+                    Width = 1770
+                    Height = 570
+                    TabIndex = 15
+                    Name ="Comando37"
+                    Caption ="Existencia Maquileros"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4081
+                    Top = 226
+                    TabIndex = 16
+                    Name ="EsEst"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+Private Sub AgragarPago_Click()
+DoCmd.OpenForm "EsMaPagos", , , "[EsMa].[IdEsMa]=" & Me![IdEsMa]
+Forms![EsMaPagos]![PagoEsMa].SetFocus
+Forms![EsMaPagos]![FechaEsMa].Enabled = False
+End Sub
+
+Private Sub AgregarDesc_Click()
+DoCmd.OpenForm "EsMaDescuentos", , , "[EsMa].[IdEsMa]=" & Me![IdEsMa]
+Forms![EsMaDescuentos]![DescuentoEsMa].SetFocus
+Forms![EsMaDescuentos]![FechaEsMa].Enabled = False
+End Sub
+
+Private Sub Comando25_Click()
+On Error GoTo Err_Comando25_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "OrdenVer"
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Comando25_Click:
+    Exit Sub
+
+Err_Comando25_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando25_Click
+End Sub
+
+Private Sub Form_Close()
+If EstaCargado("EsMa_EdoCta") = True Then
+ Forms![EsMa_EdoCta].Requery
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+On Error GoTo erroress
+If EstaCargado("EsMa_EdoCta") = True Then
+    
+    If Forms![EsMa_EdoCta]![QueTipoMaq] = 1 Then
+     Me![EsMaRecibosSem].Form.RecordSource = "EsMaRecibosSemCon"
+     EsEst = False
+     
+    ElseIf Forms![EsMa_EdoCta]![QueTipoMaq] = 2 Then
+     Me![EsMaRecibosSem].Form.RecordSource = "EsMaRecibosSemEstCon"
+     EsEst = True
+     
+    End If
+    
+  If IsNull(Forms![EsMa_EdoCta]![IdRecibos]) = False Then
+    Me.RecordsetClone.FindFirst "[IdEsMa] = " & Forms![EsMa_EdoCta]![IdEsMa]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+  End If
+End If
+erroress:
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub Agregar_Click()
+    DoCmd.GoToRecord , , acNewRec
+
+If EstaCargado("EsMa_EdoCta") = True Then
+ IdMaquileros = Forms![EsMa_EdoCta]![QueMaq]
+ FechaEsMa.Enabled = True
+End If
+    
+End Sub
+
+
+Private Sub Comando24_Click()
+On Error GoTo Err_Comando24_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "RecibosSemanalesMaq"
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Comando24_Click:
+    Exit Sub
+
+Err_Comando24_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando24_Click
+    
+End Sub
+
+Private Sub VerPag_AfterUpdate()
+If VerPag = 1 Then
+ QuePagEs = "*"
+ CuantasFaltan = "*"
+ElseIf VerPag = 2 Then
+ QuePagEs = False
+ CuantasFaltan = "a"
+End If
+
+EsMaRecibosSem.Requery
+End Sub
+Private Sub Comando37_Click()
+On Error GoTo Err_Comando37_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "MaqExis"
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Comando37_Click:
+    Exit Sub
+
+Err_Comando37_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando37_Click
+    
+End Sub

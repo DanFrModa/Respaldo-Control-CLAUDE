@@ -1,0 +1,390 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1814163752
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9495
+    DatasheetFontHeight = 10
+    ItemSuffix = 21
+    Left = 5670
+    Top = 765
+    Right = 15450
+    Bottom = 8235
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x00a6f8b89917e440
+    End
+    RecordSource ="EsMa_SaldosMaq"
+    Caption ="EsMa_SaldosMaq"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 680
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Top = 396
+                    Width = 2265
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Maq Etiqueta"
+                    Caption ="Maquilero"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Maq_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 2265
+                    Top = 396
+                    Width = 1140
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Reci Etiqueta"
+                    Caption ="Recibido"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Reci_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 3405
+                    Top = 396
+                    Width = 1140
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Pag Etiqueta"
+                    Caption ="Pagos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Pag_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 4545
+                    Top = 396
+                    Width = 1140
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descu Etiqueta"
+                    Caption ="Descuentos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descu_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 5685
+                    Top = 396
+                    Width = 1140
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Abo Etiqueta"
+                    Caption ="Abonos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Abo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 3
+                    Left = 6825
+                    Top = 396
+                    Width = 1251
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Saldo Etiqueta"
+                    Caption ="Saldo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Saldo_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7483
+                    Width = 513
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 3285
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta14"
+                    Caption ="SALDOS DE MAQUILEROS"
+                End
+            End
+        End
+        Begin Section
+            Height = 315
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Width = 2265
+                    Height = 315
+                    ColumnWidth = 2310
+                    Name ="Maq"
+                    ControlSource ="Maq"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 2265
+                    Width = 1140
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Reci"
+                    ControlSource ="Reci"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 3405
+                    Width = 1140
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Pag"
+                    ControlSource ="Pag"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 4545
+                    Width = 1140
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Descu"
+                    ControlSource ="Descu"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 5685
+                    Width = 1140
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="Abo"
+                    ControlSource ="Abo"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 6825
+                    Width = 1251
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 5
+                    BackColor = 255
+                    Name ="Saldo"
+                    ControlSource ="Saldo"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 8535
+                    Top = 75
+                    Width = 351
+                    Height = 178
+                    TabIndex = 6
+                    Name ="VerMaq"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 510
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 8235
+                    Top = 45
+                    Width = 1146
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 6795
+                    Top = 113
+                    Width = 1281
+                    TabIndex = 1
+                    Name ="SaldoTotal"
+                    ControlSource ="=Sum([saldo])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5789
+                            Top = 113
+                            Width = 1020
+                            Height = 240
+                            Name ="Etiqueta19"
+                            Caption ="Saldo Total:"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub VerMaq_Click()
+    DoCmd.OpenForm "EsMa_EdoCta"
+    Forms![EsMa_EdoCta]![QueMaq] = IdMaquileros
+    Forms![EsMa_EdoCta].Requery
+End Sub

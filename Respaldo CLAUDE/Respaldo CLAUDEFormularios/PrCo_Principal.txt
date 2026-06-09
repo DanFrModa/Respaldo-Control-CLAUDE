@@ -1,0 +1,860 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1015950287
+Begin Form
+    RecordSelectors = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 12925
+    DatasheetFontHeight = 10
+    ItemSuffix = 62
+    Left = 2400
+    Top = 75
+    Right = 17400
+    Bottom = 7770
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x677864329862e340
+    End
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 60
+                    Width = 2310
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="SACAR PRECOSTOS"
+                End
+            End
+        End
+        Begin Section
+            Height = 7370
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 279
+                    Width = 1311
+                    Height = 3517
+                    Name ="QueFamilia"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Familia.IdPrCo_Familia, PrCo_Familia.Familia FROM PrCo_Familia;"
+                    ColumnWidths ="287;284"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 60
+                            Top = 60
+                            Width = 600
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Familia:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 1474
+                    Top = 275
+                    Width = 6111
+                    Height = 3517
+                    TabIndex = 1
+                    Name ="QueModelo"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Modelos.IdPrCo_Modelos, PrCo_Modelos.TipoModelo, PrCo_Modelos.Descri"
+                        "pcion, PrCo_Maquilas.IdPrCo_Clientes FROM PrCo_Modelos INNER JOIN PrCo_Maquilas "
+                        "ON PrCo_Modelos.IdPrCo_Modelos = PrCo_Maquilas.IdPrCo_Modelos WHERE (((PrCo_Maqu"
+                        "ilas.IdPrCo_Clientes)=[Formularios]![PrCo_Principal]![QueCliente]) AND ((PrCo_Mo"
+                        "delos.IdPrCo_Familia)=[Formularios]![PrCo_Principal]![QueFamilia])) ORDER BY PrC"
+                        "o_Modelos.IdPrCo_Modelos;"
+                    ColumnWidths ="287;1701;567"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1481
+                            Top = 56
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta3"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 56
+                    Top = 4187
+                    Width = 1821
+                    Height = 3067
+                    TabIndex = 2
+                    Name ="QueCliente"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Clientes.IdPrCo_Clientes, PrCo_Clientes.TipoCliente, [Descuento]*100"
+                        " AS [Desc] FROM PrCo_Clientes;"
+                    ColumnWidths ="286;1134;284"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 63
+                            Top = 3968
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta5"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 1984
+                    Top = 4187
+                    Width = 1656
+                    Height = 3067
+                    TabIndex = 3
+                    Name ="QueTela"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Telas.IdPrCo_Telas, PrCo_Telas.NombreTela FROM PrCo_Telas INNER JOIN"
+                        " PrCo_TelasClientes ON PrCo_Telas.IdPrCo_Telas = PrCo_TelasClientes.IdPrCo_Telas"
+                        " WHERE (((PrCo_TelasClientes.IdPrCo_Clientes)=[Formularios]![PrCo_Principal]![Qu"
+                        "eCliente]));"
+                    ColumnWidths ="284;567"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1991
+                            Top = 3968
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta7"
+                            Caption ="Tela:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 3741
+                    Top = 4187
+                    Width = 1416
+                    Height = 3067
+                    TabIndex = 4
+                    Name ="QueMarca"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Marcas.IdPrCo_Marcas, PrCo_Marcas.Marca, CInt([regalias]*100) AS Reg"
+                        "al, PrCo_MarClient.IdPrCo_Clientes FROM PrCo_Marcas INNER JOIN PrCo_MarClient ON"
+                        " PrCo_Marcas.IdPrCo_Marcas = PrCo_MarClient.IdPrCo_Marcas WHERE (((PrCo_MarClien"
+                        "t.IdPrCo_Clientes)=[Formularios]![PrCo_Principal]![QueCliente]));"
+                    ColumnWidths ="285;853;227"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3748
+                            Top = 3968
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta9"
+                            Caption ="Marca:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 11622
+                    Top = 6803
+                    Width = 1191
+                    Height = 448
+                    FontWeight = 700
+                    TabIndex = 5
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 9189
+                    Top = 549
+                    Width = 681
+                    TabIndex = 6
+                    BorderColor = 4210752
+                    Name ="CTela"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8163
+                            Top = 549
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta13"
+                            Caption ="Tela:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 9189
+                    Top = 909
+                    Width = 681
+                    TabIndex = 7
+                    BorderColor = 4210752
+                    Name ="CMaquila"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8163
+                            Top = 909
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta15"
+                            Caption ="Maquila:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 9189
+                    Top = 1269
+                    Width = 681
+                    TabIndex = 8
+                    BorderColor = 4210752
+                    Name ="CHab"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8163
+                            Top = 1271
+                            Width = 945
+                            Height = 240
+                            Name ="Etiqueta17"
+                            Caption ="Habilitacion:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8848
+                    Top = 2721
+                    Width = 741
+                    TabIndex = 9
+                    BorderColor = 4210752
+                    Name ="CReg"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 8107
+                            Top = 2721
+                            Width = 735
+                            Height = 240
+                            Name ="Etiqueta19"
+                            Caption ="Regalias:"
+                        End
+                    End
+                End
+                Begin Rectangle
+                    OverlapFlags = 255
+                    Left = 8107
+                    Top = 436
+                    Width = 4647
+                    Height = 1542
+                    Name ="Cuadro24"
+                End
+                Begin Label
+                    SpecialEffect = 3
+                    OverlapFlags = 247
+                    Left = 8100
+                    Top = 225
+                    Width = 2145
+                    Height = 225
+                    Name ="Etiqueta25"
+                    Caption ="Detalle de Costos Estimados:"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    OverlapFlags = 85
+                    Left = 7808
+                    Top = 113
+                    Width = 15
+                    Height = 7080
+                    Name ="Línea26"
+                End
+                Begin Line
+                    OverlapFlags = 119
+                    SpecialEffect = 3
+                    Left = 10034
+                    Top = 510
+                    Width = 0
+                    Height = 1357
+                    Name ="Línea27"
+                End
+                Begin TextBox
+                    DecimalPlaces = 3
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 247
+                    BackStyle = 0
+                    Left = 10832
+                    Top = 566
+                    Width = 456
+                    TabIndex = 10
+                    BorderColor = 4210752
+                    Name ="CConsumo"
+                    Format ="0.000"
+                    Begin
+                        Begin Label
+                            OldBorderStyle = 1
+                            OverlapFlags = 255
+                            Left = 10091
+                            Top = 567
+                            Width = 735
+                            Height = 240
+                            BorderColor = 4210752
+                            Name ="Etiqueta29"
+                            Caption ="Consumo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 247
+                    BackStyle = 0
+                    Left = 12021
+                    Top = 566
+                    Width = 666
+                    TabIndex = 11
+                    BorderColor = 4210752
+                    Name ="CPrecioTela"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OldBorderStyle = 1
+                            OverlapFlags = 255
+                            Left = 11451
+                            Top = 567
+                            Width = 570
+                            Height = 240
+                            BorderColor = 4210752
+                            Name ="Etiqueta31"
+                            Caption ="Precio:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 7993
+                    Top = 6179
+                    Width = 4821
+                    Height = 585
+                    TabIndex = 12
+                    BorderColor = 4210752
+                    ForeColor = 255
+                    Name ="QueError"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 7993
+                            Top = 5952
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta33"
+                            Caption ="Error:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 10257
+                    Top = 2157
+                    Width = 1086
+                    TabIndex = 13
+                    BorderColor = 4210752
+                    Name ="CostoEstimado"
+                    ControlSource ="=[ctela]+[cmaquila]+[caplicaciones]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 8107
+                            Top = 2154
+                            Width = 2025
+                            Height = 240
+                            Name ="Etiqueta36"
+                            Caption ="Costo Estimado (sin marca):"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 10265
+                    Top = 3972
+                    Width = 1086
+                    TabIndex = 14
+                    BorderColor = 4210752
+                    Name ="PrecioVenta"
+                    ControlSource ="=aumentarmargen(([costoestimado]),[quecliente])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 8107
+                            Top = 3968
+                            Width = 1575
+                            Height = 240
+                            Name ="Etiqueta38"
+                            Caption ="Precio Venta Minimo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 10265
+                    Top = 4770
+                    Width = 1086
+                    TabIndex = 15
+                    BorderColor = 4210752
+                    Name ="PrecioPublico"
+                    ControlSource ="=publicosugerido([precioventa],[quecliente])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 8107
+                            Top = 4762
+                            Width = 1965
+                            Height = 240
+                            Name ="Etiqueta40"
+                            Caption ="Venta Al Publico Sugerido:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 5272
+                    Top = 4187
+                    Width = 2316
+                    Height = 3067
+                    TabIndex = 16
+                    Name ="QueAplicacion"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Aplicaciones.IdPrCo_Aplicaciones, PrCo_Aplicaciones.Aplicacion, PrCo"
+                        "_Aplicaciones.Descripcion FROM PrCo_Aplicaciones;"
+                    ColumnWidths ="286;854;228"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5279
+                            Top = 3968
+                            Width = 1530
+                            Height = 240
+                            Name ="Etiqueta42"
+                            Caption ="Aplicaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 247
+                    BackStyle = 0
+                    Left = 9189
+                    Top = 1631
+                    Width = 681
+                    TabIndex = 17
+                    BorderColor = 4210752
+                    Name ="CAplicaciones"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 8160
+                            Top = 1635
+                            Width = 1020
+                            Height = 240
+                            Name ="Etiqueta44"
+                            Caption ="Aplicaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 10730
+                    Top = 2721
+                    Width = 621
+                    TabIndex = 18
+                    BorderColor = 4210752
+                    Name ="CRegPor"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OldBorderStyle = 1
+                            OverlapFlags = 93
+                            Left = 9890
+                            Top = 2721
+                            Width = 840
+                            Height = 240
+                            BorderColor = 4210752
+                            Name ="Etiqueta46"
+                            Caption ="Porcentaje:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 11565
+                    Top = 3972
+                    Width = 741
+                    TabIndex = 19
+                    BorderColor = 4210752
+                    Name ="MargenNos"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 11565
+                    Top = 4766
+                    Width = 741
+                    TabIndex = 20
+                    BorderColor = 4210752
+                    Name ="Texto49"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 9073
+                    Top = 3081
+                    Width = 516
+                    TabIndex = 21
+                    BorderColor = 4210752
+                    Name ="Texto50"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8100
+                            Top = 3075
+                            Width = 975
+                            Height = 240
+                            Name ="Etiqueta51"
+                            Caption ="Descuentos:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 10730
+                    Top = 3081
+                    Width = 621
+                    TabIndex = 22
+                    BorderColor = 4210752
+                    Name ="Texto52"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OldBorderStyle = 1
+                            OverlapFlags = 93
+                            Left = 9890
+                            Top = 3081
+                            Width = 840
+                            Height = 240
+                            BorderColor = 4210752
+                            Name ="Etiqueta53"
+                            Caption ="Porcentaje:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 9080
+                    Top = 3464
+                    Width = 516
+                    TabIndex = 23
+                    BorderColor = 4210752
+                    Name ="Texto58"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8107
+                            Top = 3458
+                            Width = 975
+                            Height = 240
+                            Name ="Etiqueta59"
+                            Caption ="Margen:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 10730
+                    Top = 3447
+                    Width = 621
+                    TabIndex = 24
+                    BorderColor = 4210752
+                    Name ="Texto60"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OldBorderStyle = 1
+                            OverlapFlags = 93
+                            Left = 9890
+                            Top = 3447
+                            Width = 840
+                            Height = 240
+                            BorderColor = 4210752
+                            Name ="Etiqueta61"
+                            Caption ="Porcentaje:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueAplicacion_AfterUpdate()
+Dim Dbs As Database
+  Dim RstAp
+  Set Dbs = CurrentDb
+Set RstAp = Dbs.OpenRecordset("SELECT PrecioAp FROM PrCo_Aplicaciones WHERE (IdPrCo_Aplicaciones)=" & Me!QueAplicacion)
+
+CAplicaciones = RstAp!PrecioAp
+
+RstAp.Close
+Dbs.Close
+End Sub
+
+Private Sub QueCliente_AfterUpdate()
+QueError = ""
+
+CTela = ""
+QueTela = ""
+QueMarca = ""
+QueError = "Debes de seleccionar una tela para poder costear el precio de la tela."
+
+QueTela.Requery
+QueMarca.Requery
+QueModelo.Requery
+
+
+If QueModelo <> "" Then
+Call SacarMaquila
+Else
+QueError = "Debes de seleccionar un modelo para poder costear el precio de la maquila."
+End If
+
+End Sub
+
+Private Sub QueFamilia_AfterUpdate()
+QueModelo.Requery
+QueModelo = ""
+End Sub
+
+Private Sub QueMarca_AfterUpdate()
+Dim Dbs As Database
+  Dim RstReg
+  Set Dbs = CurrentDb
+Set RstReg = Dbs.OpenRecordset("SELECT Regalias FROM PrCo_Marcas WHERE (IdPrCo_Marcas)=" & Me!QueMarca)
+
+CRegPor = RstReg!Regalias
+
+RstReg.Close
+Dbs.Close
+End Sub
+
+Private Sub QueModelo_AfterUpdate()
+QueError = ""
+If QueTela <> "" Then
+Call SacarTela
+Else
+QueError = "Debes de seleccionar una tela para poder costear la tela."
+End If
+
+If QueCliente <> "" Then
+Call SacarMaquila
+Else
+QueError = "Debes de seleccionar un cliente para poder costear el precio de la maquila."
+End If
+
+End Sub
+
+Private Sub QueTela_AfterUpdate()
+QueError = ""
+If QueModelo <> "" Then
+Call SacarTela
+Else
+QueError = "Debes de seleccionar un modelo para poder costear la tela."
+End If
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+Private Sub SacarTela()
+Dim Dbs As Database
+  Dim RstTelas, RstModelos
+  Set Dbs = CurrentDb
+Set RstModelos = Dbs.OpenRecordset("SELECT Consumo FROM PrCo_Modelos WHERE (IdPrCo_Modelos)=" & Me!QueModelo)
+Set RstTelas = Dbs.OpenRecordset("SELECT Precio, FactorPeso FROM PrCo_Telas WHERE (IdPrCo_Telas)=" & Me!QueTela)
+
+CConsumo = RstModelos!Consumo * RstTelas!FactorPeso
+CPrecioTela = RstTelas!Precio
+CTela = (RstModelos!Consumo * RstTelas!FactorPeso) * (RstTelas!Precio)
+
+RstModelos.Close
+RstTelas.Close
+Dbs.Close
+End Sub
+Private Sub SacarMaquila()
+Dim Dbs As Database
+  Dim RstMaq
+  Set Dbs = CurrentDb
+Set RstMaq = Dbs.OpenRecordset("SELECT PrecioMaq FROM PrCo_Maquilas WHERE (IdPrCo_Modelos)=" & Me!QueModelo & " AND (IdPrCo_Clientes)=" & Me!QueCliente)
+
+CMaquila = RstMaq!PrecioMaq
+
+RstMaq.Close
+Dbs.Close
+End Sub
+Private Function AumentarMargen(Precio As Single, queClie As Integer) As Single
+Dim Tot As Single
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT Descuento, MargenBruto From PrCo_Clientes WHERE IdPrCo_Clientes=" & queClie)
+ 
+ Tot = ((Rst!Descuento + Rst!MargenBruto) - 1) * -1
+    AumentarMargen = (Precio / Tot)
+    
+    Rst.Close
+    Dbs.Close
+End Function
+Private Function PublicoSugerido(Venta As Single, queClie As Integer) As Single
+Dim Tot, Tot1 As Single
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT MargenEllos From PrCo_Clientes WHERE IdPrCo_Clientes=" & queClie)
+
+    Tot = (Rst!MargenEllos - 1) * -1
+    PublicoSugerido = Venta / Tot * 1.15
+    
+    Rst.Close
+    Dbs.Close
+End Function

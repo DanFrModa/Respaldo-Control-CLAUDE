@@ -1,0 +1,83 @@
+Operation = 1
+Option = 0
+Having ="(((Sum(ExisTelaPrec.Total))<>0))"
+Begin InputTables
+    Name ="ExisTelaPrec"
+End
+Begin OutputColumns
+    Expression ="ExisTelaPrec.Nombre"
+    Expression ="ExisTelaPrec.MedTela"
+    Alias ="TotTela1"
+    Expression ="Sum(ExisTelaPrec.ExTela1)"
+    Alias ="TotTela2"
+    Expression ="Sum(ExisTelaPrec.ExTela2)"
+    Alias ="Total"
+    Expression ="Sum(ExisTelaPrec.Total)"
+    Alias ="PrecioProm"
+    Expression ="Avg(ExisTelaPrec.Precio)"
+    Alias ="Importe"
+    Expression ="Sum(ExisTelaPrec.Importe)"
+    Expression ="ExisTelaPrec.Favorito"
+    Expression ="ExisTelaPrec.Medida"
+    Expression ="ExisTelaPrec.Texto1"
+    Expression ="ExisTelaPrec.Texto2"
+    Expression ="ExisTelaPrec.Descripcion"
+    Expression ="ExisTelaPrec.IdTelasCategorias"
+    Expression ="ExisTelaPrec.IdTelas"
+    Alias ="SK"
+    Expression ="Sum(ExisTelaPrec.SumKilos)"
+    Alias ="IK"
+    Expression ="Sum(ExisTelaPrec.ImpKilos)"
+    Alias ="SM"
+    Expression ="Sum(ExisTelaPrec.SumMetros)"
+    Alias ="IM"
+    Expression ="Sum(ExisTelaPrec.ImpMetros)"
+End
+Begin Groups
+    Expression ="ExisTelaPrec.Nombre"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.MedTela"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.Favorito"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.Medida"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.Texto1"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.Texto2"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.Descripcion"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.IdTelasCategorias"
+    GroupLevel = 0
+    Expression ="ExisTelaPrec.IdTelas"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 34
+    Top = -8
+    Right = 1216
+    Bottom = 305
+    Left = -1
+    Top = -1
+    Right = 1171
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 443
+        Top = 7
+        Right = 585
+        Bottom = 121
+        Top = 8
+        Name ="ExisTelaPrec"
+    End
+End

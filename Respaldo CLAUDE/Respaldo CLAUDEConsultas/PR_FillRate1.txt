@@ -1,0 +1,139 @@
+Operation = 1
+Option = 0
+Having ="(((PedidosReales.FechaFinPR) Is Not Null))"
+Begin InputTables
+    Name ="Ordenes"
+    Name ="Modelos"
+    Name ="PedidosDet"
+    Name ="Pedidos"
+    Name ="Clientes"
+    Name ="Empresas"
+    Name ="PedidosReales"
+End
+Begin OutputColumns
+    Expression ="Pedidos.NumeroPed"
+    Expression ="Ordenes.Numero"
+    Expression ="Modelos.Modelo"
+    Expression ="Clientes.Cliente"
+    Expression ="Empresas.Empresa"
+    Expression ="PedidosReales.FechaFinPR"
+    Expression ="PedidosReales.FechaEntregadaReal"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="PedidosDet"
+    Expression ="Ordenes.IdPedidosDet = PedidosDet.IdPedidosDet"
+    Flag = 3
+    LeftTable ="Modelos"
+    RightTable ="PedidosDet"
+    Expression ="Modelos.IdModelos = PedidosDet.IdModelos"
+    Flag = 3
+    LeftTable ="PedidosDet"
+    RightTable ="Pedidos"
+    Expression ="PedidosDet.IdPedidos = Pedidos.IdPedidos"
+    Flag = 2
+    LeftTable ="Pedidos"
+    RightTable ="Clientes"
+    Expression ="Pedidos.IdClientes = Clientes.IdClientes"
+    Flag = 2
+    LeftTable ="Pedidos"
+    RightTable ="Empresas"
+    Expression ="Pedidos.IdEmpresas = Empresas.IdEmpresas"
+    Flag = 2
+    LeftTable ="Pedidos"
+    RightTable ="PedidosReales"
+    Expression ="Pedidos.IdPedidos = PedidosReales.IdPedidos"
+    Flag = 2
+End
+Begin Groups
+    Expression ="Pedidos.NumeroPed"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+    Expression ="Empresas.Empresa"
+    GroupLevel = 0
+    Expression ="PedidosReales.FechaFinPR"
+    GroupLevel = 0
+    Expression ="PedidosReales.FechaEntregadaReal"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 532
+    Left = -1
+    Top = -1
+    Right = 1185
+    Bottom = 243
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 690
+        Top = 3
+        Right = 786
+        Bottom = 119
+        Top = 2
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 318
+        Top = 98
+        Right = 414
+        Bottom = 214
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 93
+        Top = 14
+        Right = 189
+        Bottom = 130
+        Top = 0
+        Name ="PedidosDet"
+    End
+    Begin
+        Left = 470
+        Top = 67
+        Right = 601
+        Bottom = 183
+        Top = 0
+        Name ="Pedidos"
+    End
+    Begin
+        Left = 641
+        Top = 115
+        Right = 737
+        Bottom = 216
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 813
+        Top = 77
+        Right = 909
+        Bottom = 193
+        Top = 0
+        Name ="Empresas"
+    End
+    Begin
+        Left = 946
+        Top = 25
+        Right = 1117
+        Bottom = 201
+        Top = 0
+        Name ="PedidosReales"
+    End
+End

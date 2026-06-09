@@ -1,0 +1,316 @@
+Version = 17
+VersionRequired = 17
+Checksum = -676421762
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10766
+    DatasheetFontHeight = 10
+    ItemSuffix = 16
+    Left = 5400
+    Top = 315
+    Right = 17070
+    Bottom = 10290
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xdc85bfbcd525e440
+    End
+    RecordSource ="Prom_Entregas"
+    Caption ="Prom_Entregas"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 9527
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6835
+                    Top = 113
+                    Width = 321
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdProm_Entregas"
+                    ControlSource ="IdProm_Entregas"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5215
+                            Top = 113
+                            Width = 1560
+                            Height = 255
+                            Name ="IdProm_Entregas Etiqueta"
+                            Caption ="IdProm_Entregas"
+                            EventProcPrefix ="IdProm_Entregas_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 1676
+                    Top = 56
+                    Width = 1545
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 56
+                            Width = 1560
+                            Height = 255
+                            Name ="Fecha Etiqueta"
+                            Caption ="Fecha"
+                            EventProcPrefix ="Fecha_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 1676
+                    Top = 398
+                    Width = 465
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 2
+                    Name ="NumeroEntrega"
+                    ControlSource ="NumeroEntrega"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 398
+                            Width = 1560
+                            Height = 255
+                            Name ="NumeroEntrega Etiqueta"
+                            Caption ="NumeroEntrega"
+                            EventProcPrefix ="NumeroEntrega_Etiqueta"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 56
+                    Top = 977
+                    Width = 10710
+                    Height = 8550
+                    TabIndex = 3
+                    Name ="Prom_EntregasDet"
+                    SourceObject ="Form.Prom_EntregasDet"
+                    LinkChildFields ="IdProm_Entregas"
+                    LinkMasterFields ="IdProm_Entregas"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 737
+                            Width = 1410
+                            Height = 240
+                            Name ="Prom_EntregasDetEtiqueta"
+                            Caption ="Prom_EntregasDet"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4454
+                    Top = 396
+                    Width = 465
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Tienda"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3584
+                            Top = 396
+                            Width = 810
+                            Height = 255
+                            Name ="Etiqueta11"
+                            Caption ="Tienda:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6803
+                    Top = 453
+                    Width = 1860
+                    Height = 405
+                    TabIndex = 5
+                    Name ="Comando13"
+                    Caption ="Abrir File"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 8850
+                    Width = 1230
+                    Height = 405
+                    TabIndex = 6
+                    Name ="Comando14"
+                    Caption ="Imprimir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando13_Click()
+On Error GoTo Err_Comando13_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "Prom_EntregasFile"
+    
+    stLinkCriteria = "[IdProm_Entregas]=" & Me![IdProm_Entregas]
+    DoCmd.OpenForm stDocName, acFormDS, , stLinkCriteria
+
+Exit_Comando13_Click:
+    Exit Sub
+
+Err_Comando13_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando13_Click
+    
+End Sub
+
+Private Sub Comando14_Click()
+DoCmd.OpenForm "Prom_EntregaRemImp"
+Forms![Prom_EntregaRemImp]![QueId] = IdProm_Entregas
+DoCmd.OpenForm "Prom_ImpAux"
+
+End Sub
+
+Private Sub TiendasImp_Click()
+DoCmd.OpenForm "Prom_ImpAux"
+End Sub

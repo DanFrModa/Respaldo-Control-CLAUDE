@@ -1,0 +1,77 @@
+Operation = 1
+Option = 0
+Where ="(((Entradas.Fecha)>=[Formularios]![VerificadorInv]![FechaDe]))"
+Having ="(((TelasColAlm.IdAlmacenes)=[Formularios]![VerificadorInv]![QueAlm]))"
+Begin InputTables
+    Name ="EntradasDet"
+    Name ="TelasColAlm"
+    Name ="Entradas"
+End
+Begin OutputColumns
+    Expression ="TelasColAlm.IdTelasColores"
+    Alias ="TotTelaE1"
+    Expression ="Sum(EntradasDet.TelaEnt1)"
+    Alias ="TotTelaE2"
+    Expression ="Sum(EntradasDet.TelaEnt2)"
+    Expression ="TelasColAlm.IdAlmacenes"
+End
+Begin Joins
+    LeftTable ="EntradasDet"
+    RightTable ="TelasColAlm"
+    Expression ="EntradasDet.IdTelasColAlm = TelasColAlm.IdTelasColAlm"
+    Flag = 1
+    LeftTable ="EntradasDet"
+    RightTable ="Entradas"
+    Expression ="EntradasDet.IdEntradas = Entradas.IdEntradas"
+    Flag = 2
+End
+Begin Groups
+    Expression ="TelasColAlm.IdTelasColores"
+    GroupLevel = 0
+    Expression ="TelasColAlm.IdAlmacenes"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 48
+    Right = 1002
+    Bottom = 353
+    Left = -1
+    Top = -1
+    Right = 951
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 636
+        Top = 6
+        Right = 825
+        Bottom = 113
+        Top = 0
+        Name ="EntradasDet"
+    End
+    Begin
+        Left = 399
+        Top = 6
+        Right = 554
+        Bottom = 113
+        Top = 0
+        Name ="TelasColAlm"
+    End
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Entradas"
+    End
+End

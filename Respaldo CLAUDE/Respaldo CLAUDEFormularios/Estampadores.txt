@@ -1,0 +1,439 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1558261517
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10375
+    DatasheetFontHeight = 10
+    ItemSuffix = 29
+    Left = 4155
+    Top = 315
+    Right = 14535
+    Bottom = 6195
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x9eb4212d50b7e240
+    End
+    RecordSource ="SELECT Estampadores.IdEstampadores, Estampadores.Activo, Estampadores.Corto, Est"
+        "ampadores.Nombre, Estampadores.Apellidos, Estampadores.Telefonos, Estampadores.D"
+        "ireccion, Estampadores.Observaciones FROM Estampadores ORDER BY Estampadores.Act"
+        "ivo, Estampadores.Corto;"
+    Caption ="Maquileros"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 510
+            BackColor = 39423
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 120
+                    Width = 4665
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta22"
+                    Caption ="DIRECTORIO DE ESTAMPADORES Y BORDADORES"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 5159
+                    Top = 170
+                    Name ="Editar"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 5389
+                            Top = 140
+                            Width = 1080
+                            Height = 240
+                            ForeColor = 16777215
+                            Name ="Etiqueta27"
+                            Caption ="Editar Datos"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 8050
+                    Top = 125
+                    Height = 328
+                    TabIndex = 1
+                    Name ="AgregarMaq"
+                    Caption ="Agregar Estampador"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 5385
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9357
+                    Top = 226
+                    Width = 126
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 9
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 3640
+                    Top = 226
+                    Width = 1185
+                    Height = 255
+                    ColumnWidth = 1185
+                    Name ="Corto"
+                    ControlSource ="Corto"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2499
+                            Top = 233
+                            Width = 1065
+                            Height = 255
+                            Name ="Corto Etiqueta"
+                            Caption ="Nombre Corto:"
+                            EventProcPrefix ="Corto_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 3640
+                    Top = 568
+                    Width = 1185
+                    Height = 255
+                    ColumnWidth = 1185
+                    TabIndex = 1
+                    Name ="Nombre"
+                    ControlSource ="Nombre"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2494
+                            Top = 568
+                            Width = 1086
+                            Height = 255
+                            Name ="Nombre Etiqueta"
+                            Caption ="Nombre"
+                            EventProcPrefix ="Nombre_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 3640
+                    Top = 910
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Apellidos"
+                    ControlSource ="Apellidos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2494
+                            Top = 910
+                            Width = 1086
+                            Height = 255
+                            Name ="Apellidos Etiqueta"
+                            Caption ="Apellidos"
+                            EventProcPrefix ="Apellidos_Etiqueta"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 6239
+                    Top = 283
+                    TabIndex = 6
+                    Name ="Activo"
+                    ControlSource ="Activo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5672
+                            Top = 226
+                            Width = 501
+                            Height = 255
+                            Name ="Activo Etiqueta"
+                            Caption ="Activo"
+                            EventProcPrefix ="Activo_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 3643
+                    Top = 3040
+                    Width = 2985
+                    Height = 1755
+                    ColumnWidth = 3000
+                    TabIndex = 4
+                    Name ="Direccion"
+                    ControlSource ="Direccion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2497
+                            Top = 3061
+                            Width = 1086
+                            Height = 255
+                            Name ="Direccion Etiqueta"
+                            Caption ="Direccion:"
+                            EventProcPrefix ="Direccion_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 6785
+                    Top = 550
+                    Width = 3312
+                    Height = 4245
+                    ColumnWidth = 3000
+                    TabIndex = 5
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6749
+                            Top = 226
+                            Width = 1140
+                            Height = 255
+                            Name ="Encargados Etiqueta"
+                            Caption ="Observaciones"
+                            EventProcPrefix ="Encargados_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 3640
+                    Top = 1303
+                    Width = 2985
+                    Height = 1590
+                    TabIndex = 3
+                    Name ="Telefonos"
+                    ControlSource ="Telefonos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2494
+                            Top = 1303
+                            Width = 1086
+                            Height = 255
+                            Name ="Etiqueta19"
+                            Caption ="Telefonos:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 113
+                    Top = 231
+                    Width = 2154
+                    Height = 5044
+                    TabIndex = 8
+                    Name ="QueMaq"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Estampadores.IdEstampadores, Estampadores.Corto, Estampadores.Activo FROM"
+                        " Estampadores ORDER BY Estampadores.Activo, Estampadores.Corto;"
+                    ColumnWidths ="0;1418;286"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 9009
+                    Top = 4932
+                    Width = 1071
+                    FontWeight = 700
+                    TabIndex = 7
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub AgregarMaq_Click()
+DoCmd.GoToRecord , , acNewRec
+QueMaq.Requery
+End Sub
+
+Private Sub Editar_AfterUpdate()
+Dim Aa As Boolean
+If Editar = False Then
+Aa = True
+Else
+Aa = False
+End If
+
+Corto.Locked = Aa
+Nombre.Locked = Aa
+Apellidos.Locked = Aa
+Telefonos.Locked = Aa
+Direccion.Locked = Aa
+Observaciones.Locked = Aa
+Activo.Locked = Aa
+
+
+End Sub
+
+Private Sub QueMaq_AfterUpdate()
+  ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[Idestampadores] = " & Me![QueMaq]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Sub Cuadro_combinado24_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[Idestampadores] = " & Me![Cuadro combinado24]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub

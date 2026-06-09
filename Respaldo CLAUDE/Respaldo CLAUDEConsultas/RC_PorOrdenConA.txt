@@ -1,0 +1,154 @@
+Operation = 1
+Option = 0
+Having ="(((Ordenes.SI_RC)=Yes) AND ((Ordenes.RC_Viva)=Yes) AND ((Clientes.IdClientes) Li"
+    "ke [Formularios]![RC_PorOrden]![QueClienteEs]))"
+Begin InputTables
+    Name ="Ordenes"
+    Name ="Modelos"
+    Name ="Clientes"
+    Name ="CantidadOrd"
+    Name ="RC"
+    Name ="RC_DiasRetraso"
+    Name ="RC_PrimeroVacio"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdOrdenes"
+    Expression ="Ordenes.Numero"
+    Expression ="Modelos.Modelo"
+    Expression ="CantidadOrd.CantOrd"
+    Alias ="UltProceso"
+    Expression ="[PrimeroVacio]-1"
+    Expression ="Clientes.Cliente"
+    Expression ="RC_DiasRetraso.DiasRetraso"
+    Expression ="Ordenes.SI_RC"
+    Expression ="Ordenes.RC_Viva"
+    Expression ="Clientes.IdClientes"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Clientes"
+    Expression ="Ordenes.IdClientes = Clientes.IdClientes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="CantidadOrd"
+    Expression ="Ordenes.IdOrdenes = CantidadOrd.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="RC"
+    Expression ="Ordenes.IdOrdenes = RC.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="RC_DiasRetraso"
+    Expression ="Ordenes.IdOrdenes = RC_DiasRetraso.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="RC_PrimeroVacio"
+    Expression ="Ordenes.IdOrdenes = RC_PrimeroVacio.IdOrdenes"
+    Flag = 1
+End
+Begin OrderBy
+    Expression ="Ordenes.Numero"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="CantidadOrd.CantOrd"
+    GroupLevel = 0
+    Expression ="[PrimeroVacio]-1"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+    Expression ="RC_DiasRetraso.DiasRetraso"
+    GroupLevel = 0
+    Expression ="Ordenes.SI_RC"
+    GroupLevel = 0
+    Expression ="Ordenes.RC_Viva"
+    GroupLevel = 0
+    Expression ="Clientes.IdClientes"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1371
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 113
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 98
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 83
+        Top = 0
+        Name ="CantidadOrd"
+    End
+    Begin
+        Left = 708
+        Top = 6
+        Right = 804
+        Bottom = 113
+        Top = 0
+        Name ="RC"
+    End
+    Begin
+        Left = 842
+        Top = 6
+        Right = 980
+        Bottom = 113
+        Top = 0
+        Name ="RC_DiasRetraso"
+    End
+    Begin
+        Left = 1018
+        Top = 6
+        Right = 1114
+        Bottom = 83
+        Top = 0
+        Name ="RC_PrimeroVacio"
+    End
+End

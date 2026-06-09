@@ -1,0 +1,688 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1342986828
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 11451
+    DatasheetFontHeight = 10
+    ItemSuffix = 61
+    Left = 4830
+    Top = 1020
+    Right = 16275
+    Bottom = 8595
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x931d1bb93583e540
+    End
+    RecordSource ="SELECT Maquileros.IdMaquileros, Maquileros.Activo, Maquileros.Corto, Maquileros."
+        "Nombre, Maquileros.Apellidos, Maquileros.Telefonos, Maquileros.Direccion, Maquil"
+        "eros.Observaciones, Maquileros.Costura, Maquileros.Proceso, Maquileros.ObsPago, "
+        "Maquileros.Asegurado FROM Maquileros ORDER BY Maquileros.Activo, Maquileros.Cort"
+        "o;"
+    Caption ="Maquileros"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 680
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 113
+                    Width = 2940
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta22"
+                    Caption ="DIRECTORIO DE MAQUILEROS"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 5669
+                    Top = 86
+                    Name ="Editar"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 5899
+                            Top = 56
+                            Width = 1080
+                            Height = 240
+                            ForeColor = 16777215
+                            Name ="Etiqueta27"
+                            Caption ="Editar Datos"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9241
+                    Top = 56
+                    Height = 328
+                    TabIndex = 1
+                    Name ="AgregarMaq"
+                    Caption ="Agregar Maquilero"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 7937
+                    Top = 86
+                    TabIndex = 2
+                    Name ="Activo"
+                    ControlSource ="Activo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 8171
+                            Top = 56
+                            Width = 504
+                            Height = 255
+                            ForeColor = 16777215
+                            Name ="Activo Etiqueta"
+                            Caption ="Activo"
+                            EventProcPrefix ="Activo_Etiqueta"
+                        End
+                    End
+                End
+                Begin OptionButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3174
+                    TabIndex = 3
+                    Name ="CostSI"
+                    DefaultValue ="True"
+                End
+                Begin OptionButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3514
+                    TabIndex = 4
+                    Name ="ProcSI"
+                    DefaultValue ="True"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 7937
+                    Top = 422
+                    TabIndex = 5
+                    Name ="Asegurado"
+                    ControlSource ="Asegurado"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 215
+                            Left = 8175
+                            Top = 396
+                            Width = 840
+                            Height = 255
+                            ForeColor = 16777215
+                            Name ="Etiqueta52"
+                            Caption ="Asegurado"
+                        End
+                    End
+                End
+            End
+        End
+        Begin Section
+            Height = 6916
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 10491
+                    Top = 453
+                    Width = 126
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 11
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 4774
+                    Top = 453
+                    Width = 1185
+                    Height = 255
+                    ColumnWidth = 1185
+                    TabIndex = 1
+                    Name ="Corto"
+                    ControlSource ="Corto"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3633
+                            Top = 460
+                            Width = 1065
+                            Height = 255
+                            Name ="Corto Etiqueta"
+                            Caption ="Nombre Corto:"
+                            EventProcPrefix ="Corto_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 4774
+                    Top = 795
+                    Width = 1185
+                    Height = 255
+                    ColumnWidth = 1185
+                    TabIndex = 2
+                    Name ="Nombre"
+                    ControlSource ="Nombre"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3628
+                            Top = 795
+                            Width = 1086
+                            Height = 255
+                            Name ="Nombre Etiqueta"
+                            Caption ="Nombre"
+                            EventProcPrefix ="Nombre_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 4774
+                    Top = 1137
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Apellidos"
+                    ControlSource ="Apellidos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3628
+                            Top = 1137
+                            Width = 1086
+                            Height = 255
+                            Name ="Apellidos Etiqueta"
+                            Caption ="Apellidos"
+                            EventProcPrefix ="Apellidos_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 4777
+                    Top = 3721
+                    Width = 2985
+                    Height = 2295
+                    ColumnWidth = 3000
+                    TabIndex = 7
+                    Name ="Direccion"
+                    ControlSource ="Direccion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3631
+                            Top = 3742
+                            Width = 1086
+                            Height = 255
+                            Name ="Direccion Etiqueta"
+                            Caption ="Direccion:"
+                            EventProcPrefix ="Direccion_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 7919
+                    Top = 777
+                    Width = 3312
+                    Height = 2340
+                    ColumnWidth = 3000
+                    TabIndex = 8
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 7883
+                            Top = 453
+                            Width = 1140
+                            Height = 255
+                            Name ="Encargados Etiqueta"
+                            Caption ="Observaciones"
+                            EventProcPrefix ="Encargados_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 4774
+                    Top = 1984
+                    Width = 2985
+                    Height = 1590
+                    TabIndex = 6
+                    Name ="Telefonos"
+                    ControlSource ="Telefonos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3628
+                            Top = 1984
+                            Width = 1086
+                            Height = 255
+                            Name ="Etiqueta19"
+                            Caption ="Telefonos:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    ColumnCount = 5
+                    Left = 113
+                    Top = 908
+                    Width = 3354
+                    Height = 5899
+                    TabIndex = 10
+                    Name ="QueMaq"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Maquileros.IdMaquileros, Maquileros.Corto AS [Nombre Corto], Maquileros.A"
+                        "ctivo, IIf([Costura]=True,\"    X\",\"\") AS Cost, IIf([Proceso]=True,\"    X\","
+                        "\"\") AS Proc, Maquileros.Costura, Maquileros.Proceso FROM Maquileros WHERE (((M"
+                        "aquileros.Proceso)=[Formularios]![Maquileros]![ProcSI])) OR (((Maquileros.Costur"
+                        "a)=[Formularios]![Maquileros]![CostSI])) ORDER BY Maquileros.Activo, Maquileros."
+                        "Corto;"
+                    ColumnWidths ="0;1421;608;584;584"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 9921
+                    Top = 6122
+                    Width = 1281
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 12
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 5215
+                    Top = 1530
+                    TabIndex = 4
+                    Name ="Costura"
+                    ControlSource ="Costura"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 5445
+                            Top = 1517
+                            Width = 615
+                            Height = 240
+                            Name ="Etiqueta30"
+                            Caption ="Costura"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 6349
+                    Top = 1530
+                    TabIndex = 5
+                    Name ="Proceso"
+                    ControlSource ="Proceso"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 6579
+                            Top = 1517
+                            Width = 660
+                            Height = 240
+                            Name ="Etiqueta31"
+                            Caption ="Proceso"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 3630
+                    Top = 1517
+                    Width = 1395
+                    Height = 255
+                    Name ="Etiqueta32"
+                    Caption ="Tipo de Maquilero:"
+                End
+                Begin OptionGroup
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 113
+                    Width = 3359
+                    Height = 463
+                    Name ="QueMaqVer"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="4"
+                    Begin
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 226
+                            Top = 56
+                            Width = 1052
+                            Height = 378
+                            OptionValue = 4
+                            Name ="Alternar36"
+                            Caption ="TODOS"
+                        End
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 1278
+                            Top = 56
+                            Width = 1052
+                            Height = 378
+                            OptionValue = 2
+                            Name ="Alternar37"
+                            Caption ="Costura"
+                        End
+                        Begin ToggleButton
+                            OverlapFlags = 87
+                            Left = 2330
+                            Top = 56
+                            Width = 1052
+                            Height = 378
+                            OptionValue = 3
+                            Name ="Alternar38"
+                            Caption ="Proceso"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 7919
+                    Top = 3511
+                    Width = 3312
+                    Height = 2505
+                    TabIndex = 9
+                    Name ="ObsPago"
+                    ControlSource ="ObsPago"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 7883
+                            Top = 3231
+                            Width = 1245
+                            Height = 255
+                            Name ="Etiqueta48"
+                            Caption ="Datos de Pagos"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6122
+                    Top = 56
+                    Height = 403
+                    TabIndex = 13
+                    Name ="VerEdo"
+                    Caption ="Ver Estado de Cuenta"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    ListWidth = 1440
+                    Left = 114
+                    Top = 566
+                    Width = 2271
+                    TabIndex = 14
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"0\""
+                    Name ="QueMac2"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW Maquileros.IdMaquileros, [Nombre]+\" \"+[apellidos] AS Maq FR"
+                        "OM Maquileros ORDER BY [Nombre]+\" \"+[apellidos];"
+                    ColumnWidths ="0;1440"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT DISTINCTROW Maquileros.IdMaquileros, [Nombre]+\"\" \"\"+[apellidos] AS "
+                        "Maq FROM Maquileros ORDER BY [Nombre]+\"\" \"\"+[apellidos];\";\"Maquileros\";\""
+                        "\";\"IdMaquileros\";\"Nombre]+\"\" \"\"+[apellidos\";\"PrimaryKey\""
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub AgregarMaq_Click()
+DoCmd.GoToRecord , , acNewRec
+QueMaq.Requery
+End Sub
+
+
+
+Private Sub Editar_AfterUpdate()
+Dim Aa As Boolean
+If Editar = False Then
+Aa = True
+Else
+Aa = False
+End If
+
+Corto.Locked = Aa
+Nombre.Locked = Aa
+Apellidos.Locked = Aa
+Telefonos.Locked = Aa
+Direccion.Locked = Aa
+Observaciones.Locked = Aa
+Activo.Locked = Aa
+ObsPago.Locked = Aa
+Costura.Locked = Aa
+Proceso.Locked = Aa
+
+
+End Sub
+
+Private Sub Form_Close()
+If EstaCargado("EsMa_EdoCta") = True Then
+ Forms![EsMa_EdoCta]![QueMaq].Requery
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(24) = True Then
+  VerEdo.Visible = True
+  ObsPago.Visible = True
+End If
+
+If PrP(37) = True Then
+ AgregarMaq.Visible = True
+ Asegurado.Enabled = True
+End If
+End Sub
+
+Private Sub QueMac2_AfterUpdate()
+' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdMaquileros] = " & Me![QueMac2]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+    QueMaq = QueMac2
+End Sub
+
+Private Sub QueMaq_AfterUpdate()
+  ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdMaquileros] = " & Me![QueMaq]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub QueMaqVer_AfterUpdate()
+If QueMaqVer = 4 Then
+  CostSI = True
+  ProcSi = True
+ElseIf QueMaqVer = 2 Then
+  CostSI = True
+  ProcSi = False
+ElseIf QueMaqVer = 3 Then
+  CostSI = False
+  ProcSi = True
+End If
+QueMaq.Requery
+End Sub
+
+Private Sub QuitarFiltro_Click()
+Me.FilterOn = False
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Sub Cuadro_combinado24_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdMaquileros] = " & Me![Cuadro combinado24]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub VerEdo_Click()
+    DoCmd.OpenForm "EsMa_EdoCta"
+    Forms![EsMa_EdoCta]![QueMaq] = IdMaquileros
+    Forms![EsMa_EdoCta].Requery
+End Sub

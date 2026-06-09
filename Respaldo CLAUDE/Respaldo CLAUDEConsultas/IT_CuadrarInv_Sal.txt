@@ -1,0 +1,60 @@
+Operation = 1
+Option = 0
+Where ="(((Salidas.Fecha)>=quefechainvfisico()))"
+Begin InputTables
+    Name ="Salidas"
+    Name ="SalidasDet"
+End
+Begin OutputColumns
+    Expression ="SalidasDet.IdTelasColAlm"
+    Alias ="S1"
+    Expression ="Sum(SalidasDet.TelaSal1)"
+    Alias ="S2"
+    Expression ="Sum(SalidasDet.TelaSal2)"
+End
+Begin Joins
+    LeftTable ="Salidas"
+    RightTable ="SalidasDet"
+    Expression ="Salidas.IdSalidas = SalidasDet.IdSalidas"
+    Flag = 1
+End
+Begin Groups
+    Expression ="SalidasDet.IdTelasColAlm"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="-1"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1371
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 401
+        Top = 6
+        Right = 497
+        Bottom = 113
+        Top = 0
+        Name ="Salidas"
+    End
+    Begin
+        Left = 535
+        Top = 6
+        Right = 631
+        Bottom = 113
+        Top = 1
+        Name ="SalidasDet"
+    End
+End

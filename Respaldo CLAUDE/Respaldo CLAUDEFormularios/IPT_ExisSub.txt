@@ -1,0 +1,470 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1664849691
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    OrderByOn = NotDefault
+    DefaultView = 2
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 11514
+    DatasheetFontHeight = 10
+    ItemSuffix = 30
+    Left = 6285
+    Top = 1140
+    Right = 17010
+    Bottom = 6660
+    DatasheetGridlinesColor = 12632256
+    OrderBy ="Cant DESC"
+    RecSrcDt = Begin
+        0xc57a90bb1683e340
+    End
+    RecordSource ="SELECT IPT_ExisSubCon.NumMod, Sum(IPT_ExisSubCon.Cantidad) AS Cant, IPT_ExisSubC"
+        "on.Numero AS Orden, IPT_ExisSubCon.TipoProducto, IPT_ExisSubCon.Genero, IPT_Exis"
+        "SubCon.Cliente, IPT_ExisSubCon.Empresa, IPT_ExisSubCon.EtiquetaM, IPT_ExisSubCon"
+        ".IdIPT_Modelos, IPT_ExisSubCon.MarcaImpresa AS [Marca Imp], IPT_ExisSubCon.IdOrd"
+        "enes, IPT_ExisSubCon.Ubicacion FROM IPT_ExisSubCon GROUP BY IPT_ExisSubCon.NumMo"
+        "d, IPT_ExisSubCon.Numero, IPT_ExisSubCon.TipoProducto, IPT_ExisSubCon.Genero, IP"
+        "T_ExisSubCon.Cliente, IPT_ExisSubCon.Empresa, IPT_ExisSubCon.EtiquetaM, IPT_Exis"
+        "SubCon.IdIPT_Modelos, IPT_ExisSubCon.MarcaImpresa, IPT_ExisSubCon.IdOrdenes, IPT"
+        "_ExisSubCon.Ubicacion HAVING (((Sum(IPT_ExisSubCon.Cantidad))>=[Formularios]![IP"
+        "T_Exis]![QueNum1Es] And (Sum(IPT_ExisSubCon.Cantidad))<=[Formularios]![IPT_Exis]"
+        "![QueNum2Es] And (Sum(IPT_ExisSubCon.Cantidad))<>0));"
+    Caption ="IPT_ExisSub"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    OnDblClick ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 60
+                    Top = 60
+                    Width = 600
+                    Height = 240
+                    Name ="NumMod Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="NumMod_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 3
+                    Left = 570
+                    Top = 57
+                    Width = 1425
+                    Height = 240
+                    Name ="Cantidad Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cantidad_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3118
+                    Top = 57
+                    Width = 1425
+                    Height = 240
+                    Name ="TipoProducto Etiqueta"
+                    Caption ="TipoProducto"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="TipoProducto_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4600
+                    Top = 57
+                    Width = 1425
+                    Height = 240
+                    Name ="Genero Etiqueta"
+                    Caption ="Genero"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Genero_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 6082
+                    Top = 57
+                    Width = 969
+                    Height = 240
+                    Name ="Cliente Etiqueta"
+                    Caption ="Cliente"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cliente_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7108
+                    Top = 57
+                    Width = 969
+                    Height = 240
+                    Name ="Empresa Etiqueta"
+                    Caption ="Empresa"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Empresa_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 8134
+                    Top = 57
+                    Width = 795
+                    Height = 240
+                    Name ="EtiquetaM Etiqueta"
+                    Caption ="EtiquetaM"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="EtiquetaM_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 2097
+                    Top = 57
+                    Width = 555
+                    Height = 240
+                    Name ="Etiqueta20"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 9184
+                    Top = 56
+                    Width = 150
+                    Height = 255
+                    Name ="Ubicacion"
+                    ControlSource ="Ubicacion"
+                End
+            End
+        End
+        Begin Section
+            Height = 396
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 456
+                    Height = 255
+                    ColumnWidth = 915
+                    Name ="Modelo"
+                    ControlSource ="NumMod"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 570
+                    Top = 57
+                    Width = 1425
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Cant"
+                    ControlSource ="Cant"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3118
+                    Top = 57
+                    Width = 1425
+                    Height = 255
+                    ColumnWidth = 1515
+                    TabIndex = 3
+                    Name ="Tipo Producto"
+                    ControlSource ="TipoProducto"
+                    EventProcPrefix ="Tipo_Producto"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4600
+                    Top = 57
+                    Width = 1425
+                    Height = 255
+                    ColumnWidth = 1050
+                    TabIndex = 4
+                    Name ="Genero"
+                    ControlSource ="Genero"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6082
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 1425
+                    TabIndex = 5
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7108
+                    Top = 57
+                    Width = 969
+                    Height = 255
+                    ColumnWidth = 1185
+                    TabIndex = 6
+                    Name ="Empresa"
+                    ControlSource ="Empresa"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 8134
+                    Top = 57
+                    Width = 795
+                    Height = 255
+                    ColumnWidth = 1185
+                    TabIndex = 7
+                    Name ="Marca"
+                    ControlSource ="EtiquetaM"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2097
+                    Top = 57
+                    Width = 555
+                    Height = 255
+                    ColumnWidth = 780
+                    TabIndex = 2
+                    Name ="Orden"
+                    ControlSource ="Orden"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    ColumnHidden = NotDefault
+                    OverlapFlags = 85
+                    Left = 8957
+                    Top = 57
+                    Width = 795
+                    Height = 255
+                    TabIndex = 8
+                    Name ="IdIPT_Modelos"
+                    ControlSource ="IdIPT_Modelos"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 10204
+                    Top = 113
+                    TabIndex = 9
+                    Name ="Marca Imp"
+                    ControlSource ="Marca Imp"
+                    EventProcPrefix ="Marca_Imp"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 10434
+                            Top = 83
+                            Width = 1080
+                            Height = 240
+                            Name ="Etiqueta25"
+                            Caption ="Marca Imp"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    ColumnHidden = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 9807
+                    Top = 56
+                    Width = 150
+                    Height = 255
+                    TabIndex = 10
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 713
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1587
+                    Top = 113
+                    Name ="CantTot"
+                    ControlSource ="=Sum([Cant])"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3571
+                    Top = 113
+                    TabIndex = 1
+                    Name ="CuentaTot"
+                    ControlSource ="=Count([nummod])"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+Private Sub Cant_DblClick(Cancel As Integer)
+Call AbrirMovs
+
+End Sub
+
+Private Sub Form_Current()
+Forms![IPT_Exis]!Imagen1.Picture = ""
+Forms![IPT_Exis]!Imagen2.Picture = ""
+Forms![IPT_Exis]!Imagen3.Picture = ""
+Forms![IPT_Exis]!Imagen1.HyperlinkAddress = ""
+Forms![IPT_Exis]!Imagen2.HyperlinkAddress = ""
+Forms![IPT_Exis]!Imagen3.HyperlinkAddress = ""
+
+Forms![IPT_Exis]![ExisAlm].Requery
+
+End Sub
+
+Private Sub Form_DblClick(Cancel As Integer)
+Call AbrirMovs
+End Sub
+
+Private Sub Modelo_DblClick(Cancel As Integer)
+Call AbrirMovs
+End Sub
+
+
+Private Sub AbrirMovs()
+Dim Dbs As Database
+Dim Rst As Recordset
+Dim CAlm, CMod As Integer
+ If Forms![IPT_Exis]![QueAlmacenEs] = "*" Then
+  CAlm = AlmDefPT
+ Else
+  CAlm = Forms![IPT_Exis]![QueAlmacenEs]
+ End If
+
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT IdIPT_Mod_Alm FROM IPT_Mod_Alm WHERE (IdIPT_Modelos=" & IdIPT_Modelos & ") AND IdIPT_Almacenes=" & CAlm)
+CMod = Rst!IdIPT_Mod_Alm
+Rst.Close
+Dbs.Close
+
+DoCmd.OpenForm "IPT_MovsSaldo"
+Forms![IPT_MovsSaldo]![QueAlm] = CAlm
+Forms![IPT_MovsSaldo]![QueMod].Requery
+Forms![IPT_MovsSaldo]![QueMod] = CMod
+
+Forms![IPT_MovsSaldo].Requery
+Forms![IPT_MovsSaldo]![ExisAlm].Requery
+End Sub

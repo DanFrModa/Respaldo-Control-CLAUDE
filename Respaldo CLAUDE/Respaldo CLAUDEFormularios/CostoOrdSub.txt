@@ -1,0 +1,925 @@
+Version = 17
+VersionRequired = 17
+Checksum = 952028634
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DividingLines = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    Cycle = 1
+    GridY = 10
+    Width = 10544
+    DatasheetFontHeight = 10
+    ItemSuffix = 84
+    Left = 945
+    Top = 2910
+    Right = 15960
+    Bottom = 9105
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x0ba92b666a66e240
+    End
+    RecordSource ="CostoOrd"
+    Caption ="CostoOrd"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin Page
+            Width = 1701
+            Height = 1701
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            Height = 6292
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 6236
+                    Top = 56
+                    Width = 225
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7876
+                    Top = 729
+                    Width = 915
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="TelaCost"
+                    ControlSource ="TelaCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 729
+                            Width = 900
+                            Height = 285
+                            Name ="TelaCost Etiqueta"
+                            Caption ="Tela:"
+                            EventProcPrefix ="TelaCost_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7876
+                    Top = 1106
+                    Width = 915
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="HabCost"
+                    ControlSource ="HabCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 1106
+                            Width = 930
+                            Height = 285
+                            Name ="HabCost Etiqueta"
+                            Caption ="Habilitacion:"
+                            EventProcPrefix ="HabCost_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7876
+                    Top = 1860
+                    Width = 915
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="BordCost"
+                    ControlSource ="BordCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 1860
+                            Width = 930
+                            Height = 285
+                            Name ="BordCost Etiqueta"
+                            Caption ="Aplicacion:"
+                            EventProcPrefix ="BordCost_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7876
+                    Top = 1483
+                    Width = 915
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="MaquilaCost"
+                    ControlSource ="MaquilaCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 1483
+                            Width = 930
+                            Height = 285
+                            Name ="MaquilaCost Etiqueta"
+                            Caption ="Maquila:"
+                            EventProcPrefix ="MaquilaCost_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7921
+                    Top = 2848
+                    Width = 870
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 6
+                    Name ="Otros"
+                    ControlSource ="Otros"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 2848
+                            Width = 960
+                            Height = 285
+                            Name ="Otros Etiqueta"
+                            Caption ="Otros:"
+                            EventProcPrefix ="Otros_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7921
+                    Top = 3190
+                    Width = 1935
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 7
+                    Name ="DescOtros"
+                    ControlSource ="DescOtros"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 3190
+                            Width = 960
+                            Height = 285
+                            Name ="DescOtros Etiqueta"
+                            Caption ="Descripcion:"
+                            EventProcPrefix ="DescOtros_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 8791
+                    Top = 4776
+                    Width = 900
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 8
+                    Name ="Costo"
+                    ControlSource ="Costo"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6920
+                            Top = 4779
+                            Width = 1470
+                            Height = 285
+                            Name ="Costo Etiqueta"
+                            Caption ="Costo Total Real:"
+                            EventProcPrefix ="Costo_Etiqueta"
+                        End
+                    End
+                End
+                Begin Tab
+                    TabStop = NotDefault
+                    OverlapFlags = 87
+                    Left = 56
+                    Top = 315
+                    Width = 6664
+                    Height = 5887
+                    TabIndex = 16
+                    Name ="TabCtl22"
+                    Begin
+                        Begin Page
+                            OverlapFlags = 215
+                            Left = 195
+                            Top = 720
+                            Width = 6390
+                            Height = 5340
+                            Name ="Tela"
+                            Begin
+                                Begin ListBox
+                                    ColumnHeads = NotDefault
+                                    OverlapFlags = 247
+                                    ColumnCount = 8
+                                    Left = 569
+                                    Top = 1002
+                                    Width = 5856
+                                    Height = 4537
+                                    Name ="TelaLista"
+                                    RowSourceType ="Table/Query"
+                                    RowSource ="SELECT Salidas.IdOrdenes, Telas.Nombre, TelasColores.Color, Sum(SalidasDet.TelaS"
+                                        "al1) AS Tela1, Sum(SalidasDet.TelaSal2) AS Tela2, Sum([telasal1]+[telasal2]) AS "
+                                        "Total, TelasColores.Precio, Sum(([telasal1]+[telasal2])*[precio]) AS Importe FRO"
+                                        "M ((SalidasDet INNER JOIN Salidas ON SalidasDet.IdSalidas = Salidas.IdSalidas) I"
+                                        "NNER JOIN TelasColAlm ON SalidasDet.IdTelasColAlm = TelasColAlm.IdTelasColAlm) I"
+                                        "NNER JOIN (TelasColores INNER JOIN Telas ON TelasColores.IdTelas = Telas.IdTelas"
+                                        ") ON TelasColAlm.IdTelasColores = TelasColores.IdTelasColores GROUP BY Salidas.I"
+                                        "dOrdenes, Telas.Nombre, TelasColores.Color, TelasColores.Precio HAVING (((Salida"
+                                        "s.IdOrdenes)=[Formularios]![CostoOrd]![idordenes])) ORDER BY Telas.Nombre, Telas"
+                                        "Colores.Color;"
+                                    ColumnWidths ="0;1247;854;567;567;567;852;567;567"
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 0
+                                    OverlapFlags = 215
+                                    BackStyle = 0
+                                    Left = 2561
+                                    Top = 5665
+                                    Width = 1071
+                                    TabIndex = 1
+                                    Name ="TotTela"
+                                    Format ="Standard"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 215
+                                            Left = 1478
+                                            Top = 5661
+                                            Width = 1065
+                                            Height = 240
+                                            Name ="Etiqueta44"
+                                            Caption ="Total de Tela:"
+                                        End
+                                    End
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 0
+                                    OverlapFlags = 215
+                                    BackStyle = 0
+                                    Left = 4942
+                                    Top = 5665
+                                    Width = 1356
+                                    TabIndex = 2
+                                    Name ="ImporteTotal"
+                                    Format ="$#,##0.00;-$#,##0.00"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 215
+                                            Left = 3859
+                                            Top = 5661
+                                            Width = 1065
+                                            Height = 240
+                                            Name ="Etiqueta46"
+                                            Caption ="Importe Total:"
+                                        End
+                                    End
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 195
+                            Top = 720
+                            Width = 6390
+                            Height = 5340
+                            Name ="Habilitacion"
+                            Begin
+                                Begin ListBox
+                                    ColumnHeads = NotDefault
+                                    OverlapFlags = 247
+                                    ColumnCount = 6
+                                    Left = 524
+                                    Top = 1012
+                                    Width = 5601
+                                    Height = 4582
+                                    Name ="HabLista"
+                                    RowSourceType ="Table/Query"
+                                    RowSource ="SELECT OrdenesHab.IdOrdenes, Habilitacion.Clave, Habilitacion.Descripcion, Orden"
+                                        "esHab.CantHabOrd AS Cantidad, OrdenesHab.PrecioHabOrd AS Precio, Sum([canthabord"
+                                        "]*[preciohabord]) AS Importe FROM Habilitacion INNER JOIN OrdenesHab ON Habilita"
+                                        "cion.IdHabilitacion = OrdenesHab.IdHabilitacion GROUP BY OrdenesHab.IdOrdenes, H"
+                                        "abilitacion.Clave, Habilitacion.Descripcion, OrdenesHab.CantHabOrd, OrdenesHab.P"
+                                        "recioHabOrd HAVING (((OrdenesHab.IdOrdenes)=[Formularios]![CostoOrd]![IdOrdenes]"
+                                        "));"
+                                    ColumnWidths ="0;567;2268;855;852;1140"
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 195
+                            Top = 720
+                            Width = 6390
+                            Height = 5340
+                            Name ="Bord/Est"
+                            EventProcPrefix ="Bord_Est"
+                            Begin
+                                Begin ListBox
+                                    ColumnHeads = NotDefault
+                                    OverlapFlags = 247
+                                    ColumnCount = 6
+                                    Left = 461
+                                    Top = 1579
+                                    Width = 6021
+                                    Height = 1927
+                                    Name ="BorLista"
+                                    RowSourceType ="Table/Query"
+                                    RowSource ="SELECT ModelosBor.IdModelos, Bordados.Nombre, Bordados.Descripcion, Bordados.Pun"
+                                        "tadas, Bordados.Precio, queesbor([BorEst]) AS QueEs FROM Bordados INNER JOIN Mod"
+                                        "elosBor ON Bordados.IdBordados = ModelosBor.IdBordados GROUP BY ModelosBor.IdMod"
+                                        "elos, Bordados.Nombre, Bordados.Descripcion, Bordados.Puntadas, Bordados.Precio,"
+                                        " queesbor([BorEst]) HAVING (((ModelosBor.IdModelos)=[Formularios]![CostoOrd]![Id"
+                                        "Modelos]));"
+                                    ColumnWidths ="0;680;2381;853;853;853"
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 195
+                            Top = 720
+                            Width = 6390
+                            Height = 5340
+                            Name ="Foto"
+                            Caption ="Foto"
+                            Begin
+                                Begin Image
+                                    SpecialEffect = 3
+                                    SizeMode = 3
+                                    Left = 851
+                                    Top = 1147
+                                    Width = 5250
+                                    Height = 4665
+                                    Name ="Imagen"
+                                End
+                                Begin CommandButton
+                                    OverlapFlags = 247
+                                    Left = 1591
+                                    Top = 729
+                                    Width = 1251
+                                    Name ="VerFoto"
+                                    Caption ="Ver Foto 1"
+                                    OnClick ="[Event Procedure]"
+                                End
+                                Begin CommandButton
+                                    OverlapFlags = 247
+                                    Left = 3859
+                                    Top = 729
+                                    Width = 1251
+                                    TabIndex = 1
+                                    Name ="VerFoto2"
+                                    Caption ="Ver Foto 2"
+                                    OnClick ="[Event Procedure]"
+                                End
+                            End
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8900
+                    Top = 729
+                    Width = 915
+                    Height = 285
+                    TabIndex = 9
+                    Name ="TelaCalc"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8900
+                    Top = 1106
+                    Width = 915
+                    Height = 285
+                    TabIndex = 10
+                    Name ="HabCalc"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8900
+                    Top = 1860
+                    Width = 915
+                    Height = 285
+                    TabIndex = 11
+                    Name ="BordCalc"
+                    ControlSource ="=[Forms]![CostoOrd]![PrecioRealE]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8900
+                    Top = 1483
+                    Width = 915
+                    Height = 285
+                    TabIndex = 12
+                    Name ="MaquilaCalc"
+                    ControlSource ="=[Forms]![CostoOrd]![Maquila]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 8787
+                    Top = 4379
+                    Width = 915
+                    Height = 285
+                    TabIndex = 13
+                    Name ="CostoCalc"
+                    ControlSource ="=[telacost]+[habcost]+[bordcost]+[maquilacost]+[otros]+[regaliascost]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6859
+                    Top = 56
+                    Width = 1911
+                    Height = 433
+                    TabIndex = 14
+                    Name ="CopiarCostos"
+                    Caption ="Copiar Costos Parciales"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    OverlapFlags = 247
+                    Left = 6916
+                    Top = 4374
+                    Width = 1935
+                    Height = 285
+                    Name ="Etiqueta53"
+                    Caption ="Suma de Costos Reales:"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 6916
+                    Top = 3593
+                    Width = 2875
+                    Height = 15
+                    Name ="Línea54"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6916
+                    Top = 3749
+                    Width = 1026
+                    Height = 568
+                    TabIndex = 17
+                    Name ="CopiarCostoReal"
+                    Caption ="Copiar Costo Real"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 215
+                    Left = 6916
+                    Top = 5351
+                    Width = 2961
+                    Height = 798
+                    TabIndex = 15
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6916
+                            Top = 5124
+                            Width = 1185
+                            Height = 240
+                            Name ="Etiqueta58"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8900
+                    Top = 2551
+                    Width = 906
+                    TabIndex = 18
+                    Name ="CostoCalc1"
+                    ControlSource ="=[telacalc]+[habcalc]+[maquilacalc]+[bordcalc]+[regaliascalc]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 7565
+                            Top = 2551
+                            Width = 1290
+                            Height = 240
+                            Name ="Etiqueta60"
+                            Caption ="Suma de Costos:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 8957
+                    Top = 3755
+                    Width = 855
+                    Height = 225
+                    TabIndex = 19
+                    ForeColor = 0
+                    Name ="Precio"
+                    ControlSource ="=[Forms]![CostoOrd]![Precio]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 7940
+                            Top = 3751
+                            Width = 1035
+                            Height = 225
+                            Name ="Etiqueta71"
+                            Caption ="Precio Venta:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 8552
+                    Top = 4029
+                    Width = 1260
+                    Height = 300
+                    FontSize = 12
+                    FontWeight = 700
+                    TabIndex = 20
+                    ForeColor = 0
+                    Name ="Margen"
+                    ControlSource ="=((([costo]/[precio]))-1)*-1"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 7940
+                            Top = 4040
+                            Width = 1035
+                            Height = 285
+                            Name ="Etiqueta73"
+                            Caption ="Margen:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7876
+                    Top = 2211
+                    Width = 915
+                    Height = 285
+                    TabIndex = 5
+                    Name ="RegaliasCost"
+                    ControlSource ="RegaliasCost"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6916
+                            Top = 2211
+                            Width = 930
+                            Height = 285
+                            Name ="Etiqueta75"
+                            Caption ="Regalias:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 8900
+                    Top = 2211
+                    Width = 915
+                    Height = 285
+                    TabIndex = 21
+                    Name ="RegaliasCalc"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin Label
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 8900
+                    Top = 456
+                    Width = 915
+                    Height = 225
+                    BackColor = -2147483643
+                    ForeColor = 0
+                    Name ="Calc"
+                    Caption ="CALCULO"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 9864
+                    Top = 737
+                    Width = 615
+                    Height = 285
+                    TabIndex = 22
+                    Name ="PorTela"
+                    ControlSource ="=[telacost]/[precio]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 9864
+                    Top = 1106
+                    Width = 615
+                    Height = 285
+                    TabIndex = 23
+                    Name ="PorHab"
+                    ControlSource ="=[habcost]/[precio]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 9864
+                    Top = 1483
+                    Width = 615
+                    Height = 285
+                    TabIndex = 24
+                    Name ="PorMaq"
+                    ControlSource ="=[maquilacost]/[precio]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 9864
+                    Top = 1860
+                    Width = 615
+                    Height = 285
+                    TabIndex = 25
+                    Name ="PorBor"
+                    ControlSource ="=[bordcost]/[precio]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 9864
+                    Top = 2211
+                    Width = 615
+                    Height = 285
+                    TabIndex = 26
+                    Name ="PorReg"
+                    ControlSource ="=[regaliascost]/[precio]"
+                    Format ="Percent"
+                End
+                Begin Label
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 9866
+                    Top = 453
+                    Width = 630
+                    Height = 225
+                    BackColor = -2147483643
+                    ForeColor = 0
+                    Name ="Etiqueta83"
+                    Caption ="%"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueOrden_AfterUpdate()
+Me![TelaLista].Requery
+Me!CantidadCortada.Requery
+End Sub
+
+Private Sub CopiarCostoReal_Click()
+Costo = CostoCalc
+End Sub
+
+Private Sub CopiarCostos_Click()
+Me![TelaCost] = Me![TelaCalc]
+Me![HabCost] = Me![HabCalc]
+Me![BordCost] = Me![BordCalc]
+If MaquilaCost = 0 Or IsNull(MaquilaCost) = True Then
+Me![MaquilaCost] = Me![MaquilaCalc]
+End If
+RegaliasCost = RegaliasCalc
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+
+Private Sub VerFoto_Click()
+On Error GoTo errores
+Me!Imagen.Picture = DirFotos(Forms![CostoOrd]![Foto1])
+Me!Imagen.HyperlinkAddress = DirFotos(Forms![CostoOrd]![Foto1])
+Exit Sub
+
+errores:
+Me!Imagen.Picture = NoFoto
+Me!Imagen.HyperlinkAddress = ""
+MsgBox Err.Description
+End Sub
+
+Private Sub VerFoto2_Click()
+On Error GoTo errores
+Me!Imagen.Picture = DirFotos(Forms![CostoOrd]![Foto2])
+Me!Imagen.HyperlinkAddress = DirFotos(Forms![CostoOrd]![Foto2])
+Exit Sub
+
+errores:
+Me!Imagen.Picture = NoFoto
+Me!Imagen.HyperlinkAddress = ""
+End Sub

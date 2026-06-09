@@ -1,0 +1,499 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1872785055
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 7540
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 5370
+    Right = 13200
+    Bottom = 7650
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x74eaf185186de340
+    End
+    RecordSource ="SELECT Alm_InvCic.FechaIC, Ind_FechasSemanas.SemanaS, Format([fechaIC],\"mmm\") "
+        "AS Mes, Year([fechaic]) AS Ano, Alm_InvCic.ModeloIC AS Modelo, Alm_InvCic.CantPr"
+        "oscai, Alm_InvCic.CantReal, [cantproscai]-[cantreal] AS Diferencia, [cantreal]/["
+        "cantproscai] AS Confiabilidad FROM Alm_InvCic LEFT JOIN Ind_FechasSemanas ON Alm"
+        "_InvCic.FechaIC = Ind_FechasSemanas.FechaS WHERE (((Ind_FechasSemanas.SemanaS) L"
+        "ike [Formularios]![Alm_IC_Consulta]![QueSemana]));"
+    Caption ="Alm_IC_Consulta"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 907
+            BackColor = 26367
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Top = 621
+                    Width = 1083
+                    Height = 240
+                    ForeColor = 0
+                    Name ="FechaIC Etiqueta"
+                    Caption ="Fecha"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="FechaIC_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 1
+                    Left = 1083
+                    Top = 621
+                    Width = 1827
+                    Height = 240
+                    ForeColor = 0
+                    Name ="SemanaS Etiqueta"
+                    Caption ="Semana"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="SemanaS_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 1
+                    Left = 2910
+                    Top = 621
+                    Width = 936
+                    Height = 240
+                    ForeColor = 0
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 3846
+                    Top = 396
+                    Width = 702
+                    Height = 465
+                    ForeColor = 0
+                    Name ="CantProscai Etiqueta"
+                    Caption ="CantidadProscai"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantProscai_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 4548
+                    Top = 396
+                    Width = 702
+                    Height = 465
+                    ForeColor = 0
+                    Name ="CantReal Etiqueta"
+                    Caption ="CantidadReal"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantReal_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 5250
+                    Top = 621
+                    Width = 795
+                    Height = 240
+                    ForeColor = 0
+                    Name ="Diferencia Etiqueta"
+                    Caption ="Diferencia"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Diferencia_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 6045
+                    Top = 621
+                    Width = 855
+                    Height = 240
+                    ForeColor = 0
+                    Name ="Confiabilidad Etiqueta"
+                    Caption ="% Conf."
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Confiabilidad_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    Left = 56
+                    Top = 56
+                    Width = 3855
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 0
+                    Name ="Etiqueta18"
+                    Caption ="CONSULTA DE INVENTARIOS CICLICOS"
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ListWidth = 1440
+                    Left = 4809
+                    Top = 56
+                    Width = 2391
+                    ColumnInfo ="\"\";\"\";\"10\";\"30\""
+                    Name ="QueSemana"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW Ind_Alm_IC.SemanaS, Last(Ind_FechasSemanas.FechaS) AS ÚltimoD"
+                        "eFechaS FROM Ind_Alm_IC INNER JOIN Ind_FechasSemanas ON Ind_Alm_IC.SemanaS = Ind"
+                        "_FechasSemanas.SemanaS GROUP BY Ind_Alm_IC.SemanaS HAVING (((Ind_Alm_IC.SemanaS)"
+                        " Is Not Null)) ORDER BY Last(Ind_FechasSemanas.FechaS) DESC;"
+                    ColumnWidths ="1440"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 223
+                            Left = 3798
+                            Top = 56
+                            Width = 1635
+                            Height = 240
+                            ForeColor = 0
+                            Name ="Ver SemanaEtiqueta_"
+                            Caption ="Ver Semana:"
+                            EventProcPrefix ="Ver_SemanaEtiqueta_"
+                        End
+                    End
+                End
+            End
+        End
+        Begin Section
+            Height = 312
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Top = -3
+                    Width = 1083
+                    Height = 315
+                    ColumnWidth = 825
+                    Name ="FechaIC"
+                    ControlSource ="FechaIC"
+                    Format ="Medium Date"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 1083
+                    Top = -3
+                    Width = 1827
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="SemanaS"
+                    ControlSource ="SemanaS"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 2910
+                    Top = -3
+                    Width = 936
+                    Height = 315
+                    ColumnWidth = 675
+                    TabIndex = 2
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 3846
+                    Top = -3
+                    Width = 702
+                    Height = 315
+                    ColumnWidth = 600
+                    TabIndex = 3
+                    Name ="CantProscai"
+                    ControlSource ="CantProscai"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 4548
+                    Top = -3
+                    Width = 702
+                    Height = 315
+                    ColumnWidth = 600
+                    TabIndex = 4
+                    Name ="CantReal"
+                    ControlSource ="CantReal"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 5250
+                    Top = -3
+                    Width = 795
+                    Height = 315
+                    ColumnWidth = 900
+                    TabIndex = 5
+                    Name ="Diferencia"
+                    ControlSource ="Diferencia"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 6045
+                    Top = -3
+                    Width = 795
+                    Height = 315
+                    ColumnWidth = 2310
+                    TabIndex = 6
+                    Name ="Confiabilidad"
+                    ControlSource ="Confiabilidad"
+                    Format ="Percent"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 780
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 6292
+                    Top = 340
+                    Width = 1176
+                    Height = 388
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 1127
+                    Top = 175
+                    Width = 981
+                    TabIndex = 1
+                    Name ="TotalProscai"
+                    ControlSource ="=Sum([cantproscai])"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 113
+                            Top = 170
+                            Width = 1050
+                            Height = 240
+                            Name ="Etiqueta23"
+                            Caption ="Total Proscai:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 3117
+                    Top = 175
+                    Width = 921
+                    TabIndex = 2
+                    Name ="TotalReal"
+                    ControlSource ="=Sum([cantreal])"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2268
+                            Top = 170
+                            Width = 1050
+                            Height = 240
+                            Name ="Etiqueta25"
+                            Caption ="Total Real:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 5047
+                    Top = 175
+                    Width = 906
+                    TabIndex = 3
+                    Name ="TotConf"
+                    ControlSource ="=Sum([cantreal])/Sum([cantproscai])"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4138
+                            Top = 170
+                            Width = 1050
+                            Height = 240
+                            Name ="Etiqueta27"
+                            Caption ="% Confiable:"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(21) = False Then
+ MsgBox "No estas autorizado para accesar a esta pantalla. Si necesitas acceso pidele a Daniel Masri", vbInformation, "ACCESO NEGADO"
+ DoCmd.Close
+End If
+End Sub
+
+Private Sub QueSemana_AfterUpdate()
+Me.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Sub Cuadro_combinado20_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[SemanaS] = '" & Me![Cuadro combinado20] & "'"
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub

@@ -1,0 +1,284 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1440954546
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 8957
+    DatasheetFontHeight = 10
+    ItemSuffix = 18
+    Left = 4875
+    Top = 945
+    Right = 13830
+    Bottom = 6780
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xda03863258d1e240
+    End
+    RecordSource ="SELECT OrdCompraExcel.IdOrdCompraExcel, OrdCompraExcel.IdOrdCompra, OrdCompraExc"
+        "el.Excel FROM OrdCompraExcel;"
+    Caption ="OrdCompraTabla"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000021d00009814000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x5044463939350000000000000000000000000000000000000000000000000000 ,
+        0x010402059c00c40253ef800101000100ea0a6f08640001000f00580202000100 ,
+        0x5802030001004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000010000000000000001000000 ,
+        0x0200000001000000000000000000000000000000000000000000000050524956 ,
+        0xe230000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000180000000000102710271027 ,
+        0x0000102700000000000000000000c40200000000000000000000000000000000 ,
+        0x00000000000000000300000000000000000010005c4b03006843040000000000 ,
+        0x0000000001000000000000000000000000000000000000003161296e06000000 ,
+        0x04000000ff00ff00ff0001000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012001a00010077696e73706f6f6c00005044463939350000504446393935 ,
+        0x504f5254000000000000000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 375
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 5835
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta11"
+                    Caption ="DESGLOSE EN EXCEL DE UNA ORDEN DE COMPRA"
+                End
+            End
+        End
+        Begin Section
+            Height = 5045
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4648
+                    Top = 56
+                    Width = 270
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="IdOrdCompra"
+                    ControlSource ="IdOrdCompra"
+                End
+                Begin BoundObjectFrame
+                    SizeMode = 3
+                    OverlapFlags = 87
+                    OLETypeAllowed = 1
+                    Left = 56
+                    Top = 651
+                    Width = 8796
+                    Height = 4320
+                    TabIndex = 1
+                    Name ="Excel"
+                    ControlSource ="Excel"
+                    OnDblClick ="[Event Procedure]"
+                    Class ="\"Excel.Sheet\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 396
+                            Width = 1560
+                            Height = 255
+                            Name ="Tabla Etiqueta"
+                            Caption ="Desglose en Excel:"
+                            EventProcPrefix ="Tabla_Etiqueta"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 1620
+                    Height = 210
+                    Name ="Etiqueta12"
+                    Caption ="Orden de Compra No."
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 1757
+                    Top = 56
+                    Width = 960
+                    Height = 255
+                    TabIndex = 2
+                    BackColor = -2147483633
+                    BorderColor = 4210752
+                    ForeColor = -2147483630
+                    Name ="NumeroCom"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 456
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 7823
+                    Top = 56
+                    Width = 1026
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Current()
+If IsNull(Excel) = True Then
+Excel.Class = "excel.sheet"
+Excel.OLETypeAllowed = acOLEEmbedded
+Excel.Action = acOLECreateEmbed
+End If
+End Sub
+
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

@@ -1,0 +1,36 @@
+Option Compare Database
+Option Explicit
+
+Private Sub CargarFotos()
+On Error GoTo Errorprueba
+
+Dim Nu As Integer
+Me!Imagen1.Picture = ""
+Me!Imagen2.Picture = ""
+Me!Imagen3.Picture = ""
+Me!Imagen1.HyperlinkAddress = ""
+Me!Imagen2.HyperlinkAddress = ""
+Me!Imagen3.HyperlinkAddress = ""
+Nu = 1
+Me!Imagen1.Picture = DirFotos(Foto1)
+Me!Imagen1.HyperlinkAddress = DirFotos(Foto1)
+Nu = 2
+Me!Imagen2.Picture = DirFotos(Foto2)
+Me!Imagen2.HyperlinkAddress = DirFotos(Foto2)
+Nu = 3
+Me!Imagen3.Picture = DirBordados(FotoBord)
+Me!Imagen3.HyperlinkAddress = DirBordados(FotoBord)
+Exit Sub
+
+Errorprueba:
+
+Select Case Nu
+Case 1
+Me!Imagen1.Picture = NoFoto
+Case 2
+Me!Imagen2.Picture = NoFoto
+Case 3
+Me!Imagen3.Picture = NoFoto
+End Select
+Resume Next
+End Sub

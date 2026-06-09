@@ -1,0 +1,637 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1027841554
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14288
+    DatasheetFontHeight = 10
+    ItemSuffix = 48
+    Left = 3405
+    Top = 540
+    Right = 17700
+    Bottom = 8685
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x36d14a6b5cffe340
+    End
+    RecordSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Sum(Corte.Cantidad) AS"
+        " SumaDeCantidad, Ordenes.Tallas, [telasdis].[descripcion]+\" / Proveedor: \"+[te"
+        "lasdis].[proveedor] AS Tela, Modelos.Foto1, Maquileros.Corto FROM Maquileros RIG"
+        "HT JOIN ((((Ordenes INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos)"
+        " INNER JOIN Corte ON Ordenes.IdOrdenes = Corte.IdOrdenes) LEFT JOIN TelasDis ON "
+        "Ordenes.IdTelasDis = TelasDis.IdTelasDis) LEFT JOIN Entregas ON Ordenes.IdOrdene"
+        "s = Entregas.IdOrdenes) ON Maquileros.IdMaquileros = Entregas.IdMaquileros GROUP"
+        " BY Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Ordenes.Tallas, [telasdis"
+        "].[descripcion]+\" / Proveedor: \"+[telasdis].[proveedor], Modelos.Foto1, Maquil"
+        "eros.Corto HAVING (((Ordenes.Numero)<>0)) ORDER BY Ordenes.Numero DESC;"
+    Caption ="SalidasOrd"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 396
+            BackColor = 10092543
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextFontFamily = 18
+                    Left = 1020
+                    Top = 56
+                    Width = 3120
+                    Height = 285
+                    FontSize = 14
+                    FontWeight = 700
+                    Name ="Etiqueta36"
+                    Caption ="SALIDAS DE TELA"
+                    FontName ="Times New Roman"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 11282
+                    Top = 56
+                    Name ="Modificar"
+                    Caption ="Modificar..."
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7766
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 4425
+                    Top = 56
+                    Width = 510
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3855
+                            Top = 56
+                            Width = 630
+                            Height = 255
+                            Name ="Numero Etiqueta"
+                            Caption ="Orden:"
+                            EventProcPrefix ="Numero_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 5669
+                    Top = 113
+                    Width = 111
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 1
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 6
+                    Left = 56
+                    Top = 918
+                    Width = 3741
+                    Height = 6787
+                    TabIndex = 2
+                    Name ="QueOrden"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Corte.Cantidad, Maquil"
+                        "eros.Corto, Clientes.Cliente FROM Maquileros RIGHT JOIN (((((Ordenes LEFT JOIN S"
+                        "alidas ON Ordenes.IdOrdenes = Salidas.IdOrdenes) INNER JOIN Modelos ON Ordenes.I"
+                        "dModelos = Modelos.IdModelos) INNER JOIN Corte ON Ordenes.IdOrdenes = Corte.IdOr"
+                        "denes) INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) LEFT JOI"
+                        "N Entregas ON Ordenes.IdOrdenes = Entregas.IdOrdenes) ON Maquileros.IdMaquileros"
+                        " = Entregas.IdMaquileros GROUP BY Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Mod"
+                        "elo, Corte.Cantidad, Maquileros.Corto, Clientes.Cliente, Salidas.IdSalidas, Orde"
+                        "nes.NoCost HAVING (((Ordenes.Numero)<>0) AND ((Salidas.IdSalidas) Is Null) AND ("
+                        "(Ordenes.NoCost)=No)) ORDER BY Ordenes.Numero DESC;"
+                    ColumnWidths ="0;456;686;510;852;567"
+                    AfterUpdate ="[Event Procedure]"
+                    OnEnter ="[Event Procedure]"
+                    OnExit ="[Event Procedure]"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin Subform
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 3855
+                    Top = 3060
+                    Width = 7770
+                    Height = 4650
+                    TabIndex = 3
+                    Name ="Salidas"
+                    SourceObject ="Form.Salidas"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6122
+                    Top = 113
+                    Width = 366
+                    Height = 255
+                    TabIndex = 4
+                    Name ="QueIdAlmacenes"
+                    DefaultValue ="3"
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 4
+                    Left = 11792
+                    Top = 596
+                    Width = 2376
+                    Height = 3997
+                    TabIndex = 5
+                    Name ="OrdenesSalidas"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Salidas.IdSalidas, Telas.Nombre, Sum(SalidasDet.TelaSal1) AS Tela11, Sum("
+                        "SalidasDet.TelaSal2) AS Tela2, Salidas.IdOrdenes, TelasColAlm.IdAlmacenes FROM T"
+                        "elasColAlm INNER JOIN ((Telas INNER JOIN Salidas ON Telas.IdTelas = Salidas.IdTe"
+                        "la) INNER JOIN SalidasDet ON Salidas.IdSalidas = SalidasDet.IdSalidas) ON TelasC"
+                        "olAlm.IdTelasColAlm = SalidasDet.IdTelasColAlm GROUP BY Salidas.IdSalidas, Telas"
+                        ".Nombre, Salidas.IdOrdenes, TelasColAlm.IdAlmacenes HAVING (((Salidas.IdOrdenes)"
+                        "=[Formularios]![SalidasOrd]![IdOrdenes]) AND ((TelasColAlm.IdAlmacenes)=[Formula"
+                        "rios]![SalidasOrd]![QueIdAlmacenes]));"
+                    ColumnWidths ="0;1134;584;584"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 255
+                    BackStyle = 0
+                    Left = 4491
+                    Top = 340
+                    Width = 1440
+                    Height = 255
+                    TabIndex = 6
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3855
+                            Top = 347
+                            Width = 645
+                            Height = 255
+                            Name ="Etiqueta21"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 8104
+                    Top = 61
+                    Width = 3471
+                    Height = 345
+                    FontSize = 14
+                    TabIndex = 7
+                    Name ="QueAlmacen"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6803
+                            Top = 56
+                            Width = 1410
+                            Height = 345
+                            FontSize = 14
+                            Name ="Etiqueta25"
+                            Caption ="Almacen:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 12642
+                    Top = 7256
+                    Width = 1356
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin OptionGroup
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 275
+                    Width = 1472
+                    Height = 568
+                    TabIndex = 9
+                    Name ="QueListaOrd"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="2"
+                    Begin
+                        Begin Label
+                            BackStyle = 1
+                            OverlapFlags = 215
+                            Left = 166
+                            Top = 56
+                            Width = 720
+                            Height = 240
+                            Name ="Etiqueta30"
+                            Caption ="Ordenes:"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 95
+                            Left = 226
+                            Top = 360
+                            OptionValue = 1
+                            Name ="Opción32"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 255
+                                    Left = 456
+                                    Top = 332
+                                    Width = 525
+                                    Height = 240
+                                    Name ="Etiqueta33"
+                                    Caption ="Todas"
+                                End
+                            End
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 247
+                            Left = 226
+                            Top = 587
+                            OptionValue = 2
+                            Name ="Opción34"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 247
+                                    Left = 456
+                                    Top = 559
+                                    Width = 720
+                                    Height = 240
+                                    Name ="Etiqueta35"
+                                    Caption ="Faltantes"
+                                End
+                            End
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 11793
+                    Top = 113
+                    Width = 2385
+                    Height = 435
+                    Name ="Etiqueta37"
+                    Caption ="Salidas de tela de esta orden:\015\012Haz doble click para ver la salida"
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    SpecialEffect = 0
+                    BorderWidth = 2
+                    Left = 3855
+                    Top = 907
+                    Width = 7761
+                    Height = 2046
+                    TabIndex = 10
+                    Name ="SalidasOrdSub"
+                    SourceObject ="Form.SalidasOrdSub"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 247
+                    Left = 5331
+                    Top = 113
+                    Width = 81
+                    Height = 255
+                    TabIndex = 11
+                    Name ="Tallas"
+                    ControlSource ="Tallas"
+                    DefaultValue ="3"
+                End
+                Begin Image
+                    SpecialEffect = 3
+                    SizeMode = 3
+                    Left = 11792
+                    Top = 5102
+                    Width = 2325
+                    Height = 2085
+                    Name ="Imagen1"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 12977
+                    Top = 4767
+                    Width = 801
+                    TabIndex = 12
+                    Name ="Foto1"
+                    ControlSource ="Foto1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 11792
+                            Top = 4762
+                            Width = 1140
+                            Height = 240
+                            Name ="Etiqueta42"
+                            Caption ="Foto Modelo 1:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 6928
+                    Top = 510
+                    Width = 4635
+                    Height = 255
+                    TabIndex = 13
+                    BorderColor = 4210752
+                    Name ="Tela"
+                    ControlSource ="Tela"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6009
+                            Top = 510
+                            Width = 915
+                            Height = 255
+                            Name ="Etiqueta44"
+                            Caption ="Tela Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 223
+                    BackStyle = 0
+                    Left = 4641
+                    Top = 623
+                    Width = 1320
+                    Height = 255
+                    TabIndex = 14
+                    Name ="Maquilero"
+                    ControlSource ="Corto"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3855
+                            Top = 630
+                            Width = 810
+                            Height = 255
+                            Name ="Etiqueta46"
+                            Caption ="Maquilero:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3571
+                    Top = 56
+                    Width = 111
+                    Height = 255
+                    TabIndex = 15
+                    Name ="SumaDeCantidad"
+                    ControlSource ="SumaDeCantidad"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Current()
+OrdenesSalidas.Requery
+
+On Error GoTo Errorprueba
+
+Dim Nu As Integer
+Me!Imagen1.Picture = ""
+Me!Imagen1.HyperlinkAddress = ""
+
+Nu = 1
+Me!Imagen1.Picture = DirFotos(Foto1)
+Me!Imagen1.HyperlinkAddress = DirFotos(Foto1)
+Exit Sub
+
+Errorprueba:
+If Err.Number <> 94 Then
+Else
+Select Case Nu
+Case 1
+Me!Imagen1.Picture = NoFoto
+End Select
+End If
+Resume Next
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If NivelAct > nivAdminDir Then
+Modificar.Visible = False
+End If
+End Sub
+
+Private Sub Modificar_Click()
+DoCmd.OpenForm "SalidasModificar"
+End Sub
+
+Private Sub OrdenesSalidas_DblClick(Cancel As Integer)
+On Error GoTo Err_Proceso_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "SalidasVer"
+    
+    stLinkCriteria = "[IdSalidas]=" & Me.OrdenesSalidas
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Proceso_Click:
+    Exit Sub
+
+Err_Proceso_Click:
+    MsgBox Err.Description
+    Resume Exit_Proceso_Click
+End Sub
+
+Private Sub QueListaOrd_AfterUpdate()
+If QueListaOrd = 2 Then
+QueOrden.RowSource = "SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Corte.Cantidad, Maquileros.Corto, Clientes.Cliente FROM Maquileros RIGHT JOIN (((((Ordenes LEFT JOIN Salidas ON Ordenes.IdOrdenes = Salidas.IdOrdenes) INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) INNER JOIN Corte ON Ordenes.IdOrdenes = Corte.IdOrdenes) INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) LEFT JOIN Entregas ON Ordenes.IdOrdenes = Entregas.IdOrdenes) ON Maquileros.IdMaquileros = Entregas.IdMaquileros GROUP BY Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Corte.Cantidad, Maquileros.Corto, Clientes.Cliente, Salidas.IdSalidas, Ordenes.NoCost HAVING (((Ordenes.Numero)<>0) AND ((Salidas.IdSalidas) Is Null) AND ((Ordenes.NoCost)=No)) ORDER BY Ordenes.Numero DESC"
+Else
+QueOrden.RowSource = "SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Corte.Cantidad, Maquileros.Corto, Clientes.Cliente FROM Maquileros RIGHT JOIN (((((Ordenes LEFT JOIN Salidas ON Ordenes.IdOrdenes = Salidas.IdOrdenes) INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) INNER JOIN Corte ON Ordenes.IdOrdenes = Corte.IdOrdenes) INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) LEFT JOIN Entregas ON Ordenes.IdOrdenes = Entregas.IdOrdenes) ON Maquileros.IdMaquileros = Entregas.IdMaquileros GROUP BY Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Corte.Cantidad, Maquileros.Corto, Clientes.Cliente HAVING (((Ordenes.Numero)<>0)) ORDER BY Ordenes.Numero DESC"
+End If
+End Sub
+
+Private Sub QueOrden_AfterUpdate()
+    Me.RecordsetClone.FindFirst "[Idordenes] = " & Me![QueOrden]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+    
+    
+    Me![Salidas].Form![Fecha].SetFocus
+    Salidas.Visible = False
+    OrdenesSalidas.Requery
+    
+End Sub
+
+Private Sub QueOrden_DblClick(Cancel As Integer)
+Salidas.Visible = True
+End Sub
+
+Private Sub QueOrden_Exit(Cancel As Integer)
+Salidas.Enabled = True
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

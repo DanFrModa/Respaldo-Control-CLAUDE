@@ -1,0 +1,202 @@
+Operation = 1
+Option = 0
+Having ="(((IPT_Modelos.NumMod) Like [Formularios]![IPT_Exis]![QueNumModEs]) AND ((IPT_Mo"
+    "delos.MarcaImpresa) Like [Formularios]![IPT_Exis]![QueMarcaImpresaEs]) AND ((cer"
+    "onulo([IPT_Modelos]![IdIPT_TIpoPiezas])) Like [Formularios]![IPT_Exis]![QueTipoP"
+    "iezasEs]) AND ((Empresas.IdEmpresas) Like [Formularios]![IPT_Exis]![QueEmpresaEs"
+    "]) AND ((ceronulo([ipt_generos]![IdIPT_Generos])) Like [Formularios]![IPT_Exis]!"
+    "[QueGeneroEs]) AND ((ceronulo([etiquetasM]![idetiquetasm])) Like [Formularios]!["
+    "IPT_Exis]![QueMarcaEs]) AND ((ceronulo([ipt_tipoprod]![idtipoprod])) Like [Formu"
+    "larios]![IPT_Exis]![QueTipoProdEs]) AND ((ceronulo([clientes]![idclientes])) Lik"
+    "e [Formularios]![IPT_Exis]![QueClienteEs]) AND ((IPT_Almacenes.IdIPT_Almacenes) "
+    "Like [Formularios]![IPT_Exis]![QueAlmacenEs]))"
+Begin InputTables
+    Name ="IPT_TipoProd"
+    Name ="IPT_Modelos"
+    Name ="IPT_Generos"
+    Name ="IPT_Mod_Alm"
+    Name ="IPT_Almacenes"
+    Name ="Clientes"
+    Name ="Empresas"
+    Name ="EtiquetasM"
+    Name ="Ordenes"
+End
+Begin OutputColumns
+    Expression ="IPT_Modelos.NumMod"
+    Alias ="Cantidad"
+    Expression ="Sum(IPT_Mod_Alm.Existencia)"
+    Expression ="IPT_TipoProd.TipoProducto"
+    Expression ="IPT_Generos.Genero"
+    Expression ="Clientes.Cliente"
+    Expression ="Empresas.Empresa"
+    Expression ="EtiquetasM.EtiquetaM"
+    Expression ="Ordenes.Numero"
+    Expression ="IPT_Modelos.IdIPT_Modelos"
+    Expression ="IPT_Modelos.MarcaImpresa"
+    Expression ="Ordenes.IdOrdenes"
+    Expression ="IPT_Modelos.Ubicacion"
+End
+Begin Joins
+    LeftTable ="IPT_Modelos"
+    RightTable ="IPT_Generos"
+    Expression ="IPT_Modelos.IdIPT_Generos = IPT_Generos.IdIPT_Generos"
+    Flag = 2
+    LeftTable ="IPT_Modelos"
+    RightTable ="IPT_Mod_Alm"
+    Expression ="IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.IdIPT_Modelos"
+    Flag = 2
+    LeftTable ="IPT_Mod_Alm"
+    RightTable ="IPT_Almacenes"
+    Expression ="IPT_Mod_Alm.IdIPT_Almacenes = IPT_Almacenes.IdIPT_Almacenes"
+    Flag = 2
+    LeftTable ="IPT_Modelos"
+    RightTable ="Clientes"
+    Expression ="IPT_Modelos.IdClientes = Clientes.IdClientes"
+    Flag = 2
+    LeftTable ="IPT_Modelos"
+    RightTable ="Empresas"
+    Expression ="IPT_Modelos.IdEmpresas = Empresas.IdEmpresas"
+    Flag = 2
+    LeftTable ="IPT_Modelos"
+    RightTable ="EtiquetasM"
+    Expression ="IPT_Modelos.IdEtiquetasM = EtiquetasM.IdEtiquetasM"
+    Flag = 2
+    LeftTable ="IPT_TipoProd"
+    RightTable ="IPT_Modelos"
+    Expression ="IPT_TipoProd.IdTipoProd = IPT_Modelos.IdIPT_TipoProd"
+    Flag = 3
+    LeftTable ="IPT_Modelos"
+    RightTable ="Ordenes"
+    Expression ="IPT_Modelos.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 2
+End
+Begin Groups
+    Expression ="IPT_Modelos.NumMod"
+    GroupLevel = 0
+    Expression ="IPT_TipoProd.TipoProducto"
+    GroupLevel = 0
+    Expression ="IPT_Generos.Genero"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+    Expression ="Empresas.Empresa"
+    GroupLevel = 0
+    Expression ="EtiquetasM.EtiquetaM"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="IPT_Modelos.IdIPT_Modelos"
+    GroupLevel = 0
+    Expression ="IPT_Modelos.MarcaImpresa"
+    GroupLevel = 0
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="IPT_Modelos.Ubicacion"
+    GroupLevel = 0
+    Expression ="ceronulo([IPT_Modelos]![IdIPT_TIpoPiezas])"
+    GroupLevel = 0
+    Expression ="Empresas.IdEmpresas"
+    GroupLevel = 0
+    Expression ="ceronulo([ipt_generos]![IdIPT_Generos])"
+    GroupLevel = 0
+    Expression ="ceronulo([etiquetasM]![idetiquetasm])"
+    GroupLevel = 0
+    Expression ="ceronulo([ipt_tipoprod]![idtipoprod])"
+    GroupLevel = 0
+    Expression ="ceronulo([clientes]![idclientes])"
+    GroupLevel = 0
+    Expression ="IPT_Almacenes.IdIPT_Almacenes"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 105
+    Right = 1258
+    Bottom = 608
+    Left = -1
+    Top = -1
+    Right = 1185
+    Bottom = 281
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 136
+        Bottom = 107
+        Top = 0
+        Name ="IPT_TipoProd"
+    End
+    Begin
+        Left = 163
+        Top = 84
+        Right = 313
+        Bottom = 230
+        Top = 2
+        Name ="IPT_Modelos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 92
+        Top = 0
+        Name ="IPT_Generos"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 122
+        Top = 0
+        Name ="IPT_Mod_Alm"
+    End
+    Begin
+        Left = 574
+        Top = 6
+        Right = 698
+        Bottom = 92
+        Top = 0
+        Name ="IPT_Almacenes"
+    End
+    Begin
+        Left = 708
+        Top = 6
+        Right = 804
+        Bottom = 107
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 842
+        Top = 6
+        Right = 938
+        Bottom = 122
+        Top = 0
+        Name ="Empresas"
+    End
+    Begin
+        Left = 974
+        Top = 79
+        Right = 1070
+        Bottom = 195
+        Top = 0
+        Name ="EtiquetasM"
+    End
+    Begin
+        Left = 418
+        Top = 130
+        Right = 542
+        Bottom = 246
+        Top = 0
+        Name ="Ordenes"
+    End
+End

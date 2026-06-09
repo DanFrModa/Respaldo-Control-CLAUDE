@@ -1,0 +1,184 @@
+Operation = 1
+Option = 0
+Having ="(((Modelos.Modelo) Like [Formularios]![RecibosSemanalesMaq]![QueModeloEs]) AND ("
+    "(CantRecMaqFecha.FechaRec)>=([Formularios]![RecibosSemanalesMaq]![FechaDe]) And "
+    "(CantRecMaqFecha.FechaRec)<=([Formularios]![RecibosSemanalesMaq]![FechaHasta])) "
+    "AND ((Maquileros.IdMaquileros) Like [Formularios]![RecibosSemanalesMaq]![QueMaqE"
+    "s]))"
+Begin InputTables
+    Name ="Ordenes"
+    Name ="CantidadOrd"
+    Name ="CantidadCorte"
+    Name ="CantidadEntMaq"
+    Name ="CantRecMaqFecha"
+    Name ="CantRecMaq"
+    Name ="Maquileros"
+    Name ="Modelos"
+End
+Begin OutputColumns
+    Alias ="Maq"
+    Expression ="[Nombre]+\" \"+[apellidos]"
+    Expression ="Ordenes.Numero"
+    Expression ="Modelos.Modelo"
+    Expression ="CantidadOrd.CantOrd"
+    Expression ="CantidadCorte.CantCorte"
+    Expression ="CantidadEntMaq.CantEnt"
+    Expression ="CantRecMaqFecha.CantRec"
+    Expression ="CantRecMaq.CantRec"
+    Expression ="CantRecMaqFecha.FechaRec"
+    Expression ="CantRecMaqFecha.Observaciones"
+    Expression ="Maquileros.IdMaquileros"
+    Alias ="Precio"
+    Expression ="Ordenes.MaquilaOrd"
+    Alias ="Importe"
+    Expression ="[MaquilaOrd]*[CantRecMaqFecha].[CantRec]"
+    Alias ="Faltantes"
+    Expression ="[cantent]-[cantrecmaq].[cantrec]"
+    Expression ="CantRecMaqFecha.IdOrdenes"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="CantidadOrd"
+    Expression ="Ordenes.IdOrdenes = CantidadOrd.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="CantidadCorte"
+    Expression ="Ordenes.IdOrdenes = CantidadCorte.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CantidadEntMaq"
+    Expression ="Ordenes.IdOrdenes = CantidadEntMaq.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CantRecMaqFecha"
+    Expression ="Ordenes.IdOrdenes = CantRecMaqFecha.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="CantRecMaq"
+    Expression ="Ordenes.IdOrdenes = CantRecMaq.IdOrdenes"
+    Flag = 1
+    LeftTable ="CantRecMaq"
+    RightTable ="Maquileros"
+    Expression ="CantRecMaq.IdMaquileros = Maquileros.IdMaquileros"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 1
+End
+Begin Groups
+    Expression ="[Nombre]+\" \"+[apellidos]"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="CantidadOrd.CantOrd"
+    GroupLevel = 0
+    Expression ="CantidadCorte.CantCorte"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.CantEnt"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.CantRec"
+    GroupLevel = 0
+    Expression ="CantRecMaq.CantRec"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.FechaRec"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.Observaciones"
+    GroupLevel = 0
+    Expression ="Maquileros.IdMaquileros"
+    GroupLevel = 0
+    Expression ="Ordenes.MaquilaOrd"
+    GroupLevel = 0
+    Expression ="[MaquilaOrd]*[CantRecMaqFecha].[CantRec]"
+    GroupLevel = 0
+    Expression ="[cantent]-[cantrecmaq].[cantrec]"
+    GroupLevel = 0
+    Expression ="CantRecMaqFecha.IdOrdenes"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 47
+    Top = 29
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1204
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 120
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 179
+        Top = -11
+        Right = 275
+        Bottom = 73
+        Top = 0
+        Name ="CantidadOrd"
+    End
+    Begin
+        Left = 337
+        Top = 33
+        Right = 433
+        Bottom = 147
+        Top = 0
+        Name ="CantidadCorte"
+    End
+    Begin
+        Left = 464
+        Top = -2
+        Right = 560
+        Bottom = 112
+        Top = 0
+        Name ="CantidadEntMaq"
+    End
+    Begin
+        Left = 727
+        Top = 2
+        Right = 823
+        Bottom = 116
+        Top = 2
+        Name ="CantRecMaqFecha"
+    End
+    Begin
+        Left = 602
+        Top = -2
+        Right = 698
+        Bottom = 112
+        Top = 0
+        Name ="CantRecMaq"
+    End
+    Begin
+        Left = 874
+        Top = -5
+        Right = 970
+        Bottom = 109
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 1004
+        Top = 6
+        Right = 1100
+        Bottom = 120
+        Top = 0
+        Name ="Modelos"
+    End
+End

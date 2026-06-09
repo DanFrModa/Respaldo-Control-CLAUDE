@@ -1,0 +1,161 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1411782835
+Begin Form
+    RecordSelectors = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 12755
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 2820
+    Top = 30
+    Right = 15570
+    Bottom = 7380
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x36ac1fb71b44e340
+    End
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin FormHeader
+            Height = 510
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 120
+                    Top = 105
+                    Width = 3855
+                    Height = 330
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Etiqueta3"
+                    Caption ="CLASIFICACION DE PRODUCTOS"
+                End
+            End
+        End
+        Begin Section
+            Height = 6862
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 113
+                    Top = 454
+                    Width = 1927
+                    Height = 2945
+                    Name ="Familia"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CP_Familia.IdCP_Familia, CP_Familia.Familia FROM CP_Familia;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 113
+                            Width = 675
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Familias:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1138
+                    Top = 56
+                    Width = 900
+                    Height = 345
+                    TabIndex = 1
+                    Name ="Comando6"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 17
+                    Left = 2494
+                    Top = 454
+                    Width = 9637
+                    Height = 5780
+                    TabIndex = 2
+                    Name ="CP"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CP.IdCP, CP.Clave, CP_Familia.Familia, CP.Descripcion, CP.Costura, CP.[1-"
+                        "OP], CP.[2-ComplementarOP], CP.[3-Moldes], CP.[4-CompraHab], CP.[5-RecHab], CP.["
+                        "6-CompraTela], CP.[7-RecTela], CP.[8-Trazo], CP.[9-Confeccion], CP.[10-Empaque],"
+                        " CP.[11-Entrega] FROM CP INNER JOIN CP_Familia ON CP.IdCP_Familia = CP_Familia.I"
+                        "dCP_Familia WHERE (((CP.IdCP_Familia)=[Formularios]![ClasificacionProductos]![Fa"
+                        "milia]));"
+                    ColumnWidths ="0;567;1134;2268;1701;285;284;284;284;284;284;284;284;284;284;284;284;284"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2490
+                            Top = 120
+                            Width = 1995
+                            Height = 240
+                            Name ="Etiqueta8"
+                            Caption ="Clasificacion de Productos:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5442
+                    Top = 56
+                    Width = 900
+                    Height = 345
+                    TabIndex = 3
+                    Name ="Comando9"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando6_Click()
+ DoCmd.OpenForm "CP_Familia"
+End Sub
+
+Private Sub Comando9_Click()
+DoCmd.OpenForm "CP"
+End Sub
+
+Private Sub Familia_AfterUpdate()
+CP.Requery
+End Sub

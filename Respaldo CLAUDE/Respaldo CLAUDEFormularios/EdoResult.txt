@@ -1,0 +1,402 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1796619397
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 8447
+    DatasheetFontHeight = 10
+    ItemSuffix = 27
+    Left = 5070
+    Top = 255
+    Right = 13515
+    Bottom = 8295
+    DatasheetGridlinesColor = 12632256
+    Filter ="[IdEdoResult]=5"
+    RecSrcDt = Begin
+        0xe81a04e198ebe240
+    End
+    RecordSource ="EdoResult"
+    Caption ="EdoResult"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 510
+            BackColor = 65535
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 113
+                    Width = 2820
+                    Height = 300
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Etiqueta16"
+                    Caption ="Meter las ventas del mes"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7540
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 900
+                    Top = 105
+                    Width = 1440
+                    Height = 255
+                    ColumnWidth = 825
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="mmmm - yyyy"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 105
+                            Width = 795
+                            Height = 255
+                            Name ="Fecha Etiqueta"
+                            Caption ="Fecha:"
+                            EventProcPrefix ="Fecha_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 900
+                    Top = 447
+                    Width = 1440
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Gastos"
+                    ControlSource ="Gastos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 447
+                            Width = 795
+                            Height = 255
+                            Name ="Gastos Etiqueta"
+                            Caption ="Gastos:"
+                            EventProcPrefix ="Gastos_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 900
+                    Top = 789
+                    Width = 1440
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Intereses"
+                    ControlSource ="Intereses"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 789
+                            Width = 795
+                            Height = 255
+                            Name ="Intereses Etiqueta"
+                            Caption ="Intereses:"
+                            EventProcPrefix ="Intereses_Etiqueta"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 56
+                    Top = 1373
+                    Width = 6345
+                    Height = 6105
+                    TabIndex = 6
+                    Name ="EdoResultSub"
+                    SourceObject ="Form.EdoResultSub"
+                    LinkChildFields ="IdEdoResult"
+                    LinkMasterFields ="IdEdoResult"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 60
+                            Top = 1133
+                            Width = 2190
+                            Height = 240
+                            Name ="EdoResultSubEtiqueta"
+                            Caption ="Copiar las ventas desde excel"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 3630
+                    Top = 75
+                    Width = 1440
+                    Height = 255
+                    TabIndex = 3
+                    Name ="Bonificaciones"
+                    ControlSource ="Bonificaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2460
+                            Top = 75
+                            Width = 1155
+                            Height = 255
+                            Name ="Etiqueta11"
+                            Caption ="Bonificaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 3630
+                    Top = 417
+                    Width = 1440
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Otros"
+                    ControlSource ="Otros"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2460
+                            Top = 417
+                            Width = 1155
+                            Height = 255
+                            Name ="Etiqueta13"
+                            Caption ="Otros"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 3630
+                    Top = 792
+                    Width = 2835
+                    Height = 255
+                    TabIndex = 5
+                    Name ="DescOtros"
+                    ControlSource ="DescOtros"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2460
+                            Top = 792
+                            Width = 1155
+                            Height = 255
+                            Name ="Etiqueta15"
+                            Caption ="Descripcion:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 6462
+                    Top = 7086
+                    Width = 1281
+                    Height = 358
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5329
+                    Top = 170
+                    Width = 1140
+                    Height = 405
+                    TabIndex = 9
+                    Name ="Comando24"
+                    Caption ="Agregar Mes"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 6519
+                    Top = 1700
+                    TabIndex = 7
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueEmpresa"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Empresas.IdEmpresas, Empresas.Empresa, Empresas.ParaEdoRes, Empresas.Impo"
+                        "rtancia FROM Empresas WHERE (((Empresas.ParaEdoRes)=Yes)) ORDER BY Empresas.Impo"
+                        "rtancia;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6519
+                            Top = 1417
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta26"
+                            Caption ="Empresa:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+Private Sub QueEmpresa_AfterUpdate()
+If IsNull(QueEmpresa) = True Then
+ Me![EdoResultSub].Form.AllowAdditions = False
+Else
+  Me![EdoResultSub].Form.AllowAdditions = True
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Sub Cuadro_combinado22_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdEdoResult] = " & Me![Cuadro combinado22]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Comando24_Click()
+On Error GoTo Err_Comando24_Click
+
+
+    DoCmd.GoToRecord , , acNewRec
+
+Exit_Comando24_Click:
+    Exit Sub
+
+Err_Comando24_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando24_Click
+    
+End Sub

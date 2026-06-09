@@ -1,0 +1,110 @@
+"IdTelasDis","TelaDis","Proveedor","Descripcion","Precio","ParaProduccion"
+1,"FelpaAlsa100","Alsatex","Felpa 100% poliester",$0.00,0
+2,"FelpaAlsa 50","Alsatex","Felpa 50% alg 50% pol",$0.00,0
+3,"FrenchAlsa 100","Alsatex","French Terry 100% pol",$0.00,0
+4,"FrenchAlsa 50","Alsatex","French Terry 50% alg 50% pol",$0.00,0
+5,"Chifon Alsa","Alsatex","Chifon 50% alg 50% pol",$0.00,0
+6,"Sportec","La leona (Centro)","Sportec",$63.00,1
+7,"1French/Felpa",,"Felpa / French Terry",$0.00,0
+8,"2Chifon",,,$0.00,0
+9,"TerrySek50","Sekine","French Terry 50%Alg 50%Pol",$60.00,0
+10,"ChifonSekine","Sekine","Chifon 50%alg 50%pol",$57.00,0
+11,"TerryAlsa50","Alsatex","French Terry 50% alg 50% pol",$0.00,0
+12,"Olimpus","deportextil","Jersey 100% poliester",$58.00,0
+13,"Mesch","deportextil","Mesch 100%pol",$0.00,0
+14,"Chifon Loma","Loma textil","Chifon 100% alg",$0.00,0
+15,"Felpaloma 100","Loma textil","Felpa 100% pol",$0.00,0
+16,"Fepa Loma 50","Loma Textil","Felpa 50% pol 50% alg",$0.00,0
+17,"ChifonVarios","Varios","Chifon variado",$57.00,0
+18,"4240-B","Kindy","Mesh",$0.00,0
+19,"ChifonRoyal","Royal Mich","Chifon 50% algod¢n, 50% Poliester",$60.00,0
+20,"FrenchRoyal","Royal Mich","French Terry 50% Algod¢n, 50% Poliester",$60.00,0
+21,"Sportec Brillosa","La Leona","Sportec 100% Poliester (Brillosa)",$55.00,0
+22,"Kinmax","Kimex","Kinmax, 100% Poliester",$83.00,1
+23,"MicrofibraNylon","Centro","Nyon Microfibra 100% Nylon",$23.00,0
+24,"ChifonRoyalPeinado","Royal mich","Chifon 50% Algod¢n, 50% Poliester Peinado",$0.00,0
+25,"FelpaRoyal","Royal Mich","Felpa 50% Algod¢n, 50% Poliester",$60.00,0
+26,"Rain Micro","Kimex","Rain Micro, 100% Poliester",$69.00,0
+27,"3",,,$0.00,0
+28,"PiqueRoyal","Royal Mich","Pique 50% Algod¢n, 50% Poliester",$0.00,0
+29,"Rib","--","Rib 50% Alg 50% Pol",$0.00,0
+30,,,,$0.00,0
+31,,,,$0.00,0
+32,"King Touch","Kimex","Poliester / Likra",$0.00,0
+33,"MicroPique","-","Micropique 100% Poliester",$0.00,1
+34,"Felpa","-","FELPA",$0.00,1
+35,"Pique","-","Pique",$0.00,1
+36,"Troya",,"Troya",$0.00,1
+37,"Algod¢n/Lycra",,"Algokdon / Lykra",$0.00,1
+38,"French Terry",,"French Terry",$0.00,1
+39,"Poliester",,,$0.00,0
+40,"Poliester","-","-",$0.00,0
+41,"Polester",,,$0.00,1
+42,"Chifon","-","Chifon",$0.00,1
+43,"Royal",,"Royal",$0.00,1
+44,"Poliester / Likra","-","Poliester / Likra",$0.00,1
+45,"Microfibra","-","-",$0.00,1
+46,"Manchester",,"Manchester",$0.00,1
+47,"Onely","-","Onely",$0.00,1
+48,"Cardigan",,"Cardigan",$0.00,1
+49,"Metropoli","Gaytan","Metropoli 100% Poliester",$0.00,1
+50,"Flame",,"Flame",$0.00,1
+51,"Dubai",,"Dubai",$0.00,1
+52,"Universo",,"Universo",$0.00,1
+53,"Polar","Borcafisa","Polar Fleece",$51.00,1
+54,"Polar","Borcafisa",,$51.00,0
+55,"Chifon",,"50% poliester 50% rayon",$0.00,0
+56,"Gabardina","-","Gabardina satinada",$0.00,1
+57,"Pepito","Deportextil","Pepito",$0.00,1
+58,"Nylon","-","Nylon",$0.00,1
+59,"Tul",,"100%  Poliester",$11.25,0
+60,"French Terry/Lycra","Sr. Cattan",,$120.00,0
+61,"Rhin Micro",,"Rhin Micro",$0.00,1
+62,"Pol/Alg/Licra",,"Poliester / Algod¢n / Licra",$0.00,1
+63,,,,$0.00,0
+64,"Australia",,"Australia 100% Poliester",$0.00,1
+65,"Jabon",,"Jabon: 87% Poliester / 13% Elastano",$0.00,1
+66,"Energica",,"Energica",$0.00,1
+67,"Susan","Textivision","Susan",$0.00,1
+68,"Viscosa/Pol/Elstano",,"Viscosa / Pol / Elastano",$0.00,1
+69,"Skin",,"Skin (Gatubela)",$0.00,1
+70,"July","July","Nylon",$0.00,1
+71,"Deborado",,,$0.00,1
+72,"DM","Camion","pol/alg/lycra",$0.00,0
+73,"Asusena",,"100% Poliester",$0.00,1
+74,"Tecno",,"Poliester / Elastano",$0.00,1
+75,"Punto de Roma",,"Poliester",$0.00,1
+76,"Rib",,"Rib",$0.00,1
+77,"Gatubela",,,$0.00,1
+78,"Chifon Estampado",,"Chifon Estampado",$0.00,1
+79,"Poliester Texturizad",,"Poliester Texturizado",$0.00,1
+80,"Polirayon",,"Polirayon",$0.00,1
+81,"Texturizada",,"Texturizada",$0.00,1
+82,"Algosdon Estampado",,"Algod¢n Estampado",$0.00,1
+83,"Capitonado",,"Capitonado",$0.00,1
+84,"Rayon",,"Rayon",$0.00,1
+85,"Hacci","Hacci","Hacci",$0.00,1
+86,"Wimbledon","Wimbledon","Wimbledon",$0.00,1
+87,"Scuba",,"Scuba 100% Poliester",$0.00,1
+88,,,,$0.00,0
+89,"Popelina",,"Popelina",$0.00,1
+90,"Wafle",,"Wafle",$0.00,1
+91,"Jackard",,"Jackard 100% Poliester",$0.00,1
+92,"Cambray",,"Cambray",$0.00,1
+93,"Polineo",,"Polineo",$0.00,1
+94,"Saludable",,"Saludable Poliester / Elastano",$0.00,1
+95,"Entretela","-","-",$0.00,1
+96,"French 100","Sekine","French Terry 100% Poliester",$0.00,1
+97,"Felpa100","-","Felpa 100% Poliester",$0.00,1
+98,"Felpa50","-","Felpa 50 Algod¢n, 50% Poliester",$0.00,1
+99,"Vinipiel","-","Vinipiel - Poliester/Elastano",$0.00,1
+100,"Viscosa","-","Viscosa",$0.00,1
+101,"Parachute","Shangtex","Poliester Nylon",$0.00,1
+102,"Mezclilla","-","-",$0.00,1
+103,"Interlock","--","Interlock",$0.00,1
+104,"Senegal","Romamills","Senegal",$0.00,1
+105,"Calipso","Palermo","Calipso",$0.00,1
+106,"Modal Fake","-","Modal Fake",$0.00,1
+107,"Thermal","-",,$0.00,0
+108,,,,$0.00,0
+109,"34",,,$0.00,0

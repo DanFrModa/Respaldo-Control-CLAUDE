@@ -1,0 +1,218 @@
+Operation = 1
+Option = 0
+Having ="(((CantidadEntMaq.MaqEnt) Is Not Null))"
+Begin InputTables
+    Name ="Ordenes"
+    Name ="OrdenesDet"
+    Name ="CantidadCorte"
+    Name ="Modelos"
+    Name ="CantidadEntMaq"
+    Name ="CantRecMaq"
+    Name ="Clientes"
+    Name ="CostoOrd"
+End
+Begin OutputColumns
+    Expression ="CantidadEntMaq.MaqEnt"
+    Expression ="CantidadEntMaq.IdMaquileros"
+    Expression ="Modelos.Modelo"
+    Expression ="Ordenes.Numero"
+    Alias ="CantOrd"
+    Expression ="Sum([t1]+[t2]+[t3]+[t4]+[t5]+[t6]+[t7]+[t8])"
+    Expression ="CantidadCorte.CantCorte"
+    Expression ="CantidadEntMaq.CantEnt"
+    Alias ="CantiRec"
+    Expression ="ceronulo([CantRec])"
+    Expression ="CantidadCorte.FechaCorte"
+    Expression ="CantidadEntMaq.FechaEnt"
+    Alias ="Faltantes"
+    Expression ="[cantent]-ceronulo([cantrec])"
+    Expression ="Ordenes.IdOrdenes"
+    Expression ="Clientes.Cliente"
+    Expression ="Clientes.IdClientes"
+    Expression ="CostoOrd.MaquilaCost"
+    Expression ="CantidadEntMaq.PromedioDePrecioPactado"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="CantidadCorte"
+    Expression ="Ordenes.IdOrdenes = CantidadCorte.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="OrdenesDet"
+    Expression ="Ordenes.IdOrdenes = OrdenesDet.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 1
+    LeftTable ="CantidadEntMaq"
+    RightTable ="Ordenes"
+    Expression ="CantidadEntMaq.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 1
+    LeftTable ="CantRecMaq"
+    RightTable ="CantidadEntMaq"
+    Expression ="CantRecMaq.IdMaquileros = CantidadEntMaq.IdMaquileros"
+    Flag = 3
+    LeftTable ="CantRecMaq"
+    RightTable ="CantidadEntMaq"
+    Expression ="CantRecMaq.IdOrdenes = CantidadEntMaq.IdOrdenes"
+    Flag = 3
+    LeftTable ="Ordenes"
+    RightTable ="Clientes"
+    Expression ="Ordenes.IdClientes = Clientes.IdClientes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CostoOrd"
+    Expression ="Ordenes.IdOrdenes = CostoOrd.IdOrdenes"
+    Flag = 2
+End
+Begin OrderBy
+    Expression ="Ordenes.Numero"
+    Flag = 1
+End
+Begin Groups
+    Expression ="CantidadEntMaq.MaqEnt"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.IdMaquileros"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="CantidadCorte.CantCorte"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.CantEnt"
+    GroupLevel = 0
+    Expression ="ceronulo([CantRec])"
+    GroupLevel = 0
+    Expression ="CantidadCorte.FechaCorte"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.FechaEnt"
+    GroupLevel = 0
+    Expression ="[cantent]-ceronulo([cantrec])"
+    GroupLevel = 0
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+    Expression ="Clientes.IdClientes"
+    GroupLevel = 0
+    Expression ="CostoOrd.MaquilaCost"
+    GroupLevel = 0
+    Expression ="CantidadEntMaq.PromedioDePrecioPactado"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="-1"
+Begin
+    Begin
+        dbText "Name" ="Ordenes.Numero"
+        dbInteger "ColumnWidth" ="915"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CantOrd"
+        dbInteger "ColumnWidth" ="1200"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CantidadCorte.CantCorte"
+        dbInteger "ColumnWidth" ="1245"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CantidadEntMaq.CantEnt"
+        dbInteger "ColumnWidth" ="1185"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CantidadEntMaq.IdMaquileros"
+        dbInteger "ColumnWidth" ="915"
+        dbBoolean "ColumnHidden" ="0"
+    End
+    Begin
+        dbText "Name" ="CantiRec"
+        dbInteger "ColumnWidth" ="1080"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 178
+    Right = 1002
+    Bottom = 566
+    Left = -1
+    Top = -1
+    Right = 951
+    Bottom = 227
+    Left = 0
+    Top = 8
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = -2
+        Right = 134
+        Bottom = 105
+        Top = 4
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 191
+        Top = 30
+        Right = 287
+        Bottom = 137
+        Top = 0
+        Name ="OrdenesDet"
+    End
+    Begin
+        Left = 325
+        Top = -2
+        Right = 421
+        Bottom = 90
+        Top = 1
+        Name ="CantidadCorte"
+    End
+    Begin
+        Left = 727
+        Top = -2
+        Right = 823
+        Bottom = 105
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 417
+        Top = 93
+        Right = 580
+        Bottom = 200
+        Top = 2
+        Name ="CantidadEntMaq"
+    End
+    Begin
+        Left = 600
+        Top = 39
+        Right = 696
+        Bottom = 146
+        Top = 0
+        Name ="CantRecMaq"
+    End
+    Begin
+        Left = 38
+        Top = 108
+        Right = 134
+        Bottom = 200
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 734
+        Top = 108
+        Right = 830
+        Bottom = 215
+        Top = 3
+        Name ="CostoOrd"
+    End
+End

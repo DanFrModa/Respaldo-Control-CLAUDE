@@ -1,0 +1,311 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1224841109
+Begin Form
+    AutoCenter = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9546
+    DatasheetFontHeight = 10
+    ItemSuffix = 12
+    Left = 4575
+    Top = 225
+    Right = 14400
+    Bottom = 8085
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x747088c1f083e340
+    End
+    RecordSource ="IPT_RevFinal"
+    Caption ="IPT_Revision"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 410
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 759
+                    Top = 170
+                    Width = 1203
+                    Height = 240
+                    Name ="IdIPT_Mod_Alm Etiqueta"
+                    Caption ="IdIPT_Mod_Alm"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdIPT_Mod_Alm_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 1962
+                    Top = 170
+                    Width = 855
+                    Height = 240
+                    Name ="TotSuma Etiqueta"
+                    Caption ="TotSuma"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="TotSuma_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 3
+                    Left = 2817
+                    Top = 170
+                    Width = 855
+                    Height = 240
+                    Name ="Existencia Etiqueta"
+                    Caption ="Existencia"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Existencia_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 3
+                    Left = 3672
+                    Top = 170
+                    Width = 855
+                    Height = 240
+                    Name ="dif Etiqueta"
+                    Caption ="Diferencia"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="dif_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Top = 170
+                    Width = 759
+                    Height = 240
+                    Name ="NumMod Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="NumMod_Etiqueta"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5839
+                    Top = 113
+                    Width = 2661
+                    Name ="Comando11"
+                    Caption ="Ver Movimientos Faltantes"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 298
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 759
+                    Width = 1203
+                    Height = 285
+                    ColumnWidth = 1701
+                    Name ="IdIPT_Mod_Alm"
+                    ControlSource ="IdIPT_Mod_Alm"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 1962
+                    Width = 855
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="TotSuma"
+                    ControlSource ="TotSuma"
+                    Format ="#,##0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 2817
+                    Width = 855
+                    Height = 285
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="Existencia"
+                    ControlSource ="Existencia"
+                    Format ="#,##0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 3672
+                    Width = 855
+                    Height = 285
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="dif"
+                    ControlSource ="dif"
+                    Format ="#,##0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Width = 759
+                    Height = 285
+                    ColumnWidth = 675
+                    TabIndex = 4
+                    Name ="NumMod"
+                    ControlSource ="NumMod"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5610
+                    Top = 15
+                    TabIndex = 5
+                    Name ="Empatar Cantidades"
+                    Caption ="Empatar"
+                    OnClick ="[Event Procedure]"
+                    EventProcPrefix ="Empatar_Cantidades"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando11_Click()
+DoCmd.OpenQuery "IPT_RevMov"
+End Sub
+
+Private Sub Comando11_DblClick(Cancel As Integer)
+
+End Sub
+
+Private Sub Empatar_Cantidades_Click()
+Dim Dbs As Database
+Set Dbs = CurrentDb
+
+                Dbs.Execute ("UPDATE IPT_Mod_Alm SET Existencia =" & TotSuma & " WHERE IdIPT_Mod_Alm =" & IdIPT_Mod_Alm)
+Me.Requery
+
+Dbs.Close
+End Sub

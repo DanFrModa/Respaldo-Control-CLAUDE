@@ -1,0 +1,78 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Prom_Codigos"
+    Name ="Prom_Genero"
+    Name ="Prom_Prenda"
+End
+Begin OutputColumns
+    Expression ="Prom_Codigos.ModeloProm"
+    Expression ="Prom_Codigos.CodigoProm"
+    Expression ="Prom_Prenda.Prenda"
+    Expression ="Prom_Genero.Genero"
+    Expression ="Prom_Codigos.IdPartida"
+    Expression ="Prom_Codigos.Precio"
+    Expression ="Prom_Codigos.CantidadRec"
+    Expression ="Prom_Codigos.Foto1"
+    Expression ="Prom_Codigos.Foto2"
+    Expression ="Prom_Codigos.CostoUS"
+End
+Begin Joins
+    LeftTable ="Prom_Codigos"
+    RightTable ="Prom_Genero"
+    Expression ="Prom_Codigos.IdGenero = Prom_Genero.IdGenero"
+    Flag = 1
+    LeftTable ="Prom_Codigos"
+    RightTable ="Prom_Prenda"
+    Expression ="Prom_Codigos.IdPrenda = Prom_Prenda.IdPrenda"
+    Flag = 1
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="Prom_Codigos.CodigoProm"
+        dbInteger "ColumnWidth" ="1695"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1189
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 38
+        Top = 6
+        Right = 145
+        Bottom = 113
+        Top = 1
+        Name ="Prom_Codigos"
+    End
+    Begin
+        Left = 238
+        Top = 11
+        Right = 334
+        Bottom = 88
+        Top = 0
+        Name ="Prom_Genero"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 113
+        Top = 0
+        Name ="Prom_Prenda"
+    End
+End

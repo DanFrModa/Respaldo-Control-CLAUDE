@@ -1,0 +1,674 @@
+Version = 17
+VersionRequired = 17
+Checksum = -218073966
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10714
+    DatasheetFontHeight = 10
+    ItemSuffix = 64
+    Left = 3930
+    Right = 14640
+    Bottom = 8820
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x956723859c53e340
+    End
+    RecordSource ="SELECT CC_Auditorias.IdCC_Auditorias, CC_Auditorias.NumAuditoria, CC_Auditorias."
+        "IdOrdenes, CC_Auditorias.FechaElaboracion, CC_Auditorias.FechaAuditoria, CC_Audi"
+        "torias.TamanoMuestra, [maquileros].[nombre]+\" \"+[maquileros].[Apellidos] AS Ma"
+        "q, quetipoaudit([tipoauditoria]) AS TipoAud, [Usuarios]![nombre]+\" \"+[usuarios"
+        "]![apellidos] AS Elab, [Usuarios_1]![nombre]+\" \"+[usuarios_1]![apellidos] AS A"
+        "uditor, CC_Auditorias.Resultado, CC_Auditorias.Observaciones, Ordenes.Numero, Cl"
+        "ientes.Cliente, Modelos.Modelo, CC_Auditorias.IdUsuariosAuditor FROM (((((CC_Aud"
+        "itorias LEFT JOIN Maquileros ON CC_Auditorias.IdMaquilero = Maquileros.IdMaquile"
+        "ros) LEFT JOIN Usuarios ON CC_Auditorias.IdUsuariosElaboro = Usuarios.IdUsuarios"
+        ") LEFT JOIN Usuarios AS Usuarios_1 ON CC_Auditorias.IdUsuariosAuditor = Usuarios"
+        "_1.IdUsuarios) INNER JOIN Ordenes ON CC_Auditorias.IdOrdenes = Ordenes.IdOrdenes"
+        ") INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) INNER JOIN Mo"
+        "delos ON Ordenes.IdModelos = Modelos.IdModelos WHERE (((CC_Auditorias.Resultado)"
+        "=0 Or (CC_Auditorias.Resultado) Is Null) AND ((CC_Auditorias.IdUsuariosAuditor)="
+        "idusuarioactf()));"
+    Caption ="CC_MeterAuditorias"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 450
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 105
+                    Top = 120
+                    Width = 5250
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta24"
+                    Caption ="METER DATOS DE MIS AUDITORIAS PENDIENTES"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5535
+                    Top = 90
+                    Width = 276
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdCC_Auditorias"
+                    ControlSource ="IdCC_Auditorias"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5955
+                    Top = 75
+                    Width = 270
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6462
+                    Top = 56
+                    Width = 270
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Resultado"
+                    ControlSource ="Resultado"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8381
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 2777
+                    Width = 600
+                    Height = 255
+                    ColumnWidth = 600
+                    FontWeight = 700
+                    Name ="NumAuditoria"
+                    ControlSource ="NumAuditoria"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 2777
+                            Width = 1560
+                            Height = 255
+                            Name ="NumAuditoria Etiqueta"
+                            Caption ="Numero de Auditoria:"
+                            EventProcPrefix ="NumAuditoria_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 1926
+                    Top = 4286
+                    Width = 915
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 1
+                    Name ="FechaElaboracion"
+                    ControlSource ="FechaElaboracion"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 58
+                            Top = 4279
+                            Width = 1680
+                            Height = 255
+                            Name ="FechaElaboracion Etiqueta"
+                            Caption ="Fecha de Elaboracion:"
+                            EventProcPrefix ="FechaElaboracion_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 1926
+                    Top = 4541
+                    Width = 915
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 2
+                    Name ="FechaAuditoria"
+                    ControlSource ="FechaAuditoria"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 56
+                            Top = 4534
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaAuditoria Etiqueta"
+                            Caption ="Fecha de Auditoria:"
+                            EventProcPrefix ="FechaAuditoria_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 1011
+                    Top = 4796
+                    Width = 1830
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 3
+                    Name ="Maq"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 56
+                            Top = 4789
+                            Width = 1560
+                            Height = 255
+                            Name ="IdMaquilero Etiqueta"
+                            Caption ="Maquilero:"
+                            EventProcPrefix ="IdMaquilero_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 906
+                    Top = 4031
+                    Width = 1935
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 4
+                    Name ="Elab"
+                    ControlSource ="Elab"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 56
+                            Top = 4024
+                            Width = 1560
+                            Height = 255
+                            Name ="IdUsuariosElaboro Etiqueta"
+                            Caption ="Elaboro:"
+                            EventProcPrefix ="IdUsuariosElaboro_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 906
+                    Top = 63
+                    Width = 2625
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 5
+                    Name ="Auditor"
+                    ControlSource ="Auditor"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 56
+                            Width = 1560
+                            Height = 255
+                            Name ="IdUsuariosAuditor Etiqueta"
+                            Caption ="Auditor:"
+                            EventProcPrefix ="IdUsuariosAuditor_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 2196
+                    Top = 5335
+                    Width = 645
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 6
+                    Name ="TamanoMuestra"
+                    ControlSource ="TamanoMuestra"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 5328
+                            Width = 1560
+                            Height = 255
+                            Name ="TamanoMuestra Etiqueta"
+                            Caption ="Tamaño de Muestra"
+                            EventProcPrefix ="TamanoMuestra_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 1641
+                    Top = 5590
+                    Width = 1200
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 7
+                    Name ="TipoAud"
+                    ControlSource ="TipoAud"
+                    StatusBarText ="1- Proceso, 2-Final"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Left = 56
+                            Top = 5583
+                            Width = 1560
+                            Height = 255
+                            Name ="TipoAuditoria Etiqueta"
+                            Caption ="Tipo de Auditoria"
+                            EventProcPrefix ="TipoAuditoria_Etiqueta"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 5
+                    Left = 15
+                    Top = 510
+                    Width = 3516
+                    Height = 2212
+                    TabIndex = 8
+                    Name ="QueAuditoria"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CC_Auditorias.IdCC_Auditorias, CC_Auditorias.NumAuditoria, Ordenes.Numero"
+                        ", Modelos.Modelo, Clientes.Cliente, CC_Auditorias.IdUsuariosAuditor, CC_Auditori"
+                        "as.Resultado FROM ((CC_Auditorias INNER JOIN Ordenes ON CC_Auditorias.IdOrdenes "
+                        "= Ordenes.IdOrdenes) INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos"
+                        ") INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes GROUP BY CC_Au"
+                        "ditorias.IdCC_Auditorias, CC_Auditorias.NumAuditoria, Ordenes.Numero, Modelos.Mo"
+                        "delo, Clientes.Cliente, CC_Auditorias.IdUsuariosAuditor, CC_Auditorias.Resultado"
+                        " HAVING (((CC_Auditorias.IdUsuariosAuditor)=idusuarioactf()) AND ((CC_Auditorias"
+                        ".Resultado)=0 Or (CC_Auditorias.Resultado) Is Null));"
+                    ColumnWidths ="0;567;680;567;567"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 9354
+                    Top = 7937
+                    Width = 1251
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 10
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 3685
+                    Top = 6292
+                    Width = 6906
+                    Height = 1578
+                    TabIndex = 11
+                    Name ="Observaciones"
+                    ControlSource ="Observaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3685
+                            Top = 6009
+                            Width = 1185
+                            Height = 240
+                            Name ="Etiqueta34"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 3032
+                    Width = 600
+                    Height = 255
+                    TabIndex = 12
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 56
+                            Top = 3032
+                            Width = 1560
+                            Height = 255
+                            Name ="Etiqueta36"
+                            Caption ="Numero de Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 223
+                    BackStyle = 0
+                    Left = 1346
+                    Top = 3287
+                    Width = 930
+                    Height = 255
+                    TabIndex = 13
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 56
+                            Top = 3287
+                            Width = 1560
+                            Height = 255
+                            Name ="Etiqueta38"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 836
+                    Top = 3542
+                    Width = 1440
+                    Height = 255
+                    TabIndex = 14
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 56
+                            Top = 3542
+                            Width = 1560
+                            Height = 255
+                            Name ="Etiqueta40"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 3685
+                    Top = 56
+                    Width = 6915
+                    Height = 5850
+                    TabIndex = 15
+                    Name ="CC_MeterAuditoriasDet"
+                    SourceObject ="Form.CC_MeterAuditoriasDet"
+                    LinkChildFields ="IdCC_Auditorias"
+                    LinkMasterFields ="IdCC_Auditorias"
+                End
+                Begin ComboBox
+                    RowSourceTypeInt = 1
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 623
+                    Top = 7087
+                    Width = 1926
+                    Height = 285
+                    FontSize = 10
+                    TabIndex = 9
+                    Name ="Res"
+                    ControlSource ="Resultado"
+                    RowSourceType ="Value List"
+                    RowSource ="1;Aprobado;2;Reprobado"
+                    ColumnWidths ="0;1701"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 623
+                            Top = 6803
+                            Width = 1635
+                            Height = 240
+                            FontSize = 10
+                            FontWeight = 700
+                            Name ="Etiqueta58"
+                            Caption ="Resultado:"
+                        End
+                    End
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 3967
+                    Width = 3345
+                    Name ="Línea59"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 5158
+                    Width = 3345
+                    Name ="Línea60"
+                End
+                Begin Rectangle
+                    BackStyle = 1
+                    OverlapFlags = 85
+                    Left = 2721
+                    Top = 6859
+                    Width = 624
+                    Height = 624
+                    Name ="Cuadro"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 6122
+                    Width = 3345
+                    Name ="Línea63"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+Private Sub Form_Current()
+If Res = 1 Then
+ Cuadro.BackColor = 65280
+ElseIf Res = 2 Then
+ Cuadro.BackColor = 255
+Else
+ Cuadro.BackColor = 16777215
+End If
+End Sub
+
+Private Sub QueAuditoria_AfterUpdate()
+    Me.RecordsetClone.FindFirst "[IdCC_Auditorias] = " & Me![QueAuditoria]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+
+
+
+Private Sub Res_AfterUpdate()
+If Res = 1 Then
+ Cuadro.BackColor = 65280
+ElseIf Res = 2 Then
+ Cuadro.BackColor = 255
+Else
+ Cuadro.BackColor = 16777215
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+Private Sub Todas_AfterUpdate()
+QueOrden = ""
+QueOrdenEs = "*"
+QueAuditoria.Requery
+End Sub

@@ -1,0 +1,208 @@
+Version = 17
+VersionRequired = 17
+Checksum = -300922972
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 12302
+    DatasheetFontHeight = 10
+    ItemSuffix = 9
+    Left = 3135
+    Top = 570
+    Right = 15435
+    Bottom = 8835
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xef0d49e6f6c4e240
+    End
+    RecordSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo FROM Ordenes INNER JOIN"
+        " Modelos ON Ordenes.IdModelos = Modelos.IdModelos WHERE (((Ordenes.IdOrdenes)=[F"
+        "ormularios]![NotasOrd]![QueOrden]));"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin FormHeader
+            Height = 396
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 53
+                    Width = 4305
+                    Height = 330
+                    FontSize = 10
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta0"
+                    Caption ="VER NOTAS DE SALIDA POR ORDEN"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7540
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 5
+                    Left = 56
+                    Top = 113
+                    Width = 2781
+                    Height = 7372
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="QueOrden"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, CantidadOrd.CantOrd, C"
+                        "lientes.Cliente FROM (((Ordenes LEFT JOIN Clientes ON Ordenes.IdClientes = Clien"
+                        "tes.IdClientes) LEFT JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) INNE"
+                        "R JOIN NotasDet ON Ordenes.IdOrdenes = NotasDet.IdOrdenes) INNER JOIN CantidadOr"
+                        "d ON Ordenes.IdOrdenes = CantidadOrd.IdOrdenes GROUP BY Ordenes.IdOrdenes, Orden"
+                        "es.Numero, Modelos.Modelo, CantidadOrd.CantOrd, Clientes.Cliente ORDER BY Ordene"
+                        "s.Numero DESC;"
+                    ColumnWidths ="0;521;567;461;852;861;229;854;861;0"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 3794
+                    Top = 170
+                    Width = 921
+                    TabIndex = 1
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2955
+                            Top = 165
+                            Width = 855
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="No. Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 5447
+                    Top = 175
+                    Width = 1521
+                    TabIndex = 2
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4818
+                            Top = 170
+                            Width = 855
+                            Height = 240
+                            Name ="Etiqueta4"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 8957
+                    Top = 113
+                    Width = 396
+                    Height = 255
+                    TabIndex = 3
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 2948
+                    Top = 510
+                    Width = 9255
+                    Height = 6975
+                    TabIndex = 4
+                    Name ="NotasOrdSub"
+                    SourceObject ="Form.NotasOrdSub"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 340
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 11283
+                    Top = 56
+                    Width = 906
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueOrden_AfterUpdate()
+Me.Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

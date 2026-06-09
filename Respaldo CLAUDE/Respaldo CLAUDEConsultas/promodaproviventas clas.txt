@@ -1,0 +1,89 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="promventas"
+    Name ="Prom_Codigos"
+    Name ="Prom_Genero"
+    Name ="Prom_Prenda"
+End
+Begin OutputColumns
+    Expression ="promventas.Codigo"
+    Alias ="Can"
+    Expression ="Sum([CantVendido]-[Devoluciones])"
+    Expression ="Prom_Genero.Genero"
+    Expression ="Prom_Prenda.Prenda"
+End
+Begin Joins
+    LeftTable ="Prom_Codigos"
+    RightTable ="Prom_Genero"
+    Expression ="Prom_Codigos.IdGenero = Prom_Genero.IdGenero"
+    Flag = 1
+    LeftTable ="Prom_Codigos"
+    RightTable ="promventas"
+    Expression ="Prom_Codigos.CodigoProm = promventas.Codigo"
+    Flag = 1
+    LeftTable ="Prom_Codigos"
+    RightTable ="Prom_Prenda"
+    Expression ="Prom_Codigos.IdPrenda = Prom_Prenda.IdPrenda"
+    Flag = 1
+End
+Begin Groups
+    Expression ="promventas.Codigo"
+    GroupLevel = 0
+    Expression ="Prom_Genero.Genero"
+    GroupLevel = 0
+    Expression ="Prom_Prenda.Prenda"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1367
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="promventas"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 113
+        Top = 2
+        Name ="Prom_Codigos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 83
+        Top = 0
+        Name ="Prom_Genero"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 113
+        Top = 0
+        Name ="Prom_Prenda"
+    End
+End

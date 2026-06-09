@@ -1,0 +1,96 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Corte"
+    Name ="Cortadores"
+    Name ="Ordenes"
+    Name ="Modelos"
+    Name ="Clientes"
+End
+Begin OutputColumns
+    Expression ="Ordenes.Numero"
+    Expression ="Cortadores.Cortador"
+    Expression ="Corte.Cantidad"
+    Expression ="Corte.Fecha"
+    Expression ="Modelos.Modelo"
+    Expression ="Clientes.Cliente"
+End
+Begin Joins
+    LeftTable ="Corte"
+    RightTable ="Cortadores"
+    Expression ="Corte.IdCortadores = Cortadores.IdCortadores"
+    Flag = 1
+    LeftTable ="Corte"
+    RightTable ="Ordenes"
+    Expression ="Corte.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Modelos"
+    Expression ="Ordenes.IdModelos = Modelos.IdModelos"
+    Flag = 1
+    LeftTable ="Ordenes"
+    RightTable ="Clientes"
+    Expression ="Ordenes.IdClientes = Clientes.IdClientes"
+    Flag = 1
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="-1"
+dbMemo "OrderBy" ="CortePorCortador.Fecha DESC"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1367
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 2
+        Name ="Corte"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 113
+        Top = 0
+        Name ="Cortadores"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 113
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 113
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 574
+        Top = 6
+        Right = 670
+        Bottom = 98
+        Top = 0
+        Name ="Clientes"
+    End
+End

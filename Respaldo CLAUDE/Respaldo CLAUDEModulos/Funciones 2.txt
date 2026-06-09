@@ -1,0 +1,231 @@
+Option Compare Database
+Option Explicit
+
+
+
+Public Function OrdenModelo(QueIdOrd As Variant) As Variant
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT Ordenes.IdOrdenes, Modelos.Modelo FROM Ordenes INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos WHERE (Ordenes.IdOrdenes)=" & QueIdOrd)
+       OrdenModelo = Rst!Modelo
+    Rst.Close
+    Dbs.Close
+End Function
+
+Public Function QueTexto1(QueIdTela As Integer) As String
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT texto1 from telas where idtelas=" & QueIdTela)
+       QueTexto1 = Rst!Texto1
+    Rst.Close
+    Dbs.Close
+End Function
+Public Function QueTexto2(QueIdTela As Integer) As String
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT texto2 from telas where idtelas=" & QueIdTela)
+    If IsNull(Rst!Texto2) = True Then
+     QueTexto2 = ""
+    
+    Else
+       QueTexto2 = Rst!Texto2
+    End If
+    Rst.Close
+    Dbs.Close
+End Function
+
+Public Function ConsumoOrd(Ord As Integer) As Single
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT Salidas.IdOrdenes, Sum(([telasal1]+[telasal2])/[cantcorte]) AS Consumo FROM CantidadCorte INNER JOIN (SalidasDet INNER JOIN Salidas ON SalidasDet.IdSalidas = Salidas.IdSalidas) ON CantidadCorte.IdOrdenes = Salidas.IdOrdenes GROUP BY Salidas.IdOrdenes, CantidadCorte.CantCorte HAVING ((CantidadCorte.CantCorte)<>0) AND salidas.idordenes=" & Ord)
+ 
+      ConsumoOrd = Rst!Consumo
+    
+    Rst.Close
+    Dbs.Close
+
+End Function
+
+
+Public Function CostoVacio(Costo As Variant) As Integer
+If IsNull(Costo) = True Or Costo = 0 Then
+CostoVacio = 0
+Else
+CostoVacio = 1
+End If
+End Function
+
+Public Function CostoBueno(Costo As Variant, CostoV As Variant) As Currency
+If CostoV = 0 Or IsNull(CostoV) = True Then
+ If Costo = 0 Or IsNull(Costo) = True Then
+ CostoBueno = 0
+ Else
+ CostoBueno = Costo
+ End If
+Else
+CostoBueno = CostoV
+End If
+End Function
+
+Public Function QueMesLargo(QueFecha As Date) As String
+QueMesLargo = Format(QueFecha, "mmmm")
+End Function
+
+Public Function EsCero(Num As Variant) As Integer
+If IsNull(Num) = True Or Num = 0 Then
+EsCero = 1
+Else
+EsCero = 0
+End If
+End Function
+
+Public Function NadaAsterisco(Num As Variant) As String
+If IsNull(Num) = True Or Num = 0 Then
+NadaAsterisco = "*"
+Else
+NadaAsterisco = ""
+End If
+End Function
+Public Function HayAsterisco(Num As Variant) As String
+If IsNull(Num) = True Or Num = 0 Then
+HayAsterisco = ""
+Else
+HayAsterisco = "*"
+End If
+End Function
+
+
+Public Function NombreEstatus(Num As Integer) As String
+If Num = 1 Then
+NombreEstatus = "Vigente"
+ElseIf Num = 2 Then
+NombreEstatus = "Cancelado"
+ElseIf Num = 3 Then
+NombreEstatus = "Recibido"
+End If
+End Function
+
+Public Function MaqyCancel(Cancel As Boolean, Maq As Variant) As Variant
+If Cancel = True Then
+MaqyCancel = "+"
+Else
+MaqyCancel = CeroNulo(Maq)
+End If
+End Function
+Public Function AsteCierto(Riesgo As Boolean) As Variant
+If Riesgo = True Then
+AsteCierto = "*"
+Else
+AsteCierto = ""
+End If
+End Function
+
+Public Function SacarUPC(CodigoEmp As String, Model As String) As String
+Dim Texto1 As String
+Texto1 = CodigoEmp + Model
+
+If Len(Texto1) <> 12 Or IsNull(Texto1) = True Then
+MsgBox "Debes de meter 12 digitos"
+Exit Function
+Else
+
+Dim Total, Digito, Resultado, Resto, RestoDun, ResultadoDun As Integer
+Dim Contador As Single
+
+For Contador = 1 To 12
+  Digito = Mid(Texto1, Contador, 1)
+    If Contador Mod 2 = 0 Then
+       Total = Total + (Digito * 3)
+       Else
+       Total = Total + (Digito * 1)
+    End If
+    
+Next
+
+Resto = Total Mod 10
+RestoDun = (Total + 3) Mod 10
+
+If Resto <> 0 Then
+Resultado = 10 - Resto
+End If
+
+If RestoDun <> 0 Then
+ResultadoDun = 10 - RestoDun
+End If
+
+SacarUPC = Texto1 + "" + Str(Resultado)
+'CodigoDUN = "1 " + Texto1 + "" + Str(ResultadoDun)
+
+End If
+End Function
+
+
+Public Function PublicoSugerido1(Venta As Single, queClie As Integer) As Single
+Dim Tot, Tot1 As Single
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("SELECT MargenEllos From PrCo_Clientes WHERE IdPrCo_Clientes=" & queClie)
+
+    Tot = (Rst!MargenEllos - 1) * -1
+    PublicoSugerido = Venta / Tot * 1.15
+    
+    Rst.Close
+    Dbs.Close
+End Function
+
+Public Function BN(Bool As Boolean) As Integer
+If Bool = True Then
+ BN = 1
+Else
+ BN = 0
+End If
+End Function
+
+Public Function Fun_InfConfiable(IG As Boolean, IT As Boolean, IH As Boolean, Med As Boolean, CD As Boolean, Ob As Boolean, IE As Boolean, EC As Boolean, MP As Boolean) As String
+If (IG = False) And (IT = False) And (IH = False) And (Med = False) And (CD = False) And (Ob = False) And (IE = False) And (EC = False) And (MP = False) Then
+ Fun_InfConfiable = "OK"
+Else
+ Fun_InfConfiable = "Con Errores"
+End If
+End Function
+
+Public Function HorasBaseAlmFunc()
+HorasBaseAlmFunc = HorasBaseAlm
+End Function
+
+Public Function PrimSeg(QueEs As Variant) As String
+If QueEs = 1 Then
+ PrimSeg = "Primeras"
+ElseIf QueEs = 2 Then
+ PrimSeg = "Segundas"
+End If
+End Function
+
+Public Function QueAlmPT() As Integer
+QueAlmPT = AlmDefPT
+End Function
+Public Function TipoCant(CanP, CanF As Integer, Tipo As Variant) As Integer
+If Tipo = 1 Then
+ TipoCant = CanF
+ElseIf Tipo = 2 Then
+ TipoCant = CanP
+End If
+End Function
+
+
+Public Function QueFechaInvFisico() As Date
+QueFechaInvFisico = FechaInvFisico
+End Function
+
+Public Function QueMesLetras(QueFecha As Date) As String
+If IsNull(QueFecha) = True Then
+QueMesLetras = 0
+Else
+QueMesLetras = Format(QueFecha, "mmmm")
+End If
+End Function

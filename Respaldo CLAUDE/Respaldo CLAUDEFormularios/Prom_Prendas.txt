@@ -1,0 +1,272 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1540477298
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5580
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 6495
+    Top = 285
+    Right = 12075
+    Bottom = 7095
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xdc7bdfca3c24e440
+    End
+    RecordSource ="Prom_Prenda"
+    Caption ="Prom_Prendas"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 825
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 60
+                    Top = 555
+                    Width = 720
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="IdPrenda Etiqueta"
+                    Caption ="Prenda"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdPrenda_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 837
+                    Top = 555
+                    Width = 2310
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Prenda Etiqueta"
+                    Caption ="Prenda"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Prenda_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 3204
+                    Top = 555
+                    Width = 975
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="ConsecUNO Etiqueta"
+                    Caption ="ConsecUNO"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="ConsecUNO_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 4236
+                    Top = 555
+                    Width = 1215
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="ConsecVARIOS Etiqueta"
+                    Caption ="ConsecVARIOS"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="ConsecVARIOS_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 75
+                    Top = 120
+                    Width = 3690
+                    Height = 300
+                    FontSize = 10
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta8"
+                    Caption ="Tipos de Prenda Promoda"
+                End
+            End
+        End
+        Begin Section
+            Height = 345
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 720
+                    Height = 255
+                    ColumnWidth = 225
+                    Name ="IdPrenda"
+                    ControlSource ="IdPrenda"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 834
+                    Top = 57
+                    Width = 2310
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Prenda"
+                    ControlSource ="Prenda"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3201
+                    Top = 57
+                    Width = 975
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 2
+                    Name ="ConsecUNO"
+                    ControlSource ="ConsecUNO"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4233
+                    Top = 57
+                    Width = 1215
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 3
+                    Name ="ConsecVARIOS"
+                    ControlSource ="ConsecVARIOS"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 570
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4365
+                    Top = 75
+                    Width = 1101
+                    Height = 388
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

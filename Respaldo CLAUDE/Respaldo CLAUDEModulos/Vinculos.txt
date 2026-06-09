@@ -1,0 +1,127 @@
+Option Compare Database
+Option Explicit
+
+Public Function ComprobarVínculos() As Boolean
+    ' Comprobar los vínculos a la base de datos CONTROL.
+    ' Devolver True si los vínculos son correctos.
+
+    Dim bd As Database, Rst As Recordset
+
+    Set bd = CurrentDb
+
+    ' Abrir la tabla vinculada para ver si la información
+    ' de conexión es correcta.
+    On Error Resume Next
+    Set Rst = bd.OpenRecordset("EtiquetasM")
+
+    ' Si no se produce ningún error, devolver True.
+    If Err = 0 Then
+        ComprobarVínculos = True
+
+Else
+        ComprobarVínculos = False
+    End If
+
+End Function
+
+
+Public Function VolverAVincularTablas() As Boolean
+    ' Intentar actualizar los vínculos a la base de datos Neptuno.
+    ' Devolver True si no se produce ningún error.
+
+    Dim cadDirectorioAccess As String
+    Dim cadRutaBúsqueda As String
+    Dim cadNombreArchivo As String
+    Dim entError As Integer
+    Dim cadError As String
+
+    Const conTablasMáximas = 8
+    Const conTablaNoExistente = 3011
+    Const conNoEsNeptuno = 3078
+    Const conNeptunoNoEncontrada = 3024
+    Const conAccesoDenegado = 3051
+
+Const conBaseDeDatosDeSóloLectura = 3027
+    Const conTítuloAplicación = "Soluciones para el programador"
+
+    ' Obtener el nombre del directorio donde está ubicado
+    ' MSAccess.exe.
+    cadDirectorioAccess = SysCmd(acSysCmdAccessDir)
+
+    ' Obtener la ruta predeterminada de la base de datos de ejemplo.
+    If Dir(cadDirectorioAccess & "Ejemplos\.") = "" Then
+        cadRutaBúsqueda = cadDirectorioAccess
+    Else
+        cadRutaBúsqueda = cadDirectorioAccess & "Ejemplos\"
+    End If
+
+' Buscar la base de datos Neptuno.
+    If (Dir(cadRutaBúsqueda & "Neptuno.mdb") <> "") Then
+        cadNombreArchivo = cadRutaBúsqueda & "Neptuno.mdb"
+    Else
+        ' Imposible encontrar Neptuno, mostrar el cuadro de diálogo Abrir.
+        MsgBox "Imposible encontrar las tablas vinculadas de la base de datos Neptuno. Debe buscar Neptuno para poder utilizar " _
+            & conTítuloAplicación & ".", vbExclamation
+        cadNombreArchivo = BuscarNeptuno(cadRutaBúsqueda)
+        If cadNombreArchivo = "" Then
+
+cadError = "Lo siento, debe buscar Neptuno para abrir " & conTítuloAplicación & "."
+            GoTo Salir_Falló
+        End If
+    End If
+
+    ' Reparar los vínculos.
+    If ActualizarVínculos(cadNombreArchivo) Then
+        VolverAVincularTablas = True
+        Exit Function
+    End If
+
+    ' Si falló, mostrar un error.
+    Select Case Err
+        Case conTablaNoExistente, conNoEsNeptuno
+            cadError = "El archivo '" & cadNombreArchivo & "' no contiene las tablas necesarias de Neptuno."
+
+Case Err = conNeptunoNoEncontrada
+            cadError = "Imposible ejecutar " & conTítuloAplicación & " hasta que busque la base de datos Neptuno."
+        Case Err = conAccesoDenegado
+            cadError = "Imposible abrir " & cadNombreArchivo & " porque es de sólo lectura o está ubicada en un recurso compartido de sólo lectura."
+        Case Err = conBaseDeDatosDeSóloLectura
+            cadError = "Imposible volver a vincular las tablas porque " & conTítuloAplicación & " es de sólo lectura o está ubicada en un recurso compartido de sólo lectura."
+
+Case Else
+            cadError = Err.Description
+    End Select
+
+Salir_Falló:
+        MsgBox cadError, vbCritical
+        VolverAVincularTablas = False
+
+End Function
+
+Private Function ActualizarVínculos(cadNombreArchivo As String) As Boolean
+    ' Actualizar los vínculos a la base de datos suministrada.
+    ' Devolver True si no se produce ningún error.
+
+    Dim bd As Database
+    Dim tdf As TableDef
+
+    ' Comprobar todas las tablas de la base de datos.
+    Set bd = CurrentDb
+    For Each tdf In bd.TableDefs
+        ' Si la tabla tiene una cadena de conexión, es una tabla vinculada.
+        If Len(tdf.Connect) > 0 Then
+            tdf.Connect = ";DATABASE=" & cadNombreArchivo
+
+Err = 0
+            On Error Resume Next
+            tdf.RefreshLink ' Volver a vincular la tabla.
+            If Err <> 0 Then
+                ActualizarVínculos = False
+                Exit Function
+            End If
+        End If
+    Next tdf
+
+    ActualizarVínculos = True ' Vinculación terminada.
+
+End Function

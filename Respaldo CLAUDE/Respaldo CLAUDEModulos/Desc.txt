@@ -1,0 +1,73 @@
+Option Compare Database
+Option Explicit
+
+
+
+Public Function Dee(Modelo As Variant) As Variant
+On Error GoTo errores
+Dim a, b As String
+Dim Aa, Bb As String
+a = Mid(Modelo, 1, 1)
+b = Mid(Modelo, 2, 1)
+
+Select Case a
+    Case 1
+      Aa = "Pantalon"
+    Case 4
+      Aa = "Conjunto"
+    Case 8
+      Aa = "Conjunto Short y Playera"
+    Case 9
+      Aa = "Short"
+    Case Else
+      Aa = "No Definido"
+End Select
+
+Select Case b
+    Case 1
+      Bb = "Caballero"
+    Case 2
+      Bb = "Dama"
+    Case 4
+      Bb = "Niño"
+    Case 6
+      Bb = "Niña"
+    Case 0
+      Bb = "Bebe"
+    Case Else
+      Bb = "No Definido"
+End Select
+
+
+
+Dee = Aa + " de " + Bb
+Exit Function
+
+errores:
+If Err.Number <> 94 Then
+MsgBox Err.Description
+End If
+End Function
+
+
+
+
+
+
+
+Public Function Gee(Num As Integer) As String
+Select Case Num
+    Case 1
+      Gee = "Caballero"
+    Case 2
+      Gee = "Dama"
+    Case 4
+      Gee = "Niño"
+    Case 6
+      Gee = "Niña"
+    Case 0
+      Gee = "Bebe"
+    Case Else
+      Gee = "No Definido"
+End Select
+End Function

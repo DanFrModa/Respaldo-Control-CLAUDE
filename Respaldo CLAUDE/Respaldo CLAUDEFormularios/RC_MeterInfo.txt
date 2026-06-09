@@ -1,0 +1,614 @@
+Version = 17
+VersionRequired = 17
+Checksum = -547928572
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5250
+    DatasheetFontHeight = 10
+    ItemSuffix = 23
+    Left = 7935
+    Top = 2325
+    Right = 13185
+    Bottom = 4785
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x39f874883d49e540
+    End
+    RecordSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Ordenes.IdCP_Articulos, Ordenes.IdRC_A"
+        "plicaciones, Ordenes.IdRC_TipoTelas, Ordenes.FechaEntregaRC, RC_Aplicaciones.Dia"
+        "s AS DiasAp, RC_TipoTelas.Dias AS DiasTela, Ordenes.SI_RC, Ordenes.RC_Viva FROM "
+        "(Ordenes LEFT JOIN RC_Aplicaciones ON Ordenes.IdRC_Aplicaciones = RC_Aplicacione"
+        "s.IdRC_Aplicaciones) LEFT JOIN RC_TipoTelas ON Ordenes.IdRC_TipoTelas = RC_TipoT"
+        "elas.IdRC_TipoTelas ORDER BY Ordenes.IdOrdenes;"
+    Caption ="RC_MeterInfo"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            Height = 2475
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1677
+                    Top = 114
+                    Width = 411
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 114
+                            Width = 1560
+                            Height = 255
+                            Name ="IdOrdenes Etiqueta"
+                            Caption ="IdOrdenes"
+                            EventProcPrefix ="IdOrdenes_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1676
+                    Top = 1819
+                    Width = 930
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 4
+                    Name ="FechaEntregaRC"
+                    ControlSource ="FechaEntregaRC"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 1819
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaEntregaRC Etiqueta"
+                            Caption ="Fecha Entrega RC"
+                            EventProcPrefix ="FechaEntregaRC_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 1076
+                    Top = 793
+                    Width = 1185
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdCP_Articulos"
+                    ControlSource ="IdCP_Articulos"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CP_Articulos.IdCP_Articulos, CP_Articulos.Clave FROM CP_Articulos;"
+                    ColumnWidths ="0;1134"
+                    BaseInfo ="\"SELECT CP_Articulos.IdCP_Articulos, CP_Articulos.Clave FROM CP_Articulos;\";\""
+                        "CP_Articulos\";\"\";\"IdCP_Articulos\";\"Clave\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 793
+                            Width = 1560
+                            Height = 255
+                            Name ="IdCP_Articulos Etiqueta"
+                            Caption ="Articulo"
+                            EventProcPrefix ="IdCP_Articulos_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 1076
+                    Top = 1135
+                    Width = 1530
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"4\""
+                    Name ="IdRC_Aplicaciones"
+                    ControlSource ="IdRC_Aplicaciones"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT RC_Aplicaciones.IdRC_Aplicaciones, RC_Aplicaciones.ClaveAplicacion, RC_Ap"
+                        "licaciones.Dias FROM RC_Aplicaciones;"
+                    ColumnWidths ="0;851;285"
+                    BaseInfo ="\"SELECT RC_Aplicaciones.IdRC_Aplicaciones, RC_Aplicaciones.ClaveAplicacion, RC_"
+                        "Aplicaciones.Dias FROM RC_Aplicaciones;\";\"RC_Aplicaciones\";\"\";\"IdRC_Aplica"
+                        "ciones\";\"ClaveAplicacion\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 1135
+                            Width = 1560
+                            Height = 255
+                            Name ="IdRC_Aplicaciones Etiqueta"
+                            Caption ="Aplicacion"
+                            EventProcPrefix ="IdRC_Aplicaciones_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 1076
+                    Top = 1477
+                    Width = 2835
+                    ColumnWidth = 900
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdRC_TipoTelas"
+                    ControlSource ="IdRC_TipoTelas"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT RC_TipoTelas.IdRC_TipoTelas, RC_TipoTelas.TipoTela, RC_TipoTelas.Dias FRO"
+                        "M RC_TipoTelas;"
+                    ColumnWidths ="0;2552;286"
+                    BaseInfo ="\"SELECT RC_TipoTelas.IdRC_TipoTelas, RC_TipoTelas.TipoTela, RC_TipoTelas.Dias F"
+                        "ROM RC_TipoTelas;\";\"RC_TipoTelas\";\"\";\"IdRC_TipoTelas\";\"TipoTela\";\"Prim"
+                        "aryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 1477
+                            Width = 1560
+                            Height = 255
+                            Name ="IdRC_TipoTelas Etiqueta"
+                            Caption ="Tipo de Tela"
+                            EventProcPrefix ="IdRC_TipoTelas_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1677
+                    Top = 453
+                    Width = 741
+                    TabIndex = 5
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 450
+                            Width = 1170
+                            Height = 240
+                            Name ="Etiqueta10"
+                            Caption ="Numero de OP:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2664
+                    Top = 1133
+                    Width = 531
+                    TabIndex = 6
+                    Name ="DiasAp"
+                    ControlSource ="DiasAp"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3968
+                    Top = 1474
+                    Width = 531
+                    TabIndex = 7
+                    Name ="DiasTela"
+                    ControlSource ="DiasTela"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4081
+                    Top = 1870
+                    Width = 966
+                    Height = 343
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 3780
+                    Top = 750
+                    TabIndex = 9
+                    Name ="SI_RC"
+                    ControlSource ="SI_RC"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 4010
+                            Top = 720
+                            Width = 1035
+                            Height = 240
+                            Name ="Etiqueta15"
+                            Caption ="Activada"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 3780
+                    Top = 1080
+                    TabIndex = 10
+                    Name ="RC_Viva"
+                    ControlSource ="RC_Viva"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 4010
+                            Top = 1050
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta16"
+                            Caption ="Viva"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3315
+                    Top = 1875
+                    Width = 351
+                    TabIndex = 11
+                    Name ="QueForm"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3975
+                    Top = 75
+                    Width = 1161
+                    Height = 523
+                    TabIndex = 12
+                    Name ="CopiarAnt"
+                    Caption ="Copiar Orden Ant"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3081
+                    Top = 165
+                    Width = 576
+                    Height = 576
+                    TabIndex = 13
+                    Name ="Siguiente"
+                    Caption ="Comando20"
+                    OnClick ="[Event Procedure]"
+                    PictureData = Begin
+                        0x2800000020000000200000000100040000000000000200000000000000000000 ,
+                        0x1000000000000000000000000000800000800000008080008000000080008000 ,
+                        0x80800000c0c0c000808080000000ff0000ff000000ffff00ff000000ff00ff00 ,
+                        0xffff0000ffffff00777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777778 ,
+                        0x7777777777777777777777777777777880777777777777777777777777777778 ,
+                        0x8007777777777777777777777777777880007777777777777777777777777778 ,
+                        0x8000077777777777777788888888888880000077777777777777880000000000 ,
+                        0x0000000777777777777788000000000000000000777777777777880000000000 ,
+                        0x0000000007777777777788000000000000000000007777777777880000000000 ,
+                        0x0000000000077777777788000000000000000000007077777777880000000000 ,
+                        0x0000000007077777777788000000000000000000707777777777880000000000 ,
+                        0x0000000707777777777788077777777770000070777777777777770000000000 ,
+                        0x0000070777777777777777777777777880007077777777777777777777777778 ,
+                        0x8007077777777777777777777777777880707777777777777777777777777778 ,
+                        0x7007777777777777777777777777777770777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777000000000000000000000000000000000000000000000000
+                    End
+                    ObjectPalette = Begin
+                        0x0003100000000000800000000080000080800000000080008000800000808000 ,
+                        0xc0c0c00080808000ff00000000ff0000ffff00000000ff00ff00ff0000ffff00 ,
+                        0xffffff0000000000
+                    End
+                    ControlTipText ="Registro siguiente"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2505
+                    Top = 165
+                    Width = 576
+                    Height = 576
+                    TabIndex = 14
+                    Name ="Anterior"
+                    Caption ="Comando21"
+                    OnClick ="[Event Procedure]"
+                    PictureData = Begin
+                        0x2800000020000000200000000100040000000000000200000000000000000000 ,
+                        0x1000000000000000000000000000800000800000008080008000000080008000 ,
+                        0x80800000c0c0c000808080000000ff0000ff000000ffff00ff000000ff00ff00 ,
+                        0xffff0000ffffff00777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777787 ,
+                        0x7777777777777777777777777777788707777777777777777777777777778880 ,
+                        0x0777777777777777777777777778880007777777777777777777777777888000 ,
+                        0x0777777777777777777777777888000008888888887777777777777788800000 ,
+                        0x0000000000007777777777788800000000000000000077777777778880000000 ,
+                        0x0000000000007777777778880000000000000000000077777777888000000000 ,
+                        0x0000000000007777777778070000000000000000000077777777778070000000 ,
+                        0x0000000000007777777777780700000000000000000077777777777780700000 ,
+                        0x0000000000007777777777777807000007777777777077777777777777807000 ,
+                        0x0000000000007777777777777778070007777777777777777777777777778070 ,
+                        0x0777777777777777777777777777780707777777777777777777777777777780 ,
+                        0x0777777777777777777777777777777707777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777000000000000000000000000000000000000000000000000
+                    End
+                    ObjectPalette = Begin
+                        0x0003100000000000800000000080000080800000000080008000800000808000 ,
+                        0xc0c0c00080808000ff00000000ff0000ffff00000000ff00ff00ff0000ffff00 ,
+                        0xffffff0000000000
+                    End
+                    ControlTipText ="Registro anterior"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2790
+                    Top = 1815
+                    Width = 351
+                    TabIndex = 15
+                    Name ="QueOrdenEstaba"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub CopiarAnt_Click()
+Dim Dbs As Database
+Dim Rst As Recordset
+Dim Ma As Variant
+
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT IdOrdenes, IdCP_Articulos, IdRC_Aplicaciones, IdRC_TipoTelas, SI_RC, RC_Viva FROM Ordenes WHERE IdOrdenes=" & IdOrdenes - 1)
+
+IdCP_Articulos = Rst!IdCP_Articulos
+IdRC_Aplicaciones = Rst!IdRC_Aplicaciones
+IdRC_TipoTelas = Rst!IdRC_TipoTelas
+SI_RC = Rst!SI_RC
+RC_Viva = Rst!RC_Viva
+
+
+Rst.Close
+Dbs.Close
+End Sub
+
+Private Sub Form_Close()
+On Error GoTo Errs
+If QueForm = 1 Then
+ Forms![OrdenVer].Requery
+ Forms![OrdenVer].RecordsetClone.FindFirst "[Idordenes] = " & Forms![OrdenVer]![QueOrden]
+ Forms![OrdenVer].Bookmark = Forms![OrdenVer].RecordsetClone.Bookmark
+ 
+ElseIf QueForm = 2 Then
+ Forms![RC_Programacion].Requery
+ Forms![RC_Programacion].RecordsetClone.FindFirst "[Idordenes] = " & Forms![RC_Programacion]![QueOrden]
+ Forms![RC_Programacion].Bookmark = Forms![RC_Programacion].RecordsetClone.Bookmark
+End If
+Errs:
+
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If EstaCargado("OrdenVer") = True Then
+ Siguiente.Visible = True
+ Anterior.Visible = True
+ CopiarAnt.Visible = True
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub Siguiente_Click()
+
+If FilterOn = True Then
+ QueOrdenEstaba = IdOrdenes
+ FilterOn = False
+ Me.RecordsetClone.FindFirst "[Idordenes] = " & QueOrdenEstaba
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+ 
+End If
+
+
+
+On Error GoTo Err_Siguiente_Click
+
+
+    DoCmd.GoToRecord , , acNext
+    
+    If EstaCargado("ordenver") = True Then
+    Call ActualizarOrden
+    End If
+
+Exit_Siguiente_Click:
+    Exit Sub
+
+Err_Siguiente_Click:
+    MsgBox Err.Description
+    Resume Exit_Siguiente_Click
+    
+End Sub
+Private Sub Anterior_Click()
+
+If FilterOn = True Then
+ QueOrdenEstaba = IdOrdenes
+ FilterOn = False
+ Me.RecordsetClone.FindFirst "[Idordenes] = " & QueOrdenEstaba
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+ 
+End If
+
+
+On Error GoTo Err_Anterior_Click
+
+
+    DoCmd.GoToRecord , , acPrevious
+     If EstaCargado("ordenver") = True Then
+    Call ActualizarOrden
+    End If
+Exit_Anterior_Click:
+    Exit Sub
+
+Err_Anterior_Click:
+    MsgBox Err.Description
+    Resume Exit_Anterior_Click
+    
+End Sub
+
+Public Sub ActualizarOrden()
+ Forms![OrdenVer]![QueOrden] = IdOrdenes
+ 
+ Forms![OrdenVer].RecordsetClone.FindFirst "[Idordenes] = " & Forms![OrdenVer]![QueOrden]
+    Forms![OrdenVer].Bookmark = Forms![OrdenVer].RecordsetClone.Bookmark
+End Sub

@@ -1,0 +1,78 @@
+Operation = 1
+Option = 0
+Having ="(((IPT_Movs.EnSa)=1))"
+Begin InputTables
+    Name ="IPT_Mod_Alm"
+    Name ="IPT_MovsDet"
+    Name ="IPT_Movs"
+End
+Begin OutputColumns
+    Expression ="IPT_Mod_Alm.IdIPT_Mod_Alm"
+    Alias ="EntSuma"
+    Expression ="Sum(IPT_MovsDet.CantMov)"
+End
+Begin Joins
+    LeftTable ="IPT_Mod_Alm"
+    RightTable ="IPT_MovsDet"
+    Expression ="IPT_Mod_Alm.IdIPT_Mod_Alm = IPT_MovsDet.IdIPT_Mod_Alm"
+    Flag = 2
+    LeftTable ="IPT_MovsDet"
+    RightTable ="IPT_Movs"
+    Expression ="IPT_MovsDet.IdIPT_Movs = IPT_Movs.IdIPT_Movs"
+    Flag = 2
+End
+Begin Groups
+    Expression ="IPT_Mod_Alm.IdIPT_Mod_Alm"
+    GroupLevel = 0
+    Expression ="IPT_Movs.EnSa"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+    Begin
+        dbText "Name" ="EntSuma"
+        dbInteger "ColumnWidth" ="1785"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 27
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1181
+    Bottom = 144
+    Left = 0
+    Top = 15
+    ColumnsShown = 543
+    Begin
+        Left = 58
+        Top = 6
+        Right = 215
+        Bottom = 122
+        Top = 0
+        Name ="IPT_Mod_Alm"
+    End
+    Begin
+        Left = 253
+        Top = 6
+        Right = 349
+        Bottom = 122
+        Top = 0
+        Name ="IPT_MovsDet"
+    End
+    Begin
+        Left = 387
+        Top = 6
+        Right = 527
+        Bottom = 122
+        Top = 3
+        Name ="IPT_Movs"
+    End
+End

@@ -1,0 +1,290 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1577298435
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DividingLines = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10892
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 3885
+    Top = 30
+    Right = 14775
+    Bottom = 8820
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x47df06797efce340
+    End
+    RecordSource ="Ordenes"
+    Caption ="OrdDetCorte"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8809
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 114
+                    Width = 600
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 114
+                            Width = 1560
+                            Height = 255
+                            Name ="Numero Etiqueta"
+                            Caption ="Numero"
+                            EventProcPrefix ="Numero_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 456
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 1
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 456
+                            Width = 1560
+                            Height = 255
+                            Name ="IdOrdenes Etiqueta"
+                            Caption ="IdOrdenes"
+                            EventProcPrefix ="IdOrdenes_Etiqueta"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 56
+                    Top = 1033
+                    Width = 8730
+                    Height = 2130
+                    TabIndex = 2
+                    Name ="OrdDetCorteSubA"
+                    SourceObject ="Form.OrdDetCorteSubA"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 56
+                            Top = 793
+                            Width = 1035
+                            Height = 240
+                            Name ="Etiqueta4"
+                            Caption ="OrdenVerSub"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 45
+                    Top = 3495
+                    Width = 8730
+                    Height = 2205
+                    TabIndex = 3
+                    Name ="OrdDetCorteSubB"
+                    SourceObject ="Form.OrdDetCorteSubB"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 45
+                            Top = 3255
+                            Width = 1035
+                            Height = 240
+                            Name ="Etiqueta5"
+                            Caption ="OrdenVerSub"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5078
+                    Top = 113
+                    Width = 246
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Tallas"
+                    ControlSource ="Tallas"
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 30
+                    Top = 6030
+                    Width = 9645
+                    Height = 2430
+                    TabIndex = 5
+                    Name ="OrdDetCorteSub"
+                    SourceObject ="Form.OrdDetCorteSub"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 30
+                            Top = 5790
+                            Width = 930
+                            Height = 240
+                            Name ="Etiqueta8"
+                            Caption ="OrdenesDet"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5078
+                    Top = 488
+                    Width = 246
+                    Height = 255
+                    TabIndex = 6
+                    Name ="QueIdCorte"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Current()
+Me![OrdDetCorteSub].Form![TallasLoc] = Tallas
+Me![OrdDetCorteSubA].Form![TallasLoc] = Tallas
+Me![OrdDetCorteSubB].Form![TallasLoc] = Tallas
+Call Me.[OrdDetCorteSubA].Form.BorrarA
+Call Me.[OrdDetCorteSubB].Form.BorrarB
+Call Me.[OrdDetCorteSub].Form.Borrar
+End Sub

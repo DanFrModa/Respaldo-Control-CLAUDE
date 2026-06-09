@@ -1,0 +1,105 @@
+Operation = 1
+Option = 0
+Where ="(((TelasColAlm.IdAlmacenes)=[Formularios]![VerificadorInv]![QueAlm]))"
+Begin InputTables
+    Name ="VerifEnt"
+    Name ="VerifSal"
+    Name ="TelasColores"
+    Name ="TelasColAlm"
+    Name ="Telas"
+End
+Begin OutputColumns
+    Expression ="Telas.Nombre"
+    Expression ="TelasColores.IdTelasColores"
+    Expression ="TelasColores.Color"
+    Alias ="Suma1"
+    Expression ="[TotTelaE1]+[TotTelaS1]"
+    Alias ="Suma2"
+    Expression ="[TotTelaE2]+[TotTelaS2]"
+    Expression ="TelasColAlm.IdAlmacenes"
+    Expression ="TelasColAlm.ExTela1"
+    Expression ="TelasColAlm.ExTela2"
+    Alias ="Dif1"
+    Expression ="([tottelaE1]+[tottelaS1])-[ExTela1]"
+    Alias ="Dif2"
+    Expression ="([tottelaE2]+[tottelaS2])-[ExTela2]"
+    Expression ="TelasColAlm.IdTelasColAlm"
+End
+Begin Joins
+    LeftTable ="VerifEnt"
+    RightTable ="TelasColores"
+    Expression ="VerifEnt.IdTelasColores = TelasColores.IdTelasColores"
+    Flag = 3
+    LeftTable ="TelasColores"
+    RightTable ="VerifSal"
+    Expression ="TelasColores.IdTelasColores = VerifSal.IdTelasColores"
+    Flag = 2
+    LeftTable ="TelasColores"
+    RightTable ="TelasColAlm"
+    Expression ="TelasColores.IdTelasColores = TelasColAlm.IdTelasColores"
+    Flag = 2
+    LeftTable ="TelasColores"
+    RightTable ="Telas"
+    Expression ="TelasColores.IdTelas = Telas.IdTelas"
+    Flag = 1
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="-1"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 204
+    Right = 1418
+    Bottom = 509
+    Left = -1
+    Top = -1
+    Right = 1371
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 157
+        Top = 58
+        Right = 253
+        Bottom = 165
+        Top = 0
+        Name ="VerifEnt"
+    End
+    Begin
+        Left = 490
+        Top = 62
+        Right = 586
+        Bottom = 169
+        Top = 0
+        Name ="VerifSal"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 113
+        Top = 0
+        Name ="TelasColores"
+    End
+    Begin
+        Left = 644
+        Top = 6
+        Right = 777
+        Bottom = 113
+        Top = 1
+        Name ="TelasColAlm"
+    End
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 113
+        Top = 0
+        Name ="Telas"
+    End
+End

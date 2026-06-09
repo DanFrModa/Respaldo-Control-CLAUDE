@@ -1,0 +1,210 @@
+Option Compare Database
+Option Explicit
+
+Public Const NoFoto As String = Ubica & "FotosMod\nodisp.gif"
+
+
+Public Function DirFotos(Model As String) As Variant
+' Ruta de donde estan las fotos de los modelos
+DirFotos = Ubica & "FotosMod\" & Model & ".jpg"
+End Function
+
+Public Function DirBordados(Bordad As String) As Variant
+' Ruta de donde estan las fotos de los bordados
+DirBordados = Ubica & "FotosBor\" & Bordad & ".jpg"
+End Function
+Public Function DirPromoda(Foto As String) As Variant
+' Ruta de donde estan las fotos de los bordados
+DirPromoda = Ubica & "FotosPromoda\" & Foto & ".jpg"
+End Function
+Public Function CeroNulo(Num As Variant) As Single
+' Cambia un valor Nulo, por un cero
+If IsNull(Num) = True Then
+CeroNulo = 0
+Else
+CeroNulo = Num
+End If
+End Function
+
+Public Function QueEsBor(var As Boolean) As String
+' Especifica si el registro de "Bordados" es Bordado o estampado
+If var = True Then
+QueEsBor = "Bordado"
+ElseIf var = False Then
+QueEsBor = "Estampado"
+ElseIf IsNull(var) = True Then
+QueEsBor = ""
+End If
+End Function
+
+
+Public Function NadaNulo(des As String) As Variant
+If IsNull(des) = True Then
+NadaNulo = "no hay nada"
+Else
+NadaNulo = des
+End If
+End Function
+
+Public Function NombreAct() As String
+Dim Dbs As Database
+Dim Rst As Recordset
+
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("Usuarios", dbOpenDynaset)
+    Rst.FindFirst "[IdUsuarios]=" & IdUsuarioACT
+    NombreAct = Rst!Nombre & " " & Rst!Apellidos
+    Rst.Close
+    Dbs.Close
+End Function
+
+Public Function IdUsuarioActF()
+IdUsuarioActF = IdUsuarioACT
+End Function
+Public Function Nivelta()
+If NivelAct = 0 Then
+Nivelta = 500
+Else
+Nivelta = NivelAct
+End If
+End Function
+Public Function CambiarPropiedad(strPropName As String, varPropType As Variant, varPropValue As Variant) As Integer
+    Dim Dbs As Database, PrP As Property
+    Const conPropNotFoundError = 3270
+
+    Set Dbs = CurrentDb
+    On Error GoTo Change_Err
+    Dbs.Properties(strPropName) = varPropValue
+    CambiarPropiedad = True
+
+Change_Bye:
+    Exit Function
+
+Change_Err:
+    If Err = conPropNotFoundError Then  ' Propiedad no encontrada.
+
+Set PrP = Dbs.CreateProperty(strPropName, _
+            varPropType, varPropValue)
+        Dbs.Properties.Append PrP
+        Resume Next
+    Else
+        ' Error desconocido.
+        CambiarPropiedad = False
+        Resume Change_Bye
+    End If
+End Function
+
+Public Function QueIdUsuarios()
+QueIdUsuarios = IdUsuarioACT
+End Function
+
+Public Function EmpresaAct()
+Dim Dbs As Database
+Dim Rst As Recordset
+
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("Propiedades", dbOpenDynaset)
+    EmpresaAct = Rst!Empresa
+    Rst.Close
+    Dbs.Close
+End Function
+Public Function Actualiz()
+On Error GoTo act_Err
+Dim Donde As String
+    Donde = (Ubica & "Act_Control.bat")
+    Call Shell(Donde, 6)
+
+
+act_Exit:
+    Exit Function
+
+act_Err:
+    MsgBox Error$
+    Resume act_Exit
+
+End Function
+
+Function EstaCargado(ByVal txtNombreFormulario As String) As Boolean
+ ' Devuelve Verdadero si se ha cargado el formulario especificado.
+    
+    Const conObjetoEstaCerrado = 0
+    Const conModoDiseño = 0
+    
+    If SysCmd(acSysCmdGetObjectState, acForm, txtNombreFormulario) <> conObjetoEstaCerrado Then
+        If Forms(txtNombreFormulario).CurrentView <> conModoDiseño Then
+            EstaCargado = True
+        End If
+    End If
+
+End Function
+
+
+Public Function VersionDis()
+Dim Dbs As Database
+Dim Rst As Recordset
+    Set Dbs = CurrentDb()
+    Set Rst = Dbs.OpenRecordset("Propiedades", dbOpenDynaset)
+    VersionDis = Rst!VersionDisponible
+    FechaInvFisico = Rst!invfisico
+    FechaInvFisicoPT = Rst!InvFisicoPT
+    Rst.Close
+    Dbs.Close
+End Function
+Public Function TextoMedida(QueEs As Boolean) As String
+If QueEs = True Then
+TextoMedida = "Kilos"
+Else
+TextoMedida = "Metros"
+End If
+End Function
+
+Public Function FiltroAno()
+FiltroAno = DesdeQueAnoAct
+End Function
+
+
+Public Sub CerrarUsuario()
+Dim Dbs As Database
+    Set Dbs = CurrentDb()
+    ' Dbs.Execute ("UPDATE Usuarios SET EstaLogiado = (EstaLogiado - 1) WHERE IdUsuarios = " & IdUsuarioAct)
+    Dbs.Execute ("UPDATE UsuariosLog SET FechaSalida = '" & Now & "' WHERE IdUsuariosLog = " & QueIdUsuariosLog)
+    Dbs.Close
+End Sub
+
+Public Function QueEstatus(Canc As Boolean, NoProd As Boolean, Entr As Boolean) As String
+If Canc = True Then
+QueEstatus = "Cancelado"
+Exit Function
+End If
+
+If NoProd = True Then
+QueEstatus = "No Producir"
+Exit Function
+End If
+
+If Entr = True Then
+QueEstatus = "Entregado"
+Exit Function
+End If
+
+If (Canc = False) And (NoProd = False) And (Entr = False) Then
+QueEstatus = "Vigente"
+End If
+
+End Function
+
+Public Function QueEmpresaFav()
+QueEmpresaFav = EmpresaFav
+End Function
+Public Function VacioNulo(Entrada As Variant) As String
+' Formatea los valores de las tallas
+If IsNull(Entrada) = True Then
+VacioNulo = ""
+Else
+  If Len(Entrada) = 1 Then
+   VacioNulo = Entrada + " "
+  Else
+   VacioNulo = Entrada
+  End If
+End If
+End Function

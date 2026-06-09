@@ -1,0 +1,593 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1521716407
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9080
+    DatasheetFontHeight = 10
+    ItemSuffix = 32
+    Left = 5880
+    Right = 15240
+    Bottom = 9750
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x3ee14ef62f2ce440
+    End
+    RecordSource ="Prom_EntregaRemision"
+    Caption ="Prom_EntregaRemision"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x890500008905000089050000890500000000000078230000ff00000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x50444643726561746f7200000000000000000000000000000000000000000000 ,
+        0x010402059c00c40253ef8001010009009a0b3408640001000f00580202000100 ,
+        0x5802030000004134000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000010000000000000001000000 ,
+        0x0200000001000000000000000000000000000000000000000000000050524956 ,
+        0xe230000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000180000000000102710271027 ,
+        0x0000102700000000000000000000c40200000000000000000000000000000000 ,
+        0x0000000000000000030000000000000000001000503403002888040000000000 ,
+        0x000000000000010000000000000000000000000000000000e7b14b4c03000000 ,
+        0x05000a00ff000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012001e00010077696e73706f6f6c000050444643726561746f7200005044 ,
+        0x4643726561746f723a000000000000000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 2197
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 1927
+                    Width = 1536
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="CodigoProm Etiqueta"
+                    Caption ="Código"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CodigoProm_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 1916
+                    Top = 1927
+                    Width = 3924
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Desc Etiqueta"
+                    Caption ="Descrcipción"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Desc_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    Left = 5829
+                    Top = 1927
+                    Width = 1026
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="CantEnt Etiqueta"
+                    Caption ="Cantidad"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantEnt_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 6981
+                    Top = 1927
+                    Width = 774
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7880
+                    Top = 1927
+                    Width = 1044
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Importe Etiqueta"
+                    Caption ="Importe"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Importe_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextFontFamily = 18
+                    Left = 56
+                    Top = 453
+                    Width = 4695
+                    Height = 345
+                    FontSize = 12
+                    FontWeight = 700
+                    Name ="Etiqueta14"
+                    Caption ="CORPORATIVO MJD S.A. DE C.V."
+                    FontName ="Times New Roman"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextFontFamily = 18
+                    Left = 1922
+                    Width = 4710
+                    Height = 360
+                    FontSize = 16
+                    FontWeight = 700
+                    Name ="Etiqueta15"
+                    Caption ="REMISIÓN A CONSIGNACIÓN"
+                    FontName ="Times New Roman"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    BackStyle = 0
+                    Left = 8120
+                    Width = 960
+                    Height = 345
+                    FontSize = 12
+                    FontWeight = 700
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="Rem"
+                    ControlSource ="Rem"
+                    Format ="0000"
+                    FontName ="Times New Roman"
+                End
+                Begin ComboBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    ColumnCount = 2
+                    Left = 1371
+                    Top = 1590
+                    Width = 2721
+                    FontSize = 10
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"0\""
+                    Name ="QueTienda"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Prom_EntregasDet.Tienda, [Tienda] & \" - \" & [NombreTda] AS Tda, Prom_En"
+                        "tregasDet.IdProm_Entregas FROM Prom_Tdas INNER JOIN Prom_EntregasDet ON Prom_Tda"
+                        "s.NumTda = Prom_EntregasDet.Tienda GROUP BY Prom_EntregasDet.Tienda, [Tienda] & "
+                        "\" - \" & [NombreTda], Prom_EntregasDet.IdProm_Entregas HAVING (((Prom_EntregasD"
+                        "et.IdProm_Entregas)=[Formularios]![Prom_Entregas]![IdProm_Entregas]));"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    FontName ="Times New Roman"
+                    BaseInfo ="\"SELECT Prom_EntregasDet.Tienda, [Tienda] & \"\" - \"\" & [NombreTda] AS Tda, P"
+                        "rom_EntregasDet.IdProm_Entregas FROM Prom_Tdas INNER JOIN Prom_EntregasDet ON Pr"
+                        "om_Tdas.NumTda = Prom_EntregasDet.Tienda GROUP BY Prom_EntregasDet.Tienda, [Tien"
+                        "da] & \"\" - \"\" & [NombreTda\";\"Prom_Tdas\";\"Prom_EntregasDet\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            TextFontFamily = 18
+                            Left = 56
+                            Top = 1587
+                            Width = 1530
+                            Height = 255
+                            FontSize = 10
+                            Name ="Etiqueta18"
+                            Caption ="Para Sucursal:"
+                            FontName ="Times New Roman"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 5045
+                    Top = 509
+                    Width = 129
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 2
+                    Name ="Tienda"
+                    ControlSource ="Tienda"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 5782
+                    Top = 566
+                    Width = 51
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 3
+                    Name ="IdProm_Entregas"
+                    ControlSource ="IdProm_Entregas"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 87
+                    Left = 4762
+                    Top = 679
+                    Width = 129
+                    Height = 255
+                    TabIndex = 4
+                    Name ="QueId"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextFontFamily = 18
+                    Left = 56
+                    Top = 793
+                    Width = 4035
+                    Height = 750
+                    FontSize = 10
+                    Name ="Etiqueta29"
+                    Caption ="Taine No. 244, Col. Chapultepec Morales,\015\012Mexico D.F., C.P. 11570\015\012R"
+                        "FC: CMJ  071025 4V6"
+                    FontName ="Times New Roman"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextFontFamily = 18
+                    Left = 7653
+                    Width = 450
+                    Height = 360
+                    FontSize = 12
+                    FontWeight = 700
+                    Name ="Etiqueta30"
+                    Caption ="No."
+                    FontName ="Times New Roman"
+                End
+                Begin CommandButton
+                    DisplayWhen = 2
+                    OverlapFlags = 85
+                    Left = 6746
+                    Top = 1077
+                    Width = 765
+                    Height = 405
+                    TabIndex = 5
+                    Name ="Imprimir"
+                    Caption ="Imprimir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin PageHeader
+            DisplayWhen = 1
+            Height = 0
+            Name ="EncabezadoDePágina"
+        End
+        Begin Section
+            Height = 255
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 56
+                    Width = 1536
+                    Height = 255
+                    ColumnWidth = 1035
+                    Name ="CodigoProm"
+                    ControlSource ="CodigoProm"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    Left = 1916
+                    Width = 3924
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Desc"
+                    ControlSource ="Desc"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 5889
+                    Width = 966
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 2
+                    Name ="CantEnt"
+                    ControlSource ="CantEnt"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 6981
+                    Width = 774
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7880
+                    Width = 1044
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="Importe"
+                    ControlSource ="Importe"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+            End
+        End
+        Begin PageFooter
+            DisplayWhen = 1
+            Height = 1134
+            Name ="PieDePágina"
+            Begin
+                Begin Line
+                    OverlapFlags = 85
+                    SpecialEffect = 0
+                    Left = 396
+                    Top = 737
+                    Width = 3458
+                    Name ="Línea25"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 855
+                    Top = 855
+                    Width = 2325
+                    Height = 210
+                    Name ="Etiqueta26"
+                    Caption ="RECIBIDO NOMBRE  Y FIRMA"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 428
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 6009
+                    Top = 113
+                    Width = 966
+                    Height = 315
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Texto23"
+                    ControlSource ="=Sum([CantEnt])"
+                    Format ="#,###"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7695
+                    Top = 113
+                    Width = 1359
+                    Height = 315
+                    FontSize = 10
+                    FontWeight = 700
+                    TabIndex = 1
+                    Name ="Texto24"
+                    ControlSource ="=Sum([Importe])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 4081
+                    Top = 113
+                    Width = 1080
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Etiqueta27"
+                    Caption ="TOTAL:"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+If EstaCargado("Prom_impAux") = True Then
+DoCmd.Close acForm, "Prom_ImpAux"
+End If
+End Sub
+
+Private Sub QueTienda_AfterUpdate()
+DoCmd.Requery
+
+End Sub
+
+
+Public Sub ImpRemision()
+DoCmd.PrintOut
+
+End Sub
+Private Sub Imprimir_Click()
+On Error GoTo Err_Imprimir_Click
+
+
+    DoCmd.PrintOut
+
+Exit_Imprimir_Click:
+    Exit Sub
+
+Err_Imprimir_Click:
+    MsgBox Err.Description
+    Resume Exit_Imprimir_Click
+    
+End Sub

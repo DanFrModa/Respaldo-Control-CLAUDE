@@ -1,0 +1,415 @@
+Version = 17
+VersionRequired = 17
+Checksum = -509544711
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5612
+    DatasheetFontHeight = 10
+    ItemSuffix = 28
+    Left = 6480
+    Top = 1275
+    Right = 12090
+    Bottom = 5115
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x47fb0b5d196de340
+    End
+    RecordSource ="IP_MuesPend"
+    Caption ="IP_MuesPend_Solicitud"
+    BeforeInsert ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 396
+            BackColor = 26367
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 3630
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 0
+                    Name ="Etiqueta26"
+                    Caption ="SOLICITUD DE MUESTRAS FISICAS"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4422
+                    Width = 495
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdUsuarioSolicitante"
+                    ControlSource ="IdUsuarioSolicitante"
+                End
+            End
+        End
+        Begin Section
+            Height = 3458
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1677
+                    Top = 114
+                    Width = 711
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdIP_MuesPend"
+                    ControlSource ="IdIP_MuesPend"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 114
+                            Width = 1560
+                            Height = 255
+                            Name ="IdIP_MuesPend Etiqueta"
+                            Caption ="Folio:"
+                            EventProcPrefix ="IdIP_MuesPend_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 1482
+                    Width = 465
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 4
+                    Name ="CantBoards"
+                    ControlSource ="CantBoards"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 1482
+                            Width = 1560
+                            Height = 255
+                            Name ="CantBoards Etiqueta"
+                            Caption ="Cantidad Boards:"
+                            EventProcPrefix ="CantBoards_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 1824
+                    Width = 465
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 5
+                    Name ="CantMuestras"
+                    ControlSource ="CantMuestras"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 1824
+                            Width = 1560
+                            Height = 255
+                            Name ="CantMuestras Etiqueta"
+                            Caption ="Cantidad Muestras:"
+                            EventProcPrefix ="CantMuestras_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 4426
+                    Top = 56
+                    Width = 1080
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 6
+                    Name ="FechaSolicitado"
+                    ControlSource ="FechaSolicitado"
+                    Format ="Medium Date"
+                    DefaultValue ="now()"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3061
+                            Top = 56
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaSolicitado Etiqueta"
+                            Caption ="Fecha Solicitado:"
+                            EventProcPrefix ="FechaSolicitado_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1676
+                    Top = 2154
+                    Width = 1215
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 7
+                    Name ="FechaRequerida"
+                    ControlSource ="FechaRequerida"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 2154
+                            Width = 1560
+                            Height = 255
+                            Name ="FechaRequerida Etiqueta"
+                            Caption ="Fecha Requerida:"
+                            EventProcPrefix ="FechaRequerida_Etiqueta"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5078
+                    Top = 1927
+                    TabIndex = 8
+                    Name ="Cancelado"
+                    ControlSource ="Cancelado"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 3180
+                            Top = 1920
+                            Width = 1800
+                            Height = 255
+                            Name ="Cancelado Etiqueta"
+                            Caption ="CANCELAR SOLICITUD"
+                            EventProcPrefix ="Cancelado_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 456
+                    Width = 1845
+                    ColumnWidth = 1560
+                    TabIndex = 1
+                    ColumnInfo ="\"\";\"\";\"10\";\"20\""
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IP_MuesPend.Cliente FROM IP_MuesPend GROUP BY IP_MuesPend.Cliente ORDER B"
+                        "Y IP_MuesPend.Cliente;"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 456
+                            Width = 1560
+                            Height = 255
+                            Name ="Cliente Etiqueta"
+                            Caption ="Cliente:"
+                            EventProcPrefix ="Cliente_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 798
+                    Width = 1845
+                    ColumnWidth = 1560
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"10\";\"20\""
+                    Name ="Categoria"
+                    ControlSource ="Categoria"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IP_MuesPend.Categoria FROM IP_MuesPend GROUP BY IP_MuesPend.Categoria ORD"
+                        "ER BY IP_MuesPend.Categoria;"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 798
+                            Width = 1560
+                            Height = 255
+                            Name ="Categoria Etiqueta"
+                            Caption ="Categoria:"
+                            EventProcPrefix ="Categoria_Etiqueta"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    Left = 1677
+                    Top = 1140
+                    Width = 2235
+                    ColumnWidth = 1935
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"10\";\"25\""
+                    Name ="Temporada"
+                    ControlSource ="Temporada"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IP_MuesPend.Temporada FROM IP_MuesPend GROUP BY IP_MuesPend.Temporada ORD"
+                        "ER BY IP_MuesPend.Temporada;"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 57
+                            Top = 1140
+                            Width = 1560
+                            Height = 255
+                            Name ="Temporada Etiqueta"
+                            Caption ="Temporada:"
+                            EventProcPrefix ="Temporada_Etiqueta"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 4081
+                    Top = 2891
+                    Width = 1311
+                    Height = 448
+                    FontWeight = 700
+                    TabIndex = 9
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+IdUsuarioSolicitante = IdUsuarioACT
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

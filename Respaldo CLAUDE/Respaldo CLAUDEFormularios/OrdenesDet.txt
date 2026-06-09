@@ -1,0 +1,703 @@
+Version = 17
+VersionRequired = 17
+Checksum = 92349657
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 9070
+    DatasheetFontHeight = 10
+    ItemSuffix = 48
+    Left = 2925
+    Top = 4650
+    Right = 12390
+    Bottom = 7140
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xaf3e940c7777e240
+    End
+    RecordSource ="SELECT OrdenesDet.*, [t1]+[t2]+[t3]+[t4]+[t5]+[t6]+[t7]+[t8] AS Total FROM Orden"
+        "esDet;"
+    Caption ="OrdenesDet"
+    BeforeInsert ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    OnGotFocus ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 651
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 105
+                    Top = 371
+                    Width = 2052
+                    Height = 240
+                    Name ="Color Etiqueta"
+                    Caption ="Colores"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Color_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 1177
+                    Top = 370
+                    Width = 228
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 7294
+                    Top = 374
+                    Width = 615
+                    Height = 240
+                    Name ="Etiqueta20"
+                    Caption ="TOTAL"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 1474
+                    Top = 396
+                    Width = 513
+                    Height = 255
+                    TabIndex = 1
+                    Name ="ElModelo"
+                    ControlSource ="=[Forms]![Ordenes]![Modelo]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 223
+                    Left = 7170
+                    Top = 390
+                    Width = 229
+                    Height = 180
+                    TabIndex = 2
+                    Name ="TotalTodo"
+                    ControlSource ="=Sum([total])"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 2205
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 3
+                    Name ="T1a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 2832
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 4
+                    Name ="T2a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 3459
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 5
+                    Name ="T3a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 4086
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 6
+                    Name ="T4a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 4713
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 7
+                    Name ="T5a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 5340
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 8
+                    Name ="T6a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 5967
+                    Top = 45
+                    Width = 570
+                    Height = 255
+                    TabIndex = 9
+                    Name ="T7a"
+                    DefaultValue ="0"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 6594
+                    Top = 45
+                    Width = 603
+                    Height = 255
+                    TabIndex = 10
+                    Name ="T8a"
+                    DefaultValue ="0"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 900
+                    Top = 30
+                    Width = 1230
+                    Height = 225
+                    Name ="Etiqueta43"
+                    Caption ="PROPORCION:"
+                End
+                Begin CommandButton
+                    Enabled = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 7426
+                    Width = 1528
+                    Height = 332
+                    TabIndex = 11
+                    Name ="CopiarDetalles"
+                    Caption ="Copiar Cantidades"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 2214
+                    Top = 371
+                    Width = 570
+                    TabIndex = 12
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA1"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],1,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 2841
+                    Top = 371
+                    Width = 570
+                    TabIndex = 13
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA2"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],3,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 3468
+                    Top = 371
+                    Width = 570
+                    TabIndex = 14
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA3"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],5,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 4095
+                    Top = 371
+                    Width = 570
+                    TabIndex = 15
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA4"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],7,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 4722
+                    Top = 371
+                    Width = 570
+                    TabIndex = 16
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA5"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],9,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 5349
+                    Top = 371
+                    Width = 570
+                    TabIndex = 17
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA6"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],11,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 5976
+                    Top = 371
+                    Width = 570
+                    TabIndex = 18
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA7"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],13,2)"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 247
+                    TextAlign = 2
+                    Left = 6603
+                    Top = 371
+                    Width = 603
+                    TabIndex = 19
+                    BackColor = -2147483633
+                    ForeColor = -2147483630
+                    Name ="TA8"
+                    ControlSource ="=Mid$([Forms]![Ordenes]![Tallas],15,2)"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 345
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 57
+                    Width = 2052
+                    Height = 255
+                    ColumnWidth = 2310
+                    Name ="Color"
+                    ControlSource ="Color"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2222
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 1
+                    Name ="T1"
+                    ControlSource ="T1"
+                    OnLostFocus ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2849
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 2
+                    Name ="T2"
+                    ControlSource ="T2"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3476
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 3
+                    Name ="T3"
+                    ControlSource ="T3"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4103
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 4
+                    Name ="T4"
+                    ControlSource ="T4"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4730
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 5
+                    Name ="T5"
+                    ControlSource ="T5"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5357
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 6
+                    Name ="T6"
+                    ControlSource ="T6"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5984
+                    Top = 57
+                    Width = 570
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 7
+                    Name ="T7"
+                    ControlSource ="T7"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6611
+                    Top = 57
+                    Width = 603
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 8
+                    Name ="T8"
+                    ControlSource ="T8"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7313
+                    Top = 57
+                    Width = 603
+                    Height = 255
+                    TabIndex = 9
+                    Name ="Texto21"
+                    ControlSource ="Total"
+                    Format ="#,###"
+                End
+                Begin CommandButton
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 7993
+                    Top = 56
+                    Width = 1014
+                    Height = 284
+                    TabIndex = 10
+                    Name ="Copiar"
+                    Caption ="Copiar Fila"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+
+Private Sub Copiar_Click()
+On Error GoTo errores
+Dim i, TtAct As Integer
+For i = 1 To 8
+ DoCmd.GoToRecord , , acPrevious
+  TtAct = Me("T" & i)
+ DoCmd.GoToRecord , , acNext
+ Me("T" & i) = TtAct
+Next i
+Exit Sub
+
+errores:
+MsgBox Err.Description
+End Sub
+
+
+
+Private Sub CopiarDetalles_Click()
+On Error GoTo errores
+If IsNull(Forms![Ordenes]![QueOrdCop]) = True Then
+MsgBox "Debes de seleccionar una orden de la cual se van a copiar los colores"
+Else
+
+Dim a, i As Integer
+Dim Dbs As Database
+Dim RstDet As Recordset
+
+a = Forms![Ordenes]![QueOrdCop]
+Set Dbs = CurrentDb
+Set RstDet = Dbs.OpenRecordset("SELECT IdOrdenes,Color,T1,T2,T3,T4,T5,T6,T7,T8 FROM OrdenesDet WHERE IdOrdenes=" & a)
+
+RstDet.MoveLast
+RstDet.MoveFirst
+Do While Not RstDet.EOF
+Me![Color] = RstDet!Color
+ For i = 1 To 8
+ Me("T" & i) = RstDet("T" & i)
+ Next
+DoCmd.GoToRecord , , acNewRec
+RstDet.MoveNext
+
+Loop
+RstDet.Close
+Dbs.Close
+Forms![Ordenes]![FechaDet] = Now()
+Exit Sub
+End If
+errores:
+MsgBox Err.Description
+End Sub
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+If IsNull(Forms![Ordenes]![FechaDet]) = True Then
+ Forms![Ordenes]![FechaDet] = Now()
+End If
+End Sub
+
+Private Sub Form_GotFocus()
+If Len(Forms![Ordenes]![Tallas]) < 16 Then
+Dim i, Tam, Tt As Integer
+Tam = Len(Forms![Ordenes]![Tallas]) + 2
+For i = 16 To Tam Step -2
+Tt = i / 2
+Me("T" & Tt).Visible = False
+Me("T" & Tt & "a").Visible = False
+Next i
+End If
+
+If Len(Forms![Ordenes]![Tallas]) > 4 Then
+Dim j, Tam1, Tt1, Di As Integer
+ Di = Len(Forms![Ordenes]![Tallas])
+ For j = 4 To Di Step 2
+ Tt1 = j / 2
+ Me("T" & Tt1).Visible = True
+ Me("T" & Tt1 & "a").Visible = True
+Next j
+End If
+End Sub
+
+Private Sub T1_LostFocus()
+
+If Forms![Ordenes]![AutoLL] = 2 Then
+  If T1a > 0 Then
+    T2 = T2a / T1a * T1
+    T3 = T3a / T1a * T1
+    T4 = T4a / T1a * T1
+    T5 = T5a / T1a * T1
+    T6 = T6a / T1a * T1
+    T7 = T7a / T1a * T1
+    T8 = T8a / T1a * T1
+
+  Else
+  MsgBox "Debes de cambiar el valor de los campos de PROPORCION!!!"
+  End If
+
+
+End If
+End Sub
+
+
+
+Public Function NuevoRegUl(Sta As Recordset)
+With Sta
+.MoveLast
+.MoveFirst
+
+Do While Not .EOF
+DoCmd.GoToRecord , , acNewRec
+Me![Color] = !Color
+.MoveNext
+Loop
+.Close
+End With
+End Function
+
+Public Property Get NuevoRecor() As Variant
+DoCmd.GoToRecord , , acNewRec
+End Property
+
+
+
+Public Sub NuevoReg()
+DoCmd.GoToRecord , , acNewRec
+End Sub

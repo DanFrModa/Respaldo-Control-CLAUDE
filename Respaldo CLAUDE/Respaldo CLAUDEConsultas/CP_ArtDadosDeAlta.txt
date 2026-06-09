@@ -1,0 +1,58 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="CP_Articulos"
+    Name ="CP_Tiempos"
+End
+Begin OutputColumns
+    Expression ="CP_Articulos.IdCP_Articulos"
+    Expression ="CP_Articulos.Clave"
+End
+Begin Joins
+    LeftTable ="CP_Articulos"
+    RightTable ="CP_Tiempos"
+    Expression ="CP_Articulos.IdCP_Articulos = CP_Tiempos.IdCP_Articulos"
+    Flag = 1
+End
+Begin Groups
+    Expression ="CP_Articulos.IdCP_Articulos"
+    GroupLevel = 0
+    Expression ="CP_Articulos.Clave"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 47
+    Top = 29
+    Right = 1258
+    Bottom = 342
+    Left = -1
+    Top = -1
+    Right = 1204
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 120
+        Top = 0
+        Name ="CP_Articulos"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 120
+        Top = 0
+        Name ="CP_Tiempos"
+    End
+End

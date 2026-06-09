@@ -1,0 +1,463 @@
+Version = 17
+VersionRequired = 17
+Checksum = 171552228
+Begin Form
+    PopUp = NotDefault
+    Modal = NotDefault
+    RecordSelectors = NotDefault
+    ShortcutMenu = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    CloseButton = NotDefault
+    DefaultView = 0
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 2494
+    DatasheetFontHeight = 10
+    ItemSuffix = 24
+    Left = 8175
+    Top = 2880
+    Right = 11700
+    Bottom = 5760
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xb3252115cf5fe240
+    End
+    RecordSource ="Usuarios"
+    Caption ="ACCESO"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 0
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+        End
+        Begin Section
+            Height = 1700
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 1066
+                    Top = 340
+                    Width = 1080
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="QueUsuario"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 226
+                            Top = 340
+                            Width = 855
+                            Height = 255
+                            Name ="Login Etiqueta"
+                            Caption ="Usuario:"
+                            EventProcPrefix ="Login_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 1066
+                    Top = 682
+                    Width = 1080
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="QueClave"
+                    InputMask ="Password"
+                    OnGotFocus ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 226
+                            Top = 682
+                            Width = 855
+                            Height = 255
+                            Name ="Password Etiqueta"
+                            Caption ="Clave:"
+                            EventProcPrefix ="Password_Etiqueta"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 161
+                    Top = 1303
+                    Width = 1037
+                    Height = 390
+                    TabIndex = 2
+                    Name ="Aceptar"
+                    Caption ="Aceptar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 1303
+                    Top = 1303
+                    Width = 1037
+                    Height = 390
+                    TabIndex = 3
+                    Name ="Cancelar"
+                    Caption ="Cancelar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1190
+                    Width = 180
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                    InputMask ="Password"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 963
+                    Width = 141
+                    TabIndex = 5
+                    Name ="Usuario"
+                    ControlSource ="Usuario"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1417
+                    Width = 180
+                    Height = 255
+                    TabIndex = 6
+                    Name ="Nivel"
+                    ControlSource ="Nivel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1644
+                    Width = 270
+                    Height = 255
+                    TabIndex = 7
+                    Name ="CantBloq"
+                    ControlSource ="CantBloq"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1984
+                    Width = 270
+                    Height = 255
+                    TabIndex = 8
+                    Name ="DesdeQueAno"
+                    ControlSource ="DesdeQueAno"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 680
+                    Width = 141
+                    TabIndex = 9
+                    Name ="EstaLogiado"
+                    ControlSource ="EstaLogiado"
+                End
+                Begin OptionButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 226
+                    TabIndex = 10
+                    Name ="Activo"
+                    ControlSource ="Activo"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2280
+                    Top = 240
+                    Width = 141
+                    TabIndex = 11
+                    Name ="IdRC_TipoUsuarios"
+                    ControlSource ="IdRC_TipoUsuarios"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+Dim a, b As Integer
+
+Private Sub Aceptar_Click()
+Call Verif
+Call Seguridad
+End Sub
+
+
+
+
+
+Private Sub Cancelar_Click()
+If MsgBox("Estas seguro de que quieres salir del programa de Control?", vbYesNo) = vbYes Then
+DoCmd.Quit
+Else
+QueUsuario.SetFocus
+End If
+End Sub
+
+
+
+
+Private Sub Verif()
+Me.RecordsetClone.FindFirst "[Usuario] = '" & Me![QueUsuario] & "'"
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+If Me!QueUsuario = Me!Usuario Then
+  If Me!CantBloq >= 5 Then
+      MsgBox ("Estas Bloqueado!!!, habla con Daniel Masri para que te arregle el problema")
+  Else
+    If Me!QueClave = Me!Clave Then
+    CantBloq = 0
+    Call VerifLog
+    Call RegUsuarios
+    Call AltaPropiedades
+    NivelAct = Me!Nivel
+    IdRC_TipoUsuariosAct = IdRC_TipoUsuarios
+    IdUsuarioACT = Me!IdUsuarios
+    DesdeQueAnoAct = DesdeQueAno
+    
+      If NivelAct <> 1 Then
+      CambiarPropiedad "StartupShowDBWindow", dbBoolean, False
+      CambiarPropiedad "AllowBuiltinToolbars", dbBoolean, False
+      CambiarPropiedad "AllowFullMenus", dbBoolean, False
+      CambiarPropiedad "AllowSpecialKeys", dbBoolean, False
+      CambiarPropiedad "AllowBypassKey", dbBoolean, False
+      CambiarPropiedad "AllowBreakIntoCode", dbBoolean, False
+      CambiarPropiedad "AllowToolbarChanges", dbBoolean, False
+      CambiarPropiedad "AllowShortcutMenus", dbBoolean, False
+      
+      Else
+      
+      CambiarPropiedad "StartupShowDBWindow", dbBoolean, True
+      CambiarPropiedad "AllowBuiltinToolbars", dbBoolean, True
+      CambiarPropiedad "AllowFullMenus", dbBoolean, True
+      CambiarPropiedad "AllowSpecialKeys", dbBoolean, True
+      CambiarPropiedad "AllowBypassKey", dbBoolean, True
+      CambiarPropiedad "AllowBreakIntoCode", dbBoolean, True
+      CambiarPropiedad "AllowToolbarChanges", dbBoolean, True
+      CambiarPropiedad "AllowShortcutMenus", dbBoolean, True
+
+      End If
+      
+      DoCmd.Close
+      DoCmd.OpenForm "panel de control"
+    
+    Else
+    MsgBox "Clave Incorrecta, Cuidado por que te puedes bloquear!!!", , "CLAVE INCORRECTA"
+    CantBloq = CantBloq + 1
+    DoCmd.GoToRecord , , acNext
+    QueClave.SetFocus
+    End If
+  End If
+Else
+    MsgBox "Usuario no registrado. Si te quieres registrar pidele a Daniel Masri", , "USUARIO NO REGISTRADO"
+    QueUsuario.SetFocus
+End If
+End Sub
+
+
+Private Sub QueClave_GotFocus()
+Aceptar.Default = True
+End Sub
+
+Private Sub QueUsuario_AfterUpdate()
+
+End Sub
+
+Private Sub VerifLog()
+If Activo = False Then
+MsgBox "Eres un usuario Inactivo. Por favor checa con Daniel Masri por que apareces asi.", vbInformation, "USUARIO INACTIVO"
+DoCmd.Quit
+End If
+
+'If EstaLogiado > 0 Then
+ 'If Nivel > nivDirectivo Then
+  'MsgBox "Actualmente hay alguien mas metido en el programa CONTROL con tu Usuario. No es posible meterse 2 veces con el mismo usuario al mismo tiempo." & vbCr & "Reportalo urgente a Daniel Masri. Gracias.", vbCritical, "URGENTE!!!"
+  'DoCmd.Quit
+ 'Else
+  'MsgBox "Este es la ventana #" & EstaLogiado + 1 & " del programa que se abre con tu Usuario." & vbCr & "Si no eres tu mismo, por favor reportalo urgente a Daniel Masri. Gracias", vbExclamation, "URGENTE!!!"
+  'EstaLogiado = EstaLogiado + 1
+ 'End If
+'Else
+'EstaLogiado = EstaLogiado + 1
+'End If
+End Sub
+
+Private Sub RegUsuarios()
+Dim Dbs As Database
+Dim Rst, Rst1 As Recordset
+Set Dbs = CurrentDb
+Dbs.Execute " INSERT INTO UsuariosLog (IdUsuarios) VALUES (" & IdUsuarios & ")"
+Set Rst = Dbs.OpenRecordset(" SELECT Last(UsuariosLog.IdUsuariosLog) AS Ulti FROM UsuariosLog")
+QueIdUsuariosLog = Rst!ulti
+Rst.Close
+
+Set Rst1 = Dbs.OpenRecordset("SELECT IdEmpresas, Importancia FROM Empresas WHERE Importancia=1")
+EmpresaFav = Rst1!IdEmpresas
+Rst1.Close
+Dbs.Close
+End Sub
+
+Private Sub Seguridad()
+         Dim i As Long
+         Dim db As Database, RS As Recordset
+         Dim RecordCount As Long
+         Dim QueVariable As String
+        On Error GoTo errores
+         Set db = CurrentDb()
+         Set RS = db.OpenRecordset(" SELECT UsuAccesos.IdAccesos, UsuAccesos.[Activado], UsuAccesos.IdUsuarios FROM UsuAccesos WHERE (UsuAccesos.IdUsuarios)=" & IdUsuarioACT & " ORDER BY UsuAccesos.IdAccesos")
+        
+         RS.MoveLast
+         RecordCount = RS.RecordCount
+     
+         RS.MoveFirst
+         For i = 1 To RecordCount
+         QueVariable = CStr(i + 1)
+            PrP(i) = RS![Activado]
+            RS.MoveNext
+         Next i
+     
+         For i = 1 To RecordCount
+            Debug.Print PrP(i)
+         Next i
+         RS.Close
+         db.Close
+         Exit Sub
+errores:
+ If Err.Number = 3021 Then
+ 
+ Else
+ MsgBox "Tu usuario tiene un problema de seguridad. Habla con Daniel Masri para que te lo resuelva. Es probable que no funcione bien el sistema", vbCritical, "ERROR EN SISTEMA DE SEGURIDAD"
+ End If
+
+End Sub
+
+Private Sub AltaPropiedades()
+Dim Dbs As Database
+Dim Rst As Recordset
+
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT IPT_Almacen_Default FROM Propiedades")
+AlmDefPT = Rst!IPT_Almacen_Default
+
+
+Rst.Close
+Dbs.Close
+End Sub

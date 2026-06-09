@@ -1,0 +1,138 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1294309395
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14505
+    DatasheetFontHeight = 10
+    ItemSuffix = 9
+    Left = 6900
+    Top = 1965
+    Right = 21405
+    Bottom = 9780
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x3ac1d6559a4be340
+    End
+    RecordSource ="CP_Familia"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7830
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin Subform
+                    OverlapFlags = 85
+                    Top = 480
+                    Width = 14505
+                    Height = 6885
+                    TabIndex = 1
+                    Name ="CP_CatalogoSub"
+                    SourceObject ="Form.CP_CatalogoSub"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 675
+                    Top = 135
+                    Width = 1266
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"10\""
+                    Name ="QueFamilia"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CP_Familia.IdCP_Familia, CP_Familia.Familia FROM CP_Familia;"
+                    ColumnWidths ="0;1701"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT CP_Familia.IdCP_Familia, CP_Familia.Familia FROM CP_Familia;\";\"CP_Fam"
+                        "ilia\";\"\";\"IdCP_Familia\";\"Familia\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 30
+                            Top = 120
+                            Width = 600
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Familia:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 13125
+                    Top = 7425
+                    Width = 1041
+                    Height = 358
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2895
+                    Top = 90
+                    Width = 291
+                    TabIndex = 3
+                    Name ="QueFamiliaEs"
+                    DefaultValue ="\"*\""
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueFamilia_AfterUpdate()
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

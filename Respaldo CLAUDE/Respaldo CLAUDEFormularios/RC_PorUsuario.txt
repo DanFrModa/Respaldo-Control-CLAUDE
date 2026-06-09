@@ -1,0 +1,518 @@
+Version = 17
+VersionRequired = 17
+Checksum = -233274274
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 15930
+    DatasheetFontHeight = 10
+    ItemSuffix = 52
+    Left = 6195
+    Top = 1245
+    Right = 22125
+    Bottom = 11190
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x04802936013ce540
+    End
+    RecordSource ="SELECT CP_Procesos.IdCP_Procesos, CP_Procesos.NumProceso, CP_Procesos.Proceso, C"
+        "P_Procesos.AntecesorRef, CP_Procesos.TipoProceso, CP_Procesos.UltimoProceso, Usu"
+        "arios.IdUsuarios, RC_TipoUsuarios.IdRC_TipoUsuarios FROM ((CP_Procesos INNER JOI"
+        "N RC_ProcUsua ON CP_Procesos.IdCP_Procesos = RC_ProcUsua.IdCP_Procesos) INNER JO"
+        "IN RC_TipoUsuarios ON RC_ProcUsua.IdRC_TipoUsuarios = RC_TipoUsuarios.IdRC_TipoU"
+        "suarios) INNER JOIN Usuarios ON RC_TipoUsuarios.IdRC_TipoUsuarios = Usuarios.IdR"
+        "C_TipoUsuarios GROUP BY CP_Procesos.IdCP_Procesos, CP_Procesos.NumProceso, CP_Pr"
+        "ocesos.Proceso, CP_Procesos.AntecesorRef, CP_Procesos.TipoProceso, CP_Procesos.U"
+        "ltimoProceso, Usuarios.IdUsuarios, RC_TipoUsuarios.IdRC_TipoUsuarios HAVING (((R"
+        "C_TipoUsuarios.IdRC_TipoUsuarios)<>1)) ORDER BY CP_Procesos.NumProceso;"
+    Caption ="Por Usuario"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000201c0000e010000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x42726f74686572204443502d4c32353430445720736572696573000000000000 ,
+        0x010408019c00740c0f93010001000100ea0a6f08640001000700580201000100 ,
+        0x5802010000004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000a88dfecb00000000000000000000020000000000000000000100f604 ,
+        0xfa020100f604fa02000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000100000000000100000000000006000000 ,
+        0x0700070000000000010000000000000002000000020100010001160000000000 ,
+        0x0001000002000000070000000000000000190000e40c000000000000b80b0000 ,
+        0x7017000000000000dc05000058020000000000000000000000000000feff0000 ,
+        0x000000000000000000000000000000000000000000000000370c0000da0c0000 ,
+        0x10270000102700001027000010270000a00a0000c2060000b80600002c040000 ,
+        0x40010000d2000000180000000000102710271027000010270000000000000000 ,
+        0x0000000000000000000000000100000000000200000000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000100000000000001000100010005010000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000ffffffff64000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0xcccccc0000000000000000000000000000000000000000000000000000000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000064000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000cccccc000000000000000000 ,
+        0x000000000000000000000000000000000000000041007200690061006c000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000006400000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000cccccc000000000000000000000000000000000000000000 ,
+        0x000000000000000041007200690061006c000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000100010064000000000000000000fa02f60403010000 ,
+        0x0000000001000100010000000000020001000100010000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x24000000f5ffffff000000000000000000000000000000000000000100000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000ffffff00010000000000000001000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000001010800 ,
+        0x0101300000010000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000001010002000000 ,
+        0x0200000001000100102700000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000020000000000000005350414e495348000000000000000000 ,
+        0x05000000000000000000000000000000000000005052495601ff0043502d4c32 ,
+        0x353430445720736572696573000000000000003f000000000000000000000000 ,
+        0x210000000000f4010000000000000000ff010000891000008910000089100000 ,
+        0x8910000089100000891000008910000089100000000000000000000000000000 ,
+        0x000b000000001027e4040000440061006e00690065006c0020004d0061007300 ,
+        0x7200690000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000005300450052005600450052000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000010000000000006400 ,
+        0x000000000100000000005f00230023004e004f00550053004500230023005f00 ,
+        0x5f00000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000530045005200560045005200 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012002e00010077696e73706f6f6c000042726f74686572204443502d4c32 ,
+        0x35343044572073657269657300003139322e3136382e312e3838000000000000 ,
+        0x000000000000000000000000
+    End
+    OnLoad ="[Event Procedure]"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 330
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 90
+                    Top = 30
+                    Width = 4890
+                    Height = 240
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="CONSULTAR PROCESOS POR USUARIO"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5370
+                    Width = 216
+                    Name ="AntecesorRef"
+                    ControlSource ="AntecesorRef"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5725
+                    Width = 216
+                    TabIndex = 1
+                    Name ="TipoProceso"
+                    ControlSource ="TipoProceso"
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6885
+                    Top = 90
+                    TabIndex = 2
+                    Name ="UltimoProceso"
+                    ControlSource ="UltimoProceso"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 9623
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 4
+                    Left = 30
+                    Top = 2820
+                    Width = 4245
+                    Height = 6787
+                    Name ="QueProceso"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW CP_Procesos.IdCP_Procesos, CP_Procesos.NumProceso, CP_Proceso"
+                        "s.Proceso, Usuarios.Nombre, Usuarios.IdUsuarios, RC_ProcUsua.IdRC_TipoUsuarios F"
+                        "ROM (Usuarios INNER JOIN RC_TipoUsuarios ON Usuarios.IdRC_TipoUsuarios = RC_Tipo"
+                        "Usuarios.IdRC_TipoUsuarios) INNER JOIN (CP_Procesos INNER JOIN RC_ProcUsua ON CP"
+                        "_Procesos.IdCP_Procesos = RC_ProcUsua.IdCP_Procesos) ON RC_TipoUsuarios.IdRC_Tip"
+                        "oUsuarios = RC_ProcUsua.IdRC_TipoUsuarios WHERE (((Usuarios.IdUsuarios) Like [Fo"
+                        "rmularios]![RC_PorUsuario]![QueUsuarioEs]) AND ((RC_ProcUsua.IdRC_TipoUsuarios)<"
+                        ">1)) ORDER BY CP_Procesos.IdCP_Procesos;"
+                    ColumnWidths ="0;289;2843;284"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 4320
+                    Top = 90
+                    Width = 11535
+                    Height = 9000
+                    TabIndex = 1
+                    Name ="RC_PorUsuarioSub"
+                    SourceObject ="Form.RC_PorUsuarioSub"
+                    LinkChildFields ="IdCP_Procesos"
+                    LinkMasterFields ="IdCP_Procesos"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 14130
+                    Top = 9180
+                    Width = 921
+                    Height = 328
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3060
+                    Top = 1560
+                    Width = 351
+                    Height = 255
+                    ColumnWidth = 1701
+                    TabIndex = 3
+                    Name ="IdCP_Procesos"
+                    ControlSource ="IdCP_Procesos"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 45
+                    Top = 75
+                    Width = 1950
+                    Height = 2677
+                    TabIndex = 4
+                    Name ="QueUsuario"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW Usuarios.IdUsuarios, Count(CP_Procesos.IdCP_Procesos) AS Cuen"
+                        "taDeIdCP_Procesos, [Nombre]+\" \"+[Apellidos] AS Usuar, Usuarios.Activo FROM (Us"
+                        "uarios INNER JOIN RC_TipoUsuarios ON Usuarios.IdRC_TipoUsuarios = RC_TipoUsuario"
+                        "s.IdRC_TipoUsuarios) INNER JOIN (CP_Procesos INNER JOIN RC_ProcUsua ON CP_Proces"
+                        "os.IdCP_Procesos = RC_ProcUsua.IdCP_Procesos) ON RC_TipoUsuarios.IdRC_TipoUsuari"
+                        "os = RC_ProcUsua.IdRC_TipoUsuarios GROUP BY Usuarios.IdUsuarios, [Nombre]+\" \"+"
+                        "[Apellidos], RC_TipoUsuarios.IdRC_TipoUsuarios, Usuarios.Activo HAVING (((Count("
+                        "CP_Procesos.IdCP_Procesos)) Like [Formularios]![RC_PorUsuario]![QueProcesoEs]) A"
+                        "ND ((RC_TipoUsuarios.IdRC_TipoUsuarios)<>1) AND ((Usuarios.Activo)=Yes)) ORDER B"
+                        "Y [Nombre]+\" \"+[Apellidos];"
+                    ColumnWidths ="0;286;567"
+                    AfterUpdate ="[Event Procedure]"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3240
+                    Top = 1155
+                    Width = 216
+                    TabIndex = 5
+                    Name ="QueUsuarioEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2775
+                    Top = 1140
+                    Width = 216
+                    TabIndex = 6
+                    Name ="QueProcesoEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin ToggleButton
+                    OverlapFlags = 85
+                    Left = 2055
+                    Top = 75
+                    Width = 793
+                    TabIndex = 7
+                    Name ="TodosUsuarios"
+                    DefaultValue ="Yes"
+                    Caption ="TODOS"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2400
+                    Top = 1125
+                    Width = 339
+                    TabIndex = 8
+                    Name ="NumProceso"
+                    ControlSource ="NumProceso"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3060
+                    Top = 1935
+                    Width = 351
+                    Height = 255
+                    TabIndex = 9
+                    Name ="IdUsuarios"
+                    ControlSource ="IdUsuarios"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 2340
+                    Top = 2310
+                    Width = 1515
+                    Height = 405
+                    TabIndex = 10
+                    Name ="Comando51"
+                    Caption ="Ver RC Por Orden"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+Private Sub Form_Open(Cancel As Integer)
+QueProceso = IdCP_Procesos
+End Sub
+
+Private Sub QueProceso_AfterUpdate()
+   Me.RecordsetClone.FindFirst "[IdCp_Procesos] = " & Me![QueProceso]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+    
+    QueUsuario = IdUsuarios
+End Sub
+
+Private Sub QueUsuario_AfterUpdate()
+QueUsuarioEs = QueUsuario
+QueProceso.Requery
+
+End Sub
+
+Private Sub TodosUsuario_Click()
+QueUsuarioEs = "*"
+QueUsuario.Requery
+
+End Sub
+
+
+Private Sub QueUsuario_Click()
+TodosUsuarios = False
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub
+
+Private Sub TodosUsuarios_Click()
+TodosUsuarios = True
+QueUsuarioEs = "*"
+QueUsuario = ""
+QueProceso.Requery
+
+End Sub
+Private Sub Comando51_Click()
+On Error GoTo Err_Comando51_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "RC_PorOrden"
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+Exit_Comando51_Click:
+    Exit Sub
+
+Err_Comando51_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando51_Click
+    
+End Sub

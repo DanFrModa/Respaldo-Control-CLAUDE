@@ -1,0 +1,630 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1999538586
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    FilterOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 13708
+    DatasheetFontHeight = 10
+    ItemSuffix = 47
+    Left = 3705
+    Top = 405
+    Right = 17415
+    Bottom = 8955
+    DatasheetGridlinesColor = 12632256
+    Filter ="[IdEdoResult]=20"
+    RecSrcDt = Begin
+        0x61d92e5199ebe240
+    End
+    RecordSource ="EdoResult"
+    Caption ="EdoResultBuscar"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 65535
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 113
+                    Top = 56
+                    Width = 4470
+                    Height = 255
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Etiqueta22"
+                    Caption ="Buscar Costos de ordenes de produccion"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8223
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6859
+                    Width = 246
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdEdoResult"
+                    ControlSource ="IdEdoResult"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 1928
+                    Top = 56
+                    Width = 1530
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 1
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="mmmm - yyyy"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1133
+                            Top = 56
+                            Width = 915
+                            Height = 255
+                            Name ="Fecha Etiqueta"
+                            Caption ="Fecha:"
+                            EventProcPrefix ="Fecha_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 1928
+                    Top = 398
+                    Width = 1515
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Gastos"
+                    ControlSource ="Gastos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1133
+                            Top = 398
+                            Width = 915
+                            Height = 255
+                            Name ="Gastos Etiqueta"
+                            Caption ="Gastos:"
+                            EventProcPrefix ="Gastos_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 1928
+                    Top = 740
+                    Width = 1515
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Intereses"
+                    ControlSource ="Intereses"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1133
+                            Top = 740
+                            Width = 915
+                            Height = 255
+                            Name ="Intereses Etiqueta"
+                            Caption ="Intereses:"
+                            EventProcPrefix ="Intereses_Etiqueta"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 1133
+                    Top = 1077
+                    Width = 12405
+                    Height = 6735
+                    TabIndex = 7
+                    Name ="EdoResultBuscarSub"
+                    SourceObject ="Form.EdoResultBuscarSub"
+                    LinkChildFields ="IdEdoResult"
+                    LinkMasterFields ="IdEdoResult"
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 5731
+                    Top = 396
+                    Width = 1470
+                    Height = 255
+                    TabIndex = 4
+                    Name ="Bonificaciones"
+                    ControlSource ="Bonificaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4591
+                            Top = 396
+                            Width = 1140
+                            Height = 255
+                            Name ="Etiqueta17"
+                            Caption ="Bonificaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 5731
+                    Top = 738
+                    Width = 1470
+                    Height = 255
+                    TabIndex = 5
+                    Name ="Otros"
+                    ControlSource ="Otros"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4591
+                            Top = 738
+                            Width = 1140
+                            Height = 255
+                            Name ="Etiqueta19"
+                            Caption ="Otros:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 9567
+                    Top = 739
+                    Width = 3981
+                    TabIndex = 6
+                    Name ="DescOtros"
+                    ControlSource ="DescOtros"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 8560
+                            Top = 737
+                            Width = 960
+                            Height = 240
+                            Name ="Etiqueta20"
+                            Caption ="Descripcion:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 12359
+                    Top = 7880
+                    Width = 1236
+                    Height = 343
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2099
+                    Top = 7936
+                    Width = 1596
+                    TabIndex = 9
+                    Name ="VentaTotal"
+                    ControlSource ="=[EdoResultBuscarSub].[Form]![ImporteTotal]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 1133
+                            Top = 7939
+                            Width = 945
+                            Height = 240
+                            Name ="Etiqueta24"
+                            Caption ="Venta Total:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 4991
+                    Top = 7937
+                    Width = 1596
+                    TabIndex = 10
+                    Name ="Texto25"
+                    ControlSource ="=[EdoResultBuscarSub].[Form]![CostoTotal]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4025
+                            Top = 7940
+                            Width = 945
+                            Height = 240
+                            Name ="Etiqueta26"
+                            Caption ="Costo Total:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 10658
+                    Top = 7937
+                    Width = 861
+                    FontWeight = 700
+                    TabIndex = 11
+                    Name ="MArgenCost"
+                    ControlSource ="=((([EdoResultBuscarSub].[Form]![CostoTotal])/([EdoResultBuscarSub].[Form]![Impo"
+                        "rteTotal]))-1)*-1"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3514
+                    Top = 398
+                    Width = 741
+                    FontWeight = 700
+                    TabIndex = 12
+                    Name ="Texto31"
+                    ControlSource ="=([gastos])/([EdoResultBuscarSub].[Form]![ImporteTotal])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3514
+                    Top = 740
+                    Width = 741
+                    FontWeight = 700
+                    TabIndex = 13
+                    Name ="Texto32"
+                    ControlSource ="=([intereses])/([EdoResultBuscarSub].[Form]![ImporteTotal])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7256
+                    Top = 396
+                    Width = 741
+                    FontWeight = 700
+                    TabIndex = 14
+                    Name ="Texto33"
+                    ControlSource ="=([bonificaciones])/([EdoResultBuscarSub].[Form]![ImporteTotal])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 7256
+                    Top = 738
+                    Width = 741
+                    FontWeight = 700
+                    TabIndex = 15
+                    Name ="Texto34"
+                    ControlSource ="=([otros])/([EdoResultBuscarSub].[Form]![ImporteTotal])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 6587
+                    Top = 7937
+                    Width = 861
+                    FontWeight = 700
+                    TabIndex = 16
+                    Name ="Texto36"
+                    ControlSource ="=([EdoResultBuscarSub].[Form]![CostoTotal])/([EdoResultBuscarSub].[Form]![Import"
+                        "eTotal])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 9517
+                    Top = 56
+                    Width = 516
+                    TabIndex = 17
+                    Name ="Texto37"
+                    ControlSource ="=[EdoResultBuscarSub].[Form]![CuantosCeros]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8277
+                            Top = 60
+                            Width = 1260
+                            Height = 240
+                            Name ="Etiqueta38"
+                            Caption ="Costos en ceros:"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 56
+                    Width = 405
+                    Height = 210
+                    Name ="Etiqueta16"
+                    Caption ="Año:"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 1077
+                    Width = 975
+                    Height = 2737
+                    TabIndex = 19
+                    Name ="QueMes"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW EdoResult.IdEdoResult, quemeslargo([fecha]) AS f, Year([fecha"
+                        "]) AS a FROM EdoResult GROUP BY EdoResult.IdEdoResult, quemeslargo([fecha]), Yea"
+                        "r([fecha]), Month([fecha]) HAVING (((Year([fecha]))=[Formularios]![EdoResultBusc"
+                        "ar]![QueAno])) ORDER BY Month([fecha]);"
+                    ColumnWidths ="0;854"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="=[IdEdoResult]"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 63
+                    Top = 793
+                    Width = 420
+                    Height = 210
+                    Name ="Etiqueta18"
+                    Caption ="Mes:"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 340
+                    Width = 915
+                    TabIndex = 18
+                    ColumnInfo ="\"\";\"\";\"3\";\"2\""
+                    Name ="QueAno"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW Year([Fecha]) AS Q FROM EdoResult GROUP BY Year([Fecha]) ORDE"
+                        "R BY Year([Fecha]) DESC;"
+                    ColumnWidths ="852"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="=Year(Now())"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7426
+                    Width = 246
+                    Height = 255
+                    TabIndex = 20
+                    Name ="QueModeloEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 12359
+                    Top = 56
+                    Width = 1215
+                    Height = 330
+                    TabIndex = 21
+                    Name ="Modificar"
+                    Caption ="Modificar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7766
+                    Width = 246
+                    Height = 255
+                    TabIndex = 22
+                    Name ="QueClienteEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 4025
+                    Width = 960
+                    Height = 555
+                    TabIndex = 23
+                    Name ="Comando44"
+                    Caption ="Eliminar Relacion"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 9195
+                    Top = 7939
+                    Width = 1476
+                    TabIndex = 24
+                    Name ="Texto45"
+                    ControlSource ="=[EdoResultBuscarSub].[Form]![ImporteTotal]-[EdoResultBuscarSub].[Form]![CostoTo"
+                        "tal]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 8107
+                            Top = 7937
+                            Width = 1065
+                            Height = 240
+                            Name ="Etiqueta46"
+                            Caption ="Utilidad Bruta:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando41_Click()
+
+End Sub
+
+Private Sub Comando44_Click()
+Me![EdoResultBuscarSub].Form![IdCostoOrd] = ""
+End Sub
+
+Private Sub QueAno_AfterUpdate()
+QueMes.Requery
+End Sub
+
+Private Sub QueMes_AfterUpdate()
+If Me.FilterOn = True Then
+   Me.FilterOn = False
+End If
+    
+    
+    Me.RecordsetClone.FindFirst "[Idedoresult] = " & Me![QueMes]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub Modificar_Click()
+    DoCmd.OpenForm "EdoResult", , , "[IdEdoResult]=" & Me![IdEdoResult]
+End Sub

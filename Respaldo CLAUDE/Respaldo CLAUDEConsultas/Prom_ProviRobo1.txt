@@ -1,0 +1,61 @@
+Operation = 1
+Option = 0
+Having ="(((Prom_EntregasDet.IdProm_Entregas)=8))"
+Begin InputTables
+    Name ="Prom_EntregasDet"
+    Name ="Prom_Codigos"
+End
+Begin OutputColumns
+    Expression ="Prom_EntregasDet.IdProm_Entregas"
+    Expression ="Prom_EntregasDet.Tienda"
+    Alias ="SumaDeCantEnt"
+    Expression ="Sum(Prom_EntregasDet.CantEnt)"
+End
+Begin Joins
+    LeftTable ="Prom_Codigos"
+    RightTable ="Prom_EntregasDet"
+    Expression ="Prom_Codigos.IdProm_Codigos = Prom_EntregasDet.IdProm_Codigo"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Prom_EntregasDet.IdProm_Entregas"
+    GroupLevel = 0
+    Expression ="Prom_EntregasDet.Tienda"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1367
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 160
+        Bottom = 113
+        Top = 2
+        Name ="Prom_EntregasDet"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 113
+        Top = 0
+        Name ="Prom_Codigos"
+    End
+End

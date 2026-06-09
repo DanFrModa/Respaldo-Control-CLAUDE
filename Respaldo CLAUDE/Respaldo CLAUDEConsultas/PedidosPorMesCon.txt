@@ -1,0 +1,298 @@
+Operation = 1
+Option = 0
+Having ="(((Month([pedidos]![fechahasta])) Like [Formularios]![PedidosPorMes]![QueMes]) A"
+    "ND ((Pedidos.IdClientes) Like [Formularios]![PedidosPorMes]![QueCliente]) AND (("
+    "Year([pedidos]![fechahasta])) Like [Formularios]![PedidosPorMes]![QueAno]) AND ("
+    "(Pedidos.IdEmpresas) Like [Formularios]![PedidosPorMes]![QueEmpresaEs]) AND ((Pe"
+    "didosDet.EntregadoParcial)=No) AND ((Pedidos.PedCancelado) Like [Formularios]![P"
+    "edidosPorMes]![QueCancelEs]) AND ((Pedidos.EntregadoTienda) Like [Formularios]!["
+    "PedidosPorMes]![QueEntregEs]) AND ((Pedidos.NoProducir) Like [Formularios]![Pedi"
+    "dosPorMes]![QueProducirEs]))"
+Begin InputTables
+    Name ="Maquileros"
+    Name ="Pedidos"
+    Name ="Clientes"
+    Name ="ImporteYCantidad"
+    Name ="Modelos"
+    Name ="PedidosDet"
+    Name ="Ordenes"
+    Name ="Corte"
+    Name ="Entregas"
+    Name ="CantidadCorte"
+    Name ="CostoOrd"
+    Name ="PRCantidadPorModelo"
+End
+Begin OutputColumns
+    Expression ="ImporteYCantidad.FechaHasta"
+    Expression ="ImporteYCantidad.Cliente"
+    Expression ="ImporteYCantidad.NoPed"
+    Expression ="ImporteYCantidad.FechaDe"
+    Expression ="Modelos.Modelo"
+    Alias ="Canti"
+    Expression ="tipocant([CantPed],[cantfalt],[Formularios]![PedidosPorMes]![QueCant])"
+    Expression ="PedidosDet.Precio"
+    Alias ="Importe"
+    Expression ="(tipocant([CantPed],[cantfalt],[Formularios]![PedidosPorMes]![QueCant]))*[precio"
+        "]"
+    Alias ="MesNum"
+    Expression ="Month([pedidos]![fechahasta])"
+    Expression ="ImporteYCantidad.CantTotal"
+    Expression ="ImporteYCantidad.ImporteTotal"
+    Expression ="PedidosDet.IdPedidosDet"
+    Expression ="Pedidos.IdClientes"
+    Alias ="FechaOrd"
+    Expression ="First(Ordenes.Fecha)"
+    Alias ="FechaCorte"
+    Expression ="First(Corte.Fecha)"
+    Expression ="Ordenes.IdOrdenes"
+    Expression ="CantidadCorte.CantCorte"
+    Alias ="AnoNum"
+    Expression ="Year([pedidos]![fechahasta])"
+    Expression ="Pedidos.IdPedidos"
+    Alias ="Margen"
+    Expression ="(([Costo]/[precio])-1)*-1"
+    Expression ="Pedidos.FechaTela"
+    Expression ="Pedidos.IdOrdCompra"
+    Alias ="Estat"
+    Expression ="QueEstatus([PedCancelado],[NoProducir],[EntregadoTienda])"
+    Expression ="Ordenes.Numero"
+    Expression ="Pedidos.IdEmpresas"
+    Expression ="PRCantidadPorModelo.SumaDeCantidadPR"
+    Expression ="PedidosDet.EntregadoParcial"
+    Expression ="PedidosDet.CantFalt"
+End
+Begin Joins
+    LeftTable ="Pedidos"
+    RightTable ="Clientes"
+    Expression ="Pedidos.IdClientes = Clientes.IdClientes"
+    Flag = 1
+    LeftTable ="Modelos"
+    RightTable ="PedidosDet"
+    Expression ="Modelos.IdModelos = PedidosDet.IdModelos"
+    Flag = 1
+    LeftTable ="ImporteYCantidad"
+    RightTable ="PedidosDet"
+    Expression ="ImporteYCantidad.PrimeroDeIdPedidosDet = PedidosDet.IdPedidosDet"
+    Flag = 3
+    LeftTable ="Pedidos"
+    RightTable ="PedidosDet"
+    Expression ="Pedidos.IdPedidos = PedidosDet.IdPedidos"
+    Flag = 1
+    LeftTable ="PedidosDet"
+    RightTable ="Ordenes"
+    Expression ="PedidosDet.IdPedidosDet = Ordenes.IdPedidosDet"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="Corte"
+    Expression ="Ordenes.IdOrdenes = Corte.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="Entregas"
+    Expression ="Ordenes.IdOrdenes = Entregas.IdOrdenes"
+    Flag = 2
+    LeftTable ="Maquileros"
+    RightTable ="Entregas"
+    Expression ="Maquileros.IdMaquileros = Entregas.IdMaquileros"
+    Flag = 3
+    LeftTable ="Ordenes"
+    RightTable ="CantidadCorte"
+    Expression ="Ordenes.IdOrdenes = CantidadCorte.IdOrdenes"
+    Flag = 2
+    LeftTable ="Ordenes"
+    RightTable ="CostoOrd"
+    Expression ="Ordenes.IdOrdenes = CostoOrd.IdOrdenes"
+    Flag = 2
+    LeftTable ="PedidosDet"
+    RightTable ="PRCantidadPorModelo"
+    Expression ="PedidosDet.IdPedidosDet = PRCantidadPorModelo.IdPedidosDet"
+    Flag = 2
+End
+Begin OrderBy
+    Expression ="Pedidos.FechaHasta"
+    Flag = 0
+    Expression ="Clientes.Cliente"
+    Flag = 0
+    Expression ="PedidosDet.IdPedidosDet"
+    Flag = 0
+End
+Begin Groups
+    Expression ="ImporteYCantidad.FechaHasta"
+    GroupLevel = 0
+    Expression ="ImporteYCantidad.Cliente"
+    GroupLevel = 0
+    Expression ="ImporteYCantidad.NoPed"
+    GroupLevel = 0
+    Expression ="ImporteYCantidad.FechaDe"
+    GroupLevel = 0
+    Expression ="Modelos.Modelo"
+    GroupLevel = 0
+    Expression ="tipocant([CantPed],[cantfalt],[Formularios]![PedidosPorMes]![QueCant])"
+    GroupLevel = 0
+    Expression ="PedidosDet.Precio"
+    GroupLevel = 0
+    Expression ="(tipocant([CantPed],[cantfalt],[Formularios]![PedidosPorMes]![QueCant]))*[precio"
+        "]"
+    GroupLevel = 0
+    Expression ="Month([pedidos]![fechahasta])"
+    GroupLevel = 0
+    Expression ="ImporteYCantidad.CantTotal"
+    GroupLevel = 0
+    Expression ="ImporteYCantidad.ImporteTotal"
+    GroupLevel = 0
+    Expression ="PedidosDet.IdPedidosDet"
+    GroupLevel = 0
+    Expression ="Pedidos.IdClientes"
+    GroupLevel = 0
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="CantidadCorte.CantCorte"
+    GroupLevel = 0
+    Expression ="Year([pedidos]![fechahasta])"
+    GroupLevel = 0
+    Expression ="Pedidos.IdPedidos"
+    GroupLevel = 0
+    Expression ="(([Costo]/[precio])-1)*-1"
+    GroupLevel = 0
+    Expression ="Pedidos.FechaTela"
+    GroupLevel = 0
+    Expression ="Pedidos.IdOrdCompra"
+    GroupLevel = 0
+    Expression ="QueEstatus([PedCancelado],[NoProducir],[EntregadoTienda])"
+    GroupLevel = 0
+    Expression ="Ordenes.Numero"
+    GroupLevel = 0
+    Expression ="Pedidos.IdEmpresas"
+    GroupLevel = 0
+    Expression ="PRCantidadPorModelo.SumaDeCantidadPR"
+    GroupLevel = 0
+    Expression ="PedidosDet.EntregadoParcial"
+    GroupLevel = 0
+    Expression ="PedidosDet.CantFalt"
+    GroupLevel = 0
+    Expression ="Pedidos.FechaHasta"
+    GroupLevel = 0
+    Expression ="Clientes.Cliente"
+    GroupLevel = 0
+    Expression ="Pedidos.PedCancelado"
+    GroupLevel = 0
+    Expression ="Pedidos.EntregadoTienda"
+    GroupLevel = 0
+    Expression ="Pedidos.NoProducir"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 9
+    Top = 138
+    Right = 1199
+    Bottom = 639
+    Left = -1
+    Top = -1
+    Right = 1175
+    Bottom = 303
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 92
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 289
+        Bottom = 92
+        Top = 10
+        Name ="Pedidos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 77
+        Top = 0
+        Name ="Clientes"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 92
+        Top = 0
+        Name ="ImporteYCantidad"
+    End
+    Begin
+        Left = 574
+        Top = 6
+        Right = 670
+        Bottom = 92
+        Top = 0
+        Name ="Modelos"
+    End
+    Begin
+        Left = 708
+        Top = 6
+        Right = 804
+        Bottom = 92
+        Top = 5
+        Name ="PedidosDet"
+    End
+    Begin
+        Left = 40
+        Top = 108
+        Right = 136
+        Bottom = 194
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 172
+        Top = 126
+        Right = 268
+        Bottom = 212
+        Top = 0
+        Name ="Corte"
+    End
+    Begin
+        Left = 306
+        Top = 126
+        Right = 402
+        Bottom = 212
+        Top = 0
+        Name ="Entregas"
+    End
+    Begin
+        Left = 574
+        Top = 126
+        Right = 670
+        Bottom = 212
+        Top = 0
+        Name ="CantidadCorte"
+    End
+    Begin
+        Left = 766
+        Top = 148
+        Right = 862
+        Bottom = 249
+        Top = 6
+        Name ="CostoOrd"
+    End
+    Begin
+        Left = 842
+        Top = 6
+        Right = 966
+        Bottom = 92
+        Top = 0
+        Name ="PRCantidadPorModelo"
+    End
+End

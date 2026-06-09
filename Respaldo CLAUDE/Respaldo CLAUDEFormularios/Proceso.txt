@@ -1,0 +1,1362 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1490468453
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    FilterOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10605
+    DatasheetFontHeight = 10
+    ItemSuffix = 97
+    Left = 5250
+    Top = 810
+    Right = 15855
+    Bottom = 7815
+    DatasheetGridlinesColor = 12632256
+    Filter ="[IdOrdenes]=3773"
+    RecSrcDt = Begin
+        0x9beda8052581e540
+    End
+    RecordSource ="SELECT Ordenes.Numero, Modelos.Modelo, Ordenes.IdOrdenes, Sum([t1]+[t2]+[t3]+[t4"
+        "]+[t5]+[t6]+[t7]+[t8]) AS Cant, Modelos.IdModelos, Pedidos.NumeroPed, Clientes.C"
+        "liente, Ordenes.OrdCancelada, Ordenes.MotivoCancelada, Ordenes.Tallas, Ordenes.M"
+        "aquilaOrd, Ordenes.AplicacionOrd, Ordenes.IdEtiquetasM, Ordenes.IdEmpresas, Orde"
+        "nes.IdClientes FROM Clientes RIGHT JOIN ((((Ordenes INNER JOIN Modelos ON Ordene"
+        "s.IdModelos = Modelos.IdModelos) INNER JOIN OrdenesDet ON Ordenes.IdOrdenes = Or"
+        "denesDet.IdOrdenes) LEFT JOIN PedidosDet ON Ordenes.IdPedidosDet = PedidosDet.Id"
+        "PedidosDet) LEFT JOIN Pedidos ON PedidosDet.IdPedidos = Pedidos.IdPedidos) ON Cl"
+        "ientes.IdClientes = Pedidos.IdClientes GROUP BY Ordenes.Numero, Modelos.Modelo, "
+        "Ordenes.IdOrdenes, Modelos.IdModelos, Pedidos.NumeroPed, Clientes.Cliente, Orden"
+        "es.OrdCancelada, Ordenes.MotivoCancelada, Ordenes.Tallas, Ordenes.MaquilaOrd, Or"
+        "denes.AplicacionOrd, Ordenes.IdEtiquetasM, Ordenes.IdEmpresas, Ordenes.IdCliente"
+        "s ORDER BY Ordenes.Numero;"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000201c0000e010000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x42726f74686572204443502d4c32353430445720736572696573000000000000 ,
+        0x010408019c00740c0f93010001000100ea0a6f08640001000700580201000100 ,
+        0x5802010000004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000a88dfecb00000000000000000000020000000000000000000100f604 ,
+        0xfa020100f604fa02000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000100000000000100000000000006000000 ,
+        0x0700070000000000010000000000000002000000020100010001160000000000 ,
+        0x0001000002000000070000000000000000190000e40c000000000000b80b0000 ,
+        0x7017000000000000dc05000058020000000000000000000000000000feff0000 ,
+        0x000000000000000000000000000000000000000000000000370c0000da0c0000 ,
+        0x10270000102700001027000010270000a00a0000c2060000b80600002c040000 ,
+        0x40010000d2000000180000000000102710271027000010270000000000000000 ,
+        0x0000000000000000000000000100000000000200000000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000100000000000001000100010005010000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000ffffffff64000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0xcccccc0000000000000000000000000000000000000000000000000000000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000064000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000cccccc000000000000000000 ,
+        0x000000000000000000000000000000000000000041007200690061006c000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000006400000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000cccccc000000000000000000000000000000000000000000 ,
+        0x000000000000000041007200690061006c000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000100010064000000000000000000fa02f60403010000 ,
+        0x0000000001000100010000000000020001000100010000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x24000000f5ffffff000000000000000000000000000000000000000100000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000ffffff00010000000000000001000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000001010800 ,
+        0x0101300000010000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000001010002000000 ,
+        0x0200000001000100102700000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000020000000000000005350414e495348000000000000000000 ,
+        0x05000000000000000000000000000000000000005052495601ff0043502d4c32 ,
+        0x353430445720736572696573000000000000003f000000000000000000000000 ,
+        0x210000000000f4010000000000000000ff010000891000008910000089100000 ,
+        0x8910000089100000891000008910000089100000000000000000000000000000 ,
+        0x000b000000001027e4040000440061006e00690065006c0020004d0061007300 ,
+        0x7200690000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000005300450052005600450052000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000010000000000006400 ,
+        0x000000000100000000005f00230023004e004f00550053004500230023005f00 ,
+        0x5f00000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000530045005200560045005200 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012002e00010077696e73706f6f6c000042726f74686572204443502d4c32 ,
+        0x35343044572073657269657300003139322e3136382e312e3838000000000000 ,
+        0x000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin Line
+            Width = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin Tab
+            Width = 5103
+            Height = 3402
+        End
+        Begin Page
+            Width = 1701
+            Height = 1701
+        End
+        Begin FormHeader
+            Height = 963
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    OverlapFlags = 87
+                    ColumnCount = 2
+                    Left = 1623
+                    Top = 170
+                    Width = 1146
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"10\""
+                    Name ="QueModelo"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Modelos.IdModelos, Modelos.Modelo FROM Modelos INNER JOIN Ordenes ON Mode"
+                        "los.IdModelos = Ordenes.IdModelos GROUP BY Modelos.IdModelos, Modelos.Modelo ORD"
+                        "ER BY Modelos.Modelo;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Modelos.IdModelos, Modelos.Modelo FROM Modelos INNER JOIN Ordenes ON Mo"
+                        "delos.IdModelos = Ordenes.IdModelos GROUP BY Modelos.IdModelos, Modelos.Modelo O"
+                        "RDER BY Modelos.Modelo;\";\"Modelos\";\"Ordenes\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 169
+                            Top = 172
+                            Width = 1455
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = 16777215
+                            Name ="Etiqueta40"
+                            Caption ="Buscar por Modelo:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 6343
+                    Top = 170
+                    Width = 846
+                    TabIndex = 1
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"3\";\"2\""
+                    Name ="QueOrden"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes ORDER BY Ordenes.Numero DE"
+                        "SC;"
+                    ColumnWidths ="0;567"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Ordenes.IdOrdenes, Ordenes.Numero FROM Ordenes ORDER BY Ordenes.Numero "
+                        "DESC;\";\"Ordenes\";\"\";\"IdOrdenes\";\"Numero\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4421
+                            Top = 177
+                            Width = 1890
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = 16777215
+                            Name ="Etiqueta42"
+                            Caption ="Buscar por No. de Orden:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3579
+                    Top = 113
+                    Width = 632
+                    Height = 272
+                    TabIndex = 2
+                    ForeColor = 0
+                    Name ="Sig"
+                    Caption ="Comando46"
+                    OnClick ="[Event Procedure]"
+                    PictureData = Begin
+                        0x2800000010000000100000000100040000000000800000000000000000000000 ,
+                        0x0000000000000000000000000000800000800000008080008000000080008000 ,
+                        0x8080000080808000c0c0c0000000ff00c0c0c00000ffff00ff000000c0c0c000 ,
+                        0xffff0000ffffff00dadadadadadadadaadadadadadadadaddadadadadadadada ,
+                        0xadadadadadadadaddadadad4dadadadaadadada44dadadaddadadad444dadada ,
+                        0xadadada4444dadadd44444444444dadaa444444444444dadd44444444444dada ,
+                        0xadadada4444dadaddadadad444dadadaadadada44dadadaddadadad4dadadada ,
+                        0xadadadadadadadad000000000000000000000000000000000000000000000000 ,
+                        0x00000000
+                    End
+                    ObjectPalette = Begin
+                        0x0003100000000000800000000080000080800000000080008000800000808000 ,
+                        0x80808000c0c0c000ff000000c0c0c000ffff00000000ff00c0c0c00000ffff00 ,
+                        0xffffff0000000000
+                    End
+                    ControlTipText ="Registro siguiente"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 3848
+                    Top = 453
+                    Width = 456
+                    TabIndex = 3
+                    BackColor = -2147483643
+                    ForeColor = 16777215
+                    Name ="NumeroOrdenes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 462
+                            Width = 3705
+                            Height = 225
+                            BackColor = -2147483633
+                            ForeColor = 16777215
+                            Name ="Etiqueta48"
+                            Caption ="Numero de Ordenes encontradas con este Modelo:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2947
+                    Top = 113
+                    Width = 632
+                    Height = 272
+                    TabIndex = 4
+                    ForeColor = 0
+                    Name ="Ant"
+                    Caption ="Comando51"
+                    OnClick ="[Event Procedure]"
+                    PictureData = Begin
+                        0x2800000010000000100000000100040000000000800000000000000000000000 ,
+                        0x0000000000000000000000000000800000800000008080008000000080008000 ,
+                        0x8080000080808000c0c0c0000000ff00c0c0c00000ffff00ff000000c0c0c000 ,
+                        0xffff0000ffffff00dadadadadadadadaadadadadadadadaddadadadadadadada ,
+                        0xadadadadadadadaddadadad4dadadadaadadad44adadadaddadad444dadadada ,
+                        0xadad4444adadadaddad44444444444daad444444444444addad44444444444da ,
+                        0xadad4444adadadaddadad444dadadadaadadad44adadadaddadadad4dadadada ,
+                        0xadadadadadadadad000000000000000000000000000000000000000000000000 ,
+                        0x00000000000000000000000000000000000000000000000000000000
+                    End
+                    ObjectPalette = Begin
+                        0x0003100000000000800000000080000080800000000080008000800000808000 ,
+                        0x80808000c0c0c000ff000000c0c0c000ffff00000000ff00c0c0c00000ffff00 ,
+                        0xffffff0000000000
+                    End
+                    ControlTipText ="Registro anterior"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 7426
+                    Top = 113
+                    Width = 1026
+                    Height = 255
+                    TabIndex = 5
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6519
+                    Top = 510
+                    Width = 276
+                    TabIndex = 6
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6066
+                    Top = 510
+                    Width = 276
+                    Height = 255
+                    TabIndex = 7
+                    Name ="IdModelos"
+                    ControlSource ="IdModelos"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 5555
+                    Top = 510
+                    Width = 336
+                    TabIndex = 8
+                    Name ="Tallas"
+                    ControlSource ="Tallas"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7370
+                    Top = 510
+                    Width = 291
+                    TabIndex = 9
+                    Name ="MaquilaOrd"
+                    ControlSource ="MaquilaOrd"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 7823
+                    Top = 453
+                    Width = 291
+                    TabIndex = 10
+                    Name ="AplicacionOrd"
+                    ControlSource ="AplicacionOrd"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 9855
+                    Top = 75
+                    Width = 426
+                    Height = 268
+                    FontWeight = 700
+                    TabIndex = 11
+                    ForeColor = 32768
+                    Name ="RC"
+                    Caption ="RC"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 8277
+                    Top = 453
+                    Width = 291
+                    TabIndex = 12
+                    Name ="IdEmpresas"
+                    ControlSource ="IdEmpresas"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 8674
+                    Top = 453
+                    Width = 291
+                    TabIndex = 13
+                    Name ="IdEtiquetasM"
+                    ControlSource ="IdEtiquetasM"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9127
+                    Top = 340
+                    Width = 291
+                    TabIndex = 14
+                    Name ="IdClientes"
+                    ControlSource ="IdClientes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9581
+                    Top = 510
+                    Width = 291
+                    TabIndex = 15
+                    Name ="QueIdIPT_Modelo"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 6066
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin Tab
+                    OverlapFlags = 85
+                    Left = 120
+                    Top = 735
+                    Width = 10485
+                    Height = 3570
+                    TabIndex = 2
+                    Name ="TabCtl3"
+                    Begin
+                        Begin Page
+                            OverlapFlags = 215
+                            Left = 255
+                            Top = 1140
+                            Width = 10215
+                            Height = 3030
+                            Name ="CORTE"
+                            Begin
+                                Begin Subform
+                                    OverlapFlags = 247
+                                    Left = 507
+                                    Top = 1542
+                                    Width = 8276
+                                    Height = 2152
+                                    Name ="ProcesoCorte"
+                                    SourceObject ="Form.ProcesoCorte"
+                                    LinkChildFields ="IdOrdenes"
+                                    LinkMasterFields ="IdOrdenes"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 223
+                                            Left = 510
+                                            Top = 1303
+                                            Width = 1590
+                                            Height = 240
+                                            Name ="Etiqueta10"
+                                            Caption ="Cantidades Cortadas:"
+                                        End
+                                    End
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 3
+                                    OverlapFlags = 215
+                                    TextAlign = 2
+                                    BackStyle = 0
+                                    Left = 2946
+                                    Top = 3777
+                                    Width = 741
+                                    TabIndex = 1
+                                    Name ="TotC"
+                                    ControlSource ="=[ProcesoCorte].[Form]![TotalCorte]"
+                                    Format ="#,###"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 215
+                                            Left = 912
+                                            Top = 3774
+                                            Width = 1980
+                                            Height = 240
+                                            Name ="Etiqueta57"
+                                            Caption ="Total de prendas Cortadas:"
+                                        End
+                                    End
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 255
+                            Top = 1140
+                            Width = 10215
+                            Height = 3030
+                            Name ="Entrega a Maquila"
+                            EventProcPrefix ="Entrega_a_Maquila"
+                            Begin
+                                Begin Subform
+                                    OverlapFlags = 247
+                                    Left = 280
+                                    Top = 1542
+                                    Width = 9911
+                                    Height = 2152
+                                    Name ="ProcesoEntrega"
+                                    SourceObject ="Form.ProcesoEntrega"
+                                    LinkChildFields ="IdOrdenes"
+                                    LinkMasterFields ="IdOrdenes"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 341
+                                            Top = 1303
+                                            Width = 1590
+                                            Height = 240
+                                            Name ="Etiqueta27"
+                                            Caption ="Cantidad Entregada:"
+                                        End
+                                    End
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 3
+                                    OverlapFlags = 247
+                                    TextAlign = 2
+                                    BackStyle = 0
+                                    Left = 3066
+                                    Top = 3777
+                                    Width = 786
+                                    TabIndex = 1
+                                    Name ="Texto52"
+                                    ControlSource ="=[ProcesoEntrega].[Form]![TotalEntrega]"
+                                    Format ="#,###"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 915
+                                            Top = 3780
+                                            Width = 2175
+                                            Height = 240
+                                            Name ="Etiqueta53"
+                                            Caption ="Total de prendas Entregadas:"
+                                        End
+                                    End
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 255
+                            Top = 1140
+                            Width = 10215
+                            Height = 3030
+                            Name ="Recibo de Maquila"
+                            EventProcPrefix ="Recibo_de_Maquila"
+                            Begin
+                                Begin Subform
+                                    OverlapFlags = 247
+                                    Left = 260
+                                    Top = 1544
+                                    Width = 10196
+                                    Height = 2152
+                                    Name ="ProcesoRecibo"
+                                    SourceObject ="Form.ProcesoRecibo"
+                                    LinkChildFields ="IdOrdenes"
+                                    LinkMasterFields ="IdOrdenes"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 255
+                                            Top = 1305
+                                            Width = 2055
+                                            Height = 240
+                                            Name ="Etiqueta25"
+                                            Caption ="Cantidad Recibida:"
+                                        End
+                                    End
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 3
+                                    OverlapFlags = 247
+                                    TextAlign = 2
+                                    BackStyle = 0
+                                    Left = 3289
+                                    Top = 3777
+                                    Width = 786
+                                    TabIndex = 1
+                                    Name ="Texto54"
+                                    ControlSource ="=[ProcesoRecibo].[Form]![TotalRecibo]"
+                                    Format ="#,###"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 1200
+                                            Top = 3780
+                                            Width = 2070
+                                            Height = 240
+                                            Name ="Etiqueta55"
+                                            Caption ="Total de prendas Recibidas:"
+                                        End
+                                    End
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 255
+                            Top = 1140
+                            Width = 10215
+                            Height = 3030
+                            Name ="Entrega Aplicacion"
+                            EventProcPrefix ="Entrega_Aplicacion"
+                            Begin
+                                Begin Subform
+                                    OverlapFlags = 247
+                                    Left = 283
+                                    Top = 1542
+                                    Width = 9236
+                                    Height = 2152
+                                    Name ="ProcesoEntregaEst"
+                                    SourceObject ="Form.ProcesoEntregaEst"
+                                    LinkChildFields ="IdOrdenes"
+                                    LinkMasterFields ="IdOrdenes"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 284
+                                            Top = 1303
+                                            Width = 1590
+                                            Height = 240
+                                            Name ="Etiqueta66"
+                                            Caption ="Cantidad Entregada:"
+                                        End
+                                    End
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 3
+                                    OverlapFlags = 247
+                                    TextAlign = 2
+                                    BackStyle = 0
+                                    Left = 3066
+                                    Top = 3777
+                                    Width = 786
+                                    TabIndex = 1
+                                    Name ="Texto67"
+                                    ControlSource ="=[ProcesoEntregaEst].[Form]![TotalEntregaEst]"
+                                    Format ="#,###"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 915
+                                            Top = 3780
+                                            Width = 2175
+                                            Height = 240
+                                            Name ="Etiqueta68"
+                                            Caption ="Total de prendas Entregadas:"
+                                        End
+                                    End
+                                End
+                            End
+                        End
+                        Begin Page
+                            OverlapFlags = 247
+                            Left = 255
+                            Top = 1140
+                            Width = 10215
+                            Height = 3030
+                            Name ="Recibo Aplicacion"
+                            EventProcPrefix ="Recibo_Aplicacion"
+                            Begin
+                                Begin Subform
+                                    OverlapFlags = 247
+                                    Left = 288
+                                    Top = 1542
+                                    Width = 9296
+                                    Height = 2152
+                                    Name ="ProcesoReciboEst"
+                                    SourceObject ="Form.ProcesoReciboEst"
+                                    LinkChildFields ="IdOrdenes"
+                                    LinkMasterFields ="IdOrdenes"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 283
+                                            Top = 1303
+                                            Width = 1590
+                                            Height = 240
+                                            Name ="Etiqueta71"
+                                            Caption ="Cantidad Recibida:"
+                                        End
+                                    End
+                                End
+                                Begin TextBox
+                                    Enabled = NotDefault
+                                    Locked = NotDefault
+                                    SpecialEffect = 3
+                                    OverlapFlags = 247
+                                    TextAlign = 2
+                                    BackStyle = 0
+                                    Left = 3289
+                                    Top = 3777
+                                    Width = 786
+                                    TabIndex = 1
+                                    Name ="Texto72"
+                                    ControlSource ="=[ProcesoReciboEst].[Form]![TotalReciboEst]"
+                                    Format ="#,###"
+                                    Begin
+                                        Begin Label
+                                            OverlapFlags = 255
+                                            Left = 1200
+                                            Top = 3780
+                                            Width = 2070
+                                            Height = 240
+                                            Name ="Etiqueta73"
+                                            Caption ="Total de prendas Recibidas:"
+                                        End
+                                    End
+                                End
+                            End
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 2207
+                    Top = 56
+                    Width = 501
+                    FontWeight = 700
+                    TabIndex = 1
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 510
+                            Top = 60
+                            Width = 1635
+                            Height = 240
+                            FontWeight = 700
+                            Name ="Etiqueta11"
+                            Caption ="Numero de Orden:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1262
+                    Top = 396
+                    Width = 771
+                    FontWeight = 700
+                    TabIndex = 3
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 510
+                            Top = 396
+                            Width = 690
+                            Height = 240
+                            FontWeight = 700
+                            Name ="Etiqueta12"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 3
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 1988
+                    Top = 4483
+                    Width = 726
+                    TabIndex = 4
+                    Name ="Cant"
+                    ControlSource ="Cant"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 456
+                            Top = 4478
+                            Width = 1500
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Cantidad Ordenada:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 1988
+                    Top = 4848
+                    Width = 726
+                    TabIndex = 5
+                    Name ="TotCortada"
+                    ControlSource ="=[ProcesoCorte].[Form]![TotalCorte]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 456
+                            Top = 4843
+                            Width = 1500
+                            Height = 240
+                            Name ="Etiqueta16"
+                            Caption ="Cantidad Cortada:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 1988
+                    Top = 5213
+                    Width = 726
+                    TabIndex = 6
+                    Name ="TotEntrega"
+                    ControlSource ="=[ProcesoEntrega].[Form]![TotalEntrega]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 453
+                            Top = 5211
+                            Width = 1530
+                            Height = 240
+                            Name ="Etiqueta18"
+                            Caption ="Cantidad Entregada:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 1988
+                    Top = 5578
+                    Width = 726
+                    TabIndex = 7
+                    Name ="TotRecibo"
+                    ControlSource ="=[ProcesoRecibo].[Form]![TotalRecibo]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 456
+                            Top = 5573
+                            Width = 1500
+                            Height = 240
+                            Name ="Etiqueta20"
+                            Caption ="Cantidad Recibida:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 8560
+                    Top = 5612
+                    Width = 1077
+                    Height = 400
+                    FontWeight = 700
+                    TabIndex = 8
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 3814
+                    Top = 4880
+                    Width = 726
+                    TabIndex = 9
+                    Name ="FaltaCorte"
+                    ControlSource ="=[cant]-([ProcesoCorte].[Form]![TotalCorte])"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2837
+                            Top = 4875
+                            Width = 975
+                            Height = 240
+                            Name ="Etiqueta31"
+                            Caption ="Por Cortar:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 215
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 3814
+                    Top = 5245
+                    Width = 726
+                    TabIndex = 10
+                    Name ="FaltaEntrega"
+                    ControlSource ="=[ProcesoCorte].[Form]![TotalCorte]-[ProcesoEntrega].[Form]![TotalEntrega]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2834
+                            Top = 5243
+                            Width = 1005
+                            Height = 240
+                            Name ="Etiqueta33"
+                            Caption ="Por Entregar:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 3814
+                    Top = 5610
+                    Width = 726
+                    TabIndex = 11
+                    Name ="FaltaRecibo"
+                    ControlSource ="=[ProcesoEntrega].[Form]![TotalEntrega]-[ProcesoRecibo].[Form]![TotalRecibo]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 2837
+                            Top = 5605
+                            Width = 975
+                            Height = 240
+                            Name ="Etiqueta35"
+                            Caption ="Por Recibir:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 5387
+                    Top = 56
+                    FontWeight = 700
+                    TabIndex = 12
+                    Name ="NumeroPed"
+                    ControlSource ="NumeroPed"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3685
+                            Top = 58
+                            Width = 1710
+                            Height = 240
+                            FontWeight = 700
+                            Name ="Etiqueta60"
+                            Caption ="Numero de Pedido:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 4427
+                    Top = 418
+                    Width = 1461
+                    FontWeight = 700
+                    TabIndex = 13
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3685
+                            Top = 420
+                            Width = 1710
+                            Height = 240
+                            FontWeight = 700
+                            Name ="Etiqueta63"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 2834
+                    Top = 4535
+                    Width = 465
+                    Height = 210
+                    Name ="Etiqueta74"
+                    Caption ="Falta:"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    SpecialEffect = 3
+                    Left = 4705
+                    Top = 4422
+                    Width = 0
+                    Height = 1531
+                    Name ="Línea75"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 6467
+                    Top = 4934
+                    Width = 726
+                    TabIndex = 14
+                    Name ="Texto76"
+                    ControlSource ="=[ProcesoEntregaEst].[Form]![TotalEntregaEst]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4932
+                            Top = 4932
+                            Width = 1530
+                            Height = 240
+                            Name ="Etiqueta77"
+                            Caption ="Cantidad Entregada:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 6467
+                    Top = 5299
+                    Width = 726
+                    TabIndex = 15
+                    Name ="Texto78"
+                    ControlSource ="=[ProcesoReciboEst].[Form]![TotalReciboEst]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4935
+                            Top = 5294
+                            Width = 1500
+                            Height = 240
+                            Name ="Etiqueta79"
+                            Caption ="Cantidad Recibida:"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 4935
+                    Top = 4590
+                    Width = 1680
+                    Height = 210
+                    Name ="Etiqueta80"
+                    Caption ="Estampado / Bordado:"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 6467
+                    Top = 5664
+                    Width = 726
+                    TabIndex = 16
+                    Name ="Texto81"
+                    ControlSource ="=[ProcesoEntregaEst].[Form]![TotalEntregaEst]-[ProcesoReciboEst].[Form]![TotalRe"
+                        "ciboEst]"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4935
+                            Top = 5659
+                            Width = 1500
+                            Height = 240
+                            Name ="Etiqueta82"
+                            Caption ="Falta por Recibir:"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6519
+                    Top = 340
+                    TabIndex = 17
+                    Name ="OrdCancelada"
+                    ControlSource ="OrdCancelada"
+                End
+                Begin Label
+                    Visible = NotDefault
+                    BackStyle = 1
+                    OverlapFlags = 93
+                    Left = 7483
+                    Top = 226
+                    Width = 1950
+                    Height = 405
+                    FontSize = 14
+                    FontWeight = 700
+                    BackColor = 255
+                    Name ="CancelEtiqueta"
+                    Caption ="CANCELADA"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 7256
+                    Top = 113
+                    Width = 1881
+                    Height = 463
+                    Name ="CancelarOrd"
+                    Caption ="Cancelar Orden"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Ant_Click()
+On Error GoTo Err_Ant_Click
+
+
+    DoCmd.GoToRecord , , acPrevious
+
+Exit_Ant_Click:
+    Exit Sub
+
+Err_Ant_Click:
+    MsgBox Err.Description
+    Resume Exit_Ant_Click
+    
+End Sub
+
+Private Sub CancelarOrd_Click()
+If MsgBox("Estas seguro de querer cancelar la orden " & Numero & "?", vbYesNo, "CANCELAR ORDEN") = vbYes Then
+Dim Dbs As Database
+Set Dbs = CurrentDb()
+ Dbs.Execute ("UPDATE Ordenes SET OrdCancelada = True WHERE IdOrdenes = " & IdOrdenes)
+Dbs.Close
+Salir.SetFocus
+CancelarOrd.Visible = False
+CancelEtiqueta.Visible = True
+End If
+End Sub
+
+
+
+Private Sub Form_Close()
+On Error Resume Next
+Forms![ListaOrdenes].Requery
+Forms![OrdenVer]![QueOrden].Requery
+End Sub
+
+Private Sub Form_Current()
+If OrdCancelada = True Then
+CancelarOrd.Visible = False
+CancelEtiqueta.Visible = True
+Else
+ If NivelAct <= nivDirectivo Then
+ CancelarOrd.Visible = True
+ End If
+CancelEtiqueta.Visible = False
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If EstaCargado("pedidospormes") = True Then
+CancelarOrd.Visible = False
+End If
+
+If NivelAct <= nivDirectivo Then
+CancelarOrd.Visible = True
+
+Me![ProcesoCorte].Form![Cant].SetFocus
+
+End If
+If PrP(32) = True Then
+Me![ProcesoCorte].Form![Fecha].Enabled = True
+Me![ProcesoCorte].Form![IdCortadores].Enabled = True
+Me![ProcesoCorte].Form![Observaciones].Enabled = True
+
+Me![ProcesoEntrega].Form![Fecha].Enabled = True
+Me![ProcesoEntrega].Form![Maquilero].Enabled = True
+
+Me![ProcesoEntregaEst].Form![Fecha].Enabled = True
+Me![ProcesoEntregaEst].Form![Maquilero].Enabled = True
+End If
+
+
+
+
+If PrP(33) = True Then
+Me![ProcesoRecibo].Form![Fecha].Enabled = True
+Me![ProcesoRecibo].Form![Maquilero].Enabled = True
+Me![ProcesoRecibo].Form![Observaciones].Enabled = True
+Me![ProcesoRecibo].Form![TipoPrendas].Enabled = True
+Me![ProcesoRecibo].Form![Cant].Enabled = True
+
+Me![ProcesoReciboEst].Form![Fecha].Enabled = True
+Me![ProcesoReciboEst].Form![Estampador].Enabled = True
+Me![ProcesoReciboEst].Form![Observaciones].Enabled = True
+Me![ProcesoReciboEst].Form![TipoPrendas].Enabled = True
+Me![ProcesoReciboEst].Form![Cant].Enabled = True
+End If
+
+
+End Sub
+
+Private Sub QueModelo_AfterUpdate()
+Dim a As Integer
+DoCmd.ApplyFilter , "[Proceso]![idmodelos]=forms![Proceso]![quemodelo]"
+Me.RecordsetClone.MoveLast
+a = Me.RecordsetClone.RecordCount
+Me!NumeroOrdenes = a
+If a > 1 Then
+   Sig.Visible = True
+   Ant.Visible = True
+   Else
+   Sig.Visible = False
+   Ant.Visible = False
+End If
+End Sub
+
+Private Sub QueOrden_AfterUpdate()
+DoCmd.ShowAllRecords
+    Me.RecordsetClone.FindFirst "[IdOrdenes] = " & Me![QueOrden]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub RC_Click()
+DoCmd.OpenForm "RC_MeterFechas"
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+Private Sub Sig_Click()
+On Error GoTo Err_Sig_Click
+
+
+    DoCmd.GoToRecord , , acNext
+
+Exit_Sig_Click:
+    Exit Sub
+
+Err_Sig_Click:
+    MsgBox Err.Description
+    Resume Exit_Sig_Click
+End Sub

@@ -1,0 +1,438 @@
+Version = 17
+VersionRequired = 17
+Checksum = 2085647905
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 12450
+    DatasheetFontHeight = 10
+    ItemSuffix = 33
+    Left = 3060
+    Top = 435
+    Right = 17385
+    Bottom = 7935
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x99c140975850e340
+    End
+    RecordSource ="SELECT Usuarios.IdUsuarios, Usuarios.Usuario, Usuarios.Clave, Usuarios.Nombre, U"
+        "suarios.Apellidos, Usuarios.Nivel, Usuarios.CantBloq, Usuarios.DesdeQueAno, Usua"
+        "rios.EstaLogiado, Usuarios.Activo, Usuarios.IdRC_TipoUsuarios, Usuarios.EmpresaF"
+        "av FROM Usuarios WHERE (((Usuarios.Activo)=Yes));"
+    Caption ="AccesoPorUsuario"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 720
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 57
+                    Top = 57
+                    Width = 1026
+                    Height = 240
+                    Name ="IdUsuarios Etiqueta"
+                    Caption ="IdUsuarios"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdUsuarios_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1140
+                    Top = 57
+                    Width = 840
+                    Height = 240
+                    Name ="Usuario Etiqueta"
+                    Caption ="Usuario"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Usuario_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2039
+                    Top = 57
+                    Width = 855
+                    Height = 240
+                    Name ="Clave Etiqueta"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Clave_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2951
+                    Top = 57
+                    Width = 1149
+                    Height = 240
+                    Name ="Nombre Etiqueta"
+                    Caption ="Nombre"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Nombre_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 4195
+                    Top = 57
+                    Width = 1368
+                    Height = 240
+                    Name ="Apellidos Etiqueta"
+                    Caption ="Apellidos"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Apellidos_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5620
+                    Top = 57
+                    Width = 645
+                    Height = 240
+                    Name ="Nivel Etiqueta"
+                    Caption ="Nivel"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Nivel_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 6420
+                    Top = 60
+                    Width = 825
+                    Height = 240
+                    Name ="DesdeQueAno Etiqueta"
+                    Caption ="Desde Ano"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="DesdeQueAno_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 7347
+                    Top = 60
+                    Width = 342
+                    Height = 240
+                    Name ="Activo Etiqueta"
+                    Caption ="Activo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Activo_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 7734
+                    Top = 63
+                    Width = 2790
+                    Height = 240
+                    Name ="IdRC_TipoUsuarios Etiqueta"
+                    Caption ="RC_TipoUsuarios"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdRC_TipoUsuarios_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 10551
+                    Top = 63
+                    Width = 1815
+                    Height = 240
+                    Name ="Etiqueta23"
+                    Caption ="Empresa Fav"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 45
+                    Top = 346
+                    Width = 1026
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdUsuarios"
+                    ControlSource ="IdUsuarios"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1128
+                    Top = 346
+                    Width = 840
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Usuario"
+                    ControlSource ="Usuario"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2027
+                    Top = 346
+                    Width = 855
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                    InputMask ="Password"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 2939
+                    Top = 346
+                    Width = 1149
+                    Height = 255
+                    ColumnWidth = 1185
+                    TabIndex = 3
+                    Name ="Nombre"
+                    ControlSource ="Nombre"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 4183
+                    Top = 346
+                    Width = 1368
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 4
+                    Name ="Apellidos"
+                    ControlSource ="Apellidos"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5608
+                    Top = 346
+                    Width = 645
+                    Height = 255
+                    ColumnWidth = 465
+                    TabIndex = 5
+                    Name ="Nivel"
+                    ControlSource ="Nivel"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6405
+                    Top = 349
+                    Width = 789
+                    Height = 255
+                    ColumnWidth = 600
+                    TabIndex = 6
+                    Name ="DesdeQueAno"
+                    ControlSource ="DesdeQueAno"
+                    StatusBarText ="Mostrar datos desde ese Año"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 7335
+                    Top = 349
+                    TabIndex = 7
+                    Name ="Activo"
+                    ControlSource ="Activo"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 7722
+                    Top = 348
+                    Width = 2811
+                    ColumnWidth = 900
+                    TabIndex = 8
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="IdRC_TipoUsuarios"
+                    ControlSource ="IdRC_TipoUsuarios"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT RC_TipoUsuarios.IdRC_TipoUsuarios, RC_TipoUsuarios.NombreTipoUsuario, RC_"
+                        "TipoUsuarios.UsuarioEjemplo FROM RC_TipoUsuarios;"
+                    ColumnWidths ="0;1701;1701"
+                    BaseInfo ="\"SELECT RC_TipoUsuarios.IdRC_TipoUsuarios, RC_TipoUsuarios.NombreTipoUsuario, R"
+                        "C_TipoUsuarios.UsuarioEjemplo FROM RC_TipoUsuarios;\";\"RC_TipoUsuarios\";\"\";\""
+                        "IdRC_TipoUsuarios\";\"NombreTipoUsuario\";\"PrimaryKey\""
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 10599
+                    Top = 349
+                    Width = 1755
+                    TabIndex = 9
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"4\";\"4\""
+                    Name ="EmpresaFav"
+                    ControlSource ="EmpresaFav"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Empresas.IdEmpresas, Empresas.Empresa FROM Empresas;"
+                    ColumnWidths ="285;1134"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 7086
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 3
+                    Left = 105
+                    Top = 60
+                    Width = 1671
+                    Height = 6712
+                    Name ="QueUsua"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Usuarios.IdUsuarios, Usuarios.Usuario, Usuarios.Nivel FROM Usuarios WHERE"
+                        " (((Usuarios.Activo)=Yes));"
+                    ColumnWidths ="0;1134;286"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 1860
+                    Top = 45
+                    Width = 10440
+                    Height = 6750
+                    TabIndex = 1
+                    Name ="AccesoPorUsuaSub"
+                    SourceObject ="Form.AccesoPorUsuaSub"
+                    LinkChildFields ="IdUsuarios"
+                    LinkMasterFields ="IdUsuarios"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 11168
+                    Top = 6803
+                    Width = 1191
+                    FontWeight = 700
+                    TabIndex = 2
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salilr"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueUsua_AfterUpdate()
+    RecordsetClone.FindFirst "[IdUsuarios] = " & Me![QueUsua]
+    Bookmark = RecordsetClone.Bookmark
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

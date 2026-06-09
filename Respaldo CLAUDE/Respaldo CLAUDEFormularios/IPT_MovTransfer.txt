@@ -1,0 +1,805 @@
+Version = 17
+VersionRequired = 17
+Checksum = -701611569
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 8617
+    DatasheetFontHeight = 10
+    ItemSuffix = 54
+    Left = 5040
+    Top = 405
+    Right = 13650
+    Bottom = 6735
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x5694eacbf77ae340
+    End
+    Caption ="IPT_Movimientos"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 630
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 120
+                    Width = 3495
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta16"
+                    Caption ="TRANSFERENCIA ENTRE ALMACENES"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4988
+                    Width = 465
+                    Height = 255
+                    ColumnWidth = 465
+                    Name ="EnSa"
+                    ControlSource ="EnSa"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4422
+                    Width = 465
+                    Height = 255
+                    TabIndex = 1
+                    Name ="QueEnSa"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6916
+                    Width = 465
+                    Height = 255
+                    TabIndex = 2
+                    Name ="QueAlmE"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 6292
+                    Width = 465
+                    Height = 255
+                    TabIndex = 3
+                    Name ="QueAlmS"
+                End
+            End
+        End
+        Begin Section
+            Height = 5717
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 113
+                    Width = 1275
+                    Height = 255
+                    ColumnWidth = 825
+                    Name ="QueFecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 113
+                            Width = 1560
+                            Height = 255
+                            Name ="Fecha Etiqueta"
+                            Caption ="Fecha:"
+                            EventProcPrefix ="Fecha_Etiqueta"
+                        End
+                    End
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 4
+                    Left = 63
+                    Top = 1469
+                    Width = 3216
+                    Height = 2107
+                    TabIndex = 1
+                    Name ="ListaSal"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Mod_Alm.IdIPT_Mod_Alm, IPT_Modelos.NumMod AS Modelo, IPT_MovsDet.Cant"
+                        "Mov AS Cantidad, IPT_Mod_Alm.Existencia, IPT_MovsDet.IdIPT_Movs FROM IPT_Modelos"
+                        " INNER JOIN (IPT_MovsDet INNER JOIN IPT_Mod_Alm ON IPT_MovsDet.IdIPT_Mod_Alm = I"
+                        "PT_Mod_Alm.IdIPT_Mod_Alm) ON IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.IdIPT_Model"
+                        "os WHERE (((IPT_MovsDet.IdIPT_Movs)=[Formularios]![IPT_MovTransfer]![Id_Salida])"
+                        ");"
+                    ColumnWidths ="0;1134;1134;853"
+                    OnDblClick ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 1190
+                            Width = 1395
+                            Height = 240
+                            Name ="Etiqueta18"
+                            Caption ="Modelos Incluidos:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 223
+                    ColumnCount = 4
+                    Left = 961
+                    Top = 4081
+                    Width = 2040
+                    Height = 255
+                    TabIndex = 3
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"7\""
+                    Name ="QueModelo"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Mod_Alm.IdIPT_Modelos, IPT_Modelos.NumMod, Empresas.Identificador, IP"
+                        "T_Mod_Alm.Existencia, IPT_Mod_Alm.IdIPT_Almacenes FROM (IPT_Modelos INNER JOIN I"
+                        "PT_Mod_Alm ON IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.IdIPT_Modelos) INNER JOIN "
+                        "Empresas ON IPT_Modelos.IdEmpresas = Empresas.IdEmpresas WHERE (((IPT_Mod_Alm.Id"
+                        "IPT_Almacenes)=[Formularios]![IPT_MovTransfer]![quealms])) ORDER BY IPT_Modelos."
+                        "NumMod;"
+                    ColumnWidths ="0;852;284;567"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT IPT_Mod_Alm.IdIPT_Modelos, IPT_Modelos.NumMod, Empresas.Identificador, "
+                        "IPT_Mod_Alm.Existencia, IPT_Mod_Alm.IdIPT_Almacenes FROM (IPT_Modelos INNER JOIN"
+                        " IPT_Mod_Alm ON IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.IdIPT_Modelos) INNER JOI"
+                        "N Empresas ON IPT_\";\"IPT_Modelos\";\"IPT_Mod_Alm\";\"Empresas\";\"\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 226
+                            Top = 4081
+                            Width = 795
+                            Height = 255
+                            Name ="Etiqueta28"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 223
+                    Left = 961
+                    Top = 4421
+                    Width = 1020
+                    Height = 255
+                    TabIndex = 4
+                    Name ="QueCant"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 226
+                            Top = 4421
+                            Width = 795
+                            Height = 255
+                            Name ="Etiqueta32"
+                            Caption ="Cantidad:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 93
+                    Left = 6122
+                    Top = 4025
+                    Width = 1986
+                    Height = 733
+                    FontSize = 12
+                    FontWeight = 700
+                    TabIndex = 5
+                    Name ="AltaMod"
+                    Caption ="Transferir  Modelo"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 6803
+                    Top = 5329
+                    Width = 1461
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 6
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 7200
+                    Top = 844
+                    Width = 975
+                    Height = 255
+                    TabIndex = 7
+                    Name ="Id_Entrada"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 7200
+                            Top = 510
+                            Width = 1245
+                            Height = 255
+                            Name ="QueIdE"
+                            Caption ="Folio de entrada:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 2381
+                    Top = 843
+                    Width = 975
+                    Height = 255
+                    TabIndex = 9
+                    Name ="ID_Salida"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 2381
+                            Top = 510
+                            Width = 1125
+                            Height = 255
+                            Name ="QueIdS"
+                            Caption ="Folio de salida:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    ColumnCount = 4
+                    Left = 4825
+                    Top = 1469
+                    Width = 3216
+                    Height = 2107
+                    TabIndex = 10
+                    Name ="ListaEnt"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT IPT_Mod_Alm.IdIPT_Mod_Alm, IPT_Modelos.NumMod AS Modelo, IPT_MovsDet.Cant"
+                        "Mov AS Cantidad, IPT_Mod_Alm.Existencia, IPT_MovsDet.IdIPT_Movs FROM IPT_Modelos"
+                        " INNER JOIN (IPT_MovsDet INNER JOIN IPT_Mod_Alm ON IPT_MovsDet.IdIPT_Mod_Alm = I"
+                        "PT_Mod_Alm.IdIPT_Mod_Alm) ON IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.IdIPT_Model"
+                        "os WHERE (((IPT_MovsDet.IdIPT_Movs)=[Formularios]![IPT_MovTransfer]![Id_Entrada]"
+                        "));"
+                    ColumnWidths ="0;1134;1134;854"
+                    OnDblClick ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4818
+                            Top = 1190
+                            Width = 1395
+                            Height = 240
+                            Name ="Etiqueta47"
+                            Caption ="Modelos Incluidos:"
+                        End
+                    End
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 93
+                    SpecialEffect = 0
+                    Left = 3458
+                    Top = 2040
+                    Width = 848
+                    Name ="Línea48"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 95
+                    SpecialEffect = 0
+                    Left = 4024
+                    Top = 1757
+                    Width = 567
+                    Height = 284
+                    Name ="Línea49"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 87
+                    SpecialEffect = 0
+                    Left = 4024
+                    Top = 2041
+                    Width = 567
+                    Height = 286
+                    Name ="Línea50"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 56
+                    Top = 843
+                    Width = 2160
+                    FontWeight = 700
+                    TabIndex = 2
+                    Name ="AlmacenSa"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 510
+                            Width = 1725
+                            Height = 255
+                            FontWeight = 700
+                            Name ="Etiqueta25"
+                            Caption ="Almacen de Salida:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 3
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 4818
+                    Top = 844
+                    Width = 2160
+                    FontWeight = 700
+                    TabIndex = 8
+                    Name ="AlmacenEn"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4818
+                            Top = 510
+                            Width = 1860
+                            Height = 255
+                            FontWeight = 700
+                            Name ="Etiqueta42"
+                            Caption ="Almacen de Entrada:"
+                        End
+                    End
+                End
+                Begin Rectangle
+                    SpecialEffect = 0
+                    BorderWidth = 2
+                    OverlapFlags = 255
+                    Top = 3798
+                    Width = 8225
+                    Height = 1314
+                    Name ="Cuadro53"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 247
+                    TextAlign = 3
+                    BackStyle = 0
+                    Left = 4808
+                    Top = 4081
+                    Width = 1140
+                    Height = 255
+                    TabIndex = 11
+                    Name ="QueExis"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 255
+                            Left = 3968
+                            Top = 4081
+                            Width = 855
+                            Height = 255
+                            Name ="Etiqueta44"
+                            Caption ="Existencia:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 247
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 4808
+                    Top = 4456
+                    Width = 1140
+                    Height = 255
+                    TabIndex = 12
+                    Name ="QueEmpresa"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 255
+                            Left = 3968
+                            Top = 4456
+                            Width = 855
+                            Height = 255
+                            Name ="Etiqueta46"
+                            Caption ="Empresa:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3696
+                    Top = 105
+                    Width = 651
+                    Height = 313
+                    TabIndex = 13
+                    Name ="Ayer"
+                    Caption ="Ayer"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3045
+                    Top = 105
+                    Width = 651
+                    Height = 313
+                    TabIndex = 14
+                    Name ="Hoya"
+                    Caption ="Hoy"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4347
+                    Top = 105
+                    Width = 801
+                    Height = 313
+                    TabIndex = 15
+                    Name ="Sabado"
+                    Caption ="Sabado"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    TabStop = NotDefault
+                    OverlapFlags = 247
+                    Left = 3061
+                    Top = 4081
+                    Width = 861
+                    Height = 493
+                    TabIndex = 16
+                    Name ="NuevosMod"
+                    Caption ="Alta Modelos"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 2179
+                    Top = 5331
+                    Width = 975
+                    Height = 255
+                    TabIndex = 17
+                    Name ="CantMod"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 566
+                            Top = 5329
+                            Width = 1620
+                            Height = 255
+                            Name ="Etiqueta54"
+                            Caption ="Cantidad de Modelos:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 4957
+                    Top = 5331
+                    Width = 975
+                    Height = 255
+                    TabIndex = 18
+                    Name ="CantPiezas"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 3341
+                            Top = 5329
+                            Width = 1605
+                            Height = 255
+                            Name ="Etiqueta56"
+                            Caption ="Cantidad de Piezas:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub AltaMod_Click()
+If IsNull(QueFecha) = True Then
+MsgBox "Para poder continuar es necesario que metas una fecha.", vbInformation, "FALTA FECHA"
+Hoya.SetFocus
+Else
+
+If QueModelo = "" Or IsNull(QueModelo) = True Or QueCant = "" Or IsNull(QueCant) = True Then
+MsgBox "Para poder agregar un modelo es necesario que metas el modelo y la cantidad.", vbInformation, "FALTA INFORMACION"
+Else
+     If (QueExis - QueCant) < 0 Then
+     MsgBox "OPERACION NO PERMITIDA." & vbCr & "No puedes dejar el modelo con existencia negativa!. Revisa bien la cantidad.", vbInformation, "OPERACION NO PERMITIDA!"
+     QueCant.SetFocus
+     Exit Sub
+     End If
+
+ 
+Dim Dbs As Database
+Dim PrimerReg, TipoM, IdModAlmS, IdModAlmE, Rst As Recordset
+Dim RefeSal, RefeEnt As String
+Dim TipMov, IdMAS, IdMAE As Integer
+
+Set Dbs = CurrentDb
+Set TipoM = Dbs.OpenRecordset("SELECT IdIPT_TiposMov FROM IPT_TiposMov WHERE (TipoEnSa)=3")
+TipMov = TipoM!IdIPT_TiposMov
+If IsNull(ID_Salida) = True Then
+  Dbs.Execute "INSERT INTO IPT_Movs (Fecha,IdIPT_TipoMov,EnSa,IdIPT_Almacenes,IdUsuarios,TieneModelos) VALUES ('" & QueFecha & "','" & TipMov & "','" & 2 & "','" & QueAlmS & "','" & IdUsuarioACT & "',1)"
+  Dbs.Execute "INSERT INTO IPT_Movs (Fecha,IdIPT_TipoMov,EnSa,IdIPT_Almacenes,IdUsuarios,TieneModelos) VALUES ('" & QueFecha & "','" & TipMov & "','" & 1 & "','" & QueAlmE & "','" & IdUsuarioACT & "',1)"
+
+  Set PrimerReg = Dbs.OpenRecordset("SELECT Max(IdIPT_Movs) as ullt FROM IPT_Movs")
+  Id_Entrada = PrimerReg!ullt
+  ID_Salida = Id_Entrada - 1
+  PrimerReg.Close
+  
+  ' Actualizar Referencia
+  RefeSal = AlmacenEn & " (" & Id_Entrada & ")"
+  RefeEnt = AlmacenSa & " (" & ID_Salida & ")"
+  Dbs.Execute "UPDATE IPT_Movs SET Referencia ='" & RefeSal & "' WHERE IdIPT_Movs = " & ID_Salida
+  Dbs.Execute "UPDATE IPT_Movs SET Referencia ='" & RefeEnt & "' WHERE IdIPT_Movs = " & Id_Entrada
+End If
+
+' Ya se metieron los movimientos en la tabla IPT_Movs, ahora se van a meter los modelos en cada registro y se van a actualizar las existencias:
+'Primero el movimiento de salida:
+   Set IdModAlmS = Dbs.OpenRecordset("SELECT IdIPT_Mod_Alm FROM IPT_Mod_Alm WHERE IdIPT_Modelos=" & QueModelo & " and IdIPT_Almacenes=" & QueAlmS)
+   IdMAS = IdModAlmS!IdIPT_Mod_Alm
+   Dbs.Execute "INSERT INTO IPT_MovsDet (IdIPT_Movs,IdIPT_Mod_Alm,CantMov) VALUES ('" & ID_Salida & "','" & IdMAS & "','" & QueCant & "')"
+   Dbs.Execute "UPDATE IPT_Mod_Alm SET Existencia = Existencia - " & QueCant & " WHERE IdIPT_Mod_Alm = " & IdMAS
+ 
+' Luego el de entrada:
+   Set IdModAlmE = Dbs.OpenRecordset("SELECT IdIPT_Mod_Alm FROM IPT_Mod_Alm WHERE IdIPT_Modelos=" & QueModelo & " and IdIPT_Almacenes=" & QueAlmE)
+   IdMAE = IdModAlmE!IdIPT_Mod_Alm
+   Dbs.Execute "INSERT INTO IPT_MovsDet (IdIPT_Movs,IdIPT_Mod_Alm,CantMov) VALUES ('" & Id_Entrada & "','" & IdMAE & "','" & QueCant & "')"
+   Dbs.Execute "UPDATE IPT_Mod_Alm SET Existencia = Existencia + " & QueCant & " WHERE IdIPT_Mod_Alm = " & IdMAE
+
+Set Rst = Dbs.OpenRecordset("SELECT Sum(CantMov) AS SumaCan FROM IPT_MovsDet GROUP BY IPT_MovsDet.IdIPT_Movs HAVING (IPT_MovsDet.IdIPT_Movs)=" & ID_Salida)
+
+
+TipoM.Close
+IdModAlmS.Close
+IdModAlmE.Close
+
+ListaSal.Requery
+ListaEnt.Requery
+CantMod = ListaSal.ListCount - 1
+CantPiezas = Rst!sumacan
+Rst.Close
+Dbs.Close
+QueModelo = ""
+QueCant = ""
+QueExis = ""
+QueEmpresa = ""
+QueModelo.SetFocus
+End If
+End If
+End Sub
+
+
+
+Private Sub Ayer_Click()
+If WeekDay(Date) = 2 Then
+ QueFecha = Date - 3
+Else
+ QueFecha = Date - 1
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If WeekDay(Date) = 2 Then
+ Sabado.Visible = True
+End If
+
+If PrP(28) = True Then
+QueFecha.Enabled = True
+QueFecha.Locked = False
+End If
+End Sub
+
+Private Sub Hoya_Click()
+ QueFecha = Date
+End Sub
+
+Private Sub ListaEnt_DblClick(Cancel As Integer)
+DoCmd.OpenForm "IPT_MovsSaldo"
+Forms![IPT_MovsSaldo]![QueAlm] = QueAlmE
+Forms![IPT_MovsSaldo]![QueMod].Requery
+Forms![IPT_MovsSaldo]![QueMod] = ListaEnt
+Forms![IPT_MovsSaldo].Requery
+End Sub
+
+Private Sub ListaSal_DblClick(Cancel As Integer)
+DoCmd.OpenForm "IPT_MovsSaldo"
+Forms![IPT_MovsSaldo]![QueAlm] = QueAlmS
+Forms![IPT_MovsSaldo]![QueMod].Requery
+Forms![IPT_MovsSaldo]![QueMod] = ListaSal
+Forms![IPT_MovsSaldo].Requery
+End Sub
+
+Private Sub NuevosMod_Click()
+DoCmd.OpenForm "IPT_AltaModelos"
+End Sub
+
+Private Sub QueModelo_AfterUpdate()
+Dim Dbs As Database
+Dim Rst, RstExis As Recordset
+On Error GoTo erss
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT Empresa FROM IPT_Modelos INNER JOIN Empresas ON IPT_Modelos.IdEmpresas = Empresas.IdEmpresas WHERE (IPT_Modelos.IdIPT_Modelos)=" & QueModelo)
+Set RstExis = Dbs.OpenRecordset("SELECT Existencia FROM IPT_Modelos INNER JOIN IPT_Mod_Alm ON IPT_Modelos.IdIPT_Modelos = IPT_Mod_Alm.IdIPT_Modelos WHERE (IPT_Modelos.IdIPT_Modelos)=" & QueModelo & " AND (IPT_Mod_Alm.IdIPT_Almacenes)=" & QueAlmS)
+QueEmpresa = Rst!Empresa
+QueExis = RstExis!Existencia
+Rst.Close
+RstExis.Close
+Dbs.Close
+Exit Sub
+erss:
+
+MsgBox "Se esta generando un error al dar de alta el modelo, no trates de dar de alta el modelo, y habla con Daniel Masri para ver que pasa.", vbInformation
+ QueModelo = ""
+
+End Sub
+
+Private Sub Sabado_Click()
+QueFecha = Date - 2
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

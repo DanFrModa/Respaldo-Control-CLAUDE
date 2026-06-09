@@ -1,0 +1,302 @@
+Version = 17
+VersionRequired = 17
+Checksum = 334559444
+Begin Report
+    LayoutForPrint = NotDefault
+    DefaultView = 0
+    DateGrouping = 1
+    GrpKeepTogether = 1
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10308
+    DatasheetFontHeight = 10
+    ItemSuffix = 13
+    Left = 600
+    Top = 330
+    Right = 14730
+    Bottom = 8340
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x3e6ddd54d863e240
+    End
+    RecordSource ="SELECT Modelos.Modelo, CostoTela.TotalTela AS Expr1, CostoHabilitacion.TotalHab,"
+        " CostoBordado.TotalBor, Modelos.Maquila, [Totaltela]+[totalhab]+[totalbor]+[maqu"
+        "ila] AS Costo, ([Totaltela]+[totalhab]+[totalbor]+[maquila])*2 AS Utilidad, (((["
+        "Totaltela]+[totalhab]+[totalbor]+[maquila])*2)/0.9)-(([Totaltela]+[totalhab]+[to"
+        "talbor]+[maquila])*2) AS Regalias, CInt((([Totaltela]+[totalhab]+[totalbor]+[maq"
+        "uila])*2)/0.9) AS PrecioVenta, dee([modelo]) AS [Desc], Mid(([modelo]),2,1) AS a"
+        ", gee(Mid(([modelo]),2,1)) AS b, Modelos.Activo FROM CostoTela INNER JOIN ((Mode"
+        "los INNER JOIN CostoBordado ON Modelos.IdModelos = CostoBordado.IdModelos) INNER"
+        " JOIN CostoHabilitacion ON Modelos.IdModelos = CostoHabilitacion.IdModelos) ON C"
+        "ostoTela.IdModelos = Modelos.IdModelos GROUP BY Modelos.Modelo, CostoTela.TotalT"
+        "ela, CostoHabilitacion.TotalHab, CostoBordado.TotalBor, Modelos.Maquila, [Totalt"
+        "ela]+[totalhab]+[totalbor]+[maquila], ([Totaltela]+[totalhab]+[totalbor]+[maquil"
+        "a])*2, ((([Totaltela]+[totalhab]+[totalbor]+[maquila])*2)/0.9)-(([Totaltela]+[to"
+        "talhab]+[totalbor]+[maquila])*2), CInt((([Totaltela]+[totalhab]+[totalbor]+[maqu"
+        "ila])*2)/0.9), dee([modelo]), Mid(([modelo]),2,1), gee(Mid(([modelo]),2,1)), Mod"
+        "elos.Activo HAVING (((Mid(([modelo]),2,1))=[Formularios]![EscojerGenero]![QueGen"
+        "ero]) AND ((Modelos.Activo)=[Formularios]![EscojerGenero]![QueModelos])) ORDER B"
+        "Y Modelos.Modelo;"
+    Caption ="ListaPrecios"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000442800008001000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x4c65786d61726b20453231300000000000000000000000000000000000000000 ,
+        0x0004500094007c03036f000001000100ea0a6f08640001000700580202000100 ,
+        0x5802030000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000002000000 ,
+        0x0000000000000000010000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000032003200 ,
+        0x0000000000000000000000000000000000100000010037000000010000000000 ,
+        0x0100010000000200010000000500000000000000000000000000000000000000 ,
+        0x00000f0000000900000034089a0b010001000700000000000000010001000000 ,
+        0x000000000100000000000f000100640000000000000000000000000053310000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000000000000000001000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000000000004c65786d61726b204532313000000000 ,
+        0x00000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080011001e00010077696e73706f6f6c004c65786d61726b2045323130005c5c ,
+        0x4e656c6c795c6c65786d61726b00000000000000000000000000000000000000 ,
+        0x00000000
+    End
+    Begin
+        Begin Label
+            FontItalic = NotDefault
+            BackStyle = 0
+            TextAlign = 1
+            TextFontFamily = 18
+            FontSize = 11
+            FontWeight = 700
+            ForeColor = 8388608
+            FontName ="Times New Roman"
+        End
+        Begin Rectangle
+            BackStyle = 0
+            BorderWidth = 1
+            Width = 850
+            Height = 850
+            BorderColor = 8388608
+        End
+        Begin Line
+            Width = 1701
+            BorderColor = 8388608
+        End
+        Begin Image
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CheckBox
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin BoundObjectFrame
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 1701
+            LabelX = -1701
+            FontName ="Arial"
+        End
+        Begin ListBox
+            OldBorderStyle = 0
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            FontName ="Arial"
+        End
+        Begin ComboBox
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 1701
+            LabelX = -1701
+            FontName ="Arial"
+        End
+        Begin Subform
+            OldBorderStyle = 0
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            Width = 4536
+            Height = 2835
+        End
+        Begin BreakLevel
+            ControlSource ="Modelo"
+        End
+        Begin FormHeader
+            KeepTogether = NotDefault
+            Height = 1757
+            Name ="EncabezadoDelInforme"
+            Begin
+                Begin Label
+                    BackStyle = 1
+                    Left = 2154
+                    Top = 623
+                    Width = 3675
+                    Height = 510
+                    FontSize = 20
+                    Name ="Etiqueta6"
+                    Caption ="Lista de Precios para "
+                End
+                Begin TextBox
+                    CanShrink = NotDefault
+                    FontItalic = NotDefault
+                    TextAlign = 2
+                    TextFontFamily = 18
+                    Left = 5663
+                    Top = 1195
+                    Width = 4589
+                    Height = 300
+                    FontSize = 9
+                    FontWeight = 700
+                    ForeColor = 8388608
+                    Name ="Texto7"
+                    ControlSource ="=Now()"
+                    Format ="Long Date"
+                    FontName ="Times New Roman"
+                End
+                Begin TextBox
+                    FontItalic = NotDefault
+                    TextAlign = 1
+                    TextFontFamily = 18
+                    Left = 5826
+                    Top = 628
+                    Width = 2550
+                    Height = 510
+                    FontSize = 20
+                    FontWeight = 700
+                    TabIndex = 1
+                    ForeColor = 8388608
+                    Name ="QueGenero"
+                    ControlSource ="b"
+                    FontName ="Times New Roman"
+                End
+            End
+        End
+        Begin PageHeader
+            Height = 414
+            Name ="EncabezadoDePágina"
+            Begin
+                Begin Label
+                    Left = 2204
+                    Top = 57
+                    Width = 1185
+                    Height = 300
+                    Name ="Modelo Etiqueta"
+                    Caption ="Modelo"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Modelo_Etiqueta"
+                End
+                Begin Label
+                    Left = 3446
+                    Top = 57
+                    Width = 3390
+                    Height = 300
+                    Name ="Desc Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Desc_Etiqueta"
+                End
+                Begin Label
+                    TextAlign = 3
+                    Left = 7457
+                    Top = 60
+                    Width = 660
+                    Height = 300
+                    Name ="PrecioVenta Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="PrecioVenta_Etiqueta"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    Left = 2204
+                    Top = 357
+                    Width = 5919
+                    Name ="Línea9"
+                End
+            End
+        End
+        Begin Section
+            KeepTogether = NotDefault
+            Height = 384
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Left = 2204
+                    Top = 57
+                    Width = 1185
+                    Height = 270
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                End
+                Begin TextBox
+                    Left = 3446
+                    Top = 57
+                    Width = 3390
+                    Height = 270
+                    TabIndex = 1
+                    Name ="Desc"
+                    ControlSource ="Desc"
+                End
+                Begin TextBox
+                    Left = 6908
+                    Top = 57
+                    Width = 1215
+                    Height = 270
+                    TabIndex = 2
+                    Name ="PrecioVenta"
+                    ControlSource ="PrecioVenta"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    Left = 2211
+                    Top = 340
+                    Width = 5952
+                    Name ="Línea11"
+                End
+            End
+        End
+        Begin PageFooter
+            Height = 528
+            Name ="PieDePágina"
+        End
+        Begin FormFooter
+            KeepTogether = NotDefault
+            Height = 0
+            Name ="PieDelInforme"
+        End
+    End
+End

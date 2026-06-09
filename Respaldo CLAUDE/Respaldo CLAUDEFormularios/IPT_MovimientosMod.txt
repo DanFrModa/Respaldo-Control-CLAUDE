@@ -1,0 +1,373 @@
+Version = 17
+VersionRequired = 17
+Checksum = 337445040
+Begin Form
+    PopUp = NotDefault
+    Modal = NotDefault
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    DefaultView = 0
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 4709
+    DatasheetFontHeight = 10
+    ItemSuffix = 21
+    Left = 7170
+    Top = 1605
+    Right = 13035
+    Bottom = 6585
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x72574d0bfb88e340
+    End
+    RecordSource ="SELECT IPT_Mod_Alm.IdIPT_Mod_Alm, IPT_Mod_Alm.IdIPT_Modelos, IPT_Mod_Alm.IdIPT_A"
+        "lmacenes, IPT_Mod_Alm.Existencia, IPT_Modelos.NumMod, IPT_MovsDet.IdIPT_Movs, IP"
+        "T_MovsDet.CantMov FROM (IPT_Mod_Alm INNER JOIN IPT_Modelos ON IPT_Mod_Alm.IdIPT_"
+        "Modelos = IPT_Modelos.IdIPT_Modelos) INNER JOIN IPT_MovsDet ON IPT_Mod_Alm.IdIPT"
+        "_Mod_Alm = IPT_MovsDet.IdIPT_Mod_Alm WHERE (((IPT_Mod_Alm.IdIPT_Mod_Alm)=[Formul"
+        "arios]![IPT_Movimientos]![QueModLista]) AND ((IPT_MovsDet.IdIPT_Movs)=[Formulari"
+        "os]![IPT_Movimientos]![IdIPT_Movs]));"
+    Caption ="IPT_MovimientosMod"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 453
+            BackColor = 16764057
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 113
+                    Width = 2145
+                    Height = 210
+                    FontWeight = 700
+                    Name ="Etiqueta13"
+                    Caption ="MODIFICAR MODELO"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2607
+                    Top = 57
+                    Width = 306
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdIPT_Mod_Alm"
+                    ControlSource ="IdIPT_Mod_Alm"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3027
+                    Top = 56
+                    Width = 300
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="IdIPT_Modelos"
+                    ControlSource ="IdIPT_Modelos"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3424
+                    Top = 56
+                    Width = 300
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="IdIPT_Almacenes"
+                    ControlSource ="IdIPT_Almacenes"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3855
+                    Top = 56
+                    Width = 300
+                    Height = 255
+                    TabIndex = 3
+                    Name ="QueEnsa"
+                End
+            End
+        End
+        Begin Section
+            Height = 2700
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 1247
+                    Width = 900
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="Existencia"
+                    ControlSource ="Existencia"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 1247
+                            Width = 1560
+                            Height = 255
+                            Name ="Existencia Etiqueta"
+                            Caption ="Existencia"
+                            EventProcPrefix ="Existencia_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 510
+                    Width = 900
+                    Height = 255
+                    TabIndex = 1
+                    Name ="NumMod"
+                    ControlSource ="NumMod"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 510
+                            Width = 1560
+                            Height = 255
+                            Name ="Etiqueta9"
+                            Caption ="Numero de Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1676
+                    Top = 907
+                    Width = 900
+                    TabIndex = 2
+                    Name ="CantMov"
+                    ControlSource ="CantMov"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 907
+                            Width = 1605
+                            Height = 240
+                            Name ="Etiqueta12"
+                            Caption ="Cantidad Movimiento:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 215
+                    Left = 1818
+                    Top = 1816
+                    Width = 951
+                    TabIndex = 3
+                    Name ="QueCant"
+                    Format ="#,##0"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 60
+                            Top = 1815
+                            Width = 1770
+                            Height = 240
+                            Name ="Etiqueta16"
+                            Caption ="Cantidad a Reemplazar:"
+                        End
+                    End
+                End
+                Begin Label
+                    BackStyle = 1
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 53
+                    Width = 4035
+                    Height = 330
+                    BackColor = 16777215
+                    BorderColor = 4210752
+                    Name ="TituloMov"
+                    Caption ="SALIDA"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 2891
+                    Top = 1700
+                    Height = 508
+                    TabIndex = 4
+                    Name ="CambiarCant"
+                    Caption ="Cambiar Cantidad"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 680
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3458
+                    Top = 170
+                    Width = 1251
+                    Height = 343
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub CambiarCant_Click()
+If MsgBox("Estas seguro de querer cambiar la cantidad del movimiento? Esto va  a afectar al movimiento y a la existencia del modelo y no se puede deshacer?", vbYesNo, "CAMBIO DE CANTIDAD") = vbYes Then
+ If QueEnSa = 1 Then
+  Existencia = Existencia - CantMov + QueCant
+  CantMov = QueCant
+  MsgBox "La cantidad fue cambiada con exito.", vbInformation, "CAMBIO DE CANTIDAD"
+ ElseIf QueEnSa = 2 Then
+   If ((Existencia + CantMov - QueCant) < 0) And (PrP(30) = False) Then
+     MsgBox "No puedes dejar en ceros la existencia!. Modifica la cantidad.", vbInformation, "NO PUEDES DEJAR EN CERO LA EXISTECIA"
+   Else
+     Existencia = Existencia + CantMov - QueCant
+     CantMov = QueCant
+     MsgBox "La cantidad fue cambiada con exito.", vbInformation, "CAMBIO DE CANTIDAD"
+   End If
+ End If
+QueCant = ""
+End If
+End Sub
+
+Private Sub Form_Close()
+Forms![IPT_Movimientos]![QueModLista].Requery
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+
+End Sub

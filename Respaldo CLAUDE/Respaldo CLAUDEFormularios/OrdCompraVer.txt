@@ -1,0 +1,1539 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1973936511
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14626
+    DatasheetFontHeight = 10
+    ItemSuffix = 113
+    Left = 3240
+    Top = 315
+    Right = 17865
+    Bottom = 8805
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x8d10f78e9176e540
+    End
+    RecordSource ="SELECT OrdCompra.IdOrdCompra, [usuarios].[Nombre]+\" \"+[usuarios].[Apellidos] A"
+        "S QuienElaboro, [usuarios_1].[nombre]+\" \"+[usuarios_1].[apellidos] AS QuienAut"
+        "orizo, OrdCompra.IdProveedor, OrdCompra.Fecha, OrdCompra.NumCompra, OrdCompra.En"
+        "tregaEn, OrdCompra.Parcial, OrdCompra.FechaEntrega, OrdCompra.Autorizado, OrdCom"
+        "pra.Cancelado, OrdCompra.CanceladoMotivo, OrdCompra.FacturasAmparadas, OrdCompra"
+        ".Totales, First(OrdCompra.Observaciones) AS PrimeroDeObservaciones, First(OrdCom"
+        "pra.CorrespondeA) AS PrimeroDeCorrespondeA, Proveedores.Proveedor, First(OrdComp"
+        "raExcel.Excel) AS PrimeroDeExcel, OrdCompra.Estatus, OrdCompra.FechaRecibido, Em"
+        "presas.Empresa, OrdCompra.FechaAutorizado FROM ((((OrdCompra INNER JOIN Usuarios"
+        " ON OrdCompra.IdUsuarios = Usuarios.IdUsuarios) LEFT JOIN Usuarios AS Usuarios_1"
+        " ON OrdCompra.IdUsuAutorizado = Usuarios_1.IdUsuarios) INNER JOIN Proveedores ON"
+        " OrdCompra.IdProveedor = Proveedores.IdProveedor) LEFT JOIN OrdCompraExcel ON Or"
+        "dCompra.IdOrdCompra = OrdCompraExcel.IdOrdCompra) INNER JOIN Empresas ON OrdComp"
+        "ra.IdEmpresas = Empresas.IdEmpresas GROUP BY OrdCompra.IdOrdCompra, [usuarios].["
+        "Nombre]+\" \"+[usuarios].[Apellidos], [usuarios_1].[nombre]+\" \"+[usuarios_1].["
+        "apellidos], OrdCompra.IdProveedor, OrdCompra.Fecha, OrdCompra.NumCompra, OrdComp"
+        "ra.EntregaEn, OrdCompra.Parcial, OrdCompra.FechaEntrega, OrdCompra.Autorizado, O"
+        "rdCompra.Cancelado, OrdCompra.CanceladoMotivo, OrdCompra.FacturasAmparadas, OrdC"
+        "ompra.Totales, Proveedores.Proveedor, OrdCompra.Estatus, OrdCompra.FechaRecibido"
+        ", Empresas.Empresa, OrdCompra.FechaAutorizado ORDER BY OrdCompra.NumCompra DESC;"
+    Caption ="OC"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000201c0000e010000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x42726f74686572204443502d4c32353430445720736572696573000000000000 ,
+        0x010408019c00740c0f93010001000100ea0a6f08640001000700580201000100 ,
+        0x5802010000004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000a88dfecb00000000000000000000020000000000000000000100f604 ,
+        0xfa020100f604fa02000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000100000000000100000000000006000000 ,
+        0x0700070000000000010000000000000002000000020100010001160000000000 ,
+        0x0001000002000000070000000000000000190000e40c000000000000b80b0000 ,
+        0x7017000000000000dc05000058020000000000000000000000000000feff0000 ,
+        0x000000000000000000000000000000000000000000000000370c0000da0c0000 ,
+        0x10270000102700001027000010270000a00a0000c2060000b80600002c040000 ,
+        0x40010000d2000000180000000000102710271027000010270000000000000000 ,
+        0x0000000000000000000000000100000000000200000000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000100000000000001000100010005010000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000ffffffff64000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0xcccccc0000000000000000000000000000000000000000000000000000000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000064000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000cccccc000000000000000000 ,
+        0x000000000000000000000000000000000000000041007200690061006c000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000006400000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000cccccc000000000000000000000000000000000000000000 ,
+        0x000000000000000041007200690061006c000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000100010064000000000000000000fa02f60403010000 ,
+        0x0000000001000100010000000000020001000100010000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x24000000f5ffffff000000000000000000000000000000000000000100000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000ffffff00010000000000000001000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000001010800 ,
+        0x0101300000010000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000001010002000000 ,
+        0x0200000001000100102700000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000020000000000000005350414e495348000000000000000000 ,
+        0x05000000000000000000000000000000000000005052495601ff0043502d4c32 ,
+        0x353430445720736572696573000000000000003f000000000000000000000000 ,
+        0x210000000000f4010000000000000000ff010000891000008910000089100000 ,
+        0x8910000089100000891000008910000089100000000000000000000000000000 ,
+        0x000b000000001027e4040000440061006e00690065006c0020004d0061007300 ,
+        0x7200690000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000005300450052005600450052000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000010000000000006400 ,
+        0x000000000100000000005f00230023004e004f00550053004500230023005f00 ,
+        0x5f00000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000530045005200560045005200 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012002e00010077696e73706f6f6c000042726f74686572204443502d4c32 ,
+        0x35343044572073657269657300003139322e3136382e312e3838000000000000 ,
+        0x000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin FormHeader
+            Height = 396
+            BackColor = 8388608
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 60
+                    Top = 60
+                    Width = 3690
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta49"
+                    Caption ="VER ORDENES DE COMPRA"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 11813
+                    Top = 45
+                    Width = 1875
+                    Height = 300
+                    Name ="ModificarOrden"
+                    Caption ="Modificar Orden"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4643
+                    Top = 56
+                    Width = 1200
+                    Height = 300
+                    TabIndex = 1
+                    Name ="Aut"
+                    Caption ="Autorizar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 6859
+                    Top = 56
+                    Width = 1200
+                    Height = 300
+                    TabIndex = 2
+                    Name ="Actualizar"
+                    Caption ="Actualizar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 14130
+                    Top = 45
+                    Width = 426
+                    Height = 268
+                    FontWeight = 700
+                    TabIndex = 3
+                    ForeColor = 32768
+                    Name ="RC"
+                    Caption ="RC"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 9225
+                    Top = 60
+                    Width = 246
+                    TabIndex = 4
+                    Name ="QueDiaHoy"
+                    ControlSource ="=Date()"
+                    Format ="Medium Date"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8108
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 59
+                    Top = 1298
+                    Width = 1656
+                    Height = 5167
+                    Name ="QueProveedor"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Proveedores.IdProveedor, Proveedores.Proveedor FROM Proveedores ORDER BY "
+                        "Proveedores.Proveedor;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 56
+                            Width = 855
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Proveedor:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    ColumnHeads = NotDefault
+                    OverlapFlags = 87
+                    ColumnCount = 6
+                    Left = 1752
+                    Top = 908
+                    Width = 3861
+                    Height = 5557
+                    TabIndex = 1
+                    Name ="QueOrden"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT OrdCompra.IdOrdCompra, OrdCompra.NumCompra AS No, Proveedores.Proveedor A"
+                        "S [Proveedor-], Empresas.Identificador AS E, OrdCompra.Autorizado AS Aut, nombre"
+                        "estatus([Estatus]) AS [Estatus-], Proveedores.IdProveedor, OrdCompra.Estatus, Or"
+                        "dCompra.IdEmpresas FROM (OrdCompra INNER JOIN Proveedores ON OrdCompra.IdProveed"
+                        "or = Proveedores.IdProveedor) INNER JOIN Empresas ON OrdCompra.IdEmpresas = Empr"
+                        "esas.IdEmpresas WHERE (((OrdCompra.Autorizado) Like [Formularios]![OrdCompraVer]"
+                        "![AutorizEs]) AND ((Proveedores.IdProveedor) Like [Formularios]![OrdCompraVer]!["
+                        "QueProvEs]) AND ((OrdCompra.Estatus) Like [Formularios]![OrdCompraVer]![QueEstat"
+                        "usEs]) AND ((OrdCompra.IdEmpresas) Like [Formularios]![OrdCompraVer]![QueEmpresa"
+                        "Es])) ORDER BY OrdCompra.NumCompra DESC;"
+                    ColumnWidths ="0;456;1701;284;348;295"
+                    AfterUpdate ="[Event Procedure]"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1474
+                    Top = 283
+                    Width = 156
+                    TabIndex = 2
+                    Name ="QueProvEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin ToggleButton
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 453
+                    Width = 1116
+                    TabIndex = 3
+                    Name ="Todos"
+                    DefaultValue ="Yes"
+                    Caption ="TODOS"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1474
+                    Width = 156
+                    Height = 255
+                    TabIndex = 4
+                    Name ="AutorizEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1247
+                    Top = 11
+                    Width = 156
+                    TabIndex = 5
+                    Name ="CancelEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 223
+                    BackStyle = 0
+                    Left = 10809
+                    Top = 57
+                    Width = 1101
+                    ColumnWidth = 2370
+                    TabIndex = 6
+                    BorderColor = 3355443
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 9344
+                            Top = 56
+                            Width = 1485
+                            Height = 240
+                            Name ="Etiqueta29"
+                            Caption ="Fecha Elaboracion:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 7082
+                    Top = 56
+                    Width = 636
+                    FontWeight = 700
+                    TabIndex = 7
+                    BorderColor = 3355443
+                    Name ="NumCompra"
+                    ControlSource ="NumCompra"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5673
+                            Top = 56
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta30"
+                            Caption ="Orden de Compra:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 7082
+                    Top = 536
+                    Width = 3306
+                    TabIndex = 8
+                    BorderColor = 3355443
+                    Name ="EntregaEn"
+                    ControlSource ="EntregaEn"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5673
+                            Top = 536
+                            Width = 915
+                            Height = 240
+                            Name ="Etiqueta31"
+                            Caption ="Entrega En:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 223
+                    BackStyle = 0
+                    Left = 10809
+                    Top = 297
+                    Width = 1101
+                    TabIndex = 9
+                    BorderColor = 3355443
+                    Name ="FechaEntrega"
+                    ControlSource ="FechaEntrega"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 9403
+                            Top = 296
+                            Width = 1425
+                            Height = 240
+                            Name ="Etiqueta33"
+                            Caption ="Fecha de Entrega:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 7082
+                    Top = 776
+                    Width = 1836
+                    TabIndex = 10
+                    BorderColor = 3355443
+                    Name ="QuienElaboro"
+                    ControlSource ="QuienElaboro"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 5673
+                            Top = 776
+                            Width = 1140
+                            Height = 240
+                            Name ="Etiqueta34"
+                            Caption ="Elaboro Orden:"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 7940
+                    Top = 56
+                    TabIndex = 11
+                    Name ="Totales"
+                    ControlSource ="Totales"
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    Left = 10147
+                    Top = 5709
+                    Width = 4446
+                    Height = 1110
+                    TabIndex = 12
+                    BorderColor = 4210752
+                    Name ="Observaciones"
+                    ControlSource ="PrimeroDeObservaciones"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 10147
+                            Top = 5431
+                            Width = 1185
+                            Height = 240
+                            Name ="Etiqueta38"
+                            Caption ="Observaciones:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    Left = 10140
+                    Top = 7104
+                    Width = 4461
+                    Height = 975
+                    TabIndex = 14
+                    BorderColor = 4210752
+                    Name ="CorrespondeA"
+                    ControlSource ="PrimeroDeCorrespondeA"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 10155
+                            Top = 6855
+                            Width = 1155
+                            Height = 240
+                            Name ="Etiqueta39"
+                            Caption ="Corresponde a:"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 8394
+                    Top = 56
+                    TabIndex = 15
+                    Name ="Cancelado"
+                    ControlSource ="Cancelado"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 13674
+                    Top = 2729
+                    Width = 906
+                    Height = 2025
+                    TabIndex = 16
+                    BorderColor = 4210752
+                    Name ="FacturasAmparadas"
+                    ControlSource ="FacturasAmparadas"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 13666
+                            Top = 2211
+                            Width = 915
+                            Height = 465
+                            Name ="Etiqueta42"
+                            Caption ="Facturas Amparadas:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 11635
+                    Top = 537
+                    Width = 276
+                    TabIndex = 17
+                    BorderColor = 3355443
+                    Name ="EParcial"
+                    ControlSource ="=esparcial([parcial])"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 10436
+                            Top = 536
+                            Width = 1185
+                            Height = 240
+                            Name ="Etiqueta48"
+                            Caption ="Entrega Parcial:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    SpecialEffect = 0
+                    Left = 5669
+                    Top = 2205
+                    Width = 7950
+                    Height = 3165
+                    TabIndex = 18
+                    Name ="OrdCompraVerSub"
+                    SourceObject ="Form.OrdCompraVerSub"
+                    LinkChildFields ="IdOrdCompra"
+                    LinkMasterFields ="IdOrdCompra"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 13665
+                    Top = 4965
+                    Width = 891
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 19
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Label
+                    BackStyle = 1
+                    OldBorderStyle = 1
+                    OverlapFlags = 95
+                    Left = 9984
+                    Top = 777
+                    Width = 1926
+                    Height = 240
+                    BackColor = 65280
+                    BorderColor = 3355443
+                    Name ="AutorizadoEs"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    Left = 9104
+                    Top = 780
+                    Width = 870
+                    Height = 240
+                    Name ="Etiqueta55"
+                    Caption ="Autorizado:"
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 255
+                    Left = 8167
+                    Top = 56
+                    TabIndex = 20
+                    Name ="Autorizado"
+                    ControlSource ="Autorizado"
+                End
+                Begin Label
+                    BackStyle = 1
+                    OldBorderStyle = 1
+                    OverlapFlags = 85
+                    TextAlign = 2
+                    Left = 12819
+                    Top = 56
+                    Width = 1755
+                    Height = 315
+                    FontSize = 12
+                    FontWeight = 700
+                    BorderColor = 4210752
+                    Name ="CanceladaEs"
+                    Caption ="CANCELADA"
+                End
+                Begin CommandButton
+                    Visible = NotDefault
+                    OverlapFlags = 93
+                    Left = 12813
+                    Top = 420
+                    Width = 1761
+                    TabIndex = 21
+                    Name ="Motivo"
+                    Caption ="Motivo Cancelacion"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 95
+                    Left = 8677
+                    Top = 56
+                    Width = 231
+                    TabIndex = 22
+                    Name ="CanceladoMotivo"
+                    ControlSource ="CanceladoMotivo"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 12813
+                    Top = 737
+                    Width = 1761
+                    Height = 343
+                    TabIndex = 23
+                    Name ="Imprimir"
+                    Caption ="Imprimir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 963
+                    Width = 156
+                    TabIndex = 24
+                    Name ="IdOrdCompra"
+                    ControlSource ="IdOrdCompra"
+                End
+                Begin BoundObjectFrame
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SizeMode = 3
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 5669
+                    Top = 5709
+                    Width = 4431
+                    Height = 2385
+                    TabIndex = 25
+                    BorderColor = 4210752
+                    Name ="QueExcel"
+                    ControlSource ="PrimeroDeExcel"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 5669
+                            Top = 5431
+                            Width = 1845
+                            Height = 240
+                            Name ="Etiqueta67"
+                            Caption ="Desglose de Cantidades:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    BorderWidth = 1
+                    OverlapFlags = 127
+                    TextAlign = 1
+                    BackStyle = 0
+                    Left = 7082
+                    Top = 296
+                    Width = 2031
+                    TabIndex = 26
+                    BorderColor = 3355443
+                    Name ="Proveedor"
+                    ControlSource ="Proveedor"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Left = 5673
+                            Top = 296
+                            Width = 1365
+                            Height = 240
+                            Name ="Etiqueta69"
+                            Caption ="Proveedor:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1247
+                    Top = 283
+                    Width = 156
+                    Height = 255
+                    TabIndex = 27
+                    Name ="QueOrdenEs"
+                End
+                Begin ListBox
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    ColumnCount = 3
+                    Left = 6679
+                    Top = 1255
+                    Width = 7821
+                    Height = 832
+                    TabIndex = 28
+                    BackColor = -2147483643
+                    ForeColor = -2147483640
+                    Name ="Coment"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT ComentaComp.IdComentaComp, [Nombre]+\" \"+[apellidos] AS Usu, First(\">>\""
+                        "+[Comentario]) AS Comen, ComentaComp.IdOrdCompra FROM Usuarios RIGHT JOIN Coment"
+                        "aComp ON Usuarios.IdUsuarios = ComentaComp.IdUsuarios GROUP BY ComentaComp.IdCom"
+                        "entaComp, [Nombre]+\" \"+[apellidos], ComentaComp.IdOrdCompra HAVING (((ComentaC"
+                        "omp.IdOrdCompra)=[Formularios]![OrdCompraVer]![IdOrdCompra]));"
+                    ColumnWidths ="0;1419;2835"
+                    OnDblClick ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 5673
+                            Top = 1247
+                            Width = 990
+                            Height = 240
+                            BackColor = -2147483633
+                            ForeColor = -2147483630
+                            Name ="Etiqueta116"
+                            Caption ="Comentarios:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 5673
+                    Top = 1587
+                    Width = 960
+                    Height = 525
+                    TabIndex = 29
+                    ForeColor = 0
+                    Name ="AgregarComent"
+                    Caption ="Agregar Comentario"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 119
+                    Left = 8961
+                    Top = 56
+                    Width = 231
+                    TabIndex = 30
+                    Name ="Estatus"
+                    ControlSource ="Estatus"
+                End
+                Begin OptionGroup
+                    OverlapFlags = 93
+                    Left = 3077
+                    Top = 312
+                    Width = 2529
+                    Height = 582
+                    TabIndex = 31
+                    Name ="QueEstatus"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="4"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 3061
+                            Top = 56
+                            Width = 960
+                            Height = 240
+                            BackColor = -2147483633
+                            Name ="Etiqueta79"
+                            Caption ="Ver Estatus:"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 4365
+                            Top = 368
+                            Width = 215
+                            Height = 195
+                            OptionValue = 2
+                            Name ="Opción85"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 255
+                                    Left = 4536
+                                    Top = 340
+                                    Width = 915
+                                    Height = 240
+                                    Name ="Etiqueta86"
+                                    Caption ="Canceladas"
+                                End
+                            End
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 3125
+                            Top = 397
+                            Width = 215
+                            Height = 195
+                            OptionValue = 4
+                            Name ="Opción81"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 255
+                                    Left = 3310
+                                    Top = 369
+                                    Width = 705
+                                    Height = 240
+                                    Name ="Etiqueta82"
+                                    Caption ="TODOS"
+                                End
+                            End
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 4365
+                            Top = 623
+                            Width = 215
+                            Height = 195
+                            OptionValue = 3
+                            Name ="Opción87"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 247
+                                    Left = 4536
+                                    Top = 580
+                                    Width = 780
+                                    Height = 240
+                                    Name ="Etiqueta88"
+                                    Caption ="Recibidas"
+                                End
+                            End
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 3125
+                            Top = 652
+                            Width = 215
+                            Height = 210
+                            OptionValue = 1
+                            Name ="Opción83"
+                            Begin
+                                Begin Label
+                                    OverlapFlags = 247
+                                    Left = 3310
+                                    Top = 609
+                                    Width = 690
+                                    Height = 240
+                                    Name ="Etiqueta84"
+                                    Caption ="Vigentes"
+                                End
+                            End
+                        End
+                    End
+                End
+                Begin OptionGroup
+                    OverlapFlags = 93
+                    Left = 1757
+                    Top = 312
+                    Width = 1233
+                    Height = 582
+                    TabIndex = 32
+                    Name ="QueAutorizado"
+                    BeforeUpdate ="[Event Procedure]"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="1"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Left = 1762
+                            Top = 56
+                            Width = 870
+                            Height = 240
+                            BackColor = -2147483633
+                            Name ="Etiqueta11"
+                            Caption ="Autorizado:"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 1813
+                            Top = 397
+                            Width = 215
+                            Height = 195
+                            OptionValue = 1
+                            Name ="Opción12"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 1813
+                            Top = 652
+                            Width = 215
+                            Height = 195
+                            OptionValue = 2
+                            Name ="Opción14"
+                        End
+                        Begin OptionButton
+                            OverlapFlags = 87
+                            Left = 2380
+                            Top = 652
+                            Width = 215
+                            Height = 195
+                            OptionValue = 3
+                            Name ="Opción16"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 223
+                    Left = 2040
+                    Top = 369
+                    Width = 705
+                    Height = 240
+                    Name ="Etiqueta89"
+                    Caption ="TODOS"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    Left = 2040
+                    Top = 609
+                    Width = 270
+                    Height = 240
+                    Name ="Etiqueta90"
+                    Caption ="SI"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    Left = 2607
+                    Top = 609
+                    Width = 315
+                    Height = 240
+                    Name ="Etiqueta91"
+                    Caption ="NO"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1247
+                    Top = 623
+                    Width = 156
+                    Height = 255
+                    TabIndex = 34
+                    Name ="QueEstatusEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 13213
+                    Top = 396
+                    Width = 1341
+                    TabIndex = 35
+                    BorderColor = 3355443
+                    Name ="FechaRecibido"
+                    ControlSource ="FechaRecibido"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 223
+                            Left = 11966
+                            Top = 396
+                            Width = 1485
+                            Height = 240
+                            Name ="Etiqueta95"
+                            Caption ="Fecha Recibido:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 7082
+                    Top = 1020
+                    Width = 1536
+                    TabIndex = 36
+                    BorderColor = 3355443
+                    Name ="Empresa"
+                    ControlSource ="Empresa"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 223
+                            Left = 5673
+                            Top = 1020
+                            Width = 1140
+                            Height = 240
+                            Name ="Etiqueta98"
+                            Caption ="Empresa:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 4409
+                    Top = 56
+                    Width = 1206
+                    TabIndex = 13
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueEmpresa"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Empresas.IdEmpresas, Empresas.Empresa FROM Empresas;"
+                    ColumnWidths ="0;2835"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Empresas.IdEmpresas, Empresas.Empresa FROM Empresas;\";\"Empresas\";\"\""
+                        ";\"IdEmpresas\";\"Empresa\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 223
+                            Left = 3968
+                            Top = 56
+                            Width = 540
+                            Height = 240
+                            Name ="Etiqueta100"
+                            Caption ="Emp.:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1474
+                    Top = 643
+                    Width = 156
+                    TabIndex = 33
+                    Name ="QueEmpresaEs"
+                    DefaultValue ="\"*\""
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 6
+                    Left = 75
+                    Top = 6797
+                    Width = 5526
+                    Height = 1297
+                    TabIndex = 37
+                    Name ="QueOrdRel"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT [OrdCom-Ord].IdOrdenes, Ordenes.Numero, Modelos.Modelo, CantidadOrd.CantO"
+                        "rd, Clientes.Cliente, Pedidos.NumeroPed FROM ((((([OrdCom-Ord] INNER JOIN Ordene"
+                        "s ON [OrdCom-Ord].IdOrdenes = Ordenes.IdOrdenes) LEFT JOIN Clientes ON Ordenes.I"
+                        "dClientes = Clientes.IdClientes) LEFT JOIN CantidadOrd ON Ordenes.IdOrdenes = Ca"
+                        "ntidadOrd.IdOrdenes) LEFT JOIN PedidosDet ON Ordenes.IdPedidosDet = PedidosDet.I"
+                        "dPedidosDet) LEFT JOIN Modelos ON Ordenes.IdModelos = Modelos.IdModelos) LEFT JO"
+                        "IN Pedidos ON PedidosDet.IdPedidos = Pedidos.IdPedidos WHERE ((([OrdCom-Ord].IdO"
+                        "rdCompra)=[Formularios]![OrdCompraVer]![IdOrdCompra]));"
+                    ColumnWidths ="0;567;737;851;1701;567"
+                    OnDblClick ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 90
+                            Top = 6510
+                            Width = 1740
+                            Height = 240
+                            Name ="Etiqueta106"
+                            Caption ="Ordenes Relacionadas:"
+                        End
+                    End
+                End
+                Begin ComboBox
+                    OverlapFlags = 215
+                    ColumnCount = 2
+                    Left = 53
+                    Top = 963
+                    Width = 1596
+                    TabIndex = 38
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueProveedorC"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Proveedores.IdProveedor, Proveedores.Proveedor FROM Proveedores ORDER BY "
+                        "Proveedores.Proveedor;"
+                    ColumnWidths ="0;284"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT Proveedores.IdProveedor, Proveedores.Proveedor FROM Proveedores ORDER B"
+                        "Y Proveedores.Proveedor;\";\"Proveedores\";\"\";\"IdProveedor\";\"Proveedor\";\""
+                        "PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Top = 963
+                            Width = 1725
+                            Height = 240
+                            Name ="Etiqueta109"
+                            Caption ="Cuadro combinado108:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 1
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 10809
+                    Top = 1021
+                    Width = 1101
+                    TabIndex = 39
+                    BorderColor = 3355443
+                    Name ="Texto110"
+                    ControlSource ="FechaAutorizado"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 9390
+                            Top = 1020
+                            Width = 1350
+                            Height = 240
+                            Name ="Etiqueta111"
+                            Caption ="Fecha Autorizado:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Alternar6_Click()
+
+End Sub
+
+Private Sub Actualizar_Click()
+QueOrden.Requery
+Me.Requery
+
+End Sub
+
+Private Sub AgregarComent_Click()
+If IdUsuarioACT = 0 Then
+MsgBox "Hubo un problema con el programa, y por seguridad no puedes meter ahorita un comentario por que no estas identificado como usuario activo. Por favor sal del programa y vuelve a ingresar para meter un comentario.", vbInformation
+Else
+If MsgBox("Estas seguro de que quieres meter un nuevo comentario para la orden No. " & Me![NumCompra] & "?." & vbCr & "Una vez ingresando una tecla, no se podra borrar el comentario.", vbYesNo, "AGREGAR COMENTARIO") = vbYes Then
+DoCmd.OpenForm "ComentaComp", , , , acFormAdd
+End If
+End If
+End Sub
+
+
+
+Private Sub Aut_Click()
+
+Dim MyString As String
+Dim Dbs As Database
+Set Dbs = CurrentDb
+
+MyString = Format(Date, "mm-dd-yyyy")
+Dbs.Execute ("UPDATE OrdCompra SET Autorizado=True, IdUsuAutorizado=" & IdUsuarioACT & ", FechaAutorizado =#" & MyString & "# WHERE IdOrdCompra=" & IdOrdCompra)
+
+Me.QueOrden.Requery
+Me.Requery
+    RecordsetClone.FindFirst "[IdOrdCompra] = " & Me![QueOrden]
+    Bookmark = RecordsetClone.Bookmark
+    QueOrdenEs = QueOrden
+    
+    MsgBox "La orden de compra No. " & NumCompra & " ya quedo autorizada.", , "ORDEN AUTORIZADA"
+
+Dbs.Close
+End Sub
+
+Private Sub Coment_DblClick(Cancel As Integer)
+On Error GoTo errores
+DoCmd.OpenForm "ComentaCompVer"
+Forms![ComentaCompVer]![QueComen] = Coment
+
+errores:
+End Sub
+
+Private Sub Form_Current()
+On Error GoTo errore:
+If EstaCargado("pedidospormes") = False Then
+If Totales = False Then
+Me![OrdCompraVerSub].Form![CantTot].Visible = False
+Else
+Me![OrdCompraVerSub].Form![CantTot].Visible = True
+End If
+End If
+
+
+
+Call PintarEstatus
+Call PintarAutorizado
+Coment.Requery
+
+errore:
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(8) = True Then
+  Aut.Visible = True
+End If
+
+
+If NivelAct <= nivDirectivo Then
+ModificarOrden.Visible = True
+End If
+Call UltimoNumero
+
+If EstaCargado("pedidospormes") = True Then
+[QueOrden] = Forms![PedidosPorMes]![IdOrdCompra]
+     RecordsetClone.FindFirst "IdOrdCompra = " & Forms![PedidosPorMes]![IdOrdCompra]
+     Bookmark = RecordsetClone.Bookmark
+End If
+End Sub
+
+Private Sub Imprimir_Click()
+DoCmd.OpenForm "ImprimirOrdenes"
+Forms![ImprimirOrdenes]![QueIdOrdCompra] = IdOrdCompra
+End Sub
+
+Private Sub ModificarOrden_Click()
+DoCmd.OpenForm "OrdCompra", , , "[IdOrdCompra]=" & Me![IdOrdCompra]
+End Sub
+
+Private Sub Motivo_Click()
+If IsNull(CanceladoMotivo) = True Then
+MsgBox "No se ha ingresado ningun motivo por la cancelacion de esta orden"
+Else
+MsgBox CanceladoMotivo
+End If
+End Sub
+
+Private Sub QueAutorizado_AfterUpdate()
+
+End Sub
+
+Private Sub QueAutorizado_BeforeUpdate(Cancel As Integer)
+If QueAutorizado = 1 Then
+AutorizEs = "*"
+ElseIf QueAutorizado = 2 Then
+AutorizEs = True
+ElseIf QueAutorizado = 3 Then
+AutorizEs = False
+End If
+QueOrden.Requery
+End Sub
+
+Private Sub QueCancelado_AfterUpdate()
+If QueCancelado = 1 Then
+CancelEs = "*"
+ElseIf QueCancelado = 2 Then
+CancelEs = True
+ElseIf QueCancelado = 3 Then
+CancelEs = False
+End If
+QueOrden.Requery
+End Sub
+
+Private Sub QueEmpresa_AfterUpdate()
+If IsNull(QueEmpresa) = True Then
+QueEmpresaEs = "*"
+Else
+QueEmpresaEs = QueEmpresa
+End If
+QueOrden.Requery
+End Sub
+
+Private Sub QueEstatus_AfterUpdate()
+If QueEstatus = 4 Then
+QueEstatusEs = "*"
+Else
+QueEstatusEs = QueEstatus
+End If
+QueOrden.Requery
+End Sub
+
+Private Sub QueOrden_AfterUpdate()
+If Me.FilterOn = True Then
+   Me.FilterOn = False
+End If
+    
+    
+    RecordsetClone.FindFirst "[IdOrdCompra] = " & Me![QueOrden]
+    Bookmark = RecordsetClone.Bookmark
+    QueOrdenEs = QueOrden
+    QueOrdRel.Requery
+
+End Sub
+
+Private Sub QueOrden_DblClick(Cancel As Integer)
+DoCmd.OpenForm "OrdCompraProceso", , , "[IdOrdCompra]=" & Me![QueOrden]
+End Sub
+
+Private Sub QueOrdRel_DblClick(Cancel As Integer)
+DoCmd.OpenForm "OrdenVer", , , "idordenes=" & QueOrdRel
+Forms![OrdenVer]![QueOrden] = QueOrdRel
+End Sub
+
+Private Sub QueProveedor_AfterUpdate()
+QueProvEs = QueProveedor
+QueOrden.Requery
+Todos = False
+QueOrdRel.Requery
+QueProveedorC = QueProveedor
+End Sub
+
+Private Sub QueProveedorC_AfterUpdate()
+If IsNull(QueProveedorC) = True Then
+QueProvEs = "*"
+QueOrden.Requery
+QueProveedor = ""
+Todos = True
+
+Else
+QueProveedor = QueProveedorC
+QueProvEs = QueProveedor
+QueOrden.Requery
+Todos = False
+QueOrdRel.Requery
+End If
+
+End Sub
+
+Private Sub RC_Click()
+DoCmd.OpenForm "RC_MeterFechas"
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+
+Private Sub Todos_Click()
+QueProvEs = "*"
+QueOrden.Requery
+QueProveedor = ""
+QueProveedorC = ""
+
+End Sub
+Private Sub UltimoNumero()
+On Error GoTo errores
+Dim Dbs As Database
+Dim Rst As Recordset
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT Max(IdOrdCompra) AS UltNum FROM OrdCompra")
+QueOrden = Rst!ultnum
+Rst.Close
+Dbs.Close
+Exit Sub
+errores:
+MsgBox Err.Description
+End Sub
+
+
+Private Function EsParcial(Campo As Boolean) As String
+If Campo = True Then
+EsParcial = "Si"
+Else
+EsParcial = "No"
+End If
+End Function
+
+Private Sub PintarAutorizado()
+On Error GoTo errore
+If Autorizado = True Then
+AutorizadoEs.BackColor = 65280
+AutorizadoEs.Caption = QuienAutorizo
+Imprimir.Visible = True
+Else
+AutorizadoEs.BackColor = 255
+AutorizadoEs.Caption = "NO"
+Imprimir.Visible = False
+End If
+Exit Sub
+errore:
+MsgBox Err.Description
+End Sub
+
+
+Private Sub PintarEstatus()
+If Estatus = 1 Then
+CanceladaEs.BackColor = 16777215
+CanceladaEs.Caption = "VIGENTE"
+Motivo.Visible = False
+FechaRecibido.Visible = False
+
+ElseIf Estatus = 2 Then
+CanceladaEs.BackColor = 255
+CanceladaEs.Caption = "CANCELADA"
+Motivo.Visible = True
+FechaRecibido.Visible = False
+
+ElseIf Estatus = 3 Then
+CanceladaEs.BackColor = 65280
+CanceladaEs.Caption = "RECIBIDA"
+Motivo.Visible = False
+FechaRecibido.Visible = True
+End If
+End Sub

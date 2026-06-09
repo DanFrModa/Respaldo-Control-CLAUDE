@@ -1,0 +1,55 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="TelasColAlm"
+    Name ="IT_CuadrarInv_Ent"
+End
+Begin OutputColumns
+    Expression ="TelasColAlm.IdTelasColAlm"
+    Alias ="E10"
+    Expression ="ceronulo([E1])"
+    Alias ="E20"
+    Expression ="ceronulo([E2])"
+End
+Begin Joins
+    LeftTable ="TelasColAlm"
+    RightTable ="IT_CuadrarInv_Ent"
+    Expression ="TelasColAlm.IdTelasColAlm = IT_CuadrarInv_Ent.IdTelasColAlm"
+    Flag = 2
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1367
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 174
+        Top = 1
+        Right = 270
+        Bottom = 108
+        Top = 0
+        Name ="TelasColAlm"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 98
+        Top = 0
+        Name ="IT_CuadrarInv_Ent"
+    End
+End

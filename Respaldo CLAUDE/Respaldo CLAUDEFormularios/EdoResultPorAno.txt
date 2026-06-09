@@ -1,0 +1,1347 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1008484767
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    FilterOn = NotDefault
+    OrderByOn = NotDefault
+    ScrollBars = 0
+    BorderStyle = 3
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 14238
+    DatasheetFontHeight = 10
+    ItemSuffix = 114
+    Left = 2265
+    Top = 435
+    Right = 16785
+    Bottom = 8415
+    DatasheetGridlinesColor = 12632256
+    Filter ="[queano]=2012"
+    RecSrcDt = Begin
+        0x9bd0c2615deee240
+    End
+    RecordSource ="SELECT EdoResult.Fecha, EdoResultTotales.ImporteTot, EdoResultTotales.CostoTotal"
+        ", [importetot]-[costototal] AS UtBruta, EdoResult.Gastos, EdoResult.Intereses, E"
+        "doResult.Bonificaciones, EdoResult.Otros, [ImporteTot]-[CostoTotal]-[Gastos]-[In"
+        "tereses]-[Bonificaciones]-[Otros] AS UtilidadNeta, Year([Fecha]) AS QueAno, quem"
+        "eslargo([fecha]) AS QueMes, EdoResult.IdEdoResult FROM EdoResult LEFT JOIN EdoRe"
+        "sultTotales ON EdoResult.IdEdoResult = EdoResultTotales.IdEdoResult WHERE (((Yea"
+        "r([Fecha]))=[Formularios]![EdoResultPorAno]![QueAnoEs])) ORDER BY EdoResult.Fech"
+        "a;"
+    Caption ="EdoResultPorAno"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 737
+            BackColor = 65535
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Top = 454
+                    Width = 882
+                    Height = 240
+                    Name ="Fecha Etiqueta"
+                    Caption ="Mes"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Fecha_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 1587
+                    Top = 454
+                    Width = 1122
+                    Height = 240
+                    Name ="Etiqueta10"
+                    Caption ="Venta Total"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 2709
+                    Top = 457
+                    Width = 1035
+                    Height = 240
+                    Name ="Etiqueta12"
+                    Caption ="Costo Total"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 3744
+                    Top = 457
+                    Width = 717
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta14"
+                    Caption ="%"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 4461
+                    Top = 457
+                    Width = 1005
+                    Height = 240
+                    Name ="Etiqueta16"
+                    Caption ="Utilidad Bruta"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 5466
+                    Top = 457
+                    Width = 717
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta17"
+                    Caption ="%"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 6183
+                    Top = 457
+                    Width = 990
+                    Height = 240
+                    Name ="Etiqueta20"
+                    Caption ="Gastos"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 7173
+                    Top = 457
+                    Width = 702
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta21"
+                    Caption ="%"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 7875
+                    Top = 457
+                    Width = 1005
+                    Height = 240
+                    Name ="Etiqueta25"
+                    Caption ="Intereses"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 8880
+                    Top = 457
+                    Width = 702
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta26"
+                    Caption ="%"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 9587
+                    Top = 453
+                    Width = 1185
+                    Height = 240
+                    Name ="Etiqueta27"
+                    Caption ="Bonificaciones"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 2
+                    Left = 10772
+                    Top = 453
+                    Width = 462
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta28"
+                    Caption ="%"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 11234
+                    Top = 453
+                    Width = 945
+                    Height = 240
+                    Name ="Etiqueta29"
+                    Caption ="Otros"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    Left = 12309
+                    Top = 453
+                    Width = 1230
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta38"
+                    Caption ="Utilidad Neta"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 13539
+                    Top = 453
+                    Width = 612
+                    Height = 240
+                    FontWeight = 700
+                    Name ="Etiqueta39"
+                    Caption ="%"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 3510
+                    Height = 270
+                    FontSize = 10
+                    FontWeight = 700
+                    Name ="Etiqueta78"
+                    Caption ="Estados de Resultados Por Año"
+                End
+                Begin ComboBox
+                    LimitToList = NotDefault
+                    OverlapFlags = 85
+                    Left = 5896
+                    Top = 113
+                    Width = 1266
+                    ColumnInfo ="\"\";\"\";\"3\";\"2\""
+                    Name ="QueAnoEs"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Year([Fecha]) AS QueAno FROM EdoResult GROUP BY Year([Fecha]) HAVING (((Y"
+                        "ear([Fecha])) Is Not Null)) ORDER BY Year([Fecha]) DESC;"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="=year(now())"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4480
+                            Top = 113
+                            Width = 1350
+                            Height = 240
+                            Name ="Etiqueta80"
+                            Caption ="Seleccionar Año:"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 2
+                    Left = 885
+                    Top = 450
+                    Width = 675
+                    Height = 240
+                    Name ="Etiqueta85"
+                    Caption ="Ver"
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    Left = 3855
+                    Top = 75
+                    Width = 192
+                    Height = 277
+                    TabIndex = 1
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="IdEdoResult"
+                    ControlSource ="IdEdoResult"
+                End
+            End
+        End
+        Begin Section
+            Height = 517
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin Rectangle
+                    SpecialEffect = 0
+                    BackStyle = 1
+                    OverlapFlags = 93
+                    Top = 283
+                    Width = 14203
+                    Height = 234
+                    Name ="Cuadro81"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 12
+                    Top = -3
+                    Width = 882
+                    Height = 292
+                    ColumnWidth = 825
+                    Name ="QueMes"
+                    ControlSource ="QueMes"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 1593
+                    Top = -3
+                    Width = 1122
+                    Height = 292
+                    TabIndex = 1
+                    Name ="ImporteTot"
+                    ControlSource ="ImporteTot"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 2715
+                    Top = -3
+                    Width = 1002
+                    Height = 292
+                    TabIndex = 2
+                    Name ="CostoTotal"
+                    ControlSource ="CostoTotal"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 3717
+                    Top = -3
+                    Width = 717
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 3
+                    Name ="Texto15"
+                    ControlSource ="=[costototal]/[ImporteTot]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 4434
+                    Top = -3
+                    Width = 1002
+                    Height = 292
+                    TabIndex = 4
+                    Name ="UtilidadBruta"
+                    ControlSource ="=[importetot]-[costototal]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 5436
+                    Top = -3
+                    Width = 717
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 5
+                    Name ="Texto19"
+                    ControlSource ="=(([costototal]/[ImporteTot])-1)*-1"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 6153
+                    Top = -3
+                    Width = 1002
+                    Height = 292
+                    TabIndex = 6
+                    Name ="Gastos"
+                    ControlSource ="Gastos"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 7155
+                    Top = -3
+                    Width = 717
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 7
+                    Name ="Texto23"
+                    ControlSource ="=[gastos]/[importetot]"
+                    Format ="Percent"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 95
+                    SpecialEffect = 0
+                    Left = 12312
+                    Width = 0
+                    Height = 517
+                    Name ="Línea24"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 7872
+                    Top = -3
+                    Width = 1002
+                    Height = 292
+                    TabIndex = 8
+                    Name ="Intereses"
+                    ControlSource ="Intereses"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 8874
+                    Top = -3
+                    Width = 717
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 9
+                    Name ="Texto32"
+                    ControlSource ="=[intereses]/[ImporteTot]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 9591
+                    Width = 1002
+                    Height = 292
+                    TabIndex = 10
+                    Name ="Bonificaciones"
+                    ControlSource ="Bonificaciones"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 10593
+                    Width = 717
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 11
+                    Name ="Texto34"
+                    ControlSource ="=[bonificaciones]/[importetot]"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 223
+                    BackStyle = 0
+                    Left = 11310
+                    Width = 1002
+                    Height = 292
+                    TabIndex = 12
+                    Name ="Otros"
+                    ControlSource ="Otros"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 12327
+                    Width = 1137
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 13
+                    Name ="UtilidadNeta"
+                    ControlSource ="UtilidadNeta"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 13464
+                    Width = 762
+                    Height = 292
+                    FontWeight = 700
+                    TabIndex = 14
+                    Name ="Texto41"
+                    ControlSource ="=[utilidadneta]/[importetot]"
+                    Format ="Percent"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 6153
+                    Top = -3
+                    Width = 0
+                    Height = 517
+                    Name ="Línea42"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 2715
+                    Top = -3
+                    Width = 0
+                    Height = 517
+                    Name ="Línea45"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 14226
+                    Width = 0
+                    Height = 517
+                    Name ="Línea46"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 4434
+                    Top = -3
+                    Width = 0
+                    Height = 517
+                    Name ="Línea47"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 7872
+                    Top = -3
+                    Width = 0
+                    Height = 517
+                    Name ="Línea49"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 9591
+                    Width = 0
+                    Height = 517
+                    Name ="Línea50"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 11310
+                    Width = 0
+                    Height = 517
+                    Name ="Línea51"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 1077
+                    Top = 56
+                    Width = 276
+                    Height = 178
+                    TabIndex = 15
+                    Name ="Comando87"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 1140
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    Left = 1575
+                    Top = 105
+                    Width = 1122
+                    Height = 277
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto53"
+                    ControlSource ="=Sum([ImporteTot])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    Left = 2712
+                    Top = 105
+                    Width = 1017
+                    Height = 277
+                    TabIndex = 1
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto54"
+                    ControlSource ="=Sum([CostoTotal])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 3729
+                    Top = 105
+                    Width = 717
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 2
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto55"
+                    ControlSource ="=Sum([costototal])/Sum([ImporteTot])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 4446
+                    Top = 105
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 3
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto56"
+                    ControlSource ="=Sum([importetot])-Sum([costototal])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 5448
+                    Top = 105
+                    Width = 717
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 4
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto57"
+                    ControlSource ="=((Sum([costototal])/Sum([ImporteTot]))-1)*-1"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 6165
+                    Top = 105
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 5
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto58"
+                    ControlSource ="=Sum([Gastos])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 7167
+                    Top = 105
+                    Width = 717
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 6
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto59"
+                    ControlSource ="=Sum([gastos])/Sum([importetot])"
+                    Format ="Percent"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 93
+                    SpecialEffect = 0
+                    Left = 12324
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea60"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 7884
+                    Top = 105
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 7
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto61"
+                    ControlSource ="=Sum([Intereses])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 8886
+                    Top = 105
+                    Width = 717
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 8
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto62"
+                    ControlSource ="=Sum([intereses])/Sum([ImporteTot])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 9603
+                    Top = 105
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 9
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto63"
+                    ControlSource ="=Sum([Bonificaciones])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 10605
+                    Top = 105
+                    Width = 717
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 10
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto64"
+                    ControlSource ="=Sum([bonificaciones])/Sum([importetot])"
+                    Format ="Percent"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 223
+                    Left = 11322
+                    Top = 105
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 11
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto65"
+                    ControlSource ="=Sum([Otros])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 223
+                    Left = 12324
+                    Top = 105
+                    Width = 1152
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 12
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto66"
+                    ControlSource ="=Sum([UtilidadNeta])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 1
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    Left = 13476
+                    Top = 105
+                    Width = 762
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 13
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto67"
+                    ControlSource ="=Sum([utilidadneta])/Sum([importetot])"
+                    Format ="Percent"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 6153
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea68"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 2715
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea69"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 14226
+                    Width = 0
+                    Height = 382
+                    Name ="Línea70"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 4446
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea71"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 7872
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea72"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 9591
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea73"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 11310
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea74"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 675
+                    Top = 150
+                    Width = 855
+                    Height = 210
+                    Name ="Etiqueta75"
+                    Caption ="TOTALES:"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 12945
+                    Top = 705
+                    Width = 1236
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 14
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 12315
+                    Top = 105
+                    Width = 0
+                    Height = 277
+                    Name ="Línea88"
+                End
+                Begin Rectangle
+                    SpecialEffect = 0
+                    BackStyle = 1
+                    OverlapFlags = 247
+                    Width = 14203
+                    Height = 99
+                    BackColor = 0
+                    Name ="Cuadro89"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 127
+                    Left = 1575
+                    Top = 375
+                    Width = 1122
+                    Height = 277
+                    TabIndex = 15
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="PromVentas"
+                    ControlSource ="=Avg([ImporteTot])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 255
+                    Left = 2712
+                    Top = 375
+                    Width = 1017
+                    Height = 277
+                    TabIndex = 16
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="PromCosto"
+                    ControlSource ="=Avg([CostoTotal])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 255
+                    Left = 4446
+                    Top = 375
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 17
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto94"
+                    ControlSource ="=[promventas]-[promcosto]"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 127
+                    Left = 6165
+                    Top = 375
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 18
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto96"
+                    ControlSource ="=Avg([Gastos])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 127
+                    SpecialEffect = 0
+                    Left = 12324
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea98"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 127
+                    Left = 7884
+                    Top = 375
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 19
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto99"
+                    ControlSource ="=Avg([Intereses])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 127
+                    Left = 9603
+                    Top = 375
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 20
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto101"
+                    ControlSource ="=Avg([Bonificaciones])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 255
+                    Left = 11322
+                    Top = 375
+                    Width = 1002
+                    Height = 277
+                    TabIndex = 21
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto103"
+                    ControlSource ="=Avg([Otros])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    DecimalPlaces = 0
+                    SpecialEffect = 0
+                    OverlapFlags = 255
+                    Left = 12324
+                    Top = 375
+                    Width = 1152
+                    Height = 277
+                    FontWeight = 700
+                    TabIndex = 22
+                    BackColor = 16777215
+                    ForeColor = 0
+                    Name ="Texto104"
+                    ControlSource ="=Avg([UtilidadNeta])"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 6153
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea106"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 2715
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea107"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 4446
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea108"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 7872
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea109"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 9591
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea110"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 11310
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea111"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 510
+                    Top = 420
+                    Width = 1020
+                    Height = 210
+                    Name ="Etiqueta112"
+                    Caption ="PROMEDIO:"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 119
+                    SpecialEffect = 0
+                    Left = 12315
+                    Top = 375
+                    Width = 0
+                    Height = 277
+                    Name ="Línea113"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando87_Click()
+DoCmd.OpenForm "EdoResultPorMes"
+End Sub
+
+Private Sub Form_Load()
+DoCmd.ApplyFilter , "[queano]=" & QueAnoEs
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+DoCmd.ApplyFilter , "[queano]=" & Year(Now)
+End Sub
+
+Private Sub QueAnoEs_AfterUpdate()
+If IsNull(QueAnoEs) = True Then
+MsgBox "Selecciona un año de la lista para poder ver la informacion que deseas.", vbInformation
+Else
+DoCmd.ApplyFilter , "[queano]=" & QueAnoEs
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

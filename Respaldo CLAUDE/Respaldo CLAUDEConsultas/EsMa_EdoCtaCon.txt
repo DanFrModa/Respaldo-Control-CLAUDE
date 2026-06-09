@@ -1,0 +1,125 @@
+Operation = 1
+Option = 0
+Where ="(((EsMa.IdMaquileros)=[Formularios]![EsMa_EdoCta]![QueMaq]))"
+Begin InputTables
+    Name ="EsMa"
+    Name ="EsMa_Pagos"
+    Name ="Maquileros"
+    Name ="EsMa_ReciboTotal"
+    Name ="EsMa_Desc"
+    Name ="EsMa_Abonos"
+End
+Begin OutputColumns
+    Alias ="Maq"
+    Expression ="[nombre]+\" \"+[apellidos]"
+    Expression ="EsMa.FechaEsMa"
+    Expression ="EsMa.IdMaquileros"
+    Alias ="Recibido"
+    Expression ="ceronulo([importe])"
+    Alias ="Pagado"
+    Expression ="ceronulo([PagoEsMa])"
+    Alias ="Descuentos"
+    Expression ="ceronulo([DescuentoEsMa])"
+    Alias ="Abonos"
+    Expression ="ceronulo([AbonoEsMa])"
+    Expression ="EsMa.IdEsMa"
+    Alias ="Rev"
+    Expression ="IIf([revisionpendientep],\"*\",\"\")"
+    Alias ="RevRec"
+    Expression ="IIf([RR],\"*\",\"\")"
+    Expression ="EsMa_ReciboTotal.IdRecibos"
+End
+Begin Joins
+    LeftTable ="EsMa"
+    RightTable ="EsMa_Pagos"
+    Expression ="EsMa.IdEsMa = EsMa_Pagos.IdEsMa"
+    Flag = 2
+    LeftTable ="EsMa"
+    RightTable ="Maquileros"
+    Expression ="EsMa.IdMaquileros = Maquileros.IdMaquileros"
+    Flag = 1
+    LeftTable ="EsMa"
+    RightTable ="EsMa_ReciboTotal"
+    Expression ="EsMa.IdEsMa = EsMa_ReciboTotal.IdEsMa"
+    Flag = 2
+    LeftTable ="EsMa"
+    RightTable ="EsMa_Desc"
+    Expression ="EsMa.IdEsMa = EsMa_Desc.IdEsMa"
+    Flag = 2
+    LeftTable ="EsMa"
+    RightTable ="EsMa_Abonos"
+    Expression ="EsMa.IdEsMa = EsMa_Abonos.IdEsMa"
+    Flag = 2
+End
+Begin OrderBy
+    Expression ="EsMa.FechaEsMa"
+    Flag = 1
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 58
+    Top = 79
+    Right = 1258
+    Bottom = 394
+    Left = -1
+    Top = -1
+    Right = 1185
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 539
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 122
+        Top = 0
+        Name ="EsMa"
+    End
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 122
+        Top = 0
+        Name ="EsMa_Pagos"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 122
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 122
+        Top = 0
+        Name ="EsMa_ReciboTotal"
+    End
+    Begin
+        Left = 574
+        Top = 6
+        Right = 670
+        Bottom = 122
+        Top = 0
+        Name ="EsMa_Desc"
+    End
+    Begin
+        Left = 708
+        Top = 6
+        Right = 804
+        Bottom = 122
+        Top = 0
+        Name ="EsMa_Abonos"
+    End
+End

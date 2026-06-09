@@ -1,0 +1,166 @@
+Version = 17
+VersionRequired = 17
+Checksum = -671610024
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 4095
+    DatasheetFontHeight = 10
+    ItemSuffix = 8
+    Left = 7245
+    Top = 1410
+    Right = 13305
+    Bottom = 8235
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x33f476b65850e340
+    End
+    DatasheetFontName ="Arial"
+    Begin
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin Section
+            Height = 5385
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 570
+                    Top = 1275
+                    Width = 3306
+                    Height = 373
+                    TabIndex = 1
+                    Name ="Mant"
+                    Caption ="Mantenimiento a Usuarios"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 570
+                    Top = 1805
+                    Width = 3306
+                    Height = 373
+                    TabIndex = 2
+                    Name ="AltaUsu"
+                    Caption ="ALTA Nuevos Usuarios"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 570
+                    Top = 2335
+                    Width = 3306
+                    Height = 373
+                    TabIndex = 3
+                    Name ="Comando2"
+                    Caption ="Ver el LOG de Usuarios"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 570
+                    Top = 315
+                    Width = 3306
+                    Height = 373
+                    Name ="Comando3"
+                    Caption ="Alta de Accesos A Usuarios"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 585
+                    Top = 2865
+                    Width = 3306
+                    Height = 373
+                    TabIndex = 4
+                    Name ="Comando4"
+                    Caption ="Alta de Usuarios A Procesos de RC"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 2777
+                    Top = 4365
+                    Width = 1131
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 5
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 585
+                    Top = 3395
+                    Width = 3306
+                    Height = 373
+                    TabIndex = 6
+                    Name ="Comando6"
+                    Caption ="Establecer Accesos a Usuarios"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 585
+                    Top = 3888
+                    Width = 3306
+                    Height = 373
+                    TabIndex = 7
+                    Name ="Comando7"
+                    Caption ="Propiedades"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub AltaUsu_Click()
+DoCmd.OpenForm "AltaUsuarios"
+End Sub
+
+Private Sub Comando2_Click()
+DoCmd.OpenForm "UsuariosLog"
+End Sub
+
+Private Sub Comando3_Click()
+DoCmd.OpenForm "AltaAccesosAUsuarios"
+End Sub
+
+Private Sub Comando4_Click()
+DoCmd.OpenForm "RC_ProcUsua"
+End Sub
+
+Private Sub Comando6_Click()
+DoCmd.OpenForm "Accesoporusua"
+End Sub
+
+Private Sub Comando7_Click()
+DoCmd.OpenTable "propiedades"
+End Sub
+
+Private Sub Mant_Click()
+DoCmd.OpenForm "Usuarios_Mant"
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

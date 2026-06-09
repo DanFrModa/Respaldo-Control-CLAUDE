@@ -1,0 +1,205 @@
+Version = 17
+VersionRequired = 17
+Checksum = 2130739570
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10148
+    DatasheetFontHeight = 10
+    ItemSuffix = 10
+    Left = 3195
+    Top = 390
+    Right = 13350
+    Bottom = 6345
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x5ff30d76ae4ae340
+    End
+    RecordSource ="CP_Procesos"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            ForeColor = -2147483630
+            FontName ="MS Sans Serif"
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin FormHeader
+            Height = 396
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 53
+                    Width = 4470
+                    Height = 270
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta2"
+                    Caption ="USUARIOS ENCARGADOS DE CADA PROCESO"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 5215
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 3
+                    Left = 113
+                    Top = 446
+                    Width = 3861
+                    Height = 4657
+                    Name ="QueProc"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT CP_Procesos.IdCP_Procesos, CP_Procesos.NumProceso, CP_Procesos.Proceso FR"
+                        "OM CP_Procesos ORDER BY CP_Procesos.NumProceso;"
+                    ColumnWidths ="0;284;1134"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 120
+                            Top = 225
+                            Width = 780
+                            Height = 240
+                            Name ="Etiqueta1"
+                            Caption ="Procesos:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 8674
+                    Top = 4648
+                    Width = 1296
+                    Height = 388
+                    FontWeight = 700
+                    TabIndex = 1
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 4762
+                    Top = 170
+                    Width = 3291
+                    ColumnWidth = 3330
+                    TabIndex = 2
+                    Name ="Proceso"
+                    ControlSource ="Proceso"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4081
+                            Top = 170
+                            Width = 705
+                            Height = 240
+                            Name ="Etiqueta6"
+                            Caption ="Proceso:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 8277
+                    Top = 113
+                    Width = 351
+                    TabIndex = 3
+                    Name ="IdCP_Procesos"
+                    ControlSource ="IdCP_Procesos"
+                End
+                Begin Subform
+                    OverlapFlags = 87
+                    Left = 4082
+                    Top = 1423
+                    Width = 5850
+                    Height = 2325
+                    TabIndex = 4
+                    Name ="RC_ProcUsuaSub"
+                    SourceObject ="Form.RC_ProcUsuaSub"
+                    LinkChildFields ="IdCP_Procesos"
+                    LinkMasterFields ="IdCP_Procesos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4081
+                            Top = 1190
+                            Width = 4620
+                            Height = 240
+                            Name ="RC_ProcUsuaSubEtiqueta"
+                            Caption ="Seleccionar los usuarios que van a encargarse de este proceso:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub QueProc_AfterUpdate()
+    Me.RecordsetClone.FindFirst "[IdCP_Procesos] = " & Me![QueProc]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Sub Lista4_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdCP_Procesos] = " & Me![Lista4]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub

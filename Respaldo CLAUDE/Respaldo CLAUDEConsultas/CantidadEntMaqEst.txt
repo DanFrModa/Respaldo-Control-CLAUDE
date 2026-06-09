@@ -1,0 +1,81 @@
+Operation = 1
+Option = 0
+Begin InputTables
+    Name ="Ordenes"
+    Name ="Maquileros"
+    Name ="EntregasEst"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdOrdenes"
+    Alias ="CantEnt"
+    Expression ="Sum(ceronulo([Cantidad]))"
+    Alias ="FechaEnt"
+    Expression ="Last(EntregasEst.Fecha)"
+    Alias ="MaqEnt"
+    Expression ="[nombre]+\" \"+[apellidos]"
+    Expression ="EntregasEst.IdMaquileros"
+    Alias ="PromedioDePrecioPactado"
+    Expression ="Avg(EntregasEst.PrecioPactado)"
+End
+Begin Joins
+    LeftTable ="Ordenes"
+    RightTable ="EntregasEst"
+    Expression ="Ordenes.IdOrdenes = EntregasEst.IdOrdenes"
+    Flag = 1
+    LeftTable ="Maquileros"
+    RightTable ="EntregasEst"
+    Expression ="Maquileros.IdMaquileros = EntregasEst.IdMaquileros"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="[nombre]+\" \"+[apellidos]"
+    GroupLevel = 0
+    Expression ="EntregasEst.IdMaquileros"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1002
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 955
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 172
+        Top = 6
+        Right = 268
+        Bottom = 113
+        Top = 0
+        Name ="Ordenes"
+    End
+    Begin
+        Left = 306
+        Top = 6
+        Right = 402
+        Bottom = 98
+        Top = 0
+        Name ="Maquileros"
+    End
+    Begin
+        Left = 440
+        Top = 6
+        Right = 536
+        Bottom = 113
+        Top = 0
+        Name ="EntregasEst"
+    End
+End

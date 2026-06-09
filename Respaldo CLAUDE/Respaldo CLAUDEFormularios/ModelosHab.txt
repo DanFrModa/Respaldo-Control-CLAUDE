@@ -1,0 +1,395 @@
+Version = 17
+VersionRequired = 17
+Checksum = -34657360
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5329
+    DatasheetFontHeight = 10
+    ItemSuffix = 19
+    Left = 3360
+    Top = 2745
+    Right = 11250
+    Bottom = 8145
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xd7292ef7985fe240
+    End
+    RecordSource ="SELECT Habilitacion.Clave, ModelosHab.IdModelos, ModelosHab.IdHabilitacion, Habi"
+        "litacion.Proveedor, ModelosHab.CantHab, Habilitacion.Descripcion FROM Habilitaci"
+        "on INNER JOIN ModelosHab ON Habilitacion.IdHabilitacion = ModelosHab.IdHabilitac"
+        "ion ORDER BY Habilitacion.Clave;"
+    Caption ="ModelosHab"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 911
+            BackColor = -2147483633
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 79
+                    Top = 593
+                    Width = 675
+                    Height = 240
+                    Name ="IdHabilitacion Etiqueta"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="IdHabilitacion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 3537
+                    Top = 593
+                    Width = 1245
+                    Height = 240
+                    Name ="CantHab Etiqueta"
+                    Caption ="Proveedor"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="CantHab_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 823
+                    Top = 593
+                    Width = 1800
+                    Height = 240
+                    Name ="Etiqueta8"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 87
+                    TextAlign = 3
+                    Left = 4784
+                    Top = 596
+                    Width = 420
+                    Height = 240
+                    Name ="Etiqueta11"
+                    Caption ="Cant."
+                    Tag ="DetachedLabel"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 56
+                    Top = 581
+                    Width = 300
+                    Height = 255
+                    ColumnWidth = 900
+                    Name ="IdModelos"
+                    ControlSource ="IdModelos"
+                End
+                Begin CommandButton
+                    OverlapFlags = 215
+                    Left = 1826
+                    Top = 566
+                    Width = 1965
+                    Height = 345
+                    TabIndex = 1
+                    ForeColor = 16711680
+                    Name ="Comando13"
+                    Caption ="Agregar Hbilitacion Fav."
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 2389
+                    Top = 171
+                    Width = 1011
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"10\""
+                    Name ="QueModCop"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Modelos.IdModelos, Modelos.Modelo FROM Modelos ORDER BY Modelos.Modelo;"
+                    ColumnWidths ="0;2835"
+                    BaseInfo ="\"SELECT Modelos.IdModelos, Modelos.Modelo FROM Modelos ORDER BY Modelos.Modelo;"
+                        "\";\"Modelos\";\"\";\"IdModelos\";\"Modelo\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Top = 170
+                            Width = 2250
+                            Height = 240
+                            Name ="Etiqueta17"
+                            Caption ="Copiar Habilitacion del modelo:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3571
+                    Top = 125
+                    Width = 966
+                    Height = 328
+                    FontWeight = 700
+                    TabIndex = 3
+                    ForeColor = 16711680
+                    Name ="Comando18"
+                    Caption ="Copiar"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 3571
+                    Top = 57
+                    Width = 1245
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Proveedor"
+                    ControlSource ="Proveedor"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 113
+                    Top = 57
+                    Width = 675
+                    ColumnWidth = 900
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"5\""
+                    Name ="IdHabilitacion"
+                    ControlSource ="IdHabilitacion"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Habilitacion.IdHabilitacion, Habilitacion.Clave FROM Habilitacion WHERE ("
+                        "((Habilitacion.[Desactivado])=False)) ORDER BY Habilitacion.Clave;"
+                    ColumnWidths ="0;1134"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 857
+                    Top = 57
+                    Width = 2670
+                    Height = 255
+                    TabIndex = 2
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"30\""
+                    Name ="Cuadro combinado9"
+                    ControlSource ="IdHabilitacion"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Habilitacion.IdHabilitacion, Habilitacion.Descripcion FROM Habilitacion W"
+                        "HERE (((Habilitacion.[Desactivado])=False)) ORDER BY Habilitacion.Descripcion;"
+                    ColumnWidths ="0;2835"
+                    EventProcPrefix ="Cuadro_combinado9"
+                End
+                Begin TextBox
+                    OverlapFlags = 247
+                    Left = 4793
+                    Top = 56
+                    Width = 450
+                    Height = 255
+                    TabIndex = 3
+                    Name ="CantHab"
+                    ControlSource ="CantHab"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando13_Click()
+Dim Dbs As Database
+Dim CopiaHab As Recordset
+Dim strmensaje As String
+
+Set Dbs = CurrentDb
+Set CopiaHab = Dbs.OpenRecordset("SELECT Habilitacion.IdHabilitacion, Habilitacion.Favorito,Habilitacion.CantFav, Habilitacion.Clave,Habilitacion.Descripcion FROM Habilitacion WHERE (((Habilitacion.Favorito)=Yes))")
+        
+With CopiaHab
+        .MoveLast
+        .MoveFirst
+
+        Do While Not .EOF
+             DoCmd.GoToRecord , , acNewRec
+            strmensaje = "Clave: " & !Clave & vbCr & "Descripcion: " & !Descripcion & vbCr & "Cantidad Preestablecida: " & !CantFav & vbCr & vbCr & _
+                "(Habilitacion " & (.AbsolutePosition + 1) & _
+                " de " & .RecordCount & ")"
+            If MsgBox(strmensaje, vbOKCancel, "AGREGAR HABILITACION") = vbCancel _
+                Then GoTo OtroMas
+        
+            Me![IdHabilitacion] = !IdHabilitacion
+            Me!CantHab = !CantFav
+           
+OtroMas:
+            .MoveNext
+
+        Loop
+
+        .Close
+    End With
+    
+Dbs.Close
+End Sub
+Private Sub Comando14_Click()
+On Error GoTo Err_Comando14_Click
+
+
+    DoCmd.GoToRecord , , acNewRec
+
+Exit_Comando14_Click:
+    Exit Sub
+
+Err_Comando14_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando14_Click
+    
+End Sub
+
+Private Sub Comando18_Click()
+Dim Dbs As Database
+Dim CopiaHab As Recordset
+Dim strmensaje As String
+
+Set Dbs = CurrentDb
+Set CopiaHab = Dbs.OpenRecordset("SELECT Habilitacion.IdHabilitacion, Habilitacion.CantFav, Habilitacion.Clave, Habilitacion.Descripcion, ModelosHab.IdModelos FROM Habilitacion INNER JOIN ModelosHab ON Habilitacion.IdHabilitacion = ModelosHab.IdHabilitacion WHERE (ModelosHab.IdModelos)=" & QueModCop)
+        
+With CopiaHab
+        .MoveLast
+        .MoveFirst
+
+        Do While Not .EOF
+             DoCmd.GoToRecord , , acNewRec
+            strmensaje = "Clave: " & !Clave & vbCr & "Descripcion: " & !Descripcion & vbCr & "Cantidad Preestablecida: " & !CantFav & vbCr & vbCr & _
+                "(Habilitacion " & (.AbsolutePosition + 1) & _
+                " de " & .RecordCount & ")"
+            If MsgBox(strmensaje, vbOKCancel, "AGREGAR HABILITACION") = vbCancel _
+                Then GoTo OtroMas
+        
+            Me![IdHabilitacion] = !IdHabilitacion
+            Me!CantHab = !CantFav
+           
+OtroMas:
+            .MoveNext
+
+        Loop
+
+        .Close
+    End With
+    
+Dbs.Close
+End Sub

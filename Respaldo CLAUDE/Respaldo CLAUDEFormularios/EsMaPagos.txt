@@ -1,0 +1,420 @@
+Version = 17
+VersionRequired = 17
+Checksum = -113858462
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    FilterOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 6651
+    DatasheetFontHeight = 10
+    ItemSuffix = 22
+    Left = 7230
+    Top = 2145
+    Right = 13875
+    Bottom = 5145
+    DatasheetGridlinesColor = 12632256
+    Filter ="[EsMa].[IdEsMa]=8422"
+    RecSrcDt = Begin
+        0x9e9a908cdd73e340
+    End
+    RecordSource ="SELECT EsMa.FechaEsMa, EsMa.IdMaquileros, EsMa_Pagos.PagoEsMa, EsMa_Pagos.IdEsMa"
+        ", EsMa.IdEsMa, EsMa_Pagos.ObsPagos, [Nombre]+\" \"+[Apellidos] AS Maq, EsMa_Pago"
+        "s.IdEsMa_Pagos, EsMa_Pagos.RevisionPendienteP FROM (EsMa LEFT JOIN EsMa_Pagos ON"
+        " EsMa.IdEsMa = EsMa_Pagos.IdEsMa) INNER JOIN Maquileros ON EsMa.IdMaquileros = M"
+        "aquileros.IdMaquileros;"
+    Caption ="EsMaPagos"
+    BeforeInsert ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 2490
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="PAGOS A MAQUILEROS"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 4965
+                    Width = 396
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdEsMa"
+                    ControlSource ="EsMa.IdEsMa"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 5535
+                    Width = 396
+                    Height = 255
+                    TabIndex = 1
+                    Name ="EsMa_Pagos.IdEsMa1"
+                    ControlSource ="EsMa_Pagos.IdEsMa"
+                    DefaultValue ="[idesma]"
+                    EventProcPrefix ="EsMa_Pagos_IdEsMa1"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 3975
+                    Width = 396
+                    Height = 255
+                    TabIndex = 2
+                    Name ="IdMaquileros"
+                    ControlSource ="IdMaquileros"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 6075
+                    Width = 396
+                    Height = 255
+                    TabIndex = 3
+                    Name ="IdEsMa_Pagos"
+                    ControlSource ="IdEsMa_Pagos"
+                End
+            End
+        End
+        Begin Section
+            Height = 2664
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1419
+                    Top = 453
+                    Width = 1140
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 1
+                    Name ="FechaEsMa"
+                    ControlSource ="FechaEsMa"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 114
+                            Top = 453
+                            Width = 1260
+                            Height = 255
+                            Name ="FechaEsMa Etiqueta"
+                            Caption ="Fecha:"
+                            EventProcPrefix ="FechaEsMa_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    OverlapFlags = 85
+                    Left = 1418
+                    Top = 1134
+                    Width = 4875
+                    Height = 840
+                    ColumnWidth = 3000
+                    TabIndex = 3
+                    Name ="ObsPagos"
+                    ControlSource ="ObsPagos"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 1134
+                            Width = 1260
+                            Height = 255
+                            Name ="ObsEsMa Etiqueta"
+                            Caption ="Observaciones:"
+                            EventProcPrefix ="ObsEsMa_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    OverlapFlags = 85
+                    Left = 1419
+                    Top = 793
+                    Width = 1356
+                    TabIndex = 2
+                    Name ="PagoEsMa"
+                    ControlSource ="PagoEsMa"
+                    Format ="$#,##0.00;-$#,##0.00"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 793
+                            Width = 900
+                            Height = 240
+                            Name ="Etiqueta8"
+                            Caption ="Pago:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4818
+                    Top = 2157
+                    Width = 1476
+                    Height = 403
+                    FontWeight = 700
+                    TabIndex = 4
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4755
+                    Top = 45
+                    Width = 1596
+                    Height = 405
+                    TabIndex = 5
+                    Name ="Agregar"
+                    Caption ="Agregar Pago"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1418
+                    Top = 113
+                    Width = 2100
+                    ColumnWidth = 900
+                    Name ="Maq"
+                    ControlSource ="Maq"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 113
+                            Top = 113
+                            Width = 1260
+                            Height = 255
+                            Name ="IdMaquileros Etiqueta"
+                            Caption ="Maquileros"
+                            EventProcPrefix ="IdMaquileros_Etiqueta"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4755
+                    Top = 570
+                    Width = 1596
+                    Height = 405
+                    TabIndex = 6
+                    Name ="Imprimir"
+                    Caption ="Imprimir Recibo"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1814
+                    Top = 2184
+                    TabIndex = 7
+                    Name ="RevisionPendienteP"
+                    ControlSource ="RevisionPendienteP"
+                    DefaultValue ="Yes"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 2040
+                            Top = 2160
+                            Width = 1455
+                            Height = 240
+                            Name ="Etiqueta19"
+                            Caption ="Revision Pendiente"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Agregar_Click()
+    DoCmd.GoToRecord , , acNewRec
+
+If EstaCargado("EsMa_EdoCta") = True Then
+ IdMaquileros = Forms![EsMa_EdoCta]![QueMaq]
+ FechaEsMa.Enabled = True
+ FechaEsMa.SetFocus
+ PagoEsMa.Enabled = True
+ 
+End If
+    
+End Sub
+
+Private Sub Form_BeforeInsert(Cancel As Integer)
+If NivelAct <= nivAdminDir Then
+ RevisionPendienteP.DefaultValue = False
+End If
+End Sub
+
+Private Sub Form_Close()
+If EstaCargado("EsMa_EdoCta") = True Then
+  Forms![EsMa_EdoCta].Requery
+
+
+If Forms![EsMa_EdoCta]![PPa] = 1 Then
+DoCmd.OpenReport "ReciboMaquileros", acPreview, "[IdEsMa_Pagos]=" & Forms![EsMa_EdoCta]![QueIdPagos]
+Forms![EsMa_EdoCta]![PPa] = 2
+End If
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(25) = True Then
+ RevisionPendienteP.Visible = True
+ RevisionPendienteP.DefaultValue = False
+End If
+
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub Imprimir_Click()
+
+Forms![EsMa_EdoCta]![QueIdPagos] = IdEsMa_Pagos
+Forms![EsMa_EdoCta]![PPa] = 1
+DoCmd.Close
+
+''DoCmd.OpenReport "ReciboMaquileros", acPreview
+
+
+    
+End Sub

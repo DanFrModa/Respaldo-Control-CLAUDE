@@ -1,0 +1,305 @@
+Version = 17
+VersionRequired = 17
+Checksum = -125545658
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowAdditions = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5565
+    DatasheetFontHeight = 10
+    ItemSuffix = 21
+    Left = 2430
+    Top = 2325
+    Right = 8595
+    Bottom = 8940
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xc62b23707153e340
+    End
+    RecordSource ="SELECT CC_Catalogo.IdCC_Catalogo, CC_Catalogo.Clave, CC_Catalogo.Descripcion, CC"
+        "_Catalogo.Favorito FROM CC_Catalogo INNER JOIN CC_PuntosNoAlta ON CC_Catalogo.Id"
+        "CC_Catalogo = CC_PuntosNoAlta.IdCC_Catalogo;"
+    Caption ="CC_AltaAudCat"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 5
+                    Top = 57
+                    Width = 621
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Clave Etiqueta"
+                    Caption ="Clave"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Clave_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 95
+                    TextAlign = 1
+                    Left = 626
+                    Top = 57
+                    Width = 3477
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 223
+                    TextAlign = 1
+                    Left = 4095
+                    Top = 57
+                    Width = 723
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Favorito Etiqueta"
+                    Caption ="Favorito"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Favorito_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 215
+                    TextAlign = 1
+                    Left = 4770
+                    Top = 56
+                    Width = 723
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta17"
+                    Caption ="Agregar"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 285
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    EnterKeyBehavior = NotDefault
+                    ScrollBars = 2
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 621
+                    Width = 3477
+                    Height = 285
+                    ColumnWidth = 3000
+                    TabIndex = 2
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 4605
+                    Top = 56
+                    Width = 186
+                    Height = 165
+                    ColumnWidth = 1701
+                    Name ="IdCC_Catalogo"
+                    ControlSource ="IdCC_Catalogo"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Width = 621
+                    Height = 285
+                    ColumnWidth = 600
+                    TabIndex = 1
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4997
+                    Top = 60
+                    Width = 321
+                    Height = 178
+                    TabIndex = 3
+                    Name ="Copiar"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 4322
+                    Top = 56
+                    Height = 165
+                    TabIndex = 4
+                    Name ="Favorito"
+                    ControlSource ="Favorito"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Agreg()
+Dim Dbs As Database
+Dim QueIdAud As Integer
+QueIdAud = Forms![CC_AltaAuditorias]![IdCC_Auditorias]
+Set Dbs = CurrentDb
+Dbs.Execute "INSERT INTO CC_AuditoriasDet (IdCC_Auditorias,IdCC_Catalogo) VALUES (" & QueIdAud & "," & Me.IdCC_Catalogo & ")"
+Dbs.Close
+Forms![CC_AltaAuditorias]![CC_AltaAuditDet].Form.Requery
+End Sub
+
+Private Sub Copiar_Click()
+On Error GoTo Erro
+Dim Dbs As Database
+Dim Rst As Recordset
+Dim Dup As Boolean
+Set Dbs = CurrentDb
+Set Rst = Dbs.OpenRecordset("SELECT IdCC_Catalogo, IdCC_Auditorias FROM CC_AuditoriasDet WHERE IdCC_Auditorias=" & Forms![CC_AltaAuditorias]![IdCC_Auditorias])
+
+Rst.MoveLast
+Rst.MoveFirst
+  
+ Do While Not Rst.EOF
+ Debug.Print Rst!IdCC_Catalogo
+        If Rst!IdCC_Catalogo = Me.IdCC_Catalogo Then
+           MsgBox "Ya existe ese punto de revision en esta Auditoria", vbInformation, "YA EXISTE ESE PUNTO DE AUDITORIA"
+           GoTo SiDup
+        End If
+            Rst.MoveNext
+     Loop
+Siguele:
+Call Agreg
+
+SiDup:
+
+Rst.Close
+Dbs.Close
+Me.Requery
+
+Exit Sub
+Erro:
+If Err.Number = 3021 Then
+ GoTo Siguele
+End If
+End Sub

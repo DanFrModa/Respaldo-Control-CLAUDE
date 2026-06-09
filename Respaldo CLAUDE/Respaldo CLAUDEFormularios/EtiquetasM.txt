@@ -1,0 +1,246 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1567999077
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowDeletions = NotDefault
+    AllowEdits = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 3615
+    DatasheetFontHeight = 10
+    ItemSuffix = 8
+    Left = 7725
+    Top = 585
+    Right = 14235
+    Bottom = 4155
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xe6f2d1fd1951e340
+    End
+    RecordSource ="EtiquetasM"
+    Caption ="Etiquetas Marca"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 657
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 57
+                    Top = 57
+                    Width = 1560
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Cliente Etiqueta"
+                    Caption ="Etiqueta Marca"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Cliente_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1757
+                    Top = 57
+                    Width = 960
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta3"
+                    Caption ="Regalias"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 2820
+                    Top = 75
+                    Width = 675
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta7"
+                    Caption ="Activa"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 369
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 57
+                    Top = 57
+                    Width = 1560
+                    Height = 255
+                    ColumnWidth = 1560
+                    Name ="EtiquetaM"
+                    ControlSource ="EtiquetaM"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1757
+                    Top = 57
+                    Width = 960
+                    Height = 255
+                    TabIndex = 1
+                    Name ="Regalias"
+                    ControlSource ="Regalias"
+                    Format ="Percent"
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 3090
+                    Top = 90
+                    TabIndex = 2
+                    Name ="Activa"
+                    ControlSource ="Activa"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 600
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 2655
+                    Top = 105
+                    Width = 735
+                    Height = 330
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Close()
+If EstaCargado("ordenes") = True Then
+Forms![Ordenes]![IdEtiquetasM].Requery
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+If PrP(9) = True Then
+Me.AllowEdits = True
+End If
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub

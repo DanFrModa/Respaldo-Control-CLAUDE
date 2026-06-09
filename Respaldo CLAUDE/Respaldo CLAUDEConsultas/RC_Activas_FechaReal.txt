@@ -1,0 +1,79 @@
+Operation = 6
+Option = 0
+Begin InputTables
+    Name ="RC_Activas"
+End
+Begin OutputColumns
+    Expression ="RC_Activas.Numero"
+    GroupLevel = 2
+    Expression ="RC_Activas.Modelo"
+    GroupLevel = 2
+    Expression ="RC_Activas.Cliente"
+    GroupLevel = 2
+    Expression ="RC_Activas.CantOrd"
+    GroupLevel = 2
+    Expression ="RC_Activas.MesInicio"
+    GroupLevel = 2
+    Expression ="RC_Activas.Clave"
+    GroupLevel = 2
+    Expression ="RC_Activas.TipoTela"
+    GroupLevel = 2
+    Expression ="RC_Activas.ClaveAplicacion"
+    GroupLevel = 2
+    Expression ="RC_Activas.NumProceso"
+    GroupLevel = 1
+    Alias ="PrimeroDeFechaReal"
+    Expression ="First(RC_Activas.FechaReal)"
+End
+Begin Groups
+    Expression ="RC_Activas.Numero"
+    GroupLevel = 2
+    Expression ="RC_Activas.Modelo"
+    GroupLevel = 2
+    Expression ="RC_Activas.Cliente"
+    GroupLevel = 2
+    Expression ="RC_Activas.CantOrd"
+    GroupLevel = 2
+    Expression ="RC_Activas.MesInicio"
+    GroupLevel = 2
+    Expression ="RC_Activas.Clave"
+    GroupLevel = 2
+    Expression ="RC_Activas.TipoTela"
+    GroupLevel = 2
+    Expression ="RC_Activas.ClaveAplicacion"
+    GroupLevel = 2
+    Expression ="RC_Activas.NumProceso"
+    GroupLevel = 1
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+Begin
+    Begin
+        dbText "Name" ="RC_Activas.TipoTela"
+        dbInteger "ColumnWidth" ="2715"
+        dbBoolean "ColumnHidden" ="0"
+    End
+End
+Begin
+    State = 2
+    Left = -8
+    Top = -28
+    Right = 1284
+    Bottom = 654
+    Left = -1
+    Top = -1
+    Right = 1273
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 559
+    Begin
+        Left = 38
+        Top = 6
+        Right = 134
+        Bottom = 107
+        Top = 10
+        Name ="RC_Activas"
+    End
+End

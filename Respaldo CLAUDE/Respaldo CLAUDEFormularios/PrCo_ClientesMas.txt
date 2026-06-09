@@ -1,0 +1,491 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1608372064
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 10544
+    DatasheetFontHeight = 10
+    ItemSuffix = 30
+    Left = 4020
+    Top = 975
+    Right = 14565
+    Bottom = 6870
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x7a48d010f264e340
+    End
+    RecordSource ="PrCo_Clientes"
+    Caption ="PrCo_ClientesMas"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 340
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 56
+                    Width = 3795
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta10"
+                    Caption ="INFORMACION DE CLIENTES"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 6519
+                    Width = 321
+                    Height = 255
+                    ColumnWidth = 1701
+                    Name ="IdPrCo_Clientes"
+                    ControlSource ="IdPrCo_Clientes"
+                End
+            End
+        End
+        Begin Section
+            Height = 5562
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 3115
+                    Top = 56
+                    Width = 1695
+                    Height = 255
+                    ColumnWidth = 2310
+                    Name ="TipoCliente"
+                    ControlSource ="TipoCliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1870
+                            Top = 56
+                            Width = 1245
+                            Height = 255
+                            Name ="TipoCliente Etiqueta"
+                            Caption ="Cliente:"
+                            EventProcPrefix ="TipoCliente_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 9635
+                    Top = 56
+                    Width = 840
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Descuento"
+                    ControlSource ="Descuento"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8390
+                            Top = 56
+                            Width = 1245
+                            Height = 255
+                            Name ="Descuento Etiqueta"
+                            Caption ="Descuento:"
+                            EventProcPrefix ="Descuento_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 9635
+                    Top = 398
+                    Width = 840
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="MargenBruto"
+                    ControlSource ="MargenBruto"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8390
+                            Top = 398
+                            Width = 1245
+                            Height = 255
+                            Name ="MargenBruto Etiqueta"
+                            Caption ="Margen Bruto:"
+                            EventProcPrefix ="MargenBruto_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 9635
+                    Top = 740
+                    Width = 840
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="MargenEllos"
+                    ControlSource ="MargenEllos"
+                    Format ="Percent"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 8390
+                            Top = 740
+                            Width = 1245
+                            Height = 255
+                            Name ="MargenEllos Etiqueta"
+                            Caption ="Margen de Ellos:"
+                            EventProcPrefix ="MargenEllos_Etiqueta"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 56
+                    Top = 56
+                    Width = 1095
+                    Height = 2032
+                    TabIndex = 4
+                    Name ="Lista13"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT DISTINCTROW [PrCo_Clientes].[IdPrCo_Clientes], [PrCo_Clientes].[TipoClien"
+                        "te] FROM [PrCo_Clientes];"
+                    ColumnWidths ="0;1440"
+                    AfterUpdate ="[Event Procedure]"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1870
+                    Top = 680
+                    Width = 1416
+                    Height = 2317
+                    TabIndex = 5
+                    Name ="Marcas"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Marcas.IdPrCo_Marcas, PrCo_Marcas.Marca, PrCo_Marcas.Activa FROM PrC"
+                        "o_Marcas WHERE (((PrCo_Marcas.Activa)=Yes));"
+                    ColumnWidths ="0;2835"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 93
+                    SpecialEffect = 0
+                    Left = 3458
+                    Top = 1643
+                    Width = 907
+                    Name ="Línea17"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 95
+                    SpecialEffect = 0
+                    Left = 4365
+                    Top = 1360
+                    Width = 283
+                    Height = 283
+                    Name ="Línea18"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 87
+                    SpecialEffect = 0
+                    Left = 4365
+                    Top = 1643
+                    Width = 283
+                    Height = 287
+                    Name ="Línea19"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 4932
+                    Top = 680
+                    Width = 1536
+                    Height = 2317
+                    TabIndex = 6
+                    Name ="MarcasClientes"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_MarClient.IdPrCo_MarClient, PrCo_Marcas.Marca, PrCo_MarClient.IdPrCo"
+                        "_Clientes FROM PrCo_Marcas INNER JOIN PrCo_MarClient ON PrCo_Marcas.IdPrCo_Marca"
+                        "s = PrCo_MarClient.IdPrCo_Marcas WHERE (((PrCo_MarClient.IdPrCo_Clientes)=[Formu"
+                        "larios]![PrCo_ClientesMas]![IdPrCo_Clientes]));"
+                    ColumnWidths ="0;2835"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 1474
+                    Top = 3061
+                    Width = 5442
+                    Name ="Línea21"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 3685
+                    Top = 793
+                    Width = 750
+                    Height = 210
+                    Name ="Etiqueta22"
+                    Caption ="MARCAS"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 1870
+                    Top = 3181
+                    Width = 1416
+                    Height = 2317
+                    TabIndex = 7
+                    Name ="Telas"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_Telas.IdPrCo_Telas, PrCo_Telas.NombreTela FROM PrCo_Telas;"
+                    ColumnWidths ="0;2835"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 93
+                    SpecialEffect = 0
+                    Left = 3458
+                    Top = 4144
+                    Width = 907
+                    Name ="Línea24"
+                End
+                Begin Line
+                    BorderWidth = 2
+                    OverlapFlags = 95
+                    SpecialEffect = 0
+                    Left = 4365
+                    Top = 3861
+                    Width = 283
+                    Height = 283
+                    Name ="Línea25"
+                End
+                Begin Line
+                    LineSlant = NotDefault
+                    BorderWidth = 2
+                    OverlapFlags = 87
+                    SpecialEffect = 0
+                    Left = 4365
+                    Top = 4144
+                    Width = 283
+                    Height = 287
+                    Name ="Línea26"
+                End
+                Begin ListBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 4932
+                    Top = 3181
+                    Width = 1536
+                    Height = 2317
+                    TabIndex = 8
+                    Name ="TelasClientes"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT PrCo_TelasClientes.IdPrCo_TelasClientes, PrCo_Telas.NombreTela, PrCo_Tela"
+                        "sClientes.IdPrCo_Clientes FROM PrCo_Telas INNER JOIN PrCo_TelasClientes ON PrCo_"
+                        "Telas.IdPrCo_Telas = PrCo_TelasClientes.IdPrCo_Telas WHERE (((PrCo_TelasClientes"
+                        ".IdPrCo_Clientes)=[Formularios]![PrCo_ClientesMas]![IdPrCo_Clientes]));"
+                    ColumnWidths ="0;2835"
+                    OnDblClick ="[Event Procedure]"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 1474
+                    Top = 5562
+                    Width = 5442
+                    Name ="Línea28"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 3685
+                    Top = 3294
+                    Width = 750
+                    Height = 210
+                    Name ="Etiqueta29"
+                    Caption ="TELAS"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Form_Current()
+MarcasClientes.Requery
+TelasClientes.Requery
+
+End Sub
+
+Sub Lista13_AfterUpdate()
+    ' Buscar el registro que coincida con el control.
+    Me.RecordsetClone.FindFirst "[IdPrCo_Clientes] = " & Me![Lista13]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Marcas_DblClick(Cancel As Integer)
+Dim Dbs As Database
+Dim QueIdMarca As Integer
+QueIdMarca = Marcas
+Set Dbs = CurrentDb
+Dbs.Execute "INSERT INTO PrCo_MarClient (IdPrCo_Marcas,IdPrCo_Clientes) VALUES (" & QueIdMarca & "," & Me.IdPrCo_Clientes & ")"
+Dbs.Close
+MarcasClientes.Requery
+
+End Sub
+
+Private Sub MarcasClientes_DblClick(Cancel As Integer)
+Dim Dbs As Database
+Dim QueIdMarcaClient As Integer
+QueIdMarcaClient = MarcasClientes
+Set Dbs = CurrentDb
+Dbs.Execute "DELETE * FROM PrCo_MarClient WHERE IdPrCo_MarClient=" & QueIdMarcaClient
+Dbs.Close
+MarcasClientes.Requery
+End Sub
+
+Private Sub Telas_DblClick(Cancel As Integer)
+Dim Dbs As Database
+Dim QueIdTela As Integer
+QueIdTela = Telas
+Set Dbs = CurrentDb
+Dbs.Execute "INSERT INTO PrCo_TelasClientes (IdPrCo_Telas,IdPrCo_Clientes) VALUES (" & QueIdTela & "," & Me.IdPrCo_Clientes & ")"
+Dbs.Close
+TelasClientes.Requery
+End Sub
+
+Private Sub TelasClientes_DblClick(Cancel As Integer)
+Dim Dbs As Database
+Dim QueIdTelaClient As Integer
+QueIdTelaClient = TelasClientes
+Set Dbs = CurrentDb
+Dbs.Execute "DELETE * FROM PrCo_TelasClientes WHERE IdPrCo_TelasClientes=" & QueIdTelaClient
+Dbs.Close
+TelasClientes.Requery
+End Sub

@@ -1,0 +1,454 @@
+Version = 17
+VersionRequired = 17
+Checksum = 1066470188
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 5691
+    DatasheetFontHeight = 10
+    ItemSuffix = 37
+    Left = 11985
+    Top = 2310
+    Right = 18345
+    Bottom = 4560
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0x1c4ada6aef4fe540
+    End
+    RecordSource ="SELECT RC.IdRC, RC.NumProcesoRC, RC.FechaReal, Ordenes.Numero, Modelos.Modelo, C"
+        "P_Procesos.NumProceso, CP_Procesos.Proceso, Clientes.Cliente, RC.IdUsuario, RC.F"
+        "echaUsuarioRC, RC.AntecesorRC, RC.IdOrdenes, CP_Procesos.UltimoProceso FROM (((R"
+        "C LEFT JOIN Ordenes ON RC.IdOrdenes = Ordenes.IdOrdenes) LEFT JOIN Modelos ON Or"
+        "denes.IdModelos = Modelos.IdModelos) LEFT JOIN CP_Procesos ON RC.IdCP_Procesos ="
+        " CP_Procesos.IdCP_Procesos) LEFT JOIN Clientes ON Ordenes.IdClientes = Clientes."
+        "IdClientes WHERE (((RC.IdRC)=[Formularios]![RC_MeterFechas]![RC_MeterFechasSub]."
+        "[Formulario]![IdRC]));"
+    Caption ="RC_MeterDatosDet"
+    OnCurrent ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 300
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Top = 56
+                    Width = 1680
+                    Height = 210
+                    ForeColor = 16777215
+                    Name ="Etiqueta5"
+                    Caption ="METER FECHA REAL"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 1984
+                    Width = 336
+                    Height = 165
+                    ColumnWidth = 1701
+                    Name ="IdRC"
+                    ControlSource ="IdRC"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 2607
+                    Width = 396
+                    Height = 165
+                    TabIndex = 1
+                    Name ="IdUsuario"
+                    ControlSource ="IdUsuario"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 85
+                    Left = 3288
+                    Width = 396
+                    Height = 165
+                    TabIndex = 2
+                    Name ="FechaUsuarioRC"
+                    ControlSource ="FechaUsuarioRC"
+                End
+            End
+        End
+        Begin Section
+            Height = 1710
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    OverlapFlags = 87
+                    Left = 2640
+                    Top = 1275
+                    Width = 1245
+                    Height = 255
+                    ColumnWidth = 825
+                    Name ="FechaReal"
+                    ControlSource ="FechaReal"
+                    Format ="Medium Date"
+                    BeforeUpdate ="[Event Procedure]"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 1620
+                            Top = 1275
+                            Width = 1020
+                            Height = 255
+                            Name ="FechaReal Etiqueta"
+                            Caption ="Fecha Real:"
+                            EventProcPrefix ="FechaReal_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1862
+                    Top = 340
+                    Width = 711
+                    TabIndex = 1
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 345
+                            Width = 1635
+                            Height = 240
+                            Name ="Etiqueta10"
+                            Caption ="Orden de Produccion:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 737
+                    Top = 623
+                    Width = 741
+                    TabIndex = 2
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 623
+                            Width = 645
+                            Height = 240
+                            Name ="Etiqueta11"
+                            Caption ="Modelo:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 2624
+                    Top = 56
+                    Width = 2826
+                    TabIndex = 3
+                    Name ="Proceso"
+                    ControlSource ="Proceso"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 692
+                    Top = 907
+                    Width = 2076
+                    TabIndex = 4
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 56
+                            Top = 907
+                            Width = 600
+                            Height = 240
+                            Name ="Etiqueta14"
+                            Caption ="Cliente:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1862
+                    Top = 56
+                    Width = 711
+                    TabIndex = 5
+                    Name ="NumProcesoRC"
+                    ControlSource ="NumProcesoRC"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 60
+                            Top = 60
+                            Width = 1755
+                            Height = 240
+                            Name ="Etiqueta15"
+                            Caption ="Numero de ProcesoRC:"
+                        End
+                    End
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 4058
+                    Top = 1245
+                    Width = 681
+                    Height = 313
+                    TabIndex = 6
+                    Name ="Hoy"
+                    Caption ="Hoy"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin Line
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 1190
+                    Width = 5202
+                    Height = 15
+                    Name ="Línea17"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3996
+                    Top = 630
+                    Width = 591
+                    TabIndex = 7
+                    Name ="AntecesorRC"
+                    ControlSource ="AntecesorRC"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 1860
+                            Top = 630
+                            Width = 2115
+                            Height = 240
+                            Name ="Etiqueta25"
+                            Caption ="Numero de Proceso Anterior:"
+                        End
+                    End
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 0
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Ayer_Click()
+FechaReal = Date - 1
+End Sub
+
+
+
+Private Sub Actualizar_Click()
+DoCmd.GoToRecord , , acFirst
+Forms![RC_MeterFechas]![RC_MeterFechasSub].Form.Requery
+Forms![RC_MeterFechas]![RC_MeterFechasSub].Form.Requery
+End Sub
+
+Private Sub FechaReal_AfterUpdate()
+If IsNull(IdUsuarioACT) = True Or IdUsuarioACT = 0 Then
+   MsgBox "No tienes un usuario valido para meter la fecha. Salte de CONTROL y vuelvete a meter para continuar", vbExclamation, "USUARIO INVALIDO"
+   FechaReal = ""
+   Exit Sub
+  End If
+
+If PrP(10) = True Then
+   Me.IdUsuario = IdUsuarioACT
+   Me.FechaUsuarioRC = Now()
+Else
+
+  Dim QueFechaHoy As Date
+  If WeekDay(Date) = vbMonday Then
+    QueFechaHoy = Date - 2
+  ElseIf WeekDay(Date) = vbTuesday Then
+    QueFechaHoy = Date - 2
+  Else
+    QueFechaHoy = Date
+  End If
+
+  If FechaReal + 2 < QueFechaHoy Then
+   FechaReal = ""
+   MsgBox "No puedes meter una fecha con mas de dos dias de retrazo. Para poder meterla, pidele al Administrador.", vbInformation, "RETRAZO EN INGRESO DE INFORMACION"
+   FechaReal.SetFocus
+  Else
+  Me.IdUsuario = IdUsuarioACT
+  Me.FechaUsuarioRC = Now()
+
+  Call MatarRC
+  End If
+
+End If
+End Sub
+
+Private Sub FechaReal_BeforeUpdate(Cancel As Integer)
+
+End Sub
+
+Private Sub Form_Current()
+If IsNull(NumProcesoRC) = True Then
+ FechaReal.Enabled = False
+Else
+ FechaReal.Enabled = True
+End If
+End Sub
+
+Private Sub Hoy_Click()
+If IsNull(IdUsuarioACT) = True Or IdUsuarioACT = 0 Then
+   MsgBox "No tienes un usuario valido para meter la fecha. Salte de CONTROL y vuelvete a meter para continuar", vbExclamation, "USUARIO INVALIDO"
+   FechaReal = ""
+   Exit Sub
+  End If
+
+FechaReal = Date
+Me.IdUsuario = IdUsuarioACT
+Me.FechaUsuarioRC = Now()
+Call MatarRC
+End Sub
+
+Private Sub MatarRC()
+If Forms![RC_MeterFechas]![UltimoProceso] = True Then
+
+Dim Dbs As Database
+Set Dbs = CurrentDb
+
+Dbs.Execute ("UPDATE Ordenes Set Ordenes.RC_Viva = False Where IdOrdenes=" & Forms![RC_MeterFechas]![RC_MeterFechasSub].Form![IdOrdenes])
+Dbs.Close
+End If
+End Sub

@@ -1,0 +1,969 @@
+Version = 17
+VersionRequired = 17
+Checksum = -1151891698
+Begin Form
+    RecordSelectors = NotDefault
+    AutoCenter = NotDefault
+    AllowAdditions = NotDefault
+    FilterOn = NotDefault
+    DefaultView = 0
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 16252
+    DatasheetFontHeight = 10
+    ItemSuffix = 66
+    Left = 2430
+    Top = 615
+    Right = 18675
+    Bottom = 9780
+    DatasheetGridlinesColor = 12632256
+    Filter ="idordenes=3948"
+    RecSrcDt = Begin
+        0xc735b58dd13be540
+    End
+    RecordSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, Clientes.Cliente, CP_A"
+        "rticulos.Clave, RC_TipoTelas.TipoTela, [ClaveAplicacion]+\" / \"+[TipoAplicacion"
+        "] AS Aplic, Ordenes.FechaEntregaRC, Ordenes.IdCP_Articulos, Ordenes.FechaProg, O"
+        "rdenes.IdRC_Aplicaciones, Ordenes.IdRC_TipoTelas, RC_Aplicaciones.Dias AS DiasAp"
+        ", RC_TipoTelas.Dias AS DiasTela, Ordenes.FechaEntrega, Ordenes.Fecha, Ordenes.SI"
+        "_RC, ordencant([idordenes]) AS Ca, Ordenes.SI_RC, Ordenes.RC_Viva FROM ((((Orden"
+        "es INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) INNER JOIN M"
+        "odelos ON Ordenes.IdModelos = Modelos.IdModelos) LEFT JOIN CP_Articulos ON Orden"
+        "es.IdCP_Articulos = CP_Articulos.IdCP_Articulos) LEFT JOIN RC_Aplicaciones ON Or"
+        "denes.IdRC_Aplicaciones = RC_Aplicaciones.IdRC_Aplicaciones) LEFT JOIN RC_TipoTe"
+        "las ON Ordenes.IdRC_TipoTelas = RC_TipoTelas.IdRC_TipoTelas WHERE (((Ordenes.SI_"
+        "RC)=Yes)) ORDER BY Ordenes.Numero DESC;"
+    Caption ="RC_Programacion"
+    OnCurrent ="[Event Procedure]"
+    OnOpen ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    PrtMip = Begin
+        0x8905000089050000890500008905000000000000201c0000e010000001000000 ,
+        0x010000006801000000000000a10700000100000001000000
+    End
+    PrtDevMode = Begin
+        0x42726f74686572204443502d4c32353430445720736572696573000000000000 ,
+        0x010408019c00740c0f93010001000100ea0a6f08640001000700580201000100 ,
+        0x5802010000004c65747465720000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000a88dfecb00000000000000000000020000000000000000000100f604 ,
+        0xfa020100f604fa02000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000100000100000000000100000000000006000000 ,
+        0x0700070000000000010000000000000002000000020100010001160000000000 ,
+        0x0001000002000000070000000000000000190000e40c000000000000b80b0000 ,
+        0x7017000000000000dc05000058020000000000000000000000000000feff0000 ,
+        0x000000000000000000000000000000000000000000000000370c0000da0c0000 ,
+        0x10270000102700001027000010270000a00a0000c2060000b80600002c040000 ,
+        0x40010000d2000000180000000000102710271027000010270000000000000000 ,
+        0x0000000000000000000000000100000000000200000000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000100000000000001000100010005010000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000000ffffffff64000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0xcccccc0000000000000000000000000000000000000000000000000000000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000064000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000cccccc000000000000000000 ,
+        0x000000000000000000000000000000000000000041007200690061006c000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000006400000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000cccccc000000000000000000000000000000000000000000 ,
+        0x000000000000000041007200690061006c000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000000000100010064000000000000000000fa02f60403010000 ,
+        0x0000000001000100010000000000020001000100010000000001010000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x24000000f5ffffff000000000000000000000000000000000000000100000000 ,
+        0x41007200690061006c0000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000ffffff00010000000000000001000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000001010800 ,
+        0x0101300000010000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000001010002000000 ,
+        0x0200000001000100102700000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x000000000000000020000000000000005350414e495348000000000000000000 ,
+        0x05000000000000000000000000000000000000005052495601ff0043502d4c32 ,
+        0x353430445720736572696573000000000000003f000000000000000000000000 ,
+        0x210000000000f4010000000000000000ff010000891000008910000089100000 ,
+        0x8910000089100000891000008910000089100000000000000000000000000000 ,
+        0x000b000000001027e4040000440061006e00690065006c0020004d0061007300 ,
+        0x7200690000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000005300450052005600450052000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000010000000000006400 ,
+        0x000000000100000000005f00230023004e004f00550053004500230023005f00 ,
+        0x5f00000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000530045005200560045005200 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x0000000000000000000000000000000000000000000000000000000000000000 ,
+        0x00000000000000000000000000000000
+    End
+    PrtDevNames = Begin
+        0x080012002e00010077696e73706f6f6c000042726f74686572204443502d4c32 ,
+        0x35343044572073657269657300003139322e3136382e312e3838000000000000 ,
+        0x000000000000000000000000
+    End
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 435
+            BackColor = 6697728
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 105
+                    Top = 135
+                    Width = 4155
+                    Height = 210
+                    FontWeight = 700
+                    ForeColor = 16777215
+                    Name ="Etiqueta44"
+                    Caption ="PROGRAMCION DE RUTAS CRITICAS"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 13436
+                    Width = 960
+                    Height = 405
+                    Name ="MeterInfo"
+                    Caption ="Meter Info"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+        Begin Section
+            CanGrow = NotDefault
+            Height = 8333
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5618
+                    Top = 125
+                    Width = 465
+                    Height = 255
+                    ColumnWidth = 600
+                    Name ="Numero"
+                    ControlSource ="Numero"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 4613
+                            Top = 125
+                            Width = 960
+                            Height = 255
+                            Name ="Numero Etiqueta"
+                            Caption ="Numero OC"
+                            EventProcPrefix ="Numero_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 6943
+                    Top = 124
+                    Width = 795
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 1
+                    Name ="Modelo"
+                    ControlSource ="Modelo"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 6313
+                            Top = 124
+                            Width = 630
+                            Height = 255
+                            Name ="IdModelos Etiqueta"
+                            Caption ="Modelo:"
+                            EventProcPrefix ="IdModelos_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 6225
+                    Top = 400
+                    Width = 1320
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 2
+                    Name ="Cliente"
+                    ControlSource ="Cliente"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 4605
+                            Top = 400
+                            Width = 1560
+                            Height = 255
+                            Name ="IdClientes Etiqueta"
+                            Caption ="Cliente:"
+                            EventProcPrefix ="IdClientes_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 6225
+                    Top = 655
+                    Width = 900
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 3
+                    Name ="Clave"
+                    ControlSource ="Clave"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 4605
+                            Top = 655
+                            Width = 1560
+                            Height = 255
+                            Name ="IdCP_Articulos Etiqueta"
+                            Caption ="Articulo:"
+                            EventProcPrefix ="IdCP_Articulos_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 6225
+                    Top = 910
+                    Width = 2790
+                    Height = 255
+                    ColumnWidth = 900
+                    TabIndex = 4
+                    Name ="Aplic"
+                    ControlSource ="Aplic"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 95
+                            Left = 4605
+                            Top = 910
+                            Width = 1560
+                            Height = 255
+                            Name ="IdRC_Aplicaciones Etiqueta"
+                            Caption ="Aplicaciones:"
+                            EventProcPrefix ="IdRC_Aplicaciones_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 95
+                    BackStyle = 0
+                    Left = 13893
+                    Top = 780
+                    Width = 1146
+                    Height = 255
+                    ColumnWidth = 825
+                    TabIndex = 6
+                    Name ="FechaEntregaRC"
+                    ControlSource ="FechaEntregaRC"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 12202
+                            Top = 787
+                            Width = 1695
+                            Height = 255
+                            Name ="FechaEntregaRC Etiqueta"
+                            Caption ="Fecha de EntregaRC"
+                            EventProcPrefix ="FechaEntregaRC_Etiqueta"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9091
+                    Top = 124
+                    Width = 441
+                    TabIndex = 7
+                    Name ="IdOrdenes"
+                    ControlSource ="IdOrdenes"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 215
+                    BackStyle = 0
+                    Left = 8527
+                    Top = 400
+                    Width = 1071
+                    TabIndex = 8
+                    Name ="Cantidad"
+                    ControlSource ="Ca"
+                    Format ="#,###"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 7780
+                            Top = 407
+                            Width = 750
+                            Height = 240
+                            Name ="Etiqueta18"
+                            Caption ="Cantidad:"
+                        End
+                    End
+                End
+                Begin Subform
+                    OverlapFlags = 85
+                    Left = 4612
+                    Top = 1491
+                    Width = 11640
+                    Height = 6840
+                    TabIndex = 9
+                    Name ="RC_ProgramacionSub"
+                    SourceObject ="Form.RC_ProgramacionSub"
+                    LinkChildFields ="IdOrdenes"
+                    LinkMasterFields ="IdOrdenes"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    BackStyle = 0
+                    Left = 13893
+                    Top = 300
+                    Width = 1146
+                    TabIndex = 10
+                    Name ="FechaProg"
+                    ControlSource ="FechaProg"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 12202
+                            Top = 307
+                            Width = 900
+                            Height = 240
+                            Name ="Etiqueta23"
+                            Caption ="FechaProg:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 10217
+                    Top = 117
+                    Width = 396
+                    TabIndex = 11
+                    Name ="IdRC_Aplicaciones"
+                    ControlSource ="IdRC_Aplicaciones"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9764
+                    Top = 457
+                    Width = 396
+                    TabIndex = 12
+                    Name ="IdRC_TipoTelas"
+                    ControlSource ="IdRC_TipoTelas"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 93
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 9027
+                    Top = 911
+                    Width = 570
+                    TabIndex = 13
+                    Name ="DiasAp"
+                    ControlSource ="DiasAp"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 255
+                    TextAlign = 2
+                    BackStyle = 0
+                    Left = 9030
+                    Top = 1143
+                    Width = 570
+                    TabIndex = 14
+                    Name ="DiasTela"
+                    ControlSource ="DiasTela"
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 13893
+                    Top = 540
+                    Width = 1146
+                    TabIndex = 15
+                    Name ="FechaEntrega"
+                    ControlSource ="FechaEntrega"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Left = 12202
+                            Top = 547
+                            Width = 1530
+                            Height = 240
+                            Name ="Etiqueta31"
+                            Caption ="Fecha Entrega Maq:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    TabStop = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 87
+                    BackStyle = 0
+                    Left = 13893
+                    Top = 60
+                    Width = 1146
+                    TabIndex = 16
+                    Name ="Fecha"
+                    ControlSource ="Fecha"
+                    Format ="Medium Date"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Left = 12202
+                            Top = 67
+                            Width = 1530
+                            Height = 240
+                            Name ="Etiqueta34"
+                            Caption ="Fecha OP:"
+                        End
+                    End
+                End
+                Begin ListBox
+                    OverlapFlags = 215
+                    ColumnCount = 7
+                    Left = 105
+                    Top = 135
+                    Width = 4266
+                    Height = 8182
+                    TabIndex = 17
+                    Name ="QueOrden"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT Ordenes.IdOrdenes, Ordenes.Numero, Modelos.Modelo, CantidadOrd.CantOrd, ["
+                        "PrimeroVacio]-1 AS UltimoProc, Clientes.Cliente, RC_DiasRetraso.DiasRetraso, Ord"
+                        "enes.SI_RC FROM ((((Ordenes INNER JOIN Modelos ON Ordenes.IdModelos = Modelos.Id"
+                        "Modelos) INNER JOIN Clientes ON Ordenes.IdClientes = Clientes.IdClientes) INNER "
+                        "JOIN CantidadOrd ON Ordenes.IdOrdenes = CantidadOrd.IdOrdenes) LEFT JOIN RC_Prim"
+                        "eroVacio ON Ordenes.IdOrdenes = RC_PrimeroVacio.IdOrdenes) LEFT JOIN RC_DiasRetr"
+                        "aso ON Ordenes.IdOrdenes = RC_DiasRetraso.IdOrdenes WHERE (((Ordenes.SI_RC)=Yes)"
+                        ") ORDER BY Ordenes.Numero DESC;"
+                    ColumnWidths ="0;567;567;567;289;1418;567"
+                    AfterUpdate ="[Event Procedure]"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 93
+                            Left = 90
+                            Top = 855
+                            Width = 630
+                            Height = 240
+                            Name ="Etiqueta36"
+                            Caption ="Lista35:"
+                        End
+                    End
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 10671
+                    Top = 117
+                    Width = 396
+                    TabIndex = 18
+                    Name ="QueOrdenEs"
+                    DefaultValue ="=[Forms]![OrdenVer]![QueOrden]"
+                End
+                Begin ComboBox
+                    SpecialEffect = 0
+                    OverlapFlags = 247
+                    ColumnCount = 3
+                    Left = 6225
+                    Top = 1143
+                    Width = 2805
+                    ColumnWidth = 900
+                    TabIndex = 5
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"\";\"\";\"10\";\"50\""
+                    Name ="TipoTela"
+                    ControlSource ="IdRC_TipoTelas"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT RC_TipoTelas.IdRC_TipoTelas, RC_TipoTelas.TipoTela, RC_TipoTelas.Dias FRO"
+                        "M RC_TipoTelas;"
+                    ColumnWidths ="0;2268;170"
+                    BaseInfo ="\"SELECT RC_TipoTelas.IdRC_TipoTelas, RC_TipoTelas.TipoTela, RC_TipoTelas.Dias F"
+                        "ROM RC_TipoTelas;\";\"RC_TipoTelas\";\"\";\"IdRC_TipoTelas\";\"TipoTela\";\"Prim"
+                        "aryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 87
+                            Left = 4605
+                            Top = 1165
+                            Width = 1560
+                            Height = 255
+                            Name ="IdRC_TipoTelas Etiqueta"
+                            Caption ="Tipo de Tela:"
+                            EventProcPrefix ="IdRC_TipoTelas_Etiqueta"
+                        End
+                    End
+                End
+                Begin OptionButton
+                    OverlapFlags = 93
+                    Left = 9707
+                    Top = 1194
+                    TabIndex = 19
+                    Name ="VerTela"
+                    AfterUpdate ="[Event Procedure]"
+                    DefaultValue ="Yes"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 93
+                    Left = 11238
+                    Top = 90
+                    TabIndex = 20
+                    Name ="SI_RC"
+                    ControlSource ="SI_RC"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 247
+                            Left = 11468
+                            Top = 60
+                            Width = 540
+                            Height = 240
+                            Name ="Etiqueta51"
+                            Caption ="Activa"
+                        End
+                    End
+                End
+                Begin Label
+                    OverlapFlags = 223
+                    Left = 11468
+                    Top = 315
+                    Width = 540
+                    Height = 300
+                    Name ="Etiqueta52"
+                    Caption ="Viva"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 215
+                    Left = 11238
+                    Top = 375
+                    Height = 300
+                    TabIndex = 21
+                    Name ="RC_Viva"
+                    ControlSource ="RC_Viva"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 9594
+                    Top = 117
+                    Width = 576
+                    TabIndex = 22
+                    Name ="IdCP_Articulos"
+                    ControlSource ="IdCP_Articulos"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 10544
+                    Top = 850
+                    Width = 576
+                    Height = 576
+                    TabIndex = 23
+                    Name ="Comando58"
+                    Caption ="Comando58"
+                    OnClick ="[Event Procedure]"
+                    PictureData = Begin
+                        0x2800000020000000200000000100040000000000000200000000000000000000 ,
+                        0x1000000000000000000000000000800000800000008080008000000080008000 ,
+                        0x80800000c0c0c000808080000000ff0000ff000000ffff00ff000000ff00ff00 ,
+                        0xffff0000ffffff00777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777778 ,
+                        0x7777777777777777777777777777777880777777777777777777777777777778 ,
+                        0x8007777777777777777777777777777880007777777777777777777777777778 ,
+                        0x8000077777777777777788888888888880000077777777777777880000000000 ,
+                        0x0000000777777777777788000000000000000000777777777777880000000000 ,
+                        0x0000000007777777777788000000000000000000007777777777880000000000 ,
+                        0x0000000000077777777788000000000000000000007077777777880000000000 ,
+                        0x0000000007077777777788000000000000000000707777777777880000000000 ,
+                        0x0000000707777777777788077777777770000070777777777777770000000000 ,
+                        0x0000070777777777777777777777777880007077777777777777777777777778 ,
+                        0x8007077777777777777777777777777880707777777777777777777777777778 ,
+                        0x7007777777777777777777777777777770777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777000000000000000000000000000000000000000000000000
+                    End
+                    ObjectPalette = Begin
+                        0x0003100000000000800000000080000080800000000080008000800000808000 ,
+                        0xc0c0c00080808000ff00000000ff0000ffff00000000ff00ff00ff0000ffff00 ,
+                        0xffffff0000000000
+                    End
+                    ControlTipText ="Registro siguiente"
+                End
+                Begin CommandButton
+                    OverlapFlags = 247
+                    Left = 9921
+                    Top = 850
+                    Width = 576
+                    Height = 576
+                    TabIndex = 24
+                    Name ="Comando64"
+                    Caption ="Comando64"
+                    OnClick ="[Event Procedure]"
+                    PictureData = Begin
+                        0x2800000020000000200000000100040000000000000200000000000000000000 ,
+                        0x1000000000000000000000000000800000800000008080008000000080008000 ,
+                        0x80800000c0c0c000808080000000ff0000ff000000ffff00ff000000ff00ff00 ,
+                        0xffff0000ffffff00777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777787 ,
+                        0x7777777777777777777777777777788707777777777777777777777777778880 ,
+                        0x0777777777777777777777777778880007777777777777777777777777888000 ,
+                        0x0777777777777777777777777888000008888888887777777777777788800000 ,
+                        0x0000000000007777777777788800000000000000000077777777778880000000 ,
+                        0x0000000000007777777778880000000000000000000077777777888000000000 ,
+                        0x0000000000007777777778070000000000000000000077777777778070000000 ,
+                        0x0000000000007777777777780700000000000000000077777777777780700000 ,
+                        0x0000000000007777777777777807000007777777777077777777777777807000 ,
+                        0x0000000000007777777777777778070007777777777777777777777777778070 ,
+                        0x0777777777777777777777777777780707777777777777777777777777777780 ,
+                        0x0777777777777777777777777777777707777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777777777777777777777777777777777777777777777777777 ,
+                        0x7777777777777777000000000000000000000000000000000000000000000000
+                    End
+                    ObjectPalette = Begin
+                        0x0003100000000000800000000080000080800000000080008000800000808000 ,
+                        0xc0c0c00080808000ff00000000ff0000ffff00000000ff00ff00ff0000ffff00 ,
+                        0xffffff0000000000
+                    End
+                    ControlTipText ="Registro anterior"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 396
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    OverlapFlags = 85
+                    Left = 14895
+                    Top = 30
+                    Width = 1146
+                    FontWeight = 700
+                    ForeColor = 255
+                    Name ="Salir"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+
+
+
+
+Private Sub Form_Current()
+If VerTela = False Then
+ TipoTela.Enabled = True
+Else
+ TipoTela.Enabled = False
+End If
+Me![RC_ProgramacionSub].Form![Copiar].Requery
+End Sub
+
+Private Sub QueOrden_AfterUpdate()
+If Me.FilterOn = True Then
+   Me.FilterOn = False
+End If
+    Me.RecordsetClone.FindFirst "[Idordenes] = " & Me![QueOrden]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub
+
+Private Sub Salir_Click()
+DoCmd.Close
+End Sub
+Private Sub MeterInfo_Click()
+On Error GoTo Err_MeterInfo_Click
+
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "RC_MeterInfo"
+    
+    stLinkCriteria = "[IdOrdenes]=" & Me![IdOrdenes]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+    
+    Forms![RC_MeterInfo]![QueForm] = 2
+
+Exit_MeterInfo_Click:
+    Exit Sub
+
+Err_MeterInfo_Click:
+    MsgBox Err.Description
+    Resume Exit_MeterInfo_Click
+    
+End Sub
+Private Sub Form_Open(Cancel As Integer)
+If EstaCargado("Panel de control") = True Then
+
+  If IdRC_TipoUsuariosAct <> 1 Then
+  MsgBox "Solo el Administrador de la RC puede ver esta pantalla. Si necesitas ver algo de esto, comentaselo a Daniel Masri.", vbInformation, "SOLO PARA ADMINISTRADORES DE LA RC"
+  DoCmd.Close
+  End If
+
+End If
+End Sub
+
+Private Sub VerTela_AfterUpdate()
+If VerTela = False Then
+ TipoTela.Enabled = True
+Else
+ TipoTela.Enabled = False
+End If
+End Sub
+Private Sub Comando58_Click()
+On Error GoTo Err_Comando58_Click
+
+
+    DoCmd.GoToRecord , , acPrevious
+    QueOrden = IdOrdenes
+
+Exit_Comando58_Click:
+    Exit Sub
+
+Err_Comando58_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando58_Click
+
+
+
+End Sub
+
+Private Sub Comando64_Click()
+On Error GoTo Err_Comando64_Click
+
+
+    DoCmd.GoToRecord , , acNext
+    QueOrden = IdOrdenes
+
+Exit_Comando64_Click:
+    Exit Sub
+
+Err_Comando64_Click:
+    MsgBox Err.Description
+    Resume Exit_Comando64_Click
+    
+End Sub

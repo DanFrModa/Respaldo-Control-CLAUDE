@@ -1,0 +1,506 @@
+Version = 17
+VersionRequired = 17
+Checksum = 405246672
+Begin Form
+    AutoCenter = NotDefault
+    NavigationButtons = NotDefault
+    AllowDeletions = NotDefault
+    PictureAlignment = 2
+    DatasheetGridlinesBehavior = 3
+    GridY = 10
+    Width = 7766
+    DatasheetFontHeight = 10
+    ItemSuffix = 37
+    Left = 5655
+    Top = 330
+    Right = 16440
+    Bottom = 6990
+    DatasheetGridlinesColor = 12632256
+    RecSrcDt = Begin
+        0xd429caef3d4ae340
+    End
+    RecordSource ="SELECT TelasDis.IdTelasDis, TelasDis.TelaDis, TelasDis.Proveedor, TelasDis.Descr"
+        "ipcion, TelasDis.Precio, TelasDis.ParaProduccion FROM TelasDis ORDER BY TelasDis"
+        ".TelaDis;"
+    Caption ="Telas"
+    OnOpen ="[Event Procedure]"
+    OnClose ="[Event Procedure]"
+    DatasheetFontName ="Arial"
+    Begin
+        Begin Label
+            BackStyle = 0
+            BackColor = -2147483633
+            ForeColor = -2147483630
+        End
+        Begin Rectangle
+            SpecialEffect = 3
+            BackStyle = 0
+            Width = 850
+            Height = 850
+        End
+        Begin Line
+            SpecialEffect = 3
+            Width = 1701
+        End
+        Begin Image
+            BackStyle = 0
+            OldBorderStyle = 0
+            PictureAlignment = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin CommandButton
+            Width = 1701
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin OptionButton
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin CheckBox
+            SpecialEffect = 2
+            LabelX = 230
+            LabelY = -30
+        End
+        Begin OptionGroup
+            SpecialEffect = 3
+            Width = 1701
+            Height = 1701
+        End
+        Begin BoundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 0
+            BackStyle = 0
+            Width = 4536
+            Height = 2835
+            LabelX = -1701
+        End
+        Begin TextBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ListBox
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1417
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin ComboBox
+            SpecialEffect = 2
+            Width = 1701
+            LabelX = -1701
+            BackColor = -2147483643
+            ForeColor = -2147483640
+        End
+        Begin Subform
+            SpecialEffect = 2
+            Width = 1701
+            Height = 1701
+        End
+        Begin UnboundObjectFrame
+            SpecialEffect = 2
+            OldBorderStyle = 1
+            Width = 4536
+            Height = 2835
+        End
+        Begin ToggleButton
+            Width = 283
+            Height = 283
+            FontSize = 8
+            FontWeight = 400
+            FontName ="MS Sans Serif"
+        End
+        Begin Tab
+            BackStyle = 0
+            Width = 5103
+            Height = 3402
+        End
+        Begin FormHeader
+            Height = 354
+            BackColor = 32768
+            Name ="EncabezadoDelFormulario"
+            Begin
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 57
+                    Width = 1197
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Tela Etiqueta"
+                    Caption ="Tela"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Tela_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1310
+                    Top = 57
+                    Width = 1710
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Proveedor Etiqueta"
+                    Caption ="Proveedor"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Proveedor_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 1
+                    Left = 3077
+                    Top = 57
+                    Width = 2475
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Descripcion Etiqueta"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Descripcion_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 93
+                    TextAlign = 3
+                    Left = 5725
+                    Top = 57
+                    Width = 942
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Precio Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio_Etiqueta"
+                End
+                Begin TextBox
+                    Visible = NotDefault
+                    OverlapFlags = 215
+                    Left = 5555
+                    Top = 56
+                    Width = 327
+                    Height = 255
+                    ForeColor = 16777215
+                    Name ="IdTelas"
+                    ControlSource ="TelaDis"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 6746
+                    Top = 57
+                    Width = 942
+                    Height = 240
+                    ForeColor = 16777215
+                    Name ="Etiqueta31"
+                    Caption ="Para Prod"
+                    Tag ="DetachedLabel"
+                End
+            End
+        End
+        Begin Section
+            Height = 353
+            BackColor = -2147483633
+            Name ="Detalle"
+            Begin
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 56
+                    Top = 57
+                    Width = 1197
+                    Height = 255
+                    ColumnWidth = 1560
+                    Name ="Tela"
+                    ControlSource ="TelaDis"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 1310
+                    Top = 57
+                    Width = 1710
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 1
+                    Name ="Proveedor"
+                    ControlSource ="Proveedor"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 3077
+                    Top = 57
+                    Width = 2475
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 2
+                    Name ="Descripcion"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    SpecialEffect = 0
+                    OldBorderStyle = 0
+                    OverlapFlags = 85
+                    BackStyle = 0
+                    Left = 5725
+                    Top = 57
+                    Width = 942
+                    Height = 255
+                    ColumnWidth = 2310
+                    TabIndex = 3
+                    Name ="Precio"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin CheckBox
+                    Enabled = NotDefault
+                    Locked = NotDefault
+                    OverlapFlags = 85
+                    Left = 7256
+                    Top = 113
+                    TabIndex = 4
+                    Name ="ParaProduccion"
+                    ControlSource ="ParaProduccion"
+                End
+            End
+        End
+        Begin FormFooter
+            Height = 1814
+            BackColor = -2147483633
+            Name ="PieDelFormulario"
+            Begin
+                Begin CommandButton
+                    Cancel = NotDefault
+                    TabStop = NotDefault
+                    OverlapFlags = 85
+                    Left = 6689
+                    Top = 1360
+                    Width = 969
+                    Height = 329
+                    FontWeight = 700
+                    TabIndex = 5
+                    ForeColor = 255
+                    Name ="Comando10"
+                    Caption ="Salir"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 850
+                    Width = 1137
+                    Height = 255
+                    Name ="Tela1"
+                    ControlSource ="TelaDis"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 1310
+                    Top = 850
+                    Width = 1650
+                    Height = 255
+                    TabIndex = 1
+                    Name ="Proveedor1"
+                    ControlSource ="Proveedor"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 3077
+                    Top = 850
+                    Width = 2475
+                    Height = 255
+                    TabIndex = 2
+                    Name ="Descripcion1"
+                    ControlSource ="Descripcion"
+                End
+                Begin TextBox
+                    OverlapFlags = 85
+                    Left = 5725
+                    Top = 850
+                    Width = 942
+                    Height = 255
+                    TabIndex = 3
+                    Name ="Precio1"
+                    ControlSource ="Precio"
+                    Format ="$#,##0.00;-$#,##0.00"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 56
+                    Top = 510
+                    Width = 1197
+                    Height = 240
+                    Name ="Etiqueta22"
+                    Caption ="Tela"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 1310
+                    Top = 510
+                    Width = 1710
+                    Height = 240
+                    Name ="Etiqueta23"
+                    Caption ="Proveedor"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 1
+                    Left = 3077
+                    Top = 510
+                    Width = 2475
+                    Height = 240
+                    Name ="Etiqueta24"
+                    Caption ="Descripcion"
+                    Tag ="DetachedLabel"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    TextAlign = 3
+                    Left = 5725
+                    Top = 510
+                    Width = 942
+                    Height = 240
+                    Name ="Precio1 Etiqueta"
+                    Caption ="Precio"
+                    Tag ="DetachedLabel"
+                    EventProcPrefix ="Precio1_Etiqueta"
+                End
+                Begin Label
+                    OverlapFlags = 85
+                    Left = 56
+                    Top = 113
+                    Width = 4470
+                    Height = 285
+                    FontWeight = 700
+                    ForeColor = 32768
+                    Name ="Etiqueta26"
+                    Caption ="Agregar nuevas telas o modificar algun dato:"
+                End
+                Begin CommandButton
+                    OverlapFlags = 85
+                    Left = 3968
+                    Top = 1247
+                    Width = 1155
+                    Height = 405
+                    TabIndex = 4
+                    Name ="Agregar"
+                    Caption ="Agregar Tela"
+                    OnClick ="[Event Procedure]"
+                End
+                Begin ComboBox
+                    OverlapFlags = 85
+                    ColumnCount = 2
+                    Left = 2381
+                    Top = 1360
+                    Width = 1304
+                    Height = 284
+                    TabIndex = 6
+                    ColumnInfo ="\"\";\"\";\"\";\"\";\"10\";\"20\""
+                    Name ="QueTela"
+                    RowSourceType ="Table/Query"
+                    RowSource ="SELECT TelasDis.IdTelasDis, TelasDis.TelaDis FROM TelasDis ORDER BY TelasDis.Tel"
+                        "aDis;"
+                    ColumnWidths ="0;1701"
+                    AfterUpdate ="[Event Procedure]"
+                    BaseInfo ="\"SELECT TelasDis.IdTelasDis, TelasDis.TelaDis FROM TelasDis ORDER BY TelasDis.T"
+                        "elaDis;\";\"TelasDis\";\"\";\"IdTelasDis\";\"TelaDis\";\"PrimaryKey\""
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 1265
+                            Top = 1360
+                            Width = 1050
+                            Height = 240
+                            Name ="Etiqueta29"
+                            Caption ="Buscar Tela:"
+                        End
+                    End
+                End
+                Begin CheckBox
+                    OverlapFlags = 85
+                    Left = 7200
+                    Top = 879
+                    TabIndex = 7
+                    Name ="Verificación35"
+                    ControlSource ="ParaProduccion"
+                    Begin
+                        Begin Label
+                            OverlapFlags = 85
+                            Left = 6803
+                            Top = 510
+                            Width = 840
+                            Height = 240
+                            Name ="Etiqueta36"
+                            Caption ="Para Prod"
+                        End
+                    End
+                End
+            End
+        End
+    End
+End
+CodeBehindForm
+Option Compare Database
+Option Explicit
+
+Private Sub Comando10_Click()
+DoCmd.Close
+End Sub
+Private Sub Agregar_Click()
+On Error GoTo Err_Agregar_Click
+
+
+    DoCmd.GoToRecord , , acNewRec
+    Tela1.SetFocus
+Exit_Agregar_Click:
+    Exit Sub
+
+Err_Agregar_Click:
+    MsgBox Err.Description
+    Resume Exit_Agregar_Click
+    
+End Sub
+
+Private Sub Form_Close()
+If EstaCargado("ordenes") = True Then
+Forms![Ordenes]![IdTelasDis].Requery
+End If
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+
+DoCmd.GoToRecord acForm, "TelasDis", acNewRec
+
+End Sub
+
+Private Sub QueTela_AfterUpdate()
+ Me.RecordsetClone.FindFirst "[IdTelasdis] = " & Me![QueTela]
+    Me.Bookmark = Me.RecordsetClone.Bookmark
+End Sub

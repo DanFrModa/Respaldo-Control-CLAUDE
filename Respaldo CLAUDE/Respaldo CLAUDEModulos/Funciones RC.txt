@@ -1,0 +1,238 @@
+Option Compare Database
+Option Explicit
+
+
+Public Function DiasLaborables(FechaDesde As Date, FechaHasta As Date) As Integer
+Dim Laborables As Integer
+On Error GoTo DiasLaborables_Error
+
+Laborables = 1 + (FechaHasta - FechaDesde)
+
+Laborables = Laborables - DateDiff("ww", FechaDesde, FechaHasta, vbSaturday)
+Laborables = Laborables - DateDiff("ww", FechaDesde, FechaHasta, vbSunday)
+Laborables = Laborables + (WeekDay(FechaDesde, vbSunday) = 1)
+Laborables = Laborables + (WeekDay(FechaDesde, vbSaturday) = 1)
+DiasLaborables = Laborables
+
+
+DiasLaborables_Error:
+
+MsgBox Err.Description
+End Function
+
+
+
+
+Public Function FechaHabiles(FechaUltima As Date, NumDias As Integer) As Date
+Dim QueDia, CuantasSem As Integer
+Dim CuantDias As Single
+
+
+CuantasSem = (NumDias + 1) / 5
+CuantDias = (NumDias / 5) - CuantasSem
+CuantDias = CuantDias * 10
+CuantDias = CuantDias / 2
+
+QueDia = (CuantasSem * 7) + CuantDias
+
+FechaHabiles = FechaUltima - QueDia
+
+
+End Function
+
+Public Function CuantosSabYDom(FechaDesde As Date, FechaHasta As Date) As Integer
+Dim Sab, Dom As Integer
+Sab = DateDiff("ww", FechaDesde, FechaHasta, vbSaturday)
+Dom = DateDiff("ww", FechaDesde, FechaHasta, vbSunday)
+
+CuantosSabYDom = Sab + Dom
+
+End Function
+
+Public Function TiempoPorArticulo(IdArt As Integer) As Integer
+Dim Dbs As Database
+Dim pp As Recordset
+
+Set Dbs = CurrentDb
+Set pp = Dbs.OpenRecordset("SELECT CP_TiempoArticulos.IdCP_Articulos, CP_TiempoArticulos.TiempoTotal FROM CP_TiempoArticulos WHERE CP_TiempoArticulos.IdCP_Articulos= " & IdArt)
+
+TiempoPorArticulo = pp!TiempoTotal + TiempoColchonCostura()
+pp.Close
+Dbs.Close
+End Function
+Public Function TiempoColchonCostura()
+Dim Dbs As Database
+Dim TiempoCol As Recordset
+
+Set Dbs = CurrentDb
+Set TiempoCol = Dbs.OpenRecordset("Select ColchonCostura from Propiedades")
+
+TiempoColchonCostura = TiempoCol!colchoncostura
+
+TiempoCol.Close
+Dbs.Close
+
+
+
+End Function
+
+Public Function EstaAntecesor(QueIdOrd As Integer, NumProCant As Integer) As String
+On Error GoTo errores
+Dim Dbs As Database
+Dim QueAnt As Recordset
+
+
+If NumProCant = 0 Then
+EstaAntecesor = "Activa"
+Else
+
+  Set Dbs = CurrentDb
+  Set QueAnt = Dbs.OpenRecordset("Select FechaReal FROM RC WHERE IdOrdenes=" & QueIdOrd & "And NumProcesoRC=" & NumProCant)
+
+  If IsNull(QueAnt!FechaReal) = True Then
+  EstaAntecesor = ""
+  Else
+  EstaAntecesor = "Activa"
+  End If
+
+End If
+
+
+QueAnt.Close
+Dbs.Close
+
+errores:
+
+End Function
+Public Function FechaAntecesor(QueIdOrd As Integer, NumProAnt As Integer) As Variant
+On Error GoTo errores
+Dim Dbs As Database
+Dim QueAnt As Recordset
+
+
+If NumProAnt = 0 Then
+FechaAntecesor = ""
+Else
+
+  Set Dbs = CurrentDb
+  Set QueAnt = Dbs.OpenRecordset("Select FechaReal FROM RC WHERE IdOrdenes=" & QueIdOrd & "And NumProcesoRC=" & NumProAnt)
+
+  If IsNull(QueAnt!FechaReal) = True Then
+  FechaAntecesor = ""
+  Else
+  FechaAntecesor = QueAnt!FechaReal
+  End If
+
+End If
+
+
+QueAnt.Close
+Dbs.Close
+
+errores:
+
+End Function
+
+Public Function FechaNueva(QueIdOrd As Integer, NumProAnt As Integer, Dias As Integer) As Variant
+On Error GoTo errores
+Dim Dbs As Database
+Dim QueAnt As Recordset
+
+If NumProAnt = 0 Then
+FechaAntecesor = ""
+Else
+
+  Set Dbs = CurrentDb
+  Set QueAnt = Dbs.OpenRecordset("Select FechaReal FROM RC WHERE IdOrdenes=" & QueIdOrd & "And NumProcesoRC=" & NumProAnt)
+
+  If IsNull(QueAnt!FechaReal) = True Then
+  FechaAntecesor = ""
+  Else
+  FechaAntecesor = QueAnt!FechaReal
+  End If
+
+End If
+
+QueAnt.Close
+Dbs.Close
+
+errores:
+
+End Function
+
+
+Public Function DiasHabAFecha(FechaInicio As Date, Dias As Integer) As Date
+
+Dim QueFecha As Date
+Dim DiasDeMas, DiasDeMas2 As Integer
+
+QueFecha = FechaInicio + Dias
+DiasDeMas = CuantosSabYDom(FechaInicio, FechaInicio + Dias)
+DiasDeMas2 = CuantosSabYDom(FechaInicio + Dias, FechaInicio + Dias + DiasDeMas)
+QueFecha = QueFecha + DiasDeMas + DiasDeMas2
+
+            If WeekDay(QueFecha) = vbSaturday Then
+             DiasHabAFecha = QueFecha + 2
+            ElseIf WeekDay(QueFecha) = vbSunday Then
+             DiasHabAFecha = QueFecha + 1
+            Else
+             DiasHabAFecha = QueFecha
+            End If
+Adio:
+End Function
+
+Public Function NumeroAString(Numero As Integer, Proc As String) As String
+Dim a As String
+a = Numero
+If Len(a) = 1 Then
+ a = "0" + a
+End If
+NumeroAString = a + " - " + Proc
+End Function
+
+Public Function OrdenCant(Ord As Integer) As Integer
+On Error GoTo errores
+Dim Dbs As Database
+Dim QueOr As Recordset
+
+  Set Dbs = CurrentDb
+  Set QueOr = Dbs.OpenRecordset("Select CantOrd FROM CantidadOrd WHERE IdOrdenes=" & Ord)
+
+OrdenCant = QueOr!CantOrd
+
+QueOr.Close
+Dbs.Close
+errores:
+
+End Function
+
+Public Function EsUrgente(Fech As Date) As String
+If Fech + 7 > Date Then
+EsUrgente = ""
+Else
+EsUrgente = "URGENTE"
+End If
+End Function
+
+Public Function QueActiva(QueProc As Variant) As Variant
+If IsNull(QueProc) = True Then
+ QueActiva = ""
+Else
+ QueActiva = "Activa"
+End If
+End Function
+Public Function TacheNulo(QqP As Variant) As Variant
+If IsNull(QqP) = True Then
+TacheNulo = "X"
+Else
+TacheNulo = QqP
+End If
+End Function
+
+Public Function NuloHoy(Fec As Variant) As Variant
+If IsNull(Fec) = True Then
+ NuloHoy = Date
+Else
+ NuloHoy = Fec
+End If
+End Function

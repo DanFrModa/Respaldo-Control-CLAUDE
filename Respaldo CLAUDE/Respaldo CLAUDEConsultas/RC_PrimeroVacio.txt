@@ -1,0 +1,60 @@
+Operation = 1
+Option = 0
+Having ="(((RC.FechaReal) Is Null))"
+Begin InputTables
+    Name ="RC"
+    Name ="Ordenes"
+End
+Begin OutputColumns
+    Expression ="Ordenes.IdOrdenes"
+    Alias ="PrimeroVacio"
+    Expression ="Min(RC.NumProcesoRC)"
+End
+Begin Joins
+    LeftTable ="RC"
+    RightTable ="Ordenes"
+    Expression ="RC.IdOrdenes = Ordenes.IdOrdenes"
+    Flag = 1
+End
+Begin Groups
+    Expression ="Ordenes.IdOrdenes"
+    GroupLevel = 0
+    Expression ="RC.FechaReal"
+    GroupLevel = 0
+End
+dbBoolean "ReturnsRecords" ="-1"
+dbInteger "ODBCTimeout" ="60"
+dbByte "RecordsetType" ="0"
+dbBoolean "OrderByOn" ="0"
+Begin
+End
+Begin
+    State = 0
+    Left = 40
+    Top = 22
+    Right = 1418
+    Bottom = 327
+    Left = -1
+    Top = -1
+    Right = 1367
+    Bottom = 144
+    Left = 0
+    Top = 0
+    ColumnsShown = 543
+    Begin
+        Left = 38
+        Top = 6
+        Right = 182
+        Bottom = 113
+        Top = 5
+        Name ="RC"
+    End
+    Begin
+        Left = 271
+        Top = 7
+        Right = 367
+        Bottom = 114
+        Top = 0
+        Name ="Ordenes"
+    End
+End
