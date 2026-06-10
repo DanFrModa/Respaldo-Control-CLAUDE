@@ -23,8 +23,14 @@ export {
   TIPOS_ALMACEN,
   esquemaAlmacenCrear,
   esquemaAlmacenEditar,
+  esquemaAlmacenSalida,
+  esquemaAlmacenesQuery,
+  esquemaAlmacenesPagina,
   type DatosAlmacenCrear,
   type DatosAlmacenEditar,
+  type AlmacenSalida,
+  type AlmacenesQuery,
+  type AlmacenesPagina,
   type TipoAlmacenClave,
 } from './esquemas/almacen.js';
 
@@ -34,3 +40,7 @@ export {
   type DatosUsuarioCrear,
   type DatosUsuarioEditar,
 } from './esquemas/usuario.js';
+
+export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
+
+export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

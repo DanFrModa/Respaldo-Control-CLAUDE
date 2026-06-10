@@ -7,7 +7,7 @@
  * en su entrada (E3) y las tablas de la UI (TanStack Table) consumen
  * `Pagina<T>` directo.
  */
-import * as z from 'zod';
+import { z } from 'zod';
 
 /** Parámetros de paginación que acepta todo listado (con defaults y topes). */
 export const esquemaPaginacion = z.object({

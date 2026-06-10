@@ -28,7 +28,7 @@ import {
 } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 import { hashPassword } from 'better-auth/crypto';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';

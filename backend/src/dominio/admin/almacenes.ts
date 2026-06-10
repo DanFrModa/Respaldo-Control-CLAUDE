@@ -28,7 +28,7 @@
  */
 import { esquemaAlmacenCrear, esquemaAlmacenEditar, TIPOS_ALMACEN } from '../../contrato/index.js';
 import type { Almacen, Prisma } from '../../datos/index.js';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
