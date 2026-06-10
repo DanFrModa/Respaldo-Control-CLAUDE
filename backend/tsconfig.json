@@ -6,9 +6,9 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 
-    /* Salida */
-    "outDir": "dist",
-    "rootDir": "src",
+    /* Salida: este config es para typecheck/IDE/ESLint (no emite). El build
+       usa tsconfig.build.json, que sí emite src/ a dist/. */
+    "noEmit": true,
     "sourceMap": true,
     "declaration": false,
 
@@ -29,6 +29,6 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "prisma/**/*.ts", "prisma.config.ts", "vitest.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

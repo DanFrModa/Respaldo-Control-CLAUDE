@@ -1,0 +1,376 @@
+// CONTROL v2 — esquema de la fundación (F0).
+// Dominios: empresas y configuración, usuarios/RBAC (A4) + tablas de better-auth,
+// almacenes, secuencias de folios (A3), bitácora (A7) y archivos R2 (A5/R6).
+//
+// Convenciones (plan maestro §4 y §8):
+//  • Modelos y campos de dominio en español, sin acentos ni eñes.
+//  • Tablas y columnas en BD en snake_case español vía @map/@@map.
+//  • FKs reales con integridad referencial (A2); onDelete Restrict en dominio
+//    (el borrado es suave: banderas `activo`), Cascade solo en tablas de sesión/auth.
+//  • Auditoría uniforme en entidades de dominio: creadoEn/creadoPorId +
+//    modificadoEn/modificadoPorId (A7). Los campos *PorId referencian usuarios SIN
+//    constraint físico a propósito: los usuarios jamás se borran (solo se desactivan)
+//    y un FK formal exigiría decenas de relaciones inversas en Usuario sin valor de
+//    consulta. La Bitacora complementa con el historial de cambios.
+//  • En las tablas exclusivas de better-auth (Sesion, Cuenta, Verificacion) los CAMPOS
+//    conservan el nombre que better-auth espera (token, expiresAt, userId…) para que el
+//    adapter del frontend (E3) no necesite field-mapping; las COLUMNAS sí van en español.
+//
+// Prisma 7: generator `prisma-client` (no `prisma-client-js`). El cliente se emite a
+// `src/datos/generated/prisma` (gitignoreado; se regenera con `prisma generate`).
+// `moduleFormat = esm` + `importFileExtension = js` para que el código generado use
+// imports con extensión `.js`, compatibles con la resolución NodeNext del backend.
+// El datasource NO lleva `url`: la conexión va por `@prisma/adapter-pg` (ver src/datos).
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/datos/generated/prisma"
+  runtime             = "nodejs"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empresas y configuración
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Empresa del grupo (multi-empresa explícito, A9). Equivale a la tabla `Empresas`
+/// del sistema viejo (doc 10 §5): `favorita` reemplaza a `Importancia = 1`,
+/// `paraIpt`/`paraEdr` conservan en qué procesos participa la empresa.
+model Empresa {
+  id            Int     @id @default(autoincrement())
+  /// Nombre corto de uso diario (viejo: `Empresas.Empresa`). Único para evitar duplicados de captura.
+  nombre        String  @unique
+  razonSocial   String? @map("razon_social")
+  /// Identificador corto usado en folios e impresos (viejo: `Identificador`).
+  identificador String?
+  /// Prefijo UPC de la empresa (viejo: `UPCEmp`).
+  upc           String?
+  /// Empresa propuesta por defecto al iniciar sesión (viejo: `Importancia = 1`).
+  favorita      Boolean @default(false)
+  /// Participa en el inventario de producto terminado (viejo: `ParaIPT`).
+  paraIpt       Boolean @map("para_ipt")
+  /// Participa en el estado de resultados (viejo: `ParaEdoRes`).
+  paraEdr       Boolean @map("para_edr")
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo): las empresas no se eliminan, se desactivan.
+  activa        Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  configuracion ConfiguracionEmpresa?
+  almacenes     Almacen[]
+  secuencias    Secuencia[]
+
+  @@map("empresas")
+}
+
+/// Configuración POR EMPRESA (plan §4): sustituye a la tabla `Propiedades` del sistema
+/// viejo (un solo registro global, doc 10 §5). Los parámetros que eran globales pasan a
+/// ser parametrizables por empresa. `VersionDisponible` y `Mantenimiento` no se migran:
+/// el deploy web (A10) y el modo mantenimiento se resuelven en infraestructura.
+model ConfiguracionEmpresa {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @unique @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Utilidad sugerida para costeo (viejo: `UtilidadSujerida`).
+  utilidadSugerida Decimal? @map("utilidad_sugerida") @db.Decimal(10, 4)
+  /// Porcentaje base de regalías (viejo: `Regalias`).
+  regaliasBase     Decimal? @map("regalias_base") @db.Decimal(10, 4)
+  /// Días de colchón que la Ruta Crítica agrega a la costura (viejo: `ColchonCostura`).
+  colchonCostura   Int?     @map("colchon_costura")
+
+  /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
+  fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
+  /// Fecha del último inventario físico de producto terminado (viejo: `InvFisicoPT`).
+  fechaInventarioPt    DateTime? @map("fecha_inventario_pt") @db.Date
+
+  /// Almacén de producto terminado por defecto (viejo: `IPT_Almacen_Default`).
+  idAlmacenPtDefault Int?     @map("id_almacen_pt_default")
+  almacenPtDefault   Almacen? @relation("ConfiguracionAlmacenPtDefault", fields: [idAlmacenPtDefault], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("configuraciones_empresa")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Usuarios y autenticación (better-auth) — A4: un solo sistema de seguridad
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Usuario del sistema. Mapea el modelo `user` de better-auth (id String cuid es
+/// requisito del adapter) y absorbe los campos de negocio de la tabla `Usuarios`
+/// del sistema viejo (doc 10 §4): `bloqueado` + `intentosFallidos` reemplazan a
+/// `CantBloq` (bloqueo a los 5 intentos, doc 00 §1.1), `esAuditor` se conserva.
+/// La contraseña NO vive aquí: va hasheada en `Cuenta` (providerId "credential").
+/// Mapping de better-auth (configurado en E3): name→nombre,
+/// createdAt→creadoEn, updatedAt→modificadoEn.
+model Usuario {
+  id              String  @id @default(cuid())
+  /// Nombre de usuario para login, normalizado a minúsculas (plugin username de better-auth).
+  username        String  @unique
+  /// Forma original del username tal como la escribió quien lo creó (requisito del plugin username).
+  displayUsername String? @map("display_username")
+  /// Nombre completo de la persona (better-auth: `name`).
+  nombre          String
+  /// better-auth exige email único; el negocio no lo usa, puede ser sintético `<username>@control.local`.
+  email           String  @unique
+  emailVerified   Boolean @default(false) @map("email_verificado")
+  image           String? @map("imagen")
+
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo): un usuario que se va se desactiva, jamás se borra.
+  activo           Boolean @default(true)
+  /// Bloqueado por intentos fallidos (regla viejo sistema: 5 intentos, doc 00 §1.1).
+  bloqueado        Boolean @default(false)
+  intentosFallidos Int     @default(0) @map("intentos_fallidos")
+  /// Bandera de auditor de calidad (viejo: `Usuarios.EsAuditor`).
+  esAuditor        Boolean @default(false) @map("es_auditor")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  sesiones Sesion[]
+  cuentas  Cuenta[]
+  roles    UsuarioRol[]
+
+  @@map("usuarios")
+}
+
+/// Sesión de better-auth (tabla auth pura — campos con los nombres que better-auth
+/// espera; columnas en español). Cascade: al borrar un usuario caen sus sesiones.
+model Sesion {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime @map("expira_en")
+  ipAddress String?  @map("direccion_ip")
+  userAgent String?  @map("agente_usuario")
+  userId    String   @map("id_usuario")
+  usuario   Usuario  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("creado_en")
+  updatedAt DateTime @updatedAt @map("modificado_en")
+
+  @@index([userId])
+  @@map("sesiones")
+}
+
+/// Cuenta de autenticación de better-auth. Para login con contraseña:
+/// providerId = "credential", accountId = id del usuario y `password` = hash
+/// (scrypt de better-auth/crypto). Tabla auth pura.
+model Cuenta {
+  id                    String    @id @default(cuid())
+  accountId             String    @map("id_cuenta")
+  providerId            String    @map("id_proveedor")
+  userId                String    @map("id_usuario")
+  usuario               Usuario   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  password              String?
+  accessToken           String?   @map("token_acceso")
+  refreshToken          String?   @map("token_refresco")
+  idToken               String?   @map("token_id")
+  accessTokenExpiresAt  DateTime? @map("token_acceso_expira_en")
+  refreshTokenExpiresAt DateTime? @map("token_refresco_expira_en")
+  scope                 String?
+  createdAt             DateTime  @default(now()) @map("creado_en")
+  updatedAt             DateTime  @updatedAt @map("modificado_en")
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("cuentas")
+}
+
+/// Verificaciones temporales de better-auth (tokens de un solo uso). Tabla auth pura.
+model Verificacion {
+  id         String   @id @default(cuid())
+  identifier String   @map("identificador")
+  value      String   @map("valor")
+  expiresAt  DateTime @map("expira_en")
+  createdAt  DateTime @default(now()) @map("creado_en")
+  updatedAt  DateTime @updatedAt @map("modificado_en")
+
+  @@index([identifier])
+  @@map("verificaciones")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RBAC (A4): roles + permisos. El catálogo de permisos vive en src/contrato;
+// la tabla `permisos` se sincroniza desde ahí por el seed (clave = ClavePermiso).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Rol de usuario. Los roles con `esSistema = true` los crea el seed (absorben los
+/// niveles del sistema viejo, doc 00 §2) y la UI no permite borrarlos ni renombrarlos.
+model Rol {
+  id          Int     @id @default(autoincrement())
+  nombre      String  @unique
+  descripcion String
+  esSistema   Boolean @default(false) @map("es_sistema")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  permisos RolPermiso[]
+  usuarios UsuarioRol[]
+
+  @@map("roles")
+}
+
+/// Permiso granular (espejo en BD del catálogo tipado de src/contrato, que es la
+/// fuente de verdad). `clave` es una ClavePermiso `modulo.accion`; el id numérico es
+/// interno y NUNCA se usa para autorizar.
+model Permiso {
+  id          Int    @id @default(autoincrement())
+  clave       String @unique
+  descripcion String
+  modulo      String
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  roles RolPermiso[]
+
+  @@map("permisos")
+}
+
+/// Permisos otorgados a un rol.
+model RolPermiso {
+  idRol     Int     @map("id_rol")
+  rol       Rol     @relation(fields: [idRol], references: [id], onDelete: Restrict)
+  idPermiso Int     @map("id_permiso")
+  permiso   Permiso @relation(fields: [idPermiso], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idRol, idPermiso])
+  @@index([idPermiso])
+  @@map("roles_permisos")
+}
+
+/// Roles asignados a un usuario.
+model UsuarioRol {
+  idUsuario String  @map("id_usuario")
+  usuario   Usuario @relation(fields: [idUsuario], references: [id], onDelete: Restrict)
+  idRol     Int     @map("id_rol")
+  rol       Rol     @relation(fields: [idRol], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idUsuario, idRol])
+  @@index([idRol])
+  @@map("usuarios_roles")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Almacenes (base del kardex único D3) y secuencias de folios (A3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tipo de almacén según el inventario que guarda (D3: un kardex para PT, telas y avíos).
+enum TipoAlmacen {
+  PT
+  TELA
+  AVIO
+
+  @@map("tipo_almacen")
+}
+
+/// Almacén físico o lógico. Unifica `IPT_Almacenes` (PT) y `Almacenes` (telas) del
+/// sistema viejo. `idEmpresa` opcional: hay almacenes de una empresa y compartidos (A9).
+/// OJO: el unique compuesto NO cubre almacenes globales (Postgres trata los NULL como
+/// distintos); el servicio de dominio valida el nombre duplicado cuando idEmpresa es null.
+model Almacen {
+  id        Int         @id @default(autoincrement())
+  nombre    String
+  tipo      TipoAlmacen
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo    Boolean     @default(true)
+  idEmpresa Int?        @map("id_empresa")
+  empresa   Empresa?    @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  configuracionesPtDefault ConfiguracionEmpresa[] @relation("ConfiguracionAlmacenPtDefault")
+
+  @@unique([idEmpresa, nombre])
+  @@map("almacenes")
+}
+
+/// Contador de folios de negocio POR EMPRESA y por tipo de documento (A3: los folios
+/// salen de aquí con UPDATE atómico — nunca `Max()+1`). `clave` identifica el tipo de
+/// folio (p. ej. "pedido", "orden", "nota-salida", "orden-compra").
+model Secuencia {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  clave     String
+  valor     BigInt  @default(0)
+
+  @@unique([idEmpresa, clave])
+  @@map("secuencias")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bitácora (A7) y archivos (A5/R6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Acción registrada en la bitácora. CANCELAR/DESACTIVAR son los "borrados" suaves;
+/// OTRO cubre eventos que no son cambio de datos (p. ej. inicios de sesión).
+enum AccionBitacora {
+  CREAR
+  MODIFICAR
+  DESACTIVAR
+  CANCELAR
+  OTRO
+
+  @@map("accion_bitacora")
+}
+
+/// Bitácora de cambios por entidad (A7). `entidad` + `idEntidad` apuntan al registro
+/// afectado (idEntidad en texto para cubrir PKs Int y String); `datos` guarda el
+/// detalle del cambio en JSON. `idUsuario` sin FK físico: es un log inmutable y los
+/// usuarios nunca se borran.
+model Bitacora {
+  id        BigInt         @id @default(autoincrement())
+  entidad   String
+  idEntidad String         @map("id_entidad")
+  accion    AccionBitacora
+  datos     Json?
+  idUsuario String?        @map("id_usuario")
+  fecha     DateTime       @default(now())
+
+  @@index([entidad, idEntidad])
+  @@map("bitacora")
+}
+
+/// Archivo guardado en Cloudflare R2 (A5: nada de rutas `S:\`; R6: repositorio de
+/// adjuntos). Los objetos se referencian SIEMPRE por esta tabla, nunca por convención
+/// de nombre (plan §2). `subidoPorId` sin FK físico (mismo criterio que la auditoría).
+model Archivo {
+  id             String   @id @default(cuid())
+  bucket         String
+  key            String   @unique
+  nombreOriginal String   @map("nombre_original")
+  tipoMime       String   @map("tipo_mime")
+  tamanoBytes    Int      @map("tamano_bytes")
+  subidoPorId    String?  @map("subido_por_id")
+  subidoEn       DateTime @default(now()) @map("subido_en")
+
+  @@map("archivos")
+}

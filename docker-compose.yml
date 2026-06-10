@@ -31,8 +31,11 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      # Reservada para E2 (Prisma). En E1 el backend no abre conexion a la BD.
+      # El backend ya usa la BD (Prisma + adapter pg). Al arrancar aplica las
+      # migraciones (migrate deploy) y, con SEED_ON_START=true, siembra los datos
+      # de fundación (FR Moda + permisos + roles + admin) — todo idempotente.
       DATABASE_URL: postgresql://control:control@postgres:5432/control_v2
+      SEED_ON_START: 'true'
     depends_on:
       postgres:
         condition: service_healthy

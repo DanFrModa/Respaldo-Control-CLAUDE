@@ -9,7 +9,9 @@ import tseslint from 'typescript-eslint';
  * pelearian con Prettier.
  */
 export default tseslint.config(
-  { ignores: ['dist/', 'node_modules/'] },
+  // El cliente Prisma de `src/datos/generated/` es codigo generado (lleva su propio
+  // @ts-nocheck): no se lintea ni se le exige el estilo del proyecto.
+  { ignores: ['dist/', 'node_modules/', 'src/datos/generated/'] },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
