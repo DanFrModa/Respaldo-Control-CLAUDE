@@ -20,6 +20,9 @@ export default defineConfig({
           name: 'integracion',
           include: ['src/**/*.int.test.ts'],
           globalSetup: ['./src/pruebas/entorno-global.ts'],
+          // Fija DATABASE_URL/secretos en el worker ANTES de importar cada suite,
+          // para que el singleton de Prisma y better-auth apunten al contenedor.
+          setupFiles: ['./src/pruebas/preparar-entorno.ts'],
           fileParallelism: false,
           testTimeout: 90_000,
           hookTimeout: 180_000,

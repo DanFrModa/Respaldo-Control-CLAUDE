@@ -24,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { ErrorValidacion } from './errores.js';
 import type { SesionUsuario } from './permisos.js';

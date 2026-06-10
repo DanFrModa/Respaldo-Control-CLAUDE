@@ -4,8 +4,8 @@
 #
 # El entorno local replica produccion (PLANMAESTRO §2.1): solo el frontend
 # publica un puerto al host; backend y postgres son privados y se alcanzan por
-# nombre dentro de la red del compose. La base de datos queda lista para E2;
-# en E1 el backend todavia NO se conecta a ella.
+# nombre dentro de la red del compose. El arranque es ordenado por healthchecks:
+# postgres healthy -> backend migra/siembra y queda healthy -> frontend (nginx).
 
 services:
   # ── PostgreSQL 17 (privado) ────────────────────────────────────────────────
@@ -36,6 +36,29 @@ services:
       # de fundación (FR Moda + permisos + roles + admin) — todo idempotente.
       DATABASE_URL: postgresql://control:control@postgres:5432/control_v2
       SEED_ON_START: 'true'
+      # Autenticacion (better-auth, E3). En local basta un secreto fijo; en
+      # produccion (Railway) se inyecta uno fuerte por variable de entorno.
+      BETTER_AUTH_SECRET: secreto-de-desarrollo-local-cambiar-en-produccion
+      BETTER_AUTH_URL: http://localhost:8080
+    # Healthcheck con node (la imagen no trae curl): solo pasa a "healthy" cuando
+    # /api/health responde 200. Durante migrate deploy + seed (corren ANTES de
+    # arrancar el server) la sonda recibe conexion rechazada porque el server aun
+    # no escucha -> exit 1 -> "starting"; el 503 de /api/health solo aplica cuando
+    # el server YA esta arriba pero la BD no responde. Asi el frontend no arranca
+    # antes de tiempo y se elimina el "502 Bad Gateway" del arranque.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      # start_period holgado: cubre migrate deploy + seed antes de contar fallos.
+      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 10
     depends_on:
       postgres:
         condition: service_healthy
@@ -47,8 +70,11 @@ services:
       context: ./frontend
     ports:
       - '8080:80'
+    # Espera a que el backend este HEALTHY (no solo "started"): nginx empieza a
+    # proxyar /api cuando el backend ya responde, evitando el 502 de arranque.
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

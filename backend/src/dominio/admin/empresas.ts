@@ -14,7 +14,7 @@
  * desmarca la anterior en la misma transacción.
  */
 import type { ConfiguracionEmpresa, Empresa } from '../../datos/index.js';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';

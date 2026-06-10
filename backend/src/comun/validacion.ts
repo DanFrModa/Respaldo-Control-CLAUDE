@@ -8,7 +8,7 @@
  * exacto. Así las rutas REST no necesitan tratar `ZodError` de dominio como un
  * caso aparte: solo conocen `ErrorDominio`.
  */
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { ErrorValidacion } from './errores.js';
 

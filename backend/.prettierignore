@@ -4,3 +4,6 @@ node_modules/
 
 # Cliente Prisma generado (codigo generado; no se formatea ni se versiona)
 src/datos/generated/
+
+# Contrato OpenAPI generado (lo emite `npm run openapi`; no se formatea a mano)
+openapi.json
