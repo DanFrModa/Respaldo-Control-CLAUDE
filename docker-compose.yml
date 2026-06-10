@@ -1,0 +1,52 @@
+# docker-compose de CONTROL v2 — levanta TODO el stack con un comando.
+#
+#   docker compose up -d --build
+#
+# El entorno local replica produccion (PLANMAESTRO §2.1): solo el frontend
+# publica un puerto al host; backend y postgres son privados y se alcanzan por
+# nombre dentro de la red del compose. La base de datos queda lista para E2;
+# en E1 el backend todavia NO se conecta a ella.
+
+services:
+  # ── PostgreSQL 17 (privado) ────────────────────────────────────────────────
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: control
+      POSTGRES_PASSWORD: control
+      POSTGRES_DB: control_v2
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U control -d control_v2']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Backend Fastify (privado: sin puerto publicado al host) ────────────────
+  backend:
+    build:
+      context: ./backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      # Reservada para E2 (Prisma). En E1 el backend no abre conexion a la BD.
+      DATABASE_URL: postgresql://control:control@postgres:5432/control_v2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frontend nginx (publico: unico expuesto al host) ───────────────────────
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - '8080:80'
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  datos_postgres:

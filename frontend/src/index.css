@@ -1,0 +1,197 @@
+/*
+ * Sistema de tema de CONTROL v2 (claro / oscuro).
+ *
+ * Convencion compatible con shadcn/ui (que llega en E4): los colores son
+ * variables CSS como tripletas de canales HSL (ej. "0 0% 100%") que se
+ * consumen con `hsl(var(--token))`. `:root` define el tema CLARO (base);
+ * la clase `.dark` en `<html>` define el tema oscuro. Tailwind v4 + shadcn
+ * podran mapear estos mismos tokens sin refactor.
+ *
+ * Paleta tomada de los valores por defecto de shadcn/ui ("slate"), para que
+ * el theming de la fundacion sea el mismo que heredaran los componentes.
+ */
+
+:root {
+  /* Tema CLARO — base por defecto (no se sigue prefers-color-scheme). */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --border: 214.3 31.8% 91.4%;
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --ring: 222.2 84% 4.9%;
+
+  /* Colores semanticos de estado (legibles en tema claro). */
+  --exito: 142 71% 35%;
+  --error: 0 72% 45%;
+  --aviso: 38 92% 38%;
+
+  color-scheme: light;
+}
+
+.dark {
+  /* Tema OSCURO. */
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --border: 217.2 32.6% 17.5%;
+  --primary: 210 40% 98%;
+  --primary-foreground: 222.2 47.4% 11.2%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --ring: 212.7 26.8% 83.9%;
+
+  /* Colores semanticos de estado (legibles en tema oscuro). */
+  --exito: 142 69% 58%;
+  --error: 0 84% 70%;
+  --aviso: 38 92% 60%;
+
+  color-scheme: dark;
+}
+
+:root {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+/* ── Estructura de pagina ─────────────────────────────────────────────────── */
+
+.pagina {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecera {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.contenedor {
+  flex: 1;
+  width: 100%;
+  max-width: 32rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 3rem);
+  letter-spacing: 0.05em;
+}
+
+.subtitulo {
+  margin: 0.25rem 0 2rem;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Tarjeta de estado ───────────────────────────────────────────────────── */
+
+.tarjeta {
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  text-align: left;
+}
+
+.tarjeta h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.estado {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.estado--ok {
+  color: hsl(var(--exito));
+}
+
+.estado--error {
+  color: hsl(var(--error));
+}
+
+.estado--cargando {
+  color: hsl(var(--aviso));
+}
+
+.detalle {
+  margin: 0.5rem 0 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.875rem;
+  word-break: break-word;
+}
+
+/* ── Alternador de tema ──────────────────────────────────────────────────── */
+
+.alternador-tema {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 44x44px: area tactil accesible (WCAG 2.5.5/2.5.8). */
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.5rem;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.alternador-tema:hover {
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.alternador-tema:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
