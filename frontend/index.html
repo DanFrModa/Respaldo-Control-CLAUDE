@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CONTROL v2</title>
+    <!--
+      Aplica el tema ANTES de renderizar React para evitar el parpadeo de tema
+      al recargar (claro -> oscuro). El tema por defecto es CLARO (sin clase);
+      solo se agrega la clase "dark" si el usuario eligio oscuro. La clave y los
+      valores deben coincidir con src/tema.ts.
+    -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('control-v2-tema') === 'oscuro') {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {
+          /* sin localStorage (modo privado, etc.): se queda en claro */
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

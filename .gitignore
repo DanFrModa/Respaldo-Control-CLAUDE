@@ -1,0 +1,33 @@
+# ─── CONTROL v2 (servicios backend/ y frontend/) ───────────────────────────
+# Dependencias
+node_modules/
+
+# Builds
+backend/dist/
+frontend/dist/
+
+# Artefactos incrementales de TypeScript (tsc -b)
+*.tsbuildinfo
+
+# Variables de entorno (los .env reales nunca se versionan; sí los .example)
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# ─── Logs y temporales ─────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Editores / SO ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ─── Tests / cobertura ─────────────────────────────────────────────────────
+coverage/
+*/coverage/
