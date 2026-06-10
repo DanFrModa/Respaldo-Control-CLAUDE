@@ -6,6 +6,9 @@ node_modules/
 backend/dist/
 frontend/dist/
 
+# Cliente Prisma generado (se regenera con `npm run db:generate` / prisma generate)
+backend/src/datos/generated/
+
 # Artefactos incrementales de TypeScript (tsc -b)
 *.tsbuildinfo
 

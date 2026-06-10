@@ -1,0 +1,530 @@
+/**
+ * Catálogo único y TIPADO de permisos de CONTROL v2.
+ *
+ * Implementa la mejora **A4** (un solo sistema de seguridad RBAC) y el plan maestro §4
+ * "Seguridad": el catálogo vive en código y la base de datos se sincroniza desde aquí
+ * (seed de `backend/prisma`). El resto del sistema SOLO puede referirse a un permiso por su
+ * {@link ClavePermiso}; nunca por id numérico ni por texto libre. Es además la fuente
+ * del contrato OpenAPI (E3).
+ *
+ * Origen: los 38 permisos granulares reales de la tabla `Accesos` del sistema viejo
+ * (doc funcional `10-Modelo-Datos-y-Usuarios.md` §4, "Sistema 2 — el vigente"),
+ * transcritos de `Respaldo CLAUDE/TABLAS/Accesos.csv`, más los permisos nuevos de
+ * administración que el sistema viejo resolvía por nivel (doc `00-Arranque-Login-y-Menu.md` §2).
+ */
+
+/**
+ * Módulos funcionales a los que pertenece cada permiso.
+ * La clave del módulo es SIEMPRE el prefijo de la clave del permiso (`modulo.accion`);
+ * el valor es la etiqueta para UI (menús, pantalla de administración de roles).
+ */
+export const MODULOS_PERMISO = {
+  ordenes: 'Órdenes de producción',
+  pedidos: 'Pedidos',
+  clientes: 'Clientes',
+  proveedores: 'Proveedores',
+  maquileros: 'Maquileros',
+  etiquetas: 'Etiquetas de marca',
+  compras: 'Órdenes de compra',
+  produccion: 'Producción (corte y maquila)',
+  telas: 'Inventario de telas',
+  ipt: 'Inventario de producto terminado',
+  esma: 'Estados de cuenta de maquileros',
+  rc: 'Ruta Crítica',
+  calidad: 'Control de calidad',
+  indicadores: 'Indicadores',
+  consultas: 'Consultas transversales',
+  usuarios: 'Administración de usuarios',
+  roles: 'Administración de roles',
+  almacenes: 'Almacenes',
+  empresas: 'Empresas',
+} as const;
+
+/** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
+export type ModuloPermiso = keyof typeof MODULOS_PERMISO;
+
+/**
+ * Referencia al permiso original del sistema viejo (tabla `Accesos`).
+ * Se conserva como metadato para trazabilidad y para la migración de `UsuAccesos` (F8):
+ * `descripcion` es el texto EXACTO de `Accesos.Descripcion` (con su ortografía original).
+ */
+export interface OrigenAcceso {
+  /** `Accesos.IdAccesos` (1–38) — posición que ocupaba en el arreglo `PrP()` del VBA. */
+  readonly idAcceso: number;
+  /** `Accesos.Formulario`: pantalla(s) del sistema viejo donde aplicaba. */
+  readonly formulario: string;
+  /** `Accesos.Descripcion` textual del sistema viejo. */
+  readonly descripcion: string;
+}
+
+/** Definición de un permiso del catálogo. */
+export interface DefinicionPermiso {
+  /** Clave estable `modulo.accion` (kebab-case, sin acentos). Es LA identidad del permiso. */
+  readonly clave: `${ModuloPermiso}.${string}`;
+  /** Módulo funcional (siempre igual al prefijo de `clave`). */
+  readonly modulo: ModuloPermiso;
+  /** Descripción clara para UI (pantalla de roles/permisos). */
+  readonly descripcion: string;
+  /** Permiso equivalente del sistema viejo; ausente en permisos nuevos de v2. */
+  readonly origen?: OrigenAcceso;
+}
+
+/**
+ * Catálogo completo de permisos, agrupado por módulo.
+ *
+ * Los 38 con `origen` son la transcripción 1:1 de `Accesos.csv`; los 5 sin `origen`
+ * son permisos nuevos de administración (A4: absorben lo que antes se decidía por
+ * nivel ≤ 20, doc 00 §2 y §3.1 "botón Administración").
+ */
+export const CATALOGO_PERMISOS = [
+  // ── Órdenes de producción ────────────────────────────────────────────────────
+  {
+    clave: 'ordenes.modificar',
+    modulo: 'ordenes',
+    descripcion: 'Modificar la orden de producción',
+    origen: {
+      idAcceso: 3,
+      formulario: 'OrdenVer/Otras',
+      descripcion: 'Poder Modificar la Orden de produccion',
+    },
+  },
+  {
+    clave: 'ordenes.precio-maquila',
+    modulo: 'ordenes',
+    descripcion: 'Capturar o modificar el precio de maquila',
+    origen: {
+      idAcceso: 4,
+      formulario: 'OrdenVer',
+      descripcion: 'Meter o modificar el precio de maquila',
+    },
+  },
+  {
+    clave: 'ordenes.habilitacion',
+    modulo: 'ordenes',
+    descripcion: 'Capturar o modificar la habilitación de la orden',
+    origen: {
+      idAcceso: 31,
+      formulario: 'OrdenVer',
+      descripcion: 'Poder meter o modificar habilitacion.',
+    },
+  },
+  {
+    clave: 'ordenes.ver-costos',
+    modulo: 'ordenes',
+    descripcion: 'Ver el botón de costos de la orden',
+    origen: { idAcceso: 34, formulario: 'OrdenVer', descripcion: 'Ver el boton de costos' },
+  },
+  {
+    clave: 'ordenes.ver-precio-real-maquila',
+    modulo: 'ordenes',
+    descripcion: 'Ver el precio real de maquila',
+    origen: { idAcceso: 36, formulario: 'OrdenVer', descripcion: 'Ver Precio Real de maquila' },
+  },
+
+  // ── Pedidos ──────────────────────────────────────────────────────────────────
+  {
+    clave: 'pedidos.modificar',
+    modulo: 'pedidos',
+    descripcion: 'Modificar pedidos',
+    origen: { idAcceso: 5, formulario: 'PedidosPorMes', descripcion: 'Modificar Pedidos' },
+  },
+  {
+    clave: 'pedidos.modificar-reales',
+    modulo: 'pedidos',
+    descripcion: 'Modificar pedidos reales',
+    origen: {
+      idAcceso: 14,
+      formulario: 'PedidosRealesVer',
+      descripcion: 'Poder modificar pedidos reales.',
+    },
+  },
+
+  // ── Clientes / Proveedores ───────────────────────────────────────────────────
+  {
+    clave: 'clientes.modificar',
+    modulo: 'clientes',
+    descripcion: 'Modificar clientes (cualquiera puede agregar)',
+    origen: {
+      idAcceso: 6,
+      formulario: 'Clientes',
+      descripcion: 'Modificar Clientes (Cualquiera puede agregar)',
+    },
+  },
+  {
+    clave: 'proveedores.modificar',
+    modulo: 'proveedores',
+    descripcion: 'Modificar información de proveedores',
+    origen: {
+      idAcceso: 38,
+      formulario: 'Proveedores',
+      descripcion: 'Poder modificar informacion de proveedores',
+    },
+  },
+
+  // ── Maquileros ───────────────────────────────────────────────────────────────
+  {
+    clave: 'maquileros.programar',
+    modulo: 'maquileros',
+    descripcion: 'Agregar o modificar los maquileros programados',
+    origen: {
+      idAcceso: 15,
+      formulario: 'MaquilerosProg',
+      descripcion: 'Poder Agregar / Modificar los maquileros programados',
+    },
+  },
+  {
+    clave: 'maquileros.alta-asegurados',
+    modulo: 'maquileros',
+    descripcion: 'Dar de alta maquileros nuevos y asignarlos como asegurados',
+    origen: {
+      idAcceso: 37,
+      formulario: 'Maquileros',
+      descripcion: 'Poder dar de alta nuevos maquileros y asignarlos como asegurados',
+    },
+  },
+
+  // ── Etiquetas de marca ───────────────────────────────────────────────────────
+  {
+    clave: 'etiquetas.modificar',
+    modulo: 'etiquetas',
+    descripcion: 'Modificar las etiquetas de marca',
+    origen: {
+      idAcceso: 9,
+      formulario: 'EtiquetasM',
+      descripcion: 'Modificar las Etiquetas de Marca',
+    },
+  },
+
+  // ── Órdenes de compra ────────────────────────────────────────────────────────
+  {
+    clave: 'compras.autorizar',
+    modulo: 'compras',
+    descripcion: 'Autorizar órdenes de compra',
+    origen: {
+      idAcceso: 8,
+      formulario: 'OrdCompraProceso',
+      descripcion: 'Poder autorizar Ordenes de Compra',
+    },
+  },
+
+  // ── Producción (corte y maquila) ─────────────────────────────────────────────
+  {
+    clave: 'produccion.corte-salidas',
+    modulo: 'produccion',
+    descripcion: 'Capturar información de corte y salidas a maquileros',
+    origen: {
+      idAcceso: 32,
+      formulario: 'Procesos',
+      descripcion: 'Poder meter informacion de corte y salidas a maquileros',
+    },
+  },
+  {
+    clave: 'produccion.entradas-maquila',
+    modulo: 'produccion',
+    descripcion: 'Capturar información de entradas de maquila',
+    origen: {
+      idAcceso: 33,
+      formulario: 'Procesos',
+      descripcion: 'Poder meter informacion de entradas de maquila',
+    },
+  },
+
+  // ── Inventario de telas ──────────────────────────────────────────────────────
+  {
+    clave: 'telas.ver-totales',
+    modulo: 'telas',
+    descripcion: 'Ver totales de telas e importes',
+    origen: {
+      idAcceso: 7,
+      formulario: 'Existencia',
+      descripcion: 'Ver Totales de telas e importes',
+    },
+  },
+
+  // ── Inventario de producto terminado (IPT) ───────────────────────────────────
+  {
+    clave: 'ipt.clasificar-modelos',
+    modulo: 'ipt',
+    descripcion: 'Clasificar los modelos del inventario de producto terminado',
+    origen: {
+      idAcceso: 26,
+      formulario: 'IPT_Modelos',
+      descripcion: 'Poder Accesar al form (Para clasificar los modelos)',
+    },
+  },
+  {
+    clave: 'ipt.consultar-existencias',
+    modulo: 'ipt',
+    descripcion: 'Consultar las existencias de producto terminado',
+    origen: {
+      idAcceso: 27,
+      formulario: 'IPT_Exis',
+      descripcion: 'Poder Accesar al form (Consultar los inventarios de PT)',
+    },
+  },
+  {
+    clave: 'ipt.fecha-libre',
+    modulo: 'ipt',
+    descripcion: 'Capturar cualquier fecha en los movimientos de almacén de PT',
+    origen: {
+      idAcceso: 28,
+      formulario: 'IPT_Movimientos',
+      descripcion: 'Poder meter la fecha que sea en los movimientos de almacen de PT',
+    },
+  },
+  {
+    clave: 'ipt.modificar-movimientos',
+    modulo: 'ipt',
+    descripcion: 'Modificar movimientos del inventario de PT',
+    origen: {
+      idAcceso: 29,
+      formulario: 'IPT_MovsLista',
+      descripcion: 'Poder MODIFICAR algun movimiento del inventario de PT',
+    },
+  },
+  {
+    clave: 'ipt.cantidades-negativas',
+    modulo: 'ipt',
+    descripcion: 'Capturar cantidades en negativo en el inventario de PT',
+    origen: {
+      idAcceso: 30,
+      formulario: 'IPT_Movimientos',
+      descripcion: 'Poder meter cantidades en negativo al Inventario de PT',
+    },
+  },
+
+  // ── Estados de cuenta de maquileros (EsMa) ───────────────────────────────────
+  {
+    clave: 'esma.ver-pagos',
+    modulo: 'esma',
+    descripcion: 'Acceder al estado de cuenta de maquileros solo para ver y registrar pagos',
+    origen: {
+      idAcceso: 24,
+      formulario: 'EsMa_EdoCta',
+      descripcion: 'Poder Accesar al form (Solo para ver y meter pagos)',
+    },
+  },
+  {
+    clave: 'esma.modificar',
+    modulo: 'esma',
+    descripcion: 'Hacer cualquier modificación a las cuentas de los maquileros',
+    origen: {
+      idAcceso: 25,
+      formulario: 'EsMa_EdoCta',
+      descripcion: 'Poder hacer cualquier modficacion a las cuentas de los maquileros',
+    },
+  },
+
+  // ── Ruta Crítica (RC) ────────────────────────────────────────────────────────
+  {
+    clave: 'rc.ver-botones',
+    modulo: 'rc',
+    descripcion: 'Ver todos los botones de la Ruta Crítica',
+    origen: { idAcceso: 1, formulario: 'OrdenVer', descripcion: 'Ver todos los botones de la RC' },
+  },
+  {
+    clave: 'rc.fechas-retraso',
+    modulo: 'rc',
+    descripcion: 'Capturar fechas con más de 2 días de retraso en la RC',
+    origen: {
+      idAcceso: 10,
+      formulario: 'RC_MeterFechas',
+      descripcion: 'Se puede meter las fechas con mas de 2 dias de retrazo',
+    },
+  },
+  {
+    clave: 'rc.fecha-libre-cumplimiento',
+    modulo: 'rc',
+    descripcion: 'Capturar cualquier fecha en el cumplimiento de la RC',
+    origen: {
+      idAcceso: 35,
+      formulario: 'RC_MeterDatosDet',
+      descripcion: 'Poder meter la fecha que sea en el cumplimiento',
+    },
+  },
+
+  // ── Control de calidad ───────────────────────────────────────────────────────
+  {
+    clave: 'calidad.generar-auditorias',
+    modulo: 'calidad',
+    descripcion: 'Generar auditorías de calidad',
+    origen: {
+      idAcceso: 11,
+      formulario: 'CC_AltaAuditorias',
+      descripcion: 'Se puedes generar auditorias',
+    },
+  },
+  {
+    clave: 'calidad.modificar-auditorias',
+    modulo: 'calidad',
+    descripcion: 'Modificar auditorías de calidad (en todas partes)',
+    origen: {
+      idAcceso: 12,
+      formulario: 'CC_AltaAuditorias',
+      descripcion: 'Modificar Auditorias (En Todas Partes)',
+    },
+  },
+  {
+    clave: 'calidad.actualizar-auditorias',
+    modulo: 'calidad',
+    descripcion: 'Actualizar auditorías de calidad (solo algunos datos)',
+    origen: {
+      idAcceso: 13,
+      formulario: 'CC_ConsultaAuditorias',
+      descripcion: 'Se pueden Actualizar las auditorias (Solo algunos datos, dando doble click)',
+    },
+  },
+
+  // ── Indicadores ──────────────────────────────────────────────────────────────
+  {
+    clave: 'indicadores.fecha-libre',
+    modulo: 'indicadores',
+    descripcion: 'Capturar cualquier fecha en los formularios de indicadores',
+    origen: {
+      idAcceso: 16,
+      formulario: 'Indicadores General',
+      descripcion: 'Poder agregar la fecha que sea en varios formularios de indicadores',
+    },
+  },
+  {
+    clave: 'indicadores.ip-productividad',
+    modulo: 'indicadores',
+    descripcion: 'Capturar la productividad de Ingeniería del Producto',
+    origen: {
+      idAcceso: 17,
+      formulario: 'IP_Productiv',
+      descripcion: 'Poder accesar al formulario (Meter Productividad de IP)',
+    },
+  },
+  {
+    clave: 'indicadores.ip-confiabilidad',
+    modulo: 'indicadores',
+    descripcion: 'Evaluar la confiabilidad de fichas técnicas',
+    origen: {
+      idAcceso: 18,
+      formulario: 'IP_ConfAgregar',
+      descripcion: 'Poder accesar al formulario (Evaluar la confiabilidad de Fichas)',
+    },
+  },
+  {
+    clave: 'indicadores.ip-muestrarios',
+    modulo: 'indicadores',
+    descripcion: 'Capturar el avance de los muestrarios pendientes',
+    origen: {
+      idAcceso: 22,
+      formulario: 'IP_MuesPend_Pend',
+      descripcion: 'Poder Accesar al form. (Meter el avance de los muestrarios pendientes)',
+    },
+  },
+  {
+    clave: 'indicadores.ciclicos-alta',
+    modulo: 'indicadores',
+    descripcion: 'Dar de alta los modelos a revisar en inventarios cíclicos',
+    origen: {
+      idAcceso: 19,
+      formulario: 'Alm_IC_Alta',
+      descripcion: 'Poder accesar al form. (Dar de alta los modelos que se van a revisar)',
+    },
+  },
+  {
+    clave: 'indicadores.ciclicos-conteo',
+    modulo: 'indicadores',
+    descripcion: 'Capturar el conteo de inventarios cíclicos',
+    origen: {
+      idAcceso: 20,
+      formulario: 'Alm_IC_Cont',
+      descripcion: 'Poder accesar al form. (Meter la cantidad que se conto)',
+    },
+  },
+  {
+    clave: 'indicadores.ciclicos-consulta',
+    modulo: 'indicadores',
+    descripcion: 'Consultar los inventarios cíclicos',
+    origen: {
+      idAcceso: 21,
+      formulario: 'Alm_IC_Consulta',
+      descripcion: 'Poder Accesar al form. (Consultar los inventarios ciclicos)',
+    },
+  },
+  {
+    clave: 'indicadores.almacen-productividad',
+    modulo: 'indicadores',
+    descripcion: 'Capturar la productividad del almacén',
+    origen: {
+      idAcceso: 23,
+      formulario: 'Alm_Prd_Diaria',
+      descripcion: 'Poder Accesar al form. (Meter la productividad de Almacen)',
+    },
+  },
+
+  // ── Consultas transversales ──────────────────────────────────────────────────
+  {
+    clave: 'consultas.ver-importes',
+    modulo: 'consultas',
+    descripcion: 'Ver importes totales y precios en las consultas',
+    origen: {
+      idAcceso: 2,
+      formulario: 'PedidosPorMes/Otras',
+      descripcion: 'Ver Importes Totales (TotalImporte) y Precios. En varias consultas',
+    },
+  },
+
+  // ── Administración (nuevos en v2, sin equivalente granular en el viejo) ──────
+  {
+    clave: 'usuarios.administrar',
+    modulo: 'usuarios',
+    descripcion: 'Administrar usuarios (alta, edición, bloqueo, asignación de roles)',
+  },
+  {
+    clave: 'roles.administrar',
+    modulo: 'roles',
+    descripcion: 'Administrar roles y sus permisos',
+  },
+  {
+    clave: 'almacenes.ver',
+    modulo: 'almacenes',
+    descripcion: 'Consultar el catálogo de almacenes',
+  },
+  {
+    clave: 'almacenes.administrar',
+    modulo: 'almacenes',
+    descripcion: 'Administrar el catálogo de almacenes (alta, edición, desactivación)',
+  },
+  {
+    clave: 'empresas.administrar',
+    modulo: 'empresas',
+    descripcion: 'Administrar empresas y su configuración',
+  },
+] as const satisfies readonly DefinicionPermiso[];
+
+/**
+ * Unión de literales con TODAS las claves de permiso válidas.
+ * El resto del sistema (servicios de dominio, rutas REST, UI) solo puede referirse
+ * a un permiso mediante este tipo — un typo es error de compilación.
+ */
+export type ClavePermiso = (typeof CATALOGO_PERMISOS)[number]['clave'];
+
+/** Todas las claves del catálogo, en el orden del catálogo. */
+export const CLAVES_PERMISO: readonly ClavePermiso[] = CATALOGO_PERMISOS.map((p) => p.clave);
+
+/** Type guard: valida en runtime que un string sea una {@link ClavePermiso} del catálogo. */
+export function esClavePermiso(valor: string): valor is ClavePermiso {
+  return (CLAVES_PERMISO as readonly string[]).includes(valor);
+}
+
+/**
+ * Catálogo agrupado por módulo (para la pantalla de administración de roles y
+ * para armar menús por permisos). Solo incluye módulos con al menos un permiso.
+ */
+export function permisosPorModulo(): ReadonlyMap<ModuloPermiso, readonly DefinicionPermiso[]> {
+  const grupos = new Map<ModuloPermiso, DefinicionPermiso[]>();
+  for (const permiso of CATALOGO_PERMISOS) {
+    const grupo = grupos.get(permiso.modulo);
+    if (grupo) {
+      grupo.push(permiso);
+    } else {
+      grupos.set(permiso.modulo, [permiso]);
+    }
+  }
+  return grupos;
+}

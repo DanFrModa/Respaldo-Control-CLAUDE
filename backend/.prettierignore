@@ -1,0 +1,6 @@
+# Builds y dependencias
+dist/
+node_modules/
+
+# Cliente Prisma generado (codigo generado; no se formatea ni se versiona)
+src/datos/generated/

@@ -1,0 +1,20 @@
+{
+  // Config de BUILD: compila la app de runtime (src/) a dist/. Excluye los
+  // archivos de prueba y los helpers de test (src/pruebas), que no forman parte
+  // del servidor. El cliente Prisma generado SÍ se emite (lo importa src/datos
+  // en runtime). El seed y prisma.config.ts corren con tsx, no por aquí.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.int.test.ts",
+    "src/pruebas/**"
+  ]
+}
