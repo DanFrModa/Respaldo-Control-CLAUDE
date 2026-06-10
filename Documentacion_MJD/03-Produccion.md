@@ -10,13 +10,21 @@ flowchart TD
     B --> C[Se generan ÓRDENES de producción<br/>una por modelo]
     C --> D[OrdenesDet<br/>desglose por Color y Tallas T1..T8]
     D --> E[CORTE<br/>OrdenesDetCorte TC1..TC8]
-    E --> F[ENTREGA a Maquilero<br/>Entregas + OrdenesDetEntM]
-    F --> G[RECIBO del Maquilero<br/>Recibos + OrdenesDetRecM]
+    E --> F[ENVÍO a Maquila costura<br/>Entregas + OrdenesDetEntM]
+    F --> G[RECIBO de Maquila<br/>Recibos + OrdenesDetRecM]
+    E --> EE[ENVÍO a Estampado<br/>EntregasEst + OrdenesDetEntA]
+    EE --> GE[RECIBO de Estampado<br/>RecibosEst + OrdenesDetRecA]
     G --> H[CONTROL DE CALIDAD<br/>CC_Auditorias]
     G --> I[Entra a INVENTARIO<br/>IPT_Movs / IPT_Mod_Alm]
     I --> J[ENTREGA al Cliente<br/>EntregasCliente]
     C --> K[COSTO de la Orden<br/>CostoOrd]
+    F -.avance.-> W[WIP / Proceso<br/>cortado·enviado·recibido·pendientes]
+    G -.avance.-> W
+    EE -.avance.-> W
+    GE -.avance.-> W
 ```
+
+> El **WIP** (form `Proceso`) consolida el avance por etapas y los pendientes — ver sección [El WIP](#el-wip--avance-de-la-orden-form-proceso) más abajo.
 
 ## Las entidades (tablas) y su jerarquía
 
@@ -122,7 +130,7 @@ Aquí se registra cuánto se cortó realmente de cada talla. Igual que en orden,
 
 ## Paso 4 — Entrega a maquilero
 
-**Pantallas:** `OrdDetEntM` (entrega a Maquila), `OrdDetEntA` (entrega a Almacén), `OrdDetEntregas`.
+**Pantallas:** `OrdDetEntM` (entrega a maquila/costura), `OrdDetEntA` (entrega a estampado/aplicación), `OrdDetEntregas`.
 
 **Tabla `Entregas`** (encabezado de la entrega que SALE hacia el maquilero):
 | Campo | Significado |
@@ -136,8 +144,11 @@ Aquí se registra cuánto se cortó realmente de cada talla. Igual que en orden,
 
 **Tabla `OrdenesDetEntM`** (desglose por talla de lo entregado): `IdEntregas`, `IdOrdenesDet`, `TC1…TC8`.
 
-> Nota: existen variantes **M** (Maquila) y **A** (Almacén) tanto en entregas como en recibos
-> (`OrdenesDetEntM`/`OrdenesDetEntA`, `OrdenesDetRecM`/`OrdenesDetRecA`).
+> 🔑 **Aclaración M / A:** hay **dos flujos de maquila paralelos**, cada uno con su entrega y su recibo:
+> - **M = Maquila (costura):** `Entregas` / `Recibos` (+ detalle por talla `OrdenesDetEntM` / `OrdenesDetRecM`).
+> - **A = Aplicación (estampado):** `EntregasEst` / `RecibosEst` (+ detalle por talla `OrdenesDetEntA` / `OrdenesDetRecA`).
+>
+> Es decir, **A = Estampado/Aplicación, no Almacén.** Una prenda puede ir a costura y también a estampado, cada uno con su ciclo enviar→recibir.
 
 ---
 
@@ -168,6 +179,52 @@ Cuando se procesa un recibo, el sistema:
 
 > 🔗 Aquí es donde el **flujo de producción se conecta con el módulo de Inventario (IPT)**.
 > Las "Primeras" y "Segundas" (`TipoPrendas`) se manejan como **almacenes distintos**.
+
+> ### ⭐ El recibo es la fuente de TRES cosas (punto de integración central)
+> Cuando se **reciben las prendas** y se registra en el avance de producción (WIP), esa **misma captura** alimenta:
+> 1. **El avance/WIP** — sube el "recibido" de la orden (por color × talla, D4).
+> 2. **El inventario de PT** — entrada automática (`MeterInventario` → `IPT_Movs` + suma a existencia).
+> 3. **El estado de cuenta del maquilero (EsMa)** — el **cargo** por la maquila recibida (cantidad × precio).
+>
+> 🟢 **Diseño objetivo (v2):** el recibo debe ser la **única fuente de verdad**, y de él se derivan **automáticamente** la entrada a inventario y el cargo en EsMa (el administrador solo **valida/ajusta el precio** en EsMa). Hoy el inventario sí es automático, pero el cargo en EsMa se **re-captura a mano** (ver [07 — EsMa](07-EsMa-Estados-de-Cuenta-Maquileros.md), mejora de doble captura). Además, como el recibo es por **color × talla**, esa granularidad debe fluir al inventario (D4).
+
+---
+
+## Flujo paralelo — Estampado / Aplicación
+
+Además de la maquila de **costura**, una orden puede pasar por **estampado (aplicación)**, que es un ciclo enviar→recibir **independiente**, con sus propias tablas:
+
+| | Costura (M) | Estampado / Aplicación (A) |
+|---|---|---|
+| Entrega (sale) | `Entregas` + `OrdenesDetEntM` | `EntregasEst` + `OrdenesDetEntA` |
+| Recibo (regresa) | `Recibos` + `OrdenesDetRecM` | `RecibosEst` + `OrdenesDetRecA` |
+| Pantallas | `ProcesoEntrega` / `ProcesoRecibo` | `ProcesoEntregaEst` / `ProcesoReciboEst` |
+| Maquilero | de costura | estampador (`Estampadores`) |
+
+Ambos ciclos llevan cantidades por talla (`TC1…TC8`) y conviven en la misma orden.
+
+---
+
+## El WIP — avance de la orden (form `Proceso`)
+
+> Esta es la **vista consolidada de avance (Work In Progress)** de cada orden — el tablero que faltaba documentar.
+
+La pantalla **`Proceso`** ("Alimentar el proceso de las órdenes", menú 3.2.1) muestra, en una sola vista, las **5 etapas** de cada orden con sus totales y, sobre todo, los **pendientes calculados**. Reúne 5 subformularios: `ProcesoCorte`, `ProcesoEntrega`, `ProcesoRecibo`, `ProcesoEntregaEst`, `ProcesoReciboEst`.
+
+| Etapa | Total | Pendiente (cálculo en pantalla) |
+|---|---|---|
+| Cantidad de la orden | `Cant` | — |
+| **Corte** | `TotalCorte` | **Por cortar** = `Cant − TotalCorte` |
+| **Envío a maquila** (costura) | `TotalEntrega` | **Cortado por enviar** = `TotalCorte − TotalEntrega` |
+| **Recibo de maquila** | `TotalRecibo` | **Por recibir** = `TotalEntrega − TotalRecibo` |
+| **Envío a estampado** | `TotalEntregaEst` | — |
+| **Recibo de estampado** | `TotalReciboEst` | **Por recibir (est.)** = `TotalEntregaEst − TotalReciboEst` |
+
+Así, de un vistazo, se ve **dónde va cada orden** y **cuánto falta en cada etapa**. Es el control operativo del día a día de producción.
+
+> 💡 **Relación con la Ruta Crítica:** el WIP es el avance por **cantidades** (cuánto se cortó/envió/recibió); la **RC** ([08](08-Ruta-Critica.md)) es el avance por **tiempos/fechas** de los procesos. Son complementarios — y en CONTROL v2 el WIP es una **fuente natural de KPIs** (avance, cuellos de botella, prendas atoradas en cada etapa).
+
+> 🟢 **DECISIÓN D4 (alcance ampliado):** **cada etapa del WIP se registra por color × talla** — corte, envío y recibo de costura, envío y recibo de estampado, y entrega al cliente. Hoy ya es así (vía la línea `OrdenesDet` con color + `TC1..TC8`), pero con el límite de 8 tallas; en v2 las tallas son **ilimitadas** y la granularidad color × talla se mantiene en **todas** las etapas. Esto permite saber, por ejemplo, "faltan por recibir 12 piezas talla 6 color rojo".
 
 ---
 
@@ -264,7 +321,7 @@ Ejemplo real de una nota:
 1. **Modelo "ancho" de tallas (T1..T8 / TC1..TC8).** Hoy las tallas son 8 columnas fijas. → 🟢 **DECISIÓN D4:** tallas **ilimitadas** (normalizar a `detalle(linea, talla, cantidad)`) y el **inventario de PT por modelo × color × talla × almacén**. Modelo de datos objetivo en [DECISIONES.md](DECISIONES.md).
 2. **Lógica de negocio metida en los botones.** Reglas críticas (como cargar inventario al recibir) viven en eventos de formularios con `INSERT/UPDATE` directos por SQL. Al migrar, esto debe pasar a **servicios/funciones de backend** con transacciones (hoy no hay transacción: si falla a la mitad, el inventario puede quedar inconsistente).
 3. **"Primeras/Segundas" como almacenes.** El campo `TipoPrendas` mezcla calidad y almacén. Vale la pena modelarlo explícito.
-4. **Duplicación M/A** (Maquila/Almacén) en entregas y recibos: revisar si ambas siguen en uso o una quedó obsoleta.
+4. **Dos flujos de maquila** (costura "M" y estampado "A"): hoy son tablas separadas (`Entregas`/`EntregasEst`, etc.). En v2 conviene **un solo modelo de "proceso de maquila"** parametrizado por tipo (costura, estampado, bordado, lavado…), evitando duplicar tablas por cada tipo. Esto enlaza con la RC (cada tipo es un proceso). 🟡
 5. **Trazabilidad por talla completa**: el sistema ya rastrea cantidades por talla en cada etapa (pedido→corte→entrega→recibo). Es una base excelente para reportes de mermas y avance que conviene conservar.
 
 ---

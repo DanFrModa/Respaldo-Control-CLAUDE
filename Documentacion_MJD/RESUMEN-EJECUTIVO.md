@@ -37,8 +37,10 @@ Modernizar **CONTROL**, el ERP textil que el dueño construyó hace ~30 años en
 
 ```
 MODELOS → PEDIDOS → PRODUCCIÓN (Ruta Crítica controla los tiempos)
-   │                    ├─ Corte
-   │                    ├─ Maquila (entrega/recibo) → Inventario PT
+   │                    ├─ Corte                         (por color × talla)
+   │                    ├─ Maquila costura (envío/recibo)
+   │                    ├─ Estampado/aplicación (envío/recibo)   ← flujo paralelo
+   │                    ├─ WIP (form Proceso): avance + pendientes por etapa
    │                    ├─ Control de Calidad (Primeras/Segundas)
    │                    └─ Entrega al cliente
    ├─ Compras (OC) y Notas de salida (avíos a maquila)
@@ -47,6 +49,8 @@ MODELOS → PEDIDOS → PRODUCCIÓN (Ruta Crítica controla los tiempos)
    ├─ EsMa (cuenta de maquileros)
    └─ Indicadores (KPIs)
 ```
+
+> ⭐ **Punto de integración central:** el **recibo de prendas** (registrado en el WIP) es **fuente única** que alimenta a la vez: el **avance/WIP**, la **entrada a inventario PT** y el **cargo en EsMa**. Principio de diseño v2: **capturar una vez, usar en todos lados**.
 
 ## 5. Decisiones del dueño (12)
 

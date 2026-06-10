@@ -50,6 +50,10 @@ Estas aplican a **todo el sistema**, no a un módulo:
 - `TipoPrendas` mezcla **calidad** (Primeras/Segundas) con **almacén** → separar conceptos. 🟡
 - Revisar duplicación **M (Maquila) / A (Almacén)** en entregas y recibos: ¿ambas en uso? 🟡
 
+### 03 — Producción · WIP y flujos de maquila
+- **Vista WIP (avance de la orden)** ya existe (form `Proceso`): cortado/enviado/recibido + pendientes, costura y estampado. → Conservar y convertir en **fuente de KPIs** (avance, prendas atoradas por etapa, cuellos de botella). 🟡
+- **Unificar los flujos de maquila** (costura "M" y estampado "A" hoy son tablas separadas) en **un solo "proceso de maquila"** parametrizado por tipo (costura/estampado/bordado/lavado…). Enlaza con la RC (cada tipo = un proceso). 🟡
+
 ### 03 — Producción · Notas de salida
 - **Notas de salida estructuradas:** hoy `NotasDet.Descripcion` es **texto libre**. → Ligar cada renglón al **catálogo de Habilitación** (avío + cantidad + unidad) para poder analizar lo enviado a maquileros y **descontarlo del inventario de avíos**. 🟡
 - Órdenes de compra: conservar el **flujo de autorización** y la relación N:N con órdenes de producción (ya bien hechos). ✅

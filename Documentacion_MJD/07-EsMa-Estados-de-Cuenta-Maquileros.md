@@ -43,6 +43,8 @@ Saldo maquilero = Σ Importe + Σ Abonos − Σ Pagos − Σ Descuentos
 
 > 🟡 **Oportunidad de mejora:** hoy la información del recibo se **recaptura a mano** en EsMa. En el sistema nuevo puede **ligarse/proponerse automáticamente** desde el recibo (con el admin solo validando/ajustando), evitando doble captura y errores.
 
+> ⭐ **Fuente única:** el **mismo recibo** que se registra en el avance de producción (WIP) alimenta **tres cosas**: el avance/WIP, la **entrada al inventario de PT** (automática) y el **cargo en EsMa**. En v2, el recibo es la **única fuente de verdad** y EsMa + inventario se derivan de él automáticamente. Ver [03 — Producción §Recibo](03-Produccion.md).
+
 ---
 
 ## 3. Modelo de datos

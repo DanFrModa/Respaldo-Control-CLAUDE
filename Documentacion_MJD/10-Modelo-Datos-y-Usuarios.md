@@ -58,7 +58,9 @@ erDiagram
 ### PRODUCCIÓN
 - `Ordenes` (→`PedidosDet`,`Modelos`,`Maquileros`,`EtiquetasM`,`Clientes`,`TelasDis`) → `OrdenesDet` (color + `T1..T8`).
 - Corte: `OrdenesDetCorte` (→`Corte`/`Cortadores`).
-- Maquila: `Entregas`+`OrdenesDetEntM/A`, `Recibos`+`OrdenesDetRecM/A`.
+- Maquila **costura (M)**: `Entregas`+`OrdenesDetEntM`, `Recibos`+`OrdenesDetRecM`.
+- Maquila **estampado/aplicación (A)**: `EntregasEst`+`OrdenesDetEntA`, `RecibosEst`+`OrdenesDetRecA`.
+- **WIP / avance:** form `Proceso` (consolida corte/envíos/recibos + pendientes; no es tabla, es vista calculada).
 - Cliente: `EntregasCliente`.
 - Notas: `Notas`→`NotasDet` (→`Ordenes`).
 
