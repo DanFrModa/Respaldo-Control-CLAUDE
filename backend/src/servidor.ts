@@ -12,7 +12,7 @@ import { construirApp } from './app.js';
 const PUERTO = Number(process.env.PORT ?? 3000);
 const HOST = '::';
 
-const app = construirApp({ logBonito: process.env.NODE_ENV !== 'production' });
+const app = await construirApp({ logBonito: process.env.NODE_ENV !== 'production' });
 
 /** Cierra la app de forma ordenada y termina el proceso. */
 async function apagar(senal: NodeJS.Signals): Promise<void> {

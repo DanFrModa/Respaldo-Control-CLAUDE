@@ -14,7 +14,7 @@
  */
 import { esClavePermiso } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
-import * as z from 'zod';
+import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';

@@ -54,3 +54,86 @@ export const esquemaAlmacenEditar = esquemaAlmacenCrear.partial().extend({
 
 /** Datos validados de edición de almacén. */
 export type DatosAlmacenEditar = z.infer<typeof esquemaAlmacenEditar>;
+
+/**
+ * Salida de un almacén en la API (lo que ve el frontend). Es la proyección del
+ * modelo `Almacen` a JSON: incluye la auditoría (quién/cuándo) sin filtrar nada
+ * sensible. Parte del contrato OpenAPI.
+ */
+export const esquemaAlmacenSalida = z
+  .object({
+    id: z.number().int().describe('Id del almacén.'),
+    nombre: z.string().describe('Nombre del almacén.'),
+    tipo: z.enum(TIPOS_ALMACEN).describe('Tipo: PT, TELA o AVIO.'),
+    activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
+    idEmpresa: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Empresa dueña, o null si es un almacén global.'),
+    creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
+    creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),
+    modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
+    modificadoPorId: z.string().nullable().describe('Id del último usuario que lo modificó.'),
+  })
+  .describe('Almacén del catálogo (base del kardex único).');
+
+/** Forma de un almacén tal como lo devuelve la API. */
+export type AlmacenSalida = z.infer<typeof esquemaAlmacenSalida>;
+
+/**
+ * Parámetros del listado de almacenes EN LA URL (querystring): todo llega como
+ * texto, así que se coaccionan números y banderas. Mapea 1:1 a los parámetros
+ * del servicio de dominio `listarAlmacenes`. `.describe()` documenta el contrato.
+ */
+export const esquemaAlmacenesQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (máx 100).'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe('Texto a buscar en el nombre (insensible a mayúsculas).'),
+    tipo: z.enum(TIPOS_ALMACEN).optional().describe('Filtra por tipo de almacén.'),
+    // En querystring todo es texto: stringbool acepta "true"/"false"/"1"/"0"
+    // (z.coerce.boolean trataría cualquier texto no vacío como true).
+    incluirInactivos: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye los desactivados ("true"/"false").'),
+    todasLasEmpresas: z
+      .stringbool()
+      .default(false)
+      .describe('Lista almacenes de todas las empresas ("true"/"false").'),
+    ordenarPor: z
+      .enum(['nombre', 'tipo', 'creadoEn'])
+      .default('nombre')
+      .describe('Columna de ordenamiento.'),
+    direccion: z.enum(['asc', 'desc']).default('asc').describe('Dirección del orden.'),
+  })
+  .describe('Filtros, orden y paginación del listado de almacenes.');
+
+/** Parámetros de listado de almacenes ya coaccionados desde la URL. */
+export type AlmacenesQuery = z.infer<typeof esquemaAlmacenesQuery>;
+
+/** Respuesta paginada del listado de almacenes (forma estándar `Pagina<T>`). */
+export const esquemaAlmacenesPagina = z
+  .object({
+    datos: z.array(esquemaAlmacenSalida).describe('Almacenes de la página.'),
+    total: z.number().int().describe('Total de almacenes que cumplen el filtro.'),
+    pagina: z.number().int().describe('Página devuelta.'),
+    porPagina: z.number().int().describe('Renglones por página.'),
+    totalPaginas: z.number().int().describe('Total de páginas.'),
+  })
+  .describe('Página de almacenes.');
+
+/** Forma de la respuesta paginada de almacenes. */
+export type AlmacenesPagina = z.infer<typeof esquemaAlmacenesPagina>;
