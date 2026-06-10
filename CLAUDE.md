@@ -1,36 +1,50 @@
 # CLAUDE.md — Contexto del proyecto (handoff entre sesiones)
 
-> **Para cualquier chat/sesión nueva:** lee este archivo primero. Resume qué estamos haciendo, dónde está todo y cómo continuar. El idioma de trabajo es **español** (el usuario es **Daniel Masri**, dueño del sistema).
+> **Para cualquier chat/sesión nueva:** lee este archivo primero, y luego **`PLANMAESTRO.md`** (la ley del desarrollo). El idioma de trabajo es **español**. **Daniel Masri** es el dueño del sistema y experto del negocio (ya **validó** toda la ingeniería inversa). **Gabriel** opera el desarrollo: coordina los agentes, verifica los avances y hace los pasos manuales en Railway/Cloudflare/GitHub.
 
 ---
 
 ## 1. Qué estamos haciendo
 
-Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Moda SA de CV*) que Daniel construyó hace ~30 años en **Microsoft Access 97**. El objetivo de esta fase fue **entender y documentar** el sistema completo (código + pantallas + datos) por **ingeniería inversa**, para luego reconstruirlo con tecnología moderna ("CONTROL v2").
+Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Moda SA de CV*) que Daniel construyó hace ~30 años en **Microsoft Access 97**. La **ingeniería inversa está COMPLETA y validada** (en `Documentacion_MJD/`) y el **plan de construcción está aprobado**: **`PLANMAESTRO.md`** (raíz del repo) — ese plan es LEY.
 
-**Estado actual:** la **fase de documentación está COMPLETA** (todos los módulos). Estamos consolidando y, próximamente, se decidirá tecnología y plan de desarrollo. NO se ha escrito código del sistema nuevo todavía.
+**Estado actual: construyendo CONTROL v2 — Fase F0 (Fundación).** Ver el estado de ejecución detallado en **§8**.
+
+**Arquitectura (decidida por Gabriel — ver `PLANMAESTRO.md` §1-3):**
+- **Backend y frontend SEPARADOS**, en carpetas `backend/` y `frontend/`. **NO es monorepo** (sin workspaces; cada carpeta autónoma con su `package.json` y `npm`).
+- **Todo dockerizado** — `docker compose up` levanta el sistema completo. Prioridad: **portabilidad** (si Railway se cae, se levanta en cualquier lado sin reescribir).
+- **Backend** = API REST: Node 22 + TypeScript + **Fastify** + Zod → genera **OpenAPI** (el "contrato"/menú). Prisma 7 + PostgreSQL 17. **better-auth** + RBAC. Archivos en **Cloudflare R2**.
+- **Frontend** = SPA: **Vite + React** + Tailwind + shadcn/ui, servido por **nginx** (sirve estáticos + reverse-proxy `/api` → backend). Su cliente del API se **genera desde el OpenAPI** del backend.
+- **Comunicación**: REST. El **OpenAPI es lo único compartido** entre los dos servicios (tipado de punta a punta sin acoplarlos).
+- **Railway**: 3 servicios (frontend público; backend y Postgres **privados** por red interna). Archivos en **R2**.
 
 ---
 
-## 2. Ubicaciones clave (rutas absolutas)
+## 2. Ubicaciones clave (rutas relativas a la raíz del repo)
 
-Todo vive en: `/Users/dmasri/Dropbox/Negocios/Marilyn/Server Compartido/Respaldo Control CLAUDE/`
+Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja en Windows; usa rutas relativas al repo). Rama de trabajo actual: **`tarea/f0-fundacion`** (flujo de ramas en §7).
 
 ```
-Respaldo Control CLAUDE/
-├── CLAUDE.md                      ← este archivo
-├── *.mdb                          ← bases Access 97 (datos, CON contraseña en producción)
-├── Respaldo CLAUDE/               ← VOLCADO del sistema en texto (lo más importante)
+<raíz del repo>/
+├── CLAUDE.md                      ← este archivo (handoff)
+├── PLANMAESTRO.md                 ← ⭐ EL PLAN (leer antes de tocar código)
+├── backend/                       ← SERVICIO 1: API (Fastify/REST/OpenAPI) — POR CONSTRUIR (§8)
+├── frontend/                      ← SERVICIO 2: app del usuario (Vite/React + nginx) — POR CONSTRUIR (§8)
+├── docker-compose.yml             ← levanta postgres + backend + frontend — POR CREAR
+├── docs/                          ← arquitectura (ADRs) + modulos (al cerrar cada uno)
+├── .github/workflows/ci.yml       ← CI bloqueante — SE REHACE para 2 servicios dockerizados
+├── control-v2/                    ← ⚠️ INTENTO VIEJO (monorepo pnpm). CANTERA: de aquí se
+│                                     reaprovecha la lógica probada; se BORRA al terminar (§8)
+├── Respaldo CLAUDE/               ← VOLCADO del sistema viejo en texto
 │   ├── Respaldo CLAUDEFormularios/   292 formularios (.txt, diseño + código VBA)
 │   ├── Respaldo CLAUDEConsultas/     161 consultas
 │   ├── Respaldo CLAUDEModulos/       13 módulos VBA
 │   ├── Respaldo CLAUDEReportes/      7 reportes
-│   ├── Respaldo CLAUDEMacros/        (vacío)
-│   └── TABLAS/                       116 tablas exportadas a CSV (datos reales)
-└── Documentacion_MJD/             ← LA DOCUMENTACIÓN que generamos (entregable)
+│   └── TABLAS/                       116 tablas exportadas a CSV (datos reales, latin-1)
+└── Documentacion_MJD/             ← LA DOCUMENTACIÓN funcional (fuente de verdad del negocio)
 ```
 
-> Hay otra carpeta antigua con respaldos: `/Users/dmasri/Dropbox/Negocios/Marilyn/Respaldos CONTROL/` (solo los .mdb originales). La carpeta de trabajo real es la de arriba.
+> Los `.mdb` de Access ya **no** viven en el repo. Para datos reales usa `Respaldo CLAUDE/TABLAS/*.csv`.
 
 ---
 
@@ -59,13 +73,11 @@ Respaldo Control CLAUDE/
 
 ---
 
-## 4. Cómo leer los archivos del sistema (notas técnicas)
+## 4. Cómo leer los archivos del sistema viejo (notas técnicas)
 
-El entorno es una **Mac sin mdbtools ni brew**. Lo que funciona:
-
-- **Leer datos de los .mdb:** librería Python `access-parser` (ya instalada: `pip3 install --user access-parser`). Las tablas también ya están en `TABLAS/*.csv`.
-- **Encoding:** TODOS los .txt exportados y los .csv están en **latin-1 (ISO-8859-1)**, NO utf-8. Al leer con Python usar `encoding="latin-1"`.
-- **⚠️ `grep` falla** leyendo estos archivos por argumento (no devuelve nada, por el encoding/entorno). **Solución: usar Python** (`re` sobre el texto), o `grep` por **stdin** (`cat archivo | grep ...`). No confíes en `grep patrón archivo`.
+- **⚠️ Encoding:** TODOS los .txt exportados y los .csv de `Respaldo CLAUDE/` están en **latin-1 (ISO-8859-1)**, NO utf-8. En Python: `encoding="latin-1"`; en Node: `fs.readFileSync(ruta, "latin1")`. Leerlos como utf-8 corrompe acentos y eñes en silencio.
+- **Datos reales:** las 116 tablas ya están exportadas en `Respaldo CLAUDE/TABLAS/*.csv`. (Si algún día hay que releer un `.mdb`: librería Python `access-parser`.)
+- **⚠️ `grep` puede fallar** leyendo estos archivos por argumento (por el encoding). Lo seguro: **Python** (`re` sobre el texto leído con latin-1), o `grep` por **stdin** (`cat archivo | grep ...`).
 - Los formularios exportados (`SaveAsText`) tienen el diseño (controles + propiedades) y, al final, una sección **`CodeBehindForm`** con el código VBA de cada control.
 
 ### Snippet útil (extraer estructura de un formulario)
@@ -96,21 +108,44 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 ---
 
-## 6. Estilo de trabajo con Daniel
+## 6. Estilo de trabajo
 
-- **Español, tono cercano y claro.** Daniel es el experto del negocio y autor del sistema; **validar con él** las interpretaciones (la documentación es ingeniería inversa).
-- Cada vez que Daniel aporta una regla/decisión nueva → **registrarla** en `DECISIONES.md` (D#), `MEJORAS.md` o `REQUISITOS-NUEVOS.md` (R#) según corresponda, y referenciarla desde el doc del módulo.
-- Al documentar un módulo: leer sus formularios + tablas reales, capturar **reglas de negocio del código** y **evidencia de datos** (no suponer), y añadir sección "Observaciones para la modernización".
-- Mantener la **numeración organizativa** de los docs ≠ estructura final (la estructura de módulos se redefine en el desarrollo, D8).
+- **Español, tono cercano y claro.** El negocio ya está **validado por Daniel**: la documentación funcional (`Documentacion_MJD/`) es la verdad del negocio y **no hay que re-validar módulos con él**. Gabriel coordina, **verifica los avances por etapas** y hace los pasos manuales de infraestructura.
+- El sistema viejo es **solo referencia de la lógica del negocio (el QUÉ)**, no de cómo programar (el CÓMO): v2 se construye 100 % nuevo (D0), corrigiendo de raíz las limitaciones de Access (ver D# y A#).
+- Decisiones de negocio nuevas → `DECISIONES.md`/`MEJORAS.md`/`REQUISITOS-NUEVOS.md`. Decisiones **técnicas** → ADR en `docs/arquitectura/`.
+- La numeración de los docs es organizativa ≠ estructura final (la estructura de módulos es la del plan §5, D8).
 
 ---
 
-## 7. Próximos pasos (cuando se retome)
+## 7. Cómo se desarrolla CONTROL v2 (reglas vigentes)
 
-1. Daniel revisa el `RESUMEN-EJECUTIVO.md`.
-2. **Decidir tecnología** (web / escritorio / nube) y arquitectura.
-3. **Diseñar el modelo de datos nuevo** (base: doc 10 + decisiones D4/D5/D7 + requisitos R1–R7).
-4. **Plan de desarrollo por fases** (núcleo: Modelos→Pedidos→Producción + RC + cadena de avíos).
-5. **Migración de datos** desde los .mdb / CSV.
+1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
+2. **Flujo de ramas (innegociable):** rama de tarea → PR a **`prueba`** (CI + review + verificación EN VIVO) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.)
+3. **Equipo mínimo por tarea: 1 coder + 1 reviewer independiente** (agentes). Nada se integra sin el visto bueno del reviewer y el CI en verde. **El orquestador (lead) NO escribe código de producción**: coordina, decide arquitectura, revisa y reporta a Gabriel. Agent Teams está habilitado (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
+4. **El contrato OpenAPI** se regenera en cada cambio del backend y el cliente del frontend queda sincronizado en la misma tarea.
+5. **Documentación viva en `docs/`:** `arquitectura/` (ADRs), `modulos/` (cómo quedó cada módulo, al cerrarlo). El funcional NO se copia: se referencia `Documentacion_MJD/` (ADR-0002). La guía de infraestructura: `docs/GUIA-RAILWAY-R2.md`.
+6. **Gabriel verifica cada etapa** en el ambiente de prueba o con `docker compose up` local, antes de continuar.
 
-> Si Daniel sigue aportando contexto del negocio, seguir capturándolo en los documentos correspondientes antes de pasar a desarrollo.
+---
+
+## 8. ESTADO DE EJECUCIÓN — Fase F0 (handoff para continuar)
+
+**Dónde vamos:** el plan maestro fue **reescrito** a la arquitectura nueva (backend/frontend dockerizados, no monorepo, REST/OpenAPI). El código de F0 **aún no está construido en la estructura nueva** — `backend/` y `frontend/` todavía no existen. Hay que construirlos.
+
+**`control-v2/` es CANTERA (intento viejo, monorepo):** un primer equipo construyó F0 como monorepo Next.js + tRPC y llegó lejos (todo revisado y aprobado en su momento). De ahí se **reaprovecha la lógica probada** y luego **se borra esa carpeta**:
+- `control-v2/packages/db` → esquema Prisma F0 completo, migración `fundacion`, **seed con FR Moda real + 38 permisos reales (de `Accesos.csv`) + 9 roles**. **Reutilizable casi tal cual.**
+- `control-v2/packages/core` → lógica de negocio con **~90 tests** (secuencias atómicas A3, auditoría A7, permisos, archivos R2, servicios admin: almacenes/usuarios/roles/empresas). **Reutilizable** (no depende de tRPC ni Next).
+- `control-v2/packages/shared` → esquemas Zod + catálogo de permisos. **Reutilizable.**
+- `control-v2/apps/web` → UI Next.js + tRPC. **Se rehace** en Vite/REST (reaprovechar componentes shadcn/login/layout donde sirvan).
+
+**Plan de F0 en 5 etapas verificables** (el chat que ejecute debe recrear estas tareas en su task list y lanzar coder+reviewer por etapa; Gabriel verifica al cerrar cada una):
+- **E1 — Esqueleto dockerizado:** `backend/` (Fastify + `/api/health`, escucha en `::`, Dockerfile), `frontend/` (Vite + nginx que proxya `/api`, Dockerfile), `docker-compose.yml`. Criterio: `docker compose up` levanta todo y se ve en el navegador. ← **EMPEZAR AQUÍ.**
+- **E2 — Backend datos+dominio:** mover lo reutilizable de `control-v2/` a `backend/src` (datos/contrato/comun/dominio) + `backend/prisma`, adaptado (sin tRPC/workspaces); los ~90 tests en verde.
+- **E3 — API REST + OpenAPI + auth:** rutas REST Fastify (Zod→OpenAPI) + better-auth (login, sesión, **bloqueo a 5 intentos** como el viejo) + permisos server-side.
+- **E4 — Frontend funcional:** cliente generado del OpenAPI + login + layout responsive (13 módulos por permisos) + **CRUD patrón Almacenes** end-to-end + doc del patrón (`docs/modulos/patron-crud.md`).
+- **E5 — Infra:** CI (build de las 2 imágenes Docker + tests), `railway.json` x2, `docs/GUIA-RAILWAY-R2.md` (3 servicios), ADRs (arquitectura, OpenAPI, better-auth, scrypt, auditoría-sin-FK), actualizar este CLAUDE.md, y **borrar `control-v2/`**.
+- **Cierre F0:** verificación integral (`docker compose up` + E2E) + commit + PR a `prueba`. Luego Gabriel conecta Railway (3 servicios) y R2 con la guía.
+
+**Versiones verificadas (jun-2026):** Fastify 5.8 · @fastify/swagger 9.7 · fastify-type-provider-zod 6.1 · Vite 8.0 · React 19.2 · react-router-dom 7.17 · openapi-typescript 7.13 · openapi-fetch 0.17 · Prisma 7.8 · better-auth 1.6 · Zod 4.4 · Tailwind 4.3 · TanStack Query 5.101 / Table 8.21 · Vitest 4.1 · Playwright 1.60 · pino 10 · pg-boss 12 · @react-pdf/renderer 4. PostgreSQL 17, Node 22.
+
+**Notas para quien orqueste:** el equipo es efímero (muere con la sesión) — recrear con TeamCreate + lanzar agentes. Specs de referencia de los roles del intento viejo en `~/.claude/equipo-f0-specs.md` (adaptarlas a la arquitectura nueva). El password del admin seedeado es `Control.2026!` (hash scrypt de better-auth). Gabriel quiere **ir verificando por etapas** (no soltar todo el enjambre de corrido).
