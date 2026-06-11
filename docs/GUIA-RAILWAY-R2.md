@@ -2,11 +2,12 @@
 
 > **Para quién:** Gabriel (operación manual en los dashboards; nada de esto lo puede hacer
 > un agente). **Tiempo estimado:** 60–75 min la primera vez (son **dos** servicios, no uno).
-> Verificada contra la documentación oficial de Railway (config-as-code, private networking,
-> variables) y Cloudflare R2 (tokens S3) en **junio 2026**; los nombres exactos de menús
-> pueden variar con rediseños del dashboard — los pasos marcados con ⚠️ incluyen qué confirmar
-> en pantalla. **Excepción:** el valor del resolver interno `fd12::10` NO está en la doc oficial
-> de Railway (es dato de su soporte/comunidad); ver el detalle en §8.1.
+> Verificada contra la documentación oficial de Railway (config-as-code, variables, y la red
+> privada — el sufijo `.railway.internal`) y Cloudflare R2 (tokens S3) en **junio 2026**; los
+> nombres exactos de menús pueden variar con rediseños del dashboard — los pasos marcados con ⚠️
+> incluyen qué confirmar en pantalla. **Excepción:** el **IP del resolver interno** `fd12::10`
+> NO sale de la doc oficial de Railway (la doc de red privada no publica ningún resolver IP);
+> es **dato de soporte/comunidad** — ver el detalle en §8.1.
 
 ## Qué vas a montar
 
