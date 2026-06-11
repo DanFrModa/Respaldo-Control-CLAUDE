@@ -35,6 +35,12 @@ Thumbs.db
 coverage/
 */coverage/
 
+# Artefactos de Playwright (reportes y resultados de las pruebas E2E)
+playwright-report/
+*/playwright-report/
+test-results/
+*/test-results/
+
 # ─── Material temporal del intento viejo (no versionar todavía) ────────────
 # control-v2/ = primer intento (monorepo pnpm). Es CANTERA: se reaprovecha
 #   localmente en E2 y se ELIMINA en E5 (ver CLAUDE.md §8). No entra al repo.

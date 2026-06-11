@@ -9,7 +9,12 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY tsconfig.json tsconfig.app.json tsconfig.node.json vite.config.ts index.html ./
+# Solo lo que el build de produccion necesita (autonomo: NO alcanza ../backend).
+# El cliente del API ya esta generado y versionado en src/api/esquema.gen.ts, asi
+# que el build no depende del contrato del backend en tiempo de construccion.
+# tsconfig.build.json hereda de tsconfig.app.json y excluye las pruebas (la imagen
+# no trae tooling de tests).
+COPY tsconfig.app.json tsconfig.build.json vite.config.ts index.html ./
 COPY src ./src
 RUN npm run build
 
