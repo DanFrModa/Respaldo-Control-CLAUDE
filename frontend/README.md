@@ -106,7 +106,7 @@ de **better-auth** (`src/lib/auth-client.ts`), que define su propio contrato.
 
 ```
 index.html                  # punto de entrada del SPA (script anti-parpadeo del tema)
-nginx.conf                  # sirve estaticos + reverse-proxy /api -> backend
+nginx.conf.template         # plantilla nginx (envsubst): estaticos + reverse-proxy /api -> ${BACKEND_UPSTREAM}
 openapi.json                # copia versionada del contrato (autonomia del build)
 components.json             # config de shadcn/ui
 src/
@@ -143,6 +143,17 @@ e2e/                        # pruebas Playwright (login + CRUD)
 
 - **Desarrollo:** lo maneja Vite (`vite.config.ts` → `server.proxy`) hacia
   `http://localhost:3000`.
-- **Produccion (Docker/Railway):** lo maneja nginx (`nginx.conf`) hacia el
-  servicio `backend`. Asi el navegador nunca habla directo con el backend: solo
-  ve al frontend, que reenvia `/api` por la red privada.
+- **Produccion (Docker/Railway):** lo maneja nginx (`nginx.conf.template`,
+  procesado con envsubst al arrancar). El `proxy_pass` usa una variable + un
+  `resolver` para re-resolver el backend en cada request (clave en Railway, donde
+  la IP IPv6 interna cambia en cada redeploy). Dos variables de entorno lo
+  configuran, con defaults para docker-compose:
+  - `BACKEND_UPSTREAM` — host:puerto del backend. Default `backend:3000`; en
+    Railway `backend.railway.internal:3000`.
+  - `DNS_RESOLVER` — IP del resolver DNS. En local se autodetecta de
+    `/etc/resolv.conf` (`127.0.0.11`); en Railway se fija `[fd12::10]` (resolver
+    interno IPv6 de la red privada).
+
+  Asi el navegador nunca habla directo con el backend: solo ve al frontend, que
+  reenvia `/api` por la red privada. El MISMO artefacto sirve en ambos entornos
+  sin tocar codigo.

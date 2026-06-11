@@ -8,7 +8,7 @@
 
 Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Moda SA de CV*) que Daniel construyó hace ~30 años en **Microsoft Access 97**. La **ingeniería inversa está COMPLETA y validada** (en `Documentacion_MJD/`) y el **plan de construcción está aprobado**: **`PLANMAESTRO.md`** (raíz del repo) — ese plan es LEY.
 
-**Estado actual: construyendo CONTROL v2 — Fase F0 (Fundación).** Ver el estado de ejecución detallado en **§8**.
+**Estado actual: CONTROL v2 — Fase F0 (Fundación) COMPLETA** (E1–E5 construidas en `backend/` y `frontend/`). Falta que Gabriel conecte Railway + R2 con `docs/GUIA-RAILWAY-R2.md`. Detalle de ejecución en **§8**; lo siguiente es **F1 (Catálogos + Modelos)**.
 
 **Arquitectura (decidida por Gabriel — ver `PLANMAESTRO.md` §1-3):**
 - **Backend y frontend SEPARADOS**, en carpetas `backend/` y `frontend/`. **NO es monorepo** (sin workspaces; cada carpeta autónoma con su `package.json` y `npm`).
@@ -28,13 +28,14 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 <raíz del repo>/
 ├── CLAUDE.md                      ← este archivo (handoff)
 ├── PLANMAESTRO.md                 ← ⭐ EL PLAN (leer antes de tocar código)
-├── backend/                       ← SERVICIO 1: API (Fastify/REST/OpenAPI) — POR CONSTRUIR (§8)
-├── frontend/                      ← SERVICIO 2: app del usuario (Vite/React + nginx) — POR CONSTRUIR (§8)
-├── docker-compose.yml             ← levanta postgres + backend + frontend — POR CREAR
-├── docs/                          ← arquitectura (ADRs) + modulos (al cerrar cada uno)
-├── .github/workflows/ci.yml       ← CI bloqueante — SE REHACE para 2 servicios dockerizados
-├── control-v2/                    ← ⚠️ INTENTO VIEJO (monorepo pnpm). CANTERA: de aquí se
-│                                     reaprovecha la lógica probada; se BORRA al terminar (§8)
+├── backend/                       ← SERVICIO 1: API (Fastify/REST/OpenAPI). src/{api,dominio,comun,
+│                                     auth,datos,contrato} + prisma/ + Dockerfile + railway.json + openapi.json
+├── frontend/                      ← SERVICIO 2: app del usuario (Vite/React + nginx). src/ + e2e/ +
+│                                     nginx.conf.template (upstream por env) + Dockerfile + railway.json
+├── docker-compose.yml             ← levanta postgres + backend + frontend (un comando)
+├── docs/                          ← arquitectura/ (ADR-0001..0006 + README) · GUIA-RAILWAY-R2.md ·
+│                                     modulos/patron-crud.md (patrón CRUD de referencia)
+├── .github/                       ← workflows/ci.yml (CI bloqueante: backend, frontend, imágenes Docker, e2e) + renovate.json
 ├── Respaldo CLAUDE/               ← VOLCADO del sistema viejo en texto
 │   ├── Respaldo CLAUDEFormularios/   292 formularios (.txt, diseño + código VBA)
 │   ├── Respaldo CLAUDEConsultas/     161 consultas
@@ -128,24 +129,21 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 ---
 
-## 8. ESTADO DE EJECUCIÓN — Fase F0 (handoff para continuar)
+## 8. ESTADO DE EJECUCIÓN — Fase F0 (COMPLETA)
 
-**Dónde vamos:** el plan maestro fue **reescrito** a la arquitectura nueva (backend/frontend dockerizados, no monorepo, REST/OpenAPI). El código de F0 **aún no está construido en la estructura nueva** — `backend/` y `frontend/` todavía no existen. Hay que construirlos.
+**F0 está construida y verificada en local.** El sistema vive en `backend/` y `frontend/` (arquitectura nueva: 2 servicios npm dockerizados, no monorepo, REST/OpenAPI). `docker compose up -d --build` levanta postgres + backend + frontend, y el flujo real funciona (login `admin` → menú por permisos → CRUD de Almacenes end-to-end), sin 502. La carpeta `control-v2/` (intento viejo, monorepo Next.js+tRPC) ya fue **reaprovechada y BORRADA** — su lógica probada (esquema Prisma, seed real, motores comunes, componentes shadcn) vive ahora dentro de `backend/`/`frontend/`.
 
-**`control-v2/` es CANTERA (intento viejo, monorepo):** un primer equipo construyó F0 como monorepo Next.js + tRPC y llegó lejos (todo revisado y aprobado en su momento). De ahí se **reaprovecha la lógica probada** y luego **se borra esa carpeta**:
-- `control-v2/packages/db` → esquema Prisma F0 completo, migración `fundacion`, **seed con FR Moda real + 38 permisos reales (de `Accesos.csv`) + 9 roles**. **Reutilizable casi tal cual.**
-- `control-v2/packages/core` → lógica de negocio con **~90 tests** (secuencias atómicas A3, auditoría A7, permisos, archivos R2, servicios admin: almacenes/usuarios/roles/empresas). **Reutilizable** (no depende de tRPC ni Next).
-- `control-v2/packages/shared` → esquemas Zod + catálogo de permisos. **Reutilizable.**
-- `control-v2/apps/web` → UI Next.js + tRPC. **Se rehace** en Vite/REST (reaprovechar componentes shadcn/login/layout donde sirvan).
+**Qué entregó cada etapa (todas cerradas con coder + reviewer + CI):**
+- **E1 — Esqueleto dockerizado:** `backend/` (Fastify, `/api/health`, escucha en `::`, Dockerfile multi-stage), `frontend/` (Vite + nginx que proxya `/api`, Dockerfile), `docker-compose.yml`.
+- **E2 — Backend datos+dominio:** `backend/prisma` (esquema F0 completo, migración `fundacion`, **seed con FR Moda real + 38 permisos reales de `Accesos.csv` + 9 roles**) + `backend/src/{datos,contrato,comun,dominio}` (motores: secuencias atómicas A3, auditoría A7, permisos, archivos R2; servicios admin almacenes/usuarios/roles/empresas). **114 tests** (datos + motores comunes) en verde.
+- **E3 — API REST + OpenAPI + auth:** rutas REST Fastify (Zod→OpenAPI en `backend/openapi.json`, Swagger UI en `/api/docs`) + better-auth (login, sesión en BD, **bloqueo a 5 intentos**) + permisos server-side en cada ruta. **+35 tests** → **149 en total en el backend** (48 unit + 101 integración con testcontainers).
+- **E4 — Frontend funcional:** cliente tipado generado del OpenAPI (`frontend/src/api/esquema.gen.ts`) + login + layout responsive (13 módulos por permisos) + **CRUD patrón Almacenes** end-to-end + doc del patrón (`docs/modulos/patron-crud.md`). **38 tests del frontend** (30 Vitest + 8 Playwright E2E).
+- **E5 — Infra y cierre:** CI (`.github/workflows/ci.yml`: jobs backend, frontend, build de las 2 imágenes Docker, e2e con docker compose) + `renovate.json`; `backend/railway.json` y `frontend/railway.json` (build por Dockerfile, healthcheck, restart, migraciones en pre-deploy del backend); `docs/GUIA-RAILWAY-R2.md` (3 servicios, frontend público / backend+Postgres privados); ADRs `docs/arquitectura/ADR-0001..0006` (arquitectura, doc-referenciada, better-auth, scrypt, auditoría-sin-FK, OpenAPI-desde-Zod); este CLAUDE.md; y borrado de `control-v2/`.
 
-**Plan de F0 en 5 etapas verificables** (el chat que ejecute debe recrear estas tareas en su task list y lanzar coder+reviewer por etapa; Gabriel verifica al cerrar cada una):
-- **E1 — Esqueleto dockerizado:** `backend/` (Fastify + `/api/health`, escucha en `::`, Dockerfile), `frontend/` (Vite + nginx que proxya `/api`, Dockerfile), `docker-compose.yml`. Criterio: `docker compose up` levanta todo y se ve en el navegador. ← **EMPEZAR AQUÍ.**
-- **E2 — Backend datos+dominio:** mover lo reutilizable de `control-v2/` a `backend/src` (datos/contrato/comun/dominio) + `backend/prisma`, adaptado (sin tRPC/workspaces); los ~90 tests en verde.
-- **E3 — API REST + OpenAPI + auth:** rutas REST Fastify (Zod→OpenAPI) + better-auth (login, sesión, **bloqueo a 5 intentos** como el viejo) + permisos server-side.
-- **E4 — Frontend funcional:** cliente generado del OpenAPI + login + layout responsive (13 módulos por permisos) + **CRUD patrón Almacenes** end-to-end + doc del patrón (`docs/modulos/patron-crud.md`).
-- **E5 — Infra:** CI (build de las 2 imágenes Docker + tests), `railway.json` x2, `docs/GUIA-RAILWAY-R2.md` (3 servicios), ADRs (arquitectura, OpenAPI, better-auth, scrypt, auditoría-sin-FK), actualizar este CLAUDE.md, y **borrar `control-v2/`**.
-- **Cierre F0:** verificación integral (`docker compose up` + E2E) + commit + PR a `prueba`. Luego Gabriel conecta Railway (3 servicios) y R2 con la guía.
+**Lo que falta (manos de Gabriel, NO es código):** conectar **Railway** (proyecto + Postgres + servicios backend/frontend, ambientes `prueba`/`production`) y **Cloudflare R2** (2 buckets + token S3), siguiendo `docs/GUIA-RAILWAY-R2.md` paso a paso (o el atajo con el Railway Agent en `docs/DESPLIEGUE-CON-AGENTE-RAILWAY.md`). El proxy del frontend ya es **portable por configuración**, sin cambios de código: el nginx usa `frontend/nginx.conf.template` (envsubst) y dos variables de entorno — `BACKEND_UPSTREAM` (default `backend:3000` para compose; en Railway `backend.railway.internal:3000`) y `DNS_RESOLVER` (autodetectado en local; en Railway `[fd12::10]`). El mismo artefacto sirve en compose y en Railway. Tras conectar la infra: PR de `tarea/f0-fundacion` → `prueba` (deploy + verificación en vivo) → `main`.
+
+**Siguiente fase: F1 — Catálogos + Modelos** (plan §5 módulos 1 y 2, §6). Replicar el **patrón CRUD** documentado en `docs/modulos/patron-crud.md` con el equipo coder+reviewer por tarea.
 
 **Versiones verificadas (jun-2026):** Fastify 5.8 · @fastify/swagger 9.7 · fastify-type-provider-zod 6.1 · Vite 8.0 · React 19.2 · react-router-dom 7.17 · openapi-typescript 7.13 · openapi-fetch 0.17 · Prisma 7.8 · better-auth 1.6 · Zod 4.4 · Tailwind 4.3 · TanStack Query 5.101 / Table 8.21 · Vitest 4.1 · Playwright 1.60 · pino 10 · pg-boss 12 · @react-pdf/renderer 4. PostgreSQL 17, Node 22.
 
-**Notas para quien orqueste:** el equipo es efímero (muere con la sesión) — recrear con TeamCreate + lanzar agentes. Specs de referencia de los roles del intento viejo en `~/.claude/equipo-f0-specs.md` (adaptarlas a la arquitectura nueva). El password del admin seedeado es `Control.2026!` (hash scrypt de better-auth). Gabriel quiere **ir verificando por etapas** (no soltar todo el enjambre de corrido).
+**Notas para quien orqueste F1:** el equipo es efímero (muere con la sesión) — recrear con TeamCreate + lanzar agentes (coder + reviewer independiente por tarea; el lead no escribe código de producción). Agent Teams habilitado (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`). El password del admin seedeado es `Control.2026!` (hash scrypt de better-auth; cámbialo al primer login). Gabriel **verifica por etapas** (no soltar todo el enjambre de corrido).

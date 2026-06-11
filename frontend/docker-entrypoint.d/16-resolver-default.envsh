@@ -1,0 +1,26 @@
+#!/bin/sh
+# Fija DNS_RESOLVER para la plantilla de nginx (CONTROL v2 frontend).
+#
+# La plantilla usa `resolver ${DNS_RESOLVER} ...`. Esta variable se resuelve asi,
+# en orden de prioridad:
+#   1. Si el ENTORNO ya trae DNS_RESOLVER (variable del servicio en Railway), se
+#      respeta tal cual. En Railway se pone DNS_RESOLVER=[fd12::10] (resolver
+#      interno fijo de la red privada; IPv6 entre corchetes).
+#   2. Si no, se usa el resolver AUTODETECTADO de /etc/resolv.conf que ya dejo el
+#      script oficial 15-local-resolvers.envsh en ${NGINX_LOCAL_RESOLVERS} (sirve
+#      en docker-compose: 127.0.0.11).
+#
+# Este script (.envsh, ejecutable) lo SOURCEA el entrypoint oficial de nginx; al
+# ir en orden 16 corre DESPUES del 15-local-resolvers (que llena NGINX_LOCAL_RESOLVERS)
+# y ANTES del 20-envsubst (que sustituye la plantilla). Por eso el export persiste.
+#
+# `set -e` (NO `set -eu`): al estar sourceado, una opcion de shell se filtraria al
+# proceso del entrypoint oficial; `set -u` haria fallar a scripts posteriores que
+# referencian variables no definidas. La expansion de abajo ya maneja los no-set.
+
+set -e
+
+DNS_RESOLVER="${DNS_RESOLVER:-${NGINX_LOCAL_RESOLVERS:-127.0.0.11}}"
+export DNS_RESOLVER
+
+echo "16-resolver-default: DNS_RESOLVER=$DNS_RESOLVER"
