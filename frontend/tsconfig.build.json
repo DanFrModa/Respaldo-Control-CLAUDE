@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    /* La imagen de produccion no trae herramientas de prueba: el build no
+       depende de los tipos de Vitest / Testing Library. */
+    "types": []
+  },
+  /* Solo codigo de la app: se excluyen pruebas y utilidades de prueba para que
+     el build de produccion (y la imagen Docker) no necesite el tooling de tests. */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/pruebas"]
+}

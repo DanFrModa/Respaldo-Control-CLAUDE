@@ -1,197 +1,186 @@
 /*
- * Sistema de tema de CONTROL v2 (claro / oscuro).
+ * Hoja de estilos raiz de CONTROL v2 — Tailwind v4 + tokens de shadcn/ui.
  *
- * Convencion compatible con shadcn/ui (que llega en E4): los colores son
- * variables CSS como tripletas de canales HSL (ej. "0 0% 100%") que se
- * consumen con `hsl(var(--token))`. `:root` define el tema CLARO (base);
- * la clase `.dark` en `<html>` define el tema oscuro. Tailwind v4 + shadcn
- * podran mapear estos mismos tokens sin refactor.
+ * Sistema de tema (claro / oscuro), heredado y CONSERVADO de E1.1:
+ *   - El tema por defecto es CLARO (`:root`). NO se sigue `prefers-color-scheme`
+ *     del sistema operativo: claro es la base y el usuario decide con el
+ *     alternador (ver `tema.ts`, `useTema.ts`, `AlternadorTema.tsx`).
+ *   - El tema OSCURO se activa con la clase `dark` en `<html>` (la pone el
+ *     script anti-parpadeo de `index.html` antes del render, y la alterna
+ *     `useTema`). El `@custom-variant dark` de abajo hace que las utilidades
+ *     `dark:*` de Tailwind respondan a esa clase.
+ *   - La persistencia vive en localStorage bajo la clave `control-v2-tema`.
  *
- * Paleta tomada de los valores por defecto de shadcn/ui ("slate"), para que
- * el theming de la fundacion sea el mismo que heredaran los componentes.
+ * Los tokens de color son variables CSS en espacio **oklch** (la paleta neutral
+ * por defecto de shadcn/ui). `@theme inline` los expone como utilidades de
+ * Tailwind (`bg-background`, `text-muted-foreground`, `border-border`, etc.) que
+ * usan los componentes de `components/ui`. Se conservan ademas los tokens
+ * semanticos de estado de E1.1 (`--exito`/`--error`/`--aviso`).
  */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* La clase `dark` en cualquier ancestro (la ponemos en <html>) activa `dark:*`. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Estado semantico (heredado de E1.1). */
+  --color-exito: var(--exito);
+  --color-error: var(--error);
+  --color-aviso: var(--aviso);
+
+  /* Sidebar (la cascara de la app). */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-heading: var(--font-sans);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
 
 :root {
-  /* Tema CLARO — base por defecto (no se sigue prefers-color-scheme). */
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --border: 214.3 31.8% 91.4%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --accent: 210 40% 96.1%;
-  --accent-foreground: 222.2 47.4% 11.2%;
-  --ring: 222.2 84% 4.9%;
+  /* Tema CLARO — base por defecto. */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
 
-  /* Colores semanticos de estado (legibles en tema claro). */
-  --exito: 142 71% 35%;
-  --error: 0 72% 45%;
-  --aviso: 38 92% 38%;
+  /* Estado semantico, legible en tema claro (heredado de E1.1). */
+  --exito: oklch(0.52 0.13 152);
+  --error: oklch(0.55 0.22 27);
+  --aviso: oklch(0.62 0.15 75);
+
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+
+  --radius: 0.625rem;
+
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
   color-scheme: light;
 }
 
 .dark {
-  /* Tema OSCURO. */
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --border: 217.2 32.6% 17.5%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --ring: 212.7 26.8% 83.9%;
+  /* Tema OSCURO (clase en <html>). */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
 
-  /* Colores semanticos de estado (legibles en tema oscuro). */
-  --exito: 142 69% 58%;
-  --error: 0 84% 70%;
-  --aviso: 38 92% 60%;
+  /* Estado semantico, legible en tema oscuro (heredado de E1.1). */
+  --exito: oklch(0.77 0.16 152);
+  --error: oklch(0.7 0.19 22);
+  --aviso: oklch(0.79 0.15 80);
+
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 
   color-scheme: dark;
 }
 
-:root {
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    Helvetica,
-    Arial,
-    sans-serif;
-}
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
 
-* {
-  box-sizing: border-box;
-}
+  body {
+    @apply bg-background text-foreground;
+  }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: hsl(var(--background));
-  color: hsl(var(--foreground));
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-
-/* ── Estructura de pagina ─────────────────────────────────────────────────── */
-
-.pagina {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.cabecera {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-.contenedor {
-  flex: 1;
-  width: 100%;
-  max-width: 32rem;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  text-align: center;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(2rem, 8vw, 3rem);
-  letter-spacing: 0.05em;
-}
-
-.subtitulo {
-  margin: 0.25rem 0 2rem;
-  color: hsl(var(--muted-foreground));
-}
-
-/* ── Tarjeta de estado ───────────────────────────────────────────────────── */
-
-.tarjeta {
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  text-align: left;
-}
-
-.tarjeta h2 {
-  margin: 0 0 0.75rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.estado {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.estado--ok {
-  color: hsl(var(--exito));
-}
-
-.estado--error {
-  color: hsl(var(--error));
-}
-
-.estado--cargando {
-  color: hsl(var(--aviso));
-}
-
-.detalle {
-  margin: 0.5rem 0 0;
-  color: hsl(var(--muted-foreground));
-  font-size: 0.875rem;
-  word-break: break-word;
-}
-
-/* ── Alternador de tema ──────────────────────────────────────────────────── */
-
-.alternador-tema {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  /* 44x44px: area tactil accesible (WCAG 2.5.5/2.5.8). */
-  width: 2.75rem;
-  height: 2.75rem;
-  padding: 0;
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.5rem;
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  cursor: pointer;
-  transition:
-    background-color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.alternador-tema:hover {
-  background: hsl(var(--accent));
-  color: hsl(var(--accent-foreground));
-}
-
-.alternador-tema:focus-visible {
-  outline: 2px solid hsl(var(--ring));
-  outline-offset: 2px;
+  html {
+    @apply font-sans;
+  }
 }
