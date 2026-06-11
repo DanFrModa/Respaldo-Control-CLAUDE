@@ -1,0 +1,258 @@
+# CI bloqueante de CONTROL v2 (PLANMAESTRO.md §9.3: nada se mergea en rojo).
+#
+# Arquitectura nueva (E1-E5): dos servicios npm autonomos y dockerizados —
+# backend/ (Fastify + Prisma + OpenAPI) y frontend/ (Vite + React, servido por
+# nginx). NO es monorepo: cada carpeta tiene su package.json y su lockfile, asi
+# que cada servicio se valida en su propio job, en paralelo.
+#
+# Corre en push y en pull_request hacia `prueba` y `main` (el flujo de ramas del
+# plan §2.4: rama de tarea -> PR a prueba -> PR a main). Sin filtro `paths`: la
+# raiz del repo ES el proyecto, asi que cualquier cambio debe pasar el CI antes
+# de entrar a una rama protegida.
+#
+# Jobs (todos bloqueantes):
+#   - backend           npm ci -> lint -> typecheck -> format:check -> test -> build -> openapi (gate)
+#   - frontend          npm ci -> gen:api (gate) -> typecheck -> lint -> format:check -> test -> build
+#   - imagenes-docker   docker build de las dos imagenes (mismo artefacto que produccion)
+#   - e2e               docker compose up + Playwright contra el stack real, y down
+#
+# Notas tecnicas:
+#   - Node 22 (engines ">=22" en ambos package.json).
+#   - El `postinstall` del backend corre `prisma generate`; prisma.config.ts usa
+#     un DATABASE_URL placeholder cuando la variable falta, asi que `npm ci`
+#     funciona sin base de datos.
+#   - Las pruebas de integracion del backend levantan su propio Postgres 17 con
+#     testcontainers (no hace falta `services:`); los runners ubuntu-latest traen
+#     Docker. Por eso `backend` necesita el runner Linux con Docker, no un
+#     servicio de Postgres aparte.
+#   - El frontend genera su cliente del contrato con `gen:api` leyendo
+#     ../backend/openapi.json (versionado); el checkout trae ambas carpetas.
+
+name: CI
+
+on:
+  push:
+    branches: [prueba, main]
+  pull_request:
+    branches: [prueba, main]
+
+# Un PR/rama en vuelo cancela su corrida anterior (ahorra minutos de runner).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Permiso minimo: solo leer el repo (no publicamos imagenes ni tocamos releases).
+permissions:
+  contents: read
+
+jobs:
+  # ── Backend: API Fastify (lint, types, formato, tests, build) ──────────────
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      # Valores dummy SOLO para que los tests/seed que tocan auth o R2 carguen su
+      # config sin fallar en CI. Los reales viven en Railway (ver
+      # docs/GUIA-RAILWAY-R2.md). NO usar estos en ningun ambiente real.
+      BETTER_AUTH_SECRET: ci-secret-solo-para-ci-no-usar-en-railway
+      BETTER_AUTH_URL: http://localhost:3000
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node 22 + cache de npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      # `npm ci` dispara el `postinstall` (prisma generate) — no necesita BD.
+      - name: Instalar dependencias (lockfile)
+        run: npm ci
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Formato (prettier --check)
+        run: npm run format:check
+
+      # `test` corre los dos proyectos de vitest: "unit" (sin BD) e "integracion"
+      # (Postgres 17 efimero via testcontainers, usando el Docker del runner).
+      - name: Tests (unit + integracion)
+        run: npm test
+
+      # `build` compila TypeScript a dist/ (no toca openapi.json).
+      - name: Build (tsc)
+        run: npm run build
+
+      # Regenera el contrato desde los MISMOS esquemas Zod de las rutas
+      # (`npm run openapi` ejecuta scripts/generar-openapi.ts). El paso siguiente
+      # falla si el openapi.json versionado no coincide con lo que produce el
+      # codigo actual — p. ej. si alguien cambio un Zod y no regenero el contrato.
+      - name: Regenerar el contrato OpenAPI
+        run: npm run openapi
+
+      - name: Verificar que openapi.json esta al dia
+        run: git diff --exit-code openapi.json
+
+  # ── Frontend: SPA Vite/React (cliente del contrato, lint, tests, build) ────
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node 22 + cache de npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias (lockfile)
+        run: npm ci
+
+      # Regenera el cliente tipado desde ../backend/openapi.json (versionado).
+      - name: Generar cliente del API (gen:api)
+        run: npm run gen:api
+
+      # El cliente y la copia del contrato se commitean: si gen:api los cambia,
+      # es que el frontend no estaba sincronizado con el contrato del backend.
+      - name: Verificar que el cliente del API esta sincronizado
+        run: git diff --exit-code openapi.json src/api/esquema.gen.ts
+
+      - name: Typecheck (tsc -b)
+        run: npm run typecheck
+
+      - name: Lint (eslint)
+        run: npm run lint
+
+      - name: Formato (prettier --check)
+        run: npm run format:check
+
+      - name: Tests (vitest)
+        run: npm test
+
+      - name: Build (tsc + vite build)
+        run: npm run build
+
+  # ── Imagenes Docker: el artefacto que se despliega en Railway ──────────────
+  # Construye ambas imagenes igual que produccion. Depende de que backend y
+  # frontend pasen primero (no tiene sentido gastar minutos si el codigo no
+  # compila). Build con cache de GitHub Actions para acelerar corridas.
+  imagenes-docker:
+    name: imagenes-docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configurar Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build imagen backend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: control-v2-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Build imagen frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: control-v2-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+
+  # ── E2E: el stack completo levantado con docker compose + Playwright ───────
+  # Reproduce el "docker compose up" que verifica Gabriel: postgres -> backend
+  # (migra + siembra) -> frontend (nginx). Playwright corre contra :8080 (login,
+  # menu por permisos, CRUD de Almacenes). Es la red de seguridad de que el
+  # artefacto real funciona, no solo las piezas por separado.
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Node 22 + cache de npm
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias del frontend (Playwright)
+        working-directory: frontend
+        run: npm ci
+
+      - name: Instalar navegador de Playwright (chromium)
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # Levanta todo el stack. Los healthchecks del compose ordenan el arranque:
+      # postgres healthy -> backend migra/siembra y queda healthy -> frontend.
+      - name: Levantar el stack (docker compose up)
+        run: docker compose up -d --build
+
+      # Espera activa a que el frontend responda 200 antes de lanzar Playwright
+      # (el `depends_on: service_healthy` del compose ya encadena el arranque,
+      # pero confirmamos el 200 publico para no correr las pruebas demasiado pronto).
+      - name: Esperar a que el frontend responda
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null; then
+              echo "Stack arriba."
+              exit 0
+            fi
+            echo "Esperando al stack... ($i/60)"
+            sleep 5
+          done
+          echo "El stack no respondio a tiempo."
+          docker compose logs
+          exit 1
+
+      - name: Pruebas E2E (Playwright)
+        working-directory: frontend
+        run: npm run test:e2e
+
+      # Diagnostico si algo fallo: vuelca logs de los tres servicios.
+      - name: Logs del stack (si fallo)
+        if: failure()
+        run: docker compose logs
+
+      - name: Reporte de Playwright (si fallo)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+      - name: Bajar el stack
+        if: always()
+        run: docker compose down -v
