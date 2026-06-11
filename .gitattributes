@@ -1,0 +1,29 @@
+# Normalización de fin de línea (CONTROL v2).
+#
+# Por qué existe: el CI tiene "gates" que fallan si un archivo generado quedó
+# distinto al versionado (`git diff --exit-code` sobre el contrato OpenAPI y el
+# cliente del frontend). Esos archivos se regeneran en CI sobre Linux (LF). Si un
+# colaborador en Windows los commitea con CRLF (autocrlf), el gate fallaría aunque
+# el contenido sea idéntico. Forzar LF blinda el CI y evita ruido de diffs por EOL.
+
+# Normaliza todos los archivos de texto a LF en el repositorio (autodetección de
+# binarios). El repo ya está en LF, así que esto no provoca renormalización masiva.
+* text=auto eol=lf
+
+# Contrato y artefactos GENERADOS: LF explícito (los protegen los gates del CI).
+backend/openapi.json          text eol=lf
+frontend/openapi.json         text eol=lf
+frontend/src/api/esquema.gen.ts text eol=lf
+
+# Scripts de shell: SIEMPRE LF (un CRLF rompe el shebang dentro del contenedor).
+*.sh                          text eol=lf
+
+# Binarios comunes: que git no intente normalizarlos.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
