@@ -8,3 +8,10 @@ npm-debug.log*
 Dockerfile
 .dockerignore
 README.md
+
+# Pruebas y artefactos (no entran a la imagen)
+e2e
+playwright.config.ts
+playwright-report
+test-results
+*.tsbuildinfo

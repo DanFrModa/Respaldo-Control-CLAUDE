@@ -1,0 +1,10 @@
+# Builds y dependencias
+dist/
+node_modules/
+
+# Reporte de Playwright y artefactos de prueba
+playwright-report/
+test-results/
+
+# Contrato OpenAPI copiado del backend (lo emite `npm run gen:api`; no se edita a mano)
+openapi.json
