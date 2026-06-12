@@ -50,11 +50,12 @@ RUN chmod +x /docker-entrypoint.d/16-resolver-default.envsh
 ENV BACKEND_UPSTREAM=backend:3000
 # Limita envsubst a NUESTRAS variables: asi NO toca las propias de nginx ($host,
 # $uri, $request_uri, $backend_upstream, ...). Es un regex sobre NOMBRES de env.
-ENV NGINX_ENVSUBST_FILTER=^(BACKEND_UPSTREAM|DNS_RESOLVER)$
+ENV NGINX_ENVSUBST_FILTER=^(BACKEND_UPSTREAM|DNS_RESOLVER|PORT)$
 
 # Estaticos compilados.
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+ENV PORT=80
 EXPOSE 80
 # El ENTRYPOINT de la imagen oficial procesa las plantillas (envsubst) y luego
 # arranca nginx; mantenemos su CMD por defecto.
