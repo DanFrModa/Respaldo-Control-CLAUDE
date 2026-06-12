@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto del proyecto (handoff entre sesiones)
 
-> **Para cualquier chat/sesión nueva:** lee este archivo primero, y luego **`PLANMAESTRO.md`** (la ley del desarrollo). El idioma de trabajo es **español**. **Daniel Masri** es el dueño del sistema y experto del negocio (ya **validó** toda la ingeniería inversa). **Gabriel** opera el desarrollo: coordina los agentes, verifica los avances y hace los pasos manuales en Railway/Cloudflare/GitHub.
+> **Para cualquier chat/sesión nueva:** lee este archivo primero, luego **`PLANMAESTRO.md`** (la ley del desarrollo) y **`HOJA-DE-RUTA.md`** (el plan por etapas + estado vivo: ahí dice exactamente qué sigue, y la ficha detallada de cada fase está en `docs/hoja-de-ruta/`). El idioma de trabajo es **español**. **Daniel Masri** es el dueño del sistema y experto del negocio (ya **validó** toda la ingeniería inversa). **Gabriel** opera el desarrollo: coordina los agentes, verifica los avances y hace los pasos manuales en Railway/Cloudflare/GitHub.
 
 ---
 

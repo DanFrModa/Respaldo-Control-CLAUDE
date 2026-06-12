@@ -1,123 +1,203 @@
-# CONTROL v2 — Hoja de ruta (explicada para Gabriel)
+# CONTROL v2 — Hoja de ruta (plan por etapas + estado vivo)
 
-> Documento vivo, en cristiano. Resume **dónde vamos, cómo funciona el trabajo, qué pasa en cada fase/tarea y cuánto puede tardar**. La versión técnica y "ley" del proyecto es `PLANMAESTRO.md`; esto es el mapa simple. — *Actualizado: 11-jun-2026.*
-
----
-
-## 1. En una frase
-
-Ya entendimos el sistema viejo, diseñamos el nuevo, y **terminamos de construir la fundación (F0)**: la app ya corre de punta a punta (login real, menú por permisos, primer módulo funcionando). **Lo único que falta para verla en internet es tu alta manual de Railway + Cloudflare R2** (con la guía que te dejé). Después arranca **F1 (Catálogos + Modelos)**.
+> **Documento vivo.** Aquí está TODO el camino: las 9 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
+> **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas las 8 fichas: solo la de la fase en curso.
+> — *Actualizado: 12-jun-2026.*
 
 ---
 
-## 2. ¿Cuánto llevamos? (sin maquillaje)
+## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
-Te doy **dos marcadores** y no los mezclo, para no engañarte:
-
-**A) Entender el negocio + diseñar el sistema → ✅ 100 %**
-La ingeniería inversa (292 formularios, 116 tablas), las decisiones del dueño y el plan maestro: terminado y validado por Daniel.
-
-**B) Construir el software (las 9 fases F0–F8) → ~12–15 %**
-**F0 (la fundación) está CONSTRUIDA** ✅ — falta solo que la despliegues en Railway. Siguen las 8 fases de módulos (F1–F8).
+- **Fase activa:** F1 — Catálogos + Modelos (por arrancar). **Siguiente etapa: `F1-E1`** (ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)).
+- **Hecho:** ingeniería inversa + diseño ✅ 100 % (validado por Daniel). **F0 (Fundación) ✅ construida y desplegada** — desde el 12-jun-2026 corre en Railway **como ambiente de prueba** (login real funcionando). El despliegue de **producción NO se monta todavía**: se contrata al acercarse el go-live, por costo (decisión de Gabriel, 12-jun-2026).
+- **Pendientes manuales de Gabriel** (no bloquean el arranque de F1): cambiar el password de `admin` (seed `Control.2026!`), activar backups del Postgres en Railway, montar **Cloudflare R2** (⚠️ sí se necesita antes de F1-E3/E4, que suben fotos), borrar el servicio frontend viejo si quedó en el canvas, y proteger las ramas exigiendo los checks del CI.
 
 ```
-Entender + diseñar    : ██████████  100 %   ✅ hecho
-Construir el software : █▓░░░░░░░░  ~12-15% (F0 ✅ construida; falta tu despliegue)
+Entender + diseñar    : ██████████  100 %  ✅
+Construir (F0–F8)     : █▓░░░░░░░░  F0 de 9 ✅ — siguen F1…F8 (50 etapas planificadas)
 ```
 
-> **Por qué F0 vale más de lo que parece:** es la fundación sobre la que se monta TODO — login, seguridad por permisos, el motor de datos/inventario, el contrato del API, y el "molde" de pantalla (CRUD) que se replica en cada módulo. Lo más difícil de la plomería ya está. Las fases siguientes (F1–F7) son "rellenar" módulos sobre esa base usando el patrón ya hecho.
->
-> Si juntas todo el esfuerzo (diseño + construcción), vamos por **un poco más de un tercio**.
+| Fase | Etapas | Estado |
+|---|---|---|
+| **F0 · Fundación** | 5 | ✅ **hecha** (construida + desplegada como prueba, 12-jun-2026) |
+| **F1 · Catálogos + Modelos** | 7 | ⬜ **sigue — arrancar por F1-E1** |
+| **F2 · Pedidos + Órdenes** | 5 | ⬜ |
+| **F3 · Producción / WIP** | 6 | ⬜ |
+| **F4 · Compras / MRP** | 6 | ⬜ |
+| **F5 · Ruta Crítica ⭐** | 7 | ⬜ |
+| **F6 · Calidad + EsMa** | 6 | ⬜ |
+| **F7 · Costos / EDR + Indicadores** | 6 | ⬜ |
+| **F8 · Migración + Go-live** | 7 | ⬜ |
 
 ---
 
-## 3. Cómo funciona el trabajo (el "motor")
+## 2. Cómo funciona el trabajo (el "motor")
 
-Cada pedazo de trabajo (una **tarea**) pasa siempre por el mismo circuito:
+Cada **etapa** es una tarea cerrada que pasa siempre por el mismo circuito:
 
-1. **Yo (orquestador)** parto el trabajo en tareas y escribo la especificación de cada una.
-2. Un **coder** (agente) la construye. (Cuando hace falta investigar algo —p.ej. la doc de Railway— sumo un **researcher**.)
-3. Un **reviewer** (agente independiente, que no vio cómo lo hizo el coder) la revisa: corre las pruebas, **levanta el sistema** y busca errores. **El reviewer tiene la última palabra**: si encuentra algo (por mínimo que sea), vuelve al coder y no se cierra hasta que quede limpio.
-4. **Yo verifico** y te lo muestro funcionando.
-5. **Tú verificas** (en el navegador o con `docker compose up`) y das el visto bueno.
-6. Recién entonces se integra (rama de tarea → `prueba` → `main`).
+1. **El lead (orquestador)** especifica la etapa a partir de su ficha (no escribe código de producción).
+2. Un **coder** la construye (o varios en paralelo **solo si** las piezas son independientes — la ficha de cada etapa ya lo dice).
+3. Un **reviewer independiente** la revisa; **tiene la última palabra** y rige *"todo lo menor es mayor"* (cero pendientes diferidos).
+4. **Gabriel verifica** con el checklist "Verificación de Gabriel" de la ficha (navegador o `docker compose up`).
+5. Recién entonces se integra: **rama de tarea → PR a `prueba` → PR a `main`** (nunca directo), con el CI en verde.
 
-**Reglas de oro:** nada avanza con algo en rojo; **"todo lo menor es mayor"** (ningún detalle se deja para después); cada agente es fresco por etapa.
-
-| Quién | Hace qué |
-|---|---|
-| **Tú (Gabriel)** | Verificas cada etapa + los pasos manuales de infraestructura (Railway y Cloudflare R2). |
-| **Yo (lead)** | Coordino, decido arquitectura, reviso y te reporto. No escribo el código de producción. |
-| **Agentes** | Construyen (coder), investigan (researcher) y se revisan entre ellos (reviewer). |
+**Reglas transversales a toda etapa** (del `PLANMAESTRO.md`, se verifican en cada review): lógica de negocio solo en `backend/src/dominio` (A1) · transacciones multi-tabla (A2) · folios por secuencia atómica (A3) · existencias solo por kardex (D3) · RBAC en cada ruta (A4) · auditoría uniforme (A7) · el contrato **OpenAPI se regenera y el cliente del frontend se sincroniza en la misma etapa** · los impresos (R9) van dentro de la etapa de su grupo funcional · la **última etapa de cada fase** incluye su parte del ETL, la doc del módulo en `docs/modulos/` y la verificación del criterio de salida en el ambiente de prueba.
 
 ---
 
-## 4. Las 9 fases — qué recibes en cada una
+## 3. Las fases y sus etapas
 
-| Fase | En cristiano, qué te entrega | Tamaño | Estado |
+Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por etapa van objetivo, alcance concreto, entregables, criterio de cierre, **checklist de verificación para Gabriel**, equipo sugerido y referencias a la doc funcional. Lo de abajo es el índice con estado. **El desglose de una fase se confirma/ajusta al arrancarla** (es plan, no escritura sagrada — lo que cambie se actualiza en la ficha y aquí).
+
+### F0 · Fundación — ✅ HECHA
+
+**Salida cumplida:** `docker compose up` levanta todo; app desplegada en Railway; login real; CRUD patrón (Almacenes) end-to-end.
+
+| Etapa | Qué entregó | Estado |
+|---|---|---|
+| **F0-E1** | Esqueleto dockerizado (backend Fastify + frontend nginx + compose) + tema claro/oscuro | ✅ en main |
+| **F0-E2** | Datos + dominio: Prisma (14 tablas), seed real FR Moda, motores comunes (folios A3, auditoría A7, permisos, archivos R2). 114 tests | ✅ en main |
+| **F0-E3** | API REST + OpenAPI + login real (bloqueo a 5 intentos) + permisos server-side. 149 tests | ✅ en main |
+| **F0-E4** | Frontend: login, layout 13 módulos por permisos, CRUD patrón Almacenes, cliente tipado. 38 tests | ✅ en main |
+| **F0-E5** | CI bloqueante, railway.json, ADRs 0001–0006, guía Railway/R2, limpieza | ✅ en main |
+| **Despliegue** | Railway (Postgres + backend + frontend privados/público) — **funge como ambiente de prueba** | ✅ 12-jun-2026 |
+
+### F1 · Catálogos + Modelos — ⬜ pendiente
+
+**Salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba. · **Ficha completa:** [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
 |---|---|---|---|
-| **F0 · Fundación** | El esqueleto funcionando: login, usuarios/permisos, el "molde" de pantallas, todo dockerizado y desplegable. Un primer CRUD (Almacenes) que fija el estándar. | Grande | ✅ **construida** (falta tu despliegue) |
-| **F1 · Catálogos + Modelos** | Las "listas maestras" (clientes, telas, avíos, colores, tallas…) y el catálogo de modelos con su **receta** + fotos. | Grande | ⬜ **sigue** |
-| **F2 · Pedidos + Órdenes** | Capturar pedidos y convertirlos en **órdenes de producción** con su matriz color × talla. | Mediano | ⬜ |
-| **F3 · Producción / WIP** | El corazón operativo: corte, mandar/recibir **maquila**, avance por etapas, y la **captura única** que actualiza inventario + cuenta del maquilero a la vez. | Muy grande | ⬜ |
-| **F4 · Compras / Materiales** | Qué materiales faltan por orden, **órdenes de compra** con autorización, recepción, y el tablero "qué tengo / qué falta". | Grande | ⬜ |
-| **F5 · Ruta Crítica** ⭐ | El módulo estrella: flujo de trabajo con **fechas que se calculan solas**, semáforos y bandeja de tareas por persona. | Muy grande | ⬜ |
-| **F6 · Calidad + EsMa** | Auditorías de calidad (AQL) y el **estado de cuenta** completo de los maquileros. | Mediano | ⬜ |
-| **F7 · Costos / EDR + Indicadores** | El **costeo**, el estado de resultados automático y los **tableros de KPIs**. | Grande | ⬜ |
-| **F8 · Migración + Go-live** | Pasar **10+ años** de datos reales, correr v1 y v2 **en paralelo** unas semanas hasta que cuadren, y **encender** el sistema nuevo. | Grande | ⬜ |
+| **F1-E1** | Catálogos sencillos + mini-pantallas de Administración (usuarios/empresas) + decisión A9 | 3 coders en paralelo + 1 reviewer (con protocolo de integración: migración Prisma única, OpenAPI regenerado una vez) | ⬜ |
+| **F1-E2** | Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 | 3 coders en paralelo + 1 reviewer | ⬜ |
+| **F1-E3** | Catálogos de materiales: telas unificadas, avíos R1 y bordados con foto R2 | 3 coders en paralelo + 1 reviewer | ⬜ |
+| **F1-E4** | Modelos: ficha + fotos R2 + BOM completo | 1 coder + 1 reviewer (cadena sobre los mismos archivos) | ⬜ |
+| **F1-E5** | Galería de modelos + generador de códigos de barra por empresa | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F1-E6** | ETL de catálogos y materiales + mapeos reutilizables + fusión de colores | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F1-E7** | ETL de modelos + BOM + fotos masivas + docs del módulo + cierre de fase en `prueba` | 1 coder + 1 reviewer | ⬜ |
 
-> Se construyen **en orden** porque cada fase se apoya en la anterior.
+### F2 · Pedidos + Órdenes — ⬜ pendiente
+
+**Salida:** Un pedido fluye hasta su orden; impreso de orden. · **Ficha completa:** [`docs/hoja-de-ruta/F2-etapas.md`](docs/hoja-de-ruta/F2-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F2-E1** | Pedidos internos + Pedidos Reales | 1 coder + 1 reviewer (con corte de contingencia E1a/E1b previsto) | ⬜ |
+| **F2-E2** | Órdenes: datos + dominio + API | 1 coder + 1 reviewer (review en dos cortes) | ⬜ |
+| **F2-E3** | Frontend de órdenes: componente MatrizColorTalla (se reusa en F3/F6) + captura completa | 1 coder + 1 reviewer | ⬜ |
+| **F2-E4** | Consultas, tableros, búsqueda global e impreso de orden | 2 coders en paralelo + 1 reviewer (límites de archivos declarados) | ⬜ |
+| **F2-E5** | ETL de pedidos y órdenes + documentación + cierre de fase | 1 coder + 1 reviewer | ⬜ |
+
+### F3 · Producción / WIP — ⬜ pendiente
+
+**Salida:** Una orden recorre todo el ciclo; inventario PT cuadra por kardex. · **Ficha completa:** [`docs/hoja-de-ruta/F3-etapas.md`](docs/hoja-de-ruta/F3-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F3-E1** | Modelo de datos F3 + motor kardex genérico + catálogos base | 1 coder + 2 reviewers | ⬜ |
+| **F3-E2** | Corte + envío a maquila unificado | 1 coder + 1 reviewer | ⬜ |
+| **F3-E3** | Inventario PT operable: movimientos, traspasos, existencias y kardex | 1 coder + 1 reviewer | ⬜ |
+| **F3-E4** | **Recibo de maquila ⭐** — transacción WIP + kardex PT + cargo EsMa (el punto de integración central del plan) | 1 coder + 2 reviewers independientes | ⬜ |
+| **F3-E5** | Entrega a cliente + tablero WIP y consultas | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F3-E6** | ETL de producción e inventario PT + cuadre + docs + cierre de fase | 2 coders en paralelo + 1 reviewer | ⬜ |
+
+### F4 · Compras / MRP — ⬜ pendiente
+
+**Salida:** El tablero "qué tengo / qué falta" reemplaza el drive manual. · **Ficha completa:** [`docs/hoja-de-ruta/F4-etapas.md`](docs/hoja-de-ruta/F4-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F4-E1** | Kardex de telas y avíos + pantallas de inventario | 1 coder + 1 reviewer (la más cargada de la fase; contingencia prevista en la ficha) | ⬜ |
+| **F4-E2** | Órdenes de compra: captura, autorización, cancelación, consultas e impresos | 1 coder + 1 reviewer (puede correr en paralelo con E1) | ⬜ |
+| **F4-E3** | Recepción de compras: lotes D5, entrada al kardex y evento para la RC | 1 coder + 1 reviewer (+2º reviewer recomendado) | ⬜ |
+| **F4-E4** | Explosión R3, generar OC desde la explosión y tablero "qué tengo / qué falta" | 1 coder + 1 reviewer | ⬜ |
+| **F4-E5** | Notas de salida estructuradas: captura, consumo de avíos, consultas e impreso | 1 coder + 1 reviewer | ⬜ |
+| **F4-E6** | ETL + cuadre de existencias, docs de módulos y cierre de fase | 2 coders en paralelo + 1 reviewer | ⬜ |
+
+### F5 · Ruta Crítica ⭐ — ⬜ pendiente
+
+**Salida:** Una orden corre con su RC y las fechas se llenan solas donde aplica. · **Ficha completa:** [`docs/hoja-de-ruta/F5-etapas.md`](docs/hoja-de-ruta/F5-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F5-E1** | Procesos como datos: catálogo + roles responsables + DAG de dependencias + checklists | 1 coder + 1 reviewer | ⬜ |
+| **F5-E2** | Plantillas de ruta por familia + reglas de duración + calendario laboral | 2 coders en paralelo + 1 reviewer (solo si no hay solape) | ⬜ |
+| **F5-E3** | Motor RC parte 1: jobs + datos de la ruta viva + generación de ruta | 1 coder + 2 reviewers | ⬜ |
+| **F5-E4** | Motor RC parte 2: CPM en pg-boss + captura de avance + semáforo | 1 coder + 2 reviewers | ⬜ |
+| **F5-E5** | Pantallas: Programar RC, bandeja de tareas con semáforo, RC por orden | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F5-E6** | Auto-avance: eventos de dominio en F3/F4 y suscriptor de la RC | 1 coder + 1 reviewer | ⬜ |
+| **F5-E7** | Concentrado planeado vs real + exportación + ETL + docs + cierre de fase | 2 coders en paralelo + 1 reviewer | ⬜ |
+
+### F6 · Calidad + EsMa — ⬜ pendiente
+
+**Salida:** EsMa cuadra contra los recibos del periodo. · **Ficha completa:** [`docs/hoja-de-ruta/F6-etapas.md`](docs/hoja-de-ruta/F6-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F6-E1** | Calidad: catálogo de defectos + motor de planes AQL + consulta de bitácora | 1 coder + 1 reviewer (Calidad y EsMa pueden correr en paralelo) | ⬜ |
+| **F6-E2** | Calidad: auditorías con folio atómico + resultado AQL + integración RC | 1 coder + 1 reviewer | ⬜ |
+| **F6-E3** | Calidad: consulta e impresión, historial por maquilero, modificar/cancelar | 1 coder + 1 reviewer | ⬜ |
+| **F6-E4** | EsMa: movimientos, validación de cargos, saldos, conciliación, recibo de pago | 1 coder + 1 reviewer | ⬜ |
+| **F6-E5** | EsMa: estado de cuenta, consultas semanales, impreso + vista móvil | 1 coder + 1 reviewer | ⬜ |
+| **F6-E6** | ETL Calidad + EsMa, reporte de cuadre v1 vs v2, docs y cierre de fase | 2 coders en paralelo + 1 reviewer | ⬜ |
+
+### F7 · Costos / EDR + Indicadores — ⬜ pendiente
+
+**Salida:** Costos y tableros cuadran contra el cálculo manual. · **Ficha completa:** [`docs/hoja-de-ruta/F7-etapas.md`](docs/hoja-de-ruta/F7-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F7-E1** | Motor de costeo: pre-costo, costo de orden y márgenes por pedido (D1) | 1 coder + 1 reviewer | ⬜ |
+| **F7-E2** | EDR automatizado: generación desde entregas, conciliación, consultas | 1 coder + 1 reviewer | ⬜ |
+| **F7-E3** | Motor de KPIs en segundo plano (pg-boss) + tableros directivos (D11) | 1 coder + 1 reviewer (+1 coder opcional para páginas) | ⬜ |
+| **F7-E4** | Productividad unificada IP/Almacén + fichas confiables + muestrarios | 1 coder + 1 reviewer | ⬜ |
+| **F7-E5** | Inventario cíclico contra el kardex propio (D6) + auditoría 5S | 1 coder + 1 reviewer | ⬜ |
+| **F7-E6** | ETL histórico + cuadre numérico v1 vs v2 + docs y cierre de fase | 1 coder + 1 reviewer | ⬜ |
+
+### F8 · Migración + Go-live — ⬜ pendiente
+
+**Salida:** Saldos v2 = saldos Access en fecha de corte; usuarios operando. · **Ficha completa:** [`docs/hoja-de-ruta/F8-etapas.md`](docs/hoja-de-ruta/F8-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F8-E1** | Cimientos del ETL integrado: extracción al corte + transporte a la nube + staging + "modo migración" + consola | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F8-E2** | ETL bloque A: usuarios + catálogos + modelos/BOM + pedidos + órdenes + calibrador de folios | 1 coder + 1 reviewer | ⬜ |
+| **F8-E3** | ETL bloque B: producción M/A + kardex PT + telas + OC/notas + EsMa + costos + RC/CC | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F8-E4** | Archivo histórico de solo lectura + frontera de 10 años por grafo | 1 coder + 1 reviewer | ⬜ |
+| **F8-E5** | Saldos iniciales como AJUSTE de kardex + reporte de cuadre v1 vs v2 | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F8-E6** | Capa de seguridad de usuarios + fotos a R2 + tablero de go-live | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F8-E7** | Prueba reina + ensayo del corte + capacitación + **paralelo 2–4 semanas con cuadre diario** + corte final y go-live | 1 coder + 1 reviewer; Gabriel opera el cuadre; Daniel valida | ⬜ |
+
+> **Nota F8:** aquí también se monta el **ambiente de producción en Railway** (hoy solo existe el de prueba, por costo) y el **modo mantenimiento** para congelar capturas durante el corte.
 
 ---
 
-## 5. F0 por dentro — las 5 etapas (TODAS terminadas ✅)
+## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
 
-| Etapa | Qué hace | Estado |
-|---|---|---|
-| **E1 · Esqueleto dockerizado** | Backend + frontend + base de datos levantando con un comando. | ✅ en main |
-| **E1.1 · Tema claro/oscuro** | Tu pedido: arranca en claro, botón arriba para cambiar, se recuerda. | ✅ en main |
-| **E2 · Datos + lógica** | Modelo de datos (Prisma, 14 tablas) + motores comunes (folios, inventario, auditoría, permisos) + seed real de FR Moda. **114 pruebas.** | ✅ en main |
-| **E3 · API + login real** | Rutas del backend + "menú" **OpenAPI** + **login real** con bloqueo a 5 intentos + permisos en el servidor. **+35 pruebas (149 en total en el backend).** | ✅ en main |
-| **E4 · Frontend de verdad** | Login + molde de pantallas responsive (13 módulos por permisos) + **CRUD completo de Almacenes** (con reactivar) + diseño (Tailwind/shadcn) + tu tema. **38 pruebas** (incl. navegador). | ✅ en main |
-| **E5 · Infra + cierre** | Pruebas automáticas (CI), config de Railway, la **guía de despliegue**, ADRs, y limpieza (se borró la cantera `control-v2/`). | ✅ en main |
-| **Cierre F0** | Todo verde con `docker compose up`. **Pendiente: TÚ despliegas en Railway** con la guía. | 🔜 **tu turno** |
+- **Módulo 12 · Documental:** los **adjuntos por orden/modelo (R6)** → etapa final de **F2** (la Orden es su ancla; el motor R2 existe desde F0). Las **fichas técnicas estructuradas (R5)** → **F6** (la auditoría AQL las consume como referencia). Confirmar al arrancar cada una.
+- **Módulo 13 · Administración (lo que faltaba):** pantallas de usuarios/empresas → **F1-E1** (ya en la ficha) · consulta de bitácora → **F6-E1** (ya en la ficha) · configuración por empresa (ex-`Propiedades`) → **F1** (confirmar al arrancar) · **modo mantenimiento** → **F8**.
+- **Respaldo doble** (job pg-boss con `pg_dump` diario cifrado a R2, §2.2 del plan): etapa chica al **inicio de F1**, en cuanto Gabriel monte R2. Es la mitigación #1 de la tabla de riesgos y hoy nadie la tiene.
+- **Impreso "Lista de precios"** (R9): sin módulo claro — decidir en F1 (si el precio vive en el modelo) o F2 (si es por cliente).
 
-Hoy mismo puedes correr todo en tu PC con `docker compose up` y usar la app en `http://localhost:8080`.
+## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
----
+- **R8** (importar pedidos de clientes y generar órdenes): es "Etapa 2" **por decisión del dueño**. D7 (campos por cliente) se diseña en F1/F2 sabiendo que R8 se apoyará en él.
+- **Promoda** (D9): cliente extinto — sus tablas NO se migran. **Proscai** (D6): ERP retirado — la comparación de cíclico es contra el propio kardex.
 
-## 6. ¿Cuánto tarda? (estimación gruesa — con su asterisco)
+## 6. Decisiones de negocio aún abiertas (agendar con Daniel, con fecha límite)
 
-El equipo de agentes comprime en **horas** lo que a una persona le tomaría **semanas**. Pero el **calendario real** lo manda otra cosa: **tus verificaciones**, los **pasos manuales de infra**, y al final el **periodo de paralelo obligatorio**.
+| Decisión | Cuándo se necesita |
+|---|---|
+| **D2** — detalles de por qué Costos/EDR no se usa hoy | antes de abrir **F7** (sesión durante F5/F6) |
+| **D8** — ubicación final de Control de Calidad (¿proceso de la RC?) | al cerrar **F5** |
+| **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
 
-| Tramo | Trabajo de agentes | Calendario realista\* |
-|---|---|---|
-| **Desplegar F0 en Railway** (tu parte) | — | unas **horas** siguiendo la guía (te acompaño) |
-| **Cada fase de módulos** (F1–F7) | ~1–3 jornadas c/u | según tus verificaciones; varias semanas en total |
-| **F8 Migración + go-live** | la migración: jornadas | **+2–4 semanas fijas** de v1 y v2 en paralelo |
+## 7. ¿Cuánto tarda? (gruesa, honesta)
 
-\* Si te tardas en verificar o la infra da lata, se estira.
+Los agentes comprimen en horas lo que tomaría semanas; el **calendario real** lo mandan tus verificaciones por etapa, los pasos manuales de infra y, al final, las **2–4 semanas fijas de paralelo** (F8-E7, no se aceleran: son el seguro de que todo cuadra antes de apagar el viejo). Fases pesadas: **F3** y **F5**. Orden de magnitud total: **unos pocos meses**.
 
-**Las 2–4 semanas de paralelo NO se aceleran**: es el seguro de que inventarios y cuentas cuadran **antes** de apagar el viejo. Es a propósito.
+## 8. Cómo se mantiene este documento (regla para toda sesión)
 
-**Traducción honesta:** el **sistema completo hasta encenderlo en producción** es del orden de **unos pocos meses**, mandado sobre todo por las fases pesadas (**F3** producción y **F5** ruta crítica) y por las semanas de paralelo del final.
-
----
-
-## 7. Lo que sigue, ya mismo
-
-1. **Cierro E5** (review + mi verificación) — es la última etapa de F0.
-2. **Tú das de alta Railway + Cloudflare R2** siguiendo `docs/GUIA-RAILWAY-R2.md` (te acompaño en vivo). Ahí CONTROL v2 queda **en internet** (ambiente de prueba y producción).
-3. Arrancamos **F1 (Catálogos + Modelos)** — y aquí ya puedo **paralelizar varios coders** porque los catálogos son módulos independientes.
-
----
-
-## 8. Lo que necesito de ti
-
-- **Verificar cada etapa** — 5 minutos en el navegador o con `docker compose up`.
-- **AHORA, al cerrar F0:** dar de alta **Railway** (3 servicios: frontend público, backend y Postgres privados) y **Cloudflare R2** (archivos), con la guía paso a paso. Te acompaño en vivo; es tu mayor "trabajo manual" del proyecto.
-- Más adelante, si surge una duda **nueva** de negocio, la validamos. El negocio base ya está validado por Daniel.
-
----
-
-*¿Algo de esto lo quieres más detallado o con otro nivel de zoom? Dímelo — este documento es vivo.*
+1. Al **cerrar una etapa**: cambiar su ⬜ → ✅ (con fecha) aquí **y** en la ficha de la fase; actualizar la sección *¿Dónde vamos?*.
+2. Al **arrancar una fase**: revisar su ficha completa y confirmar/ajustar el desglose (los ajustes se escriben en la ficha, con una línea de por qué).
+3. Decisiones de negocio nuevas → `Documentacion_MJD/DECISIONES.md`; decisiones técnicas → ADR en `docs/arquitectura/`. Este documento solo **apunta**, no duplica.
