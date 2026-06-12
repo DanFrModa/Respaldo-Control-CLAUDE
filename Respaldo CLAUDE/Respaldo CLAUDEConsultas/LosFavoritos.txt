@@ -1,9 +1,0 @@
-dbMemo "SQL" ="SELECT Habilitacion.IdHabilitacion, Habilitacion.Favorito, Habilitacion.Clave\015"
-    "\012FROM Habilitacion\015\012WHERE (((Habilitacion.Favorito)=Yes));\015\012"
-dbMemo "Connect" =""
-dbBoolean "ReturnsRecords" ="-1"
-dbInteger "ODBCTimeout" ="60"
-dbByte "RecordsetType" ="0"
-dbBoolean "OrderByOn" ="0"
-Begin
-End
