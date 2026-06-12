@@ -17,7 +17,7 @@
 #  docs/GUIA-RAILWAY-R2.md.)
 
 server {
-    listen 80;
+    listen ${PORT};
     server_name _;
 
     root /usr/share/nginx/html;
