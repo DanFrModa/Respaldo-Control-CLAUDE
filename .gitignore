@@ -40,3 +40,7 @@ playwright-report/
 */playwright-report/
 test-results/
 */test-results/
+
+# Volcado del sistema viejo (~101 MB) fuera del repo: el deploy (Railway) clona ligero.
+# Sigue en tu PC local y en la rama fuente-sistema-viejo. Ver FUENTE-SISTEMA-VIEJO.md
+Respaldo CLAUDE/

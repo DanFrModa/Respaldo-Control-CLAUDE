@@ -1,8 +1,0 @@
-dbMemo "SQL" ="SELECT DISTINCTROW [PagoEsMa], [IdEsMa_Pagos], [IdEsMa]\015\012FROM EsMa_Pagos\015"
-    "\012WHERE [PagoEsMa] In (SELECT [PagoEsMa] FROM [EsMa_Pagos] As Tmp GROUP BY [Pa"
-    "goEsMa] HAVING Count(*)>1 )\015\012ORDER BY [PagoEsMa];\015\012"
-dbMemo "Connect" =""
-dbBoolean "ReturnsRecords" ="-1"
-dbInteger "ODBCTimeout" ="60"
-Begin
-End

@@ -1,8 +1,0 @@
-dbMemo "SQL" ="TRANSFORM Sum([Can]) AS [El Valor]\015\012SELECT [Prenda], Sum([Can]) AS [Total "
-    "de Can]\015\012FROM [promodaproviventas clas]\015\012GROUP BY [Prenda]\015\012PI"
-    "VOT [Genero];\015\012"
-dbMemo "Connect" =""
-dbBoolean "ReturnsRecords" ="-1"
-dbInteger "ODBCTimeout" ="60"
-Begin
-End
