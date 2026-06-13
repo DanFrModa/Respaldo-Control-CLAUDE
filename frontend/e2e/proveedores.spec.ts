@@ -111,14 +111,17 @@ test.describe('CRUD de Proveedores', () => {
 
     const detalle = page.getByTestId('detalle-proveedor');
 
-    // Filtrar por un tipo concreto: la lista se acota a ese tipo. El motor
-    // selecciona el primero de la lista filtrada, asi que su DETALLE debe mostrar
-    // el tipo elegido (la fila puede mostrar el contacto en vez del tipo).
     await page.getByTestId('filtro-tipo-proveedor').selectOption('TELAS');
-    const filas = page.getByTestId('fila-proveedor');
-    if ((await filas.count()) > 0) {
-      await filas.first().click();
-      await expect(detalle.getByText('Telas').first()).toBeVisible();
-    }
+    // El filtro recarga la lista en el servidor y el motor auto-selecciona el
+    // primero de la lista filtrada. Lo verificamos por el DETALLE (la fila muestra
+    // el contacto, no el tipo). Si el catálogo no tiene proveedores TELAS, la lista
+    // queda vacía: ambos resultados son válidos. (Sin click: la fila se remonta al
+    // recargar y un click temprano sería inestable.)
+    await expect(
+      detalle
+        .getByText('Telas')
+        .first()
+        .or(page.getByText('No hay proveedores que coincidan con la búsqueda.')),
+    ).toBeVisible();
   });
 });
