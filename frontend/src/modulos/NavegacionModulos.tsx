@@ -13,9 +13,12 @@ import { ICONOS_MODULO, type ModuloMenu } from './catalogo';
  * /catalogos/almacenes activa Catalogos): fondo teal (sidebar-accent) + barra de
  * acento a la izquierda.
  *
- * Colapsado: solo el icono, centrado, con un Tooltip a la derecha que muestra el
- * nombre; cada enlace conserva `aria-label={modulo.titulo}` para no perder el
- * nombre accesible. Expandido: icono + label + estrella si el modulo es destacado.
+ * Colapsado: el item se ve IGUAL que expandido (mismo `gap-3 px-3 py-2`, icono
+ * `size-4` en la misma posicion, mismo estado activo con barra de acento a
+ * `left-0`) pero SIN el texto del nombre ni la estrella; el sidebar se angosta a
+ * un riel del ancho justo del icono. Un Tooltip a la derecha muestra el nombre y
+ * cada enlace conserva `aria-label={modulo.titulo}` para no perder el nombre
+ * accesible. Expandido: icono + label + estrella si el modulo es destacado.
  */
 export function NavegacionModulos({
   modulos,
@@ -40,8 +43,7 @@ export function NavegacionModulos({
             aria-label={colapsado ? modulo.titulo : undefined}
             className={({ isActive }) =>
               cn(
-                'group/nav relative flex items-center rounded-lg text-sm font-medium transition-colors',
-                colapsado ? 'h-10 w-10 justify-center' : 'gap-3 px-3 py-2',
+                'group/nav relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
                 isActive
                   ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
@@ -54,10 +56,7 @@ export function NavegacionModulos({
                 {isActive ? (
                   <span
                     aria-hidden
-                    className={cn(
-                      'absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-primary',
-                      colapsado && '-left-1',
-                    )}
+                    className="absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-primary"
                   />
                 ) : null}
                 <Icono className="size-4 shrink-0" aria-hidden />

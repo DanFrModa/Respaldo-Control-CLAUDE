@@ -63,7 +63,7 @@ export function CascaronSistema(): React.JSX.Element {
         <aside
           className={cn(
             'hidden shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-in-out lg:flex',
-            colapsado ? 'w-19' : 'w-64',
+            colapsado ? 'w-14' : 'w-64',
           )}
         >
           {/* Marca + boton contraer */}
