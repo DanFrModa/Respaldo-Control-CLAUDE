@@ -48,7 +48,7 @@ export function NavegacionModulos({
                 aria-label={colapsado ? modulo.titulo : undefined}
                 className={({ isActive }) =>
                   cn(
-                    'group/nav relative flex items-center rounded-lg py-2 text-sm font-medium transition-[background-color,color,padding] duration-200',
+                    'group/nav relative flex items-center rounded-lg py-2 text-sm font-medium transition-colors duration-200',
                     // Colapsado: icono centrado en el riel angosto; expandido: a la
                     // izquierda con hueco para el nombre. Solo cambian clases.
                     colapsado ? 'justify-center px-2' : 'gap-3 px-3',
@@ -67,7 +67,9 @@ export function NavegacionModulos({
                         className="absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-primary"
                       />
                     ) : null}
-                    <Icono className="size-4 shrink-0" aria-hidden />
+                    {/* `mx-auto` centra el icono en el riel colapsado sin depender
+                        de que justify-center sobreviva al merge de clases. */}
+                    <Icono className={cn('size-4 shrink-0', colapsado && 'mx-auto')} aria-hidden />
                     {/* Nombre + estrella SIEMPRE montados; al colapsar se animan a
                         ancho/opacidad 0 (overflow oculto) sin remontarse. */}
                     <span
