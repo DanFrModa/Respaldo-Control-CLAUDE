@@ -11,32 +11,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import type { AccionesFila } from '@/modulos/tabla-meta';
 
 /**
- * Acciones por fila que la pagina inyecta a las columnas. Se pasan por `meta` de
- * la tabla para que las celdas las invoquen sin acoplar las columnas al estado
- * de la pagina. Segun el estado de la fila se ofrece desactivar (si esta activa)
- * o reactivar (si esta inactiva); editar siempre.
+ * Acciones por fila de la tabla de almacenes. Se pasan por `meta` de la tabla
+ * (augment generico unico en `@/modulos/tabla-meta`) para que las celdas las
+ * invoquen sin acoplar las columnas al estado de la pagina. Editar siempre;
+ * desactivar (si esta activa) o reactivar (si esta inactiva) segun el estado.
  */
-export interface AccionesAlmacen {
-  puedeAdministrar: boolean;
-  alEditar: (almacen: Almacen) => void;
-  alDesactivar: (almacen: Almacen) => void;
-  alReactivar: (almacen: Almacen) => void;
-}
-
-/**
- * Las columnas leen las acciones por fila del `meta` de la tabla (TanStack
- * Table). Se augmenta `TableMeta` para que ese acceso sea TIPADO (sin `any` ni
- * casts): la tabla de almacenes provee {@link AccionesAlmacen} en su `meta`.
- */
-declare module '@tanstack/react-table' {
-  // El parametro TData es obligatorio en la firma de la interfaz original.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface TableMeta<TData> {
-    acciones?: AccionesAlmacen;
-  }
-}
+export type AccionesAlmacen = AccionesFila<Almacen>;
 
 const columnHelper = createColumnHelper<Almacen>();
 

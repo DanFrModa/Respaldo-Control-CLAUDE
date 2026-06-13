@@ -117,13 +117,22 @@ function definirRoles(): {
   const todos: readonly ClavePermiso[] = CLAVES_PERMISO;
 
   // Nivel 30 — Directivo: pierde la administración del sistema (en el viejo, el botón
-  // Administración era exclusivo de nivel ≤ 20, doc 00 §3.1). Conserva almacenes.ver.
+  // Administración era exclusivo de nivel ≤ 20, doc 00 §3.1). Conserva el `.ver` de los
+  // catálogos (consulta), pero NO su `.administrar`: administrar catálogos maestros
+  // (igual que almacenes/usuarios/roles/empresas) queda solo para Administrador y
+  // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
+  // los 5 catálogos junto con los de administración del sistema.
   const directivo = sin(
     todos,
     'usuarios.administrar',
     'roles.administrar',
     'almacenes.administrar',
     'empresas.administrar',
+    'proveedores.administrar',
+    'cortadores.administrar',
+    'temporadas.administrar',
+    'etiquetas-marca.administrar',
+    'colores.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".

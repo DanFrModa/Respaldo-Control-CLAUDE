@@ -64,3 +64,5 @@ Reglas:
 | [ADR-0004](ADR-0004-hash-scrypt.md)                | Hash de contraseñas con scrypt (better-auth) en lugar de argon2   | Aceptado |
 | [ADR-0005](ADR-0005-auditoria-sin-fk.md)           | Campos de auditoría sin FK físico hacia Usuario                   | Aceptado |
 | [ADR-0006](ADR-0006-openapi-desde-zod.md)          | El contrato OpenAPI se genera desde los esquemas Zod del backend  | Aceptado |
+| [ADR-0007](ADR-0007-catalogos-globales-vs-por-empresa.md) | Catálogos maestros globales; `idEmpresa` solo en lo operativo (A9) | Aceptado |
+| [ADR-0008](ADR-0008-schema-prisma-archivo-unico.md) | `schema.prisma` archivo único (no `prismaSchemaFolder`) en F1     | Aceptado |

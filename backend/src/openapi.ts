@@ -43,6 +43,21 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
       { name: 'salud', description: 'Estado del servicio.' },
       { name: 'sesion', description: 'Usuario actual y permisos.' },
       { name: 'almacenes', description: 'Catálogo de almacenes (CRUD patrón).' },
+      { name: 'usuarios', description: 'Administración de usuarios.' },
+      { name: 'empresas', description: 'Administración de empresas y su configuración.' },
+      { name: 'roles', description: 'Roles (solo lectura, para el selector de usuarios).' },
+      // Catálogos maestros (F1-E1).
+      {
+        name: 'proveedores',
+        description: 'Catálogo de proveedores de telas, avíos y servicios.',
+      },
+      { name: 'cortadores', description: 'Catálogo de cortadores.' },
+      { name: 'temporadas', description: 'Catálogo de temporadas.' },
+      {
+        name: 'etiquetas-marca',
+        description: 'Catálogo de etiquetas de marca (con su porcentaje de regalías).',
+      },
+      { name: 'colores', description: 'Catálogo de colores.' },
     ],
     components: {
       securitySchemes: {
