@@ -5,9 +5,17 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7 y avíos R1) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** ⬜ pendiente — el desglose se confirma/ajusta al arrancar la fase.
+> **Estado:** 🔄 en curso — **F1-E1 ✅ hecha** (13-jun-2026, verificada en `prueba`); sigue **F1-E2**.
 
-## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ⬜ pendiente
+## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
+
+> **CIERRE (13-jun-2026).** Entregado, verificado por Gabriel en `prueba` (Railway) y mergeado vía PR #15.
+> - **Qué quedó:** 5 catálogos GLOBALES (Proveedor, Cortador, Temporada, EtiquetaMarca, Color — sin `idEmpresa`, decisión A9/ADR-0007) con dominio + API + frontend (patrón CRUD) + tests; y Administración (rutas REST + pantallas de Usuarios/Empresas/Roles sobre los servicios de dominio que F0 ya tenía probados; se agregó `cambiarContrasenaUsuario` reutilizando el scrypt de better-auth). Migración única `f1_e1_catalogos`, 10 permisos nuevos + seed (el rol `Basico` queda sin permisos de catálogos para la prueba de acceso), OpenAPI + cliente del frontend sincronizados. Componente de tabla con `AccionesFila<T>` genérico y helper `numeroOpcional` para campos numéricos.
+> - **Decisiones:** A9 = catálogos globales ([`ADR-0007`](../arquitectura/ADR-0007-catalogos-globales-vs-por-empresa.md)); `schema.prisma` único ([`ADR-0008`](../arquitectura/ADR-0008-schema-prisma-archivo-unico.md)); **Marilyn Fitness = FR Moda** (misma empresa renombrada, NO se crea una 2ª empresa en E5/E6 — corregir esos supuestos al llegar).
+> - **Ajuste de equipo (vs. el plan de 3 coders en paralelo):** se hizo en **cadena por el contrato** — 1 coder backend catálogos → 1 coder backend admin → 1 coder frontend (en 2 olas) → reviewer — porque el backend de E1 es una cadena sobre archivos compartidos (`schema.prisma`, `seed.ts`, `permisos.ts`, `openapi.json`); paralelizar ahí genera esperas/conflictos (PLANMAESTRO §9.1). El paralelismo seguro (backend vs frontend) sí se aprovechó.
+> - **El CI atrapó un bug real** (corregido antes del merge, commit `7939d00`): en Zod, `.partial()` NO elimina los `.default()`, así que editar/desactivar **reseteaba campos** (proveedor.tipo, etiqueta.regalias, empresa favorita/paraIpt/paraEdr). Fix: sobrescribir esos campos como `.optional()` sin default en los esquemas de edición, + tests unitarios de esquema (sin Docker) y de regresión (integración). CI completo en verde (unit + integración testcontainers + E2E Playwright + build de imágenes Docker).
+> - **Prerrequisito de despliegue confirmado:** el backend de `prueba` necesita `SEED_ON_START=true` para sembrar los permisos nuevos al arrancar (el seed es idempotente y NO resetea la contraseña del admin). Aplica a TODA etapa futura que agregue permisos.
+> - **Diferido a su etapa (NO se coló en E1):** `docs/modulos/catalogos.md` completo y el ETL → F1-E6/E7; la fusión de colores → F1-E6.
 
 **Objetivo:** Replicar el patrón CRUD de Almacenes en los 5 catálogos sin dependencias entre sí, consolidando el estándar de la fase y dejando listas las referencias que E3 necesita (Proveedor para AvioProveedor, Color para TelaColor). Además entrega las mini-pantallas de Administración (Usuarios y Empresas) sobre los servicios de dominio que F0 YA construyó y probó — sin ellas, las verificaciones de Gabriel en E1 (usuario sin permisos) y E5 (editar el UPC de la empresa) serían imposibles, porque Gabriel no programa. Va primero porque es el menor riesgo para afinar el patrón y porque aquí se congela la decisión A9 (catálogos globales vs por empresa) que condiciona TODOS los esquemas de la fase.
 
