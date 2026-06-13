@@ -6,8 +6,8 @@
 
 ## Contexto
 
-La documentación funcional del negocio —11 documentos de módulos, `DECISIONES.md` (D0–D11),
-`MEJORAS.md` (A1–A10), `REQUISITOS-NUEVOS.md` (R1–R9) y `RESUMEN-EJECUTIVO.md`— ya vive en la
+La documentación funcional del negocio —11 documentos de módulos, `DECISIONES.md` (D0–D12),
+`MEJORAS.md` (A1–A10), `REQUISITOS-NUEVOS.md` (R1–R15) y `RESUMEN-EJECUTIVO.md`— ya vive en la
 **raíz del repositorio**, en `Documentacion_MJD/`, junto con el volcado del sistema viejo
 (`Respaldo CLAUDE/`, formularios/consultas/tablas). Es la **fuente de verdad del negocio**,
 validada por Daniel.

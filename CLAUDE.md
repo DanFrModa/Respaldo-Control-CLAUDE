@@ -10,6 +10,8 @@ Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Mo
 
 **Estado actual: CONTROL v2 — F1 (Catálogos + Modelos) EN CURSO.** F0 (Fundación) ✅ y **F1-E1 ✅** (catálogos sencillos + Administración) construida, verificada por Gabriel y desplegada en el ambiente de **`prueba`** de Railway (13-jun-2026). Detalle en **§8**; lo siguiente es **F1-E2** (catálogos estructurados: maquila unificada, tallas/curvas D4, clientes D7). **En paralelo (13-jun-2026):** Gabriel pidió un **rediseño visual** de la UI — estructura "lista + detalle" + tema verde *teal* con menú colapsable, iconos y colores explicativos (la "propuesta 3" del showcase) — que ejecuta **otro chat** con un prompt aparte; cuando aterrice, será el nuevo estándar visual que herede F1-E2+.
 
+> **Integración Finanzas (2026-06-13):** se incorporó al plan la propuesta de **Finanzas** (`Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`): decisión **D12**, requisitos **R10–R15**, **módulo 14 (Finanzas: CxC/CxP + CFDI, generaliza EsMa)** y una **fase nueva F8 (Finanzas)** entre F7 y Go-live —que pasa a **F9**— (plan ahora F0–F9, 10 fases). El **catálogo de proveedores enriquecido (R15)** entra en **F1, etapa F1-E1B**. La contabilidad NO entra (sigue con el contador); meta de fondo: **apagar SINUBE** por etapas (timbrado vía PAC = R14, posterior). Ver `DECISIONES.md` D12 y `HOJA-DE-RUTA.md`.
+
 **Arquitectura (decidida por Gabriel — ver `PLANMAESTRO.md` §1-3):**
 - **Backend y frontend SEPARADOS**, en carpetas `backend/` y `frontend/`. **NO es monorepo** (sin workspaces; cada carpeta autónoma con su `package.json` y `npm`).
 - **Todo dockerizado** — `docker compose up` levanta el sistema completo. Prioridad: **portabilidad** (si Railway se cae, se levanta en cualquier lado sin reescribir).
@@ -67,9 +69,9 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 | `08-Ruta-Critica.md` | ⭐ RC = workflow/CPM. El módulo más importante |
 | `09-Control-de-Calidad.md` | Auditorías AQL |
 | `10-Modelo-Datos-y-Usuarios.md` | ER de todas las tablas + 2 sistemas de seguridad |
-| `DECISIONES.md` | **Decisiones del dueño (D0–D11)** — leer siempre |
+| `DECISIONES.md` | **Decisiones del dueño (D0–D12)** — leer siempre |
 | `MEJORAS.md` | Mejoras de diseño para v2 (A1–A10 + por módulo) |
-| `REQUISITOS-NUEVOS.md` | Funciones que faltan (R1–R9 + principio Make-to-Order) |
+| `REQUISITOS-NUEVOS.md` | Funciones que faltan (R1–R15 + principio Make-to-Order; R10–R15 = Finanzas) |
 | `RESUMEN-EJECUTIVO.md` | Consolidado de todo |
 
 ---

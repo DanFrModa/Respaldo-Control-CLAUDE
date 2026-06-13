@@ -14,6 +14,12 @@
 | R7 | Seguimiento de recepción de materiales | Estatus automático recibido/pendiente por orden; auto-alimenta la RC | 🔴 | ✅ Registrado |
 | R8 | Importar pedidos de clientes (**Etapa 2**) | Bajar pedidos del cliente y generar órdenes de producción automáticamente | 🟢 Etapa 2 | ✅ Registrado |
 | R9 | Formatos de documentos impresos | Definir/rediseñar todos los impresos (órdenes, notas, OC, recibos…) | 🟡 | ✅ Registrado |
+| R10 | Cuenta corriente unificada de terceros | Generaliza EsMa: saldo = Σ movimientos; ejes **origen** + **fiscal**; dos vistas (operativa/fiscal); incluye notas de crédito; maquila sigue en EsMa con XML conciliado | 🟡 | ✅ Registrado |
+| R11 | Importar CFDI de proveedores (XML→CxP) | Leer/validar el XML sellado del proveedor, ligarlo a OC/entrada y conciliar el cargo en CxP (marca fiscal) | 🟡 | ✅ Registrado |
+| R12 | Importar CFDI de ventas (XML→CxC) | Jalar el XML ya timbrado (emitido por fuera), ligarlo al pedido/cliente y generar el cargo en CxC | 🟡 | ✅ Registrado |
+| R13 | Información detallada para el contador | Reportes/exportación de clientes, proveedores y sus movimientos **fiscales** | 🟡 | ✅ Registrado |
+| R14 | Timbrado nativo vía PAC (**futuro**) | Emitir + timbrar desde CONTROL; R10–R12 ya dejan la estructura lista | 🟢 Futuro | ✅ Registrado |
+| R15 | Catálogo de proveedores enriquecido | Catálogo único con **roles multi-valor** + campos fiscales/contacto/pago/operativos; va en **F1** | 🟡 | ✅ Registrado |
 
 ---
 
@@ -124,6 +130,65 @@ flowchart LR
   | **Lista de precios** | `ListaPrecios` (reporte) |
   | **Inventario de telas** | `InventariosTela` (reporte) |
 - **Por definir con Daniel:** qué documentos conservar tal cual, cuáles rediseñar, y si hay nuevos (p. ej. impreso de la explosión de materiales R3, o del estatus de recepción R7).
+
+---
+
+## 💳 Finanzas: cuentas de terceros + CFDI (R10–R15)
+
+> **Origen:** decisión **D12** (ver [DECISIONES.md](DECISIONES.md)). Detalle completo e insumo
+> original en [PROPUESTA-Finanzas-y-Proveedores.md](PROPUESTA-Finanzas-y-Proveedores.md). La meta
+> de fondo es **apagar SINUBE** por etapas, **sin tocar la contabilidad** (esa sigue con el
+> contador). Encaje: módulo **14 (Finanzas)** + **fase F8 (Finanzas)** entre F7 y Go-live (que
+> pasa a **F9**); **R15 en F1** (etapa F1-E1B).
+
+Hoy Daniel factura/timbra **fuera** de CONTROL (SINUBE) y ahí lleva cuentas de clientes y
+proveedores. La meta: que CONTROL **amarre cada documento fiscal con su operación real**
+(pedido, OC, recibo) y se vuelva el repositorio único. La contabilidad y las declaraciones
+**no** entran (se quedan con el contador); CONTROL le entrega **información fiscal limpia**.
+
+### R10 — Cuenta corriente unificada de terceros
+Un solo motor que **generaliza el EsMa** de hoy: `saldo = Σ(cargos) − Σ(abonos/pagos)`, **nunca
+editable** (consistente con D3). Sirve a **clientes (CxC)**, **proveedores (CxP)** y **maquila
+(EsMa)** con la misma mecánica. Cada movimiento lleva dos ejes — **origen** (recibo de maquila ·
+factura de proveedor · entrada sin factura · nota de crédito · pago · abono) y **naturaleza
+fiscal** (fiscal con CFDI+IVA / no fiscal) — y de un solo libro por tercero salen **dos vistas**:
+operativa (todo) y fiscal (solo CFDI). Las **notas de crédito** son un tipo de movimiento más.
+La maquila **no sale de EsMa**: al maquilero que factura se le concilia el XML sobre el
+movimiento del recibo.
+
+### R11 / R12 — Importación de CFDI (no emisión, primera etapa)
+CONTROL **jala el XML ya sellado**: del proveedor (→ alimenta **CxP**, costos e inventario) y de
+las ventas propias (emitidas por fuera → alimenta **CxC**, ligado al pedido/cliente). El XML (y
+el PDF) se guardan en **R2** y se concilian sobre el movimiento.
+
+### R13 — Información para el contador
+Reportes/exportación de clientes, proveedores y sus movimientos **fiscales** (la vista fiscal del
+libro). CONTROL **no** lleva pólizas/balanza/DIOT ni declaraciones.
+
+### R14 — Timbrado nativo vía PAC (futuro)
+Emitir + timbrar desde CONTROL. **Fase posterior**: R10–R12 ya dejan la estructura armada, así
+que pasar de "importar XML" a "emitir + timbrar" es un salto pequeño. Es lo regulado; se deja
+para el final (apagar SINUBE por etapas: primero lo operativo sin riesgo regulatorio, luego lo
+regulado).
+
+### R15 — Catálogo de proveedores enriquecido
+El catálogo viejo era muy pobre. Se enriquece **en paralelo a los campos por cliente (D7)**:
+- **Identificación/clasificación:** nombre comercial, razón social, **roles/servicios multi-valor**
+  (maquila, corte, estampado/aplicación, vende material/avíos, otros servicios — un mismo taller
+  puede tener varios, sin duplicarlo), qué provee, activo/inactivo.
+- **Fiscal:** flag **¿factura?** (define formal/informal), RFC, régimen fiscal (SAT), uso de CFDI
+  habitual, código postal de expedición, retenciones aplicables (IVA/ISR a personas físicas).
+- **Contacto:** persona/vendedor, teléfono/WhatsApp, **email** (para enviar la OC y recibir el
+  XML), dirección.
+- **Comercial/pago:** condiciones (contado o días de crédito), moneda (MXN/USD), forma y método
+  de pago (PUE/PPD), **datos bancarios** (banco, CLABE), límite de crédito (opcional).
+- **Operativo:** **lead time típico** (alimenta el MRP/Make-to-Order R3/R7), notas, **adjuntos en
+  R2** (constancia de situación fiscal, contrato).
+
+**Va en F1** (etapa **F1-E1B**): es el cimiento sobre el que luego se paran las CxP.
+
+> **Lo que esta visión NO incluye:** contabilidad electrónica, tesorería/conciliación bancaria
+> completa, y la elección/costos del PAC (se evalúan al abordar R14).
 
 ---
 

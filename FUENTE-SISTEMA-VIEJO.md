@@ -8,7 +8,7 @@ deploy clonando sin fin).
 **No se perdió.** Sigue: en tu **PC local** (`Respaldo CLAUDE/`, ahora ignorada por
 git) y en la rama **`fuente-sistema-viejo`** (snapshot completo).
 
-Para la **migración (F8)** o para consultarlo:
+Para la **migración (F9)** o para consultarlo:
 `git checkout fuente-sistema-viejo -- "Respaldo CLAUDE"`
 
 `Documentacion_MJD/` (la doc funcional validada, 168 KB) SÍ sigue en main.
