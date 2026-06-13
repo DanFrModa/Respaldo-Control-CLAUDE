@@ -1701,6 +1701,218 @@
         }
       }
     },
+    "/api/roles-proveedor": {
+      "get": {
+        "summary": "Listar roles/servicios de proveedor (catálogo selector)",
+        "tags": [
+          "proveedores"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivos",
+            "required": false,
+            "description": "Incluye los roles desactivados (\"true\"/\"false\")."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del rol."
+                      },
+                      "codigo": {
+                        "type": "string",
+                        "description": "Clave estable del rol (kebab-case)."
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "description": "Nombre legible del rol."
+                      },
+                      "activo": {
+                        "type": "boolean",
+                        "description": "Falso si está desactivado."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "codigo",
+                      "nombre",
+                      "activo"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Rol/servicio de proveedor (catálogo administrable)."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/proveedores": {
       "get": {
         "summary": "Listar proveedores",
@@ -1756,6 +1968,17 @@
             "name": "tipo",
             "required": false,
             "description": "Filtra por tipo de proveedor."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "rol",
+            "required": false,
+            "description": "Filtra por id de rol/servicio del proveedor (R15)."
           },
           {
             "schema": {
@@ -1843,7 +2066,7 @@
                               "SERVICIOS",
                               "SIN_CLASIFICAR"
                             ],
-                            "description": "Clasificación: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
+                            "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
                           },
                           "telefono": {
                             "anyOf": [
@@ -1876,7 +2099,245 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Condiciones comerciales, o null."
+                            "description": "Condiciones comerciales (texto libre), o null."
+                          },
+                          "factura": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "¿Emite CFDI? (formal/informal), o null."
+                          },
+                          "rfc": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "RFC, o null."
+                          },
+                          "regimenFiscalSat": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Régimen fiscal del SAT, o null."
+                          },
+                          "usoCfdiHabitual": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Uso de CFDI habitual, o null."
+                          },
+                          "codigoPostalExpedicion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "CP de expedición, o null."
+                          },
+                          "retieneIva": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "¿Se le retiene IVA?, o null."
+                          },
+                          "retieneIsr": {
+                            "anyOf": [
+                              {
+                                "type": "boolean"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "¿Se le retiene ISR?, o null."
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Email (para OC y XML), o null."
+                          },
+                          "direccion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Dirección, o null."
+                          },
+                          "diasCredito": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días de crédito (null/0 = contado)."
+                          },
+                          "moneda": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Moneda habitual (MXN/USD), o null."
+                          },
+                          "formaPago": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Forma de pago, o null."
+                          },
+                          "metodoPago": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Método de pago CFDI (PUE/PPD), o null."
+                          },
+                          "banco": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Banco, o null."
+                          },
+                          "clabe": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "CLABE interbancaria, o null."
+                          },
+                          "limiteCredito": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Límite de crédito, o null."
+                          },
+                          "leadTimeDias": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Lead time en días, o null."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas, o null."
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del rol."
+                                },
+                                "codigo": {
+                                  "type": "string",
+                                  "description": "Clave estable del rol (kebab-case)."
+                                },
+                                "nombre": {
+                                  "type": "string",
+                                  "description": "Nombre legible del rol."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "codigo",
+                                "nombre"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Rol/servicio asignado al proveedor."
+                            },
+                            "description": "Roles/servicios del proveedor."
+                          },
+                          "cantidadAdjuntos": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cantidad de adjuntos del proveedor."
                           },
                           "activo": {
                             "type": "boolean",
@@ -1925,6 +2386,26 @@
                           "telefono",
                           "contacto",
                           "condiciones",
+                          "factura",
+                          "rfc",
+                          "regimenFiscalSat",
+                          "usoCfdiHabitual",
+                          "codigoPostalExpedicion",
+                          "retieneIva",
+                          "retieneIsr",
+                          "email",
+                          "direccion",
+                          "diasCredito",
+                          "moneda",
+                          "formaPago",
+                          "metodoPago",
+                          "banco",
+                          "clabe",
+                          "limiteCredito",
+                          "leadTimeDias",
+                          "notas",
+                          "roles",
+                          "cantidadAdjuntos",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -1932,7 +2413,7 @@
                           "modificadoPorId"
                         ],
                         "additionalProperties": false,
-                        "description": "Proveedor del catálogo (global)."
+                        "description": "Proveedor del catálogo (global, enriquecido R15)."
                       },
                       "description": "Proveedores de la página."
                     },
@@ -2163,6 +2644,93 @@
                   "condiciones": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "roles": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "factura": {
+                    "type": "boolean"
+                  },
+                  "rfc": {
+                    "type": "string",
+                    "maxLength": 13
+                  },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "usoCfdiHabitual": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalExpedicion": {
+                    "type": "string",
+                    "pattern": "^\\d{5}$"
+                  },
+                  "retieneIva": {
+                    "type": "boolean"
+                  },
+                  "retieneIsr": {
+                    "type": "boolean"
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "direccion": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "diasCredito": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 365
+                  },
+                  "moneda": {
+                    "type": "string",
+                    "enum": [
+                      "MXN",
+                      "USD"
+                    ]
+                  },
+                  "formaPago": {
+                    "type": "string",
+                    "maxLength": 50
+                  },
+                  "metodoPago": {
+                    "type": "string",
+                    "enum": [
+                      "PUE",
+                      "PPD"
+                    ]
+                  },
+                  "banco": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "clabe": {
+                    "type": "string"
+                  },
+                  "limiteCredito": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "leadTimeDias": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 365
+                  },
+                  "notas": {
+                    "type": "string",
+                    "maxLength": 2000
                   }
                 },
                 "required": [
@@ -2179,7 +2747,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Proveedor del catálogo (global).",
+            "description": "Proveedor del catálogo (global, enriquecido R15).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2214,7 +2782,7 @@
                         "SERVICIOS",
                         "SIN_CLASIFICAR"
                       ],
-                      "description": "Clasificación: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
+                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
                     },
                     "telefono": {
                       "anyOf": [
@@ -2247,7 +2815,245 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Condiciones comerciales, o null."
+                      "description": "Condiciones comerciales (texto libre), o null."
+                    },
+                    "factura": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Emite CFDI? (formal/informal), o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC, o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT, o null."
+                    },
+                    "usoCfdiHabitual": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Uso de CFDI habitual, o null."
+                    },
+                    "codigoPostalExpedicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP de expedición, o null."
+                    },
+                    "retieneIva": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene IVA?, o null."
+                    },
+                    "retieneIsr": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene ISR?, o null."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Email (para OC y XML), o null."
+                    },
+                    "direccion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Dirección, o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito (null/0 = contado)."
+                    },
+                    "moneda": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Moneda habitual (MXN/USD), o null."
+                    },
+                    "formaPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Forma de pago, o null."
+                    },
+                    "metodoPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Método de pago CFDI (PUE/PPD), o null."
+                    },
+                    "banco": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Banco, o null."
+                    },
+                    "clabe": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CLABE interbancaria, o null."
+                    },
+                    "limiteCredito": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite de crédito, o null."
+                    },
+                    "leadTimeDias": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lead time en días, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del rol."
+                          },
+                          "codigo": {
+                            "type": "string",
+                            "description": "Clave estable del rol (kebab-case)."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre legible del rol."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "codigo",
+                          "nombre"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Rol/servicio asignado al proveedor."
+                      },
+                      "description": "Roles/servicios del proveedor."
+                    },
+                    "cantidadAdjuntos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de adjuntos del proveedor."
                     },
                     "activo": {
                       "type": "boolean",
@@ -2296,6 +3102,26 @@
                     "telefono",
                     "contacto",
                     "condiciones",
+                    "factura",
+                    "rfc",
+                    "regimenFiscalSat",
+                    "usoCfdiHabitual",
+                    "codigoPostalExpedicion",
+                    "retieneIva",
+                    "retieneIsr",
+                    "email",
+                    "direccion",
+                    "diasCredito",
+                    "moneda",
+                    "formaPago",
+                    "metodoPago",
+                    "banco",
+                    "clabe",
+                    "limiteCredito",
+                    "leadTimeDias",
+                    "notas",
+                    "roles",
+                    "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -2303,7 +3129,7 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Proveedor del catálogo (global)."
+                  "description": "Proveedor del catálogo (global, enriquecido R15)."
                 }
               }
             }
@@ -2482,7 +3308,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Proveedor del catálogo (global).",
+            "description": "Proveedor del catálogo (global, enriquecido R15).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2517,7 +3343,7 @@
                         "SERVICIOS",
                         "SIN_CLASIFICAR"
                       ],
-                      "description": "Clasificación: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
+                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
                     },
                     "telefono": {
                       "anyOf": [
@@ -2550,7 +3376,245 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Condiciones comerciales, o null."
+                      "description": "Condiciones comerciales (texto libre), o null."
+                    },
+                    "factura": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Emite CFDI? (formal/informal), o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC, o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT, o null."
+                    },
+                    "usoCfdiHabitual": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Uso de CFDI habitual, o null."
+                    },
+                    "codigoPostalExpedicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP de expedición, o null."
+                    },
+                    "retieneIva": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene IVA?, o null."
+                    },
+                    "retieneIsr": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene ISR?, o null."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Email (para OC y XML), o null."
+                    },
+                    "direccion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Dirección, o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito (null/0 = contado)."
+                    },
+                    "moneda": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Moneda habitual (MXN/USD), o null."
+                    },
+                    "formaPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Forma de pago, o null."
+                    },
+                    "metodoPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Método de pago CFDI (PUE/PPD), o null."
+                    },
+                    "banco": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Banco, o null."
+                    },
+                    "clabe": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CLABE interbancaria, o null."
+                    },
+                    "limiteCredito": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite de crédito, o null."
+                    },
+                    "leadTimeDias": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lead time en días, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del rol."
+                          },
+                          "codigo": {
+                            "type": "string",
+                            "description": "Clave estable del rol (kebab-case)."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre legible del rol."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "codigo",
+                          "nombre"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Rol/servicio asignado al proveedor."
+                      },
+                      "description": "Roles/servicios del proveedor."
+                    },
+                    "cantidadAdjuntos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de adjuntos del proveedor."
                     },
                     "activo": {
                       "type": "boolean",
@@ -2599,6 +3663,26 @@
                     "telefono",
                     "contacto",
                     "condiciones",
+                    "factura",
+                    "rfc",
+                    "regimenFiscalSat",
+                    "usoCfdiHabitual",
+                    "codigoPostalExpedicion",
+                    "retieneIva",
+                    "retieneIsr",
+                    "email",
+                    "direccion",
+                    "diasCredito",
+                    "moneda",
+                    "formaPago",
+                    "metodoPago",
+                    "banco",
+                    "clabe",
+                    "limiteCredito",
+                    "leadTimeDias",
+                    "notas",
+                    "roles",
+                    "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -2606,7 +3690,7 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Proveedor del catálogo (global)."
+                  "description": "Proveedor del catálogo (global, enriquecido R15)."
                 }
               }
             }
@@ -2800,8 +3884,95 @@
                     "type": "string",
                     "maxLength": 500
                   },
+                  "roles": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
                   "activo": {
                     "type": "boolean"
+                  },
+                  "factura": {
+                    "type": "boolean"
+                  },
+                  "rfc": {
+                    "type": "string",
+                    "maxLength": 13
+                  },
+                  "regimenFiscalSat": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "usoCfdiHabitual": {
+                    "type": "string",
+                    "maxLength": 10
+                  },
+                  "codigoPostalExpedicion": {
+                    "type": "string",
+                    "pattern": "^\\d{5}$"
+                  },
+                  "retieneIva": {
+                    "type": "boolean"
+                  },
+                  "retieneIsr": {
+                    "type": "boolean"
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "format": "email",
+                    "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+                  },
+                  "direccion": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "diasCredito": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 365
+                  },
+                  "moneda": {
+                    "type": "string",
+                    "enum": [
+                      "MXN",
+                      "USD"
+                    ]
+                  },
+                  "formaPago": {
+                    "type": "string",
+                    "maxLength": 50
+                  },
+                  "metodoPago": {
+                    "type": "string",
+                    "enum": [
+                      "PUE",
+                      "PPD"
+                    ]
+                  },
+                  "banco": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "clabe": {
+                    "type": "string"
+                  },
+                  "limiteCredito": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "leadTimeDias": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 365
+                  },
+                  "notas": {
+                    "type": "string",
+                    "maxLength": 2000
                   }
                 }
               }
@@ -2828,7 +3999,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Proveedor del catálogo (global).",
+            "description": "Proveedor del catálogo (global, enriquecido R15).",
             "content": {
               "application/json": {
                 "schema": {
@@ -2863,7 +4034,7 @@
                         "SERVICIOS",
                         "SIN_CLASIFICAR"
                       ],
-                      "description": "Clasificación: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
+                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
                     },
                     "telefono": {
                       "anyOf": [
@@ -2896,7 +4067,245 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Condiciones comerciales, o null."
+                      "description": "Condiciones comerciales (texto libre), o null."
+                    },
+                    "factura": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Emite CFDI? (formal/informal), o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC, o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT, o null."
+                    },
+                    "usoCfdiHabitual": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Uso de CFDI habitual, o null."
+                    },
+                    "codigoPostalExpedicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP de expedición, o null."
+                    },
+                    "retieneIva": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene IVA?, o null."
+                    },
+                    "retieneIsr": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene ISR?, o null."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Email (para OC y XML), o null."
+                    },
+                    "direccion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Dirección, o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito (null/0 = contado)."
+                    },
+                    "moneda": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Moneda habitual (MXN/USD), o null."
+                    },
+                    "formaPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Forma de pago, o null."
+                    },
+                    "metodoPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Método de pago CFDI (PUE/PPD), o null."
+                    },
+                    "banco": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Banco, o null."
+                    },
+                    "clabe": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CLABE interbancaria, o null."
+                    },
+                    "limiteCredito": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite de crédito, o null."
+                    },
+                    "leadTimeDias": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lead time en días, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del rol."
+                          },
+                          "codigo": {
+                            "type": "string",
+                            "description": "Clave estable del rol (kebab-case)."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre legible del rol."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "codigo",
+                          "nombre"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Rol/servicio asignado al proveedor."
+                      },
+                      "description": "Roles/servicios del proveedor."
+                    },
+                    "cantidadAdjuntos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de adjuntos del proveedor."
                     },
                     "activo": {
                       "type": "boolean",
@@ -2945,6 +4354,26 @@
                     "telefono",
                     "contacto",
                     "condiciones",
+                    "factura",
+                    "rfc",
+                    "regimenFiscalSat",
+                    "usoCfdiHabitual",
+                    "codigoPostalExpedicion",
+                    "retieneIva",
+                    "retieneIsr",
+                    "email",
+                    "direccion",
+                    "diasCredito",
+                    "moneda",
+                    "formaPago",
+                    "metodoPago",
+                    "banco",
+                    "clabe",
+                    "limiteCredito",
+                    "leadTimeDias",
+                    "notas",
+                    "roles",
+                    "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -2952,7 +4381,7 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Proveedor del catálogo (global)."
+                  "description": "Proveedor del catálogo (global, enriquecido R15)."
                 }
               }
             }
@@ -3129,7 +4558,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Proveedor del catálogo (global).",
+            "description": "Proveedor del catálogo (global, enriquecido R15).",
             "content": {
               "application/json": {
                 "schema": {
@@ -3164,7 +4593,7 @@
                         "SERVICIOS",
                         "SIN_CLASIFICAR"
                       ],
-                      "description": "Clasificación: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
+                      "description": "Clasificación rápida: TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR."
                     },
                     "telefono": {
                       "anyOf": [
@@ -3197,7 +4626,245 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Condiciones comerciales, o null."
+                      "description": "Condiciones comerciales (texto libre), o null."
+                    },
+                    "factura": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Emite CFDI? (formal/informal), o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC, o null."
+                    },
+                    "regimenFiscalSat": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Régimen fiscal del SAT, o null."
+                    },
+                    "usoCfdiHabitual": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Uso de CFDI habitual, o null."
+                    },
+                    "codigoPostalExpedicion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CP de expedición, o null."
+                    },
+                    "retieneIva": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene IVA?, o null."
+                    },
+                    "retieneIsr": {
+                      "anyOf": [
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "¿Se le retiene ISR?, o null."
+                    },
+                    "email": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Email (para OC y XML), o null."
+                    },
+                    "direccion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Dirección, o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito (null/0 = contado)."
+                    },
+                    "moneda": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Moneda habitual (MXN/USD), o null."
+                    },
+                    "formaPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Forma de pago, o null."
+                    },
+                    "metodoPago": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Método de pago CFDI (PUE/PPD), o null."
+                    },
+                    "banco": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Banco, o null."
+                    },
+                    "clabe": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "CLABE interbancaria, o null."
+                    },
+                    "limiteCredito": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite de crédito, o null."
+                    },
+                    "leadTimeDias": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Lead time en días, o null."
+                    },
+                    "notas": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Notas, o null."
+                    },
+                    "roles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del rol."
+                          },
+                          "codigo": {
+                            "type": "string",
+                            "description": "Clave estable del rol (kebab-case)."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre legible del rol."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "codigo",
+                          "nombre"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Rol/servicio asignado al proveedor."
+                      },
+                      "description": "Roles/servicios del proveedor."
+                    },
+                    "cantidadAdjuntos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de adjuntos del proveedor."
                     },
                     "activo": {
                       "type": "boolean",
@@ -3246,6 +4913,26 @@
                     "telefono",
                     "contacto",
                     "condiciones",
+                    "factura",
+                    "rfc",
+                    "regimenFiscalSat",
+                    "usoCfdiHabitual",
+                    "codigoPostalExpedicion",
+                    "retieneIva",
+                    "retieneIsr",
+                    "email",
+                    "direccion",
+                    "diasCredito",
+                    "moneda",
+                    "formaPago",
+                    "metodoPago",
+                    "banco",
+                    "clabe",
+                    "limiteCredito",
+                    "leadTimeDias",
+                    "notas",
+                    "roles",
+                    "cantidadAdjuntos",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -3253,10 +4940,707 @@
                     "modificadoPorId"
                   ],
                   "additionalProperties": false,
-                  "description": "Proveedor del catálogo (global)."
+                  "description": "Proveedor del catálogo (global, enriquecido R15)."
                 }
               }
             }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/adjuntos": {
+      "post": {
+        "summary": "Preparar la subida de un adjunto del proveedor",
+        "tags": [
+          "proveedores"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "default": "OTRO",
+                    "description": "Tipo documental del adjunto (constancia/contrato/otro).",
+                    "type": "string",
+                    "enum": [
+                      "CONSTANCIA",
+                      "CONTRATO",
+                      "OTRO"
+                    ]
+                  },
+                  "nombreOriginal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Nombre del archivo tal como lo llama el usuario."
+                  },
+                  "tipoMime": {
+                    "type": "string",
+                    "pattern": "^[\\w.+-]+\\/[\\w.+-]+$",
+                    "description": "Tipo MIME del archivo (ej. application/pdf)."
+                  },
+                  "tamanoBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño)."
+                  }
+                },
+                "required": [
+                  "nombreOriginal",
+                  "tipoMime",
+                  "tamanoBytes"
+                ],
+                "description": "Datos para preparar la subida de un adjunto de proveedor."
+              }
+            }
+          },
+          "description": "Datos para preparar la subida de un adjunto de proveedor."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de preparar la subida de un adjunto (URL prefirmada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idArchivo": {
+                      "type": "string",
+                      "description": "Id del registro Archivo creado."
+                    },
+                    "tipo": {
+                      "type": "string",
+                      "enum": [
+                        "CONSTANCIA",
+                        "CONTRATO",
+                        "OTRO"
+                      ],
+                      "description": "Tipo documental del adjunto."
+                    },
+                    "nombreOriginal": {
+                      "type": "string",
+                      "description": "Nombre original del archivo."
+                    },
+                    "urlSubida": {
+                      "type": "string",
+                      "description": "URL PUT prefirmada: el navegador sube directo a R2."
+                    },
+                    "expiraEnSegundos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Vigencia de la URL de subida (segundos)."
+                    }
+                  },
+                  "required": [
+                    "idArchivo",
+                    "tipo",
+                    "nombreOriginal",
+                    "urlSubida",
+                    "expiraEnSegundos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de preparar la subida de un adjunto (URL prefirmada)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Listar los adjuntos de un proveedor",
+        "tags": [
+          "proveedores"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adjuntos de un proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del registro Archivo."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "CONSTANCIA",
+                              "CONTRATO",
+                              "OTRO"
+                            ],
+                            "description": "Tipo documental del adjunto."
+                          },
+                          "nombreOriginal": {
+                            "type": "string",
+                            "description": "Nombre original del archivo."
+                          },
+                          "tipoMime": {
+                            "type": "string",
+                            "description": "Tipo MIME del archivo."
+                          },
+                          "tamanoBytes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño en bytes."
+                          },
+                          "urlDescarga": {
+                            "type": "string",
+                            "description": "URL GET prefirmada para ver/descargar el archivo."
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha en que se adjuntó (ISO 8601)."
+                          }
+                        },
+                        "required": [
+                          "idArchivo",
+                          "tipo",
+                          "nombreOriginal",
+                          "tipoMime",
+                          "tamanoBytes",
+                          "urlDescarga",
+                          "creadoEn"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Adjunto de un proveedor con su URL de descarga."
+                      },
+                      "description": "Adjuntos del proveedor."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Adjuntos de un proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proveedores/{id}/adjuntos/{idArchivo}": {
+      "delete": {
+        "summary": "Quitar un adjunto del proveedor",
+        "tags": [
+          "proveedores"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del proveedor."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "idArchivo",
+            "required": true,
+            "description": "Id del adjunto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
           },
           "400": {
             "description": "Respuesta de error de la API.",

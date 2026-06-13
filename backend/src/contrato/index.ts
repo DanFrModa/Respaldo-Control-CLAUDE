@@ -70,18 +70,43 @@ export { esquemaRolSalida, type RolSalida } from './esquemas/rol.js';
 export {
   TIPOS_PROVEEDOR,
   ETIQUETAS_TIPO_PROVEEDOR,
+  TIPOS_ARCHIVO_PROVEEDOR,
+  ETIQUETAS_TIPO_ARCHIVO_PROVEEDOR,
   esquemaProveedorCrear,
   esquemaProveedorEditar,
+  esquemaProveedorPatchCuerpo,
   esquemaProveedorSalida,
   esquemaProveedoresQuery,
   esquemaProveedoresPagina,
+  esquemaRolProveedorSalida,
+  esquemaProveedorAdjuntoCrear,
+  esquemaProveedorAdjuntoCrearCuerpo,
+  esquemaProveedorAdjuntoSubida,
+  esquemaProveedorAdjuntoSalida,
+  esquemaProveedorAdjuntosLista,
   type DatosProveedorCrear,
   type DatosProveedorEditar,
+  type DatosProveedorPatchCuerpo,
   type ProveedorSalida,
   type ProveedoresQuery,
   type ProveedoresPagina,
   type TipoProveedorClave,
+  type TipoArchivoProveedorClave,
+  type RolProveedorSalida,
+  type DatosProveedorAdjuntoCrear,
+  type ProveedorAdjuntoSubida,
+  type ProveedorAdjuntoSalida,
+  type ProveedorAdjuntosLista,
 } from './esquemas/proveedor.js';
+
+export {
+  MONEDAS,
+  METODOS_PAGO,
+  esRfcValido,
+  esClabeValida,
+  type Moneda,
+  type MetodoPago,
+} from './esquemas/fiscal.js';
 
 export {
   esquemaCortadorCrear,

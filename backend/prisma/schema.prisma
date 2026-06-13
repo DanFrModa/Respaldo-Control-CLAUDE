@@ -374,6 +374,10 @@ model Archivo {
   subidoPorId    String?  @map("subido_por_id")
   subidoEn       DateTime @default(now()) @map("subido_en")
 
+  /// Adjunto de proveedor que apunta a este archivo (F1-E1B), si lo hay. Relación
+  /// inversa exigida por Prisma; en la práctica es 0 o 1 (un archivo se adjunta una vez).
+  proveedorArchivo ProveedorArchivo?
+
   @@map("archivos")
 }
 
@@ -399,21 +403,81 @@ enum TipoProveedor {
   @@map("tipo_proveedor")
 }
 
-/// Proveedor (catálogo global, F1-E1). Equivale a la tabla `Proveedores` del viejo
-/// (doc 03-Producción §Órdenes de Compra). Base de `AvioProveedor` (F1-E3, R1).
+/// Proveedor (catálogo global, F1-E1 + enriquecido F1-E1B). Equivale a la tabla
+/// `Proveedores` del viejo (doc 03-Producción §Órdenes de Compra). Base de
+/// `AvioProveedor` (F1-E3, R1) y, sobre todo, cimiento de las CxP de la futura
+/// fase de Finanzas (F8, decisión D12, R15 — `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §4).
+///
+/// F1-E1B agrega: roles/servicios multi-valor (relación `ProveedorRol`, que NO
+/// reemplaza a `tipo` — este se conserva como clasificador rápido, acta de Gabriel
+/// 13-jun-2026), campos fiscales para el CFDI, datos comerciales/de pago, lead time
+/// para el MRP y adjuntos en R2 (`ProveedorArchivo`). TODOS los campos nuevos son
+/// NULLABLE: los 443 proveedores que migran en F1-E6 no traen estos datos; se
+/// capturan en altas/ediciones nuevas (la regla "factura ⇒ RFC" es de captura, no
+/// rompe filas viejas).
 model Proveedor {
   id          Int           @id @default(autoincrement())
   /// Nombre de uso diario. Único global (ADR-0007): un proveedor se da de alta una sola vez.
   nombre      String        @unique
   razonSocial String?       @map("razon_social")
-  /// Clasificación (telas/avíos/servicios); por defecto sin clasificar.
+  /// Clasificación rápida (telas/avíos/servicios); por defecto sin clasificar.
+  /// F1-E1B: SE CONSERVA junto a los roles multi-valor (acta Gabriel 13-jun-2026).
   tipo        TipoProveedor @default(SIN_CLASIFICAR)
   telefono    String?
   contacto    String?
-  /// Condiciones comerciales en texto libre (crédito, plazos…).
+  /// Condiciones comerciales en texto libre (crédito, plazos…). Se conserva de E1;
+  /// los datos comerciales estructurados (diasCredito, moneda…) los agrega E1B.
   condiciones String?
+
+  // ── Fiscal (F1-E1B, R15 §4): lo que el CFDI necesita ───────────────────────
+  /// ¿Emite CFDI? Define formal (true) vs informal (false/null). Si es true, la
+  /// regla de captura exige `rfc` + `regimenFiscalSat` (relajada para migrados).
+  factura                Boolean?
+  /// RFC del tercero (persona física 13 / moral 12), validado en Zod si viene.
+  rfc                    String?
+  /// Régimen fiscal del SAT (clave de catálogo del SAT, p. ej. "601").
+  regimenFiscalSat       String?  @map("regimen_fiscal_sat")
+  /// Uso de CFDI habitual (clave del SAT, p. ej. "G03").
+  usoCfdiHabitual        String?  @map("uso_cfdi_habitual")
+  /// Código postal del lugar de expedición del comprobante.
+  codigoPostalExpedicion String?  @map("codigo_postal_expedicion")
+  /// Se le retiene IVA (común a personas físicas en maquila).
+  retieneIva             Boolean? @map("retiene_iva")
+  /// Se le retiene ISR.
+  retieneIsr             Boolean? @map("retiene_isr")
+
+  // ── Contacto (F1-E1B): el telefono/contacto de E1 se conservan arriba ──────
+  /// Email para enviar la OC y recibir el XML del CFDI.
+  email     String?
+  direccion String?
+
+  // ── Comercial / pago (F1-E1B, R15 §4) ─────────────────────────────────────
+  /// Condición de pago: días de crédito. null o 0 = contado (ver TSDoc del dominio).
+  diasCredito   Int?     @map("dias_credito")
+  /// Moneda habitual: MXN o USD (validada en Zod).
+  moneda        String?
+  /// Forma de pago (transferencia/efectivo/cheque — clave o texto del SAT).
+  formaPago     String?  @map("forma_pago")
+  /// Método de pago del CFDI: PUE (una exhibición) o PPD (parcialidades/diferido).
+  metodoPago    String?  @map("metodo_pago")
+  banco         String?
+  /// CLABE interbancaria (18 dígitos con dígito de control, validada en Zod).
+  clabe         String?
+  /// Límite de crédito (opcional), para alertas de CxP en F8.
+  limiteCredito Decimal? @map("limite_credito") @db.Decimal(14, 2)
+
+  // ── Operativo (F1-E1B): alimenta el MRP/Make-to-Order (R3/R7, F4) ─────────
+  /// Tiempo de entrega típico en días (lead time).
+  leadTimeDias Int?    @map("lead_time_dias")
+  notas        String?
+
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
-  activo      Boolean       @default(true)
+  activo Boolean @default(true)
+
+  /// Roles/servicios multi-valor del proveedor (F1-E1B, N:N vía `ProveedorRol`).
+  roles    ProveedorRol[]
+  /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
+  archivos ProveedorArchivo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -421,6 +485,86 @@ model Proveedor {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@map("proveedores")
+}
+
+/// Rol/servicio que un proveedor puede prestar (F1-E1B, R15 §4.1). Catálogo
+/// administrable y GLOBAL (ADR-0007): un mismo proveedor puede maquilar Y cortar,
+/// o vender avíos Y maquilar, sin duplicarse. Mismo patrón N:N que `MaquileroTipoProceso`
+/// (F1-E2). El `origen` de cada movimiento (recibo vs factura) decide en qué vista
+/// cae en F8 (EsMa vs CxP); el rol solo clasifica al proveedor.
+model RolProveedor {
+  id     Int     @id @default(autoincrement())
+  /// Clave estable de negocio (kebab-case, p. ej. "maquila-costura"). Única global.
+  codigo String  @unique
+  /// Nombre legible para la UI (p. ej. "Maquila (costura)").
+  nombre String
+  /// Borrado suave (plan §4): un rol en uso se desactiva, no se borra (Restrict).
+  activo Boolean @default(true)
+
+  /// Proveedores que tienen este rol (N:N).
+  proveedores ProveedorRol[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("roles_proveedor")
+}
+
+/// Puente N:N proveedor ↔ rol (F1-E1B). Un renglón por cada rol que presta el
+/// proveedor. PK compuesta (sin id propio): el par (proveedor, rol) es único por
+/// definición. `onDelete`:
+///  • Cascade hacia `Proveedor`: los roles son configuración del proveedor; si el
+///    proveedor se borrara físicamente (no pasa hoy: borrado suave), sus renglones
+///    de rol se irían con él. Además permite reescribir el set de roles en la tx.
+///  • Restrict hacia `RolProveedor`: un rol con proveedores asignados NO se puede
+///    borrar físicamente (se desactiva con `activo`), para no dejar el par colgando.
+model ProveedorRol {
+  idProveedor    Int @map("id_proveedor")
+  idRolProveedor Int @map("id_rol_proveedor")
+
+  proveedor Proveedor    @relation(fields: [idProveedor], references: [id], onDelete: Cascade)
+  rol       RolProveedor @relation(fields: [idRolProveedor], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idProveedor, idRolProveedor])
+  @@index([idRolProveedor])
+  @@map("proveedor_rol")
+}
+
+/// Tipo de adjunto de un proveedor (F1-E1B, R15 §4: "adjuntos en R2 — constancia
+/// de situación fiscal, contrato"). `OTRO` cubre cualquier otro documento.
+enum TipoArchivoProveedor {
+  CONSTANCIA
+  CONTRATO
+  OTRO
+
+  @@map("tipo_archivo_proveedor")
+}
+
+/// Puente proveedor ↔ archivo R2 (F1-E1B). Liga un `Archivo` (registro del motor de
+/// archivos de F0) a un proveedor con su tipo documental. `onDelete`:
+///  • Cascade hacia `Proveedor`: los adjuntos son del proveedor.
+///  • Cascade hacia `Archivo`: al quitar el adjunto se borra también su `Archivo`
+///    (el objeto R2 huérfano es inofensivo — lo documenta `comun/archivos.ts`).
+model ProveedorArchivo {
+  id          Int                  @id @default(autoincrement())
+  idProveedor Int                  @map("id_proveedor")
+  idArchivo   String               @map("id_archivo")
+  tipo        TipoArchivoProveedor @default(OTRO)
+
+  proveedor Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Cascade)
+  archivo   Archivo   @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idProveedor])
+  @@map("proveedor_archivo")
 }
 
 /// Cortador (catálogo global, F1-E1). Equivale a la tabla `Cortadores` del viejo
@@ -464,9 +608,9 @@ model Temporada {
 /// viejo (doc 01-Modelos §2 y §6 punto 4): la marca/etiqueta del modelo, con su
 /// porcentaje de `regalias` que alimenta el costeo (% del precio).
 model EtiquetaMarca {
-  id     Int    @id @default(autoincrement())
+  id       Int     @id @default(autoincrement())
   /// Nombre de la etiqueta de marca. Único global (ADR-0007).
-  nombre String @unique
+  nombre   String  @unique
   /// Porcentaje de regalías (0–100), validado en Zod y en el dominio. Alimenta el costeo (01-Modelos §6).
   regalias Decimal @default(0) @db.Decimal(5, 2)
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).

@@ -246,6 +246,37 @@ async function sembrarRoles(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3b. Roles de proveedor (F1-E1B, R15 §4.1) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Roles/servicios base de proveedor (R15 §4.1 —
+ * `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`). Catálogo administrable:
+ * Gabriel puede agregar/desactivar más desde la UI; estos son el punto de partida.
+ * Se siembran por `codigo` (clave natural estable), sin pisar el `nombre` si ya
+ * existe (pudo editarse). NO se borran los que no estén aquí (podrían estar en uso).
+ */
+const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
+  { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
+  { codigo: 'corte', nombre: 'Corte' },
+  { codigo: 'estampado-aplicacion', nombre: 'Estampado / aplicación' },
+  { codigo: 'vende-telas', nombre: 'Vende telas' },
+  { codigo: 'vende-avios', nombre: 'Vende avíos' },
+  { codigo: 'otros-servicios', nombre: 'Otros servicios' },
+];
+
+async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
+  for (const rol of ROLES_PROVEEDOR_BASE) {
+    await prisma.rolProveedor.upsert({
+      where: { codigo: rol.codigo },
+      // No se pisa el nombre/activo si ya existe (pudo editarse en producción).
+      update: {},
+      create: { codigo: rol.codigo, nombre: rol.nombre },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. Usuario admin (contraseña TEMPORAL — cambiarla en el primer inicio de sesión)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -302,6 +333,7 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarEmpresa(prisma);
   const idPermisoPorClave = await sembrarPermisos(prisma);
   await sembrarRoles(prisma, idPermisoPorClave);
+  await sembrarRolesProveedor(prisma);
   await sembrarAdmin(prisma);
 }
 
