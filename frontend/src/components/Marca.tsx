@@ -32,22 +32,39 @@ const WORDMARK: Record<TamanoMarca, string> = {
  * eso el wordmark "Control v2" es el unico texto "real" del nombre y el subtitulo
  * se marca `aria-hidden`; el cuadro del icono tambien es decorativo. Asi un lector
  * de pantalla anuncia "Control v2" y no "Control v2 FR Moda".
+ *
+ * Modos del texto (cuadro del logo SIEMPRE visible):
+ *   - `soloIcono`: NO renderiza el wordmark (lo desmonta). Para usos donde el
+ *     texto no debe existir nunca (no aplica al sidebar colapsable animado).
+ *   - `colapsado`: el wordmark SIGUE montado pero se anima a ancho/opacidad 0
+ *     (se "desvanece" sin remontarse). Pensado para el sidebar colapsable: al
+ *     alternar, el cuadro se queda quieto y solo las palabras entran/salen suave,
+ *     sin parpadeo. `soloIcono` tiene prioridad si ambos vienen en true.
  */
 export function Marca({
   soloIcono = false,
+  colapsado = false,
   tamano = 'md',
   conSubtitulo = true,
   className,
 }: {
-  /** Muestra solo el cuadro del icono (p. ej. sidebar colapsado). */
+  /** Muestra solo el cuadro del icono (desmonta el wordmark). */
   soloIcono?: boolean;
+  /**
+   * Sidebar colapsable: mantiene el wordmark montado pero animado a ancho 0
+   * (se desvanece sin remontar). Ignorado si `soloIcono` es true.
+   */
+  colapsado?: boolean;
   tamano?: TamanoMarca;
   /** Muestra "FR Moda" bajo el wordmark (ignorado si `soloIcono`). */
   conSubtitulo?: boolean;
   className?: string;
 }): React.JSX.Element {
   return (
-    <span className={cn('inline-flex items-center gap-2.5', className)}>
+    // Sin `gap` en el contenedor: el espacio cuadro<->wordmark vive como margen
+    // izquierdo del wordmark (`ml-2.5`) para poder animarlo a 0 al colapsar y no
+    // dejar un hueco fantasma cuando el texto se desvanece.
+    <span className={cn('inline-flex items-center', className)}>
       <span
         aria-hidden
         className={cn(
@@ -58,7 +75,14 @@ export function Marca({
         <Shirt className={ICONO[tamano]} aria-hidden />
       </span>
       {soloIcono ? null : (
-        <span className="flex min-w-0 flex-col leading-tight">
+        <span
+          className={cn(
+            // En modo `colapsado` el wordmark se anima a ancho/margen/opacidad 0
+            // (overflow oculto) sin desmontarse; expandido recupera su ancho.
+            'flex min-w-0 flex-col overflow-hidden leading-tight whitespace-nowrap transition-[max-width,opacity,margin] duration-200 ease-in-out',
+            colapsado ? 'ml-0 max-w-0 opacity-0' : 'ml-2.5 max-w-[12rem] opacity-100',
+          )}
+        >
           <span className={cn('font-heading font-semibold tracking-tight', WORDMARK[tamano])}>
             Control <span className="text-primary">v2</span>
           </span>
