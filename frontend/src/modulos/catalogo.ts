@@ -1,3 +1,20 @@
+import {
+  Banknote,
+  Calculator,
+  ChartLine,
+  Factory,
+  Files,
+  Library,
+  type LucideIcon,
+  Medal,
+  Package,
+  Route,
+  Settings,
+  Shirt,
+  ShoppingCart,
+  Warehouse,
+} from 'lucide-react';
+
 import type { ClavePermiso } from '@/api/tipos';
 
 /**
@@ -28,6 +45,28 @@ export type IconoModulo =
   | 'grafica'
   | 'archivo'
   | 'engrane';
+
+/**
+ * Mapa nombre estable -> componente Lucide. Vive aqui (modulo de datos, no
+ * componente) para reusarse SIN romper fast-refresh: el sidebar
+ * (`NavegacionModulos`), el inicio y "Proximamente" pintan el icono de color de
+ * cada modulo a partir de este mapa.
+ */
+export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
+  libreria: Library,
+  camisa: Shirt,
+  carrito: ShoppingCart,
+  fabrica: Factory,
+  paquete: Package,
+  almacen: Warehouse,
+  ruta: Route,
+  medalla: Medal,
+  billete: Banknote,
+  calculadora: Calculator,
+  grafica: ChartLine,
+  archivo: Files,
+  engrane: Settings,
+};
 
 export interface ModuloMenu {
   /** Identificador estable y primer segmento de la ruta (sin acentos). */

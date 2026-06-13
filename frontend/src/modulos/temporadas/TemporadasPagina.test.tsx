@@ -73,8 +73,10 @@ describe('<TemporadasPagina>', () => {
       sesion: estadoSesionDePrueba(['temporadas.ver', 'temporadas.administrar']),
     });
 
+    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
+    // el detalle), por eso su nombre se busca con getAllByText.
     expect(screen.getAllByTestId('fila-temporada')).toHaveLength(2);
-    expect(screen.getByText('Primavera 2026')).toBeInTheDocument();
+    expect(screen.getAllByText('Primavera 2026').length).toBeGreaterThan(0);
     expect(screen.getByText('Otoño 2026')).toBeInTheDocument();
   });
 
@@ -112,8 +114,9 @@ describe('<TemporadasPagina>', () => {
       sesion: estadoSesionDePrueba(['temporadas.ver']),
     });
 
-    expect(screen.queryByTestId('nueva-temporada')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-temporada')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nuevo-temporada')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-temporada')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-temporada')).not.toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {
@@ -123,8 +126,8 @@ describe('<TemporadasPagina>', () => {
       sesion: estadoSesionDePrueba(['temporadas.ver', 'temporadas.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('acciones-temporada'));
-    await usuario.click(await screen.findByTestId('desactivar-temporada'));
+    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    await usuario.click(screen.getByTestId('desactivar-temporada'));
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar temporada')).toBeInTheDocument();
@@ -133,18 +136,16 @@ describe('<TemporadasPagina>', () => {
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
 
-  it('una fila inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
+  it('una temporada inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
     const usuario = userEvent.setup();
     useTemporadas.mockReturnValue(consultaConDatos([temporada(9, 'Temporada Apagada', false)]));
     renderConProveedores(<TemporadasPagina />, {
       sesion: estadoSesionDePrueba(['temporadas.ver', 'temporadas.administrar']),
     });
 
-    const fila = screen.getByTestId('fila-temporada');
-    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
-
-    await usuario.click(within(fila).getByTestId('acciones-temporada'));
-    expect(await screen.findByTestId('activar-temporada')).toBeInTheDocument();
+    const detalle = screen.getByTestId('detalle-temporada');
+    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-temporada')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-temporada')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-temporada'));

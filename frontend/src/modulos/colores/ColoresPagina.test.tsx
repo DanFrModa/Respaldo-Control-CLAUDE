@@ -74,8 +74,10 @@ describe('<ColoresPagina>', () => {
       sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
     });
 
+    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
+    // el detalle), por eso su nombre se busca con getAllByText.
     expect(screen.getAllByTestId('fila-color')).toHaveLength(2);
-    expect(screen.getByText('Rojo')).toBeInTheDocument();
+    expect(screen.getAllByText('Rojo').length).toBeGreaterThan(0);
     expect(screen.getByText('Azul')).toBeInTheDocument();
   });
 
@@ -112,7 +114,8 @@ describe('<ColoresPagina>', () => {
     });
 
     expect(screen.queryByTestId('nuevo-color')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-color')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-color')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-color')).not.toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {
@@ -122,8 +125,8 @@ describe('<ColoresPagina>', () => {
       sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('acciones-color'));
-    await usuario.click(await screen.findByTestId('desactivar-color'));
+    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    await usuario.click(screen.getByTestId('desactivar-color'));
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar color')).toBeInTheDocument();
@@ -132,18 +135,16 @@ describe('<ColoresPagina>', () => {
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
 
-  it('una fila inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
+  it('un color inactivo ofrece Activar y reactiva directo (sin confirmación)', async () => {
     const usuario = userEvent.setup();
     useColores.mockReturnValue(consultaConDatos([color(9, 'Gris Apagado', false)]));
     renderConProveedores(<ColoresPagina />, {
       sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
     });
 
-    const fila = screen.getByTestId('fila-color');
-    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
-
-    await usuario.click(within(fila).getByTestId('acciones-color'));
-    expect(await screen.findByTestId('activar-color')).toBeInTheDocument();
+    const detalle = screen.getByTestId('detalle-color');
+    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-color')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-color')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-color'));

@@ -29,7 +29,12 @@ vi.mock('@/api/cortadores', () => ({
 }));
 
 /** Cortador de ejemplo. */
-function cortador(id: number, nombre: string, activo = true): Cortador {
+function cortador(
+  id: number,
+  nombre: string,
+  activo = true,
+  extra: Partial<Cortador> = {},
+): Cortador {
   return {
     id,
     nombre,
@@ -40,6 +45,7 @@ function cortador(id: number, nombre: string, activo = true): Cortador {
     creadoPorId: null,
     modificadoEn: '2026-01-01T00:00:00.000Z',
     modificadoPorId: null,
+    ...extra,
   };
 }
 
@@ -75,9 +81,27 @@ describe('<CortadoresPagina>', () => {
       sesion: estadoSesionDePrueba(['cortadores.ver', 'cortadores.administrar']),
     });
 
+    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
+    // el detalle), por eso su nombre se busca con getAllByText.
     expect(screen.getAllByTestId('fila-cortador')).toHaveLength(2);
-    expect(screen.getByText('Taller Pérez')).toBeInTheDocument();
+    expect(screen.getAllByText('Taller Pérez').length).toBeGreaterThan(0);
     expect(screen.getByText('Corte Express')).toBeInTheDocument();
+  });
+
+  it('muestra en el detalle el precio de referencia y los teléfonos', () => {
+    useCortadores.mockReturnValue(
+      consultaConDatos([
+        cortador(1, 'Taller Pérez', true, { precioReferencia: 25, telefonos: '55-1234' }),
+      ]),
+    );
+    renderConProveedores(<CortadoresPagina />, {
+      sesion: estadoSesionDePrueba(['cortadores.ver', 'cortadores.administrar']),
+    });
+
+    const detalle = screen.getByTestId('detalle-cortador');
+    // El precio se formatea como moneda (es-MX) y los teléfonos se muestran tal cual.
+    expect(within(detalle).getByText('$25.00')).toBeInTheDocument();
+    expect(within(detalle).getByText('55-1234')).toBeInTheDocument();
   });
 
   it('muestra el estado vacio cuando no hay resultados', () => {
@@ -115,7 +139,8 @@ describe('<CortadoresPagina>', () => {
     });
 
     expect(screen.queryByTestId('nuevo-cortador')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-cortador')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-cortador')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-cortador')).not.toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {
@@ -125,8 +150,8 @@ describe('<CortadoresPagina>', () => {
       sesion: estadoSesionDePrueba(['cortadores.ver', 'cortadores.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('acciones-cortador'));
-    await usuario.click(await screen.findByTestId('desactivar-cortador'));
+    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    await usuario.click(screen.getByTestId('desactivar-cortador'));
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar cortador')).toBeInTheDocument();
@@ -135,18 +160,16 @@ describe('<CortadoresPagina>', () => {
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
 
-  it('una fila inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
+  it('un cortador inactivo ofrece Activar y reactiva directo (sin confirmación)', async () => {
     const usuario = userEvent.setup();
     useCortadores.mockReturnValue(consultaConDatos([cortador(9, 'Taller Apagado', false)]));
     renderConProveedores(<CortadoresPagina />, {
       sesion: estadoSesionDePrueba(['cortadores.ver', 'cortadores.administrar']),
     });
 
-    const fila = screen.getByTestId('fila-cortador');
-    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
-
-    await usuario.click(within(fila).getByTestId('acciones-cortador'));
-    expect(await screen.findByTestId('activar-cortador')).toBeInTheDocument();
+    const detalle = screen.getByTestId('detalle-cortador');
+    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-cortador')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-cortador')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-cortador'));
