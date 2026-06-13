@@ -71,7 +71,32 @@
 
 ---
 
-## F1-E1B · Catálogo de Proveedores enriquecido (R15) — ⬜ pendiente
+## F1-E1B · Catálogo de Proveedores enriquecido (R15) — 🔄 backend hecho (en revisión)
+
+> **ACTA DE DECISIÓN (`tipo` enum vs roles):** el `tipo` de E1
+> (TELAS/AVIOS/SERVICIOS/SIN_CLASIFICAR) **se conserva como clasificador rápido** + **roles multivalor** (Gabriel, 13-jun-2026). Ambos coexisten: la lista filtra por `tipo` Y por `rol`.
+>
+> **Modelado del backend (para el reviewer y el coder de frontend):**
+> - **Condición de pago** se modeló como `diasCredito Int?` (NULL o 0 = contado; >0 = días de
+>   crédito). Se eligió un entero simple sobre un enum+campo porque el negocio solo distingue
+>   "contado" de "N días" y así el cálculo de vencimientos de las CxP (F8) no necesita un mapeo extra.
+> - **Roles** van **inline** en el body de crear/editar (`roles: number[]`), en la MISMA
+>   transacción (A2). El dominio exige **≥1 rol** en alta y al reemplazar el set en edición
+>   (omitir `roles` = no se tocan; mandar `[]` = error). Solo se asignan roles activos.
+> - **Adjuntos** (`ProveedorArchivo` → `Archivo` de F0): `onDelete Cascade` a Proveedor y a
+>   Archivo (quitar el adjunto borra su `Archivo`; el objeto R2 huérfano es inofensivo). Key R2
+>   ordenada por id (`proveedores/<id>/…`), nunca por nombre. El servicio de archivos se inyecta
+>   (default `servicioArchivos()` lazy) → CI verde sin R2 real (cliente S3 falso en tests).
+>   `ProveedorRol`: `onDelete Cascade` a Proveedor, `Restrict` a `RolProveedor` (un rol en uso
+>   no se borra; se desactiva).
+> - **Reglas de captura** (en Zod + repetidas en dominio, A1): `factura=true ⇒ rfc + regimenFiscalSat`;
+>   `rfc` validado (forma física 13 / moral 12), `clabe` 18 dígitos con dígito de control (módulo 10,
+>   pesos 3,7,1), `moneda ∈ {MXN,USD}`, `metodoPago ∈ {PUE,PPD}`. **Sin permisos nuevos** (reusa
+>   `proveedores.ver`/`.administrar`). Migración única `f1_e1b_proveedor_enriquecido` (aditiva: ADD
+>   COLUMN nullable + 3 tablas), aplica en limpio. Seed idempotente de `RolProveedor` (6 roles base).
+> - **Endpoints nuevos/cambiados:** `GET /api/roles-proveedor` (selector); listado `?rol=` además de
+>   `?tipo=`; GET `/:id` y listado devuelven `roles[]` + `cantidadAdjuntos`;
+>   `POST|GET|DELETE /api/proveedores/:id/adjuntos[/:idArchivo]`.
 
 **Objetivo:** Enriquecer el catálogo de Proveedores que F1-E1 ya entregó (hoy: nombre, razón social, `tipo`, teléfono, contacto, condiciones) para convertirlo en el **cimiento de las CxP** de la futura fase de Finanzas (F8, decisión D12). Se agregan **roles/servicios multi-valor** (un mismo proveedor puede maquilar y cortar, o vender avíos y además maquilar — sin duplicarlo), los **campos fiscales** que el CFDI necesita, los **datos comerciales/de pago** y el **lead time** que alimenta el MRP (R3/R7 de F4), más **adjuntos en R2** (constancia de situación fiscal, contrato). Es una etapa pequeña y autocontenida que cuelga del Proveedor de E1 y del motor de archivos de F0; por eso va aquí, en cadena corta (1 coder), justo después de E1. (Se numeró **E1B** —sin renumerar E2–E7— porque se incorporó al integrar la propuesta de Finanzas; ver `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`.)
 

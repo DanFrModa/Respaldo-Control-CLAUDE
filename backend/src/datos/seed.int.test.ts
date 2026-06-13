@@ -87,6 +87,21 @@ describe('seed de fundación', () => {
     expect(claves.map((p) => p.clave).sort()).toEqual([...CLAVES_PERMISO].sort());
   });
 
+  it('siembra los roles de proveedor base (F1-E1B, R15) de forma idempotente', async () => {
+    const roles = await prisma.rolProveedor.findMany({ select: { codigo: true } });
+    const codigos = roles.map((r) => r.codigo).sort();
+    expect(codigos).toEqual(
+      [
+        'corte',
+        'estampado-aplicacion',
+        'maquila-costura',
+        'otros-servicios',
+        'vende-avios',
+        'vende-telas',
+      ].sort(),
+    );
+  });
+
   it('el admin queda con cuenta credential (hash, nunca texto plano) y rol Administrador completo', async () => {
     const admin = await prisma.usuario.findUniqueOrThrow({
       where: { username: 'admin' },

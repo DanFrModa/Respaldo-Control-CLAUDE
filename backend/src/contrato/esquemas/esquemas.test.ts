@@ -4,7 +4,11 @@ import { esquemaAlmacenCrear, esquemaAlmacenEditar } from './almacen.js';
 import { esquemaEmpresaCrear, esquemaEmpresaEditar } from './empresa.js';
 import { esquemaEtiquetaMarcaCrear, esquemaEtiquetaMarcaEditar } from './etiqueta-marca.js';
 import { esquemaLogin } from './login.js';
-import { esquemaProveedorCrear, esquemaProveedorEditar } from './proveedor.js';
+import {
+  esquemaProveedorCrear,
+  esquemaProveedorEditar,
+  esquemaProveedorPatchCuerpo,
+} from './proveedor.js';
 import { esquemaUsuarioCrear, esquemaUsuarioEditar } from './usuario.js';
 
 describe('esquemaLogin', () => {
@@ -133,5 +137,94 @@ describe('esquemas de edición: omitir un campo con default NO lo rellena (Zod .
     expect(datos).toEqual({ upc: '750' });
     // si se mandan, se respetan
     expect(esquemaEmpresaEditar.parse({ favorita: true }).favorita).toBe(true);
+  });
+});
+
+// ── Proveedor enriquecido (F1-E1B, R15): campos fiscales/pago + roles + regla ──
+describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
+  it('acepta un alta con roles + campos fiscales/comerciales válidos', () => {
+    const datos = esquemaProveedorCrear.parse({
+      nombre: 'Maquilas del Norte',
+      tipo: 'SERVICIOS',
+      roles: [1, 2],
+      factura: true,
+      rfc: 'abc010101ab1', // se normaliza a mayúsculas
+      regimenFiscalSat: '601',
+      diasCredito: 30,
+      moneda: 'MXN',
+      metodoPago: 'PPD',
+      clabe: '002010077777777771',
+      leadTimeDias: 15,
+    });
+    expect(datos.rfc).toBe('ABC010101AB1');
+    expect(datos.roles).toEqual([1, 2]);
+    expect(datos.moneda).toBe('MXN');
+  });
+
+  it('regla factura ⇒ exige RFC + régimen (alta)', () => {
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', factura: true }).success).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({ nombre: 'X', factura: true, rfc: 'ABC010101AB1' }).success,
+    ).toBe(false); // falta régimen
+    expect(
+      esquemaProveedorCrear.safeParse({
+        nombre: 'X',
+        factura: true,
+        rfc: 'ABC010101AB1',
+        regimenFiscalSat: '601',
+      }).success,
+    ).toBe(true);
+    // factura falso/omitido NO exige nada (filas migradas)
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X' }).success).toBe(true);
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', factura: false }).success).toBe(true);
+  });
+
+  it('regla factura ⇒ RFC también en edición y en el cuerpo del PATCH', () => {
+    expect(esquemaProveedorEditar.safeParse({ id: 1, factura: true }).success).toBe(false);
+    expect(esquemaProveedorPatchCuerpo.safeParse({ factura: true }).success).toBe(false);
+    expect(
+      esquemaProveedorPatchCuerpo.safeParse({
+        factura: true,
+        rfc: 'ABC010101AB1',
+        regimenFiscalSat: '601',
+      }).success,
+    ).toBe(true);
+  });
+
+  it('valida CLABE (dígito de control), moneda y método de pago', () => {
+    expect(
+      esquemaProveedorCrear.safeParse({ nombre: 'X', clabe: '002010077777777772' }).success,
+    ).toBe(false); // dígito de control malo
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', clabe: '123' }).success).toBe(false);
+    expect(
+      esquemaProveedorCrear.safeParse({ nombre: 'X', clabe: '002010077777777771' }).success,
+    ).toBe(true);
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', moneda: 'EUR' }).success).toBe(false);
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', metodoPago: 'XXX' }).success).toBe(false);
+  });
+
+  it('valida el RFC cuando viene (forma física/moral)', () => {
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', rfc: 'NO' }).success).toBe(false);
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', rfc: 'ABC010101AB1' }).success).toBe(
+      true,
+    );
+  });
+
+  it('rechaza roles repetidos en el arreglo', () => {
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', roles: [1, 1, 2] }).success).toBe(false);
+  });
+
+  it('edición: omitir `roles` los deja undefined (no toca los existentes)', () => {
+    const datos = esquemaProveedorEditar.parse({ id: 1, telefono: '555' });
+    expect('roles' in datos).toBe(false);
+    expect(datos.roles).toBeUndefined();
+    // si se manda [] el esquema lo acepta; el DOMINIO es quien exige ≥1 al reemplazar
+    expect(esquemaProveedorEditar.parse({ id: 1, roles: [] }).roles).toEqual([]);
+  });
+
+  it('edición: omitir `tipo` lo deja undefined (no rellena SIN_CLASIFICAR, trampa de .partial())', () => {
+    const datos = esquemaProveedorEditar.parse({ id: 1, activo: false });
+    expect('tipo' in datos).toBe(false);
+    expect(datos.tipo).toBeUndefined();
   });
 });
