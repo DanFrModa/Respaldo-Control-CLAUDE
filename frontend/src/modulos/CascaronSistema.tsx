@@ -63,76 +63,74 @@ export function CascaronSistema(): React.JSX.Element {
         <aside
           className={cn(
             'hidden shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200 ease-in-out lg:flex',
-            colapsado ? 'w-14' : 'w-64',
+            colapsado ? 'w-22' : 'w-64',
           )}
         >
-          {/* Marca + boton contraer */}
+          {/* Marca + boton contraer SIEMPRE en el header (la flecha nunca baja a
+              otra fila): al colapsar, el wordmark se desvanece y queda [logo]
+              [flecha] en el riel. `justify-between` en ambos estados. */}
           <div
             className={cn(
-              'flex h-14 items-center border-b',
-              colapsado ? 'justify-center px-2' : 'justify-between px-4',
+              'flex h-14 items-center justify-between border-b',
+              colapsado ? 'px-2' : 'px-4',
             )}
           >
-            {colapsado ? <Marca soloIcono /> : <Marca tamano="md" />}
-            {colapsado ? null : (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={alternarColapso}
-                aria-label={etiquetaColapso}
-                title={etiquetaColapso}
-                data-testid="contraer-menu"
-              >
-                <ChevronsLeft className="size-4" aria-hidden />
-              </Button>
-            )}
-          </div>
-
-          {/* Boton expandir (solo visible colapsado, bajo la marca) */}
-          {colapsado ? (
-            <div className="flex justify-center border-b py-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={alternarColapso}
-                    aria-label={etiquetaColapso}
-                    data-testid="contraer-menu"
-                  >
+            <Marca tamano="md" colapsado={colapsado} />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="shrink-0"
+                  onClick={alternarColapso}
+                  aria-label={etiquetaColapso}
+                  title={etiquetaColapso}
+                  data-testid="contraer-menu"
+                >
+                  {colapsado ? (
                     <ChevronsRight className="size-4" aria-hidden />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">{etiquetaColapso}</TooltipContent>
-              </Tooltip>
-            </div>
-          ) : null}
+                  ) : (
+                    <ChevronsLeft className="size-4" aria-hidden />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              {colapsado ? <TooltipContent side="right">{etiquetaColapso}</TooltipContent> : null}
+            </Tooltip>
+          </div>
 
           {/* Navegacion */}
           <div className="flex-1 overflow-y-auto">
             <NavegacionModulos modulos={modulos} colapsado={colapsado} />
           </div>
 
-          {/* Bloque de usuario abajo */}
-          <div className={cn('border-t p-2', colapsado && 'flex justify-center')}>
-            {colapsado ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <Avatar nombre={sesion.nombre} tono="pt" tamano="sm" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="right">{sesion.nombre}</TooltipContent>
-              </Tooltip>
-            ) : (
-              <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
-                <Avatar nombre={sesion.nombre} tono="pt" tamano="sm" />
-                <div className="flex min-w-0 flex-col leading-tight">
-                  <span className="truncate text-sm font-medium">{sesion.nombre}</span>
-                  <span className="truncate text-xs text-muted-foreground">@{sesion.username}</span>
+          {/* Bloque de usuario abajo: el Avatar va SIEMPRE dentro del mismo
+              Tooltip/Trigger (no se remonta); el nombre/usuario se anima a ancho 0
+              al colapsar. Tooltip con el nombre solo cuando colapsado. */}
+          <div className="border-t p-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    'flex items-center rounded-lg py-1.5 transition-[padding] duration-200',
+                    colapsado ? 'justify-center px-0' : 'px-2',
+                  )}
+                >
+                  <Avatar nombre={sesion.nombre} tono="pt" tamano="sm" />
+                  <div
+                    className={cn(
+                      'flex min-w-0 flex-col overflow-hidden leading-tight whitespace-nowrap transition-[max-width,opacity,margin] duration-200 ease-in-out',
+                      colapsado ? 'ml-0 max-w-0 opacity-0' : 'ml-2.5 max-w-[12rem] opacity-100',
+                    )}
+                  >
+                    <span className="truncate text-sm font-medium">{sesion.nombre}</span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      @{sesion.username}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              </TooltipTrigger>
+              {colapsado ? <TooltipContent side="right">{sesion.nombre}</TooltipContent> : null}
+            </Tooltip>
           </div>
         </aside>
 
