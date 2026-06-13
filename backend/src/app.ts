@@ -4,9 +4,17 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 
 import { rutasAlmacenes } from './api/almacenes/almacenes.rutas.js';
+import { rutasColores } from './api/colores/colores.rutas.js';
+import { rutasCortadores } from './api/cortadores/cortadores.rutas.js';
+import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
+import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas.js';
 import { registrarManejadorErrores } from './api/errores.js';
+import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
+import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
 import { rutasSesion } from './api/sesion/sesion.rutas.js';
+import { rutasTemporadas } from './api/temporadas/temporadas.rutas.js';
+import { rutasUsuarios } from './api/usuarios/usuarios.rutas.js';
 import { registrarAuth, type OpcionesAuth } from './auth/plugin.js';
 import { opcionesSwagger, RUTA_DOCS } from './openapi.js';
 
@@ -71,6 +79,16 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasSalud, { prefix: '/api' });
   await app.register(rutasSesion, { prefix: '/api' });
   await app.register(rutasAlmacenes, { prefix: '/api' });
+  // Catálogos maestros globales (F1-E1) — patrón CRUD de Almacenes.
+  await app.register(rutasProveedores, { prefix: '/api' });
+  await app.register(rutasCortadores, { prefix: '/api' });
+  await app.register(rutasTemporadas, { prefix: '/api' });
+  await app.register(rutasEtiquetasMarca, { prefix: '/api' });
+  await app.register(rutasColores, { prefix: '/api' });
+  // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
+  await app.register(rutasUsuarios, { prefix: '/api' });
+  await app.register(rutasEmpresas, { prefix: '/api' });
+  await app.register(rutasRoles, { prefix: '/api' });
 
   return app;
 }

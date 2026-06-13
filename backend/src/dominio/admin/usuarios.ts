@@ -8,8 +8,9 @@
  *   `Usuarios.Clave` era texto plano): el hash scrypt de `better-auth/crypto`
  *   vive en la `Cuenta` con `providerId: "credential"` — el mismo formato que
  *   verifica el login de better-auth (E3, ADR-0003). Ningún servicio devuelve
- *   hashes, y el CAMBIO de contraseña es flujo de better-auth (E3), no de este
- *   servicio (solo el alta fija la inicial).
+ *   hashes. El RESET de contraseña por un administrador vive aquí
+ *   (`cambiarContrasenaUsuario`), reusando ese mismo hash scrypt que el alta y el
+ *   seed; NO es el self-service de better-auth (que exige la clave actual).
  * - **Bloqueo por intentos** (doc 00 §1.1: al 5º intento fallido el viejo
  *   bloqueaba con "Estás bloqueado, habla con Daniel Masri"): el contador lo
  *   lleva el login (E3); aquí vive el DESBLOQUEO manual del administrador, y el
@@ -22,6 +23,7 @@
  * uno se genera el sintético `<username>@control.local`.
  */
 import {
+  esquemaUsuarioCambiarContrasena,
   esquemaUsuarioCrear,
   esquemaUsuarioEditar,
   type DatosUsuarioEditar,
@@ -420,6 +422,54 @@ export async function desbloquearUsuario(
       throw new ErrorConflicto(`El usuario "${actual.username}" no está bloqueado.`);
     }
     return actualizarUsuario(sesion, { id, bloqueado: false }, { tx });
+  }, bd);
+}
+
+/**
+ * CAMBIO de contraseña por un administrador (reset, doc 10 §6.3). NO es el flujo
+ * self-service de better-auth (ese exige la contraseña actual y opera sobre la
+ * propia sesión): aquí un administrador fija una nueva contraseña a CUALQUIER
+ * usuario. Reusa EXACTAMENTE el mecanismo del alta y del seed —el hash scrypt de
+ * `better-auth/crypto` en la `Cuenta` con `providerId: "credential"`, el mismo
+ * formato que verifica el login (ADR-0003)— sin introducir lógica de auth nueva.
+ *
+ * Se hace `upsert` de la credencial (si por algún motivo el usuario no tuviera
+ * fila `credential`, se crea) en una transacción con bitácora. La contraseña
+ * JAMÁS aparece en la bitácora ni en la respuesta.
+ *
+ * Reglas: permiso `usuarios.administrar`; el usuario debe existir; la nueva
+ * contraseña cumple las reglas del esquema compartido.
+ */
+export async function cambiarContrasenaUsuario(
+  sesion: SesionUsuario,
+  id: string,
+  password: string,
+  bd?: ContextoBd,
+): Promise<UsuarioDto> {
+  verificarPermiso(sesion, 'usuarios.administrar');
+  const datos = validarEntrada(esquemaUsuarioCambiarContrasena, { password });
+  const hash = await hashPassword(datos.password);
+
+  return enTransaccion(async (tx) => {
+    const actual = await exigirUsuario(tx, id);
+
+    await tx.cuenta.upsert({
+      where: { providerId_accountId: { providerId: 'credential', accountId: id } },
+      update: { password: hash },
+      create: { providerId: 'credential', accountId: id, userId: id, password: hash },
+    });
+
+    // Tocar al usuario deja constancia de auditoría (quién/cuándo) de la operación.
+    await tx.usuario.update({ where: { id }, data: datosModificacion(sesion) });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Usuario',
+      idEntidad: id,
+      accion: 'MODIFICAR',
+      datos: { username: actual.username, operacion: 'cambiarContrasena' }, // sin password
+    });
+
+    return aDto(await exigirUsuario(tx, id));
   }, bd);
 }
 

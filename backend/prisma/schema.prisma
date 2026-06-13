@@ -1,6 +1,8 @@
-// CONTROL v2 — esquema de la fundación (F0).
+// CONTROL v2 — esquema de la fundación (F0) + catálogos sencillos (F1-E1).
 // Dominios: empresas y configuración, usuarios/RBAC (A4) + tablas de better-auth,
-// almacenes, secuencias de folios (A3), bitácora (A7) y archivos R2 (A5/R6).
+// almacenes, secuencias de folios (A3), bitácora (A7), archivos R2 (A5/R6) y
+// catálogos maestros globales (F1: Proveedor, Cortador, Temporada, EtiquetaMarca,
+// Color — GLOBALES sin idEmpresa por ADR-0007/A9).
 //
 // Convenciones (plan maestro §4 y §8):
 //  • Modelos y campos de dominio en español, sin acentos ni eñes.
@@ -373,4 +375,126 @@ model Archivo {
   subidoEn       DateTime @default(now()) @map("subido_en")
 
   @@map("archivos")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogos (F1) — maestros GLOBALES (sin idEmpresa): se capturan una vez y los
+// comparten todas las empresas (ADR-0007, decisión A9). Unicidad de `nombre`
+// GLOBAL (@unique). Mismo patrón que `Almacen`: borrado suave (`activo`) +
+// auditoría uniforme (A7) creadoEn/creadoPorId + modificadoEn/modificadoPorId.
+// onDelete Restrict no aplica aún (no hay relaciones entrantes en F1-E1; las
+// agregan F1-E3/E4: AvioProveedor→Proveedor, TelaColor→Color, Modelo→Temporada).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Clasificación del proveedor (doc funcional 03-Producción §Órdenes de Compra:
+/// el campo `TipoProv` del viejo usaba H/T/S — habilitación/avíos, telas, servicios).
+/// `SIN_CLASIFICAR` cubre los proveedores del viejo sin tipo capturado. El mapeo
+/// H/T/S → este enum lo hace el ETL en F1-E6; aquí solo se define el enum nuevo.
+enum TipoProveedor {
+  TELAS
+  AVIOS
+  SERVICIOS
+  SIN_CLASIFICAR
+
+  @@map("tipo_proveedor")
+}
+
+/// Proveedor (catálogo global, F1-E1). Equivale a la tabla `Proveedores` del viejo
+/// (doc 03-Producción §Órdenes de Compra). Base de `AvioProveedor` (F1-E3, R1).
+model Proveedor {
+  id          Int           @id @default(autoincrement())
+  /// Nombre de uso diario. Único global (ADR-0007): un proveedor se da de alta una sola vez.
+  nombre      String        @unique
+  razonSocial String?       @map("razon_social")
+  /// Clasificación (telas/avíos/servicios); por defecto sin clasificar.
+  tipo        TipoProveedor @default(SIN_CLASIFICAR)
+  telefono    String?
+  contacto    String?
+  /// Condiciones comerciales en texto libre (crédito, plazos…).
+  condiciones String?
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo      Boolean       @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("proveedores")
+}
+
+/// Cortador (catálogo global, F1-E1). Equivale a la tabla `Cortadores` del viejo
+/// (doc 03-Producción §Paso 3 Corte): quien corta la tela antes de la maquila.
+model Cortador {
+  id               Int      @id @default(autoincrement())
+  /// Nombre de uso diario. Único global (ADR-0007).
+  nombre           String   @unique
+  /// Precio de referencia por corte (informativo; el costo real va en la orden).
+  precioReferencia Decimal? @map("precio_referencia") @db.Decimal(12, 2)
+  telefonos        String?
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo           Boolean  @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("cortadores")
+}
+
+/// Temporada (catálogo global, F1-E1). Equivale a la tabla `Temporadas` del viejo
+/// (doc 01-Modelos §2): clasifica los modelos por temporada comercial.
+model Temporada {
+  id     Int     @id @default(autoincrement())
+  /// Nombre de la temporada. Único global (ADR-0007).
+  nombre String  @unique
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("temporadas")
+}
+
+/// Etiqueta de marca (catálogo global, F1-E1). Equivale a la tabla `EtiquetasM` del
+/// viejo (doc 01-Modelos §2 y §6 punto 4): la marca/etiqueta del modelo, con su
+/// porcentaje de `regalias` que alimenta el costeo (% del precio).
+model EtiquetaMarca {
+  id     Int    @id @default(autoincrement())
+  /// Nombre de la etiqueta de marca. Único global (ADR-0007).
+  nombre String @unique
+  /// Porcentaje de regalías (0–100), validado en Zod y en el dominio. Alimenta el costeo (01-Modelos §6).
+  regalias Decimal @default(0) @db.Decimal(5, 2)
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo   Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("etiquetas_marca")
+}
+
+/// Color (catálogo global, F1-E1). Motivado por `TelasColores.Color` (texto libre en
+/// el viejo, doc 04-Inventarios §B.2): se normaliza a un catálogo único. La fusión de
+/// duplicados (alias) llega en F1-E6; aquí solo unicidad por nombre + normalización
+/// LIGERA (trim + colapsar espacios) en el dominio.
+model Color {
+  id     Int     @id @default(autoincrement())
+  /// Nombre del color, normalizado. Único global (ADR-0007).
+  nombre String  @unique
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("colores")
 }

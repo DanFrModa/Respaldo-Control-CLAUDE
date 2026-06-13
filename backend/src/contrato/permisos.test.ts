@@ -20,8 +20,10 @@ describe('catálogo de permisos', () => {
   });
 
   it('toda clave tiene formato `modulo.accion` y su prefijo coincide con el módulo', () => {
+    // El módulo y la acción son kebab-case (minúsculas, dígitos y guiones); p. ej.
+    // el catálogo de etiquetas de marca usa el módulo `etiquetas-marca` (F1-E1).
     for (const permiso of CATALOGO_PERMISOS) {
-      expect(permiso.clave).toMatch(/^[a-z]+\.[a-z][a-z0-9-]*$/);
+      expect(permiso.clave).toMatch(/^[a-z][a-z0-9-]*\.[a-z][a-z0-9-]*$/);
       expect(permiso.clave.startsWith(`${permiso.modulo}.`)).toBe(true);
       expect(Object.keys(MODULOS_PERMISO)).toContain(permiso.modulo);
     }
@@ -34,13 +36,24 @@ describe('catálogo de permisos', () => {
     );
   });
 
-  it('incluye los permisos nuevos de administración de v2', () => {
+  it('incluye los permisos nuevos de administración y de catálogos de v2', () => {
     const nuevos = catalogo.filter((p) => p.origen === undefined).map((p) => p.clave);
     expect(nuevos.sort()).toEqual([
       'almacenes.administrar',
       'almacenes.ver',
+      // Catálogos maestros globales (F1-E1, ADR-0007): ver + administrar por catálogo.
+      'colores.administrar',
+      'colores.ver',
+      'cortadores.administrar',
+      'cortadores.ver',
       'empresas.administrar',
+      'etiquetas-marca.administrar',
+      'etiquetas-marca.ver',
+      'proveedores.administrar',
+      'proveedores.ver',
       'roles.administrar',
+      'temporadas.administrar',
+      'temporadas.ver',
       'usuarios.administrar',
     ]);
   });

@@ -24,7 +24,9 @@ export const MODULOS_PERMISO = {
   clientes: 'Clientes',
   proveedores: 'Proveedores',
   maquileros: 'Maquileros',
-  etiquetas: 'Etiquetas de marca',
+  // Módulo LEGADO de F0 (solo agrupa `etiquetas.modificar`, sin uso en v2): el
+  // catálogo vigente vive en el módulo `etiquetas-marca` (más abajo).
+  etiquetas: 'Etiquetas de marca (legado)',
   compras: 'Órdenes de compra',
   produccion: 'Producción (corte y maquila)',
   telas: 'Inventario de telas',
@@ -38,6 +40,11 @@ export const MODULOS_PERMISO = {
   roles: 'Administración de roles',
   almacenes: 'Almacenes',
   empresas: 'Empresas',
+  // ── Catálogos maestros (F1-E1, globales — ADR-0007) ────────────────────────
+  cortadores: 'Cortadores',
+  temporadas: 'Temporadas',
+  'etiquetas-marca': 'Etiquetas de marca',
+  colores: 'Colores',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -150,6 +157,10 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Modificar Clientes (Cualquiera puede agregar)',
     },
   },
+  // LEGADO (F0, de Accesos.csv): SIN uso en el código de v2. El dominio y las rutas
+  // de proveedores usan solo las claves nuevas `proveedores.ver`/`.administrar` (F1-E1,
+  // ver más abajo). Se conserva por trazabilidad; se consolidará al construir la
+  // administración fina de roles (fase posterior). NO asignarla en seeds futuros.
   {
     clave: 'proveedores.modificar',
     modulo: 'proveedores',
@@ -184,6 +195,11 @@ export const CATALOGO_PERMISOS = [
   },
 
   // ── Etiquetas de marca ───────────────────────────────────────────────────────
+  // LEGADO (F0, de Accesos.csv; módulo `etiquetas`): SIN uso en el código de v2. El
+  // dominio y las rutas del catálogo usan solo las claves nuevas
+  // `etiquetas-marca.ver`/`.administrar` (F1-E1, ver más abajo). Se conserva por
+  // trazabilidad; se consolidará al construir la administración fina de roles (fase
+  // posterior). NO asignarla en seeds futuros.
   {
     clave: 'etiquetas.modificar',
     modulo: 'etiquetas',
@@ -494,6 +510,61 @@ export const CATALOGO_PERMISOS = [
     clave: 'empresas.administrar',
     modulo: 'empresas',
     descripcion: 'Administrar empresas y su configuración',
+  },
+
+  // ── Catálogos maestros (F1-E1, globales — ADR-0007; CRUD patrón Almacenes) ───
+  // Cada catálogo tiene `ver` (consulta) y `administrar` (alta/edición/des-reactivación).
+  // No tienen equivalente granular en el viejo: eran tablas planas sin control de acceso
+  // propio (lo regía el nivel). En v2 son permisos RBAC nuevos (A4).
+  {
+    clave: 'proveedores.ver',
+    modulo: 'proveedores',
+    descripcion: 'Consultar el catálogo de proveedores',
+  },
+  {
+    clave: 'proveedores.administrar',
+    modulo: 'proveedores',
+    descripcion: 'Administrar el catálogo de proveedores (alta, edición, desactivación)',
+  },
+  {
+    clave: 'cortadores.ver',
+    modulo: 'cortadores',
+    descripcion: 'Consultar el catálogo de cortadores',
+  },
+  {
+    clave: 'cortadores.administrar',
+    modulo: 'cortadores',
+    descripcion: 'Administrar el catálogo de cortadores (alta, edición, desactivación)',
+  },
+  {
+    clave: 'temporadas.ver',
+    modulo: 'temporadas',
+    descripcion: 'Consultar el catálogo de temporadas',
+  },
+  {
+    clave: 'temporadas.administrar',
+    modulo: 'temporadas',
+    descripcion: 'Administrar el catálogo de temporadas (alta, edición, desactivación)',
+  },
+  {
+    clave: 'etiquetas-marca.ver',
+    modulo: 'etiquetas-marca',
+    descripcion: 'Consultar el catálogo de etiquetas de marca',
+  },
+  {
+    clave: 'etiquetas-marca.administrar',
+    modulo: 'etiquetas-marca',
+    descripcion: 'Administrar el catálogo de etiquetas de marca (alta, edición, desactivación)',
+  },
+  {
+    clave: 'colores.ver',
+    modulo: 'colores',
+    descripcion: 'Consultar el catálogo de colores',
+  },
+  {
+    clave: 'colores.administrar',
+    modulo: 'colores',
+    descripcion: 'Administrar el catálogo de colores (alta, edición, desactivación)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 
