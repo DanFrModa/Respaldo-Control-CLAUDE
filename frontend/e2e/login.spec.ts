@@ -18,7 +18,7 @@ test.describe('Inicio de sesión', () => {
   test('una ruta protegida sin sesión redirige a /login', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/login$/);
-    await expect(page.getByRole('heading', { name: 'CONTROL v2' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Control v2/i })).toBeVisible();
     await expect(page.getByText('Iniciar sesión')).toBeVisible();
   });
 

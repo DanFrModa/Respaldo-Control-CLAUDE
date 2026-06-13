@@ -53,6 +53,9 @@ test.describe('Administración — Usuarios y RBAC', () => {
     await page.getByTestId('guardar-usuario').click();
 
     await expect(page.getByText(`Usuario "${username}" creado.`)).toBeVisible();
+    // La lista es paginada de servidor; se busca por nombre para encontrar la fila
+    // del recién creado (también ejercita el buscador de la lista + detalle).
+    await page.getByTestId('buscar-usuario').fill(username);
     await expect(page.getByTestId('fila-usuario').filter({ hasText: username })).toBeVisible();
 
     // ── 2) Cerrar sesión del admin ──────────────────────────────────────────────

@@ -9,7 +9,7 @@ import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades
 import { AlmacenesPagina } from './AlmacenesPagina';
 
 // Se controla la capa de datos: las pruebas no tocan la red. `useAlmacenes`
-// devuelve una forma minima de `UseQueryResult` (solo lo que el componente lee).
+// captura la query con la que se le llama, para verificar el filtro por tipo.
 type EstadoConsulta = {
   data: TipoPagina | undefined;
   isPending: boolean;
@@ -18,11 +18,15 @@ type EstadoConsulta = {
   error: ErrorDeApi | null;
   refetch: () => void;
 };
-const useAlmacenes = vi.fn<() => EstadoConsulta>();
+const useAlmacenes = vi.fn<(query: unknown) => EstadoConsulta>();
 const desactivarMutate = vi.fn();
 const reactivarMutate = vi.fn();
+let ultimaQuery: Record<string, unknown> | undefined;
 vi.mock('@/api/almacenes', () => ({
-  useAlmacenes: () => useAlmacenes(),
+  useAlmacenes: (query: Record<string, unknown>) => {
+    ultimaQuery = query;
+    return useAlmacenes(query);
+  },
   useCrearAlmacen: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarAlmacen: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarAlmacen: () => ({ mutate: desactivarMutate, isPending: false }),
@@ -66,6 +70,7 @@ describe('<AlmacenesPagina>', () => {
     useAlmacenes.mockReset();
     desactivarMutate.mockReset();
     reactivarMutate.mockReset();
+    ultimaQuery = undefined;
   });
 
   it('lista los almacenes que devuelve el API', () => {
@@ -76,10 +81,14 @@ describe('<AlmacenesPagina>', () => {
       sesion: estadoSesionDePrueba(['almacenes.ver', 'almacenes.administrar']),
     });
 
+    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
+    // el detalle), por eso su nombre se busca con getAllByText. El nombre del
+    // segundo se busca dentro de su fila (evita chocar con la opción "Telas" del
+    // filtro de tipo, que tambien dice "Telas").
     const filas = screen.getAllByTestId('fila-almacen');
     expect(filas).toHaveLength(2);
-    expect(screen.getByText('Bodega Central')).toBeInTheDocument();
-    expect(screen.getByText('Telas')).toBeInTheDocument();
+    expect(screen.getAllByText('Bodega Central').length).toBeGreaterThan(0);
+    expect(within(filas[1] as HTMLElement).getByText('Telas')).toBeInTheDocument();
   });
 
   it('muestra el boton "Nuevo almacén" y abre el dialogo de alta con permiso de administrar', async () => {
@@ -102,8 +111,10 @@ describe('<AlmacenesPagina>', () => {
       sesion: estadoSesionDePrueba(['almacenes.ver']),
     });
 
+    // Ni el boton "Nuevo", ni las acciones del detalle (editar/desactivar).
     expect(screen.queryByTestId('nuevo-almacen')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-almacen')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-almacen')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-almacen')).not.toBeInTheDocument();
   });
 
   it('muestra el estado vacio cuando no hay resultados', () => {
@@ -139,10 +150,9 @@ describe('<AlmacenesPagina>', () => {
       sesion: estadoSesionDePrueba(['almacenes.ver', 'almacenes.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('acciones-almacen'));
-    await usuario.click(await screen.findByTestId('desactivar-almacen'));
+    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    await usuario.click(screen.getByTestId('desactivar-almacen'));
 
-    // Aparece el dialogo de confirmacion con el nombre del almacen.
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar almacén')).toBeInTheDocument();
 
@@ -150,34 +160,38 @@ describe('<AlmacenesPagina>', () => {
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
 
-  it('un almacén inactivo se ve con badge "Inactivo" y ofrece Activar (no Desactivar)', async () => {
+  it('un almacén inactivo ofrece Activar y reactiva directo (sin confirmación)', async () => {
     const usuario = userEvent.setup();
     useAlmacenes.mockReturnValue(consultaConDatos([almacen(9, 'Bodega Apagada', false)]));
     renderConProveedores(<AlmacenesPagina />, {
       sesion: estadoSesionDePrueba(['almacenes.ver', 'almacenes.administrar']),
     });
 
-    const fila = screen.getByTestId('fila-almacen');
-    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
-
-    await usuario.click(within(fila).getByTestId('acciones-almacen'));
-    // La fila inactiva ofrece Activar, no Desactivar.
-    expect(await screen.findByTestId('activar-almacen')).toBeInTheDocument();
+    // El detalle del registro inactivo muestra su estado y ofrece "Activar".
+    const detalle = screen.getByTestId('detalle-almacen');
+    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-almacen')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-almacen')).not.toBeInTheDocument();
-  });
 
-  it('reactiva directamente (sin confirmación) y llama a la mutación', async () => {
-    const usuario = userEvent.setup();
-    useAlmacenes.mockReturnValue(consultaConDatos([almacen(9, 'Bodega Apagada', false)]));
-    renderConProveedores(<AlmacenesPagina />, {
-      sesion: estadoSesionDePrueba(['almacenes.ver', 'almacenes.administrar']),
-    });
-
-    await usuario.click(screen.getByTestId('acciones-almacen'));
-    await usuario.click(await screen.findByTestId('activar-almacen'));
-
+    await usuario.click(screen.getByTestId('activar-almacen'));
     // Reactivar es no destructivo: NO abre diálogo de confirmación.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
+  });
+
+  it('el filtro por tipo se refleja en la consulta del API', async () => {
+    const usuario = userEvent.setup();
+    useAlmacenes.mockReturnValue(consultaConDatos([almacen(1, 'Bodega Central')]));
+    renderConProveedores(<AlmacenesPagina />, {
+      sesion: estadoSesionDePrueba(['almacenes.ver']),
+    });
+
+    // Sin filtro, la query no lleva `tipo` (todos los tipos).
+    expect(ultimaQuery?.tipo).toBeUndefined();
+
+    await usuario.selectOptions(screen.getByTestId('filtro-tipo-almacen'), 'TELA');
+
+    // Tras elegir un tipo, la siguiente consulta lo incluye.
+    expect(ultimaQuery?.tipo).toBe('TELA');
   });
 });

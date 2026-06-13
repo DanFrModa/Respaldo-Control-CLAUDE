@@ -3,24 +3,27 @@ import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { avatarPorTono, type Tono } from '@/lib/tono';
+import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
- * Portada del modulo Administracion: lista sus secciones. Las CONSTRUIDAS
- * (Usuarios y Empresas, F1-E1) se muestran como tarjeta-enlace SOLO si la sesion
- * tiene su permiso `.administrar` (igual que el sidebar oculta los modulos sin
- * permiso, A4); el resto (roles, configuracion, bitacora) aun por construir, como
- * "Próximamente". La decision real de acceso la toma el backend en cada ruta (A1).
+ * Portada del modulo Administracion (rediseño "Teal fresco"): lista sus secciones
+ * como tarjetas con icono de color. Las CONSTRUIDAS (Usuarios y Empresas, F1-E1)
+ * se muestran como tarjeta-enlace SOLO si la sesion tiene su permiso `.administrar`
+ * (igual que el sidebar oculta los modulos sin permiso, A4); el resto (roles,
+ * bitacora) aun por construir, como "Próximamente". La decision real de acceso la
+ * toma el backend en cada ruta (A1).
  */
 
-/** Una seccion ya construida (pantalla real), con su ruta, icono y permiso. */
+/** Una seccion ya construida (pantalla real), con su ruta, icono, tono y permiso. */
 interface SeccionLista {
   clave: string;
   titulo: string;
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
+  tono: Tono;
   /** Permiso que hace visible la seccion (la administracion no tiene `.ver`). */
   permiso: ClavePermiso;
 }
@@ -40,6 +43,7 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Usuarios del sistema, sus roles y su estado de acceso.',
     ruta: '/administracion/usuarios',
     icono: Users,
+    tono: 'pt',
     permiso: 'usuarios.administrar',
   },
   {
@@ -48,6 +52,7 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Empresas del grupo y su configuración de costeo e inventario.',
     ruta: '/administracion/empresas',
     icono: Building2,
+    tono: 'avios',
     permiso: 'empresas.administrar',
   },
 ];
@@ -68,43 +73,56 @@ export function AdministracionPagina(): React.JSX.Element {
   const visibles = SECCIONES_LISTAS.filter((sub) => tienePermiso(sub.permiso));
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <h1 className="text-2xl font-semibold tracking-tight">Administración</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Configuración del sistema. Elige una sección para administrarla.
-      </p>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
+        <h1 className="text-2xl font-semibold tracking-tight">Administración</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Configuración del sistema. Elige una sección para administrarla.
+        </p>
 
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {visibles.map((sub) => (
-          <Link
-            key={sub.clave}
-            to={sub.ruta}
-            className="group"
-            data-testid={`administracion-${sub.clave}`}
-          >
-            <Card className="h-full transition-colors group-hover:ring-primary/40">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <sub.icono className="size-4 text-muted-foreground" aria-hidden />
-                  {sub.titulo}
-                </CardTitle>
-                <CardDescription>{sub.descripcion}</CardDescription>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))}
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visibles.map((sub) => (
+            <Link
+              key={sub.clave}
+              to={sub.ruta}
+              className="group flex items-start gap-3 rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10 transition-all hover:ring-primary/40 hover:shadow-sm"
+              data-testid={`administracion-${sub.clave}`}
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  'flex size-10 shrink-0 items-center justify-center rounded-xl',
+                  avatarPorTono(sub.tono),
+                )}
+              >
+                <sub.icono className="size-5" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-heading text-base font-medium">{sub.titulo}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{sub.descripcion}</p>
+              </div>
+            </Link>
+          ))}
 
-        {SECCIONES_PENDIENTES.map((sub) => (
-          <Card key={sub.clave} className="h-full opacity-70">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between gap-2 text-base">
-                {sub.titulo}
-                <Badge variant="outline">Próximamente</Badge>
-              </CardTitle>
-              <CardDescription>{sub.descripcion}</CardDescription>
-            </CardHeader>
-          </Card>
-        ))}
+          {SECCIONES_PENDIENTES.map((sub) => (
+            <div
+              key={sub.clave}
+              className="flex items-start gap-3 rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10 opacity-70"
+            >
+              <span
+                aria-hidden
+                className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-heading text-base font-medium">{sub.titulo}</h2>
+                  <Badge variant="outline">Próximamente</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{sub.descripcion}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

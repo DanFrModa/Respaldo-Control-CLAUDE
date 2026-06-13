@@ -67,6 +67,11 @@ function consultaConDatos(datos: Empresa[]): EstadoConsulta {
 
 const ADMIN = ['empresas.administrar'] as const;
 
+/** Atajo: el panel de detalle (donde viven las acciones del registro seleccionado). */
+function detalle(): HTMLElement {
+  return screen.getByTestId('detalle-empresa');
+}
+
 describe('<EmpresasPagina>', () => {
   beforeEach(() => {
     useEmpresas.mockReset();
@@ -81,8 +86,10 @@ describe('<EmpresasPagina>', () => {
     );
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
+    // Dos renglones; la primera queda auto-seleccionada (su nombre aparece tambien
+    // en el detalle), por eso se busca con getAllByText.
     expect(screen.getAllByTestId('fila-empresa')).toHaveLength(2);
-    expect(screen.getByText('FR Moda')).toBeInTheDocument();
+    expect(screen.getAllByText('FR Moda').length).toBeGreaterThan(0);
     expect(screen.getByText('Otra SA')).toBeInTheDocument();
   });
 
@@ -112,8 +119,9 @@ describe('<EmpresasPagina>', () => {
     useEmpresas.mockReturnValue(consultaConDatos([empresa(1, 'FR Moda')]));
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([]) });
 
-    expect(screen.queryByTestId('nueva-empresa')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-empresa')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nuevo-empresa')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-empresa')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('configurar-empresa')).not.toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {
@@ -121,8 +129,8 @@ describe('<EmpresasPagina>', () => {
     useEmpresas.mockReturnValue(consultaConDatos([empresa(7, 'Vieja SA')]));
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    await u.click(screen.getByTestId('acciones-empresa'));
-    await u.click(await screen.findByTestId('desactivar-empresa'));
+    // La empresa queda auto-seleccionada: "Desactivar" es un boton directo del detalle.
+    await u.click(screen.getByTestId('desactivar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar empresa')).toBeInTheDocument();
@@ -137,14 +145,13 @@ describe('<EmpresasPagina>', () => {
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
     // Por defecto las inactivas se ocultan: hay que mostrarlas.
-    await u.click(screen.getByTestId('mostrar-desactivadas'));
+    await u.click(screen.getByTestId('mostrar-desactivados'));
 
-    const fila = screen.getByTestId('fila-empresa');
-    expect(within(fila).getByText('Inactiva')).toBeInTheDocument();
+    expect(within(detalle()).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-empresa')).toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-empresa')).not.toBeInTheDocument();
 
-    await u.click(within(fila).getByTestId('acciones-empresa'));
-    await u.click(await screen.findByTestId('activar-empresa'));
-
+    await u.click(screen.getByTestId('activar-empresa'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
   });
@@ -156,11 +163,24 @@ describe('<EmpresasPagina>', () => {
     );
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    expect(screen.getByText('Activa SA')).toBeInTheDocument();
+    // "Activa SA" queda auto-seleccionada (aparece en lista y detalle).
+    expect(screen.getAllByText('Activa SA').length).toBeGreaterThan(0);
     expect(screen.queryByText('Inactiva SA')).not.toBeInTheDocument();
 
-    await u.click(screen.getByTestId('mostrar-desactivadas'));
+    await u.click(screen.getByTestId('mostrar-desactivados'));
     expect(screen.getByText('Inactiva SA')).toBeInTheDocument();
+  });
+
+  it('abre la configuración de la empresa desde las acciones del detalle', async () => {
+    const u = userEvent.setup();
+    useEmpresas.mockReturnValue(consultaConDatos([empresa(5, 'Config SA')]));
+    renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+    // "Configurar" es una accion extra del detalle de la empresa seleccionada.
+    await u.click(screen.getByTestId('configurar-empresa'));
+
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByText('Configuración de Config SA')).toBeInTheDocument();
   });
 
   it('edita el UPC de una empresa y lo envía en el cuerpo del PATCH', async () => {
@@ -168,8 +188,8 @@ describe('<EmpresasPagina>', () => {
     useEmpresas.mockReturnValue(consultaConDatos([empresa(3, 'Marca SA', { upc: '750' })]));
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
-    await u.click(screen.getByTestId('acciones-empresa'));
-    await u.click(await screen.findByTestId('editar-empresa'));
+    // "Editar" es un boton directo del detalle de la empresa auto-seleccionada.
+    await u.click(screen.getByTestId('editar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
     const upc = within(dialogo).getByLabelText('UPC');

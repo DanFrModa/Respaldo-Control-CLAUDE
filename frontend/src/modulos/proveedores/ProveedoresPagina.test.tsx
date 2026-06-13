@@ -84,8 +84,10 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
     });
 
+    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
+    // el detalle), por eso su nombre se busca con getAllByText.
     expect(screen.getAllByTestId('fila-proveedor')).toHaveLength(2);
-    expect(screen.getByText('Telas del Norte')).toBeInTheDocument();
+    expect(screen.getAllByText('Telas del Norte').length).toBeGreaterThan(0);
     expect(screen.getByText('Avíos SA')).toBeInTheDocument();
   });
 
@@ -123,8 +125,10 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver']),
     });
 
+    // Ni el boton "Nuevo", ni las acciones del detalle (editar/desactivar).
     expect(screen.queryByTestId('nuevo-proveedor')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-proveedor')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-proveedor')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-proveedor')).not.toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {
@@ -134,8 +138,8 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('acciones-proveedor'));
-    await usuario.click(await screen.findByTestId('desactivar-proveedor'));
+    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    await usuario.click(screen.getByTestId('desactivar-proveedor'));
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar proveedor')).toBeInTheDocument();
@@ -144,18 +148,17 @@ describe('<ProveedoresPagina>', () => {
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
 
-  it('una fila inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
+  it('un proveedor inactivo ofrece Activar y reactiva directo (sin confirmación)', async () => {
     const usuario = userEvent.setup();
     useProveedores.mockReturnValue(consultaConDatos([proveedor(9, 'Proveedor Apagado', false)]));
     renderConProveedores(<ProveedoresPagina />, {
       sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
     });
 
-    const fila = screen.getByTestId('fila-proveedor');
-    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
-
-    await usuario.click(within(fila).getByTestId('acciones-proveedor'));
-    expect(await screen.findByTestId('activar-proveedor')).toBeInTheDocument();
+    // El detalle del registro inactivo muestra su estado y ofrece "Activar".
+    const detalle = screen.getByTestId('detalle-proveedor');
+    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-proveedor')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-proveedor')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-proveedor'));

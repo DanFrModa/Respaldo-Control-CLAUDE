@@ -1,44 +1,58 @@
-import {
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  type SortingState,
-  useReactTable,
-} from '@tanstack/react-table';
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, PlusIcon, SearchIcon } from 'lucide-react';
+import { Barcode, Building2, FileText, ScrollText, SettingsIcon, StarIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useDesactivarEmpresa, useEmpresas, useReactivarEmpresa } from '@/api/empresas';
 import type { Empresa } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
+import { Avatar, TipoBadge } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useDebounce } from '@/lib/useDebounce';
+import { ListaDetalle } from '@/modulos/ListaDetalle';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  CampoDetalle,
+  Historial,
+  RejillaCampos,
+  SeccionDetalle,
+  ValorVacio,
+} from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
-import { type AccionesEmpresa, columnasEmpresas } from './columnas';
 import { DialogoConfiguracion } from './DialogoConfiguracion';
 import { DialogoEmpresa } from './DialogoEmpresa';
 
+/** Badge de "Favorita" (estrella ámbar): la empresa predeterminada al iniciar sesión. */
+function BadgeFavorita(): React.JSX.Element {
+  return (
+    <span className="inline-flex h-5 w-fit shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 text-xs font-medium text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
+      <StarIcon className="size-3 fill-current" aria-hidden />
+      Favorita
+    </span>
+  );
+}
+
+/** ¿Coincide la empresa con el texto buscado (nombre/razón/RFC/UPC)? */
+function coincide(empresa: Empresa, texto: string): boolean {
+  if (texto === '') {
+    return true;
+  }
+  return [empresa.nombre, empresa.razonSocial, empresa.identificador, empresa.upc]
+    .filter((campo): campo is string => typeof campo === 'string')
+    .some((campo) => campo.toLowerCase().includes(texto));
+}
+
 /**
- * Pantalla de Empresas — administracion de empresas (multi-empresa A9). A
- * diferencia de los catalogos, la lista NO viene paginada del servidor (array
- * plano, favorita primero), asi que la busqueda y el orden se hacen EN CLIENTE
- * con TanStack Table. Alta/edicion en dialogo; configuracion por empresa en un
- * dialogo secundario; borrado suave reversible (campo `activa`).
+ * Pantalla de Empresas — administracion de empresas (multi-empresa A9) sobre el
+ * motor LISTA + DETALLE (rediseño "Teal fresco"). A diferencia de los catalogos,
+ * la lista NO viene paginada del servidor (array plano, favorita primero), asi que
+ * la busqueda y el filtro de inactivas se hacen EN CLIENTE y se le pasan al motor
+ * los registros ya filtrados (sin `paginacion`). El detalle muestra los datos de
+ * la empresa y sus banderas (favorita/IPT/EDR); ofrece editar / desactivar /
+ * reactivar y la accion extra "Configurar" (parametros de costeo e inventario).
  *
  * Todo va gobernado por `empresas.administrar`. La decision real la toma el
- * backend en cada ruta (A1).
+ * backend en cada ruta (A1). OJO: aqui el flag de borrado suave es `activa`
+ * (femenino), por eso `obtenerActivo={(e) => e.activa}`.
  */
 export function EmpresasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -48,10 +62,10 @@ export function EmpresasPagina(): React.JSX.Element {
   const desactivar = useDesactivarEmpresa();
   const reactivar = useReactivarEmpresa();
 
-  // ── Estado de la vista (filtrado/orden en cliente) ──────────────────────────
-  const [busqueda, setBusqueda] = useState('');
+  // ── Estado de la vista (filtrado en cliente) ────────────────────────────────
+  const [textoBusqueda, setTextoBusqueda] = useState('');
+  const busqueda = useDebounce(textoBusqueda.trim().toLowerCase(), 300);
   const [incluirInactivas, setIncluirInactivas] = useState(false);
-  const [orden, setOrden] = useState<SortingState>([{ id: 'nombre', desc: false }]);
 
   // ── Dialogos ───────────────────────────────────────────────────────────────
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
@@ -91,157 +105,94 @@ export function EmpresasPagina(): React.JSX.Element {
     });
   }
 
-  // ── Datos filtrados (oculta inactivas salvo que se pidan) ───────────────────
+  // Registros filtrados en cliente: oculta inactivas (salvo que se pidan) y aplica
+  // la busqueda por nombre/razon social/identificador/UPC.
   const empresas = useMemo(() => {
     const todas = consulta.data ?? [];
-    return incluirInactivas ? todas : todas.filter((empresa) => empresa.activa);
-  }, [consulta.data, incluirInactivas]);
-
-  const columnas = useMemo(() => columnasEmpresas({ alConfigurar: setAConfigurar }), []);
-
-  const tabla = useReactTable<Empresa>({
-    data: empresas,
-    columns: columnas,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    enableMultiSort: false,
-    state: { sorting: orden, globalFilter: busqueda },
-    onSortingChange: setOrden,
-    onGlobalFilterChange: setBusqueda,
-    // Busqueda en cliente sobre nombre, razon social, identificador y UPC.
-    globalFilterFn: (fila, _columnId, valor) => {
-      const texto = String(valor).trim().toLowerCase();
-      if (texto === '') {
-        return true;
-      }
-      const e = fila.original;
-      return [e.nombre, e.razonSocial, e.identificador, e.upc]
-        .filter((campo): campo is string => typeof campo === 'string')
-        .some((campo) => campo.toLowerCase().includes(texto));
-    },
-    meta: {
-      acciones: {
-        puedeAdministrar,
-        alEditar: abrirEdicion,
-        alDesactivar: setADesactivar,
-        alReactivar: reactivarEmpresa,
-      } satisfies AccionesEmpresa,
-    },
-  });
-
-  const totalColumnas = tabla.getAllLeafColumns().length;
-  const hayFilas = tabla.getRowModel().rows.length > 0;
+    return todas.filter(
+      (empresa) => (incluirInactivas || empresa.activa) && coincide(empresa, busqueda),
+    );
+  }, [consulta.data, incluirInactivas, busqueda]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Empresas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Empresas del grupo y su configuración de costeo e inventario.
-          </p>
-        </div>
-        {puedeAdministrar ? (
-          <Button onClick={abrirAlta} data-testid="nueva-empresa">
-            <PlusIcon aria-hidden />
-            Nueva empresa
+    <>
+      <ListaDetalle<Empresa>
+        testid="empresa"
+        titulo="Empresas"
+        descripcion="Empresas del grupo y su configuración de costeo e inventario."
+        icono={Building2}
+        registros={empresas}
+        cargando={consulta.isPending}
+        error={consulta.isError ? consulta.error.message : null}
+        alReintentar={() => void consulta.refetch()}
+        obtenerId={(e) => e.id}
+        obtenerTitulo={(e) => e.nombre}
+        obtenerActivo={(e) => e.activa}
+        obtenerSecundaria={(e) => e.identificador ?? e.razonSocial ?? undefined}
+        renderAvatarLista={(e) => (
+          <Avatar nombre={e.nombre} tono="pt" tamano="sm">
+            <Building2 className="size-4" aria-hidden />
+          </Avatar>
+        )}
+        busqueda={textoBusqueda}
+        alBuscar={setTextoBusqueda}
+        incluirInactivos={incluirInactivas}
+        alAlternarInactivos={() => setIncluirInactivas((v) => !v)}
+        textoVacio="No hay empresas que coincidan con la búsqueda."
+        puedeAdministrar={puedeAdministrar}
+        alNuevo={abrirAlta}
+        textoNuevo="Nueva empresa"
+        alEditar={abrirEdicion}
+        alDesactivar={setADesactivar}
+        alReactivar={reactivarEmpresa}
+        renderAvatarDetalle={(e) => (
+          <Avatar nombre={e.nombre} tono="pt" tamano="lg">
+            <Building2 className="size-7" aria-hidden />
+          </Avatar>
+        )}
+        renderMeta={(e) => (e.favorita ? <BadgeFavorita /> : null)}
+        accionesExtra={(e) => (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAConfigurar(e)}
+            data-testid="configurar-empresa"
+          >
+            <SettingsIcon aria-hidden />
+            Configurar
           </Button>
-        ) : null}
-      </div>
+        )}
+        renderDetalle={(e) => (
+          <>
+            <SeccionDetalle titulo="Datos de la empresa">
+              <RejillaCampos>
+                <CampoDetalle icono={ScrollText} etiqueta="Razón social" anchoCompleto>
+                  {e.razonSocial ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={FileText} etiqueta="Identificador (RFC)">
+                  {e.identificador ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={Barcode} etiqueta="UPC">
+                  {e.upc ?? <ValorVacio />}
+                </CampoDetalle>
+              </RejillaCampos>
+            </SeccionDetalle>
 
-      {/* Barra de herramientas: busqueda (cliente) + filtro de inactivas */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
-          <SearchIcon
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            placeholder="Buscar empresa…"
-            className="pl-8"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            aria-label="Buscar empresas"
-            data-testid="buscar-empresa"
-          />
-        </div>
-        <Button
-          type="button"
-          variant={incluirInactivas ? 'secondary' : 'outline'}
-          size="sm"
-          onClick={() => setIncluirInactivas((v) => !v)}
-          aria-pressed={incluirInactivas}
-          aria-label="Mostrar también las empresas desactivadas"
-          data-testid="mostrar-desactivadas"
-        >
-          {incluirInactivas ? 'Ocultar desactivadas' : 'Mostrar desactivadas'}
-        </Button>
-      </div>
+            <SeccionDetalle titulo="Banderas">
+              <div className="flex flex-wrap gap-1.5">
+                {e.favorita ? <BadgeFavorita /> : null}
+                {e.paraIpt ? <TipoBadge tono="pt">Inventario PT (IPT)</TipoBadge> : null}
+                {e.paraEdr ? <TipoBadge tono="avios">Estado de resultados (EDR)</TipoBadge> : null}
+                {!e.favorita && !e.paraIpt && !e.paraEdr ? (
+                  <span className="text-sm text-muted-foreground">Sin banderas activas.</span>
+                ) : null}
+              </div>
+            </SeccionDetalle>
 
-      {/* Tabla / estados */}
-      <div className="mt-4 rounded-xl border">
-        <Table>
-          <TableHeader>
-            {tabla.getHeaderGroups().map((grupo) => (
-              <TableRow key={grupo.id}>
-                {grupo.headers.map((cabecera) => (
-                  <TableHead key={cabecera.id} className={anchoColumna(cabecera.column.id)}>
-                    {cabecera.column.getCanSort() ? (
-                      <BotonOrden cabecera={cabecera} />
-                    ) : (
-                      flexRender(cabecera.column.columnDef.header, cabecera.getContext())
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {consulta.isPending ? (
-              <FilasEsqueleto columnas={totalColumnas} />
-            ) : consulta.isError ? (
-              <TableRow>
-                <TableCell colSpan={totalColumnas} className="py-10 text-center">
-                  <p className="text-sm font-medium text-destructive">{consulta.error.message}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => void consulta.refetch()}
-                  >
-                    Reintentar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ) : !hayFilas ? (
-              <TableRow>
-                <TableCell
-                  colSpan={totalColumnas}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No hay empresas que coincidan con la búsqueda.
-                </TableCell>
-              </TableRow>
-            ) : (
-              tabla.getRowModel().rows.map((fila) => (
-                <TableRow
-                  key={fila.id}
-                  data-testid="fila-empresa"
-                  data-activa={fila.original.activa}
-                >
-                  {fila.getVisibleCells().map((celda) => (
-                    <TableCell key={celda.id}>
-                      {flexRender(celda.column.columnDef.cell, celda.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            <Historial creadoEn={e.creadoEn} modificadoEn={e.modificadoEn} />
+          </>
+        )}
+      />
 
       {/* Dialogos */}
       <DialogoEmpresa
@@ -270,50 +221,6 @@ export function EmpresasPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </div>
-  );
-}
-
-/** Ancho fijo de la columna de acciones (las demas reparten el resto). */
-function anchoColumna(id: string): string | undefined {
-  return id === 'acciones' ? 'w-12' : undefined;
-}
-
-/** Boton de cabecera para ordenar una columna; muestra la flecha del orden activo. */
-function BotonOrden({
-  cabecera,
-}: {
-  cabecera: ReturnType<
-    ReturnType<typeof useReactTable<Empresa>>['getHeaderGroups']
-  >[number]['headers'][number];
-}): React.JSX.Element {
-  const orden = cabecera.column.getIsSorted();
-  const Icono = orden === false ? ArrowUpDownIcon : orden === 'asc' ? ArrowUpIcon : ArrowDownIcon;
-  return (
-    <button
-      type="button"
-      onClick={cabecera.column.getToggleSortingHandler()}
-      className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-    >
-      {flexRender(cabecera.column.columnDef.header, cabecera.getContext())}
-      <Icono className="size-3.5 text-muted-foreground" aria-hidden />
-    </button>
-  );
-}
-
-/** Filas de carga (skeleton) mientras llega la lista. */
-function FilasEsqueleto({ columnas }: { columnas: number }): React.JSX.Element {
-  return (
-    <>
-      {Array.from({ length: 4 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: columnas }).map((__, j) => (
-            <TableCell key={j}>
-              <Skeleton className="h-5 w-full max-w-32" />
-            </TableCell>
-          ))}
-        </TableRow>
-      ))}
     </>
   );
 }

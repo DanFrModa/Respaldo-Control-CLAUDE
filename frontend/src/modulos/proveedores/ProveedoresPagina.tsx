@@ -1,11 +1,4 @@
-import {
-  type ColumnSort,
-  flexRender,
-  getCoreRowModel,
-  type SortingState,
-  useReactTable,
-} from '@tanstack/react-table';
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, PlusIcon, SearchIcon } from 'lucide-react';
+import { ClipboardList, Mail, Phone, ScrollText, Tag } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,42 +6,42 @@ import { useDesactivarProveedor, useProveedores, useReactivarProveedor } from '@
 import { ETIQUETAS_TIPO_PROVEEDOR, TIPOS_PROVEEDOR, type TipoProveedorClave } from '@/api/esquemas';
 import type { Proveedor, ProveedoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Avatar, TipoBadge } from '@/components/dominio/visuales';
 import { SelectNativo } from '@/components/ui/native-select';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useDebounce } from '@/lib/useDebounce';
+import type { Tono } from '@/lib/tono';
+import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
+import {
+  CampoDetalle,
+  Historial,
+  RejillaCampos,
+  SeccionDetalle,
+  ValorVacio,
+} from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
-import { type AccionesProveedor, columnasProveedores } from './columnas';
 import { DialogoProveedor } from './DialogoProveedor';
-
-/** Columnas por las que el backend sabe ordenar. */
-type ColumnaOrden = NonNullable<ProveedoresQuery['ordenarPor']>;
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
 
-/** Orden inicial: por nombre, ascendente. */
-const ORDEN_INICIAL: ColumnSort = { id: 'nombre', desc: false };
-
 /** Valor del filtro de tipo que significa "todos" (sin filtrar). */
 const TIPO_TODOS = 'TODOS';
 
+/** Tono explicativo (color del avatar/chip) por tipo de proveedor. */
+const TONO_POR_TIPO: Record<TipoProveedorClave, Tono> = {
+  TELAS: 'telas',
+  AVIOS: 'avios',
+  SERVICIOS: 'servicios',
+  SIN_CLASIFICAR: 'neutro',
+};
+
 /**
- * Pantalla de Proveedores — CRUD del catalogo de proveedores (replica del patron
- * de Almacenes). Lista con busqueda (debounce), **filtro por tipo**, orden y
- * paginacion de servidor; alta/edicion en dialogo; borrado suave reversible
- * (desactivar con confirmacion, ver inactivos con el toggle, reactivar directo);
- * toasts; estados de carga/vacio/error; consciente de permisos.
+ * Pantalla de Proveedores — CRUD del catalogo sobre el motor LISTA + DETALLE
+ * (rediseño "Teal fresco"). Lista con busqueda (debounce), **filtro por tipo**,
+ * paginacion de servidor y toggle de inactivos; el detalle muestra los datos del
+ * proveedor y permite editar / desactivar / reactivar. Borrado suave reversible
+ * (desactivar con confirmacion, reactivar directo); toasts; consciente de permisos.
  *
  * `proveedores.ver` gobierna el acceso a la pantalla; `proveedores.administrar`
  * decide las acciones de escritura. La decision real la toma el backend (A1).
@@ -62,15 +55,13 @@ export function ProveedoresPagina(): React.JSX.Element {
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [tipoFiltro, setTipoFiltro] = useState<TipoProveedorClave | typeof TIPO_TODOS>(TIPO_TODOS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
-  const [orden, setOrden] = useState<SortingState>([ORDEN_INICIAL]);
   const [pagina, setPagina] = useState(1);
 
-  const ordenActivo = orden[0] ?? ORDEN_INICIAL;
   const query: ProveedoresQuery = {
     pagina,
     porPagina: POR_PAGINA,
-    ordenarPor: ordenActivo.id as ColumnaOrden,
-    direccion: ordenActivo.desc ? 'desc' : 'asc',
+    ordenarPor: 'nombre',
+    direccion: 'asc',
     incluirInactivos: incluirInactivos ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
     ...(tipoFiltro !== TIPO_TODOS ? { tipo: tipoFiltro } : {}),
@@ -117,7 +108,7 @@ export function ProveedoresPagina(): React.JSX.Element {
     });
   }
 
-  // Cambiar busqueda, tipo, orden o el filtro de inactivos reinicia a la pagina 1.
+  // Cambiar busqueda, tipo o el filtro de inactivos reinicia a la pagina 1.
   function alBuscar(valor: string): void {
     setTextoBusqueda(valor);
     setPagina(1);
@@ -133,75 +124,40 @@ export function ProveedoresPagina(): React.JSX.Element {
     setPagina(1);
   }
 
-  // ── Tabla (TanStack Table en modo servidor) ────────────────────────────────
-  const datos = consulta.data?.datos ?? [];
-  const totalPaginas = consulta.data?.totalPaginas ?? 0;
-
-  const tabla = useReactTable<Proveedor>({
-    data: datos,
-    columns: columnasProveedores,
-    getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    pageCount: totalPaginas,
-    enableMultiSort: false,
-    state: { sorting: orden },
-    onSortingChange: (actualizador) => {
-      setOrden((previo) => {
-        const siguiente = typeof actualizador === 'function' ? actualizador(previo) : actualizador;
-        return siguiente.length > 0 ? siguiente : [ORDEN_INICIAL];
-      });
-      setPagina(1);
-    },
-    meta: {
-      acciones: {
-        puedeAdministrar,
-        alEditar: abrirEdicion,
-        alDesactivar: setADesactivar,
-        alReactivar: reactivarProveedor,
-      } satisfies AccionesProveedor,
-    },
-  });
-
-  const totalColumnas = tabla.getAllLeafColumns().length;
-  const datosPagina = consulta.data;
+  const datos = consulta.data;
+  const totalPaginas = datos?.totalPaginas ?? 0;
+  const paginacion: PaginacionListaDetalle | undefined = datos
+    ? {
+        total: datos.total,
+        pagina: datos.pagina,
+        totalPaginas,
+        ocupado: consulta.isFetching,
+        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
+        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
+      }
+    : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Proveedores</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Catálogo de proveedores de telas, avíos y servicios.
-          </p>
-        </div>
-        {puedeAdministrar ? (
-          <Button onClick={abrirAlta} data-testid="nuevo-proveedor">
-            <PlusIcon aria-hidden />
-            Nuevo proveedor
-          </Button>
-        ) : null}
-      </div>
-
-      {/* Barra de herramientas: busqueda + filtro por tipo + filtro de inactivos */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
-          <SearchIcon
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            placeholder="Buscar por nombre…"
-            className="pl-8"
-            value={textoBusqueda}
-            onChange={(e) => alBuscar(e.target.value)}
-            aria-label="Buscar proveedores por nombre"
-            data-testid="buscar-proveedor"
-          />
-        </div>
-        <div className="w-full sm:w-44">
+    <>
+      <ListaDetalle<Proveedor>
+        testid="proveedor"
+        titulo="Proveedores"
+        descripcion="Proveedores de telas, avíos y servicios."
+        icono={ClipboardList}
+        registros={datos?.datos ?? []}
+        cargando={consulta.isPending}
+        error={consulta.isError ? consulta.error.message : null}
+        alReintentar={() => void consulta.refetch()}
+        obtenerId={(p) => p.id}
+        obtenerTitulo={(p) => p.nombre}
+        obtenerActivo={(p) => p.activo}
+        obtenerSecundaria={(p) => p.contacto ?? ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}
+        renderAvatarLista={(p) => (
+          <Avatar nombre={p.nombre} tono={TONO_POR_TIPO[p.tipo]} tamano="sm" />
+        )}
+        busqueda={textoBusqueda}
+        alBuscar={alBuscar}
+        filtros={
           <SelectNativo
             value={tipoFiltro}
             onChange={(e) => alCambiarTipo(e.target.value)}
@@ -215,110 +171,50 @@ export function ProveedoresPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
-        </div>
-        <Button
-          type="button"
-          variant={incluirInactivos ? 'secondary' : 'outline'}
-          size="sm"
-          onClick={alAlternarInactivos}
-          aria-pressed={incluirInactivos}
-          aria-label="Mostrar también los proveedores desactivados"
-          data-testid="mostrar-desactivados"
-        >
-          {incluirInactivos ? 'Ocultar desactivados' : 'Mostrar desactivados'}
-        </Button>
-      </div>
-
-      {/* Tabla / estados */}
-      <div className="mt-4 rounded-xl border">
-        <Table>
-          <TableHeader>
-            {tabla.getHeaderGroups().map((grupo) => (
-              <TableRow key={grupo.id}>
-                {grupo.headers.map((cabecera) => (
-                  <TableHead key={cabecera.id} className={anchoColumna(cabecera.column.id)}>
-                    {cabecera.column.getCanSort() ? (
-                      <BotonOrden cabecera={cabecera} />
-                    ) : (
-                      flexRender(cabecera.column.columnDef.header, cabecera.getContext())
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {consulta.isPending ? (
-              <FilasEsqueleto columnas={totalColumnas} />
-            ) : consulta.isError ? (
-              <TableRow>
-                <TableCell colSpan={totalColumnas} className="py-10 text-center">
-                  <p className="text-sm font-medium text-destructive">{consulta.error.message}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => void consulta.refetch()}
-                  >
-                    Reintentar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ) : datos.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={totalColumnas}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No hay proveedores que coincidan con la búsqueda.
-                </TableCell>
-              </TableRow>
-            ) : (
-              tabla.getRowModel().rows.map((fila) => (
-                <TableRow
-                  key={fila.id}
-                  data-testid="fila-proveedor"
-                  data-activo={fila.original.activo}
-                >
-                  {fila.getVisibleCells().map((celda) => (
-                    <TableCell key={celda.id}>
-                      {flexRender(celda.column.columnDef.cell, celda.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Paginacion (servidor) */}
-      {datosPagina && datosPagina.total > 0 ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <p className="text-muted-foreground" data-testid="resumen-paginacion">
-            {datosPagina.total} proveedor{datosPagina.total === 1 ? '' : 'es'} · página{' '}
-            {datosPagina.pagina} de {totalPaginas}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              disabled={datosPagina.pagina <= 1 || consulta.isFetching}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              disabled={datosPagina.pagina >= totalPaginas || consulta.isFetching}
-            >
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      ) : null}
+        }
+        incluirInactivos={incluirInactivos}
+        alAlternarInactivos={alAlternarInactivos}
+        textoVacio="No hay proveedores que coincidan con la búsqueda."
+        paginacion={paginacion}
+        puedeAdministrar={puedeAdministrar}
+        alNuevo={abrirAlta}
+        textoNuevo="Nuevo proveedor"
+        alEditar={abrirEdicion}
+        alDesactivar={setADesactivar}
+        alReactivar={reactivarProveedor}
+        renderAvatarDetalle={(p) => (
+          <Avatar nombre={p.nombre} tono={TONO_POR_TIPO[p.tipo]} tamano="lg" />
+        )}
+        renderMeta={(p) => (
+          <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</TipoBadge>
+        )}
+        renderDetalle={(p) => (
+          <>
+            <SeccionDetalle titulo="Datos del proveedor">
+              <RejillaCampos>
+                <CampoDetalle icono={Mail} etiqueta="Contacto">
+                  {p.contacto ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={Phone} etiqueta="Teléfono">
+                  {p.telefono ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={Tag} etiqueta="Tipo">
+                  <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>
+                    {ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}
+                  </TipoBadge>
+                </CampoDetalle>
+                <CampoDetalle icono={ScrollText} etiqueta="Condiciones de pago">
+                  {p.condiciones ?? <ValorVacio />}
+                </CampoDetalle>
+                <CampoDetalle icono={ClipboardList} etiqueta="Razón social" anchoCompleto>
+                  {p.razonSocial ?? <ValorVacio />}
+                </CampoDetalle>
+              </RejillaCampos>
+            </SeccionDetalle>
+            <Historial creadoEn={p.creadoEn} modificadoEn={p.modificadoEn} />
+          </>
+        )}
+      />
 
       {/* Dialogos */}
       <DialogoProveedor
@@ -346,50 +242,6 @@ export function ProveedoresPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </div>
-  );
-}
-
-/** Ancho fijo de la columna de acciones (las demas reparten el resto). */
-function anchoColumna(id: string): string | undefined {
-  return id === 'acciones' ? 'w-12' : undefined;
-}
-
-/** Boton de cabecera para ordenar una columna; muestra la flecha del orden activo. */
-function BotonOrden({
-  cabecera,
-}: {
-  cabecera: ReturnType<
-    ReturnType<typeof useReactTable<Proveedor>>['getHeaderGroups']
-  >[number]['headers'][number];
-}): React.JSX.Element {
-  const orden = cabecera.column.getIsSorted();
-  const Icono = orden === false ? ArrowUpDownIcon : orden === 'asc' ? ArrowUpIcon : ArrowDownIcon;
-  return (
-    <button
-      type="button"
-      onClick={cabecera.column.getToggleSortingHandler()}
-      className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-    >
-      {flexRender(cabecera.column.columnDef.header, cabecera.getContext())}
-      <Icono className="size-3.5 text-muted-foreground" aria-hidden />
-    </button>
-  );
-}
-
-/** Filas de carga (skeleton) mientras llega la primera pagina. */
-function FilasEsqueleto({ columnas }: { columnas: number }): React.JSX.Element {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: columnas }).map((__, j) => (
-            <TableCell key={j}>
-              <Skeleton className="h-5 w-full max-w-32" />
-            </TableCell>
-          ))}
-        </TableRow>
-      ))}
     </>
   );
 }

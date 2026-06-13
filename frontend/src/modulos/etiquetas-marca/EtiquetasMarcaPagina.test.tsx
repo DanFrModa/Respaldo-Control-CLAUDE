@@ -70,16 +70,19 @@ describe('<EtiquetasMarcaPagina>', () => {
 
   it('lista las etiquetas y muestra las regalías como porcentaje', () => {
     useEtiquetasMarca.mockReturnValue(
-      consultaConDatos([etiqueta(1, 'Marilyn', 8), etiqueta(2, 'MJD', 12.5)]),
+      consultaConDatos([etiqueta(1, 'Marca Norte', 8), etiqueta(2, 'Marca Sur', 12.5)]),
     );
     renderConProveedores(<EtiquetasMarcaPagina />, {
       sesion: estadoSesionDePrueba(['etiquetas-marca.ver', 'etiquetas-marca.administrar']),
     });
 
+    // Hay dos renglones; el primero queda auto-seleccionado y su detalle muestra el
+    // porcentaje de regalías. El % aparece en la lista y en el detalle (getAllByText).
     expect(screen.getAllByTestId('fila-etiqueta-marca')).toHaveLength(2);
-    expect(screen.getByText('Marilyn')).toBeInTheDocument();
-    expect(screen.getByText('8%')).toBeInTheDocument();
-    expect(screen.getByText('12.5%')).toBeInTheDocument();
+    expect(screen.getAllByText('Marca Norte').length).toBeGreaterThan(0);
+    expect(screen.getByText('Marca Sur')).toBeInTheDocument();
+    const detalle = screen.getByTestId('detalle-etiqueta-marca');
+    expect(within(detalle).getByText('8%')).toBeInTheDocument();
   });
 
   it('muestra el estado vacio cuando no hay resultados', () => {
@@ -109,13 +112,14 @@ describe('<EtiquetasMarcaPagina>', () => {
   });
 
   it('oculta las acciones de escritura para quien solo puede ver', () => {
-    useEtiquetasMarca.mockReturnValue(consultaConDatos([etiqueta(1, 'Marilyn', 8)]));
+    useEtiquetasMarca.mockReturnValue(consultaConDatos([etiqueta(1, 'Marca Norte', 8)]));
     renderConProveedores(<EtiquetasMarcaPagina />, {
       sesion: estadoSesionDePrueba(['etiquetas-marca.ver']),
     });
 
-    expect(screen.queryByTestId('nueva-etiqueta-marca')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('acciones-etiqueta-marca')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('nuevo-etiqueta-marca')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('editar-etiqueta-marca')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('desactivar-etiqueta-marca')).not.toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {
@@ -125,8 +129,8 @@ describe('<EtiquetasMarcaPagina>', () => {
       sesion: estadoSesionDePrueba(['etiquetas-marca.ver', 'etiquetas-marca.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('acciones-etiqueta-marca'));
-    await usuario.click(await screen.findByTestId('desactivar-etiqueta-marca'));
+    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    await usuario.click(screen.getByTestId('desactivar-etiqueta-marca'));
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar etiqueta de marca')).toBeInTheDocument();
@@ -135,18 +139,16 @@ describe('<EtiquetasMarcaPagina>', () => {
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
 
-  it('una fila inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
+  it('una etiqueta inactiva ofrece Activar y reactiva directo (sin confirmación)', async () => {
     const usuario = userEvent.setup();
     useEtiquetasMarca.mockReturnValue(consultaConDatos([etiqueta(9, 'Marca Apagada', 5, false)]));
     renderConProveedores(<EtiquetasMarcaPagina />, {
       sesion: estadoSesionDePrueba(['etiquetas-marca.ver', 'etiquetas-marca.administrar']),
     });
 
-    const fila = screen.getByTestId('fila-etiqueta-marca');
-    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
-
-    await usuario.click(within(fila).getByTestId('acciones-etiqueta-marca'));
-    expect(await screen.findByTestId('activar-etiqueta-marca')).toBeInTheDocument();
+    const detalle = screen.getByTestId('detalle-etiqueta-marca');
+    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByTestId('activar-etiqueta-marca')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-etiqueta-marca')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-etiqueta-marca'));
@@ -161,7 +163,7 @@ describe('<EtiquetasMarcaPagina>', () => {
       sesion: estadoSesionDePrueba(['etiquetas-marca.ver', 'etiquetas-marca.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('nueva-etiqueta-marca'));
+    await usuario.click(screen.getByTestId('nuevo-etiqueta-marca'));
     const dialogo = await screen.findByRole('dialog');
     await usuario.type(within(dialogo).getByLabelText('Nombre'), 'Marca X');
     await usuario.type(within(dialogo).getByLabelText('Regalías (%)'), '150');
