@@ -1,6 +1,6 @@
 # CONTROL v2 — Hoja de ruta (plan por etapas + estado vivo)
 
-> **Documento vivo.** Aquí está TODO el camino: las 9 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
+> **Documento vivo.** Aquí está TODO el camino: las 10 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas las 8 fichas: solo la de la fase en curso.
 > — *Actualizado: 12-jun-2026.*
 
@@ -14,20 +14,21 @@
 
 ```
 Entender + diseñar    : ██████████  100 %  ✅
-Construir (F0–F8)     : █▓░░░░░░░░  F0 de 9 ✅ — siguen F1…F8 (50 etapas planificadas)
+Construir (F0–F9)     : █░░░░░░░░░  F0 de 10 ✅ — siguen F1…F9 (57 etapas planificadas)
 ```
 
 | Fase | Etapas | Estado |
 |---|---|---|
 | **F0 · Fundación** | 5 | ✅ **hecha** (construida + desplegada como prueba, 12-jun-2026) |
-| **F1 · Catálogos + Modelos** | 7 | ⬜ **sigue — arrancar por F1-E1** |
+| **F1 · Catálogos + Modelos** | 8 | ⬜ **sigue — arrancar por F1-E1** |
 | **F2 · Pedidos + Órdenes** | 5 | ⬜ |
 | **F3 · Producción / WIP** | 6 | ⬜ |
 | **F4 · Compras / MRP** | 6 | ⬜ |
 | **F5 · Ruta Crítica ⭐** | 7 | ⬜ |
 | **F6 · Calidad + EsMa** | 6 | ⬜ |
 | **F7 · Costos / EDR + Indicadores** | 6 | ⬜ |
-| **F8 · Migración + Go-live** | 7 | ⬜ |
+| **F8 · Finanzas (CxC/CxP + CFDI)** | 6 | ⬜ |
+| **F9 · Migración + Go-live** | 7 | ⬜ |
 
 ---
 
@@ -69,6 +70,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | Etapa | Qué entrega | Equipo | Estado |
 |---|---|---|---|
 | **F1-E1** | Catálogos sencillos + mini-pantallas de Administración (usuarios/empresas) + decisión A9 | 3 coders en paralelo + 1 reviewer (con protocolo de integración: migración Prisma única, OpenAPI regenerado una vez) | ⬜ |
+| **F1-E1B** | Catálogo de Proveedores **enriquecido** (R15): roles multi-valor + campos fiscales/pago/operativos + adjuntos R2 — cimiento de las CxP (D12) | 1 coder + 1 reviewer (extiende el Proveedor de E1) | ⬜ |
 | **F1-E2** | Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 | 3 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E3** | Catálogos de materiales: telas unificadas, avíos R1 y bordados con foto R2 | 3 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E4** | Modelos: ficha + fotos R2 + BOM completo | 1 coder + 1 reviewer (cadena sobre los mismos archivos) | ⬜ |
@@ -154,28 +156,43 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **F7-E5** | Inventario cíclico contra el kardex propio (D6) + auditoría 5S | 1 coder + 1 reviewer | ⬜ |
 | **F7-E6** | ETL histórico + cuadre numérico v1 vs v2 + docs y cierre de fase | 1 coder + 1 reviewer | ⬜ |
 
-### F8 · Migración + Go-live — ⬜ pendiente
+### F8 · Finanzas (CxC/CxP + CFDI) — ⬜ pendiente
 
-**Salida:** Saldos v2 = saldos Access en fecha de corte; usuarios operando. · **Ficha completa:** [`docs/hoja-de-ruta/F8-etapas.md`](docs/hoja-de-ruta/F8-etapas.md)
+**Salida:** CxC y CxP cuadran por suma de movimientos; un CFDI de proveedor y uno de venta importados, conciliados y ligados a su operación; reporte fiscal para el contador. · **Ficha completa:** [`docs/hoja-de-ruta/F8-etapas.md`](docs/hoja-de-ruta/F8-etapas.md)
 
 | Etapa | Qué entrega | Equipo | Estado |
 |---|---|---|---|
-| **F8-E1** | Cimientos del ETL integrado: extracción al corte + transporte a la nube + staging + "modo migración" + consola | 2 coders en paralelo + 1 reviewer | ⬜ |
-| **F8-E2** | ETL bloque A: usuarios + catálogos + modelos/BOM + pedidos + órdenes + calibrador de folios | 1 coder + 1 reviewer | ⬜ |
-| **F8-E3** | ETL bloque B: producción M/A + kardex PT + telas + OC/notas + EsMa + costos + RC/CC | 2 coders en paralelo + 1 reviewer | ⬜ |
-| **F8-E4** | Archivo histórico de solo lectura + frontera de 10 años por grafo | 1 coder + 1 reviewer | ⬜ |
-| **F8-E5** | Saldos iniciales como AJUSTE de kardex + reporte de cuadre v1 vs v2 | 2 coders en paralelo + 1 reviewer | ⬜ |
-| **F8-E6** | Capa de seguridad de usuarios + fotos a R2 + tablero de go-live | 2 coders en paralelo + 1 reviewer | ⬜ |
-| **F8-E7** | Prueba reina + ensayo del corte + capacitación + **paralelo 2–4 semanas con cuadre diario** + corte final y go-live | 1 coder + 1 reviewer; Gabriel opera el cuadre; Daniel valida | ⬜ |
+| **F8-E1** | Motor de cuenta corriente de terceros (generaliza EsMa, R10): movimiento con ejes origen+fiscal, saldo = Σ movimientos, notas de crédito, dos vistas | 1 coder + 2 reviewers (motor central) | ⬜ |
+| **F8-E2** | CxP — cuentas por pagar de proveedores: cargos desde recibos/entradas/OC, pagos/abonos, estado de cuenta, conciliación con maquila (EsMa) | 1 coder + 1 reviewer | ⬜ |
+| **F8-E3** | Importación de CFDI de proveedores (R11): parseo/validación del XML, ligado a OC/entrada, conciliación del cargo, XML en R2 | 1 coder + 1 reviewer | ⬜ |
+| **F8-E4** | CxC — cuentas por cobrar + importación de CFDI de ventas (R12): XML timbrado por fuera → cargo CxC ligado a pedido/cliente, cobros, estado de cuenta | 1 coder + 1 reviewer | ⬜ |
+| **F8-E5** | Reportes fiscales para el contador (R13): exportación de movimientos fiscales de clientes y proveedores; vistas y conciliaciones | 1 coder + 1 reviewer | ⬜ |
+| **F8-E6** | ETL de saldos/históricos de terceros (desde SINUBE/CFDI) + cuadre + docs del módulo + cierre de fase en `prueba` | 1 coder + 1 reviewer | ⬜ |
 
-> **Nota F8:** aquí también se monta el **ambiente de producción en Railway** (hoy solo existe el de prueba, por costo) y el **modo mantenimiento** para congelar capturas durante el corte.
+> **Nota F8:** el **timbrado nativo vía PAC (R14)** es sub-entrega **posterior** (lo regulado) — no entra en estas 6 etapas; queda como visión a futuro una vez que R10–R12 dejaron la estructura lista. El **catálogo de proveedores enriquecido (R15)** NO está aquí: se construye antes, en **F1-E1B** (es el cimiento de las CxP). El desglose se confirma/ajusta al arrancar la fase (esquema Prisma y pantallas se definen al construir, D12 §8).
+
+### F9 · Migración + Go-live — ⬜ pendiente
+
+**Salida:** Saldos v2 = saldos Access en fecha de corte; usuarios operando. · **Ficha completa:** [`docs/hoja-de-ruta/F9-etapas.md`](docs/hoja-de-ruta/F9-etapas.md)
+
+| Etapa | Qué entrega | Equipo | Estado |
+|---|---|---|---|
+| **F9-E1** | Cimientos del ETL integrado: extracción al corte + transporte a la nube + staging + "modo migración" + consola | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F9-E2** | ETL bloque A: usuarios + catálogos + modelos/BOM + pedidos + órdenes + calibrador de folios | 1 coder + 1 reviewer | ⬜ |
+| **F9-E3** | ETL bloque B: producción M/A + kardex PT + telas + OC/notas + EsMa + costos + RC/CC | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F9-E4** | Archivo histórico de solo lectura + frontera de 10 años por grafo | 1 coder + 1 reviewer | ⬜ |
+| **F9-E5** | Saldos iniciales como AJUSTE de kardex + reporte de cuadre v1 vs v2 | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F9-E6** | Capa de seguridad de usuarios + fotos a R2 + tablero de go-live | 2 coders en paralelo + 1 reviewer | ⬜ |
+| **F9-E7** | Prueba reina + ensayo del corte + capacitación + **paralelo 2–4 semanas con cuadre diario** + corte final y go-live | 1 coder + 1 reviewer; Gabriel opera el cuadre; Daniel valida | ⬜ |
+
+> **Nota F9:** aquí también se monta el **ambiente de producción en Railway** (hoy solo existe el de prueba, por costo) y el **modo mantenimiento** para congelar capturas durante el corte.
 
 ---
 
 ## 4. Piezas que el plan §6 no asignaba a ninguna fase (ya asignadas — auditoría 12-jun-2026)
 
 - **Módulo 12 · Documental:** los **adjuntos por orden/modelo (R6)** → etapa final de **F2** (la Orden es su ancla; el motor R2 existe desde F0). Las **fichas técnicas estructuradas (R5)** → **F6** (la auditoría AQL las consume como referencia). Confirmar al arrancar cada una.
-- **Módulo 13 · Administración (lo que faltaba):** pantallas de usuarios/empresas → **F1-E1** (ya en la ficha) · consulta de bitácora → **F6-E1** (ya en la ficha) · configuración por empresa (ex-`Propiedades`) → **F1** (confirmar al arrancar) · **modo mantenimiento** → **F8**.
+- **Módulo 13 · Administración (lo que faltaba):** pantallas de usuarios/empresas → **F1-E1** (ya en la ficha) · consulta de bitácora → **F6-E1** (ya en la ficha) · configuración por empresa (ex-`Propiedades`) → **F1** (confirmar al arrancar) · **modo mantenimiento** → **F9**.
 - **Respaldo doble** (job pg-boss con `pg_dump` diario cifrado a R2, §2.2 del plan): etapa chica al **inicio de F1**, en cuanto Gabriel monte R2. Es la mitigación #1 de la tabla de riesgos y hoy nadie la tiene.
 - **Impreso "Lista de precios"** (R9): sin módulo claro — decidir en F1 (si el precio vive en el modelo) o F2 (si es por cliente).
 
@@ -194,7 +211,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 
 ## 7. ¿Cuánto tarda? (gruesa, honesta)
 
-Los agentes comprimen en horas lo que tomaría semanas; el **calendario real** lo mandan tus verificaciones por etapa, los pasos manuales de infra y, al final, las **2–4 semanas fijas de paralelo** (F8-E7, no se aceleran: son el seguro de que todo cuadra antes de apagar el viejo). Fases pesadas: **F3** y **F5**. Orden de magnitud total: **unos pocos meses**.
+Los agentes comprimen en horas lo que tomaría semanas; el **calendario real** lo mandan tus verificaciones por etapa, los pasos manuales de infra y, al final, las **2–4 semanas fijas de paralelo** (F9-E7, no se aceleran: son el seguro de que todo cuadra antes de apagar el viejo). Fases pesadas: **F3**, **F5** y **F9**. Orden de magnitud total: **unos pocos meses**.
 
 ## 8. Cómo se mantiene este documento (regla para toda sesión)
 

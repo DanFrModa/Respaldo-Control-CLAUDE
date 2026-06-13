@@ -46,7 +46,7 @@ Se acepta como **estándar para todo el sistema**:
 
 ## Consecuencias
 
-- (+) Toda fase futura (F1–F8) replica este criterio **sin re-discutirlo**: los reviews lo
+- (+) Toda fase futura (F1–F9) replica este criterio **sin re-discutirlo**: los reviews lo
   citan como ADR-0005 en lugar de re-litigar A2.
 - (+) El modelo `Usuario` se mantiene limpio (solo relaciones con significado), y las
   migraciones no cargan con índices/constraints sin valor.

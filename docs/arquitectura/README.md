@@ -20,7 +20,7 @@ Reglas:
   reemplaza, se escribe un ADR nuevo y el viejo se marca como `Reemplazado por ADR-NNNN`.
   (Correcciones menores de redacción sí se permiten.)
 - Estados posibles: `Aceptado` · `Reemplazado por ADR-NNNN` · `Obsoleto`.
-- No confundir con las **decisiones de negocio** de Daniel (D0–D11): esas viven en
+- No confundir con las **decisiones de negocio** de Daniel (D0–D12): esas viven en
   [`Documentacion_MJD/DECISIONES.md`](../../Documentacion_MJD/DECISIONES.md) y son de
   dominio, no de tecnología. Un ADR puede referenciarlas.
 

@@ -52,7 +52,7 @@ MODELOS → PEDIDOS → PRODUCCIÓN (Ruta Crítica controla los tiempos)
 
 > ⭐ **Punto de integración central:** el **recibo de prendas** (registrado en el WIP) es **fuente única** que alimenta a la vez: el **avance/WIP**, la **entrada a inventario PT** y el **cargo en EsMa**. Principio de diseño v2: **capturar una vez, usar en todos lados**.
 
-## 5. Decisiones del dueño (12)
+## 5. Decisiones del dueño (13)
 
 Detalle en [DECISIONES.md](DECISIONES.md).
 
@@ -70,6 +70,7 @@ Detalle en [DECISIONES.md](DECISIONES.md).
 | D9 | **Excluir Promoda**. |
 | D10 | RC = **motor de workflow configurable**. |
 | D11 | **La mayoría de KPIs se derivan de la RC**. |
+| D12 | **Finanzas en CONTROL sin contabilidad**: CxC + CxP como cuenta de terceros (generaliza EsMa) + CFDI por importación; apagar SINUBE. |
 
 ## 6. Mejoras de arquitectura clave
 
@@ -94,6 +95,10 @@ Detalle en [REQUISITOS-NUEVOS.md](REQUISITOS-NUEVOS.md).
 
 **Gestión documental:**
 - **R5** Fichas técnicas por orden · **R6** Repositorio de archivos por orden.
+
+**Finanzas (CxC/CxP + CFDI — decisión D12, módulo 14, fase F8):**
+- **R10** Cuenta corriente unificada de terceros (generaliza EsMa) · **R11** Importar CFDI de proveedores (→CxP) · **R12** Importar CFDI de ventas (→CxC) · **R13** Info fiscal para el contador.
+- **R14** *(futuro)* Timbrado nativo vía PAC · **R15** Catálogo de proveedores enriquecido (va en F1).
 
 **Otros:**
 - **R9** Definir formatos de documentos impresos.

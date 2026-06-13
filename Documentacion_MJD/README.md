@@ -22,7 +22,7 @@
 | 10 | [Modelo de Datos completo + Usuarios y Permisos](10-Modelo-Datos-y-Usuarios.md) | ✅ Listo |
 | — | ~~Promoda~~ — **excluido** (cliente que ya no se usa, ver DECISIÓN D9) | ❌ Fuera de alcance |
 
-**Documentos de apoyo:** [DECISIONES.md](DECISIONES.md) (decisiones del dueño) · [MEJORAS.md](MEJORAS.md) (mejoras de diseño) · [REQUISITOS-NUEVOS.md](REQUISITOS-NUEVOS.md) (funciones nuevas que faltan).
+**Documentos de apoyo:** [DECISIONES.md](DECISIONES.md) (decisiones del dueño) · [MEJORAS.md](MEJORAS.md) (mejoras de diseño) · [REQUISITOS-NUEVOS.md](REQUISITOS-NUEVOS.md) (funciones nuevas que faltan) · [PROPUESTA-Finanzas-y-Proveedores.md](PROPUESTA-Finanzas-y-Proveedores.md) (insumo de Finanzas — ✅ integrado: D12 + R10–R15 + módulo 14 / fase F8).
 
 > Documentado siguiendo el **orden estricto del menú**: 1. MODELOS · 2. PEDIDOS · 3. PRODUCCIÓN · 4. INVENTARIOS · 5. INDICADORES · 6. COSTOS Y EDR.
 >
