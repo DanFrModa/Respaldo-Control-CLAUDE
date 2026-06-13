@@ -49,8 +49,16 @@ export type DatosEmpresaCrear = z.infer<typeof esquemaEmpresaCrear>;
  * Edición de empresa: todos los campos del alta son opcionales (edición parcial)
  * más `activa` para reactivar (el borrado suave se hace por DELETE). El dominio
  * exige que haya al menos un cambio.
+ *
+ * Las banderas con `.default(false)` en el alta se sobrescriben aquí como `.optional()`
+ * SIN default: en una edición parcial, omitir una bandera NO debe resetearla (Zod
+ * `.partial()` NO quita los defaults). Si no se mandan, quedan `undefined` y conservan
+ * su valor real en la BD (p. ej. editar el `upc` no borra la marca de favorita).
  */
 export const esquemaEmpresaEditar = esquemaEmpresaCrear.partial().extend({
+  favorita: z.boolean({ error: 'Favorita debe ser verdadero o falso' }).optional(),
+  paraIpt: z.boolean({ error: 'Para IPT debe ser verdadero o falso' }).optional(),
+  paraEdr: z.boolean({ error: 'Para EDR debe ser verdadero o falso' }).optional(),
   activa: z.boolean({ error: 'Activa debe ser verdadero o falso' }).optional(),
 });
 

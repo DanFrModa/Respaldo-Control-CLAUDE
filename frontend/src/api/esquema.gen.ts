@@ -1518,10 +1518,7 @@ export interface paths {
           'application/json': {
             nombre?: string;
             razonSocial?: string;
-            /**
-             * @default SIN_CLASIFICAR
-             * @enum {string}
-             */
+            /** @enum {string} */
             tipo?: 'TELAS' | 'AVIOS' | 'SERVICIOS' | 'SIN_CLASIFICAR';
             telefono?: string;
             contacto?: string;
@@ -3622,7 +3619,6 @@ export interface paths {
         content: {
           'application/json': {
             nombre?: string;
-            /** @default 0 */
             regalias?: number;
             activo?: boolean;
           };
@@ -6264,11 +6260,8 @@ export interface paths {
             razonSocial?: string;
             identificador?: string;
             upc?: string;
-            /** @default false */
             favorita?: boolean;
-            /** @default false */
             paraIpt?: boolean;
-            /** @default false */
             paraEdr?: boolean;
             activa?: boolean;
           };

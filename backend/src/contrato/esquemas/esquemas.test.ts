@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import { esquemaAlmacenCrear, esquemaAlmacenEditar } from './almacen.js';
+import { esquemaEmpresaCrear, esquemaEmpresaEditar } from './empresa.js';
+import { esquemaEtiquetaMarcaCrear, esquemaEtiquetaMarcaEditar } from './etiqueta-marca.js';
 import { esquemaLogin } from './login.js';
+import { esquemaProveedorCrear, esquemaProveedorEditar } from './proveedor.js';
 import { esquemaUsuarioCrear, esquemaUsuarioEditar } from './usuario.js';
 
 describe('esquemaLogin', () => {
@@ -80,5 +83,55 @@ describe('esquemaUsuario', () => {
       password: 'NuevaClave123',
     });
     expect(datos).toEqual({ id: 'abc', bloqueado: false, idsRoles: [1, 2] });
+  });
+});
+
+// REGRESIÓN (bug que cazó el CI): en Zod, `.partial()` NO elimina los `.default()`.
+// Un esquema de EDICIÓN parcial debe sobrescribir como `.optional()` los campos que
+// tienen `.default()` en el alta; si no, al omitir el campo en una edición, el parse lo
+// rellena con su default y PISA el valor real en la BD (p.ej. desactivar un proveedor sin
+// mandar `tipo` lo cambiaría a SIN_CLASIFICAR). Estos tests garantizan que el campo
+// omitido quede `undefined` (no presente) en la salida del parse.
+describe('esquemas de edición: omitir un campo con default NO lo rellena (Zod .partial())', () => {
+  it('el alta SÍ aplica el default (control: comprueba que el default existe)', () => {
+    expect(esquemaProveedorCrear.parse({ nombre: 'X' }).tipo).toBe('SIN_CLASIFICAR');
+    expect(esquemaEtiquetaMarcaCrear.parse({ nombre: 'X' }).regalias).toBe(0);
+    const empresa = esquemaEmpresaCrear.parse({ nombre: 'X' });
+    expect(empresa.favorita).toBe(false);
+    expect(empresa.paraIpt).toBe(false);
+    expect(empresa.paraEdr).toBe(false);
+  });
+
+  it('esquemaProveedorEditar: omitir `tipo` lo deja undefined (no rellena SIN_CLASIFICAR)', () => {
+    const datos = esquemaProveedorEditar.parse({ id: 1, activo: false });
+    expect('tipo' in datos).toBe(false);
+    expect(datos.tipo).toBeUndefined();
+    expect(datos).toEqual({ id: 1, activo: false });
+    // pero si se manda, sigue validándose contra el enum
+    expect(esquemaProveedorEditar.parse({ id: 1, tipo: 'AVIOS' }).tipo).toBe('AVIOS');
+    expect(esquemaProveedorEditar.safeParse({ id: 1, tipo: 'OTRO' }).success).toBe(false);
+  });
+
+  it('esquemaEtiquetaMarcaEditar: omitir `regalias` lo deja undefined (no rellena 0)', () => {
+    const datos = esquemaEtiquetaMarcaEditar.parse({ id: 1, activo: false });
+    expect('regalias' in datos).toBe(false);
+    expect(datos.regalias).toBeUndefined();
+    expect(datos).toEqual({ id: 1, activo: false });
+    // si se manda, sigue acotado a 0–100
+    expect(esquemaEtiquetaMarcaEditar.parse({ id: 1, regalias: 15 }).regalias).toBe(15);
+    expect(esquemaEtiquetaMarcaEditar.safeParse({ id: 1, regalias: 150 }).success).toBe(false);
+  });
+
+  it('esquemaEmpresaEditar: omitir las banderas las deja undefined (no rellena false)', () => {
+    const datos = esquemaEmpresaEditar.parse({ upc: '750' });
+    expect('favorita' in datos).toBe(false);
+    expect('paraIpt' in datos).toBe(false);
+    expect('paraEdr' in datos).toBe(false);
+    expect(datos.favorita).toBeUndefined();
+    expect(datos.paraIpt).toBeUndefined();
+    expect(datos.paraEdr).toBeUndefined();
+    expect(datos).toEqual({ upc: '750' });
+    // si se mandan, se respetan
+    expect(esquemaEmpresaEditar.parse({ favorita: true }).favorita).toBe(true);
   });
 });

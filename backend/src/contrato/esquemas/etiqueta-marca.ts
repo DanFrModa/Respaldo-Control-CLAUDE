@@ -25,12 +25,22 @@ export type DatosEtiquetaMarcaCrear = z.infer<typeof esquemaEtiquetaMarcaCrear>;
 /**
  * Edición de etiqueta de marca: todos los campos del alta opcionales (edición
  * parcial) más `activo` para el borrado suave (plan §4: nada se borra físicamente).
+ *
+ * Los campos con `.default()` en el alta se sobrescriben aquí como `.optional()` SIN
+ * default: en una edición parcial, omitir un campo NO debe resetearlo (Zod `.partial()`
+ * NO quita los defaults). Aquí `regalias` sin `.default(0)` → si no se manda, queda
+ * `undefined` y NO se pisa el porcentaje real con 0.
  */
 export const esquemaEtiquetaMarcaEditar = esquemaEtiquetaMarcaCrear.partial().extend({
   id: z
     .number({ error: 'El id de la etiqueta es obligatorio' })
     .int({ error: 'El id de la etiqueta debe ser entero' })
     .positive({ error: 'El id de la etiqueta debe ser positivo' }),
+  regalias: z
+    .number({ error: 'Las regalías deben ser un número' })
+    .min(0, { error: 'Las regalías no pueden ser menores a 0%' })
+    .max(100, { error: 'Las regalías no pueden ser mayores a 100%' })
+    .optional(),
   activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
 });
 

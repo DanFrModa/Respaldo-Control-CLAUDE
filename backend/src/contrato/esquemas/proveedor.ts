@@ -60,12 +60,20 @@ export type DatosProveedorCrear = z.infer<typeof esquemaProveedorCrear>;
 /**
  * Edición de proveedor: todos los campos del alta son opcionales (edición parcial)
  * más `activo` para el borrado suave (plan §4: nada se borra físicamente).
+ *
+ * Los campos con `.default()` en el alta se sobrescriben aquí como `.optional()` SIN
+ * default: en una edición parcial, omitir un campo NO debe resetearlo (Zod `.partial()`
+ * NO quita los defaults, así que el omitido se rellenaría con su default y pisaría el
+ * valor real en la BD). Aquí `tipo` sin default → si no se manda, queda `undefined`.
  */
 export const esquemaProveedorEditar = esquemaProveedorCrear.partial().extend({
   id: z
     .number({ error: 'El id del proveedor es obligatorio' })
     .int({ error: 'El id del proveedor debe ser entero' })
     .positive({ error: 'El id del proveedor debe ser positivo' }),
+  tipo: z
+    .enum(TIPOS_PROVEEDOR, { error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR' })
+    .optional(),
   activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
 });
 

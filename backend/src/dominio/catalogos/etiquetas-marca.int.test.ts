@@ -165,6 +165,20 @@ describe('Catálogo Etiquetas de marca (CRUD patrón, F1-E1 — global ADR-0007)
       );
     });
 
+    it('REGRESIÓN: desactivar NO resetea las regalías (Zod .partial() no quita el default)', async () => {
+      const sesion = sesionAdmin();
+      const etiqueta = await crearEtiquetaMarca(sesion, { nombre: 'Marca', regalias: 15 }, bd());
+
+      // Desactivar manda solo { id, activo:false }; el esquema de edición NO debe
+      // rellenar regalias con su default (0) ni el dominio pisar el valor real.
+      const desactivada = await desactivarEtiquetaMarca(sesion, etiqueta.id, bd());
+      expect(desactivada.activo).toBe(false);
+      expect(desactivada.regalias.toNumber()).toBe(15);
+
+      const enBd = await cliente.etiquetaMarca.findUniqueOrThrow({ where: { id: etiqueta.id } });
+      expect(enBd.regalias.toNumber()).toBe(15);
+    });
+
     it('reactivar funciona', async () => {
       const sesion = sesionAdmin();
       const etiqueta = await crearEtiquetaMarca(sesion, { nombre: 'Marca', regalias: 5 }, bd());

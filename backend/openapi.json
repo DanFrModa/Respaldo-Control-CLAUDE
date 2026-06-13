@@ -2780,7 +2780,6 @@
                     "maxLength": 200
                   },
                   "tipo": {
-                    "default": "SIN_CLASIFICAR",
                     "type": "string",
                     "enum": [
                       "TELAS",
@@ -7107,7 +7106,6 @@
                     "maxLength": 100
                   },
                   "regalias": {
-                    "default": 0,
                     "type": "number",
                     "minimum": 0,
                     "maximum": 100
@@ -12270,15 +12268,12 @@
                     "maxLength": 20
                   },
                   "favorita": {
-                    "default": false,
                     "type": "boolean"
                   },
                   "paraIpt": {
-                    "default": false,
                     "type": "boolean"
                   },
                   "paraEdr": {
-                    "default": false,
                     "type": "boolean"
                   },
                   "activa": {
