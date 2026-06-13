@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CONTROL v2 — Paletas (estructura Lista + detalle)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Nunito:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #0b0f0c; color: #e5e7eb; font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+  /* ===== Page chrome ===== */
+  .page-wrap { max-width: 1340px; margin: 0 auto; padding: 0 18px 100px; }
+  .navbar { position: sticky; top: 0; z-index: 50; background: rgba(9,13,10,.86); backdrop-filter: blur(14px); border-bottom: 1px solid rgba(255,255,255,.08); }
+  .nav-inner { max-width: 1340px; margin: 0 auto; padding: 10px 18px; display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+  .nav-pill { font-size: 12px; font-weight: 600; color: #cbd5e1; text-decoration: none; padding: 5px 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,.10); background: rgba(255,255,255,.03); white-space: nowrap; transition: all .18s; }
+  .nav-pill:hover { color: #fff; border-color: rgba(255,255,255,.40); transform: translateY(-1px); }
+  .nav-pill .dotw { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align: middle; }
+
+  .prop-head { padding: 56px 0 22px; }
+  .prop-kicker { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; opacity: .5; }
+  .prop-title { font-size: clamp(24px, 3.4vw, 36px); font-weight: 800; line-height: 1.06; margin: 8px 0 10px; letter-spacing: -.02em; color: #f3f7f4; }
+  .prop-sub { font-size: 15px; max-width: 840px; line-height: 1.6; opacity: .74; }
+  .swatches { display: inline-flex; gap: 6px; margin-top: 15px; vertical-align: middle; }
+  .swatch { width: 26px; height: 26px; border-radius: 7px; box-shadow: 0 1px 4px rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.12); }
+  .swatch.lab { position: relative; }
+
+  /* =================================================================== */
+  /* SHARED STRUCTURE — master–detail (identical across all 8 palettes)  */
+  /* Every color comes from CSS variables set per-palette scope (.cN)     */
+  /* =================================================================== */
+  .frame {
+    border-radius: 18px; overflow: hidden; min-height: 640px;
+    display: grid; grid-template-columns: var(--side-w, 232px) 1fr;
+    transition: grid-template-columns .28s cubic-bezier(.4,0,.2,1);
+    background: var(--bg); border: 1px solid var(--frame-bd);
+    box-shadow: 0 34px 80px -34px rgba(0,0,0,.7);
+    font-family: var(--font, 'Inter', sans-serif);
+  }
+  .frame.collapsed { grid-template-columns: 66px 1fr; }
+  .frame * { font-family: inherit; }
+
+  /* ---- Sidebar ---- */
+  .side { background: var(--side-bg); border-right: 1px solid var(--side-bd); padding: 16px 12px; display: flex; flex-direction: column; overflow: hidden; }
+  .lg-row { display: flex; align-items: center; gap: 10px; padding: 4px 6px 8px; min-height: 42px; }
+  .logo-badge { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: var(--logo-bg); color: var(--logo-fg); box-shadow: var(--logo-sh); }
+  .logo-badge svg { width: 19px; height: 19px; }
+  .lg-t { font-weight: 800; font-size: 15.5px; color: var(--side-title); white-space: nowrap; }
+  .lg-t small { display: block; font-size: 9px; font-weight: 700; letter-spacing: .17em; opacity: .58; margin-top: 1px; }
+  .collapse-btn { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; color: var(--side-ico); background: var(--collapse-bg); border: 1px solid var(--side-bd); transition: all .15s; }
+  .collapse-btn svg { width: 16px; height: 16px; transition: transform .28s; }
+  .collapse-btn:hover { color: var(--brand); border-color: var(--brand); }
+  .side-sep { height: 1px; background: var(--side-bd); margin: 8px 4px 10px; opacity: .8; }
+  .navlist { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+  .nav-i { position: relative; display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 9px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all .15s; color: var(--nav-fg); white-space: nowrap; }
+  .nav-i svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-i:hover { background: var(--nav-hover-bg); color: var(--nav-hover-fg); }
+  .nav-i.on { background: var(--nav-on-bg); color: var(--nav-on-fg); font-weight: 600; }
+  .nav-i.on svg { color: var(--nav-on-ico); }
+  .nav-i .label { transition: opacity .18s; }
+  .nav-i .tip { position: absolute; left: 50px; top: 50%; transform: translateY(-50%); background: var(--tip-bg); color: var(--tip-fg); font-size: 11.5px; font-weight: 600; padding: 5px 10px; border-radius: 7px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 40; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+  .nav-i .tip::before { content: ''; position: absolute; left: -4px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 8px; height: 8px; background: var(--tip-bg); }
+  /* collapsed sidebar: hide labels & logo text, center icons, show tooltips */
+  .frame.collapsed .lg-t, .frame.collapsed .nav-i .label, .frame.collapsed .side-foot-txt { display: none; }
+  .frame.collapsed .lg-row { justify-content: center; padding: 4px 0 8px; }
+  .frame.collapsed .collapse-btn { margin-left: 0; }
+  .frame.collapsed .collapse-btn svg { transform: rotate(180deg); }
+  .frame.collapsed .nav-i { justify-content: center; padding: 9px 0; }
+  .frame.collapsed .nav-i:hover .tip { opacity: 1; }
+  .frame.collapsed .side-foot { justify-content: center; }
+  .side-foot { margin-top: auto; padding-top: 10px; display: flex; align-items: center; gap: 9px; border-top: 1px solid var(--side-bd); }
+  .side-foot .mini-ava { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 12px; flex-shrink: 0; background: var(--ava-bg); color: var(--ava-fg); }
+  .side-foot-txt { line-height: 1.15; white-space: nowrap; }
+  .side-foot-txt b { display: block; font-size: 12.5px; color: var(--side-title); font-weight: 700; }
+  .side-foot-txt span { font-size: 10.5px; color: var(--nav-fg); }
+
+  /* ---- Work area (topbar + list + detail) ---- */
+  .work { display: flex; flex-direction: column; min-width: 0; }
+  .top { display: flex; align-items: center; gap: 13px; padding: 12px 22px; background: var(--top-bg); border-bottom: 1px solid var(--top-bd); }
+  .crumb { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .crumb b { color: var(--ink); } .crumb svg { width: 14px; height: 14px; opacity: .5; }
+  .topsearch { display: flex; align-items: center; gap: 8px; padding: 8px 13px; border-radius: 10px; flex: 1; max-width: 340px; background: var(--field-bg); border: 1px solid var(--field-bd); color: var(--muted); }
+  .topsearch svg { width: 15px; height: 15px; opacity: .6; }
+  .topsearch input { border: none; background: transparent; outline: none; font-size: 13px; width: 100%; color: inherit; }
+  .ico-b { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; cursor: pointer; background: var(--field-bg); border: 1px solid var(--field-bd); color: var(--muted); transition: all .15s; }
+  .ico-b svg { width: 17px; height: 17px; } .ico-b:hover { color: var(--brand); border-color: var(--brand); }
+  .ava { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; flex-shrink: 0; background: var(--ava-bg); color: var(--ava-fg); }
+  .userblock { display: flex; align-items: center; gap: 9px; }
+  .userblock .uname { font-size: 13px; font-weight: 700; color: var(--ink); line-height: 1.15; }
+  .userblock .urole { font-size: 11px; color: var(--muted); }
+
+  .split { display: grid; grid-template-columns: 332px 1fr; min-width: 0; flex: 1; }
+
+  /* ---- List column ---- */
+  .listcol { border-right: 1px solid var(--list-bd); display: flex; flex-direction: column; background: var(--list-bg); min-width: 0; }
+  .lhead { padding: 15px 16px 13px; border-bottom: 1px solid var(--list-bd); }
+  .ltitle-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ltitle { font-size: 17px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+  .lcount { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .listsearch { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 9px; margin-top: 11px; background: var(--field-bg); border: 1px solid var(--field-bd); color: var(--muted); }
+  .listsearch svg { width: 15px; height: 15px; opacity: .6; }
+  .listsearch input { border: none; background: transparent; outline: none; font-size: 12.5px; width: 100%; color: inherit; }
+  .listscroll { overflow-y: auto; }
+  .litem { display: flex; align-items: center; gap: 11px; padding: 11px 16px; cursor: pointer; border-bottom: 1px solid var(--list-rowbd); transition: all .14s; border-left: 3px solid transparent; }
+  .litem:hover { background: var(--list-hover); }
+  .litem.on { background: var(--list-on-bg); border-left-color: var(--brand); }
+  .li-ava { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; }
+  .li-name { font-size: 13px; font-weight: 600; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+  .li-name svg { width: 13px; height: 13px; }
+  .li-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+  .li-sub svg { width: 11px; height: 11px; opacity: .7; }
+
+  /* ---- Detail panel ---- */
+  .detail { display: flex; flex-direction: column; background: var(--bg); min-width: 0; overflow: hidden; }
+  .dhero { padding: 22px 26px 18px; border-bottom: 1px solid var(--list-bd); background: var(--hero-bg); }
+  .dhero-top { display: flex; align-items: center; gap: 15px; }
+  .d-ava { width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; font-weight: 800; font-size: 23px; color: #fff; flex-shrink: 0; }
+  .d-name { font-size: 22px; font-weight: 800; color: var(--ink); letter-spacing: -.01em; }
+  .d-meta { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .dacts { display: flex; gap: 9px; margin-top: 18px; flex-wrap: wrap; }
+  .dbody { padding: 22px 26px; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; }
+  .dsec-t { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--muted); margin-bottom: 13px; display: flex; align-items: center; gap: 7px; }
+  .dsec-t svg { width: 14px; height: 14px; opacity: .8; }
+  .dgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+  .dfield { display: flex; gap: 10px; align-items: flex-start; }
+  .dfield .fico { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; background: var(--fico-bg); color: var(--brand); }
+  .dfield .fico svg { width: 16px; height: 16px; }
+  .dfield label { font-size: 11px; color: var(--muted); font-weight: 600; display: block; margin-bottom: 2px; }
+  .dfield .fval { font-size: 14px; color: var(--ink); font-weight: 600; }
+  .tl { display: flex; flex-direction: column; gap: 0; }
+  .tl-i { display: flex; gap: 13px; padding-bottom: 17px; position: relative; }
+  .tl-i:last-child { padding-bottom: 0; }
+  .tl-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; z-index: 1; }
+  .tl-ico svg { width: 15px; height: 15px; }
+  .tl-i:not(:last-child)::before { content: ''; position: absolute; left: 14.5px; top: 32px; bottom: 2px; width: 2px; background: var(--list-rowbd); }
+  .tl-txt { font-size: 13.5px; color: var(--ink); font-weight: 500; } .tl-txt b { font-weight: 700; }
+  .tl-date { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+
+  /* ---- Shared atoms: badges, tags, buttons ---- */
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .badge svg { width: 12px; height: 12px; }
+  .badge-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 7px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .tag svg { width: 13px; height: 13px; }
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 15px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all .16s; background: var(--brand); color: var(--brand-fg); box-shadow: var(--btn-sh); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn:hover { background: var(--brand-700); transform: translateY(-1px); }
+  .btn-2 { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .16s; background: var(--btn2-bg); color: var(--btn2-fg); border: 1px solid var(--btn2-bd); }
+  .btn-2 svg { width: 15px; height: 15px; }
+  .btn-2:hover { background: var(--btn2-hover); }
+  .btn-2.danger:hover { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-bd); }
+  .btn-icon-sm { display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; cursor: pointer; background: var(--brand); color: var(--brand-fg); box-shadow: var(--btn-sh); transition: all .16s; }
+  .btn-icon-sm svg { width: 17px; height: 17px; } .btn-icon-sm:hover { background: var(--brand-700); }
+
+  /* type tag colors + status colors + avatar gradients are per-palette */
+  .t-telas { background: var(--telas-bg); color: var(--telas-fg); }
+  .t-avios { background: var(--avios-bg); color: var(--avios-fg); }
+  .t-serv  { background: var(--serv-bg);  color: var(--serv-fg); }
+  .b-active   { background: var(--ok-bg);  color: var(--ok-fg); }   .b-active .badge-dot   { background: var(--ok-dot); }
+  .b-inactive { background: var(--off-bg); color: var(--off-fg); }  .b-inactive .badge-dot { background: var(--off-dot); }
+  .av-telas { background: var(--av-telas); } .av-avios { background: var(--av-avios); } .av-serv { background: var(--av-serv); } .av-off { background: var(--av-off); }
+  .fico-telas { background: var(--telas-bg); color: var(--telas-fg); }
+  .tl-ok   { background: var(--ok-bg);    color: var(--ok-fg); }
+  .tl-pay  { background: var(--telas-bg); color: var(--telas-fg); }
+  .tl-edit { background: var(--serv-bg);  color: var(--serv-fg); }
+
+  /* iconos GRANDES (variante "menta", palette 4) */
+  .big-icons .nav-i { padding: 10px 11px; gap: 13px; font-size: 13.5px; font-weight: 600; }
+  .big-icons .nav-i svg { width: 21px; height: 21px; }
+  .big-icons .li-ava { width: 42px; height: 42px; border-radius: 12px; font-size: 15px; }
+  .big-icons .dfield .fico { width: 38px; height: 38px; } .big-icons .dfield .fico svg { width: 19px; height: 19px; }
+
+  /* ===== responsive ===== */
+  @media (max-width: 980px) {
+    .frame { grid-template-columns: 66px 1fr !important; }
+    .frame .lg-t, .frame .nav-i .label, .frame .side-foot-txt { display: none; }
+    .frame .lg-row { justify-content: center; }
+    .frame .nav-i { justify-content: center; }
+    .frame .collapse-btn { display: none; }
+    .split { grid-template-columns: 1fr; }
+    .detail { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ TOP NAV ============ -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <span style="font-weight:800;font-size:14px;letter-spacing:-.01em;margin-right:4px;">CONTROL v2 · paletas</span>
+    <a class="nav-pill" href="#c1"><span class="dotw" style="background:#10b981"></span>1 · Esmeralda</a>
+    <a class="nav-pill" href="#c2"><span class="dotw" style="background:#15803d"></span>2 · Verde bosque</a>
+    <a class="nav-pill" href="#c3"><span class="dotw" style="background:#0d9488"></span>3 · Teal</a>
+    <a class="nav-pill" href="#c4"><span class="dotw" style="background:#059669"></span>4 · Menta</a>
+    <a class="nav-pill" href="#c5"><span class="dotw" style="background:#65a30d"></span>5 · Verde lima</a>
+    <a class="nav-pill" href="#c6"><span class="dotw" style="background:#6b7d3a"></span>6 · Oliva</a>
+    <a class="nav-pill" href="#c7"><span class="dotw" style="background:#0f2a22"></span>7 · Sidebar verde</a>
+    <a class="nav-pill" href="#c8"><span class="dotw" style="background:#22c55e"></span>8 · Verde neón</a>
+  </div>
+</nav>
+
+<header style="text-align:center;padding:58px 18px 6px;">
+  <h1 style="font-size:clamp(28px,5vw,50px);font-weight:800;letter-spacing:-.03em;margin:0;background:linear-gradient(95deg,#34d399,#a3e635,#10b981);-webkit-background-clip:text;background-clip:text;color:transparent;">CONTROL v2 — Paletas (estructura Lista + detalle)</h1>
+  <p style="max-width:860px;margin:18px auto 0;font-size:16px;line-height:1.6;color:#9ca3af;">Ocho variaciones de <b style="color:#d1fae5;">color y personalidad</b> sobre la <b style="color:#d1fae5;">misma estructura ya elegida</b>: lista de proveedores a la izquierda + panel de detalle a la derecha. Cambia solo la <b style="color:#d1fae5;">paleta</b> — como el logo es <b style="color:#86efac;">verde</b>, el <b style="color:#d1fae5;">color de marca es verde en todas</b>, pero en <b style="color:#86efac;">ocho tonos distintos</b> (esmeralda, bosque, teal, menta, lima, oliva, sidebar verde profundo y verde neón). Lo que sí cambia entre propuestas es qué tan vivos son los colores que <b style="color:#d1fae5;">explican</b> (tipos y estados), la calidez y la personalidad.</p>
+  <p style="margin:14px auto 0;font-size:13px;color:#6b7280;">El menú lateral se <b style="color:#9ca3af;">colapsa</b> con el botón «&nbsp;de arriba (pruébalo). Salta entre paletas con la barra superior ↑</p>
+</header>
+
+<div class="page-wrap" id="proposals"></div>
+
+<script>
+/* ===================== ICON LIBRARY (lucide-style, inline SVG) ===================== */
+const I = {
+  layers:'<path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/>',
+  shirt:'<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z"/>',
+  cart:'<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  factory:'<path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M17 18h1"/><path d="M12 18h1"/><path d="M7 18h1"/>',
+  box:'<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+  warehouse:'<path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35a2 2 0 0 1 1.26-1.86l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"/><path d="M6 18h12"/><path d="M6 14h12"/><rect x="6" y="10" width="12" height="12"/>',
+  route:'<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="m9 12 2 2 4-4"/>',
+  wallet:'<path d="M19 7V5a2 2 0 0 0-2-2H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  coins:'<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
+  chart:'<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/>',
+  files:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M9 13h6"/><path d="M9 17h3"/>',
+  cog:'<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/>',
+  search:'<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  chevron:'<path d="m9 18 6-6-6-6"/>',
+  chevronsLeft:'<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>',
+  plus:'<path d="M5 12h14"/><path d="M12 5v14"/>',
+  filter:'<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+  bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+  phone:'<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92Z"/>',
+  pencil:'<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>',
+  power:'<path d="M12 2v10"/><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>',
+  mail:'<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  mapPin:'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  user:'<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  creditCard:'<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+  spool:'<path d="M19 13V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v7"/><path d="M5 13a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2Z"/><line x1="8" x2="8" y1="4" y2="20"/><line x1="16" x2="16" y1="4" y2="20"/>',
+  scissors:'<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>',
+  truck:'<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  fileText:'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
+  check:'<path d="M20 6 9 17l-5-5"/>',
+  contact:'<path d="M16 18a4 4 0 0 0-8 0"/><rect width="18" height="18" x="3" y="4" rx="2"/><circle cx="12" cy="10" r="3"/>'
+};
+function svg(name, extra='') { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${I[name]||''}</svg>`; }
+
+/* ===================== DATA (identical across palettes) ===================== */
+const MODULES = [
+  ['Catálogos','layers',true],['Modelos','shirt',false],['Pedidos','cart',false],
+  ['Producción','factory',false],['Compras y Materiales','box',false],['Inventarios','warehouse',false],
+  ['Ruta Crítica','route',false],['Calidad','shield',false],['EsMa','wallet',false],
+  ['Costos y EDR','coins',false],['Indicadores','chart',false],['Documental','files',false],
+  ['Administración','cog',false]
+];
+// name, tipo, tipoClass, typeIcon, tel, estado(active/inactive), estadoLabel, avClass, initial, contacto, condiciones
+const ROWS = [
+  ['Textiles del Norte','Telas','t-telas','spool','55 81 4210 9930','active','Activo','av-telas','T','Laura Méndez','30 días'],
+  ['Avíos del Bajío','Avíos','t-avios','scissors','477 120 4455','active','Activo','av-avios','A','Jorge Ramírez','Contado'],
+  ['Bordados MJD','Servicios','t-serv','factory','55 26 7788 1200','active','Activo','av-serv','B','Ana Beltrán','15 días'],
+  ['Hilos del Centro','Avíos','t-avios','scissors','442 305 7711','inactive','Inactivo','av-off','H','Pedro Solís','30 días'],
+  ['Telas Premium SA de CV','Telas','t-telas','spool','81 1199 6050','active','Activo','av-telas','T','Marina Ruiz','45 días'],
+  ['Cortes Express','Servicios','t-serv','scissors','55 64 9090 3321','active','Activo','av-serv','C','Raúl Cano','Contado']
+];
+const typeIcon = { 'Telas':'spool', 'Avíos':'scissors', 'Servicios':'factory' };
+
+/* ===================== FRAME BUILDER (one structure, all palettes) ===================== */
+let UID = 0;
+function frame(extraFrameClass='') {
+  const fid = 'frame-' + (++UID);
+  const nav = MODULES.map(([n,ic,on]) =>
+    `<div class="nav-i ${on?'on':''}">${svg(ic)}<span class="label">${n}</span><span class="tip">${n}</span></div>`).join('');
+  const list = ROWS.map(([n,t,tc,ti,tel,st,stl,av,ini],i) => `
+    <div class="litem ${i===0?'on':''}">
+      <div class="li-ava ${av}">${ini}</div>
+      <div style="min-width:0;flex:1">
+        <div class="li-name">${n}</div>
+        <div class="li-sub">${svg(typeIcon[t])}${t} · ${tel}</div>
+      </div>
+      <span class="badge b-${st}"><span class="badge-dot"></span></span>
+    </div>`).join('');
+  const s = ROWS[0]; // Textiles del Norte
+  return `
+  <div class="frame ${extraFrameClass}" id="${fid}">
+    <aside class="side">
+      <div class="lg-row">
+        <div class="logo-badge">${svg('layers')}</div>
+        <div class="lg-t">CONTROL<small>MARILYN · MJD</small></div>
+        <div class="collapse-btn" onclick="document.getElementById('${fid}').classList.toggle('collapsed')" title="Contraer / expandir menú">${svg('chevronsLeft')}</div>
+      </div>
+      <div class="side-sep"></div>
+      <div class="navlist">${nav}</div>
+      <div class="side-foot">
+        <div class="mini-ava">D</div>
+        <div class="side-foot-txt"><b>Daniel</b><span>Administrador</span></div>
+      </div>
+    </aside>
+
+    <div class="work">
+      <div class="top">
+        <div class="crumb">Catálogos ${svg('chevron')} <b>Proveedores</b></div>
+        <div class="topsearch">${svg('search')}<input placeholder="Buscar en CONTROL…"/></div>
+        <div style="flex:1"></div>
+        <div class="ico-b" title="Notificaciones">${svg('bell')}</div>
+        <div class="ico-b" title="Cambiar tema">${svg('sun')}</div>
+        <div class="userblock">
+          <div class="ava">D</div>
+          <div><div class="uname">Daniel</div><div class="urole">Administrador</div></div>
+        </div>
+      </div>
+
+      <div class="split">
+        <!-- LISTA -->
+        <div class="listcol">
+          <div class="lhead">
+            <div class="ltitle-row">
+              <div><div class="ltitle">Proveedores</div><div class="lcount">6 proveedores · 5 activos</div></div>
+              <button class="btn-icon-sm" title="Nuevo proveedor">${svg('plus')}</button>
+            </div>
+            <div class="listsearch">${svg('search')}<input placeholder="Buscar proveedor…"/></div>
+          </div>
+          <div class="listscroll">${list}</div>
+        </div>
+
+        <!-- DETALLE -->
+        <div class="detail">
+          <div class="dhero">
+            <div class="dhero-top">
+              <div class="d-ava ${s[7]}">${s[8]}</div>
+              <div style="flex:1;min-width:0">
+                <div class="d-name">${s[0]}</div>
+                <div class="d-meta">
+                  <span class="tag ${s[2]}">${svg(s[3])}${s[1]}</span>
+                  <span class="badge b-${s[5]}"><span class="badge-dot"></span>${svg('check')}${s[6]}</span>
+                </div>
+              </div>
+            </div>
+            <div class="dacts">
+              <button class="btn">${svg('pencil')}Editar</button>
+              <button class="btn-2 danger">${svg('power')}Desactivar</button>
+              <button class="btn-2">${svg('mail')}Email</button>
+            </div>
+          </div>
+
+          <div class="dbody">
+            <div>
+              <div class="dsec-t">${svg('contact')}Datos del proveedor</div>
+              <div class="dgrid">
+                <div class="dfield"><div class="fico">${svg('user')}</div><div><label>Contacto</label><div class="fval">Laura Méndez</div></div></div>
+                <div class="dfield"><div class="fico">${svg('phone')}</div><div><label>Teléfono</label><div class="fval">55 81 4210 9930</div></div></div>
+                <div class="dfield"><div class="fico">${svg('creditCard')}</div><div><label>Condiciones de pago</label><div class="fval">30 días</div></div></div>
+                <div class="dfield"><div class="fico fico-telas">${svg('spool')}</div><div><label>Tipo</label><div class="fval">Telas</div></div></div>
+                <div class="dfield" style="grid-column:1/3"><div class="fico">${svg('mapPin')}</div><div><label>Dirección</label><div class="fval">Av. Industrias 240, Monterrey, N.L.</div></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="dsec-t">${svg('clock')}Historial reciente</div>
+              <div class="tl">
+                <div class="tl-i"><div class="tl-ico tl-ok">${svg('truck')}</div><div><div class="tl-txt">Orden de compra <b>OC-1042</b> recibida</div><div class="tl-date">Hace 3 días · $128,400</div></div></div>
+                <div class="tl-i"><div class="tl-ico tl-pay">${svg('creditCard')}</div><div><div class="tl-txt">Pago aplicado a factura <b>A-771</b></div><div class="tl-date">Hace 12 días</div></div></div>
+                <div class="tl-i"><div class="tl-ico tl-edit">${svg('pencil')}</div><div><div class="tl-txt">Datos de contacto actualizados</div><div class="tl-date">Hace 1 mes</div></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ===================== PALETTES (only colors change) ===================== */
+/* Each palette is a set of CSS custom properties scoped to .cN.
+   Order of swatches shown in header: brand, Telas, Avíos, Servicios, bg.
+   El color de marca es VERDE en todas (el logo es verde), en 8 tonos
+   distintos (esmeralda, bosque, teal, menta, lima, oliva, sidebar verde,
+   verde neón). Dentro de cada propuesta, los colores que EXPLICAN
+   (tipos y estados) son consistentes y bien distinguibles. */
+const PALETTES = [
+  {
+    n:1, id:'c1', cls:'c1', name:'Esmeralda vivo', tone:'Verde esmeralda', toneHex:'#10b981',
+    blurb:'Verde esmeralda de marca (el color del logo), alegre y clarísimo. Los tipos saltan a la vista: Telas en azul, Avíos en ámbar, Servicios en violeta. Activo en verde, Inactivo en gris.',
+    sw:['#10b981','#2563eb','#f59e0b','#8b5cf6','#f6fbf8'], font:"'Inter', sans-serif",
+    vars:{
+      '--font':"'Inter', sans-serif",
+      '--bg':'#f6fbf8','--frame-bd':'#d6e9df','--ink':'#0f2a20','--muted':'#5b7468',
+      '--brand':'#10b981','--brand-700':'#059669','--brand-fg':'#ffffff','--btn-sh':'0 5px 14px -3px rgba(16,185,129,.5)',
+      '--side-bg':'#ffffff','--side-bd':'#e4f0ea','--side-title':'#0f2a20','--side-ico':'#5b7468',
+      '--logo-bg':'linear-gradient(135deg,#10b981,#34d399)','--logo-fg':'#ffffff','--logo-sh':'0 5px 14px -3px rgba(16,185,129,.55)',
+      '--collapse-bg':'#f0faf5',
+      '--nav-fg':'#52685e','--nav-hover-bg':'#ecfdf5','--nav-hover-fg':'#0f2a20','--nav-on-bg':'#d1fae5','--nav-on-fg':'#047857','--nav-on-ico':'#059669',
+      '--tip-bg':'#0f2a20','--tip-fg':'#ffffff',
+      '--top-bg':'#ffffff','--top-bd':'#e4f0ea',
+      '--field-bg':'#f1f9f5','--field-bd':'#dcefe6',
+      '--ava-bg':'linear-gradient(135deg,#10b981,#6ee7b7)','--ava-fg':'#04231a',
+      '--list-bg':'#ffffff','--list-bd':'#e7f1ec','--list-rowbd':'#f0f6f3','--list-hover':'#f6fbf8','--list-on-bg':'#ecfdf5',
+      '--hero-bg':'#ffffff','--fico-bg':'#ecfdf5',
+      '--btn2-bg':'#ffffff','--btn2-fg':'#42594f','--btn2-bd':'#dde9e3','--btn2-hover':'#f3f9f6',
+      '--danger-bg':'#fef2f2','--danger-fg':'#dc2626','--danger-bd':'#fecaca',
+      '--telas-bg':'#dbeafe','--telas-fg':'#1d4ed8','--avios-bg':'#fef3c7','--avios-fg':'#b45309','--serv-bg':'#ede9fe','--serv-fg':'#6d28d9',
+      '--ok-bg':'#d1fae5','--ok-fg':'#047857','--ok-dot':'#10b981','--off-bg':'#f1f5f4','--off-fg':'#64748b','--off-dot':'#94a3b8',
+      '--av-telas':'linear-gradient(135deg,#2563eb,#60a5fa)','--av-avios':'linear-gradient(135deg,#f59e0b,#fbbf24)','--av-serv':'linear-gradient(135deg,#8b5cf6,#c4b5fd)','--av-off':'linear-gradient(135deg,#94a3b8,#cbd5e1)'
+    }
+  },
+  {
+    n:2, id:'c2', cls:'c2', name:'Verde bosque + pastel', tone:'Verde bosque', toneHex:'#15803d',
+    blurb:'Verde bosque de marca, serio y elegante, con colores explicativos en pastel suave. Profesional pero cálido; los tipos se distinguen sin gritar y el estado Activo mantiene su verde.',
+    sw:['#15803d','#0ea5e9','#f59e0b','#d946ef','#f6f8fd'], font:"'Manrope', sans-serif",
+    vars:{
+      '--font':"'Manrope', sans-serif",
+      '--bg':'#f6fbf8','--frame-bd':'#d8e9df','--ink':'#16271d','--muted':'#5f7268',
+      '--brand':'#15803d','--brand-700':'#14532d','--brand-fg':'#ffffff','--btn-sh':'0 5px 14px -3px rgba(21,128,61,.45)',
+      '--side-bg':'#fafdfb','--side-bd':'#e3f0e8','--side-title':'#166534','--side-ico':'#5f7268',
+      '--logo-bg':'linear-gradient(135deg,#166534,#15803d)','--logo-fg':'#eefbef','--logo-sh':'0 5px 14px -3px rgba(21,128,61,.5)',
+      '--collapse-bg':'#eef6f1',
+      '--nav-fg':'#587265','--nav-hover-bg':'#eef9f1','--nav-hover-fg':'#166534','--nav-on-bg':'#d6ead8','--nav-on-fg':'#15803d','--nav-on-ico':'#15803d',
+      '--tip-bg':'#166534','--tip-fg':'#eefbef',
+      '--top-bg':'#fafdfb','--top-bd':'#e3f0e8',
+      '--field-bg':'#eff6f2','--field-bd':'#dde9e2',
+      '--ava-bg':'linear-gradient(135deg,#15803d,#4ade80)','--ava-fg':'#06230f',
+      '--list-bg':'#fafdfb','--list-bd':'#e6f1ea','--list-rowbd':'#eef6f1','--list-hover':'#f5fbf8','--list-on-bg':'#eff8f2',
+      '--hero-bg':'#fafdfb','--fico-bg':'#eff8f2',
+      '--btn2-bg':'#ffffff','--btn2-fg':'#4a6055','--btn2-bd':'#dce9e1','--btn2-hover':'#f2f8f5',
+      '--danger-bg':'#fdf3f1','--danger-fg':'#c2410c','--danger-bd':'#f6cab8',
+      '--telas-bg':'#dbeafe','--telas-fg':'#2563eb','--avios-bg':'#fdebd0','--avios-fg':'#c2710c','--serv-bg':'#f9e2f7','--serv-fg':'#a21caf',
+      '--ok-bg':'#d6f3e0','--ok-fg':'#15803d','--ok-dot':'#22c55e','--off-bg':'#eef0f4','--off-fg':'#6b7280','--off-dot':'#9ca3af',
+      '--av-telas':'linear-gradient(135deg,#2563eb,#60a5fa)','--av-avios':'linear-gradient(135deg,#f59e0b,#fcd9a6)','--av-serv':'linear-gradient(135deg,#d946ef,#f0abfc)','--av-off':'linear-gradient(135deg,#9ca3af,#d1d5db)'
+    }
+  },
+  {
+    n:3, id:'c3', cls:'c3', name:'Teal fresco', tone:'Teal (verde-azulado)', toneHex:'#0d9488',
+    blurb:'Verde-azulado moderno y limpio, con acentos frescos y brillantes. Telas en índigo, Avíos en cian, Servicios en rosa: distinción nítida y fresca.',
+    sw:['#0d9488','#4f46e5','#0891b2','#db2777','#f3fbfa'], font:"'Sora', sans-serif",
+    vars:{
+      '--font':"'Sora', sans-serif",
+      '--bg':'#f3fbfa','--frame-bd':'#cfeae6','--ink':'#0c2b29','--muted':'#557571',
+      '--brand':'#0d9488','--brand-700':'#0f766e','--brand-fg':'#ffffff','--btn-sh':'0 5px 14px -3px rgba(13,148,136,.5)',
+      '--side-bg':'#ffffff','--side-bd':'#e0f0ed','--side-title':'#0c2b29','--side-ico':'#557571',
+      '--logo-bg':'linear-gradient(135deg,#0d9488,#2dd4bf)','--logo-fg':'#ffffff','--logo-sh':'0 5px 14px -3px rgba(13,148,136,.55)',
+      '--collapse-bg':'#eefbf9',
+      '--nav-fg':'#4e6e6a','--nav-hover-bg':'#effdfb','--nav-hover-fg':'#0c2b29','--nav-on-bg':'#ccfbf1','--nav-on-fg':'#0f766e','--nav-on-ico':'#0d9488',
+      '--tip-bg':'#0c2b29','--tip-fg':'#ffffff',
+      '--top-bg':'#ffffff','--top-bd':'#e0f0ed',
+      '--field-bg':'#eef9f7','--field-bd':'#d6ede9',
+      '--ava-bg':'linear-gradient(135deg,#0d9488,#5eead4)','--ava-fg':'#04231f',
+      '--list-bg':'#ffffff','--list-bd':'#e2f1ee','--list-rowbd':'#eef7f5','--list-hover':'#f3fbfa','--list-on-bg':'#effdfb',
+      '--hero-bg':'#ffffff','--fico-bg':'#effdfb',
+      '--btn2-bg':'#ffffff','--btn2-fg':'#3f5c58','--btn2-bd':'#d7e9e6','--btn2-hover':'#f1f8f7',
+      '--danger-bg':'#fdf2f6','--danger-fg':'#db2777','--danger-bd':'#f7c8dd',
+      '--telas-bg':'#e0e7ff','--telas-fg':'#4338ca','--avios-bg':'#cffafe','--avios-fg':'#0e7490','--serv-bg':'#fce7f3','--serv-fg':'#be185d',
+      '--ok-bg':'#ccfbf1','--ok-fg':'#0f766e','--ok-dot':'#14b8a6','--off-bg':'#eef2f1','--off-fg':'#64748b','--off-dot':'#94a3b8',
+      '--av-telas':'linear-gradient(135deg,#4f46e5,#818cf8)','--av-avios':'linear-gradient(135deg,#0891b2,#22d3ee)','--av-serv':'linear-gradient(135deg,#db2777,#f472b6)','--av-off':'linear-gradient(135deg,#94a3b8,#cbd5e1)'
+    }
+  },
+  {
+    n:4, id:'c4', cls:'c4', name:'Menta + iconos grandes', tone:'Verde menta', toneHex:'#059669', big:true,
+    blurb:'Fondo blanco/menta muy claro, iconos GRANDES con etiquetas y máxima legibilidad: pensada para gente no técnica. La más acogedora y fácil de leer.',
+    sw:['#059669','#3b82f6','#f59e0b','#ec4899','#f4fdf9'], font:"'Nunito', sans-serif",
+    vars:{
+      '--font':"'Nunito', sans-serif",
+      '--bg':'#f4fdf9','--frame-bd':'#cdeede','--ink':'#0d3326','--muted':'#5a766a',
+      '--brand':'#059669','--brand-700':'#047857','--brand-fg':'#ffffff','--btn-sh':'0 6px 16px -3px rgba(5,150,105,.45)',
+      '--side-bg':'#ffffff','--side-bd':'#dcf2e7','--side-title':'#0d3326','--side-ico':'#5a766a',
+      '--logo-bg':'linear-gradient(135deg,#10b981,#6ee7b7)','--logo-fg':'#03251b','--logo-sh':'0 6px 16px -3px rgba(16,185,129,.5)',
+      '--collapse-bg':'#edfcf4',
+      '--nav-fg':'#4f6b60','--nav-hover-bg':'#ecfdf5','--nav-hover-fg':'#0d3326','--nav-on-bg':'#d1fae5','--nav-on-fg':'#047857','--nav-on-ico':'#059669',
+      '--tip-bg':'#0d3326','--tip-fg':'#ffffff',
+      '--top-bg':'#ffffff','--top-bd':'#dcf2e7',
+      '--field-bg':'#edfaf4','--field-bd':'#d3efe4',
+      '--ava-bg':'linear-gradient(135deg,#10b981,#6ee7b7)','--ava-fg':'#03251b',
+      '--list-bg':'#ffffff','--list-bd':'#e0f3ec','--list-rowbd':'#edf8f3','--list-hover':'#f4fdf9','--list-on-bg':'#ecfdf5',
+      '--hero-bg':'#ffffff','--fico-bg':'#ecfdf5',
+      '--btn2-bg':'#ffffff','--btn2-fg':'#43615a','--btn2-bd':'#d6ece4','--btn2-hover':'#f1faf6',
+      '--danger-bg':'#fef2f2','--danger-fg':'#dc2626','--danger-bd':'#fecaca',
+      '--telas-bg':'#dbeafe','--telas-fg':'#1d4ed8','--avios-bg':'#fef3c7','--avios-fg':'#b45309','--serv-bg':'#fce7f3','--serv-fg':'#be185d',
+      '--ok-bg':'#d1fae5','--ok-fg':'#047857','--ok-dot':'#10b981','--off-bg':'#f0f3f1','--off-fg':'#64748b','--off-dot':'#94a3b8',
+      '--av-telas':'linear-gradient(135deg,#3b82f6,#93c5fd)','--av-avios':'linear-gradient(135deg,#f59e0b,#fcd34d)','--av-serv':'linear-gradient(135deg,#ec4899,#f9a8d4)','--av-off':'linear-gradient(135deg,#94a3b8,#cbd5e1)'
+    }
+  },
+  {
+    n:5, id:'c5', cls:'c5', name:'Verde lima energético', tone:'Verde lima', toneHex:'#65a30d',
+    blurb:'Verde lima vibrante y energético, que "llama a entrar" y se siente fresco. Telas en azul, Avíos en teal, Servicios en fucsia; Activo en verde. Lleno de vida sin perder claridad.',
+    sw:['#65a30d','#2563eb','#0d9488','#c026d3','#fbfdf4'], font:"'Outfit', sans-serif",
+    vars:{
+      '--font':"'Outfit', sans-serif",
+      '--bg':'#fbfdf4','--frame-bd':'#e3edcf','--ink':'#1f2a0c','--muted':'#677155',
+      '--brand':'#65a30d','--brand-700':'#4d7c0f','--brand-fg':'#ffffff','--btn-sh':'0 5px 14px -3px rgba(101,163,13,.5)',
+      '--side-bg':'#fbfdf7','--side-bd':'#e6efd6','--side-title':'#3f6212','--side-ico':'#677155',
+      '--logo-bg':'linear-gradient(135deg,#65a30d,#84cc16)','--logo-fg':'#16250b','--logo-sh':'0 5px 14px -3px rgba(101,163,13,.55)',
+      '--collapse-bg':'#f1f7e4',
+      '--nav-fg':'#62714e','--nav-hover-bg':'#f3f9e7','--nav-hover-fg':'#3f6212','--nav-on-bg':'#dcedc0','--nav-on-fg':'#4d7c0f','--nav-on-ico':'#65a30d',
+      '--tip-bg':'#3f6212','--tip-fg':'#f4fbe6',
+      '--top-bg':'#fbfdf7','--top-bd':'#e6efd6',
+      '--field-bg':'#f3f8e9','--field-bd':'#e4eed3',
+      '--ava-bg':'linear-gradient(135deg,#65a30d,#a3e635)','--ava-fg':'#16250b',
+      '--list-bg':'#fbfdf7','--list-bd':'#e9f1da','--list-rowbd':'#f1f7e8','--list-hover':'#f8fcf1','--list-on-bg':'#f3f9e7',
+      '--hero-bg':'#fbfdf7','--fico-bg':'#f3f9e7',
+      '--btn2-bg':'#fbfdf7','--btn2-fg':'#586349','--btn2-bd':'#dfead0','--btn2-hover':'#f3f8ec',
+      '--danger-bg':'#fef2f2','--danger-fg':'#dc2626','--danger-bd':'#fecaca',
+      '--telas-bg':'#dbeafe','--telas-fg':'#1d4ed8','--avios-bg':'#ccfbf1','--avios-fg':'#0f766e','--serv-bg':'#fae8ff','--serv-fg':'#a21caf',
+      '--ok-bg':'#d6f3e0','--ok-fg':'#15803d','--ok-dot':'#22c55e','--off-bg':'#f2efec','--off-fg':'#78716c','--off-dot':'#a8a29e',
+      '--av-telas':'linear-gradient(135deg,#2563eb,#60a5fa)','--av-avios':'linear-gradient(135deg,#0d9488,#2dd4bf)','--av-serv':'linear-gradient(135deg,#c026d3,#e879f9)','--av-off':'linear-gradient(135deg,#a8a29e,#d6d3d1)'
+    }
+  },
+  {
+    n:6, id:'c6', cls:'c6', name:'Oliva natural + crema', tone:'Verde oliva', toneHex:'#6b7d3a',
+    blurb:'Verde oliva terroso y natural sobre cremas cálidos: orgánico, artesanal y muy acogedor. Los tipos en tonos tierra que combinan sin perder claridad.',
+    sw:['#6b7d3a','#3f6212','#a16207','#9d174d','#faf8f0'], font:"'Manrope', sans-serif",
+    vars:{
+      '--font':"'Manrope', sans-serif",
+      '--bg':'#faf8f0','--frame-bd':'#e6e0cf','--ink':'#33331f','--muted':'#736f5b',
+      '--brand':'#6b7d3a','--brand-700':'#556330','--brand-fg':'#fdfbef','--btn-sh':'0 5px 14px -3px rgba(107,125,58,.45)',
+      '--side-bg':'#fdfcf6','--side-bd':'#ece6d6','--side-title':'#3a3a22','--side-ico':'#736f5b',
+      '--logo-bg':'linear-gradient(135deg,#556330,#8ca54a)','--logo-fg':'#fdfbef','--logo-sh':'0 5px 14px -3px rgba(107,125,58,.5)',
+      '--collapse-bg':'#f6f3e8',
+      '--nav-fg':'#6e6a56','--nav-hover-bg':'#f4f1e5','--nav-hover-fg':'#3a3a22','--nav-on-bg':'#eaecd6','--nav-on-fg':'#556330','--nav-on-ico':'#6b7d3a',
+      '--tip-bg':'#3a3a22','--tip-fg':'#fdfbef',
+      '--top-bg':'#fdfcf6','--top-bd':'#ece6d6',
+      '--field-bg':'#f5f2e6','--field-bd':'#e7e1d0',
+      '--ava-bg':'linear-gradient(135deg,#6b7d3a,#a3b563)','--ava-fg':'#22270f',
+      '--list-bg':'#fdfcf6','--list-bd':'#efe9d9','--list-rowbd':'#f3efe2','--list-hover':'#f8f5ec','--list-on-bg':'#f4f1e3',
+      '--hero-bg':'#fdfcf6','--fico-bg':'#f1f0df',
+      '--btn2-bg':'#fdfcf6','--btn2-fg':'#5c5945','--btn2-bd':'#e6e0cf','--btn2-hover':'#f5f2e8',
+      '--danger-bg':'#fbf1ed','--danger-fg':'#b45309','--danger-bd':'#f0d3b8',
+      '--telas-bg':'#dce7c8','--telas-fg':'#3f6212','--avios-bg':'#f6e6c4','--avios-fg':'#a16207','--serv-bg':'#f6dce6','--serv-fg':'#9d174d',
+      '--ok-bg':'#e3eccb','--ok-fg':'#4d7c0f','--ok-dot':'#84a83c','--off-bg':'#ece9dd','--off-fg':'#78716c','--off-dot':'#a8a29e',
+      '--av-telas':'linear-gradient(135deg,#3f6212,#84a83c)','--av-avios':'linear-gradient(135deg,#a16207,#d4a32e)','--av-serv':'linear-gradient(135deg,#9d174d,#d6608f)','--av-off':'linear-gradient(135deg,#a8a29e,#d6d3d1)'
+    }
+  },
+  {
+    n:7, id:'c7', cls:'c7', name:'Sidebar verde profundo', tone:'Sidebar verde (Supabase)', toneHex:'#0f2a22',
+    blurb:'Estilo Supabase: sidebar oscuro verde profundo con el logo verde de marca, y contenido claro y luminoso a la derecha. Contraste elegante; los colores siguen explicando.',
+    sw:['#0f2a22','#16a34a','#0284c7','#d97706','#f7f8fc'], font:"'Inter', sans-serif",
+    vars:{
+      '--font':"'Inter', sans-serif",
+      '--bg':'#f5faf7','--frame-bd':'#d8e6df','--ink':'#16271d','--muted':'#5f7268',
+      '--brand':'#16a34a','--brand-700':'#15803d','--brand-fg':'#ffffff','--btn-sh':'0 5px 14px -3px rgba(22,163,74,.45)',
+      '--side-bg':'#0f2a22','--side-bd':'#14532d','--side-title':'#eafaf0','--side-ico':'#7fb89a',
+      '--logo-bg':'linear-gradient(135deg,#22c55e,#4ade80)','--logo-fg':'#06281a','--logo-sh':'0 5px 16px -3px rgba(34,197,94,.55)',
+      '--collapse-bg':'rgba(255,255,255,.07)',
+      '--nav-fg':'#8fc2a6','--nav-hover-bg':'rgba(255,255,255,.08)','--nav-hover-fg':'#eafaf0','--nav-on-bg':'rgba(16,185,129,.22)','--nav-on-fg':'#86efac','--nav-on-ico':'#10b981',
+      '--tip-bg':'#0a1c16','--tip-fg':'#eafaf0',
+      '--top-bg':'#ffffff','--top-bd':'#e4f0ea',
+      '--field-bg':'#eff6f2','--field-bd':'#dde9e2',
+      '--ava-bg':'linear-gradient(135deg,#15803d,#4ade80)','--ava-fg':'#06230f',
+      '--list-bg':'#ffffff','--list-bd':'#e6f1ea','--list-rowbd':'#eff6f1','--list-hover':'#f5faf7','--list-on-bg':'#eff8f2',
+      '--hero-bg':'#ffffff','--fico-bg':'#eef7f1',
+      '--btn2-bg':'#ffffff','--btn2-fg':'#4c6158','--btn2-bd':'#dde9e2','--btn2-hover':'#f2f8f5',
+      '--danger-bg':'#fdf2f1','--danger-fg':'#dc2626','--danger-bd':'#f8cdc7',
+      '--telas-bg':'#dbeafe','--telas-fg':'#0369a1','--avios-bg':'#fef3c7','--avios-fg':'#b45309','--serv-bg':'#ede9fe','--serv-fg':'#6d28d9',
+      '--ok-bg':'#dcfce7','--ok-fg':'#15803d','--ok-dot':'#22c55e','--off-bg':'#eef0f4','--off-fg':'#64748b','--off-dot':'#94a3b8',
+      '--av-telas':'linear-gradient(135deg,#0284c7,#38bdf8)','--av-avios':'linear-gradient(135deg,#d97706,#fbbf24)','--av-serv':'linear-gradient(135deg,#7c3aed,#c084fc)','--av-off':'linear-gradient(135deg,#94a3b8,#cbd5e1)'
+    }
+  },
+  {
+    n:8, id:'c8', cls:'c8', name:'Oscuro verde neón', tone:'Verde neón', toneHex:'#22c55e',
+    blurb:'Modo oscuro con verde neón que brilla como la marca, con glow sobre el fondo profundo. Los colores explicativos (tipos y estados) resaltan sobre el negro. Para quien prefiere oscuro.',
+    sw:['#22c55e','#38bdf8','#fbbf24','#34d399','#0a140d'], font:"'Space Grotesk', sans-serif",
+    vars:{
+      '--font':"'Space Grotesk', sans-serif",
+      '--bg':'#0a140d','--frame-bd':'#1d2b22','--ink':'#e6f5ec','--muted':'#86a394',
+      '--brand':'#22c55e','--brand-700':'#16a34a','--brand-fg':'#04130c','--btn-sh':'0 0 18px -2px rgba(34,197,94,.55)',
+      '--side-bg':'#06100b','--side-bd':'#1a2b20','--side-title':'#e6f5ec','--side-ico':'#86a394',
+      '--logo-bg':'linear-gradient(135deg,#22e08a,#4ade80)','--logo-fg':'#04130c','--logo-sh':'0 0 18px -2px rgba(34,224,138,.55)',
+      '--collapse-bg':'#13201a',
+      '--nav-fg':'#8baa97','--nav-hover-bg':'#15241c','--nav-hover-fg':'#e0f5ea','--nav-on-bg':'rgba(34,197,94,.18)','--nav-on-fg':'#86efac','--nav-on-ico':'#4ade80',
+      '--tip-bg':'#06100b','--tip-fg':'#e6f5ec',
+      '--top-bg':'#0d1912','--top-bd':'#1d2b22',
+      '--field-bg':'#111d16','--field-bd':'#26392d',
+      '--ava-bg':'linear-gradient(135deg,#22c55e,#4ade80)','--ava-fg':'#04130c',
+      '--list-bg':'#0d1912','--list-bd':'#1d2b22','--list-rowbd':'#172419','--list-hover':'#13201a','--list-on-bg':'#15281c',
+      '--hero-bg':'#0d1912','--fico-bg':'#15281c',
+      '--btn2-bg':'#172419','--btn2-fg':'#c1ddca','--btn2-bd':'#2a3f30','--btn2-hover':'#1f3326',
+      '--danger-bg':'rgba(248,113,113,.14)','--danger-fg':'#fca5a5','--danger-bd':'rgba(248,113,113,.3)',
+      '--telas-bg':'rgba(56,189,248,.16)','--telas-fg':'#7dd3fc','--avios-bg':'rgba(251,191,36,.16)','--avios-fg':'#fcd34d','--serv-bg':'rgba(232,121,249,.18)','--serv-fg':'#f0abfc',
+      '--ok-bg':'rgba(52,211,153,.16)','--ok-fg':'#6ee7b7','--ok-dot':'#34d399','--off-bg':'rgba(139,133,163,.16)','--off-fg':'#a59fbb','--off-dot':'#8b85a3',
+      '--av-telas':'linear-gradient(135deg,#0ea5e9,#38bdf8)','--av-avios':'linear-gradient(135deg,#f59e0b,#fbbf24)','--av-serv':'linear-gradient(135deg,#d946ef,#e879f9)','--av-off':'linear-gradient(135deg,#475569,#64748b)'
+    }
+  }
+];
+
+/* ===================== RENDER ===================== */
+// Build a scoped CSS block of variables for each palette.
+function paletteCss(p) {
+  const decls = Object.entries(p.vars).map(([k,v]) => `${k}:${v};`).join('');
+  return `.${p.cls} .frame{${decls}}`;
+}
+const styleEl = document.createElement('style');
+styleEl.textContent = PALETTES.map(paletteCss).join('\n');
+document.head.appendChild(styleEl);
+
+const container = document.getElementById('proposals');
+container.innerHTML = PALETTES.map(p => `
+  <section id="${p.id}" class="${p.cls}">
+    <div class="prop-head">
+      <div class="prop-kicker">Propuesta ${p.n} · <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${p.toneHex};vertical-align:middle;margin:0 5px 0 2px;"></span>${p.tone}</div>
+      <h2 class="prop-title">${p.name}</h2>
+      <p class="prop-sub">${p.blurb}</p>
+      <span class="swatches">${p.sw.map((c,idx)=>`<span class="swatch" style="background:${c}" title="${['Marca (verde)','Telas','Avíos','Servicios','Fondo'][idx]||''}"></span>`).join('')}</span>
+    </div>
+    ${frame(p.big ? 'big-icons' : '')}
+  </section>
+`).join('');
+</script>
+
+</body>
+</html>
