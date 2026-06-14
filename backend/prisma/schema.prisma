@@ -377,6 +377,9 @@ model Archivo {
   /// Adjunto de proveedor que apunta a este archivo (F1-E1B), si lo hay. Relación
   /// inversa exigida por Prisma; en la práctica es 0 o 1 (un archivo se adjunta una vez).
   proveedorArchivo ProveedorArchivo?
+  /// Bordado cuya foto es este archivo (F1-E3), si lo hay. Inversa de `Bordado.archivoFoto`;
+  /// 0 o 1 (un archivo es la foto de un solo bordado).
+  bordado          Bordado?
 
   @@map("archivos")
 }
@@ -478,6 +481,8 @@ model Proveedor {
   roles    ProveedorRol[]
   /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
   archivos ProveedorArchivo[]
+  /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
+  avios    AvioProveedor[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -634,6 +639,9 @@ model Color {
   nombre String  @unique
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
+
+  /// Telas que tienen este color con su precio (F1-E3, N:N vía `TelaColor`).
+  telas TelaColor[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -838,4 +846,231 @@ model ClienteCampo {
   @@unique([idCliente, etiqueta])
   @@index([idCliente])
   @@map("cliente_campo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogos de MATERIALES (F1-E3) — los tres catálogos complejos que alimentan el
+// BOM (docs/hoja-de-ruta/F1-etapas.md §F1-E3). Maestros GLOBALES (sin idEmpresa,
+// ADR-0007/A9) con auditoría uniforme (A7) y borrado suave (`activo`):
+//  • Telas UNIFICADAS (D5): una SOLA entidad `Tela` para BOM e inventario —corrige la
+//    dualidad Telas/TelasDis del viejo— con su clasificación (`TelaCategoria`) y su grid
+//    de colores con precio (`TelaColor`, N:N a Color). El mapeo Telas/TelasDis→Tela es
+//    del ETL de E6, no aquí (ADR-0009).
+//  • Avíos (R1): catálogo `Avio` (ex `Habilitacion`) con sus proveedores y precios
+//    (`AvioProveedor`, N:N a Proveedor). `unidad`/`presentacion` NULLABLE (obligatorias
+//    solo en altas nuevas por UI; relajadas para los 629 avíos migrados en E6 — ADR-0009).
+//    `precioReferencia` es el fallback de precio cuando no hay proveedor mapeable (ADR-0009).
+//  • Bordados (R2): `Bordado` (ex tabla con `BorEst` y `Foto`) con su foto en R2 (FK
+//    directa al `Archivo` de F0; 1 bordado → 0..1 foto, sin tabla puente).
+// onDelete: Restrict hacia los catálogos en uso (Color, Proveedor, TelaCategoria — se
+// desactivan, no se borran físico); Cascade hacia el maestro padre en los puentes
+// (Tela en TelaColor, Avio en AvioProveedor — permite reescribir el set en la tx A2);
+// SetNull en Bordado→Archivo (quitar la foto no borra el bordado). Mismo patrón que
+// F1-E1B (Proveedor↔RolProveedor) y F1-E2 (Maquilero↔TipoProceso).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tipo de componente de una tela dentro del lote (D5 — doc 04-Inventarios §B.1:
+/// telas de dos componentes, p. ej. felpa + cardigan del mismo lote). `OTRO` cubre
+/// acompañantes y telas de un solo componente. Sustituye la dualidad fija
+/// ExTela1/ExTela2 del viejo (que F4 generaliza a N acompañantes por lote, D5).
+enum TipoComponenteTela {
+  CUERPO
+  CARDIGAN
+  OTRO
+
+  @@map("tipo_componente_tela")
+}
+
+/// Tipo de un "bordado" (ex campo `BorEst` del viejo, doc 01-Modelos §2): distingue
+/// bordado real de estampado/aplicación. En F4 el BOM del modelo los referencia igual.
+enum TipoBordado {
+  BORDADO
+  ESTAMPADO
+
+  @@map("tipo_bordado")
+}
+
+/// Categoría de tela (catálogo global, F1-E3). Equivale a `TelasCategorias` del viejo
+/// (doc 04-Inventarios §B.2): agrupa las telas (Felpa, Jersey, Rib…). Sin permiso
+/// propio: se gobierna con `telas.administrar` (ADR-0009). Borrado suave + auditoría A7.
+model TelaCategoria {
+  id     Int     @id @default(autoincrement())
+  /// Nombre de la categoría. Único global (ADR-0007).
+  nombre String  @unique
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo Boolean @default(true)
+
+  /// Telas clasificadas en esta categoría.
+  telas Tela[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("telas_categorias")
+}
+
+/// Tela UNIFICADA (catálogo global, F1-E3, D5 — ADR-0009). UNA sola entidad que sirve
+/// al BOM (doc 01-Modelos §2, TelasDis) Y al inventario (doc 04-Inventarios §B.2, Telas):
+/// corrige la dualidad Telas/TelasDis del viejo. Diseñada para que Lote/LoteComponente
+/// de F4 cuelguen de ella sin retocarla. El mapeo del par viejo → esta tabla lo hace el
+/// ETL de E6. `idCategoria` OPCIONAL (no romper el ETL si la tela vieja no trae categoría).
+model Tela {
+  id             Int                @id @default(autoincrement())
+  /// Nombre de la tela. Único global (ADR-0007).
+  nombre         String             @unique
+  descripcion    String?
+  /// Categoría (opcional para no romper el ETL de E6). Restrict: una categoría en uso
+  /// no se borra físico → se desactiva.
+  idCategoria    Int?               @map("id_categoria")
+  categoria      TelaCategoria?     @relation(fields: [idCategoria], references: [id], onDelete: Restrict)
+  /// Unidad de medida de uso/compra (kg, m…). Texto libre (la UI sugiere una lista).
+  unidadMedida   String?            @map("unidad_medida")
+  /// Rol típico de la tela en el lote (D5: cuerpo/cardigan/otro). Default OTRO.
+  tipoComponente TipoComponenteTela @default(OTRO) @map("tipo_componente")
+  /// Tela de uso frecuente (preselección en la UI de captura).
+  favorito       Boolean            @default(false)
+  /// Precio de referencia por unidad (informativo; el costo real va por lote/orden).
+  precioSugerido Decimal?           @map("precio_sugerido") @db.Decimal(12, 2)
+  /// ¿Es tela de producción (vs. muestra/insumo no productivo)? Default true.
+  paraProduccion Boolean            @default(true) @map("para_produccion")
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo         Boolean            @default(true)
+
+  /// Colores disponibles de esta tela con su precio (N:N a Color).
+  colores TelaColor[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("telas")
+}
+
+/// Puente N:N tela ↔ color con precio (F1-E3). Equivale a `TelasColores` del viejo
+/// (doc 04-Inventarios §B.2). PK compuesta (idTela, idColor): un color aparece UNA vez
+/// por tela. `onDelete`:
+///  • Cascade hacia `Tela`: los colores son configuración de la tela; permite reescribir
+///    el grid de colores en la transacción A2.
+///  • Restrict hacia `Color`: un color usado por alguna tela no se borra físico (se
+///    desactiva con `activo`, con mensaje claro), para no dejar el par colgando.
+/// Auditoría COMPLETA: `precio` es editable (A7).
+model TelaColor {
+  idTela  Int      @map("id_tela")
+  idColor Int      @map("id_color")
+  /// Precio del metro/kg de esta tela en este color (informativo; el costo real va por lote).
+  precio  Decimal? @db.Decimal(12, 2)
+
+  tela  Tela  @relation(fields: [idTela], references: [id], onDelete: Cascade)
+  color Color @relation(fields: [idColor], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idTela, idColor])
+  @@index([idColor])
+  @@map("telas_colores")
+}
+
+/// Avío / habilitación (catálogo global, F1-E3, R1). Equivale a `Habilitacion` del viejo
+/// (doc 01-Modelos §2, con Favorito/CantFav). `unidad` y `presentacion` son campos NUEVOS
+/// que el viejo no tiene: NULLABLE en BD a propósito (obligatorios SOLO en altas nuevas por
+/// UI, que valida el dominio/Zod del form) para que el ETL de E6 cargue los 629 avíos
+/// históricos sin esos datos (ADR-0009). `precioReferencia` es el fallback de precio cuando
+/// el proveedor del precio histórico no es mapeable (ADR-0009, insumo del costeo F7).
+model Avio {
+  id               Int      @id @default(autoincrement())
+  /// Clave de negocio del avío (estable). Única global y clave de captura.
+  clave            String   @unique
+  descripcion      String
+  /// Unidad de medida (pza, m, kg…). NULLABLE en BD; obligatoria en alta por UI (ADR-0009).
+  unidad           String?
+  /// Presentación/empaque (caja, rollo…). NULLABLE en BD; obligatoria en alta por UI (ADR-0009).
+  presentacion     String?
+  /// Avío de uso frecuente (preselección en la UI; si es favorito ⇒ `cantFav` obligatoria).
+  favorito         Boolean  @default(false)
+  /// Cantidad preestablecida cuando es favorito (la exige el dominio si `favorito`).
+  cantFav          Decimal? @map("cant_fav") @db.Decimal(12, 2)
+  /// Avío genérico de stock (R4 / Make-to-Order): no se compra por orden, se tiene en almacén.
+  esGenerico       Boolean  @default(false) @map("es_generico")
+  /// Precio de referencia (fallback de precio sin proveedor mapeable — ADR-0009).
+  precioReferencia Decimal? @map("precio_referencia") @db.Decimal(12, 2)
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo           Boolean  @default(true)
+
+  /// Proveedores que surten este avío con su precio (N:N a Proveedor).
+  proveedores AvioProveedor[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("avios")
+}
+
+/// Puente N:N avío ↔ proveedor con precio y condiciones (F1-E3, R1 — insight del dueño:
+/// el mismo avío se compra a varios proveedores a precios distintos; base de R3/R7 en F4).
+/// PK compuesta (idAvio, idProveedor): un proveedor aparece UNA vez por avío. `onDelete`:
+///  • Cascade hacia `Avio`: los proveedores son configuración del avío; permite reescribir
+///    el set en la transacción A2.
+///  • Restrict hacia `Proveedor`: un proveedor con avíos asignados no se borra físico (se
+///    desactiva), para no dejar el par colgando.
+/// Auditoría COMPLETA: `precio`/`condiciones` son editables (A7).
+model AvioProveedor {
+  idAvio      Int      @map("id_avio")
+  idProveedor Int      @map("id_proveedor")
+  /// Precio al que ESTE proveedor surte el avío.
+  precio      Decimal? @db.Decimal(12, 2)
+  /// Condiciones comerciales de este proveedor para este avío (texto libre).
+  condiciones String?
+
+  avio      Avio      @relation(fields: [idAvio], references: [id], onDelete: Cascade)
+  proveedor Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idAvio, idProveedor])
+  @@index([idProveedor])
+  @@map("avio_proveedor")
+}
+
+/// Bordado / estampado (catálogo global, F1-E3, R2). Equivale a la tabla del viejo con
+/// `BorEst` y `Foto` (doc 01-Modelos §2). La foto vive en R2: FK DIRECTA al `Archivo` de
+/// F0 (1 bordado → 0..1 foto, sin tabla puente). `onDelete: SetNull` en la foto: quitar/
+/// borrar el archivo NO borra el bordado, solo lo deja sin foto (placeholder NoFoto en UI).
+/// `nombre` @unique = catálogo limpio en v2; si el viejo trae homónimos, el ETL de E6 los
+/// desambigua o los manda a reporte (ADR-0009, riesgo menor anotado).
+model Bordado {
+  id            Int         @id @default(autoincrement())
+  /// Nombre del bordado/estampado. Único global (ADR-0007 / catálogo limpio v2).
+  nombre        String      @unique
+  descripcion   String?
+  /// Número de puntadas (informativo, alimenta el costeo del bordado).
+  puntadas      Int?
+  /// Precio de referencia del bordado/estampado.
+  precio        Decimal?    @db.Decimal(12, 2)
+  /// Bordado real vs. estampado/aplicación (ex `BorEst`). Default BORDADO.
+  tipo          TipoBordado @default(BORDADO)
+  /// Foto del bordado en R2 (opcional). FK directa al `Archivo` de F0; SetNull al borrar.
+  /// @unique: la relación con Archivo es 1:1 (un archivo es la foto de un solo bordado),
+  /// por eso el lado que define la FK debe ser único (mismo patrón que ProveedorArchivo).
+  idArchivoFoto String?     @unique @map("id_archivo_foto")
+  archivoFoto   Archivo?    @relation(fields: [idArchivoFoto], references: [id], onDelete: SetNull)
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo        Boolean     @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("bordados")
 }

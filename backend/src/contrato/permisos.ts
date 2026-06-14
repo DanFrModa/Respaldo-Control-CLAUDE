@@ -48,6 +48,11 @@ export const MODULOS_PERMISO = {
   // ── Catálogos estructurados (F1-E2) ────────────────────────────────────────
   // `clientes` y `maquileros` ya existen como label arriba; `tallas` es nuevo.
   tallas: 'Tallas y curvas',
+  // ── Catálogos de materiales (F1-E3) ────────────────────────────────────────
+  // `telas` ya existe arriba (Inventario de telas): la administración del CATÁLOGO de
+  // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` y `bordados` son nuevos.
+  avios: 'Avíos',
+  bordados: 'Bordados y estampados',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -607,6 +612,46 @@ export const CATALOGO_PERMISOS = [
     modulo: 'clientes',
     descripcion:
       'Administrar el catálogo de clientes y sus campos de referencia (alta, edición, desactivación)',
+  },
+
+  // ── Catálogos de materiales (F1-E3, globales — ADR-0007/ADR-0009; CRUD patrón Almacenes) ─
+  // Telas unificadas (D5) con sus colores, avíos (R1) con sus proveedores y bordados (R2)
+  // con foto. Como los catálogos de F1-E1/E2: `ver` (consulta) y `administrar`
+  // (alta/edición/des-reactivación). Las CATEGORÍAS de tela y los PROVEEDORES de un avío
+  // NO tienen permiso propio: se gobiernan con `telas.administrar` / `avios.administrar`
+  // (mismo criterio que `tipos-proceso` con `maquileros.*` en E2).
+  {
+    clave: 'telas.ver',
+    modulo: 'telas',
+    descripcion: 'Consultar el catálogo de telas y sus colores',
+  },
+  {
+    clave: 'telas.administrar',
+    modulo: 'telas',
+    descripcion:
+      'Administrar el catálogo de telas, sus categorías y colores (alta, edición, desactivación)',
+  },
+  {
+    clave: 'avios.ver',
+    modulo: 'avios',
+    descripcion: 'Consultar el catálogo de avíos',
+  },
+  {
+    clave: 'avios.administrar',
+    modulo: 'avios',
+    descripcion:
+      'Administrar el catálogo de avíos y sus proveedores (alta, edición, desactivación)',
+  },
+  {
+    clave: 'bordados.ver',
+    modulo: 'bordados',
+    descripcion: 'Consultar el catálogo de bordados y estampados',
+  },
+  {
+    clave: 'bordados.administrar',
+    modulo: 'bordados',
+    descripcion:
+      'Administrar el catálogo de bordados y estampados, incluida su foto (alta, edición, desactivación)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

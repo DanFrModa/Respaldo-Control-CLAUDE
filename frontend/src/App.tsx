@@ -5,6 +5,9 @@ import { Toaster } from '@/components/ui/sonner';
 import { CascaronSistema } from '@/modulos/CascaronSistema';
 import { AdministracionPagina } from '@/modulos/administracion/AdministracionPagina';
 import { AlmacenesPagina } from '@/modulos/almacenes/AlmacenesPagina';
+import { AviosPagina } from '@/modulos/avios/AviosPagina';
+import { BordadosPagina } from '@/modulos/bordados/BordadosPagina';
+import { GaleriaBordados } from '@/modulos/bordados/GaleriaBordados';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
@@ -14,6 +17,7 @@ import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPa
 import { MaquilerosPagina } from '@/modulos/maquileros/MaquilerosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
+import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TemporadasPagina } from '@/modulos/temporadas/TemporadasPagina';
 import { UsuariosPagina } from '@/modulos/usuarios/UsuariosPagina';
 import { Inicio } from '@/paginas/Inicio';
@@ -62,6 +66,10 @@ const router = createBrowserRouter([
           { path: 'catalogos/maquileros', element: <MaquilerosPagina /> },
           { path: 'catalogos/tallas', element: <TallasCurvasPagina /> },
           { path: 'catalogos/clientes', element: <ClientesPagina /> },
+          { path: 'catalogos/telas', element: <TelasPagina /> },
+          { path: 'catalogos/avios', element: <AviosPagina /> },
+          { path: 'catalogos/bordados', element: <BordadosPagina /> },
+          { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

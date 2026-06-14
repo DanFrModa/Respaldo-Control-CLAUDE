@@ -1,10 +1,14 @@
 import {
+  Boxes,
   CalendarRange,
   Contact,
   Factory,
+  Images,
+  Layers,
   Palette,
   Ruler,
   Scissors,
+  Stamp,
   Tags,
   Truck,
   Warehouse,
@@ -134,13 +138,47 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     tono: 'avios',
     permiso: 'clientes.ver',
   },
+  // ── Catálogos de materiales (F1-E3) ──────────────────────────────────────────
+  {
+    clave: 'telas',
+    titulo: 'Telas',
+    descripcion: 'Catálogo unificado de telas (BOM e inventario) con sus colores.',
+    ruta: '/catalogos/telas',
+    icono: Layers,
+    tono: 'telas',
+    permiso: 'telas.ver',
+  },
+  {
+    clave: 'avios',
+    titulo: 'Avíos',
+    descripcion: 'Habilitación: hilos, botones, etiquetas… con sus proveedores y precios.',
+    ruta: '/catalogos/avios',
+    icono: Boxes,
+    tono: 'avios',
+    permiso: 'avios.ver',
+  },
+  {
+    clave: 'bordados',
+    titulo: 'Bordados y estampados',
+    descripcion: 'Catálogo de bordados y estampados con su foto.',
+    ruta: '/catalogos/bordados',
+    icono: Stamp,
+    tono: 'servicios',
+    permiso: 'bordados.ver',
+  },
+  {
+    clave: 'galeria-bordados',
+    titulo: 'Galería de bordados',
+    descripcion: 'Vista visual de los bordados y estampados con foto.',
+    ruta: '/catalogos/galeria-bordados',
+    icono: Images,
+    tono: 'pt',
+    permiso: 'bordados.ver',
+  },
 ];
 
 /** Catalogos aun por construir (se muestran como "Próximamente"). */
-const CATALOGOS_PENDIENTES: readonly SubcatalogoPendiente[] = [
-  { clave: 'telas', titulo: 'Telas', descripcion: 'Catálogo de telas y composiciones.' },
-  { clave: 'avios', titulo: 'Avíos', descripcion: 'Habilitación: hilos, botones, etiquetas…' },
-];
+const CATALOGOS_PENDIENTES: readonly SubcatalogoPendiente[] = [];
 
 export function CatalogosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
