@@ -80,7 +80,6 @@ export {
   esquemaProveedoresPagina,
   esquemaRolProveedorSalida,
   esquemaProveedorAdjuntoCrear,
-  esquemaProveedorAdjuntoCrearCuerpo,
   esquemaProveedorAdjuntoSubida,
   esquemaProveedorAdjuntoSalida,
   esquemaProveedorAdjuntosLista,

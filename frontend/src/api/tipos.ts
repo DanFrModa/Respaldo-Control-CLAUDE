@@ -53,6 +53,30 @@ export type ProveedorCrear =
 export type ProveedorEditar =
   paths['/api/proveedores/{id}']['patch']['requestBody']['content']['application/json'];
 
+// ── Catalogo de roles de proveedor (F1-E1B, selector) ────────────────────────
+
+/** Lista de roles/servicios de proveedor (`GET /api/roles-proveedor`) — array plano. */
+export type RolesProveedorLista =
+  paths['/api/roles-proveedor']['get']['responses']['200']['content']['application/json'];
+/** Un rol de proveedor del catalogo selector. */
+export type RolProveedor = RolesProveedorLista[number];
+
+// ── Adjuntos de proveedor (F1-E1B, archivos en R2 via presigned) ─────────────
+
+/** Lista de adjuntos de un proveedor (`GET /api/proveedores/{id}/adjuntos`). */
+export type ProveedorAdjuntosLista =
+  paths['/api/proveedores/{id}/adjuntos']['get']['responses']['200']['content']['application/json'];
+/** Un adjunto de proveedor (con su URL de descarga prefirmada). */
+export type ProveedorAdjunto = ProveedorAdjuntosLista['datos'][number];
+/** Tipo documental de un adjunto de proveedor (constancia/contrato/otro). */
+export type TipoArchivoProveedor = ProveedorAdjunto['tipo'];
+/** Cuerpo para preparar la subida de un adjunto (`POST /api/proveedores/{id}/adjuntos`). */
+export type ProveedorAdjuntoCrear =
+  paths['/api/proveedores/{id}/adjuntos']['post']['requestBody']['content']['application/json'];
+/** Respuesta al preparar la subida (registro Archivo + URL PUT prefirmada). */
+export type ProveedorAdjuntoSubida =
+  paths['/api/proveedores/{id}/adjuntos']['post']['responses']['201']['content']['application/json'];
+
 /** Pagina de cortadores (`GET /api/cortadores`). */
 export type CortadoresPagina =
   paths['/api/cortadores']['get']['responses']['200']['content']['application/json'];

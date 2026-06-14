@@ -226,10 +226,40 @@ function datosEnriquecidosCrear(
   return data;
 }
 
+/** Campos de TEXTO editables (clave del payload === clave del modelo). */
+const CAMPOS_TEXTO_EDITABLES = [
+  'razonSocial',
+  'telefono',
+  'contacto',
+  'condiciones',
+  'rfc',
+  'regimenFiscalSat',
+  'usoCfdiHabitual',
+  'codigoPostalExpedicion',
+  'email',
+  'direccion',
+  'moneda',
+  'formaPago',
+  'metodoPago',
+  'banco',
+  'clabe',
+  'notas',
+] as const;
+
+/** Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean). */
+const CAMPOS_BOOL_EDITABLES = ['factura', 'retieneIva', 'retieneIsr'] as const;
+
+/** Campos NUMÉRICOS enteros editables (nullables: `null` = borrar el dato). */
+const CAMPOS_NUM_EDITABLES = ['diasCredito', 'leadTimeDias'] as const;
+
 /**
  * Aplica los campos enriquecidos que VENGAN en la edición al `update` y registra qué
- * cambió (para la bitácora). Solo toca los campos presentes en el payload (omitir =
- * no tocar). Devuelve el detalle de cambios para la bitácora.
+ * cambió (para la bitácora). Semántica del PATCH parcial (M1):
+ *   - campo OMITIDO (`undefined`) → no se toca.
+ *   - campo en `null` (o texto que queda vacío) → se BORRA (se pone a `null`); NUNCA
+ *     se escribe `''` (un texto vacío se normaliza a `null` antes de comparar/guardar).
+ *   - campo con valor → se guarda si difiere del actual.
+ * Devuelve el detalle de cambios para la bitácora.
  */
 function aplicarEnriquecidosEditar(
   datos: z.output<typeof esquemaProveedorEditar>,
@@ -237,43 +267,49 @@ function aplicarEnriquecidosEditar(
   cambios: Prisma.ProveedorUpdateInput,
 ): Record<string, unknown> {
   const detalle: Record<string, unknown> = {};
-  // Campos escalares editables (clave del payload === clave del modelo).
-  const campos = [
-    'razonSocial',
-    'telefono',
-    'contacto',
-    'condiciones',
-    'factura',
-    'rfc',
-    'regimenFiscalSat',
-    'usoCfdiHabitual',
-    'codigoPostalExpedicion',
-    'retieneIva',
-    'retieneIsr',
-    'email',
-    'direccion',
-    'diasCredito',
-    'moneda',
-    'formaPago',
-    'metodoPago',
-    'banco',
-    'clabe',
-    'leadTimeDias',
-    'notas',
-  ] as const;
-  for (const campo of campos) {
+
+  // Textos: omitir = no tocar; vacío/`null` = borrar (normalizado a null, nunca '').
+  for (const campo of CAMPOS_TEXTO_EDITABLES) {
+    const crudo = datos[campo];
+    if (crudo === undefined) {
+      continue;
+    }
+    const nuevo = crudo === null || crudo === '' ? null : crudo;
+    const anterior = actual[campo];
+    if (nuevo !== anterior) {
+      (cambios as Record<string, unknown>)[campo] = nuevo;
+      detalle[campo] = { de: anterior, a: nuevo };
+    }
+  }
+
+  // Banderas: omitir = no tocar (no son nullables; el formulario manda boolean).
+  for (const campo of CAMPOS_BOOL_EDITABLES) {
     const nuevo = datos[campo];
     if (nuevo === undefined) {
       continue;
     }
     const anterior = actual[campo];
     if (nuevo !== anterior) {
-      // Asignación dinámica acotada a los campos escalares listados (seguro por tipos del modelo).
       (cambios as Record<string, unknown>)[campo] = nuevo;
       detalle[campo] = { de: anterior, a: nuevo };
     }
   }
+
+  // Numéricos enteros: omitir = no tocar; `null` = borrar.
+  for (const campo of CAMPOS_NUM_EDITABLES) {
+    const nuevo = datos[campo];
+    if (nuevo === undefined) {
+      continue;
+    }
+    const anterior = actual[campo];
+    if (nuevo !== anterior) {
+      (cambios as Record<string, unknown>)[campo] = nuevo;
+      detalle[campo] = { de: anterior, a: nuevo };
+    }
+  }
+
   // `limiteCredito` es Decimal: comparar por valor numérico (Prisma devuelve Decimal).
+  // Omitir = no tocar; `null` = borrar.
   if (datos.limiteCredito !== undefined) {
     const anterior = actual.limiteCredito === null ? null : Number(actual.limiteCredito);
     if (datos.limiteCredito !== anterior) {
