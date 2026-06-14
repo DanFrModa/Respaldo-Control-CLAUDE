@@ -159,6 +159,68 @@ export {
   type ColoresPagina,
 } from './esquemas/color.js';
 
+// ── Catálogos estructurados (F1-E2): maestros globales con relaciones (ADR-0007) ──
+export {
+  esquemaMaquileroCrear,
+  esquemaMaquileroEditar,
+  esquemaMaquileroSalida,
+  esquemaListarMaquileros,
+  esquemaMaquilerosPagina,
+  esquemaTipoProcesoSalida,
+  type DatosMaquileroCrear,
+  type DatosMaquileroEditar,
+  type MaquileroSalida,
+  type ListarMaquileros,
+  type MaquilerosPagina,
+  type TipoProcesoSalida,
+} from './esquemas/maquilero.js';
+
+export {
+  esquemaTallaCrear,
+  esquemaTallaEditar,
+  esquemaTallaSalida,
+  esquemaListarTallas,
+  esquemaTallasPagina,
+  esquemaCurvaCrear,
+  esquemaCurvaEditar,
+  esquemaCurvaSalida,
+  esquemaCurvaTallaItemSalida,
+  esquemaListarCurvas,
+  esquemaCurvasPagina,
+  type DatosTallaCrear,
+  type DatosTallaEditar,
+  type TallaSalida,
+  type ListarTallas,
+  type TallasPagina,
+  type DatosCurvaCrear,
+  type DatosCurvaEditar,
+  type CurvaSalida,
+  type CurvaTallaItemSalida,
+  type ListarCurvas,
+  type CurvasPagina,
+} from './esquemas/talla.js';
+
+export {
+  TIPOS_CAMPO_CLIENTE,
+  esquemaClienteCrear,
+  esquemaClienteEditar,
+  esquemaClienteSalida,
+  esquemaListarClientes,
+  esquemaClientesPagina,
+  esquemaClienteCampoCrear,
+  esquemaClienteCampoEditar,
+  esquemaClienteCampoSalida,
+  type TipoCampoClienteClave,
+  type DatosClienteCrear,
+  type DatosClienteEditar,
+  type ClienteSalida,
+  type ListarClientes,
+  type ClientesPagina,
+  type DatosClienteCampoCrear,
+  type DatosClienteCampoEditar,
+  type ClienteCampoSalida,
+} from './esquemas/cliente.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

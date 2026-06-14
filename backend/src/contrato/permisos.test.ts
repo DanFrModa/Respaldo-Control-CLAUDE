@@ -41,6 +41,9 @@ describe('catálogo de permisos', () => {
     expect(nuevos.sort()).toEqual([
       'almacenes.administrar',
       'almacenes.ver',
+      // Catálogos estructurados (F1-E2): clientes (D7) + maquileros + tallas/curvas (D4).
+      'clientes.administrar',
+      'clientes.ver',
       // Catálogos maestros globales (F1-E1, ADR-0007): ver + administrar por catálogo.
       'colores.administrar',
       'colores.ver',
@@ -49,9 +52,13 @@ describe('catálogo de permisos', () => {
       'empresas.administrar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      'maquileros.administrar',
+      'maquileros.ver',
       'proveedores.administrar',
       'proveedores.ver',
       'roles.administrar',
+      'tallas.administrar',
+      'tallas.ver',
       'temporadas.administrar',
       'temporadas.ver',
       'usuarios.administrar',

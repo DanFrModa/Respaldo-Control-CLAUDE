@@ -45,6 +45,9 @@ export const MODULOS_PERMISO = {
   temporadas: 'Temporadas',
   'etiquetas-marca': 'Etiquetas de marca',
   colores: 'Colores',
+  // ── Catálogos estructurados (F1-E2) ────────────────────────────────────────
+  // `clientes` y `maquileros` ya existen como label arriba; `tallas` es nuevo.
+  tallas: 'Tallas y curvas',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -565,6 +568,45 @@ export const CATALOGO_PERMISOS = [
     clave: 'colores.administrar',
     modulo: 'colores',
     descripcion: 'Administrar el catálogo de colores (alta, edición, desactivación)',
+  },
+
+  // ── Catálogos estructurados (F1-E2, globales — ADR-0007; CRUD patrón Almacenes) ─
+  // Maquila unificada (Maquilero + TipoProceso N:N), tallas/curvas (D4) y clientes
+  // con campos de referencia (D7). Como los catálogos de F1-E1: `ver` (consulta) y
+  // `administrar` (alta/edición/des-reactivación). El catálogo `tipos-proceso` NO
+  // tiene permiso propio: su selector (`GET /api/tipos-proceso`) se protege con
+  // `maquileros.ver` (mismo criterio que `roles-proveedor` con `proveedores.ver` en
+  // E1B); el ABM fino de tipos-proceso queda diferido a una fase posterior.
+  {
+    clave: 'maquileros.ver',
+    modulo: 'maquileros',
+    descripcion: 'Consultar el catálogo de maquileros',
+  },
+  {
+    clave: 'maquileros.administrar',
+    modulo: 'maquileros',
+    descripcion: 'Administrar el catálogo de maquileros (alta, edición, desactivación)',
+  },
+  {
+    clave: 'tallas.ver',
+    modulo: 'tallas',
+    descripcion: 'Consultar el catálogo de tallas y curvas',
+  },
+  {
+    clave: 'tallas.administrar',
+    modulo: 'tallas',
+    descripcion: 'Administrar el catálogo de tallas y curvas (alta, edición, desactivación)',
+  },
+  {
+    clave: 'clientes.ver',
+    modulo: 'clientes',
+    descripcion: 'Consultar el catálogo de clientes',
+  },
+  {
+    clave: 'clientes.administrar',
+    modulo: 'clientes',
+    descripcion:
+      'Administrar el catálogo de clientes y sus campos de referencia (alta, edición, desactivación)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

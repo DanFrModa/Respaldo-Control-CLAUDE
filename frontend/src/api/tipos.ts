@@ -135,6 +135,90 @@ export type ColorCrear =
 export type ColorEditar =
   paths['/api/colores/{id}']['patch']['requestBody']['content']['application/json'];
 
+// ── Catalogos estructurados F1-E2 ─────────────────────────────────────────────
+
+// PIEZA A — Maquila unificada (Maquilero + TipoProceso N:N).
+
+/** Pagina de maquileros (`GET /api/maquileros`). */
+export type MaquilerosPagina =
+  paths['/api/maquileros']['get']['responses']['200']['content']['application/json'];
+/** Un maquilero tal como lo devuelve el API (con sus tipos de proceso). */
+export type Maquilero = MaquilerosPagina['datos'][number];
+/** Parametros de consulta del listado de maquileros (querystring; incluye `tipoProceso`). */
+export type MaquilerosQuery = NonNullable<paths['/api/maquileros']['get']['parameters']['query']>;
+/** Cuerpo de alta de maquilero (`POST /api/maquileros`). */
+export type MaquileroCrear =
+  paths['/api/maquileros']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de maquilero (`PATCH /api/maquileros/{id}`). */
+export type MaquileroEditar =
+  paths['/api/maquileros/{id}']['patch']['requestBody']['content']['application/json'];
+/** Lista de tipos de proceso (`GET /api/tipos-proceso`) — array plano (selector). */
+export type TiposProcesoLista =
+  paths['/api/tipos-proceso']['get']['responses']['200']['content']['application/json'];
+/** Un tipo de proceso de maquila del catalogo selector. */
+export type TipoProceso = TiposProcesoLista[number];
+
+// PIEZA B — Tallas / Curvas (D4).
+
+/** Pagina de tallas (`GET /api/tallas`). */
+export type TallasPagina =
+  paths['/api/tallas']['get']['responses']['200']['content']['application/json'];
+/** Una talla tal como la devuelve el API. */
+export type Talla = TallasPagina['datos'][number];
+/** Parametros de consulta del listado de tallas (querystring). */
+export type TallasQuery = NonNullable<paths['/api/tallas']['get']['parameters']['query']>;
+/** Cuerpo de alta de talla (`POST /api/tallas`). */
+export type TallaCrear = paths['/api/tallas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de talla (`PATCH /api/tallas/{id}`). */
+export type TallaEditar =
+  paths['/api/tallas/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Pagina de curvas de tallas (`GET /api/curvas-talla`). */
+export type CurvasPagina =
+  paths['/api/curvas-talla']['get']['responses']['200']['content']['application/json'];
+/** Una curva de tallas tal como la devuelve el API (con sus items ordenados). */
+export type Curva = CurvasPagina['datos'][number];
+/** Un renglon de una curva (talla + posicion). */
+export type CurvaItem = Curva['items'][number];
+/** Parametros de consulta del listado de curvas (querystring). */
+export type CurvasQuery = NonNullable<paths['/api/curvas-talla']['get']['parameters']['query']>;
+/** Cuerpo de alta de curva (`POST /api/curvas-talla`). */
+export type CurvaCrear =
+  paths['/api/curvas-talla']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de curva (`PATCH /api/curvas-talla/{id}`). */
+export type CurvaEditar =
+  paths['/api/curvas-talla/{id}']['patch']['requestBody']['content']['application/json'];
+
+// PIEZA C — Clientes (D7) + campos de referencia.
+
+/** Pagina de clientes (`GET /api/clientes`). */
+export type ClientesPagina =
+  paths['/api/clientes']['get']['responses']['200']['content']['application/json'];
+/** Un cliente tal como lo devuelve el API (con sus campos de referencia). */
+export type Cliente = ClientesPagina['datos'][number];
+/** Parametros de consulta del listado de clientes (querystring). */
+export type ClientesQuery = NonNullable<paths['/api/clientes']['get']['parameters']['query']>;
+/** Cuerpo de alta de cliente (`POST /api/clientes`). */
+export type ClienteCrear =
+  paths['/api/clientes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de cliente (`PATCH /api/clientes/{id}`). */
+export type ClienteEditar =
+  paths['/api/clientes/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Lista de campos de referencia de un cliente (`GET /api/clientes/{id}/campos`). */
+export type ClienteCamposLista =
+  paths['/api/clientes/{id}/campos']['get']['responses']['200']['content']['application/json'];
+/** Un campo de referencia de un cliente (D7). */
+export type ClienteCampo = ClienteCamposLista['datos'][number];
+/** Tipo de dato de un campo de referencia (TEXTO/NUMERO/FECHA). */
+export type TipoCampoCliente = ClienteCampo['tipo'];
+/** Cuerpo de alta de un campo de referencia (`POST /api/clientes/{id}/campos`). */
+export type ClienteCampoCrear =
+  paths['/api/clientes/{id}/campos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de un campo de referencia (`PATCH /api/clientes/{id}/campos/{idCampo}`). */
+export type ClienteCampoEditar =
+  paths['/api/clientes/{id}/campos/{idCampo}']['patch']['requestBody']['content']['application/json'];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

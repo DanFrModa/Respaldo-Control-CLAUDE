@@ -1,6 +1,9 @@
 import {
   CalendarRange,
+  Contact,
+  Factory,
   Palette,
+  Ruler,
   Scissors,
   Tags,
   Truck,
@@ -103,15 +106,40 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     tono: 'servicios',
     permiso: 'colores.ver',
   },
+  // ── Catálogos estructurados (F1-E2) ──────────────────────────────────────────
+  {
+    clave: 'maquileros',
+    titulo: 'Maquileros',
+    descripcion: 'Talleres de costura y estampado (maquila unificada).',
+    ruta: '/catalogos/maquileros',
+    icono: Factory,
+    tono: 'servicios',
+    permiso: 'maquileros.ver',
+  },
+  {
+    clave: 'tallas',
+    titulo: 'Tallas y curvas',
+    descripcion: 'Tallas y curvas de tallas (ilimitadas, D4).',
+    ruta: '/catalogos/tallas',
+    icono: Ruler,
+    tono: 'neutro',
+    permiso: 'tallas.ver',
+  },
+  {
+    clave: 'clientes',
+    titulo: 'Clientes',
+    descripcion: 'Clientes y sus campos de referencia (D7).',
+    ruta: '/catalogos/clientes',
+    icono: Contact,
+    tono: 'avios',
+    permiso: 'clientes.ver',
+  },
 ];
 
 /** Catalogos aun por construir (se muestran como "Próximamente"). */
 const CATALOGOS_PENDIENTES: readonly SubcatalogoPendiente[] = [
-  { clave: 'clientes', titulo: 'Clientes', descripcion: 'Catálogo de clientes y sus datos.' },
-  { clave: 'maquileros', titulo: 'Maquileros', descripcion: 'Talleres de costura y estampado.' },
   { clave: 'telas', titulo: 'Telas', descripcion: 'Catálogo de telas y composiciones.' },
   { clave: 'avios', titulo: 'Avíos', descripcion: 'Habilitación: hilos, botones, etiquetas…' },
-  { clave: 'tallas', titulo: 'Tallas', descripcion: 'Curvas de tallas (ilimitadas, D4).' },
 ];
 
 export function CatalogosPagina(): React.JSX.Element {

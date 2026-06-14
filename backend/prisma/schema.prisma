@@ -642,3 +642,200 @@ model Color {
 
   @@map("colores")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Catálogos ESTRUCTURADOS (F1-E2) — maestros GLOBALES (sin idEmpresa, ADR-0007/A9)
+// con relaciones internas:
+//  • Maquila unificada (PLANMAESTRO §4): Maquilero + TipoProceso (N:N) —
+//    unifica Maquileros + Estampadores del viejo (doc 03-Producción).
+//  • Tallas ilimitadas (D4, MEJORAS A6): Talla + CurvaTalla (maestro-detalle ordenado).
+//  • Campos de referencia por cliente (D7): Cliente + ClienteCampo (definición; los
+//    VALORES son de F2 vía OrdenReferencia).
+// Mismo patrón de auditoría uniforme (A7) y borrado suave (`activo`) que F1-E1.
+// onDelete: Restrict hacia los catálogos (en uso ⇒ se desactiva, no se borra físico);
+// Cascade hacia el maestro padre en los puentes/detalles (permite reescribir el set
+// en la transacción A2). Idéntico al patrón Proveedor↔RolProveedor de F1-E1B.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Maquilero (catálogo global, F1-E2). UNIFICA Maquileros + Estampadores del viejo
+/// (doc 03-Producción §Paso 4 Entrega a maquilero y §Flujo paralelo Estampado/Aplicación).
+/// Las CAPACIDADES (costura/estampado/…) se modelan N:N a TipoProceso (maquila
+/// unificada, PLANMAESTRO §4) — NO como tablas separadas. Mismo patrón N:N que
+/// Proveedor↔RolProveedor. Cimiento de EsMa/CxP (F6/F8).
+model Maquilero {
+  id            Int     @id @default(autoincrement())
+  /// Código corto de uso diario (viejo: `Corto`). Único global y clave de negocio.
+  /// (El `nombre` NO es único: el viejo tiene homónimos; la dedup en E6 va a REPORTE.)
+  corto         String  @unique
+  nombre        String
+  apellidos     String?
+  telefonos     String?
+  direccion     String?
+  observaciones String?
+  /// Observaciones específicas de pago.
+  obsPago       String? @map("obs_pago")
+  /// ¿Está asegurado? (viejo: `Asegurado`).
+  asegurado     Boolean @default(false)
+  activo        Boolean @default(true)
+
+  tipos MaquileroTipoProceso[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("maquileros")
+}
+
+/// Tipo de proceso de maquila (catálogo administrable y GLOBAL, F1-E2). Costura,
+/// estampado, bordado, lavado, aplicación… En F5 cada tipo se liga a un proceso de
+/// la Ruta Crítica. Mismo patrón que `RolProveedor` (se siembra; admin fina diferida,
+/// igual que roles-proveedor en E1B).
+model TipoProceso {
+  id     Int     @id @default(autoincrement())
+  /// Clave estable kebab-case (p. ej. "costura"). Única global.
+  codigo String  @unique
+  nombre String
+  activo Boolean @default(true)
+
+  maquileros MaquileroTipoProceso[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("tipos_proceso")
+}
+
+/// Puente N:N maquilero ↔ tipo de proceso (F1-E2). Idéntico a `ProveedorRol`:
+/// Cascade hacia Maquilero (capacidades del maquilero; permite reescribir el set en
+/// la tx), Restrict hacia TipoProceso (un tipo en uso no se borra físico; se desactiva).
+model MaquileroTipoProceso {
+  idMaquilero   Int @map("id_maquilero")
+  idTipoProceso Int @map("id_tipo_proceso")
+
+  maquilero   Maquilero   @relation(fields: [idMaquilero], references: [id], onDelete: Cascade)
+  tipoProceso TipoProceso @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idMaquilero, idTipoProceso])
+  @@index([idTipoProceso])
+  @@map("maquilero_tipo_proceso")
+}
+
+/// Talla individual (catálogo global, D4 — PLANMAESTRO §4; MEJORAS A6: anchos fijos
+/// T1..T8 → catálogo). `orden` da el orden canónico de despliegue (NO único en BD;
+/// lo gestiona el dominio).
+model Talla {
+  id       Int     @id @default(autoincrement())
+  /// Etiqueta de la talla (XCH, CH, M, G, XG, 28, 30…). Única global.
+  etiqueta String  @unique
+  orden    Int     @default(0)
+  activo   Boolean @default(true)
+
+  curvas CurvaTallaItem[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("tallas")
+}
+
+/// Curva de tallas (D4): conjunto ORDENADO de tallas (p. ej. "Caballero básica").
+model CurvaTalla {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  activo Boolean @default(true)
+
+  items CurvaTallaItem[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("curvas_talla")
+}
+
+/// Renglón de una curva (maestro-detalle ordenado). Una talla aparece UNA vez por
+/// curva (PK compuesta); `posicion` da el orden dentro de la curva (lo asigna el
+/// dominio; no único en BD para permitir reordenar en tx). Cascade hacia CurvaTalla
+/// (permite reescribir el set en la tx), Restrict hacia Talla (una talla usada por
+/// una curva no se borra físico → se desactiva, con mensaje claro).
+model CurvaTallaItem {
+  idCurva  Int @map("id_curva")
+  idTalla  Int @map("id_talla")
+  posicion Int
+
+  curva CurvaTalla @relation(fields: [idCurva], references: [id], onDelete: Cascade)
+  talla Talla      @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idCurva, idTalla])
+  @@index([idTalla])
+  @@map("curva_talla_item")
+}
+
+/// Tipo de dato de un campo de referencia de cliente (D7). Para validar el VALOR en F2.
+enum TipoCampoCliente {
+  TEXTO
+  NUMERO
+  FECHA
+
+  @@map("tipo_campo_cliente")
+}
+
+/// Cliente (catálogo global, F1-E2). El viejo solo tiene Id/Cliente/Activo
+/// (doc 02-Pedidos §2); v2 agrega contacto básico. Los VALORES de los campos de
+/// referencia (OrdenReferencia) son de F2; aquí: catálogo + DEFINICIÓN de campos (D7).
+model Cliente {
+  id        Int     @id @default(autoincrement())
+  nombre    String  @unique
+  contacto  String?
+  telefono  String?
+  email     String?
+  direccion String?
+  activo    Boolean @default(true)
+
+  campos ClienteCampo[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("clientes")
+}
+
+/// Definición de un campo de referencia POR cliente (D7 — PLANMAESTRO §4). Cada
+/// cliente define SUS campos (p. ej. "No. de pedido del cliente", semilla del Monarch
+/// viejo, D7). `etiqueta` única DENTRO del cliente. Borrado suave (`activo`). Los
+/// valores se capturan por orden en F2 (OrdenReferencia): el dominio documenta YA que
+/// un campo con valores NO se borrará físico (regla para F2). Cascade desde Cliente.
+model ClienteCampo {
+  id        Int              @id @default(autoincrement())
+  idCliente Int              @map("id_cliente")
+  etiqueta  String
+  tipo      TipoCampoCliente @default(TEXTO)
+  orden     Int              @default(0)
+  activo    Boolean          @default(true)
+
+  cliente Cliente @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idCliente, etiqueta])
+  @@index([idCliente])
+  @@map("cliente_campo")
+}

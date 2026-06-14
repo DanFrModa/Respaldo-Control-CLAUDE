@@ -4,15 +4,18 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 
 import { rutasAlmacenes } from './api/almacenes/almacenes.rutas.js';
+import { rutasClientes } from './api/clientes/clientes.rutas.js';
 import { rutasColores } from './api/colores/colores.rutas.js';
 import { rutasCortadores } from './api/cortadores/cortadores.rutas.js';
 import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
 import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas.js';
 import { registrarManejadorErrores } from './api/errores.js';
+import { rutasMaquileros } from './api/maquileros/maquileros.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
 import { rutasSesion } from './api/sesion/sesion.rutas.js';
+import { rutasTallas } from './api/tallas/tallas.rutas.js';
 import { rutasTemporadas } from './api/temporadas/temporadas.rutas.js';
 import { rutasUsuarios } from './api/usuarios/usuarios.rutas.js';
 import { registrarAuth, type OpcionesAuth } from './auth/plugin.js';
@@ -85,6 +88,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasTemporadas, { prefix: '/api' });
   await app.register(rutasEtiquetasMarca, { prefix: '/api' });
   await app.register(rutasColores, { prefix: '/api' });
+  // Catálogos estructurados (F1-E2) — maquila unificada, tallas/curvas (D4), clientes (D7).
+  await app.register(rutasMaquileros, { prefix: '/api' });
+  await app.register(rutasTallas, { prefix: '/api' });
+  await app.register(rutasClientes, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });
