@@ -122,7 +122,8 @@ function definirRoles(): {
   // (igual que almacenes/usuarios/roles/empresas) queda solo para Administrador y
   // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
   // los catálogos junto con los de administración del sistema. Los catálogos
-  // ESTRUCTURADOS de F1-E2 (maquileros/tallas/clientes) siguen el MISMO reparto.
+  // ESTRUCTURADOS de F1-E2 (maquileros/tallas/clientes) y los de MATERIALES de F1-E3
+  // (telas/avios/bordados) siguen el MISMO reparto.
   const directivo = sin(
     todos,
     'usuarios.administrar',
@@ -138,6 +139,10 @@ function definirRoles(): {
     'maquileros.administrar',
     'tallas.administrar',
     'clientes.administrar',
+    // F1-E3 — catálogos de materiales.
+    'telas.administrar',
+    'avios.administrar',
+    'bordados.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
