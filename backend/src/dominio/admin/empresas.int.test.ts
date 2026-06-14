@@ -82,6 +82,28 @@ describe('administración de empresas (doc 10 §5, A9)', () => {
     expect(refrescadas.filter((e) => e.favorita).map((e) => e.id)).toEqual([primera.id]);
   });
 
+  it('REGRESIÓN: editar otro campo NO resetea las banderas (Zod .partial() no quita el default)', async () => {
+    const sesion = sesionAdmin();
+    const empresa = await crearEmpresa(
+      sesion,
+      { nombre: 'FR Moda', favorita: true, paraIpt: true, paraEdr: true },
+      bd(),
+    );
+
+    // Editar solo `upc`: el esquema de edición NO debe rellenar las banderas con su
+    // default (false) ni el dominio pisar los valores reales.
+    const actualizada = await actualizarEmpresa(sesion, empresa.id, { upc: '750' }, bd());
+    expect(actualizada.upc).toBe('750');
+    expect(actualizada.favorita).toBe(true);
+    expect(actualizada.paraIpt).toBe(true);
+    expect(actualizada.paraEdr).toBe(true);
+
+    const enBd = await cliente.empresa.findUniqueOrThrow({ where: { id: empresa.id } });
+    expect(enBd.favorita).toBe(true);
+    expect(enBd.paraIpt).toBe(true);
+    expect(enBd.paraEdr).toBe(true);
+  });
+
   it('no se desactiva la favorita ni la empresa activa de la sesión', async () => {
     const sesion = sesionAdmin();
     const favorita = await crearEmpresa(sesion, { nombre: 'Favorita', favorita: true }, bd());

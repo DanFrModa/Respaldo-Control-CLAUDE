@@ -91,3 +91,119 @@ export const esquemaUsuarioEditar = z.object({
 
 /** Datos validados de edición de usuario. */
 export type DatosUsuarioEditar = z.infer<typeof esquemaUsuarioEditar>;
+
+/**
+ * Reasignación del conjunto de roles del usuario (lo enviado REEMPLAZA al
+ * actual — `asignarRoles` del dominio). El `id` del usuario va en la URL.
+ */
+export const esquemaUsuarioAsignarRoles = z.object({
+  idsRoles: z
+    .array(
+      z
+        .number({ error: 'Cada rol debe ser un número' })
+        .int({ error: 'Cada rol debe ser un id entero' })
+        .positive({ error: 'Cada rol debe ser un id positivo' }),
+      { error: 'Los roles deben ser una lista de ids' },
+    )
+    .describe('Ids de los roles que quedarán asignados (reemplazan a los actuales).'),
+});
+
+/** Datos validados de reasignación de roles. */
+export type DatosUsuarioAsignarRoles = z.infer<typeof esquemaUsuarioAsignarRoles>;
+
+/**
+ * Cambio de contraseña por un administrador (reset, NO el flujo self-service de
+ * better-auth: aquí no se exige la contraseña actual). El `id` del usuario va en
+ * la URL; la nueva contraseña cumple las mismas reglas que el alta.
+ */
+export const esquemaUsuarioCambiarContrasena = z.object({
+  password: reglaPassword.describe('Nueva contraseña (mín. 8 caracteres).'),
+});
+
+/** Datos validados del cambio de contraseña. */
+export type DatosUsuarioCambiarContrasena = z.infer<typeof esquemaUsuarioCambiarContrasena>;
+
+/**
+ * Salida de un usuario en la API (lo que ve el frontend): datos de dominio +
+ * estado + roles aplanados. NUNCA expone el hash de contraseña ni datos de
+ * autenticación (la selección del dominio ni los toca). Parte del contrato OpenAPI.
+ */
+export const esquemaUsuarioSalida = z
+  .object({
+    id: z.string().describe('Id del usuario (cuid).'),
+    username: z.string().describe('Nombre de inicio de sesión (normalizado a minúsculas).'),
+    nombre: z.string().describe('Nombre completo de la persona.'),
+    email: z.string().describe('Correo (puede ser sintético `<username>@control.local`).'),
+    activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
+    bloqueado: z.boolean().describe('Verdadero si quedó bloqueado por intentos fallidos.'),
+    intentosFallidos: z.number().int().describe('Intentos de login fallidos acumulados.'),
+    esAuditor: z.boolean().describe('Bandera de auditor de calidad.'),
+    creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
+    modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
+    roles: z
+      .array(
+        z.object({
+          id: z.number().int().describe('Id del rol.'),
+          nombre: z.string().describe('Nombre del rol.'),
+        }),
+      )
+      .describe('Roles asignados al usuario (RBAC A4).'),
+  })
+  .describe('Usuario del sistema (sin datos de autenticación).');
+
+/** Forma de un usuario tal como lo devuelve la API. */
+export type UsuarioSalida = z.infer<typeof esquemaUsuarioSalida>;
+
+/**
+ * Parámetros del listado de usuarios EN LA URL (querystring): todo llega como
+ * texto, así que se coaccionan números y banderas. Mapea 1:1 al servicio de
+ * dominio `listarUsuarios`. `.describe()` documenta el contrato.
+ */
+export const esquemaUsuariosQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página (máx 100).'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe('Texto a buscar en usuario y nombre (insensible a mayúsculas).'),
+    incluirInactivos: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye los desactivados ("true"/"false").'),
+    soloBloqueados: z
+      .stringbool()
+      .default(false)
+      .describe('Solo los bloqueados por intentos ("true"/"false").'),
+    ordenarPor: z
+      .enum(['username', 'nombre', 'creadoEn'])
+      .default('username')
+      .describe('Columna de ordenamiento.'),
+    direccion: z.enum(['asc', 'desc']).default('asc').describe('Dirección del orden.'),
+  })
+  .describe('Filtros, orden y paginación del listado de usuarios.');
+
+/** Parámetros de listado de usuarios ya coaccionados desde la URL. */
+export type UsuariosQuery = z.infer<typeof esquemaUsuariosQuery>;
+
+/** Respuesta paginada del listado de usuarios (forma estándar `Pagina<T>`). */
+export const esquemaUsuariosPagina = z
+  .object({
+    datos: z.array(esquemaUsuarioSalida).describe('Usuarios de la página.'),
+    total: z.number().int().describe('Total de usuarios que cumplen el filtro.'),
+    pagina: z.number().int().describe('Página devuelta.'),
+    porPagina: z.number().int().describe('Renglones por página.'),
+    totalPaginas: z.number().int().describe('Total de páginas.'),
+  })
+  .describe('Página de usuarios.');
+
+/** Forma de la respuesta paginada de usuarios. */
+export type UsuariosPagina = z.infer<typeof esquemaUsuariosPagina>;

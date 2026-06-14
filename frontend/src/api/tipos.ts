@@ -34,3 +34,157 @@ export type AlmacenCrear =
 /** Cuerpo de edicion de almacen (`PATCH /api/almacenes/{id}`). */
 export type AlmacenEditar =
   paths['/api/almacenes/{id}']['patch']['requestBody']['content']['application/json'];
+
+// ── Catalogos F1-E1 (mismo patron que Almacenes) ─────────────────────────────
+
+/** Pagina de proveedores (`GET /api/proveedores`). */
+export type ProveedoresPagina =
+  paths['/api/proveedores']['get']['responses']['200']['content']['application/json'];
+/** Un proveedor tal como lo devuelve el API. */
+export type Proveedor = ProveedoresPagina['datos'][number];
+/** Parametros de consulta del listado de proveedores (querystring). */
+export type ProveedoresQuery = NonNullable<paths['/api/proveedores']['get']['parameters']['query']>;
+/** Tipo de proveedor (clasificacion de negocio). */
+export type TipoProveedor = Proveedor['tipo'];
+/** Cuerpo de alta de proveedor (`POST /api/proveedores`). */
+export type ProveedorCrear =
+  paths['/api/proveedores']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de proveedor (`PATCH /api/proveedores/{id}`). */
+export type ProveedorEditar =
+  paths['/api/proveedores/{id}']['patch']['requestBody']['content']['application/json'];
+
+// ── Catalogo de roles de proveedor (F1-E1B, selector) ────────────────────────
+
+/** Lista de roles/servicios de proveedor (`GET /api/roles-proveedor`) — array plano. */
+export type RolesProveedorLista =
+  paths['/api/roles-proveedor']['get']['responses']['200']['content']['application/json'];
+/** Un rol de proveedor del catalogo selector. */
+export type RolProveedor = RolesProveedorLista[number];
+
+// ── Adjuntos de proveedor (F1-E1B, archivos en R2 via presigned) ─────────────
+
+/** Lista de adjuntos de un proveedor (`GET /api/proveedores/{id}/adjuntos`). */
+export type ProveedorAdjuntosLista =
+  paths['/api/proveedores/{id}/adjuntos']['get']['responses']['200']['content']['application/json'];
+/** Un adjunto de proveedor (con su URL de descarga prefirmada). */
+export type ProveedorAdjunto = ProveedorAdjuntosLista['datos'][number];
+/** Tipo documental de un adjunto de proveedor (constancia/contrato/otro). */
+export type TipoArchivoProveedor = ProveedorAdjunto['tipo'];
+/** Cuerpo para preparar la subida de un adjunto (`POST /api/proveedores/{id}/adjuntos`). */
+export type ProveedorAdjuntoCrear =
+  paths['/api/proveedores/{id}/adjuntos']['post']['requestBody']['content']['application/json'];
+/** Respuesta al preparar la subida (registro Archivo + URL PUT prefirmada). */
+export type ProveedorAdjuntoSubida =
+  paths['/api/proveedores/{id}/adjuntos']['post']['responses']['201']['content']['application/json'];
+
+/** Pagina de cortadores (`GET /api/cortadores`). */
+export type CortadoresPagina =
+  paths['/api/cortadores']['get']['responses']['200']['content']['application/json'];
+/** Un cortador tal como lo devuelve el API. */
+export type Cortador = CortadoresPagina['datos'][number];
+/** Parametros de consulta del listado de cortadores (querystring). */
+export type CortadoresQuery = NonNullable<paths['/api/cortadores']['get']['parameters']['query']>;
+/** Cuerpo de alta de cortador (`POST /api/cortadores`). */
+export type CortadorCrear =
+  paths['/api/cortadores']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de cortador (`PATCH /api/cortadores/{id}`). */
+export type CortadorEditar =
+  paths['/api/cortadores/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Pagina de temporadas (`GET /api/temporadas`). */
+export type TemporadasPagina =
+  paths['/api/temporadas']['get']['responses']['200']['content']['application/json'];
+/** Una temporada tal como la devuelve el API. */
+export type Temporada = TemporadasPagina['datos'][number];
+/** Parametros de consulta del listado de temporadas (querystring). */
+export type TemporadasQuery = NonNullable<paths['/api/temporadas']['get']['parameters']['query']>;
+/** Cuerpo de alta de temporada (`POST /api/temporadas`). */
+export type TemporadaCrear =
+  paths['/api/temporadas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de temporada (`PATCH /api/temporadas/{id}`). */
+export type TemporadaEditar =
+  paths['/api/temporadas/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Pagina de etiquetas de marca (`GET /api/etiquetas-marca`). */
+export type EtiquetasMarcaPagina =
+  paths['/api/etiquetas-marca']['get']['responses']['200']['content']['application/json'];
+/** Una etiqueta de marca tal como la devuelve el API. */
+export type EtiquetaMarca = EtiquetasMarcaPagina['datos'][number];
+/** Parametros de consulta del listado de etiquetas de marca (querystring). */
+export type EtiquetasMarcaQuery = NonNullable<
+  paths['/api/etiquetas-marca']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de etiqueta de marca (`POST /api/etiquetas-marca`). */
+export type EtiquetaMarcaCrear =
+  paths['/api/etiquetas-marca']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de etiqueta de marca (`PATCH /api/etiquetas-marca/{id}`). */
+export type EtiquetaMarcaEditar =
+  paths['/api/etiquetas-marca/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Pagina de colores (`GET /api/colores`). */
+export type ColoresPagina =
+  paths['/api/colores']['get']['responses']['200']['content']['application/json'];
+/** Un color tal como lo devuelve el API. */
+export type Color = ColoresPagina['datos'][number];
+/** Parametros de consulta del listado de colores (querystring). */
+export type ColoresQuery = NonNullable<paths['/api/colores']['get']['parameters']['query']>;
+/** Cuerpo de alta de color (`POST /api/colores`). */
+export type ColorCrear =
+  paths['/api/colores']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de color (`PATCH /api/colores/{id}`). */
+export type ColorEditar =
+  paths['/api/colores/{id}']['patch']['requestBody']['content']['application/json'];
+
+// ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
+// OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
+// rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).
+
+/** Pagina de usuarios (`GET /api/usuarios`). */
+export type UsuariosPagina =
+  paths['/api/usuarios']['get']['responses']['200']['content']['application/json'];
+/** Un usuario tal como lo devuelve el API (con sus roles). */
+export type Usuario = UsuariosPagina['datos'][number];
+/** Parametros de consulta del listado de usuarios (querystring). */
+export type UsuariosQuery = NonNullable<paths['/api/usuarios']['get']['parameters']['query']>;
+/** Cuerpo de alta de usuario (`POST /api/usuarios`). */
+export type UsuarioCrear =
+  paths['/api/usuarios']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de usuario (`PATCH /api/usuarios/{id}`). */
+export type UsuarioEditar =
+  paths['/api/usuarios/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de reemplazo de roles (`POST /api/usuarios/{id}/roles`). */
+export type UsuarioAsignarRoles =
+  paths['/api/usuarios/{id}/roles']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cambio de contraseña (`POST /api/usuarios/{id}/contrasena`). */
+export type UsuarioContrasena =
+  paths['/api/usuarios/{id}/contrasena']['post']['requestBody']['content']['application/json'];
+
+// ── Administracion F1-E1: Roles (solo lectura para el selector) ────────────────
+
+/** Lista de roles (`GET /api/roles`) — array plano, sin paginacion. */
+export type RolesLista =
+  paths['/api/roles']['get']['responses']['200']['content']['application/json'];
+/** Un rol tal como lo devuelve el API. */
+export type Rol = RolesLista[number];
+
+// ── Administracion F1-E1: Empresas ────────────────────────────────────────────
+// OJO: lista SIN paginacion (array plano, favorita primero), `id` = int y el flag
+// se llama `activa` (femenino). Todas las rutas exigen `empresas.administrar`.
+
+/** Lista de empresas (`GET /api/empresas`) — array plano (favorita primero). */
+export type EmpresasLista =
+  paths['/api/empresas']['get']['responses']['200']['content']['application/json'];
+/** Una empresa tal como la devuelve el API. */
+export type Empresa = EmpresasLista[number];
+/** Cuerpo de alta de empresa (`POST /api/empresas`). */
+export type EmpresaCrear =
+  paths['/api/empresas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de empresa (`PATCH /api/empresas/{id}`). */
+export type EmpresaEditar =
+  paths['/api/empresas/{id}']['patch']['requestBody']['content']['application/json'];
+/** Configuracion por empresa (`GET /api/empresas/{id}/configuracion`). */
+export type EmpresaConfiguracion =
+  paths['/api/empresas/{id}/configuracion']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo de edicion de la configuracion (`PATCH /api/empresas/{id}/configuracion`). */
+export type EmpresaConfiguracionEditar =
+  paths['/api/empresas/{id}/configuracion']['patch']['requestBody']['content']['application/json'];

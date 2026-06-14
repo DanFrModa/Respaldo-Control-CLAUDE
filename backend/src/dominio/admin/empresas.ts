@@ -42,8 +42,18 @@ const esquemaCrearEmpresa = z.object({
 
 export type EntradaCrearEmpresa = z.input<typeof esquemaCrearEmpresa>;
 
+// Las banderas con `.default(false)` en el alta se sobrescriben aquí como `.optional()`
+// SIN default: en una edición parcial, omitir una bandera NO debe resetearla (Zod
+// `.partial()` NO quita los defaults, así que la omitida se rellenaría con `false` y
+// pisaría el valor real en la BD —p. ej. editar el `upc` borraría la marca de favorita).
+// El `.extend` va ANTES del `.refine` (el refine devuelve un schema sin `.extend`).
 const esquemaActualizarEmpresa = esquemaCrearEmpresa
   .partial()
+  .extend({
+    favorita: z.boolean().optional(),
+    paraIpt: z.boolean().optional(),
+    paraEdr: z.boolean().optional(),
+  })
   .refine((cambios) => Object.values(cambios).some((valor) => valor !== undefined), {
     message: 'No hay ningún cambio que guardar.',
   });

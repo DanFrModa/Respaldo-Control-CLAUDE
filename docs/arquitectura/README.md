@@ -20,7 +20,7 @@ Reglas:
   reemplaza, se escribe un ADR nuevo y el viejo se marca como `Reemplazado por ADR-NNNN`.
   (Correcciones menores de redacción sí se permiten.)
 - Estados posibles: `Aceptado` · `Reemplazado por ADR-NNNN` · `Obsoleto`.
-- No confundir con las **decisiones de negocio** de Daniel (D0–D11): esas viven en
+- No confundir con las **decisiones de negocio** de Daniel (D0–D12): esas viven en
   [`Documentacion_MJD/DECISIONES.md`](../../Documentacion_MJD/DECISIONES.md) y son de
   dominio, no de tecnología. Un ADR puede referenciarlas.
 
@@ -64,3 +64,5 @@ Reglas:
 | [ADR-0004](ADR-0004-hash-scrypt.md)                | Hash de contraseñas con scrypt (better-auth) en lugar de argon2   | Aceptado |
 | [ADR-0005](ADR-0005-auditoria-sin-fk.md)           | Campos de auditoría sin FK físico hacia Usuario                   | Aceptado |
 | [ADR-0006](ADR-0006-openapi-desde-zod.md)          | El contrato OpenAPI se genera desde los esquemas Zod del backend  | Aceptado |
+| [ADR-0007](ADR-0007-catalogos-globales-vs-por-empresa.md) | Catálogos maestros globales; `idEmpresa` solo en lo operativo (A9) | Aceptado |
+| [ADR-0008](ADR-0008-schema-prisma-archivo-unico.md) | `schema.prisma` archivo único (no `prismaSchemaFolder`) en F1     | Aceptado |

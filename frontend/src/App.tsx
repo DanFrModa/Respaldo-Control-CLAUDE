@@ -3,8 +3,16 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import { Toaster } from '@/components/ui/sonner';
 import { CascaronSistema } from '@/modulos/CascaronSistema';
+import { AdministracionPagina } from '@/modulos/administracion/AdministracionPagina';
 import { AlmacenesPagina } from '@/modulos/almacenes/AlmacenesPagina';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
+import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
+import { CortadoresPagina } from '@/modulos/cortadores/CortadoresPagina';
+import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
+import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { TemporadasPagina } from '@/modulos/temporadas/TemporadasPagina';
+import { UsuariosPagina } from '@/modulos/usuarios/UsuariosPagina';
 import { Inicio } from '@/paginas/Inicio';
 import { Login } from '@/paginas/Login';
 import { NoEncontrado } from '@/paginas/NoEncontrado';
@@ -28,7 +36,8 @@ const queryClient = new QueryClient({
  *  - `/login` es publica.
  *  - El resto cuelga de `RutaProtegida` (exige sesion) -> `CascaronSistema` (la
  *    cascara con sidebar + header), que renderiza cada pantalla en su `Outlet`.
- *  - `/catalogos/almacenes` es el CRUD real; `/:modulo` muestra "Proximamente"
+ *  - Los CRUD de Catalogos (almacenes + los 5 de F1-E1) y de Administracion
+ *    (usuarios + empresas) son rutas reales; `/:modulo` muestra "Proximamente"
  *    para los modulos aun no construidos (su ruta especifica tiene prioridad).
  */
 const router = createBrowserRouter([
@@ -42,6 +51,14 @@ const router = createBrowserRouter([
           { index: true, element: <Inicio /> },
           { path: 'catalogos', element: <CatalogosPagina /> },
           { path: 'catalogos/almacenes', element: <AlmacenesPagina /> },
+          { path: 'catalogos/proveedores', element: <ProveedoresPagina /> },
+          { path: 'catalogos/cortadores', element: <CortadoresPagina /> },
+          { path: 'catalogos/temporadas', element: <TemporadasPagina /> },
+          { path: 'catalogos/etiquetas-marca', element: <EtiquetasMarcaPagina /> },
+          { path: 'catalogos/colores', element: <ColoresPagina /> },
+          { path: 'administracion', element: <AdministracionPagina /> },
+          { path: 'administracion/usuarios', element: <UsuariosPagina /> },
+          { path: 'administracion/empresas', element: <EmpresasPagina /> },
           { path: ':modulo', element: <Proximamente /> },
           { path: '*', element: <NoEncontrado /> },
         ],

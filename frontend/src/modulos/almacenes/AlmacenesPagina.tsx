@@ -1,55 +1,44 @@
-import {
-  type ColumnSort,
-  flexRender,
-  getCoreRowModel,
-  type SortingState,
-  useReactTable,
-} from '@tanstack/react-table';
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, PlusIcon, SearchIcon } from 'lucide-react';
+import { Tag, Warehouse } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useAlmacenes, useDesactivarAlmacen, useReactivarAlmacen } from '@/api/almacenes';
+import { ETIQUETAS_TIPO_ALMACEN, TIPOS_ALMACEN, type TipoAlmacenClave } from '@/api/esquemas';
 import type { Almacen, AlmacenesQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
+import type { Tono } from '@/lib/tono';
+import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
+import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
-import { type AccionesAlmacen, columnasAlmacenes } from './columnas';
 import { DialogoAlmacen } from './DialogoAlmacen';
-
-/** Columnas por las que el backend sabe ordenar. */
-type ColumnaOrden = NonNullable<AlmacenesQuery['ordenarPor']>;
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
 
-/** Orden inicial: por nombre, ascendente. */
-const ORDEN_INICIAL: ColumnSort = { id: 'nombre', desc: false };
+/** Valor del filtro de tipo que significa "todos" (sin filtrar). */
+const TIPO_TODOS = 'TODOS';
+
+/** Tono explicativo (color del avatar/chip) por tipo de almacen. */
+const TONO_POR_TIPO: Record<TipoAlmacenClave, Tono> = {
+  PT: 'pt',
+  TELA: 'telas',
+  AVIO: 'avios',
+};
 
 /**
- * Pantalla de Almacenes — el CRUD ESTANDAR del frontend (la plantilla que se
- * replica en todo el ERP). Consume `/api/almacenes` con el cliente generado +
- * **TanStack Query** (datos) y **TanStack Table** (tabla en modo servidor):
- * lista con busqueda (debounce), orden y **paginacion de servidor**; alta y
- * edicion en dialogo; ciclo de borrado suave REVERSIBLE —desactivar con
- * confirmacion, ver los desactivados con el toggle, y reactivar (restaurar) de
- * forma directa—; toasts; estados de carga/vacio/error; consciente de permisos.
+ * Pantalla de Almacenes — CRUD del catalogo del kardex unico sobre el motor
+ * LISTA + DETALLE (rediseño "Teal fresco"). Lista con busqueda (debounce),
+ * **filtro por tipo** (PT/telas/avíos), paginacion de servidor y toggle de
+ * inactivos; el detalle muestra el tipo y el historial, y permite editar /
+ * desactivar / reactivar. Borrado suave reversible (desactivar con confirmacion,
+ * reactivar directo); toasts; consciente de permisos.
  *
- * El permiso `almacenes.ver` ya gobierna el acceso a la pantalla; aqui
- * `almacenes.administrar` decide si se muestran las acciones de escritura. La
- * decision real la toma el backend en cada ruta (A1): el front solo presenta.
+ * `almacenes.ver` gobierna el acceso a la pantalla; `almacenes.administrar`
+ * decide las acciones de escritura. La decision real la toma el backend (A1).
  */
 export function AlmacenesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -58,18 +47,18 @@ export function AlmacenesPagina(): React.JSX.Element {
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
+  const [tipoFiltro, setTipoFiltro] = useState<TipoAlmacenClave | typeof TIPO_TODOS>(TIPO_TODOS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
-  const [orden, setOrden] = useState<SortingState>([ORDEN_INICIAL]);
   const [pagina, setPagina] = useState(1);
 
-  const ordenActivo = orden[0] ?? ORDEN_INICIAL;
   const query: AlmacenesQuery = {
     pagina,
     porPagina: POR_PAGINA,
-    ordenarPor: ordenActivo.id as ColumnaOrden,
-    direccion: ordenActivo.desc ? 'desc' : 'asc',
+    ordenarPor: 'nombre',
+    direccion: 'asc',
     incluirInactivos: incluirInactivos ? 'true' : 'false',
     ...(busqueda.length > 0 ? { busqueda } : {}),
+    ...(tipoFiltro !== TIPO_TODOS ? { tipo: tipoFiltro } : {}),
   };
 
   const consulta = useAlmacenes(query);
@@ -105,8 +94,7 @@ export function AlmacenesPagina(): React.JSX.Element {
     });
   }
 
-  // Reactivar es una accion NO destructiva (restaura el borrado suave): se aplica
-  // directo, sin dialogo de confirmacion (a diferencia de desactivar).
+  // Reactivar es NO destructivo: se aplica directo, sin dialogo de confirmacion.
   function reactivarAlmacen(almacen: Almacen): void {
     reactivar.mutate(almacen.id, {
       onSuccess: () => toast.success(`Almacén "${almacen.nombre}" activado.`),
@@ -114,9 +102,14 @@ export function AlmacenesPagina(): React.JSX.Element {
     });
   }
 
-  // Cambiar busqueda, orden o el filtro de inactivos reinicia a la pagina 1.
+  // Cambiar busqueda, tipo o el filtro de inactivos reinicia a la pagina 1.
   function alBuscar(valor: string): void {
     setTextoBusqueda(valor);
+    setPagina(1);
+  }
+
+  function alCambiarTipo(valor: string): void {
+    setTipoFiltro(valor as TipoAlmacenClave | typeof TIPO_TODOS);
     setPagina(1);
   }
 
@@ -125,179 +118,89 @@ export function AlmacenesPagina(): React.JSX.Element {
     setPagina(1);
   }
 
-  // ── Tabla (TanStack Table en modo servidor) ────────────────────────────────
-  const datos = consulta.data?.datos ?? [];
-  const totalPaginas = consulta.data?.totalPaginas ?? 0;
-
-  const tabla = useReactTable<Almacen>({
-    data: datos,
-    columns: columnasAlmacenes,
-    getCoreRowModel: getCoreRowModel(),
-    // El backend pagina, ordena y filtra: la tabla solo refleja el estado.
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    pageCount: totalPaginas,
-    enableMultiSort: false,
-    state: { sorting: orden },
-    onSortingChange: (actualizador) => {
-      setOrden((previo) => {
-        const siguiente = typeof actualizador === 'function' ? actualizador(previo) : actualizador;
-        // Sin orden (tercer click) vuelve al orden inicial: el backend siempre ordena.
-        return siguiente.length > 0 ? siguiente : [ORDEN_INICIAL];
-      });
-      setPagina(1);
-    },
-    meta: {
-      acciones: {
-        puedeAdministrar,
-        alEditar: abrirEdicion,
-        alDesactivar: setADesactivar,
-        alReactivar: reactivarAlmacen,
-      } satisfies AccionesAlmacen,
-    },
-  });
-
-  const totalColumnas = tabla.getAllLeafColumns().length;
-  const datosPagina = consulta.data;
+  const datos = consulta.data;
+  const totalPaginas = datos?.totalPaginas ?? 0;
+  const paginacion: PaginacionListaDetalle | undefined = datos
+    ? {
+        total: datos.total,
+        pagina: datos.pagina,
+        totalPaginas,
+        ocupado: consulta.isFetching,
+        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
+        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
+      }
+    : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Almacenes</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Catálogo de almacenes del kardex único (producto terminado, telas y avíos).
-          </p>
-        </div>
-        {puedeAdministrar ? (
-          <Button onClick={abrirAlta} data-testid="nuevo-almacen">
-            <PlusIcon aria-hidden />
-            Nuevo almacén
-          </Button>
-        ) : null}
-      </div>
-
-      {/* Barra de herramientas: busqueda + filtro de inactivos */}
-      <div className="mt-6 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 sm:max-w-xs">
-          <SearchIcon
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            placeholder="Buscar por nombre…"
-            className="pl-8"
-            value={textoBusqueda}
-            onChange={(e) => alBuscar(e.target.value)}
-            aria-label="Buscar almacenes por nombre"
-            data-testid="buscar-almacen"
-          />
-        </div>
-        <Button
-          type="button"
-          variant={incluirInactivos ? 'secondary' : 'outline'}
-          size="sm"
-          onClick={alAlternarInactivos}
-          aria-pressed={incluirInactivos}
-          aria-label="Mostrar también los almacenes desactivados"
-          data-testid="mostrar-desactivados"
-        >
-          {incluirInactivos ? 'Ocultar desactivados' : 'Mostrar desactivados'}
-        </Button>
-      </div>
-
-      {/* Tabla / estados */}
-      <div className="mt-4 rounded-xl border">
-        <Table>
-          <TableHeader>
-            {tabla.getHeaderGroups().map((grupo) => (
-              <TableRow key={grupo.id}>
-                {grupo.headers.map((cabecera) => (
-                  <TableHead key={cabecera.id} className={anchoColumna(cabecera.column.id)}>
-                    {cabecera.column.getCanSort() ? (
-                      <BotonOrden cabecera={cabecera} />
-                    ) : (
-                      flexRender(cabecera.column.columnDef.header, cabecera.getContext())
-                    )}
-                  </TableHead>
-                ))}
-              </TableRow>
+    <>
+      <ListaDetalle<Almacen>
+        testid="almacen"
+        titulo="Almacenes"
+        descripcion="Almacenes del kardex único (producto terminado, telas y avíos)."
+        icono={Warehouse}
+        registros={datos?.datos ?? []}
+        cargando={consulta.isPending}
+        error={consulta.isError ? consulta.error.message : null}
+        alReintentar={() => void consulta.refetch()}
+        obtenerId={(a) => a.id}
+        obtenerTitulo={(a) => a.nombre}
+        obtenerActivo={(a) => a.activo}
+        obtenerSecundaria={(a) => ETIQUETAS_TIPO_ALMACEN[a.tipo]}
+        renderAvatarLista={(a) => (
+          <Avatar nombre={a.nombre} tono={TONO_POR_TIPO[a.tipo]} tamano="sm">
+            <Warehouse className="size-4" aria-hidden />
+          </Avatar>
+        )}
+        busqueda={textoBusqueda}
+        alBuscar={alBuscar}
+        filtros={
+          <SelectNativo
+            value={tipoFiltro}
+            onChange={(e) => alCambiarTipo(e.target.value)}
+            aria-label="Filtrar almacenes por tipo"
+            data-testid="filtro-tipo-almacen"
+          >
+            <option value={TIPO_TODOS}>Todos los tipos</option>
+            {TIPOS_ALMACEN.map((tipo) => (
+              <option key={tipo} value={tipo}>
+                {ETIQUETAS_TIPO_ALMACEN[tipo]}
+              </option>
             ))}
-          </TableHeader>
-          <TableBody>
-            {consulta.isPending ? (
-              <FilasEsqueleto columnas={totalColumnas} />
-            ) : consulta.isError ? (
-              <TableRow>
-                <TableCell colSpan={totalColumnas} className="py-10 text-center">
-                  <p className="text-sm font-medium text-destructive">{consulta.error.message}</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-3"
-                    onClick={() => void consulta.refetch()}
-                  >
-                    Reintentar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ) : datos.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={totalColumnas}
-                  className="py-10 text-center text-sm text-muted-foreground"
-                >
-                  No hay almacenes que coincidan con la búsqueda.
-                </TableCell>
-              </TableRow>
-            ) : (
-              tabla.getRowModel().rows.map((fila) => (
-                <TableRow
-                  key={fila.id}
-                  data-testid="fila-almacen"
-                  data-activo={fila.original.activo}
-                >
-                  {fila.getVisibleCells().map((celda) => (
-                    <TableCell key={celda.id}>
-                      {flexRender(celda.column.columnDef.cell, celda.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Paginacion (servidor) */}
-      {datosPagina && datosPagina.total > 0 ? (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
-          <p className="text-muted-foreground" data-testid="resumen-paginacion">
-            {datosPagina.total} almacén{datosPagina.total === 1 ? '' : 'es'} · página{' '}
-            {datosPagina.pagina} de {totalPaginas}
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagina((p) => Math.max(1, p - 1))}
-              disabled={datosPagina.pagina <= 1 || consulta.isFetching}
-            >
-              Anterior
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-              disabled={datosPagina.pagina >= totalPaginas || consulta.isFetching}
-            >
-              Siguiente
-            </Button>
-          </div>
-        </div>
-      ) : null}
+          </SelectNativo>
+        }
+        incluirInactivos={incluirInactivos}
+        alAlternarInactivos={alAlternarInactivos}
+        textoVacio="No hay almacenes que coincidan con la búsqueda."
+        paginacion={paginacion}
+        puedeAdministrar={puedeAdministrar}
+        alNuevo={abrirAlta}
+        textoNuevo="Nuevo almacén"
+        alEditar={abrirEdicion}
+        alDesactivar={setADesactivar}
+        alReactivar={reactivarAlmacen}
+        renderAvatarDetalle={(a) => (
+          <Avatar nombre={a.nombre} tono={TONO_POR_TIPO[a.tipo]} tamano="lg">
+            <Warehouse className="size-7" aria-hidden />
+          </Avatar>
+        )}
+        renderMeta={(a) => (
+          <TipoBadge tono={TONO_POR_TIPO[a.tipo]}>{ETIQUETAS_TIPO_ALMACEN[a.tipo]}</TipoBadge>
+        )}
+        renderDetalle={(a) => (
+          <>
+            <SeccionDetalle titulo="Datos del almacén">
+              <RejillaCampos>
+                <CampoDetalle icono={Tag} etiqueta="Tipo">
+                  <TipoBadge tono={TONO_POR_TIPO[a.tipo]}>
+                    {ETIQUETAS_TIPO_ALMACEN[a.tipo]}
+                  </TipoBadge>
+                </CampoDetalle>
+              </RejillaCampos>
+            </SeccionDetalle>
+            <Historial creadoEn={a.creadoEn} modificadoEn={a.modificadoEn} />
+          </>
+        )}
+      />
 
       {/* Dialogos */}
       <DialogoAlmacen
@@ -325,50 +228,6 @@ export function AlmacenesPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </div>
-  );
-}
-
-/** Ancho fijo de la columna de acciones (las demas reparten el resto). */
-function anchoColumna(id: string): string | undefined {
-  return id === 'acciones' ? 'w-12' : undefined;
-}
-
-/** Boton de cabecera para ordenar una columna; muestra la flecha del orden activo. */
-function BotonOrden({
-  cabecera,
-}: {
-  cabecera: ReturnType<
-    ReturnType<typeof useReactTable<Almacen>>['getHeaderGroups']
-  >[number]['headers'][number];
-}): React.JSX.Element {
-  const orden = cabecera.column.getIsSorted();
-  const Icono = orden === false ? ArrowUpDownIcon : orden === 'asc' ? ArrowUpIcon : ArrowDownIcon;
-  return (
-    <button
-      type="button"
-      onClick={cabecera.column.getToggleSortingHandler()}
-      className="-ml-1 inline-flex items-center gap-1 rounded px-1 py-0.5 font-medium hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-    >
-      {flexRender(cabecera.column.columnDef.header, cabecera.getContext())}
-      <Icono className="size-3.5 text-muted-foreground" aria-hidden />
-    </button>
-  );
-}
-
-/** Filas de carga (skeleton) mientras llega la primera pagina. */
-function FilasEsqueleto({ columnas }: { columnas: number }): React.JSX.Element {
-  return (
-    <>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <TableRow key={i}>
-          {Array.from({ length: columnas }).map((__, j) => (
-            <TableCell key={j}>
-              <Skeleton className="h-5 w-full max-w-32" />
-            </TableCell>
-          ))}
-        </TableRow>
-      ))}
     </>
   );
 }

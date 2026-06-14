@@ -1,6 +1,6 @@
 # CLAUDE.md — Contexto del proyecto (handoff entre sesiones)
 
-> **Para cualquier chat/sesión nueva:** lee este archivo primero, y luego **`PLANMAESTRO.md`** (la ley del desarrollo). El idioma de trabajo es **español**. **Daniel Masri** es el dueño del sistema y experto del negocio (ya **validó** toda la ingeniería inversa). **Gabriel** opera el desarrollo: coordina los agentes, verifica los avances y hace los pasos manuales en Railway/Cloudflare/GitHub.
+> **Para cualquier chat/sesión nueva:** lee este archivo primero, luego **`PLANMAESTRO.md`** (la ley del desarrollo) y **`HOJA-DE-RUTA.md`** (el plan por etapas + estado vivo: ahí dice exactamente qué sigue, y la ficha detallada de cada fase está en `docs/hoja-de-ruta/`). El idioma de trabajo es **español**. **Daniel Masri** es el dueño del sistema y experto del negocio (ya **validó** toda la ingeniería inversa). **Gabriel** opera el desarrollo: coordina los agentes, verifica los avances y hace los pasos manuales en Railway/Cloudflare/GitHub.
 
 ---
 
@@ -8,7 +8,9 @@
 
 Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Moda SA de CV*) que Daniel construyó hace ~30 años en **Microsoft Access 97**. La **ingeniería inversa está COMPLETA y validada** (en `Documentacion_MJD/`) y el **plan de construcción está aprobado**: **`PLANMAESTRO.md`** (raíz del repo) — ese plan es LEY.
 
-**Estado actual: CONTROL v2 — Fase F0 (Fundación) COMPLETA** (E1–E5 construidas en `backend/` y `frontend/`). Falta que Gabriel conecte Railway + R2 con `docs/GUIA-RAILWAY-R2.md`. Detalle de ejecución en **§8**; lo siguiente es **F1 (Catálogos + Modelos)**.
+**Estado actual: CONTROL v2 — F1 (Catálogos + Modelos) EN CURSO.** F0 (Fundación) ✅, **F1-E1 ✅** (catálogos sencillos + Administración) y **F1-E1B ✅** (Proveedor enriquecido R15: fiscal/pago/operativo + roles + adjuntos PDF) construidas, verificadas por Gabriel y desplegadas en **`prueba`** de Railway (13-jun-2026). Detalle en **§8**; lo siguiente es **F1-E2** (catálogos estructurados: maquila unificada, tallas/curvas D4, clientes D7). **En paralelo (13-jun-2026):** Gabriel pidió un **rediseño visual** de la UI — estructura "lista + detalle" + tema verde *teal* con menú colapsable, iconos y colores explicativos (la "propuesta 3" del showcase) — que ejecuta **otro chat** con un prompt aparte; cuando aterrice, será el nuevo estándar visual que herede F1-E2+.
+
+> **Integración Finanzas (2026-06-13):** se incorporó al plan la propuesta de **Finanzas** (`Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`): decisión **D12**, requisitos **R10–R15**, **módulo 14 (Finanzas: CxC/CxP + CFDI, generaliza EsMa)** y una **fase nueva F8 (Finanzas)** entre F7 y Go-live —que pasa a **F9**— (plan ahora F0–F9, 10 fases). El **catálogo de proveedores enriquecido (R15)** entra en **F1, etapa F1-E1B**. La contabilidad NO entra (sigue con el contador); meta de fondo: **apagar SINUBE** por etapas (timbrado vía PAC = R14, posterior). Ver `DECISIONES.md` D12 y `HOJA-DE-RUTA.md`.
 
 **Arquitectura (decidida por Gabriel — ver `PLANMAESTRO.md` §1-3):**
 - **Backend y frontend SEPARADOS**, en carpetas `backend/` y `frontend/`. **NO es monorepo** (sin workspaces; cada carpeta autónoma con su `package.json` y `npm`).
@@ -67,9 +69,9 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 | `08-Ruta-Critica.md` | ⭐ RC = workflow/CPM. El módulo más importante |
 | `09-Control-de-Calidad.md` | Auditorías AQL |
 | `10-Modelo-Datos-y-Usuarios.md` | ER de todas las tablas + 2 sistemas de seguridad |
-| `DECISIONES.md` | **Decisiones del dueño (D0–D11)** — leer siempre |
+| `DECISIONES.md` | **Decisiones del dueño (D0–D12)** — leer siempre |
 | `MEJORAS.md` | Mejoras de diseño para v2 (A1–A10 + por módulo) |
-| `REQUISITOS-NUEVOS.md` | Funciones que faltan (R1–R9 + principio Make-to-Order) |
+| `REQUISITOS-NUEVOS.md` | Funciones que faltan (R1–R15 + principio Make-to-Order; R10–R15 = Finanzas) |
 | `RESUMEN-EJECUTIVO.md` | Consolidado de todo |
 
 ---
@@ -121,15 +123,31 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 ## 7. Cómo se desarrolla CONTROL v2 (reglas vigentes)
 
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
-2. **Flujo de ramas (innegociable):** rama de tarea → PR a **`prueba`** (CI + review + verificación EN VIVO) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.)
+2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** (CI + review + verificación EN VIVO) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel:** el lead y los agentes codean en el working tree de la rama; cuando la etapa está terminada **y verificada**, Gabriel da el OK → se comitea **TODO junto** → **Gabriel prueba** → al final se hacen los docs. No se comitea "cada cosa". *(Incidente 13-jun-2026: un push automático mandó E1B-backend a `prueba` sin permiso — no repetir.)*
 3. **Equipo mínimo por tarea: 1 coder + 1 reviewer independiente** (agentes). Nada se integra sin el visto bueno del reviewer y el CI en verde. **El orquestador (lead) NO escribe código de producción**: coordina, decide arquitectura, revisa y reporta a Gabriel. Agent Teams está habilitado (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
 4. **El contrato OpenAPI** se regenera en cada cambio del backend y el cliente del frontend queda sincronizado en la misma tarea.
 5. **Documentación viva en `docs/`:** `arquitectura/` (ADRs), `modulos/` (cómo quedó cada módulo, al cerrarlo). El funcional NO se copia: se referencia `Documentacion_MJD/` (ADR-0002). La guía de infraestructura: `docs/GUIA-RAILWAY-R2.md`.
-6. **Gabriel verifica cada etapa** en el ambiente de prueba o con `docker compose up` local, antes de continuar.
+6. **Gabriel verifica cada etapa en el ambiente de `prueba` de Railway** (NO en local), antes de continuar.
+7. **NUNCA Docker local (innegociable).** Ni el lead ni los agentes abren ni corren Docker / `docker compose` / testcontainers en la máquina de Gabriel. Las pruebas pesadas (integración con testcontainers, e2e con compose) corren en **CI (GitHub Actions)**; la verificación funcional, en **Railway**. Para generar migraciones Prisma sin BD local: redactar el `migration.sql` a mano y validarlo con `prisma migrate diff`, o dejar que CI/Railway las apliquen. *(Decisión de Gabriel, 13-jun-2026.)*
 
 ---
 
-## 8. ESTADO DE EJECUCIÓN — Fase F0 (COMPLETA)
+## 8. ESTADO DE EJECUCIÓN — F0 ✅ · F1-E1 ✅ · F1-E1B ✅ (sigue F1-E2)
+
+### F1-E1 — Catálogos sencillos + Administración (✅ 13-jun-2026, en `prueba`)
+
+**Entregada, verificada por Gabriel en `prueba` y mergeada (PR #15).** 5 catálogos **GLOBALES** (Proveedor, Cortador, Temporada, EtiquetaMarca, Color — sin `idEmpresa`, decisión A9/ADR-0007) con dominio+API+frontend (patrón CRUD)+tests, y **Administración** (rutas REST + pantallas de Usuarios/Empresas/Roles sobre los servicios de dominio que F0 ya tenía probados; se agregó `cambiarContrasenaUsuario` reusando el scrypt de better-auth). Migración única `f1_e1_catalogos`, 10 permisos nuevos + seed (rol `Basico` sin catálogos para la prueba de acceso), OpenAPI + cliente del frontend sincronizados.
+- **Decisiones:** ADR-0007 (catálogos globales/A9), ADR-0008 (`schema.prisma` único). **Marilyn Fitness = FR Moda** (misma empresa renombrada; NO crear 2ª empresa en E5/E6).
+- **El CI atrapó un bug real y se corrigió antes del merge** (commit `7939d00`): en Zod `.partial()` NO quita los `.default()`, así que editar/desactivar reseteaba campos (proveedor.tipo, etiqueta.regalias, empresa favorita/IPT/EDR). Fix con tests de esquema + regresión. CI completo en verde (unit + integración testcontainers + E2E + build de imágenes).
+- **Ajuste de equipo:** se hizo en cadena por el contrato (backend catálogos → backend admin → frontend en 2 olas) + reviewer, no 3 coders en paralelo — el backend de E1 es una cadena sobre archivos compartidos (schema/seed/permisos/openapi), §9.1.
+- **Despliegue (trampa para toda etapa futura):** el backend de `prueba` necesita `SEED_ON_START=true` para sembrar los permisos nuevos al arrancar (seed idempotente; NO resetea el password del admin).
+- **Detalle completo y aprendizajes:** nota de **CIERRE de F1-E1** en `docs/hoja-de-ruta/F1-etapas.md`.
+
+**Rediseño visual (en paralelo, otro chat):** Gabriel eligió la "propuesta 3" del showcase — estructura **lista + detalle**, tema **verde teal**, **menú colapsable**, iconos y colores explicativos, intuitiva para gente no técnica. Lo ejecuta un chat aparte (referencia visual: `docs/diseno/propuestas-colores.html`, propuesta 3 "Teal fresco"). Cuando aterrice, será el estándar visual que herede F1-E2+.
+
+---
+
+### F0 — Fundación (✅, base del proyecto)
 
 **F0 está construida y verificada en local.** El sistema vive en `backend/` y `frontend/` (arquitectura nueva: 2 servicios npm dockerizados, no monorepo, REST/OpenAPI). `docker compose up -d --build` levanta postgres + backend + frontend, y el flujo real funciona (login `admin` → menú por permisos → CRUD de Almacenes end-to-end), sin 502. La carpeta `control-v2/` (intento viejo, monorepo Next.js+tRPC) ya fue **reaprovechada y BORRADA** — su lógica probada (esquema Prisma, seed real, motores comunes, componentes shadcn) vive ahora dentro de `backend/`/`frontend/`.
 

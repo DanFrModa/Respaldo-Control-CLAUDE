@@ -1,6 +1,12 @@
 /*
  * Hoja de estilos raiz de CONTROL v2 — Tailwind v4 + tokens de shadcn/ui.
  *
+ * Tema "Teal fresco" (rediseño visual, propuesta 3): paleta verde teal, claro por
+ * DEFECTO y un oscuro elegante (teal profundo, no neon). Recolorear estos tokens
+ * (variables CSS) retematiza TODA la app: los componentes de `components/ui` usan
+ * las utilidades de Tailwind (`bg-background`, `text-primary`, `border-border`, …)
+ * que `@theme inline` mapea a estas variables.
+ *
  * Sistema de tema (claro / oscuro), heredado y CONSERVADO de E1.1:
  *   - El tema por defecto es CLARO (`:root`). NO se sigue `prefers-color-scheme`
  *     del sistema operativo: claro es la base y el usuario decide con el
@@ -11,11 +17,8 @@
  *     `dark:*` de Tailwind respondan a esa clase.
  *   - La persistencia vive en localStorage bajo la clave `control-v2-tema`.
  *
- * Los tokens de color son variables CSS en espacio **oklch** (la paleta neutral
- * por defecto de shadcn/ui). `@theme inline` los expone como utilidades de
- * Tailwind (`bg-background`, `text-muted-foreground`, `border-border`, etc.) que
- * usan los componentes de `components/ui`. Se conservan ademas los tokens
- * semanticos de estado de E1.1 (`--exito`/`--error`/`--aviso`).
+ * Tipografia: Inter Variable (importada en `main.tsx` desde
+ * `@fontsource-variable/inter`), con caida a la pila del sistema.
  */
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -42,6 +45,14 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /*
+   * Realce suave de marca (teal claro): chips, iconos de campo, fondos de
+   * acento informativo. Es un token propio del rediseño (no estandar de shadcn);
+   * usalo con `bg-primary-soft` / `text-primary-soft-foreground`.
+   */
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-foreground: var(--primary-soft-foreground);
 
   /* Estado semantico (heredado de E1.1). */
   --color-exito: var(--exito);
@@ -75,52 +86,86 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /*
+   * Animaciones del acordeón (secciones plegables, p. ej. la ficha de Proveedor).
+   * Estos tokens generan las utilidades `animate-accordion-down`/`-up` (Tailwind v4
+   * deriva `animate-*` de `--animate-*`) que usa `components/ui/accordion.tsx`. El
+   * alto objetivo lo aporta radix en `--radix-accordion-content-height`, por eso el
+   * cierre/apertura es una transición suave (no un salto). Se declaran AQUÍ —y no se
+   * dejan solo a `tw-animate-css`— para que la animación sea explícita y verificable
+   * en nuestra fuente; el `@keyframes` de abajo las respalda.
+   */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
 :root {
-  /* Tema CLARO — base por defecto. */
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Tema CLARO "Teal fresco" — base por defecto. */
+  --background: #f4fbfa; /* velo teal muy claro */
+  --foreground: #0c2b29; /* verde casi negro, alto contraste */
+  --card: #ffffff;
+  --card-foreground: #0c2b29;
+  --popover: #ffffff;
+  --popover-foreground: #0c2b29;
+  --primary: #0d9488; /* teal-600 */
+  --primary-foreground: #ffffff;
+  --primary-soft: #ccfbf1; /* teal-100 */
+  --primary-soft-foreground: #0f766e; /* teal-700 */
+  --secondary: #e6f4f1; /* teal apagado para superficies secundarias */
+  --secondary-foreground: #0f5e57;
+  --muted: #ecf6f4;
+  --muted-foreground: #557571; /* gris verdoso legible */
+  --accent: #ccfbf1; /* mismo realce suave que primary-soft */
+  --accent-foreground: #0f766e;
+  --destructive: #dc2626; /* rojo claro (red-600) */
+  --border: #d8ebe7;
+  --input: #d8ebe7;
+  --ring: #0d9488;
 
   /* Estado semantico, legible en tema claro (heredado de E1.1). */
-  --exito: oklch(0.52 0.13 152);
-  --error: oklch(0.55 0.22 27);
-  --aviso: oklch(0.62 0.15 75);
+  --exito: #15803d;
+  --error: #dc2626;
+  --aviso: #b45309;
 
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --chart-1: #0d9488;
+  --chart-2: #0f766e;
+  --chart-3: #14b8a6;
+  --chart-4: #5eead4;
+  --chart-5: #134e4a;
 
   --radius: 0.625rem;
 
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Sidebar claro: blanco, con el activo en teal suave. */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0c2b29;
+  --sidebar-primary: #0d9488;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ccfbf1; /* fondo del modulo activo */
+  --sidebar-accent-foreground: #0f766e; /* texto del modulo activo */
+  --sidebar-border: #d8ebe7;
+  --sidebar-ring: #0d9488;
 
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-sans:
+    'Inter Variable', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono:
     ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
@@ -128,45 +173,47 @@
 }
 
 .dark {
-  /* Tema OSCURO (clase en <html>). */
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  /* Tema OSCURO "Teal fresco" (clase en <html>): teal profundo, elegante. */
+  --background: #07201d; /* teal casi negro */
+  --foreground: #e4f3ef;
+  --card: #0d2a26;
+  --card-foreground: #e4f3ef;
+  --popover: #0d2a26;
+  --popover-foreground: #e4f3ef;
+  --primary: #2dd4bf; /* teal-400, vivo pero no neon */
+  --primary-foreground: #04231f;
+  --primary-soft: #143f39; /* teal profundo para chips */
+  --primary-soft-foreground: #5eead4; /* teal-300 */
+  --secondary: #113530;
+  --secondary-foreground: #cfeae4;
+  --muted: #102e2a;
+  --muted-foreground: #8fb3ac;
+  --accent: #143f39;
+  --accent-foreground: #5eead4;
+  --destructive: #f87171; /* rojo claro legible sobre fondo oscuro */
+  --border: oklch(1 0 0 / 12%); /* blanco translucido */
+  --input: oklch(1 0 0 / 16%);
+  --ring: #2dd4bf;
 
   /* Estado semantico, legible en tema oscuro (heredado de E1.1). */
-  --exito: oklch(0.77 0.16 152);
-  --error: oklch(0.7 0.19 22);
-  --aviso: oklch(0.79 0.15 80);
+  --exito: #4ade80;
+  --error: #f87171;
+  --aviso: #fbbf24;
 
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+  --chart-1: #2dd4bf;
+  --chart-2: #5eead4;
+  --chart-3: #14b8a6;
+  --chart-4: #0d9488;
+  --chart-5: #99f6e4;
 
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #0d2a26;
+  --sidebar-foreground: #e4f3ef;
+  --sidebar-primary: #2dd4bf;
+  --sidebar-primary-foreground: #04231f;
+  --sidebar-accent: #143f39; /* fondo del modulo activo */
+  --sidebar-accent-foreground: #5eead4; /* texto del modulo activo */
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: #2dd4bf;
 
   color-scheme: dark;
 }

@@ -40,6 +40,15 @@ services:
       # produccion (Railway) se inyecta uno fuerte por variable de entorno.
       BETTER_AUTH_SECRET: secreto-de-desarrollo-local-cambiar-en-produccion
       BETTER_AUTH_URL: http://localhost:8080
+      # Cloudflare R2 (archivos, F0). Valores DUMMY para local/CI: el firmado de
+      # las URLs prefirmadas (presigned PUT/GET) es 100% local y NO contacta a R2,
+      # asi que con estos basta para que el flujo de adjuntos (F1-E1B) funcione sin
+      # un R2 real (el E2E mockea el PUT). En produccion (Railway) se inyectan los
+      # valores reales por variable de entorno.
+      R2_ACCOUNT_ID: dev
+      R2_ACCESS_KEY_ID: dev
+      R2_SECRET_ACCESS_KEY: dev
+      R2_BUCKET: control-v2-dev
     # Healthcheck con node (la imagen no trae curl): solo pasa a "healthy" cuando
     # /api/health responde 200. Durante migrate deploy + seed (corren ANTES de
     # arrancar el server) la sonda recibe conexion rechazada porque el server aun

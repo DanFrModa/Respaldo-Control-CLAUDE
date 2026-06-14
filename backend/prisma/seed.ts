@@ -117,13 +117,22 @@ function definirRoles(): {
   const todos: readonly ClavePermiso[] = CLAVES_PERMISO;
 
   // Nivel 30 — Directivo: pierde la administración del sistema (en el viejo, el botón
-  // Administración era exclusivo de nivel ≤ 20, doc 00 §3.1). Conserva almacenes.ver.
+  // Administración era exclusivo de nivel ≤ 20, doc 00 §3.1). Conserva el `.ver` de los
+  // catálogos (consulta), pero NO su `.administrar`: administrar catálogos maestros
+  // (igual que almacenes/usuarios/roles/empresas) queda solo para Administrador y
+  // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
+  // los 5 catálogos junto con los de administración del sistema.
   const directivo = sin(
     todos,
     'usuarios.administrar',
     'roles.administrar',
     'almacenes.administrar',
     'empresas.administrar',
+    'proveedores.administrar',
+    'cortadores.administrar',
+    'temporadas.administrar',
+    'etiquetas-marca.administrar',
+    'colores.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
@@ -237,6 +246,37 @@ async function sembrarRoles(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3b. Roles de proveedor (F1-E1B, R15 §4.1) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Roles/servicios base de proveedor (R15 §4.1 —
+ * `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`). Catálogo administrable:
+ * Gabriel puede agregar/desactivar más desde la UI; estos son el punto de partida.
+ * Se siembran por `codigo` (clave natural estable), sin pisar el `nombre` si ya
+ * existe (pudo editarse). NO se borran los que no estén aquí (podrían estar en uso).
+ */
+const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
+  { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
+  { codigo: 'corte', nombre: 'Corte' },
+  { codigo: 'estampado-aplicacion', nombre: 'Estampado / aplicación' },
+  { codigo: 'vende-telas', nombre: 'Vende telas' },
+  { codigo: 'vende-avios', nombre: 'Vende avíos' },
+  { codigo: 'otros-servicios', nombre: 'Otros servicios' },
+];
+
+async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
+  for (const rol of ROLES_PROVEEDOR_BASE) {
+    await prisma.rolProveedor.upsert({
+      where: { codigo: rol.codigo },
+      // No se pisa el nombre/activo si ya existe (pudo editarse en producción).
+      update: {},
+      create: { codigo: rol.codigo, nombre: rol.nombre },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. Usuario admin (contraseña TEMPORAL — cambiarla en el primer inicio de sesión)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -293,6 +333,7 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarEmpresa(prisma);
   const idPermisoPorClave = await sembrarPermisos(prisma);
   await sembrarRoles(prisma, idPermisoPorClave);
+  await sembrarRolesProveedor(prisma);
   await sembrarAdmin(prisma);
 }
 
