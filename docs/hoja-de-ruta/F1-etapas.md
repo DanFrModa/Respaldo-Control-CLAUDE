@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7, avíos R1 y **Proveedor enriquecido R15** en E1B) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** 🔄 en curso — **F1-E1 ✅ y F1-E1B ✅ hechas** (13-jun-2026, verificadas en `prueba`); sigue **F1-E2**.
+> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅ y F1-E2 ✅ hechas** (13-jun-2026, verificadas en `prueba`); sigue **F1-E3**.
 
 ## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
 
@@ -150,7 +150,17 @@
 
 ---
 
-## F1-E2 · Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 — ⬜ pendiente
+## F1-E2 · Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 — ✅ hecha (13-jun-2026, en `prueba`)
+
+> **CIERRE (13-jun-2026).** Entregado por 3 coders en paralelo + 1 reviewer independiente (el lead orquesta, no codea), verificado por Gabriel en `prueba` (Railway) y mergeado vía **PR #27**. Reviewer independiente: **aprobado sin hallazgos**.
+> - **Qué quedó (8 tablas + 1 enum, todas GLOBALES ADR-0007, auditoría A7, borrado suave, lógica solo en dominio A1, transacciones A2, RBAC por ruta A4):**
+>   - **Maquila unificada:** `Maquilero` (unifica Maquileros+Estampadores; clave `corto` única, `nombre` NO único por homónimos del viejo) + `TipoProceso` + `MaquileroTipoProceso` (N:N, exige ≥1 tipo, set en una transacción — patrón idéntico a `ProveedorRol`). `GET /api/tipos-proceso` es selector bajo `maquileros.ver`; el ABM fino de tipos-proceso queda diferido (como `roles-proveedor` en E1B). Seed idempotente: costura, estampado, bordado, lavado, aplicación.
+>   - **Tallas/Curvas (D4):** `Talla` (etiqueta única, orden) + `CurvaTalla` + `CurvaTallaItem` (curva = conjunto ORDENADO de tallas; items en una transacción). Una talla EN USO por una curva ACTIVA no se puede desactivar ni borrar (Restrict en BD + bloqueo del borrado suave con mensaje claro).
+>   - **Clientes (D7):** `Cliente` (+ contacto) + `ClienteCampo` (definición de campos de referencia por cliente; etiqueta única DENTRO del cliente). SOLO la definición; los valores (`OrdenReferencia`) son de F2 (documentado: un campo con valores no se borrará físico).
+> - **6 permisos nuevos** (maquileros/tallas/clientes `.ver`/`.administrar`); el rol `Basico` queda SIN ellos (prueba de acceso de Gabriel). Migración única aditiva `f1_e2_catalogos_estructurados` (timestamp > E1B). OpenAPI + cliente del frontend regenerados y sincronizados (27→38 paths). Frontend con el estándar teal **lista+detalle** (`ListaDetalle`): Maquileros (filtro por tipo + selector de tipos), Tallas y curvas (armador visual de curvas en orden) y Clientes (editor inline de campos D7). Pruebas: unit + integración (testcontainers, CI) + componente + E2E Playwright (CI).
+> - **El CI atrapó 1 test inválido** (corregido antes del merge, commit `905ca24`): un test de integración de maquileros afirmaba un escenario imposible por diseño (reusar un `corto` —único GLOBAL— entre un activo y uno desactivado); se reescribió para cubrir la regla real (alta con el `corto` de un desactivado → conflicto que invita a reactivar). El código de dominio estaba correcto.
+> - **PENDIENTE diferido (decisión de Gabriel, "luego se ve el plan"):** el job **e2e** del CI necesita subir el cap del rate-limit de login porque la suite e2e creció (cada test inicia sesión; >20 logins/min desde una sola IP topan `REGLA_RATE_LOGIN` 20/60 s y `tallas.spec`, último alfabético, cae en el paso de login). **Fix ya redactado (guardado en `git stash`, sin commitear):** `AUTH_LOGIN_RATE_MAX` configurable por entorno en `backend/src/auth/config.ts` (default **20**, producción intacta) + `AUTH_LOGIN_RATE_MAX=1000` en `docker-compose.yml` (solo afecta el e2e de CI y el compose local; **Railway queda en 20** porque no usa docker-compose). NO es bug de F1-E2; es infraestructura de e2e que crecerá con cada etapa (valorar `storageState` de Playwright como fix durable). Hay que aplicarlo antes del PR de `prueba`→`main` para tener el CI 100% verde.
+> - **Diferido a fin de fase (F1-E6/E7):** `docs/modulos/catalogos.md` y el ETL de estos catálogos.
 
 **Objetivo:** Construir los tres catálogos con estructura propia (relación N:N, maestro-detalle ordenado y definición de campos dinámicos), que son independientes entre sí en datos y archivos — por eso van en paralelo. Van después de E1 solo para que el patrón ya esté consolidado con lo simple; no dependen de E1 en datos.
 

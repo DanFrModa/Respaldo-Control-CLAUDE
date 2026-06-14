@@ -8,7 +8,7 @@
 
 Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Moda SA de CV*) que Daniel construyó hace ~30 años en **Microsoft Access 97**. La **ingeniería inversa está COMPLETA y validada** (en `Documentacion_MJD/`) y el **plan de construcción está aprobado**: **`PLANMAESTRO.md`** (raíz del repo) — ese plan es LEY.
 
-**Estado actual: CONTROL v2 — F1 (Catálogos + Modelos) EN CURSO.** F0 (Fundación) ✅, **F1-E1 ✅** (catálogos sencillos + Administración) y **F1-E1B ✅** (Proveedor enriquecido R15: fiscal/pago/operativo + roles + adjuntos PDF) construidas, verificadas por Gabriel y desplegadas en **`prueba`** de Railway (13-jun-2026). Detalle en **§8**; lo siguiente es **F1-E2** (catálogos estructurados: maquila unificada, tallas/curvas D4, clientes D7). **En paralelo (13-jun-2026):** Gabriel pidió un **rediseño visual** de la UI — estructura "lista + detalle" + tema verde *teal* con menú colapsable, iconos y colores explicativos (la "propuesta 3" del showcase) — que ejecuta **otro chat** con un prompt aparte; cuando aterrice, será el nuevo estándar visual que herede F1-E2+.
+**Estado actual: CONTROL v2 — F1 (Catálogos + Modelos) EN CURSO.** F0 (Fundación) ✅, **F1-E1 ✅** (catálogos sencillos + Administración) y **F1-E1B ✅** (Proveedor enriquecido R15: fiscal/pago/operativo + roles + adjuntos PDF) construidas, verificadas por Gabriel y desplegadas en **`prueba`** de Railway (13-jun-2026). Detalle en **§8**; lo siguiente es **F1-E3** (catálogos de materiales: telas D5, avíos R1, bordados con foto R2). **F1-E2 ✅** (catálogos estructurados: maquila unificada, tallas/curvas D4, clientes D7) quedó hecha, verificada por Gabriel y desplegada en `prueba` (13-jun-2026). **En paralelo (13-jun-2026):** Gabriel pidió un **rediseño visual** de la UI — estructura "lista + detalle" + tema verde *teal* con menú colapsable, iconos y colores explicativos (la "propuesta 3" del showcase) — que ejecuta **otro chat** con un prompt aparte; cuando aterrice, será el nuevo estándar visual que herede F1-E2+.
 
 > **Integración Finanzas (2026-06-13):** se incorporó al plan la propuesta de **Finanzas** (`Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`): decisión **D12**, requisitos **R10–R15**, **módulo 14 (Finanzas: CxC/CxP + CFDI, generaliza EsMa)** y una **fase nueva F8 (Finanzas)** entre F7 y Go-live —que pasa a **F9**— (plan ahora F0–F9, 10 fases). El **catálogo de proveedores enriquecido (R15)** entra en **F1, etapa F1-E1B**. La contabilidad NO entra (sigue con el contador); meta de fondo: **apagar SINUBE** por etapas (timbrado vía PAC = R14, posterior). Ver `DECISIONES.md` D12 y `HOJA-DE-RUTA.md`.
 
@@ -132,7 +132,14 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 ---
 
-## 8. ESTADO DE EJECUCIÓN — F0 ✅ · F1-E1 ✅ · F1-E1B ✅ (sigue F1-E2)
+## 8. ESTADO DE EJECUCIÓN — F0 ✅ · F1-E1 ✅ · F1-E1B ✅ · F1-E2 ✅ (sigue F1-E3)
+
+### F1-E2 — Catálogos estructurados (✅ 13-jun-2026, en `prueba`)
+
+**Entregada por 3 coders en paralelo + 1 reviewer independiente, verificada por Gabriel en `prueba` y mergeada (PR #27).** 3 catálogos GLOBALES con dominio+API+frontend (teal lista+detalle)+tests: **Maquila unificada** (Maquilero+TipoProceso N:N, exige ≥1 tipo; clave `corto`, `nombre` no único), **Tallas/Curvas D4** (curva = tallas ordenadas; una talla en uso por una curva activa no se desactiva) y **Clientes D7** (definición de campos por cliente; los valores son de F2). 6 permisos nuevos (rol `Basico` sin ellos), migración única aditiva, OpenAPI + cliente sincronizados, tipos-proceso seedeados (selector bajo `maquileros.ver`; ABM fino diferido como roles-proveedor).
+- **El CI atrapó un test inválido** (corregido, `905ca24`): un test afirmaba un escenario de reactivación imposible con `corto` único global; el código de dominio estaba bien.
+- **Pendiente diferido (decisión de Gabriel, "luego se ve el plan"):** el job **e2e** del CI necesita subir el cap del rate-limit de login (la suite e2e creció; >20 logins/min desde 1 IP topan la regla y `tallas.spec` cae en el login). Fix ya redactado y guardado en `git stash`: `AUTH_LOGIN_RATE_MAX` env-configurable (default **20**, prod intacta) + `1000` en `docker-compose.yml` (Railway queda en 20, no usa docker-compose). Aplicar antes del PR `prueba`→`main` para CI 100% verde.
+- **Detalle completo y aprendizajes:** nota de **CIERRE de F1-E2** en `docs/hoja-de-ruta/F1-etapas.md`.
 
 ### F1-E1 — Catálogos sencillos + Administración (✅ 13-jun-2026, en `prueba`)
 
