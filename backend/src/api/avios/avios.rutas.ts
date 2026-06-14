@@ -10,7 +10,7 @@
  * Particularidades: los `proveedores` (N:N CON datos propios — precio/condiciones, R1) van
  * inline en el body de crear/editar; `GET /avios/{id}/proveedores` expone el precio por
  * proveedor (no lleva permiso propio: se protege con `avios.ver`, mismo criterio que
- * `tipos-proceso` con `maquileros.ver` en E2). CERO lógica de negocio o acceso a datos
+ * el resto de relaciones embebidas del catálogo). CERO lógica de negocio o acceso a datos
  * aquí; los errores de dominio los traduce el error handler global (`src/api/errores.ts`).
  *
  * NOTA (integración): los esquemas de avío AÚN no se re-exportan desde `contrato/index.ts`

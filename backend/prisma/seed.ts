@@ -131,12 +131,11 @@ function definirRoles(): {
     'almacenes.administrar',
     'empresas.administrar',
     'proveedores.administrar',
-    'cortadores.administrar',
     'temporadas.administrar',
     'etiquetas-marca.administrar',
     'colores.administrar',
-    // F1-E2 — catálogos estructurados.
-    'maquileros.administrar',
+    // F1-E2 — catálogos estructurados. NOTA: maquileros/cortadores se fusionaron en
+    // proveedores (D12/R15) → cubiertos por `proveedores.administrar` de arriba.
     'tallas.administrar',
     'clientes.administrar',
     // F1-E3 — catálogos de materiales.
@@ -267,13 +266,27 @@ async function sembrarRoles(
  * existe (pudo editarse). NO se borran los que no estén aquí (podrían estar en uso).
  */
 const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
+  // Servicios de producción (cubren a los antiguos Maquilero y Cortador — fusión de
+  // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
-  { codigo: 'estampado-aplicacion', nombre: 'Estampado / aplicación' },
+  { codigo: 'estampado', nombre: 'Estampado' },
+  { codigo: 'bordado', nombre: 'Bordado' },
+  { codigo: 'lavado', nombre: 'Lavado' },
+  { codigo: 'aplicacion', nombre: 'Aplicación' },
+  // Venta de materiales (proveedores comerciales).
   { codigo: 'vende-telas', nombre: 'Vende telas' },
   { codigo: 'vende-avios', nombre: 'Vende avíos' },
   { codigo: 'otros-servicios', nombre: 'Otros servicios' },
 ];
+
+/**
+ * Roles de proveedor OBSOLETOS que sembrados antiguos pudieron dejar en `prueba` y que
+ * la fusión de terceros (D12/R15) reemplazó. Se DESACTIVAN (no se borran: pudieron
+ * quedar asignados a algún proveedor de prueba; el borrado suave evita dejar pares
+ * colgando). `estampado-aplicacion` se separó en `estampado` + `aplicacion`.
+ */
+const ROLES_PROVEEDOR_OBSOLETOS: string[] = ['estampado-aplicacion'];
 
 async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
   for (const rol of ROLES_PROVEEDOR_BASE) {
@@ -284,6 +297,11 @@ async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
       create: { codigo: rol.codigo, nombre: rol.nombre },
     });
   }
+  // Desactiva los roles obsoletos si existen (idempotente; no falla si no están).
+  await prisma.rolProveedor.updateMany({
+    where: { codigo: { in: ROLES_PROVEEDOR_OBSOLETOS }, activo: true },
+    data: { activo: false },
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

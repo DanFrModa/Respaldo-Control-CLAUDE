@@ -11,10 +11,8 @@ import { GaleriaBordados } from '@/modulos/bordados/GaleriaBordados';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
-import { CortadoresPagina } from '@/modulos/cortadores/CortadoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
-import { MaquilerosPagina } from '@/modulos/maquileros/MaquilerosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -59,11 +57,9 @@ const router = createBrowserRouter([
           { path: 'catalogos', element: <CatalogosPagina /> },
           { path: 'catalogos/almacenes', element: <AlmacenesPagina /> },
           { path: 'catalogos/proveedores', element: <ProveedoresPagina /> },
-          { path: 'catalogos/cortadores', element: <CortadoresPagina /> },
           { path: 'catalogos/temporadas', element: <TemporadasPagina /> },
           { path: 'catalogos/etiquetas-marca', element: <EtiquetasMarcaPagina /> },
           { path: 'catalogos/colores', element: <ColoresPagina /> },
-          { path: 'catalogos/maquileros', element: <MaquilerosPagina /> },
           { path: 'catalogos/tallas', element: <TallasCurvasPagina /> },
           { path: 'catalogos/clientes', element: <ClientesPagina /> },
           { path: 'catalogos/telas', element: <TelasPagina /> },

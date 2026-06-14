@@ -2,12 +2,10 @@ import {
   Boxes,
   CalendarRange,
   Contact,
-  Factory,
   Images,
   Layers,
   Palette,
   Ruler,
-  Scissors,
   Stamp,
   Tags,
   Truck,
@@ -75,15 +73,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     permiso: 'proveedores.ver',
   },
   {
-    clave: 'cortadores',
-    titulo: 'Cortadores',
-    descripcion: 'Talleres de corte y su precio de referencia.',
-    ruta: '/catalogos/cortadores',
-    icono: Scissors,
-    tono: 'servicios',
-    permiso: 'cortadores.ver',
-  },
-  {
     clave: 'temporadas',
     titulo: 'Temporadas',
     descripcion: 'Ciclos comerciales del año.',
@@ -111,15 +100,8 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     permiso: 'colores.ver',
   },
   // ── Catálogos estructurados (F1-E2) ──────────────────────────────────────────
-  {
-    clave: 'maquileros',
-    titulo: 'Maquileros',
-    descripcion: 'Talleres de costura y estampado (maquila unificada).',
-    ruta: '/catalogos/maquileros',
-    icono: Factory,
-    tono: 'servicios',
-    permiso: 'maquileros.ver',
-  },
+  // NOTA (fusión de terceros, D12/R15): "Maquileros" y "Cortadores" se fusionaron en
+  // "Proveedores" (un tercero con sus roles de servicio); ya no tienen tarjeta propia.
   {
     clave: 'tallas',
     titulo: 'Tallas y curvas',

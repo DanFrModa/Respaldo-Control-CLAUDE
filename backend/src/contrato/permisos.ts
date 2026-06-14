@@ -23,7 +23,6 @@ export const MODULOS_PERMISO = {
   pedidos: 'Pedidos',
   clientes: 'Clientes',
   proveedores: 'Proveedores',
-  maquileros: 'Maquileros',
   // Módulo LEGADO de F0 (solo agrupa `etiquetas.modificar`, sin uso en v2): el
   // catálogo vigente vive en el módulo `etiquetas-marca` (más abajo).
   etiquetas: 'Etiquetas de marca (legado)',
@@ -41,12 +40,14 @@ export const MODULOS_PERMISO = {
   almacenes: 'Almacenes',
   empresas: 'Empresas',
   // ── Catálogos maestros (F1-E1, globales — ADR-0007) ────────────────────────
-  cortadores: 'Cortadores',
+  // NOTA (fusión de terceros, D12/R15): el módulo `cortadores` se eliminó; el cortador
+  // es un Proveedor con el rol `corte`.
   temporadas: 'Temporadas',
   'etiquetas-marca': 'Etiquetas de marca',
   colores: 'Colores',
   // ── Catálogos estructurados (F1-E2) ────────────────────────────────────────
-  // `clientes` y `maquileros` ya existen como label arriba; `tallas` es nuevo.
+  // `clientes` ya existe como label arriba; `tallas` es nuevo. NOTA (fusión de terceros,
+  // D12/R15): el módulo `maquileros` se eliminó; el maquilero es un Proveedor con roles.
   tallas: 'Tallas y curvas',
   // ── Catálogos de materiales (F1-E3) ────────────────────────────────────────
   // `telas` ya existe arriba (Inventario de telas): la administración del CATÁLOGO de
@@ -180,27 +181,12 @@ export const CATALOGO_PERMISOS = [
     },
   },
 
-  // ── Maquileros ───────────────────────────────────────────────────────────────
-  {
-    clave: 'maquileros.programar',
-    modulo: 'maquileros',
-    descripcion: 'Agregar o modificar los maquileros programados',
-    origen: {
-      idAcceso: 15,
-      formulario: 'MaquilerosProg',
-      descripcion: 'Poder Agregar / Modificar los maquileros programados',
-    },
-  },
-  {
-    clave: 'maquileros.alta-asegurados',
-    modulo: 'maquileros',
-    descripcion: 'Dar de alta maquileros nuevos y asignarlos como asegurados',
-    origen: {
-      idAcceso: 37,
-      formulario: 'Maquileros',
-      descripcion: 'Poder dar de alta nuevos maquileros y asignarlos como asegurados',
-    },
-  },
+  // ── Maquileros (LEGADO de Accesos.csv) ─────────────────────────────────────────
+  // NOTA (fusión de terceros, D12/R15): el catálogo `Maquilero` se eliminó (un maquilero
+  // es un Proveedor con roles de servicio). Los accesos granulares 15 y 37 del sistema
+  // viejo (programar maquileros / alta de asegurados) pertenecen a flujos de PRODUCCIÓN
+  // (programación, EsMa) que se modelarán en sus fases (F3/F6) con su propio permiso; NO
+  // son del catálogo. Se omiten aquí; el ETL de `UsuAccesos` (F8) los remapeará entonces.
 
   // ── Etiquetas de marca ───────────────────────────────────────────────────────
   // LEGADO (F0, de Accesos.csv; módulo `etiquetas`): SIN uso en el código de v2. El
@@ -535,16 +521,6 @@ export const CATALOGO_PERMISOS = [
     descripcion: 'Administrar el catálogo de proveedores (alta, edición, desactivación)',
   },
   {
-    clave: 'cortadores.ver',
-    modulo: 'cortadores',
-    descripcion: 'Consultar el catálogo de cortadores',
-  },
-  {
-    clave: 'cortadores.administrar',
-    modulo: 'cortadores',
-    descripcion: 'Administrar el catálogo de cortadores (alta, edición, desactivación)',
-  },
-  {
     clave: 'temporadas.ver',
     modulo: 'temporadas',
     descripcion: 'Consultar el catálogo de temporadas',
@@ -576,22 +552,12 @@ export const CATALOGO_PERMISOS = [
   },
 
   // ── Catálogos estructurados (F1-E2, globales — ADR-0007; CRUD patrón Almacenes) ─
-  // Maquila unificada (Maquilero + TipoProceso N:N), tallas/curvas (D4) y clientes
-  // con campos de referencia (D7). Como los catálogos de F1-E1: `ver` (consulta) y
-  // `administrar` (alta/edición/des-reactivación). El catálogo `tipos-proceso` NO
-  // tiene permiso propio: su selector (`GET /api/tipos-proceso`) se protege con
-  // `maquileros.ver` (mismo criterio que `roles-proveedor` con `proveedores.ver` en
-  // E1B); el ABM fino de tipos-proceso queda diferido a una fase posterior.
-  {
-    clave: 'maquileros.ver',
-    modulo: 'maquileros',
-    descripcion: 'Consultar el catálogo de maquileros',
-  },
-  {
-    clave: 'maquileros.administrar',
-    modulo: 'maquileros',
-    descripcion: 'Administrar el catálogo de maquileros (alta, edición, desactivación)',
-  },
+  // Tallas/curvas (D4) y clientes con campos de referencia (D7). Como los catálogos de
+  // F1-E1: `ver` (consulta) y `administrar` (alta/edición/des-reactivación).
+  // NOTA (fusión de terceros, D12/R15): el catálogo `maquileros` y sus permisos se
+  // eliminaron (un maquilero es un Proveedor con roles → `proveedores.*`). El catálogo
+  // `tipos-proceso` (que se conserva para la Ruta Crítica, F5) ya no tiene selector ni
+  // permiso propio; su ABM se definirá en F5.
   {
     clave: 'tallas.ver',
     modulo: 'tallas',
@@ -619,7 +585,7 @@ export const CATALOGO_PERMISOS = [
   // con foto. Como los catálogos de F1-E1/E2: `ver` (consulta) y `administrar`
   // (alta/edición/des-reactivación). Las CATEGORÍAS de tela y los PROVEEDORES de un avío
   // NO tienen permiso propio: se gobiernan con `telas.administrar` / `avios.administrar`
-  // (mismo criterio que `tipos-proceso` con `maquileros.*` en E2).
+  // (mismo criterio de sub-catálogo embebido sin permiso propio).
   {
     clave: 'telas.ver',
     modulo: 'telas',

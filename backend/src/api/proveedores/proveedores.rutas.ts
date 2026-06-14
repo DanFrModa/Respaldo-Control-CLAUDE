@@ -76,6 +76,9 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
     limiteCredito: proveedor.limiteCredito === null ? null : Number(proveedor.limiteCredito),
     leadTimeDias: proveedor.leadTimeDias,
     notas: proveedor.notas,
+    corto: proveedor.corto,
+    asegurado: proveedor.asegurado,
+    obsPago: proveedor.obsPago,
     roles: proveedor.roles.map((r) => ({
       id: r.rol.id,
       codigo: r.rol.codigo,

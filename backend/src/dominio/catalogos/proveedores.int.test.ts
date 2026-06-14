@@ -495,6 +495,152 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
     });
   });
 
+  describe('datos de taller (fusión de terceros, D12/R15): corto / asegurado / obsPago', () => {
+    it('crea un proveedor con corto, asegurado y obsPago', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        {
+          nombre: 'Taller con datos',
+          tipo: 'SERVICIOS',
+          roles: [rolMaquila],
+          corto: 'TCD',
+          asegurado: true,
+          obsPago: 'Paga los viernes',
+        },
+        bd(),
+      );
+
+      expect(proveedor).toMatchObject({
+        corto: 'TCD',
+        asegurado: true,
+        obsPago: 'Paga los viernes',
+      });
+
+      // Verificación directa en BD.
+      const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id: proveedor.id } });
+      expect(enBd).toMatchObject({ corto: 'TCD', asegurado: true, obsPago: 'Paga los viernes' });
+    });
+
+    it('los datos de taller son opcionales: alta sin ellos quedan en null', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        { nombre: 'Sin datos de taller', roles: [rolMaquila] },
+        bd(),
+      );
+      expect(proveedor.corto).toBeNull();
+      expect(proveedor.asegurado).toBeNull();
+      expect(proveedor.obsPago).toBeNull();
+    });
+
+    it('edita corto, asegurado y obsPago con bitácora del detalle', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        { nombre: 'Taller', roles: [rolMaquila], corto: 'OLD', asegurado: false },
+        bd(),
+      );
+
+      const actualizado = await actualizarProveedor(
+        sesion,
+        { id: proveedor.id, corto: 'NEW', asegurado: true, obsPago: 'Transferencia' },
+        bd(),
+      );
+      expect(actualizado).toMatchObject({
+        corto: 'NEW',
+        asegurado: true,
+        obsPago: 'Transferencia',
+      });
+
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Proveedor', idEntidad: String(proveedor.id), accion: 'MODIFICAR' },
+        orderBy: { fecha: 'desc' },
+      });
+      expect(bitacora.datos).toMatchObject({
+        corto: { de: 'OLD', a: 'NEW' },
+        asegurado: { de: false, a: true },
+      });
+    });
+
+    it('vaciar corto/obsPago en edición (null) los BORRA; "" se normaliza a null', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        {
+          nombre: 'Taller a vaciar',
+          roles: [rolMaquila],
+          corto: 'XYZ',
+          asegurado: true,
+          obsPago: 'algo',
+        },
+        bd(),
+      );
+
+      // null vacía corto; "" vacía obsPago (el dominio normaliza '' a null).
+      const actualizado = await actualizarProveedor(
+        sesion,
+        { id: proveedor.id, corto: null, obsPago: '' },
+        bd(),
+      );
+      expect(actualizado.corto).toBeNull();
+      expect(actualizado.obsPago).toBeNull();
+
+      const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id: proveedor.id } });
+      expect(enBd.corto).toBeNull();
+      expect(enBd.obsPago).toBeNull();
+    });
+
+    // Blindaje del bug histórico de F1-E1 (`.partial()` + `.default()` reseteaba campos):
+    // editar OTRO campo NO debe tocar los datos de taller ya capturados.
+    it('editar otro campo NO resetea corto/asegurado/obsPago', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        {
+          nombre: 'Taller intacto',
+          roles: [rolMaquila],
+          corto: 'INT',
+          asegurado: true,
+          obsPago: 'no me toques',
+        },
+        bd(),
+      );
+
+      // Se edita solo el teléfono; los datos de taller se OMITEN del PATCH.
+      const actualizado = await actualizarProveedor(
+        sesion,
+        { id: proveedor.id, telefono: '555-9999' },
+        bd(),
+      );
+      expect(actualizado.telefono).toBe('555-9999');
+      expect(actualizado.corto).toBe('INT');
+      expect(actualizado.asegurado).toBe(true);
+      expect(actualizado.obsPago).toBe('no me toques');
+    });
+
+    it('dos proveedores con corto null NO chocan (unicidad nullable)', async () => {
+      const sesion = sesionAdmin();
+      // Ambos sin corto: el índice único nullable trata los null como distintos.
+      await crearProveedor(sesion, { nombre: 'Sin corto A', roles: [rolMaquila] }, bd());
+      await expect(
+        crearProveedor(sesion, { nombre: 'Sin corto B', roles: [rolMaquila] }, bd()),
+      ).resolves.toBeTruthy();
+    });
+
+    it('dos proveedores con el MISMO corto SÍ chocan → ErrorConflicto', async () => {
+      const sesion = sesionAdmin();
+      await crearProveedor(
+        sesion,
+        { nombre: 'Taller uno', roles: [rolMaquila], corto: 'DUP' },
+        bd(),
+      );
+      await expect(
+        crearProveedor(sesion, { nombre: 'Taller dos', roles: [rolMaquila], corto: 'DUP' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+  });
+
   describe('adjuntos en R2 (R15 §4, con servicio de archivos FALSO inyectado)', () => {
     it('agrega un adjunto en una transacción: crea Archivo + ProveedorArchivo + bitácora', async () => {
       const sesion = sesionAdmin();

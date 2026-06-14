@@ -129,6 +129,22 @@ const camposEnriquecidos = {
     .trim()
     .max(2000, { error: 'Las notas no pueden tener más de 2000 caracteres' })
     .optional(),
+
+  // ── Maquila/corte (fusión de terceros, D12/R15) ───────────────────────────────
+  // Atributos propios del antiguo Maquilero, portados al Proveedor. Solo se capturan
+  // cuando el tercero presta servicios de taller (rol maquila/corte/…); por eso son
+  // opcionales. `corto` es clave corta única global (nullable).
+  corto: z
+    .string()
+    .trim()
+    .max(50, { error: 'El código corto no puede tener más de 50 caracteres' })
+    .optional(),
+  asegurado: z.boolean({ error: '¿Asegurado? debe ser verdadero o falso' }).optional(),
+  obsPago: z
+    .string()
+    .trim()
+    .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' })
+    .optional(),
 } as const;
 
 /**
@@ -157,6 +173,10 @@ const camposEnriquecidosEditar = {
   limiteCredito: camposEnriquecidos.limiteCredito.nullable(),
   leadTimeDias: camposEnriquecidos.leadTimeDias.nullable(),
   notas: camposEnriquecidos.notas.nullable(),
+  // Fusión de terceros (D12/R15): `corto`/`obsPago` se pueden VACIAR (M1); `asegurado`
+  // es bandera (omitir = no tocar), no se hace nullable (igual que `factura`).
+  corto: camposEnriquecidos.corto.nullable(),
+  obsPago: camposEnriquecidos.obsPago.nullable(),
 } as const;
 
 /**
@@ -361,6 +381,10 @@ export const esquemaProveedorSalida = z
     // ── Operativo (E1B) ─────────────────────────────────────────────────────────
     leadTimeDias: z.number().int().nullable().describe('Lead time en días, o null.'),
     notas: z.string().nullable().describe('Notas, o null.'),
+    // ── Maquila/corte (fusión de terceros D12/R15) ───────────────────────────────
+    corto: z.string().nullable().describe('Código corto del taller (ex maquilero), o null.'),
+    asegurado: z.boolean().nullable().describe('¿Está asegurado? (talleres), o null.'),
+    obsPago: z.string().nullable().describe('Observaciones de pago (talleres), o null.'),
     // ── Relaciones (E1B) ────────────────────────────────────────────────────────
     roles: z.array(esquemaRolProveedorEnProveedor).describe('Roles/servicios del proveedor.'),
     cantidadAdjuntos: z.number().int().describe('Cantidad de adjuntos del proveedor.'),

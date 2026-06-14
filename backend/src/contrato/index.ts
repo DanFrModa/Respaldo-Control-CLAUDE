@@ -108,19 +108,6 @@ export {
 } from './esquemas/fiscal.js';
 
 export {
-  esquemaCortadorCrear,
-  esquemaCortadorEditar,
-  esquemaCortadorSalida,
-  esquemaCortadoresQuery,
-  esquemaCortadoresPagina,
-  type DatosCortadorCrear,
-  type DatosCortadorEditar,
-  type CortadorSalida,
-  type CortadoresQuery,
-  type CortadoresPagina,
-} from './esquemas/cortador.js';
-
-export {
   esquemaTemporadaCrear,
   esquemaTemporadaEditar,
   esquemaTemporadaSalida,
@@ -160,21 +147,8 @@ export {
 } from './esquemas/color.js';
 
 // ── Catálogos estructurados (F1-E2): maestros globales con relaciones (ADR-0007) ──
-export {
-  esquemaMaquileroCrear,
-  esquemaMaquileroEditar,
-  esquemaMaquileroSalida,
-  esquemaListarMaquileros,
-  esquemaMaquilerosPagina,
-  esquemaTipoProcesoSalida,
-  type DatosMaquileroCrear,
-  type DatosMaquileroEditar,
-  type MaquileroSalida,
-  type ListarMaquileros,
-  type MaquilerosPagina,
-  type TipoProcesoSalida,
-} from './esquemas/maquilero.js';
-
+// NOTA (fusión de terceros, D12/R15): maquileros se eliminó como catálogo (un maquilero
+// es ahora un Proveedor con sus roles de servicio).
 export {
   esquemaTallaCrear,
   esquemaTallaEditar,

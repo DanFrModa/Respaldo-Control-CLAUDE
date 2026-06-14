@@ -5,8 +5,8 @@
  *
  *  • **`ServicioTelasCategorias`**: CRUD simple de `TelaCategoria` (réplica del patrón de
  *    Cortadores), con `nombre` único global (ADR-0007, A9) y borrado suave. SIN permiso
- *    propio: se gobierna con `telas.ver`/`telas.administrar` (ADR-0009, mismo criterio que
- *    `tipos-proceso` con `maquileros.*` en F1-E2).
+ *    propio: se gobierna con `telas.ver`/`telas.administrar` (ADR-0009, mismo criterio de
+ *    sub-catálogo sin permiso propio que `TelaColor`).
  *  • **`ServicioTelas`**: CRUD de la `Tela` UNIFICADA con su grid de colores con precio.
  *    La tela y su set de `colores` (N:N a `Color` de F1-E1, cada renglón con `precio`) se
  *    crean/editan EN UNA transacción (A2): calca `sincronizarTipos` del Maquilero, pero el

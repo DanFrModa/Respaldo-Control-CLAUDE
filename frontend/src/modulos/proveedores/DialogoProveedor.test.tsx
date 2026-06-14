@@ -61,6 +61,9 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     limiteCredito: null,
     leadTimeDias: null,
     notas: null,
+    corto: null,
+    asegurado: null,
+    obsPago: null,
     roles: [],
     cantidadAdjuntos: 0,
     activo: true,
@@ -171,6 +174,34 @@ describe('<DialogoProveedor>', () => {
     expect(cuerpo.roles).toEqual([1, 2]);
     // Tras el exito cierra el dialogo.
     expect(alCambiarAbierto).toHaveBeenCalledWith(false);
+  });
+
+  // Fusión de terceros (D12/R15): la UI captura los datos de taller del proveedor.
+  it('captura los datos de taller (corto/asegurado/obsPago) y los envía en el alta', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ProveedorCrear, opciones?: { onSuccess?: (r: Proveedor) => void }) => {
+        opciones?.onSuccess?.(proveedorEjemplo({ nombre: 'Taller' }));
+      },
+    );
+    renderConProveedores(
+      <DialogoProveedor abierto alCambiarAbierto={vi.fn()} proveedor={undefined} />,
+    );
+
+    await usuario.type(screen.getByLabelText('Nombre'), 'Taller');
+    await usuario.click(screen.getByTestId('rol-proveedor-opcion-1'));
+    // Expande "Datos de taller" y captura los tres campos.
+    await usuario.click(screen.getByRole('button', { name: 'Datos de taller' }));
+    await usuario.type(await screen.findByLabelText('Código corto'), 'TLR');
+    await usuario.click(screen.getByTestId('proveedor-asegurado'));
+    await usuario.type(screen.getByLabelText('Observaciones de pago'), 'paga viernes');
+    await usuario.click(screen.getByTestId('guardar-proveedor'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as ProveedorCrear;
+    expect(cuerpo.corto).toBe('TLR');
+    expect(cuerpo.asegurado).toBe(true);
+    expect(cuerpo.obsPago).toBe('paga viernes');
   });
 
   it('en edición monta el adjuntador y pre-carga los roles del proveedor', async () => {
