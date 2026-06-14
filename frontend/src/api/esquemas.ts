@@ -325,6 +325,19 @@ export const esquemaProveedorFormulario = z
       .string()
       .trim()
       .max(2000, { error: 'Las notas no pueden tener más de 2000 caracteres' }),
+    // ── Datos de taller (fusión de terceros, D12/R15) ────────────────────────────
+    // Atributos del antiguo Maquilero, portados al Proveedor. Aplican cuando el
+    // tercero presta servicios de producción (maquila/corte/…); siempre visibles y
+    // opcionales (la lógica de negocio la valida el backend, A1).
+    corto: z
+      .string()
+      .trim()
+      .max(50, { error: 'El código corto no puede tener más de 50 caracteres' }),
+    asegurado: z.boolean(),
+    obsPago: z
+      .string()
+      .trim()
+      .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' }),
   })
   .refine(
     // Regla de captura R15 (espejo del backend): si emite CFDI, exige RFC + régimen.
@@ -335,33 +348,8 @@ export const esquemaProveedorFormulario = z
 /** Datos del formulario de proveedor. */
 export type DatosProveedorFormulario = z.infer<typeof esquemaProveedorFormulario>;
 
-// ── Cortadores (espejo de `esquemaCortadorCrear`/`Editar` del backend) ────────
-
-/**
- * Captura del formulario de cortador. Solo el `nombre` es obligatorio. El
- * `precioReferencia` es opcional y, si se captura, no puede ser negativo; se
- * captura como texto en el `<input>` y se convierte a numero al enviar
- * (`numeroOpcionalACuerpo`).
- */
-export const esquemaCortadorFormulario = z.object({
-  nombre: z
-    .string({ error: 'El nombre es obligatorio' })
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-  precioReferencia: numeroOpcional({
-    min: 0,
-    mensajeNoNumero: 'El precio de referencia debe ser un número',
-    mensajeMin: 'El precio de referencia no puede ser negativo',
-  }).describe('Precio de referencia por corte (vacío = sin precio).'),
-  telefonos: z
-    .string()
-    .trim()
-    .max(150, { error: 'Los teléfonos no pueden tener más de 150 caracteres' }),
-});
-
-/** Datos del formulario de cortador. */
-export type DatosCortadorFormulario = z.infer<typeof esquemaCortadorFormulario>;
+// NOTA (fusion de terceros, D12/R15): el formulario de Cortador se elimino; el cortador es
+// un Proveedor con el rol `corte` (usa el formulario de proveedor).
 
 // ── Temporadas (espejo de `esquemaTemporadaCrear`/`Editar` del backend) ───────
 
@@ -600,47 +588,5 @@ export const esquemaConfiguracionEmpresa = z.object({
 /** Datos del formulario de configuracion de empresa. */
 export type DatosConfiguracionEmpresa = z.infer<typeof esquemaConfiguracionEmpresa>;
 
-// ── Maquileros (espejo de `esquemaMaquileroCrear`/`Editar` del backend, F1-E2) ─
-
-/**
- * Captura del formulario de maquilero (maquila unificada; alta y edicion comparten
- * forma). `corto` y `nombre` son obligatorios; los demas campos son texto opcional. Los
- * `tipos` de proceso (capacidades, N:N) los exige el dialogo (≥1) como estado aparte, no
- * son texto del schema. Validacion solo de UX: el backend re-valida y es la autoridad (A1).
- */
-export const esquemaMaquileroFormulario = z.object({
-  corto: z
-    .string({ error: 'El código corto es obligatorio' })
-    .trim()
-    .min(1, { error: 'El código corto es obligatorio' })
-    .max(50, { error: 'El código corto no puede tener más de 50 caracteres' }),
-  nombre: z
-    .string({ error: 'El nombre es obligatorio' })
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
-  apellidos: z
-    .string()
-    .trim()
-    .max(200, { error: 'Los apellidos no pueden tener más de 200 caracteres' }),
-  telefonos: z
-    .string()
-    .trim()
-    .max(200, { error: 'Los teléfonos no pueden tener más de 200 caracteres' }),
-  direccion: z
-    .string()
-    .trim()
-    .max(300, { error: 'La dirección no puede tener más de 300 caracteres' }),
-  observaciones: z
-    .string()
-    .trim()
-    .max(2000, { error: 'Las observaciones no pueden tener más de 2000 caracteres' }),
-  obsPago: z
-    .string()
-    .trim()
-    .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' }),
-  asegurado: z.boolean(),
-});
-
-/** Datos del formulario de maquilero. */
-export type DatosMaquileroFormulario = z.infer<typeof esquemaMaquileroFormulario>;
+// NOTA (fusion de terceros, D12/R15): el formulario de Maquilero se elimino; un maquilero
+// es un Proveedor con sus roles de servicio (usa el formulario de proveedor).

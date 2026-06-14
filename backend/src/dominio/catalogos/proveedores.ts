@@ -223,6 +223,10 @@ function datosEnriquecidosCrear(
   if (datos.limiteCredito !== undefined) data.limiteCredito = datos.limiteCredito;
   if (datos.leadTimeDias !== undefined) data.leadTimeDias = datos.leadTimeDias;
   if (datos.notas !== undefined) data.notas = datos.notas;
+  // Fusión de terceros (D12/R15): atributos del antiguo maquilero.
+  if (datos.corto !== undefined) data.corto = datos.corto;
+  if (datos.asegurado !== undefined) data.asegurado = datos.asegurado;
+  if (datos.obsPago !== undefined) data.obsPago = datos.obsPago;
   return data;
 }
 
@@ -244,10 +248,13 @@ const CAMPOS_TEXTO_EDITABLES = [
   'banco',
   'clabe',
   'notas',
+  // Fusión de terceros (D12/R15): atributos del antiguo maquilero (texto nullable).
+  'corto',
+  'obsPago',
 ] as const;
 
 /** Campos BOOLEANOS editables (no nullables: el formulario los manda como boolean). */
-const CAMPOS_BOOL_EDITABLES = ['factura', 'retieneIva', 'retieneIsr'] as const;
+const CAMPOS_BOOL_EDITABLES = ['factura', 'retieneIva', 'retieneIsr', 'asegurado'] as const;
 
 /** Campos NUMÉRICOS enteros editables (nullables: `null` = borrar el dato). */
 const CAMPOS_NUM_EDITABLES = ['diasCredito', 'leadTimeDias'] as const;

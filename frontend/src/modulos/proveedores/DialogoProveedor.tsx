@@ -76,6 +76,10 @@ const VALORES_INICIALES: DatosProveedorFormulario = {
   leadTimeDias: '',
   condiciones: '',
   notas: '',
+  // Datos de taller (fusión de terceros, D12/R15)
+  corto: '',
+  asegurado: false,
+  obsPago: '',
 };
 
 /** Lee un campo de texto opcional del proveedor para el formulario (`null` -> ''). */
@@ -136,6 +140,9 @@ function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
     ['clabe', datos.clabe],
     ['condiciones', datos.condiciones],
     ['notas', datos.notas],
+    // Datos de taller (fusión de terceros, D12/R15).
+    ['corto', datos.corto],
+    ['obsPago', datos.obsPago],
   ];
   for (const [clave, valor] of textos) {
     if (valor.length > 0) {
@@ -148,6 +155,8 @@ function aCuerpoFormulario(datos: DatosProveedorFormulario): ProveedorCrear {
   cuerpo.factura = datos.factura;
   cuerpo.retieneIva = datos.retieneIva;
   cuerpo.retieneIsr = datos.retieneIsr;
+  // Datos de taller (fusión de terceros, D12/R15).
+  cuerpo.asegurado = datos.asegurado;
 
   // ── Numericos opcionales (se omiten si vacios) ──────────────────────────────
   const diasCredito = numeroOpcionalACuerpo(datos.diasCredito);
@@ -208,10 +217,14 @@ function aCuerpoEditar(datos: DatosProveedorFormulario): ProveedorEditar {
     clabe: textoONull(datos.clabe),
     condiciones: textoONull(datos.condiciones),
     notas: textoONull(datos.notas),
+    // Datos de taller (fusión de terceros, D12/R15): texto opcional vacio -> null (borrar).
+    corto: textoONull(datos.corto),
+    obsPago: textoONull(datos.obsPago),
     // Banderas: siempre viajan como boolean.
     factura: datos.factura,
     retieneIva: datos.retieneIva,
     retieneIsr: datos.retieneIsr,
+    asegurado: datos.asegurado,
     // Numericos opcionales: vacio -> null (borrar).
     diasCredito: numeroOpcionalACuerpo(datos.diasCredito) ?? null,
     limiteCredito: numeroOpcionalACuerpo(datos.limiteCredito) ?? null,
@@ -305,6 +318,10 @@ export function DialogoProveedor({
         leadTimeDias: numeroTexto(proveedor.leadTimeDias),
         condiciones: texto(proveedor.condiciones),
         notas: texto(proveedor.notas),
+        // Datos de taller (fusión de terceros, D12/R15)
+        corto: texto(proveedor.corto),
+        asegurado: bandera(proveedor.asegurado),
+        obsPago: texto(proveedor.obsPago),
       });
       setIdsRoles(proveedor.roles.map((rol) => rol.id));
     } else {
@@ -733,6 +750,51 @@ export function DialogoProveedor({
                 </AccordionContent>
               </AccordionItem>
 
+              {/* ── Datos de taller (fusión de terceros, D12/R15) ─────────────── */}
+              {/* Aplican cuando el proveedor presta servicios de producción (maquila/
+                  corte/…). Siempre visibles y opcionales; el backend es la autoridad (A1). */}
+              <AccordionItem value="taller">
+                <AccordionTrigger>Datos de taller</AccordionTrigger>
+                <AccordionContent>
+                  <FieldGroup>
+                    <Field data-invalid={Boolean(errors.corto)}>
+                      <FieldLabel htmlFor="proveedor-corto">Código corto</FieldLabel>
+                      <Input
+                        id="proveedor-corto"
+                        aria-invalid={Boolean(errors.corto)}
+                        disabled={guardando}
+                        {...registrar('corto')}
+                      />
+                      <FieldDescription>
+                        Clave corta de uso diario del taller (única). Solo para talleres.
+                      </FieldDescription>
+                      <FieldError errors={[errors.corto]} />
+                    </Field>
+
+                    <Casilla
+                      id="proveedor-asegurado"
+                      etiqueta="¿Está asegurado?"
+                      registrar={registrar}
+                      campo="asegurado"
+                      deshabilitado={guardando}
+                    />
+
+                    <Field data-invalid={Boolean(errors.obsPago)}>
+                      <FieldLabel htmlFor="proveedor-obs-pago">Observaciones de pago</FieldLabel>
+                      <textarea
+                        id="proveedor-obs-pago"
+                        rows={3}
+                        aria-invalid={Boolean(errors.obsPago)}
+                        disabled={guardando}
+                        className="w-full min-w-0 resize-y rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30"
+                        {...registrar('obsPago')}
+                      />
+                      <FieldError errors={[errors.obsPago]} />
+                    </Field>
+                  </FieldGroup>
+                </AccordionContent>
+              </AccordionItem>
+
               {/* ── Adjuntos (solo en edicion; necesitan el id) ──────────────── */}
               <AccordionItem value="adjuntos">
                 <AccordionTrigger>Adjuntos</AccordionTrigger>
@@ -784,7 +846,7 @@ function Casilla({
   id: string;
   etiqueta: string;
   registrar: UseFormRegister<DatosProveedorFormulario>;
-  campo: 'factura' | 'retieneIva' | 'retieneIsr';
+  campo: 'factura' | 'retieneIva' | 'retieneIsr' | 'asegurado';
   deshabilitado: boolean;
 }): React.JSX.Element {
   return (

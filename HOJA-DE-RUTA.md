@@ -8,7 +8,7 @@
 
 ## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
-- **Fase activa:** F1 — Catálogos + Modelos. **`F1-E1` ✅, `F1-E1B` ✅ y `F1-E2` ✅ hechas, verificadas y desplegadas en `prueba`** (13-jun-2026). **Siguiente etapa: `F1-E3`** (catálogos de materiales: telas D5, avíos R1, bordados con foto R2; ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)).
+- **Fase activa:** F1 — Catálogos + Modelos. **`F1-E1` ✅, `F1-E1B` ✅ y `F1-E2` ✅ hechas, verificadas y desplegadas en `prueba`** (13-jun-2026). **Siguiente etapa: `F1-E3`** (catálogos de materiales: telas D5, avíos R1, bordados con foto R2; ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)). **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero se da de alta una vez como **Proveedor** y marca sus servicios con casillas de roles (sin duplicar terceros).
 - **Hecho:** ingeniería inversa + diseño ✅ 100 % (validado por Daniel). **F0 (Fundación) ✅ construida y desplegada** — desde el 12-jun-2026 corre en Railway **como ambiente de prueba** (login real funcionando). El despliegue de **producción NO se monta todavía**: se contrata al acercarse el go-live, por costo (decisión de Gabriel, 12-jun-2026).
 - **Pendientes manuales de Gabriel** (no bloquean el arranque de F1): cambiar el password de `admin` (seed `Control.2026!`), activar backups del Postgres en Railway, montar **Cloudflare R2** (⚠️ sí se necesita antes de F1-E3/E4, que suben fotos), borrar el servicio frontend viejo si quedó en el canvas, y proteger las ramas exigiendo los checks del CI.
 
@@ -71,8 +71,9 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 |---|---|---|---|
 | **F1-E1** | Catálogos sencillos + mini-pantallas de Administración (usuarios/empresas) + decisión A9 | 1 coder backend (cat.) → 1 coder backend (admin) → 1 coder frontend + 1 reviewer (cadena por contrato, ver nota de cierre) | ✅ **13-jun-2026 (en prueba)** |
 | **F1-E1B** | Catálogo de Proveedores **enriquecido** (R15): roles multi-valor + campos fiscales/pago/operativos + adjuntos R2 — cimiento de las CxP (D12) | 1 coder + 1 reviewer (extiende el Proveedor de E1) | ✅ **13-jun-2026 (en prueba)** |
-| **F1-E2** | Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 | 3 coders en paralelo + 1 reviewer | ✅ **13-jun-2026 (en prueba)** |
+| **F1-E2** | Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 | 3 coders en paralelo + 1 reviewer | ✅ **13-jun-2026 (en prueba)** · ⚠️ **rectificado 14-jun (D12/R15): se ELIMINÓ el catálogo de Maquilero — un maquilero es un Proveedor con roles de servicio, ver abajo)** |
 | **F1-E3** | Catálogos de materiales: telas unificadas, avíos R1 y bordados con foto R2 | 3 coders en paralelo + 1 reviewer | ⬜ |
+| **Fusión de terceros** | Rectificación D12/R15: se eliminan los catálogos `Maquilero` (de F1-E2) y `Cortador` (de F1-E1) — UN solo catálogo de terceros: el Proveedor con casillas de roles. `precioReferencia` del cortador → desuso; el **costo del corte va en la orden (F2/F3)**. `TipoProceso` se conserva para la Ruta Crítica (F5). | 1 coder + 1 reviewer (rama `tarea/fusion-terceros`) | 🔄 14-jun-2026 |
 | **F1-E4** | Modelos: ficha + fotos R2 + BOM completo | 1 coder + 1 reviewer (cadena sobre los mismos archivos) | ⬜ |
 | **F1-E5** | Galería de modelos + generador de códigos de barra por empresa | 2 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E6** | ETL de catálogos y materiales + mapeos reutilizables + fusión de colores | 2 coders en paralelo + 1 reviewer | ⬜ |

@@ -51,18 +51,13 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
         name: 'proveedores',
         description: 'Catálogo de proveedores de telas, avíos y servicios.',
       },
-      { name: 'cortadores', description: 'Catálogo de cortadores.' },
       { name: 'temporadas', description: 'Catálogo de temporadas.' },
       {
         name: 'etiquetas-marca',
         description: 'Catálogo de etiquetas de marca (con su porcentaje de regalías).',
       },
       { name: 'colores', description: 'Catálogo de colores.' },
-      // Catálogos estructurados (F1-E2).
-      {
-        name: 'maquileros',
-        description: 'Catálogo de maquileros (maquila unificada) y sus tipos de proceso.',
-      },
+      // Catálogos estructurados (F1-E2). NOTA: maquileros se fusionó en proveedores (D12/R15).
       { name: 'tallas', description: 'Catálogo de tallas y curvas de tallas (D4).' },
       {
         name: 'clientes',

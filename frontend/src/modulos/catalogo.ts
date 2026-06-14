@@ -96,7 +96,7 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
   {
     clave: 'catalogos',
     titulo: 'Catálogos',
-    descripcion: 'Clientes, maquileros, proveedores, telas, avíos, colores, tallas y almacenes',
+    descripcion: 'Clientes, proveedores, telas, avíos, colores, tallas y almacenes',
     ruta: '/catalogos',
     icono: 'libreria',
     permisos: 'autenticado',

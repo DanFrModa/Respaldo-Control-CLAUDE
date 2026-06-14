@@ -418,6 +418,13 @@ enum TipoProveedor {
 /// NULLABLE: los 443 proveedores que migran en F1-E6 no traen estos datos; se
 /// capturan en altas/ediciones nuevas (la regla "factura ⇒ RFC" es de captura, no
 /// rompe filas viejas).
+///
+/// FUSIÓN DE TERCEROS (D12/R15 — `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`
+/// §4): este catálogo ABSORBE a los antiguos `Maquilero` y `Cortador` (eliminados). Un
+/// tercero se da de alta UNA sola vez como Proveedor y marca sus servicios (maquila,
+/// corte, estampado, bordado, lavado, aplicación, venta de telas/avíos…) con CASILLAS de
+/// `RolProveedor`. Los atributos propios del maquilero se portaron como campos nullable
+/// (`corto`, `asegurado`, `obsPago`, abajo).
 model Proveedor {
   id          Int           @id @default(autoincrement())
   /// Nombre de uso diario. Único global (ADR-0007): un proveedor se da de alta una sola vez.
@@ -473,6 +480,22 @@ model Proveedor {
   /// Tiempo de entrega típico en días (lead time).
   leadTimeDias Int?    @map("lead_time_dias")
   notas        String?
+
+  // ── Maquila/corte (fusión de terceros, D12/R15) ───────────────────────────
+  // Al consolidar Maquilero y Cortador en este único catálogo (un tercero se da de
+  // alta UNA vez y marca sus servicios con casillas de `RolProveedor`), se portan los
+  // atributos PROPIOS del maquilero que no tenían equivalente en Proveedor. Son
+  // NULLABLE: los proveedores que ya existen (y los que migren en F1-E6) no los traen;
+  // se capturan en altas/ediciones de talleres. El `nombre`/`telefono`/`direccion`/
+  // `notas` del maquilero ya viven en los campos homónimos de arriba (no se duplican).
+  // El `precioReferencia` del cortador NO se porta: el costo del corte se definirá en la
+  // orden de producción (pendiente F2/F3).
+  /// Clave corta de uso diario del taller (ex `Maquilero.corto`). Única global (nullable).
+  corto     String?  @unique
+  /// ¿Está asegurado? (ex `Maquilero.asegurado`). Nullable: solo aplica a talleres.
+  asegurado Boolean?
+  /// Observaciones específicas de pago (ex `Maquilero.obsPago`).
+  obsPago   String?  @map("obs_pago")
 
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
@@ -572,25 +595,9 @@ model ProveedorArchivo {
   @@map("proveedor_archivo")
 }
 
-/// Cortador (catálogo global, F1-E1). Equivale a la tabla `Cortadores` del viejo
-/// (doc 03-Producción §Paso 3 Corte): quien corta la tela antes de la maquila.
-model Cortador {
-  id               Int      @id @default(autoincrement())
-  /// Nombre de uso diario. Único global (ADR-0007).
-  nombre           String   @unique
-  /// Precio de referencia por corte (informativo; el costo real va en la orden).
-  precioReferencia Decimal? @map("precio_referencia") @db.Decimal(12, 2)
-  telefonos        String?
-  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
-  activo           Boolean  @default(true)
-
-  creadoEn        DateTime @default(now()) @map("creado_en")
-  creadoPorId     String?  @map("creado_por_id")
-  modificadoEn    DateTime @updatedAt @map("modificado_en")
-  modificadoPorId String?  @map("modificado_por_id")
-
-  @@map("cortadores")
-}
+// NOTA (fusión de terceros, D12/R15): el modelo `Cortador` se ELIMINÓ. El cortador es
+// ahora un Proveedor con el rol `corte` (casilla de `RolProveedor`). Su `precioReferencia`
+// NO se portó: el costo del corte se definirá en la orden de producción (pendiente F2/F3).
 
 /// Temporada (catálogo global, F1-E1). Equivale a la tabla `Temporadas` del viejo
 /// (doc 01-Modelos §2): clasifica los modelos por temporada comercial.
@@ -654,8 +661,9 @@ model Color {
 // ─────────────────────────────────────────────────────────────────────────────
 // Catálogos ESTRUCTURADOS (F1-E2) — maestros GLOBALES (sin idEmpresa, ADR-0007/A9)
 // con relaciones internas:
-//  • Maquila unificada (PLANMAESTRO §4): Maquilero + TipoProceso (N:N) —
-//    unifica Maquileros + Estampadores del viejo (doc 03-Producción).
+//  • Tipos de proceso: catálogo independiente (consumidor real: la Ruta Crítica, F5).
+//    NOTA fusión de terceros (D12/R15): la "maquila unificada" (Maquilero+TipoProceso
+//    N:N) se ELIMINÓ; un maquilero es ahora un Proveedor con roles de servicio.
 //  • Tallas ilimitadas (D4, MEJORAS A6): Talla + CurvaTalla (maestro-detalle ordenado).
 //  • Campos de referencia por cliente (D7): Cliente + ClienteCampo (definición; los
 //    VALORES son de F2 vía OrdenReferencia).
@@ -665,49 +673,19 @@ model Color {
 // en la transacción A2). Idéntico al patrón Proveedor↔RolProveedor de F1-E1B.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Maquilero (catálogo global, F1-E2). UNIFICA Maquileros + Estampadores del viejo
-/// (doc 03-Producción §Paso 4 Entrega a maquilero y §Flujo paralelo Estampado/Aplicación).
-/// Las CAPACIDADES (costura/estampado/…) se modelan N:N a TipoProceso (maquila
-/// unificada, PLANMAESTRO §4) — NO como tablas separadas. Mismo patrón N:N que
-/// Proveedor↔RolProveedor. Cimiento de EsMa/CxP (F6/F8).
-model Maquilero {
-  id            Int     @id @default(autoincrement())
-  /// Código corto de uso diario (viejo: `Corto`). Único global y clave de negocio.
-  /// (El `nombre` NO es único: el viejo tiene homónimos; la dedup en E6 va a REPORTE.)
-  corto         String  @unique
-  nombre        String
-  apellidos     String?
-  telefonos     String?
-  direccion     String?
-  observaciones String?
-  /// Observaciones específicas de pago.
-  obsPago       String? @map("obs_pago")
-  /// ¿Está asegurado? (viejo: `Asegurado`).
-  asegurado     Boolean @default(false)
-  activo        Boolean @default(true)
-
-  tipos MaquileroTipoProceso[]
-
-  creadoEn        DateTime @default(now()) @map("creado_en")
-  creadoPorId     String?  @map("creado_por_id")
-  modificadoEn    DateTime @updatedAt @map("modificado_en")
-  modificadoPorId String?  @map("modificado_por_id")
-
-  @@map("maquileros")
-}
-
-/// Tipo de proceso de maquila (catálogo administrable y GLOBAL, F1-E2). Costura,
-/// estampado, bordado, lavado, aplicación… En F5 cada tipo se liga a un proceso de
-/// la Ruta Crítica. Mismo patrón que `RolProveedor` (se siembra; admin fina diferida,
-/// igual que roles-proveedor en E1B).
+/// Tipo de proceso (catálogo administrable y GLOBAL). Costura, estampado, bordado,
+/// lavado, aplicación… En F5 cada tipo se liga a un proceso de la Ruta Crítica (su
+/// consumidor real). SE CONSERVA como catálogo independiente: la fusión de terceros
+/// (D12/R15) eliminó `Maquilero`/`MaquileroTipoProceso`, así que ya NO tiene relación
+/// inversa hacia maquileros (los servicios de un taller se marcan ahora con casillas de
+/// `RolProveedor` en el Proveedor; NO hay enlace Proveedor↔TipoProceso). Mismo patrón
+/// que `RolProveedor` (se siembra; admin fina diferida).
 model TipoProceso {
   id     Int     @id @default(autoincrement())
   /// Clave estable kebab-case (p. ej. "costura"). Única global.
   codigo String  @unique
   nombre String
   activo Boolean @default(true)
-
-  maquileros MaquileroTipoProceso[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -717,23 +695,10 @@ model TipoProceso {
   @@map("tipos_proceso")
 }
 
-/// Puente N:N maquilero ↔ tipo de proceso (F1-E2). Idéntico a `ProveedorRol`:
-/// Cascade hacia Maquilero (capacidades del maquilero; permite reescribir el set en
-/// la tx), Restrict hacia TipoProceso (un tipo en uso no se borra físico; se desactiva).
-model MaquileroTipoProceso {
-  idMaquilero   Int @map("id_maquilero")
-  idTipoProceso Int @map("id_tipo_proceso")
-
-  maquilero   Maquilero   @relation(fields: [idMaquilero], references: [id], onDelete: Cascade)
-  tipoProceso TipoProceso @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
-
-  creadoEn    DateTime @default(now()) @map("creado_en")
-  creadoPorId String?  @map("creado_por_id")
-
-  @@id([idMaquilero, idTipoProceso])
-  @@index([idTipoProceso])
-  @@map("maquilero_tipo_proceso")
-}
+// NOTA (fusión de terceros, D12/R15): los modelos `Maquilero` y `MaquileroTipoProceso`
+// se ELIMINARON. Un maquilero es ahora un Proveedor con sus roles de servicio (casillas
+// de `RolProveedor`: maquila-costura, estampado, bordado, lavado, aplicación…). Sus
+// atributos propios (corto/asegurado/obsPago) se portaron a `Proveedor`.
 
 /// Talla individual (catálogo global, D4 — PLANMAESTRO §4; MEJORAS A6: anchos fijos
 /// T1..T8 → catálogo). `orden` da el orden canónico de despliegue (NO único en BD;

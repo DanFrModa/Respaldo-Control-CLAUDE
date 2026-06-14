@@ -275,6 +275,43 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
     expect(esquemaProveedorEditar.safeParse({ id: 1, tipo: null }).success).toBe(false);
   });
 
+  // Fusión de terceros (D12/R15): datos de taller (corto/asegurado/obsPago).
+  it('alta: acepta corto/asegurado/obsPago y NO les inyecta default (no son default-trap)', () => {
+    const datos = esquemaProveedorCrear.parse({
+      nombre: 'Taller',
+      corto: 'TLR',
+      asegurado: true,
+      obsPago: 'paga viernes',
+    });
+    expect(datos.corto).toBe('TLR');
+    expect(datos.asegurado).toBe(true);
+    expect(datos.obsPago).toBe('paga viernes');
+
+    // Omitirlos en el alta los deja undefined (sin default que pise valores).
+    const sin = esquemaProveedorCrear.parse({ nombre: 'Taller' });
+    expect('corto' in sin).toBe(false);
+    expect('asegurado' in sin).toBe(false);
+    expect('obsPago' in sin).toBe(false);
+  });
+
+  it('edición: omitir corto/asegurado/obsPago los deja undefined (sin default que resetee)', () => {
+    const datos = esquemaProveedorEditar.parse({ id: 1, telefono: '555' });
+    expect('corto' in datos).toBe(false);
+    expect('asegurado' in datos).toBe(false);
+    expect('obsPago' in datos).toBe(false);
+    expect(datos.corto).toBeUndefined();
+    expect(datos.asegurado).toBeUndefined();
+    expect(datos.obsPago).toBeUndefined();
+  });
+
+  it('edición: corto/obsPago ACEPTAN null para borrarlos (asegurado es bandera, no nullable)', () => {
+    const datos = esquemaProveedorEditar.parse({ id: 1, corto: null, obsPago: null });
+    expect(datos.corto).toBeNull();
+    expect(datos.obsPago).toBeNull();
+    // `asegurado` es bandera (como factura): omitir = no tocar; null NO es válido.
+    expect(esquemaProveedorEditar.safeParse({ id: 1, asegurado: null }).success).toBe(false);
+  });
+
   it('el cuerpo del PATCH también acepta null en los opcionales', () => {
     const cuerpo = esquemaProveedorPatchCuerpo.parse({
       rfc: null,

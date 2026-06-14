@@ -77,19 +77,8 @@ export type ProveedorAdjuntoCrear =
 export type ProveedorAdjuntoSubida =
   paths['/api/proveedores/{id}/adjuntos']['post']['responses']['201']['content']['application/json'];
 
-/** Pagina de cortadores (`GET /api/cortadores`). */
-export type CortadoresPagina =
-  paths['/api/cortadores']['get']['responses']['200']['content']['application/json'];
-/** Un cortador tal como lo devuelve el API. */
-export type Cortador = CortadoresPagina['datos'][number];
-/** Parametros de consulta del listado de cortadores (querystring). */
-export type CortadoresQuery = NonNullable<paths['/api/cortadores']['get']['parameters']['query']>;
-/** Cuerpo de alta de cortador (`POST /api/cortadores`). */
-export type CortadorCrear =
-  paths['/api/cortadores']['post']['requestBody']['content']['application/json'];
-/** Cuerpo de edicion de cortador (`PATCH /api/cortadores/{id}`). */
-export type CortadorEditar =
-  paths['/api/cortadores/{id}']['patch']['requestBody']['content']['application/json'];
+// NOTA (fusion de terceros, D12/R15): los tipos de Cortador se eliminaron; el cortador es
+// un Proveedor con el rol `corte` (usa los tipos de Proveedor de arriba).
 
 /** Pagina de temporadas (`GET /api/temporadas`). */
 export type TemporadasPagina =
@@ -137,26 +126,10 @@ export type ColorEditar =
 
 // ── Catalogos estructurados F1-E2 ─────────────────────────────────────────────
 
-// PIEZA A — Maquila unificada (Maquilero + TipoProceso N:N).
-
-/** Pagina de maquileros (`GET /api/maquileros`). */
-export type MaquilerosPagina =
-  paths['/api/maquileros']['get']['responses']['200']['content']['application/json'];
-/** Un maquilero tal como lo devuelve el API (con sus tipos de proceso). */
-export type Maquilero = MaquilerosPagina['datos'][number];
-/** Parametros de consulta del listado de maquileros (querystring; incluye `tipoProceso`). */
-export type MaquilerosQuery = NonNullable<paths['/api/maquileros']['get']['parameters']['query']>;
-/** Cuerpo de alta de maquilero (`POST /api/maquileros`). */
-export type MaquileroCrear =
-  paths['/api/maquileros']['post']['requestBody']['content']['application/json'];
-/** Cuerpo de edicion de maquilero (`PATCH /api/maquileros/{id}`). */
-export type MaquileroEditar =
-  paths['/api/maquileros/{id}']['patch']['requestBody']['content']['application/json'];
-/** Lista de tipos de proceso (`GET /api/tipos-proceso`) — array plano (selector). */
-export type TiposProcesoLista =
-  paths['/api/tipos-proceso']['get']['responses']['200']['content']['application/json'];
-/** Un tipo de proceso de maquila del catalogo selector. */
-export type TipoProceso = TiposProcesoLista[number];
+// NOTA (fusion de terceros, D12/R15): la "maquila unificada" (Maquilero + TipoProceso) se
+// elimino. Un maquilero es ahora un Proveedor con sus roles de servicio (tipos de Proveedor
+// de arriba). El catalogo TipoProceso se conserva en BD para la Ruta Critica (F5) pero ya no
+// expone selector REST, asi que aqui no hay tipos derivados de el.
 
 // PIEZA B — Tallas / Curvas (D4).
 

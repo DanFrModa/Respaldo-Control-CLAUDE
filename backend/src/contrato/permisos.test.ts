@@ -29,11 +29,16 @@ describe('catálogo de permisos', () => {
     }
   });
 
-  it('transcribe los 38 accesos del sistema viejo (ids 1–38, sin repetir ni faltar)', () => {
+  it('transcribe los accesos del sistema viejo sin repetir (ids 15 y 37 diferidos por la fusión de terceros)', () => {
+    // Fusión de terceros (D12/R15): al eliminar el catálogo `maquileros` se quitaron sus
+    // dos accesos LEGADO (idAcceso 15 "programar maquileros" y 37 "alta de asegurados"),
+    // que pertenecen a flujos de PRODUCCIÓN/EsMa (F3/F6), no al catálogo. Se remapearán en
+    // el ETL de `UsuAccesos` (F8). El resto de los ids del sistema viejo (1–38) siguen 1:1.
     const idsViejos = catalogo.flatMap((p) => (p.origen ? [p.origen.idAcceso] : []));
-    expect([...idsViejos].sort((a, b) => a - b)).toEqual(
-      Array.from({ length: 38 }, (_, i) => i + 1),
+    const esperados = Array.from({ length: 38 }, (_, i) => i + 1).filter(
+      (id) => id !== 15 && id !== 37,
     );
+    expect([...idsViejos].sort((a, b) => a - b)).toEqual(esperados);
   });
 
   it('incluye los permisos nuevos de administración y de catálogos de v2', () => {
@@ -47,19 +52,16 @@ describe('catálogo de permisos', () => {
       // Catálogos de materiales (F1-E3): bordados/estampados (R2) + foto.
       'bordados.administrar',
       'bordados.ver',
-      // Catálogos estructurados (F1-E2): clientes (D7) + maquileros + tallas/curvas (D4).
+      // Catálogos estructurados (F1-E2): clientes (D7) + tallas/curvas (D4).
+      // NOTA (fusión de terceros, D12/R15): maquileros/cortadores se fusionaron en proveedores.
       'clientes.administrar',
       'clientes.ver',
       // Catálogos maestros globales (F1-E1, ADR-0007): ver + administrar por catálogo.
       'colores.administrar',
       'colores.ver',
-      'cortadores.administrar',
-      'cortadores.ver',
       'empresas.administrar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
-      'maquileros.administrar',
-      'maquileros.ver',
       'proveedores.administrar',
       'proveedores.ver',
       'roles.administrar',
