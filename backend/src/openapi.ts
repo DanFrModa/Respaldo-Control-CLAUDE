@@ -58,6 +58,16 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
         description: 'Catálogo de etiquetas de marca (con su porcentaje de regalías).',
       },
       { name: 'colores', description: 'Catálogo de colores.' },
+      // Catálogos estructurados (F1-E2).
+      {
+        name: 'maquileros',
+        description: 'Catálogo de maquileros (maquila unificada) y sus tipos de proceso.',
+      },
+      { name: 'tallas', description: 'Catálogo de tallas y curvas de tallas (D4).' },
+      {
+        name: 'clientes',
+        description: 'Catálogo de clientes y sus campos de referencia (D7).',
+      },
     ],
     components: {
       securitySchemes: {

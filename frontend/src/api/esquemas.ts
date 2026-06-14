@@ -417,6 +417,47 @@ export const esquemaColorFormulario = z.object({
 /** Datos del formulario de color. */
 export type DatosColorFormulario = z.infer<typeof esquemaColorFormulario>;
 
+// ── Tallas y curvas (espejo de `esquemaTallaCrear`/`esquemaCurvaCrear`, D4) ───
+
+/**
+ * Captura del formulario de talla (alta y edicion comparten forma). La `etiqueta`
+ * es obligatoria; el `orden` es opcional (texto en un `<input type="number">`;
+ * vacio = lo asigna el backend con 0). Validacion solo de UX: el backend re-valida
+ * y es la autoridad (A1).
+ */
+export const esquemaTallaFormulario = z.object({
+  etiqueta: z
+    .string({ error: 'La etiqueta es obligatoria' })
+    .trim()
+    .min(1, { error: 'La etiqueta es obligatoria' })
+    .max(50, { error: 'La etiqueta no puede tener más de 50 caracteres' }),
+  orden: numeroOpcional({
+    min: 0,
+    mensajeNoNumero: 'El orden debe ser un número',
+    mensajeMin: 'El orden no puede ser negativo',
+  }).describe('Orden de despliegue (vacío = 0).'),
+});
+
+/** Datos del formulario de talla. */
+export type DatosTallaFormulario = z.infer<typeof esquemaTallaFormulario>;
+
+/**
+ * Captura del formulario de curva (alta y edicion comparten forma). Solo el
+ * `nombre` es texto del schema; las tallas (≥1, en orden) las gestiona el armador
+ * de curva como estado aparte (igual que los roles del proveedor) y se envian
+ * INLINE en el cuerpo del API. El backend exige ≥1 y es la autoridad (A1).
+ */
+export const esquemaCurvaFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+});
+
+/** Datos del formulario de curva. */
+export type DatosCurvaFormulario = z.infer<typeof esquemaCurvaFormulario>;
+
 // ── Usuarios (espejo de `esquemaUsuarioCrear`/`Editar` del backend) ───────────
 
 /**
@@ -558,3 +599,48 @@ export const esquemaConfiguracionEmpresa = z.object({
 
 /** Datos del formulario de configuracion de empresa. */
 export type DatosConfiguracionEmpresa = z.infer<typeof esquemaConfiguracionEmpresa>;
+
+// ── Maquileros (espejo de `esquemaMaquileroCrear`/`Editar` del backend, F1-E2) ─
+
+/**
+ * Captura del formulario de maquilero (maquila unificada; alta y edicion comparten
+ * forma). `corto` y `nombre` son obligatorios; los demas campos son texto opcional. Los
+ * `tipos` de proceso (capacidades, N:N) los exige el dialogo (≥1) como estado aparte, no
+ * son texto del schema. Validacion solo de UX: el backend re-valida y es la autoridad (A1).
+ */
+export const esquemaMaquileroFormulario = z.object({
+  corto: z
+    .string({ error: 'El código corto es obligatorio' })
+    .trim()
+    .min(1, { error: 'El código corto es obligatorio' })
+    .max(50, { error: 'El código corto no puede tener más de 50 caracteres' }),
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
+  apellidos: z
+    .string()
+    .trim()
+    .max(200, { error: 'Los apellidos no pueden tener más de 200 caracteres' }),
+  telefonos: z
+    .string()
+    .trim()
+    .max(200, { error: 'Los teléfonos no pueden tener más de 200 caracteres' }),
+  direccion: z
+    .string()
+    .trim()
+    .max(300, { error: 'La dirección no puede tener más de 300 caracteres' }),
+  observaciones: z
+    .string()
+    .trim()
+    .max(2000, { error: 'Las observaciones no pueden tener más de 2000 caracteres' }),
+  obsPago: z
+    .string()
+    .trim()
+    .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' }),
+  asegurado: z.boolean(),
+});
+
+/** Datos del formulario de maquilero. */
+export type DatosMaquileroFormulario = z.infer<typeof esquemaMaquileroFormulario>;

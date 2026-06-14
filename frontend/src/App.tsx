@@ -6,11 +6,14 @@ import { CascaronSistema } from '@/modulos/CascaronSistema';
 import { AdministracionPagina } from '@/modulos/administracion/AdministracionPagina';
 import { AlmacenesPagina } from '@/modulos/almacenes/AlmacenesPagina';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
+import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { CortadoresPagina } from '@/modulos/cortadores/CortadoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { MaquilerosPagina } from '@/modulos/maquileros/MaquilerosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TemporadasPagina } from '@/modulos/temporadas/TemporadasPagina';
 import { UsuariosPagina } from '@/modulos/usuarios/UsuariosPagina';
 import { Inicio } from '@/paginas/Inicio';
@@ -56,6 +59,9 @@ const router = createBrowserRouter([
           { path: 'catalogos/temporadas', element: <TemporadasPagina /> },
           { path: 'catalogos/etiquetas-marca', element: <EtiquetasMarcaPagina /> },
           { path: 'catalogos/colores', element: <ColoresPagina /> },
+          { path: 'catalogos/maquileros', element: <MaquilerosPagina /> },
+          { path: 'catalogos/tallas', element: <TallasCurvasPagina /> },
+          { path: 'catalogos/clientes', element: <ClientesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
