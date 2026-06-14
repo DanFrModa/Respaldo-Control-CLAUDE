@@ -20,7 +20,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 import type { esquemaProveedorAdjuntoSalida } from '../../contrato/index.js';
 import {
   esquemaErrorApi,
-  esquemaProveedorAdjuntoCrearCuerpo,
+  esquemaProveedorAdjuntoCrear,
   esquemaProveedorAdjuntosLista,
   esquemaProveedorAdjuntoSubida,
   esquemaProveedorCrear,
@@ -301,7 +301,7 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
       summary: 'Preparar la subida de un adjunto del proveedor',
       security: SEGURIDAD_SESION,
       params: esquemaParamId,
-      body: esquemaProveedorAdjuntoCrearCuerpo,
+      body: esquemaProveedorAdjuntoCrear,
       response: { 201: esquemaProveedorAdjuntoSubida, ...respuestasError },
     },
     handler: async (request, reply) => {

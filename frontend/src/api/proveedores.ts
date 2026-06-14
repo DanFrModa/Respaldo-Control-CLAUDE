@@ -11,10 +11,13 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
   Proveedor,
+  ProveedorAdjunto,
+  ProveedorAdjuntoCrear,
   ProveedorCrear,
   ProveedorEditar,
   ProveedoresPagina,
   ProveedoresQuery,
+  RolProveedor,
 } from './tipos';
 
 /**
@@ -146,5 +149,165 @@ export function useReactivarProveedor(): UseMutationResult<Proveedor, ErrorDeApi
   return useMutation({
     mutationFn: reactivarProveedor,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES }),
+  });
+}
+
+// ── Roles de proveedor (F1-E1B, catalogo selector) ───────────────────────────
+
+/** Clave de cache del catalogo de roles de proveedor. */
+export const CLAVE_ROLES_PROVEEDOR = ['roles-proveedor'] as const;
+
+/** Pide el catalogo de roles/servicios de proveedor (array plano, sin paginacion). */
+async function listarRolesProveedor(): Promise<RolProveedor[]> {
+  const { data, error } = await api.GET('/api/roles-proveedor');
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Lista los roles/servicios de proveedor activos (para el selector multiple y el filtro). */
+export function useRolesProveedor(): UseQueryResult<RolProveedor[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_ROLES_PROVEEDOR, 'lista'],
+    queryFn: listarRolesProveedor,
+  });
+}
+
+// ── Adjuntos de proveedor (F1-E1B, archivos PDF en R2 via presigned) ──────────
+
+/** Clave de cache de los adjuntos de UN proveedor. */
+function claveAdjuntos(idProveedor: number): readonly unknown[] {
+  return [...CLAVE_PROVEEDORES, 'adjuntos', idProveedor];
+}
+
+/** Lista los adjuntos de un proveedor (`GET /api/proveedores/{id}/adjuntos`). */
+async function listarAdjuntos(idProveedor: number): Promise<ProveedorAdjunto[]> {
+  const { data, error } = await api.GET('/api/proveedores/{id}/adjuntos', {
+    params: { path: { id: idProveedor } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/** Lista los adjuntos de un proveedor (deshabilitada si no hay id, p. ej. en alta). */
+export function useAdjuntosProveedor(
+  idProveedor: number | undefined,
+): UseQueryResult<ProveedorAdjunto[], ErrorDeApi> {
+  return useQuery({
+    queryKey: claveAdjuntos(idProveedor ?? 0),
+    queryFn: () => listarAdjuntos(idProveedor as number),
+    enabled: idProveedor !== undefined,
+  });
+}
+
+/** Argumentos de la mutacion de subida de un adjunto. */
+export interface ArgsSubirAdjunto {
+  idProveedor: number;
+  /** El archivo PDF elegido por el usuario. */
+  archivo: File;
+  /**
+   * Tipo documental (constancia/contrato/otro). En el contrato el campo es
+   * opcional (tiene default); aqui el llamador SIEMPRE elige uno, por eso se
+   * excluye `undefined` (necesario bajo `exactOptionalPropertyTypes`).
+   */
+  tipo: NonNullable<ProveedorAdjuntoCrear['tipo']>;
+}
+
+/**
+ * Sube un adjunto PDF a R2 en DOS pasos (flujo presigned de F0):
+ *   1) `POST /api/proveedores/{id}/adjuntos` con los metadatos → el backend
+ *      registra el `Archivo` y devuelve una URL PUT prefirmada.
+ *   2) El navegador hace `PUT` del archivo DIRECTO a esa URL (R2), con los headers
+ *      `Content-Type` y `Content-Length` EXACTOS (la firma solo acepta esos).
+ *
+ * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
+ * (El `Archivo` registrado quedaría sin objeto en R2; es inofensivo y el usuario
+ * puede reintentar.) Al terminar invalida la lista de adjuntos y la de proveedores
+ * (para refrescar el conteo `cantidadAdjuntos`).
+ */
+async function subirAdjunto({ idProveedor, archivo, tipo }: ArgsSubirAdjunto): Promise<void> {
+  const { data, error } = await api.POST('/api/proveedores/{id}/adjuntos', {
+    params: { path: { id: idProveedor } },
+    body: {
+      tipo,
+      nombreOriginal: archivo.name,
+      tipoMime: archivo.type,
+      tamanoBytes: archivo.size,
+    },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+
+  // Paso 2: PUT directo a R2 con los headers EXACTOS (tipo y tamaño firmados).
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(data.urlSubida, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': archivo.type,
+        'Content-Length': String(archivo.size),
+      },
+      body: archivo,
+    });
+  } catch {
+    throw new ErrorDeApi({
+      codigo: 'SUBIDA',
+      mensaje: 'No se pudo subir el archivo. Verifica tu conexión e intenta de nuevo.',
+    });
+  }
+  if (!respuesta.ok) {
+    throw new ErrorDeApi({
+      codigo: 'SUBIDA',
+      mensaje: 'El almacenamiento rechazó el archivo. Intenta de nuevo.',
+    });
+  }
+}
+
+/** Sube un adjunto PDF (presigned PUT) e invalida las listas afectadas. */
+export function useSubirAdjuntoProveedor(): UseMutationResult<void, ErrorDeApi, ArgsSubirAdjunto> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: subirAdjunto,
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: claveAdjuntos(variables.idProveedor) });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES });
+    },
+  });
+}
+
+/** Argumentos de la mutacion de quitar un adjunto. */
+export interface ArgsQuitarAdjunto {
+  idProveedor: number;
+  idArchivo: string;
+}
+
+/** Quita un adjunto (`DELETE /api/proveedores/{id}/adjuntos/{idArchivo}`). */
+async function quitarAdjunto({ idProveedor, idArchivo }: ArgsQuitarAdjunto): Promise<void> {
+  const { error, response } = await api.DELETE('/api/proveedores/{id}/adjuntos/{idArchivo}', {
+    params: { path: { id: idProveedor, idArchivo } },
+  });
+  // 204 No Content: éxito sin cuerpo (no hay `data`); cualquier !ok es error.
+  if (!response.ok) {
+    throw new ErrorDeApi(error);
+  }
+}
+
+/** Quita un adjunto e invalida las listas afectadas (adjuntos + conteo en proveedores). */
+export function useQuitarAdjuntoProveedor(): UseMutationResult<
+  void,
+  ErrorDeApi,
+  ArgsQuitarAdjunto
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: quitarAdjunto,
+    onSuccess: (_resultado, variables) => {
+      void queryClient.invalidateQueries({ queryKey: claveAdjuntos(variables.idProveedor) });
+      void queryClient.invalidateQueries({ queryKey: CLAVE_PROVEEDORES });
+    },
   });
 }

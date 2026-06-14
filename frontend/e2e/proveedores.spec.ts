@@ -125,3 +125,119 @@ test.describe('CRUD de Proveedores', () => {
     ).toBeVisible();
   });
 });
+
+/**
+ * E2E del proveedor ENRIQUECIDO (F1-E1B, R15): crear con ≥1 rol + datos fiscales
+ * desde las secciones plegables, verlo en la lista y en el detalle (chips de rol),
+ * y filtrar la lista por rol. El selector de roles ('Roles / servicios') va abierto
+ * por defecto en el diálogo; las secciones (Fiscal, etc.) se expanden con clic.
+ */
+test.describe('Proveedor enriquecido (R15)', () => {
+  test('crear con 2 roles + datos fiscales, verlo en la lista y filtrar por rol', async ({
+    page,
+  }) => {
+    const sufijo = Date.now().toString().slice(-6);
+    const nombre = `Proveedor R15 ${sufijo}`;
+
+    await entrarComoAdmin(page);
+    await page.goto('/catalogos/proveedores');
+    await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
+
+    // ── Crear con roles + fiscal ────────────────────────────────────────────────
+    await page.getByTestId('nuevo-proveedor').click();
+    const dialogo = page.getByRole('dialog');
+    await expect(dialogo.getByRole('heading', { name: 'Nuevo proveedor' })).toBeVisible();
+    await dialogo.getByLabel('Nombre').fill(nombre);
+
+    // La sección de roles está abierta por defecto: marca los DOS primeros roles.
+    const selectorRoles = dialogo.getByTestId('selector-roles-proveedor');
+    const opcionesRol = selectorRoles.getByRole('checkbox');
+    await opcionesRol.nth(0).check();
+    await opcionesRol.nth(1).check();
+    // Recuerda el nombre del primer rol para filtrar luego por él.
+    const nombrePrimerRol = (await selectorRoles.locator('label').first().innerText()).trim();
+
+    // Expande "Fiscal" y captura RFC + régimen (forma de persona moral: 12 chars).
+    await dialogo.getByRole('button', { name: 'Fiscal' }).click();
+    await dialogo.getByTestId('proveedor-factura').check();
+    await dialogo.getByLabel('RFC').fill('ABC123456T1A');
+    await dialogo.getByLabel('Régimen fiscal (SAT)').fill('601');
+
+    await page.getByTestId('guardar-proveedor').click();
+
+    // ── Aparece en la lista ─────────────────────────────────────────────────────
+    await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
+    await page.getByTestId('buscar-proveedor').fill(nombre);
+    const fila = page.getByTestId('fila-proveedor').filter({ hasText: nombre });
+    await expect(fila).toBeVisible();
+
+    // ── Detalle: los roles se ven como chips ────────────────────────────────────
+    await fila.click();
+    const detalle = page.getByTestId('detalle-proveedor');
+    await expect(detalle.getByRole('heading', { name: nombre })).toBeVisible();
+    await expect(detalle.getByTestId('roles-proveedor-detalle')).toBeVisible();
+    await expect(
+      detalle.getByTestId('roles-proveedor-detalle').getByText(nombrePrimerRol),
+    ).toBeVisible();
+
+    // ── Filtrar por rol ─────────────────────────────────────────────────────────
+    // Limpia la búsqueda y filtra por el rol marcado: la lista lo sigue mostrando.
+    await page.getByTestId('buscar-proveedor').fill('');
+    await page.getByTestId('filtro-rol-proveedor').selectOption({ label: nombrePrimerRol });
+    await page.getByTestId('buscar-proveedor').fill(nombre);
+    await expect(page.getByTestId('fila-proveedor').filter({ hasText: nombre })).toBeVisible();
+  });
+
+  test('adjuntar un PDF (red de R2 mockeada) lo lista y se puede quitar', async ({ page }) => {
+    const sufijo = Date.now().toString().slice(-6);
+    const nombre = `Proveedor Adjunto ${sufijo}`;
+
+    await entrarComoAdmin(page);
+    await page.goto('/catalogos/proveedores');
+    await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
+
+    // Crea un proveedor mínimo (con un rol) para poder adjuntar en edición.
+    await page.getByTestId('nuevo-proveedor').click();
+    const dialogoAlta = page.getByRole('dialog');
+    await dialogoAlta.getByLabel('Nombre').fill(nombre);
+    await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
+    await page.getByTestId('guardar-proveedor').click();
+    await expect(page.getByText(`Proveedor "${nombre}" creado.`)).toBeVisible();
+
+    await page.getByTestId('buscar-proveedor').fill(nombre);
+    await page.getByTestId('fila-proveedor').filter({ hasText: nombre }).click();
+
+    // ── Mockea SOLO el PUT a R2 (la URL prefirmada), sin tocar el backend ────────
+    // El flujo de subida es: POST /api/.../adjuntos (backend real) → devuelve una
+    // `urlSubida` prefirmada de R2 → el navegador hace PUT directo a esa URL. Aquí
+    // interceptamos UNICAMENTE ese PUT externo (no es `/api/`) y lo resolvemos 200,
+    // para no depender de R2 real; el resto de la red (POST/GET/DELETE del backend)
+    // pasa intacta (`fallback`).
+    await page.route('**/*', (route) => {
+      const peticion = route.request();
+      const esPutAR2 = peticion.method() === 'PUT' && !peticion.url().includes('/api/');
+      return esPutAR2 ? route.fulfill({ status: 200 }) : route.fallback();
+    });
+
+    // Abre la edición y expande Adjuntos.
+    await page.getByTestId('editar-proveedor').click();
+    const dialogoEdicion = page.getByRole('dialog');
+    await dialogoEdicion.getByRole('button', { name: 'Adjuntos' }).click();
+    await expect(dialogoEdicion.getByTestId('adjuntador-proveedor')).toBeVisible();
+
+    // Elige tipo y sube un PDF en memoria (sin archivo en disco).
+    await dialogoEdicion.getByTestId('adjunto-tipo').selectOption('CONSTANCIA');
+    await dialogoEdicion.getByTestId('adjunto-archivo').setInputFiles({
+      name: 'constancia.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4 contenido de prueba'),
+    });
+
+    // El adjunto aparece listado; luego se quita.
+    await expect(page.getByText('constancia.pdf')).toBeVisible();
+    const fila = dialogoEdicion.getByTestId('fila-adjunto').filter({ hasText: 'constancia.pdf' });
+    await expect(fila).toBeVisible();
+    await fila.getByTestId('quitar-adjunto').click();
+    await expect(page.getByText('Adjunto "constancia.pdf" eliminado.')).toBeVisible();
+  });
+});

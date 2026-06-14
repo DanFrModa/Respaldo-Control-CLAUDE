@@ -135,37 +135,202 @@ export const ETIQUETAS_TIPO_PROVEEDOR: Record<TipoProveedorClave, string> = {
   SIN_CLASIFICAR: 'Sin clasificar',
 };
 
+/** Monedas del proveedor (espejo de `MONEDAS` del backend, R15 §4). */
+export const MONEDAS_PROVEEDOR = ['MXN', 'USD'] as const;
+/** Clave de moneda. */
+export type MonedaClave = (typeof MONEDAS_PROVEEDOR)[number];
+/** Etiquetas para UI de cada moneda. */
+export const ETIQUETAS_MONEDA: Record<MonedaClave, string> = {
+  MXN: 'Peso mexicano (MXN)',
+  USD: 'Dólar (USD)',
+};
+
+/** Métodos de pago del CFDI (espejo de `METODOS_PAGO` del backend, R15 §4). */
+export const METODOS_PAGO_PROVEEDOR = ['PUE', 'PPD'] as const;
+/** Clave de método de pago. */
+export type MetodoPagoClave = (typeof METODOS_PAGO_PROVEEDOR)[number];
+/** Etiquetas para UI de cada método de pago CFDI. */
+export const ETIQUETAS_METODO_PAGO: Record<MetodoPagoClave, string> = {
+  PUE: 'PUE — Pago en una sola exhibición',
+  PPD: 'PPD — Pago en parcialidades o diferido',
+};
+
+/** Tipos documentales de adjunto de proveedor (espejo del backend, R15 §4). */
+export const TIPOS_ARCHIVO_PROVEEDOR = ['CONSTANCIA', 'CONTRATO', 'OTRO'] as const;
+/** Clave de tipo de adjunto. */
+export type TipoArchivoProveedorClave = (typeof TIPOS_ARCHIVO_PROVEEDOR)[number];
+/** Etiquetas para UI de cada tipo de adjunto. */
+export const ETIQUETAS_TIPO_ARCHIVO_PROVEEDOR: Record<TipoArchivoProveedorClave, string> = {
+  CONSTANCIA: 'Constancia de situación fiscal',
+  CONTRATO: 'Contrato',
+  OTRO: 'Otro',
+};
+
 /**
- * Captura del formulario de proveedor (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; los demas datos (razon social, telefono, contacto,
- * condiciones) son opcionales. El `tipo` siempre se elige (default sin clasificar).
+ * Valor "sin elegir" de un `<select>` opcional con enum (moneda/método). Como un
+ * `<select>` siempre entrega un string, el campo se modela como string y se valida
+ * "vacío = sin valor"; la conversión al enum del API la hace `aCuerpo` del dialogo.
  */
-export const esquemaProveedorFormulario = z.object({
-  nombre: z
-    .string({ error: 'El nombre es obligatorio' })
-    .trim()
-    .min(1, { error: 'El nombre es obligatorio' })
-    .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
-  razonSocial: z
-    .string()
-    .trim()
-    .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
-  tipo: z.enum(TIPOS_PROVEEDOR, {
-    error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR',
-  }),
-  telefono: z
-    .string()
-    .trim()
-    .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' }),
-  contacto: z
-    .string()
-    .trim()
-    .max(150, { error: 'El contacto no puede tener más de 150 caracteres' }),
-  condiciones: z
-    .string()
-    .trim()
-    .max(500, { error: 'Las condiciones no pueden tener más de 500 caracteres' }),
-});
+export const SIN_ELEGIR = '';
+
+/**
+ * ¿Es un RFC mexicano con forma válida? Espejo de `esRfcValido` del backend
+ * (`src/contrato/esquemas/fiscal.ts`): persona moral (12) o física (13), forma
+ * y fecha plausibles. SOLO valida la forma (no el padrón del SAT). UX espejo: el
+ * backend re-valida y es la autoridad (A1).
+ */
+function esRfcValido(rfc: string): boolean {
+  const limpio = rfc.trim().toUpperCase();
+  const patron = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+  if (!patron.test(limpio)) {
+    return false;
+  }
+  const fecha = limpio.length === 13 ? limpio.slice(4, 10) : limpio.slice(3, 9);
+  const mes = Number(fecha.slice(2, 4));
+  const dia = Number(fecha.slice(4, 6));
+  return mes >= 1 && mes <= 12 && dia >= 1 && dia <= 31;
+}
+
+/**
+ * ¿Es una CLABE interbancaria válida? Espejo de `esClabeValida` del backend: 18
+ * dígitos con dígito de control (algoritmo Banxico, pesos 3-7-1).
+ */
+function esClabeValida(clabe: string): boolean {
+  const limpio = clabe.trim();
+  if (!/^\d{18}$/.test(limpio)) {
+    return false;
+  }
+  const PESOS = [3, 7, 1];
+  let suma = 0;
+  for (let i = 0; i < 17; i += 1) {
+    const cifra = Number(limpio.charAt(i));
+    const peso = PESOS[i % 3] ?? 1;
+    suma += (cifra * peso) % 10;
+  }
+  const control = (10 - (suma % 10)) % 10;
+  return control === Number(limpio.charAt(17));
+}
+
+/**
+ * Captura del formulario de proveedor enriquecido (F1-E1B, R15; alta y edición
+ * comparten forma). Solo el `nombre` es obligatorio; los `roles` (≥1) los exige el
+ * dialogo (estado aparte, no son texto del schema). Todos los demás campos son
+ * opcionales y se agrupan en secciones (General · Fiscal · Contacto · Pago ·
+ * Operativo). Los numéricos se capturan como texto (patron `numeroOpcional`) y los
+ * enum-opcionales como string ("" = sin elegir); `aCuerpo` del dialogo convierte.
+ *
+ * Refleja las reglas del backend (factura ⇒ RFC + régimen; RFC/CLABE válidos),
+ * pero es SOLO UX: el servidor re-valida y es la autoridad (A1).
+ */
+export const esquemaProveedorFormulario = z
+  .object({
+    // ── General ─────────────────────────────────────────────────────────────────
+    nombre: z
+      .string({ error: 'El nombre es obligatorio' })
+      .trim()
+      .min(1, { error: 'El nombre es obligatorio' })
+      .max(150, { error: 'El nombre no puede tener más de 150 caracteres' }),
+    razonSocial: z
+      .string()
+      .trim()
+      .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
+    tipo: z.enum(TIPOS_PROVEEDOR, {
+      error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR',
+    }),
+    // ── Fiscal ──────────────────────────────────────────────────────────────────
+    factura: z.boolean(),
+    rfc: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .max(13, { error: 'El RFC no puede tener más de 13 caracteres' })
+      .refine((v) => v === '' || esRfcValido(v), {
+        error: 'El RFC no tiene una forma válida (12 para moral, 13 para física)',
+      }),
+    regimenFiscalSat: z
+      .string()
+      .trim()
+      .max(10, { error: 'El régimen fiscal no puede tener más de 10 caracteres' }),
+    usoCfdiHabitual: z
+      .string()
+      .trim()
+      .max(10, { error: 'El uso de CFDI no puede tener más de 10 caracteres' }),
+    codigoPostalExpedicion: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || /^\d{5}$/.test(v), {
+        error: 'El código postal debe tener 5 dígitos',
+      }),
+    retieneIva: z.boolean(),
+    retieneIsr: z.boolean(),
+    // ── Contacto ──────────────────────────────────────────────────────────────────
+    email: z
+      .string()
+      .trim()
+      .max(200, { error: 'El email no puede tener más de 200 caracteres' })
+      .refine((v) => v === '' || z.email().safeParse(v).success, {
+        error: 'El email no es válido',
+      }),
+    direccion: z
+      .string()
+      .trim()
+      .max(300, { error: 'La dirección no puede tener más de 300 caracteres' }),
+    telefono: z
+      .string()
+      .trim()
+      .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' }),
+    contacto: z
+      .string()
+      .trim()
+      .max(150, { error: 'El contacto no puede tener más de 150 caracteres' }),
+    // ── Pago ──────────────────────────────────────────────────────────────────────
+    diasCredito: numeroOpcional({
+      min: 0,
+      max: 365,
+      mensajeNoNumero: 'Los días de crédito deben ser un número',
+      mensajeMin: 'Los días de crédito no pueden ser negativos',
+      mensajeMax: 'Los días de crédito no pueden ser más de 365',
+    }).describe('Días de crédito (vacío o 0 = contado).'),
+    moneda: z.string(),
+    formaPago: z
+      .string()
+      .trim()
+      .max(50, { error: 'La forma de pago no puede tener más de 50 caracteres' }),
+    metodoPago: z.string(),
+    banco: z.string().trim().max(100, { error: 'El banco no puede tener más de 100 caracteres' }),
+    clabe: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || esClabeValida(v), {
+        error: 'La CLABE debe tener 18 dígitos con dígito de control válido',
+      }),
+    limiteCredito: numeroOpcional({
+      min: 0,
+      mensajeNoNumero: 'El límite de crédito debe ser un número',
+      mensajeMin: 'El límite de crédito no puede ser negativo',
+    }).describe('Límite de crédito (vacío = sin valor).'),
+    // ── Operativo ───────────────────────────────────────────────────────────────
+    leadTimeDias: numeroOpcional({
+      min: 0,
+      max: 365,
+      mensajeNoNumero: 'El lead time debe ser un número',
+      mensajeMin: 'El lead time no puede ser negativo',
+      mensajeMax: 'El lead time no puede ser más de 365 días',
+    }).describe('Lead time en días (vacío = sin valor).'),
+    condiciones: z
+      .string()
+      .trim()
+      .max(500, { error: 'Las condiciones no pueden tener más de 500 caracteres' }),
+    notas: z
+      .string()
+      .trim()
+      .max(2000, { error: 'Las notas no pueden tener más de 2000 caracteres' }),
+  })
+  .refine(
+    // Regla de captura R15 (espejo del backend): si emite CFDI, exige RFC + régimen.
+    (datos) => !datos.factura || (datos.rfc !== '' && datos.regimenFiscalSat !== ''),
+    { error: 'Si el proveedor factura, captura su RFC y su régimen fiscal', path: ['rfc'] },
+  );
 
 /** Datos del formulario de proveedor. */
 export type DatosProveedorFormulario = z.infer<typeof esquemaProveedorFormulario>;

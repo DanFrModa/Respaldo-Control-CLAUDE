@@ -294,6 +294,65 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       ).rejects.toBeInstanceOf(ErrorValidacion);
     });
 
+    // M1: en edición, mandar `null` en un campo opcional ya capturado lo BORRA
+    // (lo pone a null). Omitirlo NO lo toca. Nunca se guarda ''.
+    it('vaciar un campo opcional (null) en edición lo BORRA; omitirlo no lo toca', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        {
+          nombre: 'Con datos',
+          roles: [rolMaquila],
+          telefono: '555-1234',
+          rfc: 'CDA010101AB1',
+          diasCredito: 30,
+          limiteCredito: 50000,
+          moneda: 'MXN',
+          notas: 'una nota',
+        },
+        bd(),
+      );
+
+      // Vaciar telefono y diasCredito (null), y NO mandar rfc (omitir = no tocar).
+      const actualizado = await actualizarProveedor(
+        sesion,
+        { id: proveedor.id, telefono: null, diasCredito: null, limiteCredito: null, moneda: null },
+        bd(),
+      );
+
+      expect(actualizado.telefono).toBeNull();
+      expect(actualizado.diasCredito).toBeNull();
+      expect(actualizado.limiteCredito).toBeNull();
+      expect(actualizado.moneda).toBeNull();
+      // rfc y notas NO se tocaron (se omitieron).
+      expect(actualizado.rfc).toBe('CDA010101AB1');
+      expect(actualizado.notas).toBe('una nota');
+
+      // La bitácora registra el borrado (de: valor, a: null).
+      const bitacora = await cliente.bitacora.findFirstOrThrow({
+        where: { entidad: 'Proveedor', idEntidad: String(proveedor.id), accion: 'MODIFICAR' },
+        orderBy: { fecha: 'desc' },
+      });
+      expect(bitacora.datos).toMatchObject({ telefono: { de: '555-1234', a: null } });
+    });
+
+    it('un texto opcional que llega vacío ("") se normaliza a null (nunca se guarda "")', async () => {
+      const sesion = sesionAdmin();
+      const proveedor = await crearProveedor(
+        sesion,
+        { nombre: 'Prov vacío', roles: [rolMaquila], banco: 'BBVA' },
+        bd(),
+      );
+
+      // El cuerpo del PATCH acepta '' (texto vacío); el dominio lo guarda como null.
+      const actualizado = await actualizarProveedor(sesion, { id: proveedor.id, banco: '' }, bd());
+      expect(actualizado.banco).toBeNull();
+
+      // Verificación directa en BD: el valor es null, no ''.
+      const enBd = await cliente.proveedor.findUniqueOrThrow({ where: { id: proveedor.id } });
+      expect(enBd.banco).toBeNull();
+    });
+
     it('sin cambio real es idempotente: no escribe bitácora', async () => {
       const sesion = sesionAdmin();
       const proveedor = await crearProveedor(

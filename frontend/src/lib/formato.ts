@@ -51,3 +51,25 @@ export function formatearFechaHora(valor: string | null | undefined): string {
     minute: '2-digit',
   });
 }
+
+/**
+ * Formatea un tamaño en bytes a una unidad legible (B, KB, MB, GB) con una cifra
+ * decimal a partir de KB (p. ej. 1536 -> "1.5 KB"). Se usa para mostrar el tamaño
+ * de los adjuntos PDF de un proveedor.
+ */
+export function formatearTamano(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return SIN_DATO;
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const unidades = ['KB', 'MB', 'GB', 'TB'];
+  let valor = bytes / 1024;
+  let i = 0;
+  while (valor >= 1024 && i < unidades.length - 1) {
+    valor /= 1024;
+    i += 1;
+  }
+  return `${valor.toFixed(1)} ${unidades[i]}`;
+}

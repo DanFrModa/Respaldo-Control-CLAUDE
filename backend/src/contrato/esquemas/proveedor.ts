@@ -132,6 +132,34 @@ const camposEnriquecidos = {
 } as const;
 
 /**
+ * Variante de EDICIÓN de los campos enriquecidos: los de texto/numéricos/enum
+ * aceptan además `null` para poder VACIAR un dato ya capturado (M1). Semántica del
+ * PATCH parcial: omitir el campo (`undefined`) = no tocar; mandar `null` = ponerlo a
+ * null (borrar). Las banderas (`factura`/`retieneIva`/`retieneIsr`) NO se hacen
+ * nullable: el formulario siempre las manda como boolean y `undefined` basta para
+ * "no tocar". `.nullable()` se aplica SOBRE el `.optional()` ya existente, así que
+ * cada campo acepta `undefined | null | <valor válido>` conservando sus reglas.
+ */
+const camposEnriquecidosEditar = {
+  ...camposEnriquecidos,
+  rfc: camposEnriquecidos.rfc.nullable(),
+  regimenFiscalSat: camposEnriquecidos.regimenFiscalSat.nullable(),
+  usoCfdiHabitual: camposEnriquecidos.usoCfdiHabitual.nullable(),
+  codigoPostalExpedicion: camposEnriquecidos.codigoPostalExpedicion.nullable(),
+  email: camposEnriquecidos.email.nullable(),
+  direccion: camposEnriquecidos.direccion.nullable(),
+  diasCredito: camposEnriquecidos.diasCredito.nullable(),
+  moneda: camposEnriquecidos.moneda.nullable(),
+  formaPago: camposEnriquecidos.formaPago.nullable(),
+  metodoPago: camposEnriquecidos.metodoPago.nullable(),
+  banco: camposEnriquecidos.banco.nullable(),
+  clabe: camposEnriquecidos.clabe.nullable(),
+  limiteCredito: camposEnriquecidos.limiteCredito.nullable(),
+  leadTimeDias: camposEnriquecidos.leadTimeDias.nullable(),
+  notas: camposEnriquecidos.notas.nullable(),
+} as const;
+
+/**
  * Alta de proveedor (catálogo global F1-E1, ADR-0007: sin `idEmpresa`). El nombre
  * es la clave de negocio (único global); los demás datos son opcionales.
  *
@@ -209,11 +237,14 @@ const baseProveedorEditar = z
       .min(1, { error: 'El nombre es obligatorio' })
       .max(150, { error: 'El nombre no puede tener más de 150 caracteres' })
       .optional(),
+    // Opcionales nullable (M1): omitir = no tocar; `null` = borrar. `nombre` NO es
+    // nullable (clave de negocio obligatoria) y `tipo` tampoco (siempre tiene valor).
     razonSocial: z
       .string()
       .trim()
       .max(200, { error: 'La razón social no puede tener más de 200 caracteres' })
-      .optional(),
+      .optional()
+      .nullable(),
     tipo: z
       .enum(TIPOS_PROVEEDOR, { error: 'El tipo debe ser TELAS, AVIOS, SERVICIOS o SIN_CLASIFICAR' })
       .optional(),
@@ -221,21 +252,24 @@ const baseProveedorEditar = z
       .string()
       .trim()
       .max(100, { error: 'El teléfono no puede tener más de 100 caracteres' })
-      .optional(),
+      .optional()
+      .nullable(),
     contacto: z
       .string()
       .trim()
       .max(150, { error: 'El contacto no puede tener más de 150 caracteres' })
-      .optional(),
+      .optional()
+      .nullable(),
     condiciones: z
       .string()
       .trim()
       .max(500, { error: 'Las condiciones no pueden tener más de 500 caracteres' })
-      .optional(),
+      .optional()
+      .nullable(),
     /** Reemplaza el set de roles si viene; el dominio exige ≥1. Omitir = no tocar. */
     roles: esquemaRolesIds.optional(),
     activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
-    ...camposEnriquecidos,
+    ...camposEnriquecidosEditar,
   })
   .extend({
     id: z
@@ -244,11 +278,16 @@ const baseProveedorEditar = z
       .positive({ error: 'El id del proveedor debe ser positivo' }),
   });
 
-/** Regla de captura compartida por crear/editar: factura ⇒ RFC + régimen fiscal. */
+/**
+ * Regla de captura compartida por crear/editar: factura ⇒ RFC + régimen fiscal. En
+ * edición rfc/régimen pueden llegar `null` (intento de vaciarlos); `?? ''` los trata
+ * como ausentes, así que poner factura sin RFC —o vaciar el RFC con factura activa—
+ * falla la regla (no se puede facturar sin RFC).
+ */
 const reglaFacturaExigeRfc = (datos: {
-  factura?: boolean | undefined;
-  rfc?: string | undefined;
-  regimenFiscalSat?: string | undefined;
+  factura?: boolean | null | undefined;
+  rfc?: string | null | undefined;
+  regimenFiscalSat?: string | null | undefined;
 }): boolean =>
   datos.factura !== true || ((datos.rfc ?? '') !== '' && (datos.regimenFiscalSat ?? '') !== '');
 
@@ -443,9 +482,6 @@ export const esquemaProveedorAdjuntoCrear = z
 
 /** Datos validados de alta de adjunto de proveedor. */
 export type DatosProveedorAdjuntoCrear = z.infer<typeof esquemaProveedorAdjuntoCrear>;
-
-/** Cuerpo del POST de adjunto coaccionado desde la red. */
-export const esquemaProveedorAdjuntoCrearCuerpo = esquemaProveedorAdjuntoCrear;
 
 /** Salida tras solicitar la subida: registro + URL PUT prefirmada para R2. */
 export const esquemaProveedorAdjuntoSubida = z

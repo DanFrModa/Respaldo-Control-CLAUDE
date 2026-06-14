@@ -227,4 +227,75 @@ describe('esquemaProveedor enriquecido (F1-E1B, R15)', () => {
     expect('tipo' in datos).toBe(false);
     expect(datos.tipo).toBeUndefined();
   });
+
+  // M1: en EDICIÓN los opcionales aceptan `null` (vaciar = borrar), distinto de
+  // `undefined` (no tocar). El alta NO acepta `null` (omitir = el dominio lo deja null).
+  it('edición: los campos opcionales (texto/num/enum) ACEPTAN null para borrarlos', () => {
+    const datos = esquemaProveedorEditar.parse({
+      id: 1,
+      rfc: null,
+      regimenFiscalSat: null,
+      usoCfdiHabitual: null,
+      codigoPostalExpedicion: null,
+      email: null,
+      direccion: null,
+      razonSocial: null,
+      telefono: null,
+      contacto: null,
+      condiciones: null,
+      moneda: null,
+      formaPago: null,
+      metodoPago: null,
+      banco: null,
+      clabe: null,
+      diasCredito: null,
+      limiteCredito: null,
+      leadTimeDias: null,
+      notas: null,
+    });
+    expect(datos.rfc).toBeNull();
+    expect(datos.moneda).toBeNull();
+    expect(datos.diasCredito).toBeNull();
+    expect(datos.limiteCredito).toBeNull();
+    expect(datos.razonSocial).toBeNull();
+  });
+
+  it('edición: `null` y `undefined` son distintos (uno borra, el otro no toca)', () => {
+    const conNull = esquemaProveedorEditar.parse({ id: 1, telefono: null });
+    expect('telefono' in conNull).toBe(true);
+    expect(conNull.telefono).toBeNull();
+
+    const sinCampo = esquemaProveedorEditar.parse({ id: 1 });
+    expect('telefono' in sinCampo).toBe(false);
+    expect(sinCampo.telefono).toBeUndefined();
+  });
+
+  it('edición: `nombre` y `tipo` NO aceptan null (clave de negocio / siempre con valor)', () => {
+    expect(esquemaProveedorEditar.safeParse({ id: 1, nombre: null }).success).toBe(false);
+    expect(esquemaProveedorEditar.safeParse({ id: 1, tipo: null }).success).toBe(false);
+  });
+
+  it('el cuerpo del PATCH también acepta null en los opcionales', () => {
+    const cuerpo = esquemaProveedorPatchCuerpo.parse({
+      rfc: null,
+      diasCredito: null,
+      moneda: null,
+    });
+    expect(cuerpo.rfc).toBeNull();
+    expect(cuerpo.diasCredito).toBeNull();
+    expect(cuerpo.moneda).toBeNull();
+  });
+
+  it('alta: los opcionales NO aceptan null (en el alta se omite, no se manda null)', () => {
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', rfc: null }).success).toBe(false);
+    expect(esquemaProveedorCrear.safeParse({ nombre: 'X', diasCredito: null }).success).toBe(false);
+  });
+
+  it('edición: si se intenta vaciar el RFC con factura activa, la regla lo rechaza', () => {
+    // factura=true + rfc=null (vaciar) ⇒ falla la regla factura ⇒ RFC.
+    expect(
+      esquemaProveedorEditar.safeParse({ id: 1, factura: true, rfc: null, regimenFiscalSat: '601' })
+        .success,
+    ).toBe(false);
+  });
 });
