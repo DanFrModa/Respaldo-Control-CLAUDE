@@ -8,7 +8,7 @@
 
 ## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
-- **Fase activa:** F1 — Catálogos + Modelos. **`F1-E1` ✅ hecha, verificada y desplegada en `prueba`** (13-jun-2026). **Siguiente etapa: `F1-E2`** (ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)).
+- **Fase activa:** F1 — Catálogos + Modelos. **`F1-E1` ✅ y `F1-E1B` ✅ hechas, verificadas y desplegadas en `prueba`** (13-jun-2026). **Siguiente etapa: `F1-E2`** (ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)).
 - **Hecho:** ingeniería inversa + diseño ✅ 100 % (validado por Daniel). **F0 (Fundación) ✅ construida y desplegada** — desde el 12-jun-2026 corre en Railway **como ambiente de prueba** (login real funcionando). El despliegue de **producción NO se monta todavía**: se contrata al acercarse el go-live, por costo (decisión de Gabriel, 12-jun-2026).
 - **Pendientes manuales de Gabriel** (no bloquean el arranque de F1): cambiar el password de `admin` (seed `Control.2026!`), activar backups del Postgres en Railway, montar **Cloudflare R2** (⚠️ sí se necesita antes de F1-E3/E4, que suben fotos), borrar el servicio frontend viejo si quedó en el canvas, y proteger las ramas exigiendo los checks del CI.
 
@@ -20,7 +20,7 @@ Construir (F0–F9)     : █░░░░░░░░░  F0 de 10 ✅ — sigue
 | Fase | Etapas | Estado |
 |---|---|---|
 | **F0 · Fundación** | 5 | ✅ **hecha** (construida + desplegada como prueba, 12-jun-2026) |
-| **F1 · Catálogos + Modelos** | 8 | 🔄 **en curso — F1-E1 ✅ (13-jun, en prueba); sigue F1-E2 (F1-E1B = R15, se agenda en la fase)** |
+| **F1 · Catálogos + Modelos** | 8 | 🔄 **en curso — F1-E1 ✅ y F1-E1B ✅ (13-jun, en prueba); sigue F1-E2** |
 | **F2 · Pedidos + Órdenes** | 5 | ⬜ |
 | **F3 · Producción / WIP** | 6 | ⬜ |
 | **F4 · Compras / MRP** | 6 | ⬜ |
@@ -70,7 +70,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | Etapa | Qué entrega | Equipo | Estado |
 |---|---|---|---|
 | **F1-E1** | Catálogos sencillos + mini-pantallas de Administración (usuarios/empresas) + decisión A9 | 1 coder backend (cat.) → 1 coder backend (admin) → 1 coder frontend + 1 reviewer (cadena por contrato, ver nota de cierre) | ✅ **13-jun-2026 (en prueba)** |
-| **F1-E1B** | Catálogo de Proveedores **enriquecido** (R15): roles multi-valor + campos fiscales/pago/operativos + adjuntos R2 — cimiento de las CxP (D12) | 1 coder + 1 reviewer (extiende el Proveedor de E1) | ⬜ |
+| **F1-E1B** | Catálogo de Proveedores **enriquecido** (R15): roles multi-valor + campos fiscales/pago/operativos + adjuntos R2 — cimiento de las CxP (D12) | 1 coder + 1 reviewer (extiende el Proveedor de E1) | ✅ **13-jun-2026 (en prueba)** |
 | **F1-E2** | Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 | 3 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E3** | Catálogos de materiales: telas unificadas, avíos R1 y bordados con foto R2 | 3 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E4** | Modelos: ficha + fotos R2 + BOM completo | 1 coder + 1 reviewer (cadena sobre los mismos archivos) | ⬜ |

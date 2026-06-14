@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7, avíos R1 y **Proveedor enriquecido R15** en E1B) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** 🔄 en curso — **F1-E1 ✅ hecha** (13-jun-2026, verificada en `prueba`); sigue **F1-E2**.
+> **Estado:** 🔄 en curso — **F1-E1 ✅ y F1-E1B ✅ hechas** (13-jun-2026, verificadas en `prueba`); sigue **F1-E2**.
 
 ## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
 
@@ -71,7 +71,12 @@
 
 ---
 
-## F1-E1B · Catálogo de Proveedores enriquecido (R15) — 🔄 backend hecho (en revisión)
+## F1-E1B · Catálogo de Proveedores enriquecido (R15) — ✅ hecha (13-jun-2026, en `prueba`)
+
+> **CIERRE (13-jun-2026).** Entregado, verificado por Gabriel en `prueba` (Railway) y mergeado vía PR #21 (+ #22, fix de e2e). Reviewer independiente: **100% aprobado**.
+> - **Qué quedó:** `Proveedor` extendido (campos fiscales/pago/operativo, todos NULLABLE) + tablas `RolProveedor` (catálogo administrable, seed idempotente), `ProveedorRol` (N:N, **≥1 rol**) y `ProveedorArchivo` (adjuntos PDF en R2, flujo presigned). Dominio en transacción (A2) + auditoría (A7); CLABE con dígito de control; regla `factura ⇒ RFC + régimen`. Frontend: diálogo en secciones plegables, selector de roles, adjuntador PDF, filtro por rol, detalle enriquecido. OpenAPI + cliente del frontend sincronizados. Sin permisos RBAC nuevos (reusa `proveedores.ver`/`.administrar`).
+> - **M1 (corrección de review):** en edición, vaciar un campo opcional lo pone a `null` (back+front), no conserva el viejo.
+> - **Diferido a fin de fase (F1-E6/E7):** `docs/modulos/` del catálogo de proveedores y el ETL.
 
 > **ACTA DE DECISIÓN (`tipo` enum vs roles):** el `tipo` de E1
 > (TELAS/AVIOS/SERVICIOS/SIN_CLASIFICAR) **se conserva como clasificador rápido** + **roles multivalor** (Gabriel, 13-jun-2026). Ambos coexisten: la lista filtra por `tipo` Y por `rol`.
