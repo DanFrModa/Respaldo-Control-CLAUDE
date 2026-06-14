@@ -89,6 +89,16 @@ export function crearClienteR2(config: ConfigR2): S3Client {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
     },
+    // R2 (y demás S3-compatibles) NO soportan los checksums CRC32 que el SDK v3
+    // de AWS agrega por DEFECTO ("WHEN_SUPPORTED") a cada PutObject: el PUT
+    // prefirmado saldría con `x-amz-checksum-crc32`/`x-amz-sdk-checksum-algorithm`
+    // y R2 rechaza la subida (su respuesta de error no trae cabeceras CORS, así
+    // que el navegador lo disfraza de "error de CORS"). "WHEN_REQUIRED" solo los
+    // manda cuando la operación los exige (un PutObject normal no) → URL
+    // prefirmada limpia que R2 acepta. Aplica a fotos de bordado/modelo y a los
+    // adjuntos PDF de proveedor (todos usan este cliente).
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 }
 
