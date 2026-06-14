@@ -6,6 +6,8 @@
 > **Entrega de la fase (plan §6):** Corte, envíos/recibos de maquila unificada, servicio transaccional recibo→IPT+EsMa, WIP y entregas a cliente.
 > **Criterio de salida:** Una orden recorre todo el ciclo; inventario PT cuadra por kardex.
 > **Estado:** ⬜ pendiente — el desglose se confirma/ajusta al arrancar la fase.
+>
+> **⚠️ Actualización 14-jun-2026 (fusión de terceros, D12/R15):** ya NO existen los catálogos `Maquilero` ni `Cortador`. Un maquilero/cortador es un **`Proveedor` con su(s) rol(es) de servicio** (`maquila-costura`, `corte`, `estampado`, `bordado`, `lavado`, `aplicacion`). El flujo de maquila de esta fase filtra **proveedores por rol**, NO una tabla `Maquilero` ni "banderas Costura/Proceso"; toda mención de abajo a "maquileros/cortadores" debe leerse así. (No se construyó enlace `Proveedor`↔`TipoProceso`: el servicio se declara con las casillas de rol; `TipoProceso` queda como catálogo independiente para la RC en F5.) El **costo del corte** se define en la orden de producción (no en un catálogo de cortadores). Ver `DECISIONES.md` D12/R15.
 
 ## F3-E1 · Modelo de datos F3 + motor kardex genérico + catálogos base — ⬜ pendiente
 

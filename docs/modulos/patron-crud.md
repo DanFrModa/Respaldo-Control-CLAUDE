@@ -2,7 +2,7 @@
 
 > Esta es la **plantilla** de toda pantalla de administración del frontend de
 > CONTROL v2. El CRUD de **Almacenes** (`frontend/src/modulos/almacenes/`) la
-> implementa de referencia; cada módulo nuevo (clientes, maquileros, telas, …)
+> implementa de referencia; cada módulo nuevo (clientes, telas, avíos, …)
 > se construye copiando esta estructura. Si cambias el patrón, cámbialo aquí y en
 > Almacenes a la vez.
 

@@ -34,6 +34,7 @@ Hechos que pesan:
 1. **Los catálogos maestros de F1 son GLOBALES (sin `idEmpresa`):** Proveedor, Cortador,
    Temporada, Etiqueta de marca y Color se capturan una sola vez y los comparten todas las
    empresas. Unicidad de nombre **global** (`@unique` sobre `nombre`).
+   > **Nota posterior (14-jun-2026):** `Cortador` (y `Maquilero` de F1-E2) se **fusionaron en `Proveedor`** con roles multi-valor — ya no son catálogos propios (fusión de terceros, D12/R15; ver `DECISIONES.md`). Lo de "globales sin `idEmpresa`" sigue vigente para los catálogos que quedan; `Cortador` aquí es solo el ejemplo histórico de cuando esta decisión se tomó.
 2. **`idEmpresa` (A9) se reserva para lo operativo y los recursos físicos por empresa:**
    almacenes/inventario (ya en F0), secuencias de folios (ya en F0) y la operación de F2+
    (pedidos, órdenes, movimientos de kardex, EsMa, costos). Los catálogos maestros quedan
