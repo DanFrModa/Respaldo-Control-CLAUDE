@@ -215,8 +215,10 @@ export interface ArgsSubirFoto {
  * Sube la FOTO de un bordado a R2 en DOS pasos (flujo presigned de F0):
  *   1) `POST /api/bordados/{id}/foto` con los metadatos → el backend registra el
  *      `Archivo`, liga la foto al bordado y devuelve una URL PUT prefirmada.
- *   2) El navegador hace `PUT` de la imagen DIRECTO a esa URL (R2), con los headers
- *      `Content-Type` y `Content-Length` EXACTOS (la firma solo acepta esos).
+ *   2) El navegador hace `PUT` de la imagen DIRECTO a esa URL (R2) con su
+ *      `Content-Type`. La URL prefirmada NO firma content-type/content-length (el
+ *      navegador los maneja como headers especiales y romperían el SigV4), así que
+ *      el PUT cuadra y R2 lo acepta.
  *
  * Si el PUT a R2 falla, se propaga como `ErrorDeApi` para que el toast lo muestre.
  * Al terminar invalida la foto del bordado y la lista (para refrescar `idArchivoFoto`).
@@ -239,10 +241,10 @@ async function subirFoto({ idBordado, archivo }: ArgsSubirFoto): Promise<void> {
   try {
     respuesta = await fetch(data.urlSubida, {
       method: 'PUT',
-      headers: {
-        'Content-Type': archivo.type,
-        'Content-Length': String(archivo.size),
-      },
+      // Solo Content-Type (para que R2 etiquete el objeto con su tipo). NO se
+      // manda Content-Length: es un "forbidden header" que el navegador fija solo,
+      // y la URL prefirmada ya no lo firma (ver backend comun/archivos.ts).
+      headers: { 'Content-Type': archivo.type },
       body: archivo,
     });
   } catch {
