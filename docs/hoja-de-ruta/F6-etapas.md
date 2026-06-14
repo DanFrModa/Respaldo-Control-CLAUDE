@@ -6,6 +6,8 @@
 > **Entrega de la fase (plan §6):** AQL configurable + estado de cuenta completo de maquileros (abonos, descuentos, pagos, impresos).
 > **Criterio de salida:** EsMa cuadra contra los recibos del periodo.
 > **Estado:** ⬜ pendiente — el desglose se confirma/ajusta al arrancar la fase.
+>
+> **⚠️ Actualización 14-jun-2026 (fusión de terceros, D12/R15):** los "maquileros" de EsMa son ahora **`Proveedor` con rol de maquila** (ya no existe la tabla `Maquilero`); el estado de cuenta y los recibos de pago se ligan a ese proveedor. Toda mención de abajo a "maquileros" se refiere a esos proveedores filtrados por rol. Ver `DECISIONES.md` D12/R15.
 
 ## F6-E1 · Calidad — catálogo de defectos + motor de planes AQL + consulta de bitácora (vertical) — ⬜ pendiente
 
