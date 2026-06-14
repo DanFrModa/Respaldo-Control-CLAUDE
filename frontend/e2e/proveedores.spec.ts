@@ -37,6 +37,8 @@ test.describe('CRUD de Proveedores', () => {
     await expect(dialogoAlta.getByRole('heading', { name: 'Nuevo proveedor' })).toBeVisible();
     await dialogoAlta.getByLabel('Nombre').fill(nombre);
     await dialogoAlta.getByLabel('Tipo').selectOption('AVIOS');
+    // Crear ahora exige >=1 rol (R15): marca el primero del selector (abierto por defecto).
+    await dialogoAlta.getByTestId('selector-roles-proveedor').getByRole('checkbox').first().check();
     await page.getByTestId('guardar-proveedor').click();
 
     // El toast confirma y la fila aparece en la lista; la busqueda la aisla.
@@ -160,7 +162,7 @@ test.describe('Proveedor enriquecido (R15)', () => {
     // Expande "Fiscal" y captura RFC + régimen (forma de persona moral: 12 chars).
     await dialogo.getByRole('button', { name: 'Fiscal' }).click();
     await dialogo.getByTestId('proveedor-factura').check();
-    await dialogo.getByLabel('RFC').fill('ABC123456T1A');
+    await dialogo.getByLabel('RFC').fill('ABC120101T1A');
     await dialogo.getByLabel('Régimen fiscal (SAT)').fill('601');
 
     await page.getByTestId('guardar-proveedor').click();
