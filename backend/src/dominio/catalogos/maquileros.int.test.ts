@@ -386,7 +386,11 @@ describe('Catálogo Maquileros (F1-E2, maquila unificada — global ADR-0007)', 
       expect(reactivado.activo).toBe(true);
     });
 
-    it('reactivar choca si el corto fue reutilizado por otro activo → ErrorConflicto', async () => {
+    // El `corto` es ÚNICO GLOBAL (DB + `exigirCortoLibre`): no puede haber un segundo
+    // maquilero ACTIVO con el corto de uno desactivado. La regla real que importa cubrir
+    // es que el alta con ese corto CHOCA y te invita a reactivar (no que la reactivación
+    // choque, escenario imposible por diseño).
+    it('crear con el corto de un maquilero desactivado choca (pide reactivarlo) → ErrorConflicto', async () => {
       const sesion = sesionAdmin();
       const maquilero = await crearMaquilero(
         sesion,
@@ -394,11 +398,9 @@ describe('Catálogo Maquileros (F1-E2, maquila unificada — global ADR-0007)', 
         bd(),
       );
       await desactivarMaquilero(sesion, maquilero.id, bd());
-      // Otro maquilero activo toma el mismo corto.
-      await crearMaquilero(sesion, { corto: 'Repe', nombre: 'Nuevo', tipos: [tipoCostura] }, bd());
-      await expect(reactivarMaquilero(sesion, maquilero.id, bd())).rejects.toBeInstanceOf(
-        ErrorConflicto,
-      );
+      await expect(
+        crearMaquilero(sesion, { corto: 'Repe', nombre: 'Nuevo', tipos: [tipoCostura] }, bd()),
+      ).rejects.toBeInstanceOf(ErrorConflicto);
     });
   });
 
