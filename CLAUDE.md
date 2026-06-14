@@ -123,11 +123,12 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 ## 7. Cómo se desarrolla CONTROL v2 (reglas vigentes)
 
 1. **`PLANMAESTRO.md` es ley.** Innegociables (A1–A8): **lógica de negocio solo en `backend/src/dominio`** (nunca en las rutas REST ni en el frontend); operaciones multi-tabla en **transacción** (A2); folios por **secuencia atómica** (A3, nunca `Max()+1`); existencias = **suma de movimientos** (kardex, D3); auditoría uniforme (A7); RBAC único (A4).
-2. **Flujo de ramas (innegociable):** rama de tarea → PR a **`prueba`** (CI + review + verificación EN VIVO) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.)
+2. **Flujo de ramas + AUTORIZACIÓN (innegociable):** rama de tarea → PR a **`prueba`** (CI + review + verificación EN VIVO) → PR de `prueba` a **`main`** (producción). Nunca directo a `prueba` ni `main`. (`prueba` ya existe en GitHub.) La rama de tarea **NO debe trackear `prueba`** como upstream (riesgo de push accidental). **NADA de `git commit` ni `git push` sin autorización EXPRESA de Gabriel:** el lead y los agentes codean en el working tree de la rama; cuando la etapa está terminada **y verificada**, Gabriel da el OK → se comitea **TODO junto** → **Gabriel prueba** → al final se hacen los docs. No se comitea "cada cosa". *(Incidente 13-jun-2026: un push automático mandó E1B-backend a `prueba` sin permiso — no repetir.)*
 3. **Equipo mínimo por tarea: 1 coder + 1 reviewer independiente** (agentes). Nada se integra sin el visto bueno del reviewer y el CI en verde. **El orquestador (lead) NO escribe código de producción**: coordina, decide arquitectura, revisa y reporta a Gabriel. Agent Teams está habilitado (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`).
 4. **El contrato OpenAPI** se regenera en cada cambio del backend y el cliente del frontend queda sincronizado en la misma tarea.
 5. **Documentación viva en `docs/`:** `arquitectura/` (ADRs), `modulos/` (cómo quedó cada módulo, al cerrarlo). El funcional NO se copia: se referencia `Documentacion_MJD/` (ADR-0002). La guía de infraestructura: `docs/GUIA-RAILWAY-R2.md`.
-6. **Gabriel verifica cada etapa** en el ambiente de prueba o con `docker compose up` local, antes de continuar.
+6. **Gabriel verifica cada etapa en el ambiente de `prueba` de Railway** (NO en local), antes de continuar.
+7. **NUNCA Docker local (innegociable).** Ni el lead ni los agentes abren ni corren Docker / `docker compose` / testcontainers en la máquina de Gabriel. Las pruebas pesadas (integración con testcontainers, e2e con compose) corren en **CI (GitHub Actions)**; la verificación funcional, en **Railway**. Para generar migraciones Prisma sin BD local: redactar el `migration.sql` a mano y validarlo con `prisma migrate diff`, o dejar que CI/Railway las apliquen. *(Decisión de Gabriel, 13-jun-2026.)*
 
 ---
 
