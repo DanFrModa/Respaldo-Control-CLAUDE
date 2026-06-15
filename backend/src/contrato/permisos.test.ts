@@ -62,6 +62,11 @@ describe('catálogo de permisos', () => {
       'empresas.administrar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
+      'modelos.administrar',
+      // Generador de códigos de barra (F1-E5): EAN-13 + DUN-14 (sucesor del form `Codigo`).
+      'modelos.codigos-barra',
+      'modelos.ver',
       'proveedores.administrar',
       'proveedores.ver',
       'roles.administrar',

@@ -54,6 +54,8 @@ export const MODULOS_PERMISO = {
   // telas (telas.ver/.administrar) reutiliza ese módulo; `avios` y `bordados` son nuevos.
   avios: 'Avíos',
   bordados: 'Bordados y estampados',
+  // ── Modelos (Módulo 2, F1-E4) ──────────────────────────────────────────────
+  modelos: 'Modelos',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -618,6 +620,33 @@ export const CATALOGO_PERMISOS = [
     modulo: 'bordados',
     descripcion:
       'Administrar el catálogo de bordados y estampados, incluida su foto (alta, edición, desactivación)',
+  },
+
+  // ── Modelos (Módulo 2, F1-E4, global — ADR-0007; doc 01-Modelos) ────────────
+  // El catálogo de productos con su receta/BOM (telas/avíos/bordados) y sus fotos. Como
+  // los catálogos de F1: `ver` (consulta) y `administrar` (alta/edición/des-reactivación,
+  // BOM y fotos). El selector de Género (`GET /api/generos`) se gobierna con `modelos.ver`
+  // (no tiene permiso propio: mismo criterio de sub-catálogo selector que RolProveedor).
+  {
+    clave: 'modelos.ver',
+    modulo: 'modelos',
+    descripcion: 'Consultar el catálogo de modelos, su receta (BOM) y sus fotos',
+  },
+  {
+    clave: 'modelos.administrar',
+    modulo: 'modelos',
+    descripcion:
+      'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/bordados) y fotos (alta, edición, desactivación)',
+  },
+  // ── Generador de códigos de barra (F1-E5, Módulo 1 del viejo → form `Codigo`) ─
+  // Permiso de SOLO LECTURA: generar/ver/imprimir el EAN-13 y DUN-14 de un modelo para la
+  // empresa activa (prefijo de `Empresa.upc`). Es una sub-función del módulo Modelos
+  // (misma fila que `modelos.ver`); no muta datos. Como es de lectura, los roles que ven
+  // modelos lo heredan (el seed lo incluye salvo donde se restrinja explícitamente).
+  {
+    clave: 'modelos.codigos-barra',
+    modulo: 'modelos',
+    descripcion: 'Generar y descargar los códigos de barra (EAN-13 / DUN-14) de un modelo',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

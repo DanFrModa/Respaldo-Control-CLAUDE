@@ -108,6 +108,24 @@ describe('seed de fundación', () => {
     );
   });
 
+  it('siembra los 8 géneros base (F1-E4) de forma idempotente', async () => {
+    const generos = await prisma.genero.findMany({ select: { nombre: true } });
+    const nombres = generos.map((g) => g.nombre).sort();
+    // Los 8 géneros del sistema viejo (doc 01-Modelos §3, lista de precios por género).
+    expect(nombres).toEqual(
+      [
+        'Caballero',
+        'Dama',
+        'Niño Infantil',
+        'Niña Infantil',
+        'Niño Juvenil',
+        'Niña Juvenil',
+        'Bebo',
+        'Beba',
+      ].sort(),
+    );
+  });
+
   it('el admin queda con cuenta credential (hash, nunca texto plano) y rol Administrador completo', async () => {
     const admin = await prisma.usuario.findUniqueOrThrow({
       where: { username: 'admin' },
