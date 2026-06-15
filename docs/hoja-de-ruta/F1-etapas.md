@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7, avíos R1 y **Proveedor enriquecido R15** en E1B) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅, F1-E2 ✅, F1-E3 ✅ y F1-E4 ✅ hechas** (F1-E4: 14-jun-2026, verificada en `prueba`); sigue **F1-E5**. **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
+> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅, F1-E2 ✅, F1-E3 ✅, F1-E4 ✅ y F1-E5 ✅ hechas** (F1-E5: 14-jun-2026, verificada en `prueba`); sigue **F1-E6** (ETL de catálogos y materiales). **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
 
 ## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
 
@@ -333,7 +333,13 @@
 
 ---
 
-## F1-E5 · Galería de modelos (móvil) + generador de códigos de barra por empresa — ⬜ pendiente
+## F1-E5 · Galería de modelos (móvil) + generador de códigos de barra por empresa — ✅ hecha (14-jun-2026, en `prueba`)
+
+> **CIERRE (14-jun-2026).** Entregada por 2 coders (secuencial en el mismo árbol para no chocar en los archivos de cableado: router, menú, `modelos.rutas.ts`, seed de permisos) + 1 reviewer independiente (el lead orquesta, no codea), verificada por Gabriel en `prueba` (Railway) y mergeada vía **PR #39**. Reviewer: **APROBADO** sin bloqueantes (verificó el algoritmo EAN-13/DUN-14 de 3 formas independientes: contra el VBA viejo `HacerCodigo`/`HacerDun`, contra GS1 a mano, y 20.000 casos ITF-14); 1 hallazgo MENOR corregido (las 2 deps nuevas del frontend pinneadas a versión exacta como el resto del repo). **Decisión de Gabriel:** el **impreso de etiqueta PDF SÍ entró** — primer impreso del sistema (**R9**), con `@react-pdf/renderer`.
+>
+> **Lo que quedó:** (A) Pantalla *Galería de modelos* móvil-first (grid paginado de servidor, búsqueda, filtros temporada/estado, foto principal con NoFoto resuelta en UNA consulta sin N+1, tap → ficha del modelo por deep-link); reusa el permiso `modelos.ver`. (B) `ServicioCodigoBarras` puro (EAN-13 + DUN-14, prefijo desde `Empresa.upc`, **corrige el hardcodeo del form viejo**) + endpoint `GET /api/modelos/{id}/codigos-barra` (empresa activa de la sesión) + permiso nuevo `modelos.codigos-barra` + pantalla *Generador* con render escaneable (bwip-js: EAN-13 e ITF-14), mensaje legible si la empresa no tiene UPC, e impreso PDF.
+>
+> **Trampa/aprendizaje clave (importante para la migración F1-E6/E7):** la regla del viejo es `prefijo(7) + códigoModelo + verificador` y **exige que `prefijo+código` den exactamente 12 dígitos**, o sea **el código de modelo es de 5 dígitos** (sin relleno automático). Verificado contra los datos reales: de 4,978 modelos, **4,713 (95%) tienen código de 5 dígitos**; el resto son de 3/4/6/7/8 dígitos y 160 no-numéricos. Esos ~5% NO generan EAN-13 estándar tal cual (el viejo también los rechazaba). **Decisión abierta para cuando se migren los modelos:** ¿rellenar con ceros los códigos cortos (`0939`→`00939`) o dejarlos sin código de barras? — solo se cambia si se valida contra una etiqueta física real (cambiar el relleno cambia el código). Mientras tanto, para probar en `prueba` hay que capturar un modelo con código de 5 dígitos (p. ej. `00501` con UPC `7500092` → `7500092005011`).
 
 **Objetivo:** Cerrar las consultas de cara al negocio (la galería visual para enseñar producto fuera de la oficina — vista móvil PRIORITARIA) y la utilería de códigos EAN-13/DUN-14 parametrizada por empresa, corrigiendo el hardcodeo de prefijos UPC del form Codigo viejo. Son dos piezas pequeñas, independientes entre sí y dependientes de E4 (necesitan que Modelo exista) — por eso van aquí y en paralelo.
 
