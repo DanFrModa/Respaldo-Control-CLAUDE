@@ -142,6 +142,9 @@ function definirRoles(): {
     'telas.administrar',
     'avios.administrar',
     'bordados.administrar',
+    // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
+    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
+    'modelos.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
@@ -336,6 +339,39 @@ async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3d. Géneros de modelo (F1-E4) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Géneros de modelo del sistema viejo (doc `01-Modelos.md` §3, lista de precios por
+ * género). Catálogo selector: se siembran + se expone solo `GET /api/generos`; el ABM
+ * fino se DIFIERE (mismo patrón que `RolProveedor`/`TipoProceso`). Se siembran por
+ * `nombre` (clave natural), sin pisar `activo` si ya existe. NO se borran los que no
+ * estén aquí (podrían estar en uso una vez que el ETL E7 pueble `Modelo.idGenero`).
+ */
+const GENEROS_BASE: string[] = [
+  'Caballero',
+  'Dama',
+  'Niño Infantil',
+  'Niña Infantil',
+  'Niño Juvenil',
+  'Niña Juvenil',
+  'Bebo',
+  'Beba',
+];
+
+async function sembrarGeneros(prisma: PrismaClient): Promise<void> {
+  for (const nombre of GENEROS_BASE) {
+    await prisma.genero.upsert({
+      where: { nombre },
+      // No se pisa el activo si ya existe (pudo editarse/desactivarse en producción).
+      update: {},
+      create: { nombre },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. Usuario admin (contraseña TEMPORAL — cambiarla en el primer inicio de sesión)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -394,6 +430,7 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarRoles(prisma, idPermisoPorClave);
   await sembrarRolesProveedor(prisma);
   await sembrarTiposProceso(prisma);
+  await sembrarGeneros(prisma);
   await sembrarAdmin(prisma);
 }
 

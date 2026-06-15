@@ -142,7 +142,9 @@
                           "avios.ver",
                           "avios.administrar",
                           "bordados.ver",
-                          "bordados.administrar"
+                          "bordados.administrar",
+                          "modelos.ver",
+                          "modelos.administrar"
                         ]
                       },
                       "description": "Claves de permiso efectivas del usuario (unión de sus roles)."
@@ -24356,6 +24358,5169 @@
             "name": "id",
             "required": true,
             "description": "Id del bordado."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/generos": {
+      "get": {
+        "summary": "Listar géneros (catálogo selector)",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivos",
+            "required": false,
+            "description": "Incluye los géneros desactivados (\"true\"/\"false\")."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Id del género."
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "description": "Nombre del género (único global)."
+                      },
+                      "activo": {
+                        "type": "boolean",
+                        "description": "Falso si está desactivado (borrado suave)."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "nombre",
+                      "activo"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Género del catálogo (selector)."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos": {
+      "get": {
+        "summary": "Listar modelos",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar en el código o la descripción (insensible a mayúsculas)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idTemporada",
+            "required": false,
+            "description": "Filtra por id de temporada."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivos",
+            "required": false,
+            "description": "Incluye los descontinuados (\"true\"/\"false\")."
+          },
+          {
+            "schema": {
+              "default": "codigo",
+              "type": "string",
+              "enum": [
+                "codigo",
+                "descripcion",
+                "creadoEn"
+              ]
+            },
+            "in": "query",
+            "name": "ordenarPor",
+            "required": false,
+            "description": "Columna de orden."
+          },
+          {
+            "schema": {
+              "default": "asc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "description": "Dirección del orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de modelos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del modelo."
+                          },
+                          "codigo": {
+                            "type": "string",
+                            "description": "Código/clave de negocio del modelo (único global)."
+                          },
+                          "descripcion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción, o null."
+                          },
+                          "maquilaBase": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo de maquila base, o null."
+                          },
+                          "idTemporada": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la temporada, o null."
+                          },
+                          "temporada": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de la temporada, o null."
+                          },
+                          "idCurvaTalla": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la curva de tallas, o null."
+                          },
+                          "curvaTalla": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de la curva de tallas, o null."
+                          },
+                          "idGenero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del género, o null."
+                          },
+                          "genero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del género, o null."
+                          },
+                          "cantidadFotos": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cantidad de fotos del modelo."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está descontinuado (borrado suave)."
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha de alta (ISO 8601)."
+                          },
+                          "creadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del usuario que lo creó."
+                          },
+                          "modificadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha de la última modificación (ISO 8601)."
+                          },
+                          "modificadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del último usuario que lo modificó."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "codigo",
+                          "descripcion",
+                          "maquilaBase",
+                          "idTemporada",
+                          "temporada",
+                          "idCurvaTalla",
+                          "curvaTalla",
+                          "idGenero",
+                          "genero",
+                          "cantidadFotos",
+                          "activo",
+                          "creadoEn",
+                          "creadoPorId",
+                          "modificadoEn",
+                          "modificadoPorId"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Modelo del catálogo (global)."
+                      },
+                      "description": "Modelos de la página."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de modelos que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página de modelos."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "codigo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "maquilaBase": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "idTemporada": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idCurvaTalla": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idGenero": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "codigo"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Modelo del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código/clave de negocio del modelo (único global)."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción, o null."
+                    },
+                    "maquilaBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila base, o null."
+                    },
+                    "idTemporada": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la temporada, o null."
+                    },
+                    "temporada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la temporada, o null."
+                    },
+                    "idCurvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la curva de tallas, o null."
+                    },
+                    "curvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la curva de tallas, o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del género, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género, o null."
+                    },
+                    "cantidadFotos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de fotos del modelo."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está descontinuado (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "codigo",
+                    "descripcion",
+                    "maquilaBase",
+                    "idTemporada",
+                    "temporada",
+                    "idCurvaTalla",
+                    "curvaTalla",
+                    "idGenero",
+                    "genero",
+                    "cantidadFotos",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Modelo del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}": {
+      "get": {
+        "summary": "Obtener la ficha de un modelo (con su BOM)",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ficha de un modelo con su receta (BOM) completa.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código/clave de negocio del modelo (único global)."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción, o null."
+                    },
+                    "maquilaBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila base, o null."
+                    },
+                    "idTemporada": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la temporada, o null."
+                    },
+                    "temporada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la temporada, o null."
+                    },
+                    "idCurvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la curva de tallas, o null."
+                    },
+                    "curvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la curva de tallas, o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del género, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género, o null."
+                    },
+                    "cantidadFotos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de fotos del modelo."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está descontinuado (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    },
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la tela."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la tela (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de tela por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "nombre",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela del BOM del modelo."
+                      },
+                      "description": "Telas del BOM."
+                    },
+                    "avios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío (para la UI)."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de avío por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío del BOM del modelo."
+                      },
+                      "description": "Avíos del BOM."
+                    },
+                    "bordados": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idBordado": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del bordado."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre del bordado (para la UI)."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "BORDADO",
+                              "ESTAMPADO"
+                            ],
+                            "description": "Tipo del bordado (para la UI)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del bordado en este modelo, o null."
+                          }
+                        },
+                        "required": [
+                          "idBordado",
+                          "nombre",
+                          "tipo",
+                          "precio"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de bordado del BOM del modelo."
+                      },
+                      "description": "Bordados del BOM."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "codigo",
+                    "descripcion",
+                    "maquilaBase",
+                    "idTemporada",
+                    "temporada",
+                    "idCurvaTalla",
+                    "curvaTalla",
+                    "idGenero",
+                    "genero",
+                    "cantidadFotos",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId",
+                    "telas",
+                    "avios",
+                    "bordados"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Ficha de un modelo con su receta (BOM) completa."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Actualizar un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "codigo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  },
+                  "maquilaBase": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idTemporada": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idCurvaTalla": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idGenero": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "descripcion": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Modelo del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código/clave de negocio del modelo (único global)."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción, o null."
+                    },
+                    "maquilaBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila base, o null."
+                    },
+                    "idTemporada": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la temporada, o null."
+                    },
+                    "temporada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la temporada, o null."
+                    },
+                    "idCurvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la curva de tallas, o null."
+                    },
+                    "curvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la curva de tallas, o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del género, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género, o null."
+                    },
+                    "cantidadFotos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de fotos del modelo."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está descontinuado (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "codigo",
+                    "descripcion",
+                    "maquilaBase",
+                    "idTemporada",
+                    "temporada",
+                    "idCurvaTalla",
+                    "curvaTalla",
+                    "idGenero",
+                    "genero",
+                    "cantidadFotos",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Modelo del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Descontinuar un modelo (borrado suave)",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Modelo del catálogo (global).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del modelo."
+                    },
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código/clave de negocio del modelo (único global)."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción, o null."
+                    },
+                    "maquilaBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de maquila base, o null."
+                    },
+                    "idTemporada": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la temporada, o null."
+                    },
+                    "temporada": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la temporada, o null."
+                    },
+                    "idCurvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la curva de tallas, o null."
+                    },
+                    "curvaTalla": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la curva de tallas, o null."
+                    },
+                    "idGenero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del género, o null."
+                    },
+                    "genero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del género, o null."
+                    },
+                    "cantidadFotos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad de fotos del modelo."
+                    },
+                    "activo": {
+                      "type": "boolean",
+                      "description": "Falso si está descontinuado (borrado suave)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "codigo",
+                    "descripcion",
+                    "maquilaBase",
+                    "idTemporada",
+                    "temporada",
+                    "idCurvaTalla",
+                    "curvaTalla",
+                    "idGenero",
+                    "genero",
+                    "cantidadFotos",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Modelo del catálogo (global)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/bom/telas": {
+      "get": {
+        "summary": "Listar las telas del BOM de un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telas del BOM de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la tela."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la tela (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de tela por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "nombre",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela del BOM del modelo."
+                      },
+                      "description": "Telas del BOM."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Telas del BOM de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Reemplazar el set completo de telas del BOM",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "telas": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idTela": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "consumoPorPrenda": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "paraPreCosto": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "paraProduccion": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "paraCosto": {
+                          "default": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "idTela",
+                        "consumoPorPrenda"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "telas"
+                ],
+                "description": "Set completo de telas del BOM del modelo."
+              }
+            }
+          },
+          "description": "Set completo de telas del BOM del modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telas del BOM de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la tela."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la tela (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de tela por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "nombre",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela del BOM del modelo."
+                      },
+                      "description": "Telas del BOM."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Telas del BOM de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/bom/avios": {
+      "get": {
+        "summary": "Listar los avíos del BOM de un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avíos del BOM de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío (para la UI)."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de avío por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío del BOM del modelo."
+                      },
+                      "description": "Avíos del BOM."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Avíos del BOM de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Reemplazar el set completo de avíos del BOM",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "avios": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idAvio": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "consumoPorPrenda": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "paraPreCosto": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "paraProduccion": {
+                          "default": true,
+                          "type": "boolean"
+                        },
+                        "paraCosto": {
+                          "default": true,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "idAvio",
+                        "consumoPorPrenda"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "avios"
+                ],
+                "description": "Set completo de avíos del BOM del modelo."
+              }
+            }
+          },
+          "description": "Set completo de avíos del BOM del modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Avíos del BOM de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío (para la UI)."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de avío por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío del BOM del modelo."
+                      },
+                      "description": "Avíos del BOM."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Avíos del BOM de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/bom/bordados": {
+      "get": {
+        "summary": "Listar los bordados del BOM de un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bordados del BOM de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idBordado": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del bordado."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre del bordado (para la UI)."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "BORDADO",
+                              "ESTAMPADO"
+                            ],
+                            "description": "Tipo del bordado (para la UI)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del bordado en este modelo, o null."
+                          }
+                        },
+                        "required": [
+                          "idBordado",
+                          "nombre",
+                          "tipo",
+                          "precio"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de bordado del BOM del modelo."
+                      },
+                      "description": "Bordados del BOM."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Bordados del BOM de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Reemplazar el set completo de bordados del BOM",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bordados": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idBordado": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "precio": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "required": [
+                        "idBordado"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "bordados"
+                ],
+                "description": "Set completo de bordados del BOM del modelo."
+              }
+            }
+          },
+          "description": "Set completo de bordados del BOM del modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bordados del BOM de un modelo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idBordado": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del bordado."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre del bordado (para la UI)."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "BORDADO",
+                              "ESTAMPADO"
+                            ],
+                            "description": "Tipo del bordado (para la UI)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del bordado en este modelo, o null."
+                          }
+                        },
+                        "required": [
+                          "idBordado",
+                          "nombre",
+                          "tipo",
+                          "precio"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de bordado del BOM del modelo."
+                      },
+                      "description": "Bordados del BOM."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Bordados del BOM de un modelo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/copiar-bom": {
+      "post": {
+        "summary": "Copiar la receta (BOM) de otro modelo",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idOrigen": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "reemplazar": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "idOrigen"
+                ],
+                "description": "Copiar la receta (BOM) de otro modelo."
+              }
+            }
+          },
+          "description": "Copiar la receta (BOM) de otro modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "telas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idTela": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la tela."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la tela (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de tela por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idTela",
+                          "nombre",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de tela del BOM del modelo."
+                      },
+                      "description": "Telas del BOM."
+                    },
+                    "avios": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idAvio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del avío."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave del avío (para la UI)."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del avío (para la UI)."
+                          },
+                          "consumoPorPrenda": {
+                            "type": "number",
+                            "description": "Consumo de avío por prenda."
+                          },
+                          "paraPreCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el pre-costeo?"
+                          },
+                          "paraProduccion": {
+                            "type": "boolean",
+                            "description": "¿Se considera al producir?"
+                          },
+                          "paraCosto": {
+                            "type": "boolean",
+                            "description": "¿Entra en el costeo real?"
+                          }
+                        },
+                        "required": [
+                          "idAvio",
+                          "clave",
+                          "descripcion",
+                          "consumoPorPrenda",
+                          "paraPreCosto",
+                          "paraProduccion",
+                          "paraCosto"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de avío del BOM del modelo."
+                      },
+                      "description": "Avíos del BOM."
+                    },
+                    "bordados": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idBordado": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del bordado."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre del bordado (para la UI)."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "BORDADO",
+                              "ESTAMPADO"
+                            ],
+                            "description": "Tipo del bordado (para la UI)."
+                          },
+                          "precio": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio del bordado en este modelo, o null."
+                          }
+                        },
+                        "required": [
+                          "idBordado",
+                          "nombre",
+                          "tipo",
+                          "precio"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de bordado del BOM del modelo."
+                      },
+                      "description": "Bordados del BOM."
+                    }
+                  },
+                  "required": [
+                    "telas",
+                    "avios",
+                    "bordados"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/fotos": {
+      "post": {
+        "summary": "Preparar la subida de una foto del modelo",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombreOriginal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Nombre del archivo tal como lo llama el usuario."
+                  },
+                  "tipoMime": {
+                    "type": "string",
+                    "pattern": "^image\\/[\\w.+-]+$",
+                    "description": "Tipo MIME de la imagen (ej. image/jpeg, image/png, image/webp)."
+                  },
+                  "tamanoBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño)."
+                  },
+                  "tipo": {
+                    "default": "OTRO",
+                    "description": "Tipo de foto (frente/espalda/otra).",
+                    "type": "string",
+                    "enum": [
+                      "FRENTE",
+                      "ESPALDA",
+                      "OTRO"
+                    ]
+                  }
+                },
+                "required": [
+                  "nombreOriginal",
+                  "tipoMime",
+                  "tamanoBytes"
+                ],
+                "description": "Datos para preparar la subida de una foto de un modelo."
+              }
+            }
+          },
+          "description": "Datos para preparar la subida de una foto de un modelo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de preparar la subida de una foto (URL prefirmada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idFoto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del registro ModeloFoto creado."
+                    },
+                    "idArchivo": {
+                      "type": "string",
+                      "description": "Id del registro Archivo creado para la foto."
+                    },
+                    "nombreOriginal": {
+                      "type": "string",
+                      "description": "Nombre original del archivo."
+                    },
+                    "urlSubida": {
+                      "type": "string",
+                      "description": "URL PUT prefirmada: el navegador sube directo a R2."
+                    },
+                    "expiraEnSegundos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Vigencia de la URL de subida (segundos)."
+                    }
+                  },
+                  "required": [
+                    "idFoto",
+                    "idArchivo",
+                    "nombreOriginal",
+                    "urlSubida",
+                    "expiraEnSegundos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de preparar la subida de una foto (URL prefirmada)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Listar las fotos de un modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Fotos de un modelo (N por modelo).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idFoto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del registro ModeloFoto."
+                          },
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del registro Archivo de la foto."
+                          },
+                          "tipo": {
+                            "type": "string",
+                            "enum": [
+                              "FRENTE",
+                              "ESPALDA",
+                              "OTRO"
+                            ],
+                            "description": "Tipo de foto (frente/espalda/otra)."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden de despliegue en el carrusel."
+                          },
+                          "nombreOriginal": {
+                            "type": "string",
+                            "description": "Nombre original del archivo."
+                          },
+                          "tipoMime": {
+                            "type": "string",
+                            "description": "Tipo MIME de la imagen."
+                          },
+                          "tamanoBytes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño en bytes."
+                          },
+                          "urlDescarga": {
+                            "type": "string",
+                            "description": "URL GET prefirmada para ver la foto."
+                          }
+                        },
+                        "required": [
+                          "idFoto",
+                          "idArchivo",
+                          "tipo",
+                          "orden",
+                          "nombreOriginal",
+                          "tipoMime",
+                          "tamanoBytes",
+                          "urlDescarga"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Foto de un modelo con su URL de descarga."
+                      },
+                      "description": "Fotos del modelo (ordenadas)."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Fotos de un modelo (N por modelo)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modelos/{id}/fotos/{idFoto}": {
+      "patch": {
+        "summary": "Actualizar los metadatos de una foto (tipo/orden)",
+        "tags": [
+          "modelos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tipo": {
+                    "description": "Nuevo tipo (frente/espalda/otra).",
+                    "type": "string",
+                    "enum": [
+                      "FRENTE",
+                      "ESPALDA",
+                      "OTRO"
+                    ]
+                  },
+                  "orden": {
+                    "description": "Nuevo orden de despliegue.",
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "description": "Metadatos a actualizar de una foto del modelo (tipo/orden)."
+              }
+            }
+          },
+          "description": "Metadatos a actualizar de una foto del modelo (tipo/orden)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idFoto",
+            "required": true,
+            "description": "Id de la foto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Quitar una foto del modelo",
+        "tags": [
+          "modelos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del modelo."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idFoto",
+            "required": true,
+            "description": "Id de la foto."
           }
         ],
         "security": [

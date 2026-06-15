@@ -1,0 +1,510 @@
+/**
+ * Modelos — Módulo 2 (F1-E4): el catálogo de productos. CRUD del `Modelo` (ex tabla
+ * `Modelos`, doc `Documentacion_MJD/01-Modelos.md` §2) y el selector de `Genero`.
+ *
+ * La RECETA/BOM (telas/avíos/bordados) y las FOTOS viven en archivos hermanos
+ * (`bom-modelo.ts`, `fotos-modelo.ts`) para no inflar éste: el `Modelo` se da de alta primero
+ * y luego se le agregan el BOM y las fotos (igual que la foto del bordado en E3). Catálogo
+ * GLOBAL (ADR-0007, A9): la unicidad de `codigo` es global.
+ *
+ * Piezas del patrón conservadas (PLANMAESTRO §9.2): permiso primero (`modelos.ver`/
+ * `.administrar`); Zod compartido de `src/contrato`; todo cambio en UNA transacción (A2) con
+ * auditoría (A7) + `Bitacora` juntos o nada; borrado SUAVE reversible (`activo` =
+ * descontinuar); unicidad de `codigo` validada en la transacción y respaldada por el unique de
+ * la base (P2002 → `ErrorConflicto`); listado paginado/ordenado/buscado en SERVIDOR (volumen
+ * ~4,987 modelos: la tabla nunca trae todo para filtrar en memoria — cubre la consulta
+ * `TodosModelos` del viejo, doc 01-Modelos §3).
+ */
+import {
+  esquemaModeloCrear,
+  esquemaModeloEditar,
+  type DatosModeloCrear,
+  type DatosModeloEditar,
+} from '../../contrato/esquemas/modelo.js';
+import type { Genero, Modelo, Prisma } from '../../datos/index.js';
+import { z } from 'zod';
+
+import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  armarPagina,
+  esquemaPaginacion,
+  rangoPrisma,
+  type Pagina,
+} from '../../comun/paginacion.js';
+import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
+import {
+  clienteLectura,
+  enTransaccion,
+  type ContextoBd,
+  type Tx,
+} from '../../comun/transaccion.js';
+import { validarEntrada } from '../../comun/validacion.js';
+
+/** Alta: campos del esquema compartido (catálogo global, sin `idEmpresa`). */
+export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
+
+/** Edición: `id` + cambios parciales (incluye `activo` para descontinuar/reactivar). */
+export type EntradaActualizarModelo = z.input<typeof esquemaModeloEditar>;
+
+/** Modelo con su temporada/curva/género y el conteo de fotos (forma del listado). */
+export type ModeloConRelaciones = Modelo & {
+  temporada: { nombre: string } | null;
+  curvaTalla: { nombre: string } | null;
+  genero: { nombre: string } | null;
+  _count: { fotos: number };
+};
+
+/** `include` estándar para traer nombres de relaciones + conteo de fotos. */
+export const incluirRelacionesModelo = {
+  temporada: { select: { nombre: true } },
+  curvaTalla: { select: { nombre: true } },
+  genero: { select: { nombre: true } },
+  _count: { select: { fotos: true } },
+} satisfies Prisma.ModeloInclude;
+
+/** Parámetros del listado (los reutiliza la ruta REST en su entrada; tipos nativos). */
+const esquemaListarModelosDominio = esquemaPaginacion.extend({
+  /** Texto a buscar en el código o la descripción (insensible a mayúsculas). */
+  busqueda: z.string().trim().max(200).optional(),
+  /** Filtra por temporada. */
+  idTemporada: z.number().int().positive().optional(),
+  /** Por omisión solo activos; `true` muestra también los descontinuados. */
+  incluirInactivos: z.boolean().default(false),
+  ordenarPor: z.enum(['codigo', 'descripcion', 'creadoEn']).default('codigo'),
+  direccion: z.enum(['asc', 'desc']).default('asc'),
+});
+
+/** Parámetros del listado (los reutiliza la ruta REST en su entrada). */
+export type ParametrosListarModelos = z.input<typeof esquemaListarModelosDominio>;
+
+/**
+ * Unicidad de negocio GLOBAL (ADR-0007): no puede haber dos modelos con el mismo `codigo`,
+ * sin importar mayúsculas. Se valida DENTRO de la transacción; la carrera residual la captura
+ * el unique de la base (P2002 → `ErrorConflicto`). El mensaje distingue si el existente está
+ * activo o descontinuado (invita a reactivar).
+ */
+async function exigirCodigoLibre(tx: Tx, codigo: string, idActual?: number): Promise<void> {
+  const existente = await tx.modelo.findFirst({
+    where: {
+      codigo: { equals: codigo, mode: 'insensitive' },
+      ...(idActual === undefined ? {} : { id: { not: idActual } }),
+    },
+    select: { id: true, activo: true },
+  });
+  if (existente !== null) {
+    throw new ErrorConflicto(
+      existente.activo
+        ? `Ya existe un modelo con el código "${codigo}".`
+        : `Ya existe un modelo con el código "${codigo}" (está descontinuado; puedes reactivarlo).`,
+    );
+  }
+}
+
+/** Busca un modelo por id o lanza `ErrorNoEncontrado`. */
+export async function exigirModelo(tx: Tx, id: number): Promise<Modelo> {
+  const modelo = await tx.modelo.findUnique({ where: { id } });
+  if (modelo === null) {
+    throw new ErrorNoEncontrado('Modelo', id);
+  }
+  return modelo;
+}
+
+/** Valida que una temporada (si viene) exista y esté ACTIVA. Lanza `ErrorValidacion` si no. */
+async function exigirTemporadaValida(tx: Tx, idTemporada: number): Promise<void> {
+  const temporada = await tx.temporada.findUnique({
+    where: { id: idTemporada },
+    select: { nombre: true, activo: true },
+  });
+  if (temporada === null) {
+    throw new ErrorValidacion('La temporada seleccionada no existe.');
+  }
+  if (!temporada.activo) {
+    throw new ErrorValidacion(
+      `La temporada "${temporada.nombre}" está desactivada y no se puede asignar.`,
+    );
+  }
+}
+
+/** Valida que una curva de tallas (si viene) exista y esté ACTIVA. */
+async function exigirCurvaValida(tx: Tx, idCurva: number): Promise<void> {
+  const curva = await tx.curvaTalla.findUnique({
+    where: { id: idCurva },
+    select: { nombre: true, activo: true },
+  });
+  if (curva === null) {
+    throw new ErrorValidacion('La curva de tallas seleccionada no existe.');
+  }
+  if (!curva.activo) {
+    throw new ErrorValidacion(
+      `La curva de tallas "${curva.nombre}" está desactivada y no se puede asignar.`,
+    );
+  }
+}
+
+/** Valida que un género (si viene) exista y esté ACTIVO. */
+async function exigirGeneroValido(tx: Tx, idGenero: number): Promise<void> {
+  const genero = await tx.genero.findUnique({
+    where: { id: idGenero },
+    select: { nombre: true, activo: true },
+  });
+  if (genero === null) {
+    throw new ErrorValidacion('El género seleccionado no existe.');
+  }
+  if (!genero.activo) {
+    throw new ErrorValidacion(
+      `El género "${genero.nombre}" está desactivado y no se puede asignar.`,
+    );
+  }
+}
+
+/** Construye el `data` de los campos opcionales presentes en el alta (solo los definidos). */
+function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUncheckedCreateInput> {
+  const data: Partial<Prisma.ModeloUncheckedCreateInput> = {};
+  if (datos.descripcion !== undefined) data.descripcion = datos.descripcion;
+  if (datos.maquilaBase !== undefined) data.maquilaBase = datos.maquilaBase;
+  if (datos.idTemporada !== undefined) data.idTemporada = datos.idTemporada;
+  if (datos.idCurvaTalla !== undefined) data.idCurvaTalla = datos.idCurvaTalla;
+  if (datos.idGenero !== undefined) data.idGenero = datos.idGenero;
+  return data;
+}
+
+/**
+ * Compara un decimal capturado (number | null | undefined) con el guardado (Decimal | null).
+ * `undefined` = no se tocó. Distingue `null` (vaciar) de un número nuevo. Mismo helper que
+ * Tela/Bordado en E3.
+ */
+function cambiaDecimal(entrada: number | null | undefined, actual: Prisma.Decimal | null): boolean {
+  if (entrada === undefined) {
+    return false;
+  }
+  const actualNum = actual === null ? null : actual.toNumber();
+  return actualNum !== entrada;
+}
+
+/**
+ * Aplica los campos opcionales que VENGAN en la edición al `update` y registra qué cambió
+ * (para la bitácora). Semántica del PATCH parcial (M1): texto omitido = no tocar; `null`/'' =
+ * borrar; número/FK omitido = no tocar; `null` en una FK la quita. Devuelve el detalle de
+ * cambios. Mismo patrón que `aplicarOpcionalesEditar` de la tela.
+ */
+function aplicarOpcionalesEditar(
+  datos: DatosModeloEditar,
+  actual: Modelo,
+  cambios: Prisma.ModeloUncheckedUpdateInput,
+): Record<string, unknown> {
+  const detalle: Record<string, unknown> = {};
+
+  // descripcion (texto): omitir = no tocar; vacío/`null` = borrar (a null, nunca '').
+  if (datos.descripcion !== undefined) {
+    const nuevo = datos.descripcion === null || datos.descripcion === '' ? null : datos.descripcion;
+    if (nuevo !== actual.descripcion) {
+      cambios.descripcion = nuevo;
+      detalle.descripcion = { de: actual.descripcion, a: nuevo };
+    }
+  }
+
+  // maquilaBase (decimal nullable): omitir = no tocar; `null` = quitar; número = fijar.
+  if (cambiaDecimal(datos.maquilaBase, actual.maquilaBase)) {
+    const nuevo = datos.maquilaBase ?? null;
+    cambios.maquilaBase = nuevo;
+    detalle.maquilaBase = {
+      de: actual.maquilaBase === null ? null : actual.maquilaBase.toNumber(),
+      a: nuevo,
+    };
+  }
+
+  // FKs (idTemporada/idCurvaTalla/idGenero): `null` quita; un id fija; omitir = no tocar.
+  if (datos.idTemporada !== undefined && datos.idTemporada !== actual.idTemporada) {
+    cambios.idTemporada = datos.idTemporada;
+    detalle.idTemporada = { de: actual.idTemporada, a: datos.idTemporada };
+  }
+  if (datos.idCurvaTalla !== undefined && datos.idCurvaTalla !== actual.idCurvaTalla) {
+    cambios.idCurvaTalla = datos.idCurvaTalla;
+    detalle.idCurvaTalla = { de: actual.idCurvaTalla, a: datos.idCurvaTalla };
+  }
+  if (datos.idGenero !== undefined && datos.idGenero !== actual.idGenero) {
+    cambios.idGenero = datos.idGenero;
+    detalle.idGenero = { de: actual.idGenero, a: datos.idGenero };
+  }
+
+  return detalle;
+}
+
+/**
+ * Crea un modelo (catálogo global) en UNA transacción (A2). Reglas: permiso
+ * `modelos.administrar`; `codigo` único global → `ErrorConflicto`; temporada/curva/género
+ * (si vienen) existentes y ACTIVAS; nace activo y SIN BOM ni fotos (se capturan aparte);
+ * auditoría y bitácora en la misma transacción (A7).
+ *
+ * @example
+ * const m = await crearModelo(sesion, {
+ *   codigo: "501", descripcion: "Sudadera", maquilaBase: 35, idTemporada: 2,
+ * });
+ */
+export async function crearModelo(
+  sesion: SesionUsuario,
+  entrada: EntradaCrearModelo,
+  bd?: ContextoBd,
+): Promise<ModeloConRelaciones> {
+  verificarPermiso(sesion, 'modelos.administrar');
+  const datos = validarEntrada(esquemaModeloCrear, entrada);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      await exigirCodigoLibre(tx, datos.codigo);
+      if (datos.idTemporada !== undefined) await exigirTemporadaValida(tx, datos.idTemporada);
+      if (datos.idCurvaTalla !== undefined) await exigirCurvaValida(tx, datos.idCurvaTalla);
+      if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
+
+      const modelo = await tx.modelo.create({
+        data: {
+          codigo: datos.codigo,
+          ...datosOpcionalesCrear(datos),
+          ...datosCreacion(sesion),
+        },
+      });
+
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Modelo',
+        idEntidad: modelo.id,
+        accion: 'CREAR',
+        datos: { codigo: modelo.codigo, idTemporada: modelo.idTemporada },
+      });
+
+      return tx.modelo.findUniqueOrThrow({
+        where: { id: modelo.id },
+        include: incluirRelacionesModelo,
+      });
+    }, bd);
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto(`Ya existe un modelo con el código "${datos.codigo}".`, {
+        causa: error,
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Actualiza un modelo: datos generales y/o `activo` para descontinuar (borrado suave) o
+ * reactivar. Todo en UNA transacción (A2). El BOM NO se toca aquí (tiene sus propios
+ * endpoints). Bitácora según lo que pasó: `MODIFICAR` con el detalle, y/o `DESACTIVAR` si se
+ * descontinuó.
+ */
+export async function actualizarModelo(
+  sesion: SesionUsuario,
+  entrada: EntradaActualizarModelo,
+  bd?: ContextoBd,
+): Promise<ModeloConRelaciones> {
+  verificarPermiso(sesion, 'modelos.administrar');
+  const datos = validarEntrada(esquemaModeloEditar, entrada);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      const actual = await exigirModelo(tx, datos.id);
+
+      const cambiaCodigo = datos.codigo !== undefined && datos.codigo !== actual.codigo;
+      const reactiva = datos.activo === true && !actual.activo;
+      const desactiva = datos.activo === false && actual.activo;
+
+      const cambios: Prisma.ModeloUncheckedUpdateInput = { ...datosModificacion(sesion) };
+      const detalleOpcionales = aplicarOpcionalesEditar(datos, actual, cambios);
+      if (cambiaCodigo && datos.codigo !== undefined) {
+        cambios.codigo = datos.codigo;
+      }
+      if ((reactiva || desactiva) && datos.activo !== undefined) {
+        cambios.activo = datos.activo;
+      }
+
+      if (cambiaCodigo) {
+        await exigirCodigoLibre(tx, datos.codigo ?? actual.codigo, datos.id);
+      } else if (reactiva) {
+        await exigirCodigoLibre(tx, actual.codigo, datos.id);
+      }
+
+      // Si se asignan FKs nuevas (no null), validarlas (existen y activas).
+      if (
+        datos.idTemporada !== undefined &&
+        datos.idTemporada !== null &&
+        datos.idTemporada !== actual.idTemporada
+      ) {
+        await exigirTemporadaValida(tx, datos.idTemporada);
+      }
+      if (
+        datos.idCurvaTalla !== undefined &&
+        datos.idCurvaTalla !== null &&
+        datos.idCurvaTalla !== actual.idCurvaTalla
+      ) {
+        await exigirCurvaValida(tx, datos.idCurvaTalla);
+      }
+      if (
+        datos.idGenero !== undefined &&
+        datos.idGenero !== null &&
+        datos.idGenero !== actual.idGenero
+      ) {
+        await exigirGeneroValido(tx, datos.idGenero);
+      }
+
+      const huboCambio =
+        cambiaCodigo || Object.keys(detalleOpcionales).length > 0 || reactiva || desactiva;
+
+      if (!huboCambio) {
+        return tx.modelo.findUniqueOrThrow({
+          where: { id: datos.id },
+          include: incluirRelacionesModelo,
+        });
+      }
+
+      await tx.modelo.update({ where: { id: datos.id }, data: cambios });
+
+      if (cambiaCodigo || Object.keys(detalleOpcionales).length > 0 || reactiva) {
+        await registrarBitacora(tx, sesion, {
+          entidad: 'Modelo',
+          idEntidad: datos.id,
+          accion: 'MODIFICAR',
+          datos: {
+            ...(cambiaCodigo ? { codigo: { de: actual.codigo, a: datos.codigo } } : {}),
+            ...detalleOpcionales,
+            ...(reactiva ? { operacion: 'reactivar' } : {}),
+          },
+        });
+      }
+      if (desactiva) {
+        await registrarBitacora(tx, sesion, {
+          entidad: 'Modelo',
+          idEntidad: datos.id,
+          accion: 'DESACTIVAR',
+          datos: { codigo: actual.codigo },
+        });
+      }
+
+      return tx.modelo.findUniqueOrThrow({
+        where: { id: datos.id },
+        include: incluirRelacionesModelo,
+      });
+    }, bd);
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto('Ya existe un modelo con ese código.', { causa: error });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Descontinúa (borrado SUAVE) un modelo: deja de aparecer en capturas pero su historial, BOM
+ * y fotos quedan intactos. Descontinuar dos veces es `ErrorConflicto`. Atajo del botón
+ * "Descontinuar".
+ */
+export async function descontinuarModelo(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<ModeloConRelaciones> {
+  verificarPermiso(sesion, 'modelos.administrar');
+  return enTransaccion(async (tx) => {
+    const actual = await exigirModelo(tx, id);
+    if (!actual.activo) {
+      throw new ErrorConflicto(`El modelo "${actual.codigo}" ya está descontinuado.`);
+    }
+    return actualizarModelo(sesion, { id, activo: false }, { tx });
+  }, bd);
+}
+
+/** Reactiva un modelo descontinuado (operación inversa del borrado suave). */
+export async function reactivarModelo(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<ModeloConRelaciones> {
+  verificarPermiso(sesion, 'modelos.administrar');
+  return enTransaccion(async (tx) => {
+    const actual = await exigirModelo(tx, id);
+    if (actual.activo) {
+      throw new ErrorConflicto(`El modelo "${actual.codigo}" ya está activo.`);
+    }
+    return actualizarModelo(sesion, { id, activo: true }, { tx });
+  }, bd);
+}
+
+/** Obtiene un modelo por id (datos generales + relaciones + conteo de fotos), o lanza `ErrorNoEncontrado`. */
+export async function obtenerModelo(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<ModeloConRelaciones> {
+  verificarPermiso(sesion, 'modelos.ver');
+  const modelo = await clienteLectura(bd).modelo.findUnique({
+    where: { id },
+    include: incluirRelacionesModelo,
+  });
+  if (modelo === null) {
+    throw new ErrorNoEncontrado('Modelo', id);
+  }
+  return modelo;
+}
+
+/**
+ * Lista modelos con búsqueda, orden y paginación EN SERVIDOR (volumen ~4,987: la tabla de la
+ * UI nunca trae todo para filtrar en memoria — cubre `TodosModelos` del viejo). Por defecto:
+ * solo activos. La búsqueda cubre `codigo` O `descripcion`; filtro opcional `idTemporada`.
+ *
+ * @example
+ * const pagina = await listarModelos(sesion, { idTemporada: 2, busqueda: "sudadera" });
+ */
+export async function listarModelos(
+  sesion: SesionUsuario,
+  parametros: ParametrosListarModelos = {},
+  bd?: ContextoBd,
+): Promise<Pagina<ModeloConRelaciones>> {
+  verificarPermiso(sesion, 'modelos.ver');
+  const filtros = validarEntrada(esquemaListarModelosDominio, parametros);
+
+  const where: Prisma.ModeloWhereInput = {
+    ...(filtros.incluirInactivos ? {} : { activo: true }),
+    ...(filtros.idTemporada === undefined ? {} : { idTemporada: filtros.idTemporada }),
+    ...(filtros.busqueda === undefined || filtros.busqueda === ''
+      ? {}
+      : {
+          OR: [
+            { codigo: { contains: filtros.busqueda, mode: 'insensitive' } },
+            { descripcion: { contains: filtros.busqueda, mode: 'insensitive' } },
+          ],
+        }),
+  };
+
+  const cliente = clienteLectura(bd);
+  const [total, datos] = await Promise.all([
+    cliente.modelo.count({ where }),
+    cliente.modelo.findMany({
+      where,
+      orderBy: { [filtros.ordenarPor]: filtros.direccion },
+      include: incluirRelacionesModelo,
+      ...rangoPrisma(filtros),
+    }),
+  ]);
+
+  return armarPagina(datos, total, filtros);
+}
+
+// ── Género (catálogo selector, R bajo `modelos.ver`) ──────────────────────────
+
+/**
+ * Lista los géneros para el selector de la ficha. Por defecto solo los activos (los inactivos
+ * no se pueden asignar). Requiere `modelos.ver` (sin permiso propio: mismo criterio de
+ * sub-catálogo selector que `RolProveedor`). El ABM fino se DIFIERE.
+ */
+export async function listarGeneros(
+  sesion: SesionUsuario,
+  opciones: { incluirInactivos?: boolean } = {},
+  bd?: ContextoBd,
+): Promise<Genero[]> {
+  verificarPermiso(sesion, 'modelos.ver');
+  return clienteLectura(bd).genero.findMany({
+    where: opciones.incluirInactivos === true ? {} : { activo: true },
+    orderBy: { nombre: 'asc' },
+  });
+}

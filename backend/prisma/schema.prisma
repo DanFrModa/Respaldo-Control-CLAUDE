@@ -380,6 +380,9 @@ model Archivo {
   /// Bordado cuya foto es este archivo (F1-E3), si lo hay. Inversa de `Bordado.archivoFoto`;
   /// 0 o 1 (un archivo es la foto de un solo bordado).
   bordado          Bordado?
+  /// Foto de modelo que apunta a este archivo (F1-E4), si la hay. Inversa de
+  /// `ModeloFoto.archivo`; 0 o 1 (un archivo es UNA foto de UN modelo — Cascade en ambos).
+  modeloFoto       ModeloFoto?
 
   @@map("archivos")
 }
@@ -608,6 +611,9 @@ model Temporada {
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
+  /// Modelos clasificados en esta temporada (F1-E4, FK nullable Restrict).
+  modelos Modelo[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -726,7 +732,9 @@ model CurvaTalla {
   nombre String  @unique
   activo Boolean @default(true)
 
-  items CurvaTallaItem[]
+  items   CurvaTallaItem[]
+  /// Modelos que usan esta curva de tallas (F1-E4, D4 — FK nullable Restrict).
+  modelos Modelo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -905,6 +913,8 @@ model Tela {
 
   /// Colores disponibles de esta tela con su precio (N:N a Color).
   colores TelaColor[]
+  /// Renglones del BOM de modelos que usan esta tela (F1-E4, Restrict hacia la tela).
+  modelos ModeloTela[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -969,6 +979,8 @@ model Avio {
 
   /// Proveedores que surten este avío con su precio (N:N a Proveedor).
   proveedores AvioProveedor[]
+  /// Renglones del BOM de modelos que usan este avío (F1-E4, Restrict hacia el avío).
+  modelos     ModeloAvio[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1032,10 +1044,225 @@ model Bordado {
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo        Boolean     @default(true)
 
+  /// Renglones del BOM de modelos que usan este bordado (F1-E4, Restrict hacia el bordado).
+  modelos ModeloBordado[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
   @@map("bordados")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Modelos (Módulo 2, F1-E4) — el catálogo de productos y su RECETA/BOM completa,
+// más sus fotos en R2 (doc `Documentacion_MJD/01-Modelos.md`). GLOBAL (sin idEmpresa,
+// ADR-0007/A9) con auditoría uniforme (A7) y borrado suave (`activo` = descontinuar).
+//
+// Un `Modelo` (ex tabla `Modelos`) lleva su BOM en tres tablas de enlace —espejo de
+// `ModelosTela`/`ModelosHab`/`ModelosBor` del viejo (doc 01-Modelos §2)—:
+//  • `ModeloTela`  (telas) y `ModeloAvio` (avíos): cada renglón con `consumoPorPrenda` y
+//    las TRES banderas de uso 🔑 `paraPreCosto`/`paraProduccion`/`paraCosto` (doc 01-Modelos
+//    §2: un componente puede costear sin listarse en producción y viceversa — se CONSERVA).
+//  • `ModeloBordado` (bordados/estampados): uno o varios, SIN cantidad y SIN banderas, pero
+//    CON `precio` por renglón (decisión cerrada con Gabriel). `precio` es nullable en BD
+//    para que el ETL de E7 cargue históricos rellenando desde `Bordado.precio`; en la
+//    captura por UI es REQUERIDO y se pre-llena con `Bordado.precio` (editable). Misma
+//    relajación-para-ETL que `Avio.unidad/presentacion` en E3 (ADR-0009).
+// Las fotos (`ModeloFoto`, N por modelo) viven en R2: tabla puente al `Archivo` de F0
+// (A5: nunca por convención de nombre, corrige las fotos en `S:\` del viejo, doc 01-Modelos §6).
+//
+// onDelete (igual que el resto del esquema, F1-E2/E3): Restrict hacia los catálogos en uso
+// (Temporada/CurvaTalla/Genero, y Tela/Avio/Bordado en los renglones del BOM — se desactivan,
+// no se borran físico); Cascade del BOM y las fotos hacia el `Modelo` padre (permite reescribir
+// el set en la transacción A2 y arrastra todo al descontinuar físico —que no pasa: borrado
+// suave—); Cascade en `ModeloFoto`→`Archivo` (mismo criterio que `ProveedorArchivo` de E1B:
+// el objeto R2 huérfano es inofensivo).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Género del modelo (catálogo global, F1-E4). Sembrado con los 8 del sistema viejo
+/// (Caballero, Dama, Niño/Niña Infantil/Juvenil, Bebo, Beba). Mismo patrón que
+/// `RolProveedor`/`TipoProceso`: se siembra + se expone SOLO un selector
+/// (`GET /api/generos` bajo `modelos.ver`); el ABM fino se DIFIERE. Borrado suave + A7.
+model Genero {
+  id     Int     @id @default(autoincrement())
+  /// Nombre del género. Único global (ADR-0007).
+  nombre String  @unique
+  /// Borrado suave (plan §4: patrón conservado del sistema viejo).
+  activo Boolean @default(true)
+
+  /// Modelos de este género (F1-E4, FK nullable Restrict).
+  modelos Modelo[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("generos")
+}
+
+/// Modelo / producto (catálogo global, F1-E4 — ex tabla `Modelos`, doc 01-Modelos §2).
+/// `codigo` es la clave de negocio (única global). `maquilaBase` es el costo de maquila base
+/// que heredan las órdenes (doc 01-Modelos §4 punto 4). `idTemporada`/`idCurvaTalla`/`idGenero`
+/// son FK NULLABLE: el ETL de E7 las poblará y no todos los modelos viejos las traen; la curva
+/// vive en el modelo (D4). NO lleva `idEtiquetaMarca` (se difiere a F7/Costos).
+model Modelo {
+  id          Int      @id @default(autoincrement())
+  /// Código/clave de negocio del modelo. Único global (ADR-0007).
+  codigo      String   @unique
+  descripcion String?
+  /// Costo de maquila base que heredan las órdenes (doc 01-Modelos §4).
+  maquilaBase Decimal? @map("maquila_base") @db.Decimal(12, 2)
+
+  /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
+  idTemporada  Int?        @map("id_temporada")
+  temporada    Temporada?  @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+  /// Curva de tallas del modelo (D4, opcional). Restrict (igual que temporada).
+  idCurvaTalla Int?        @map("id_curva_talla")
+  curvaTalla   CurvaTalla? @relation(fields: [idCurvaTalla], references: [id], onDelete: Restrict)
+  /// Género (opcional; se poblará en el ETL E7). Restrict (igual que temporada).
+  idGenero     Int?        @map("id_genero")
+  genero       Genero?     @relation(fields: [idGenero], references: [id], onDelete: Restrict)
+
+  /// Borrado suave = descontinuar (plan §4: patrón conservado del sistema viejo).
+  activo Boolean @default(true)
+
+  /// Fotos del modelo en R2 (N por modelo).
+  fotos    ModeloFoto[]
+  /// BOM — telas del modelo (N:N a Tela con consumo + banderas).
+  telas    ModeloTela[]
+  /// BOM — avíos del modelo (N:N a Avio con consumo + banderas).
+  avios    ModeloAvio[]
+  /// BOM — bordados/estampados del modelo (N:N a Bordado con precio).
+  bordados ModeloBordado[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("modelos")
+}
+
+/// Tipo de foto del modelo (F1-E4): frente, espalda u otra. `orden` da el orden de
+/// despliegue del carrusel (lo gestiona el dominio; no único en BD).
+enum TipoFotoModelo {
+  FRENTE
+  ESPALDA
+  OTRO
+
+  @@map("tipo_foto_modelo")
+}
+
+/// Foto de un modelo en R2 (F1-E4, R2 — doc 01-Modelos §6: corrige las fotos por nombre en
+/// `S:\` del viejo). Liga un `Archivo` (motor de F0) a un modelo con su tipo y orden. N por
+/// modelo. `onDelete`:
+///  • Cascade hacia `Modelo`: las fotos son del modelo.
+///  • Cascade hacia `Archivo`: al quitar la foto se borra también su `Archivo` (el objeto R2
+///    huérfano es inofensivo — lo documenta `comun/archivos.ts`). Mismo criterio que
+///    `ProveedorArchivo` de E1B.
+model ModeloFoto {
+  id        Int            @id @default(autoincrement())
+  idModelo  Int            @map("id_modelo")
+  idArchivo String         @map("id_archivo")
+  tipo      TipoFotoModelo @default(OTRO)
+  orden     Int            @default(0)
+
+  modelo  Modelo  @relation(fields: [idModelo], references: [id], onDelete: Cascade)
+  archivo Archivo @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idModelo])
+  @@map("modelo_foto")
+}
+
+/// Puente BOM modelo ↔ tela (F1-E4 — ex `ModelosTela`, doc 01-Modelos §2). PK compuesta
+/// (idModelo, idTela): una tela aparece UNA vez por modelo. `consumoPorPrenda` = consumo de
+/// tela por prenda; las TRES banderas 🔑 marcan para qué propósitos cuenta el renglón
+/// (`paraPreCosto`/`paraProduccion`/`paraCosto`, doc 01-Modelos §2 — se conservan). `onDelete`:
+/// Cascade hacia `Modelo` (permite reescribir el BOM en la tx A2); Restrict hacia `Tela` (una
+/// tela usada por un modelo no se borra físico → se desactiva). Auditoría COMPLETA: los
+/// campos son editables (A7).
+model ModeloTela {
+  idModelo         Int     @map("id_modelo")
+  idTela           Int     @map("id_tela")
+  /// Consumo de tela por prenda (doc 01-Modelos §2: `CantTela`).
+  consumoPorPrenda Decimal @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// 🔑 Entra en el PRE-costeo (estimación antes de producir).
+  paraPreCosto     Boolean @default(true) @map("para_pre_costo")
+  /// 🔑 Se considera al PRODUCIR (lo que realmente se manda pedir/usar).
+  paraProduccion   Boolean @default(true) @map("para_produccion")
+  /// 🔑 Entra en el COSTEO real de la orden.
+  paraCosto        Boolean @default(true) @map("para_costo")
+
+  modelo Modelo @relation(fields: [idModelo], references: [id], onDelete: Cascade)
+  tela   Tela   @relation(fields: [idTela], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idModelo, idTela])
+  @@index([idTela])
+  @@map("modelo_tela")
+}
+
+/// Puente BOM modelo ↔ avío (F1-E4 — ex `ModelosHab`, doc 01-Modelos §2). Misma forma que
+/// `ModeloTela` (consumo + 3 banderas 🔑), referenciando `Avio`. PK compuesta (idModelo,
+/// idAvio): un avío aparece UNA vez por modelo. Cascade hacia `Modelo`, Restrict hacia `Avio`.
+model ModeloAvio {
+  idModelo         Int     @map("id_modelo")
+  idAvio           Int     @map("id_avio")
+  /// Consumo de avío por prenda (doc 01-Modelos §2: `CantHab`).
+  consumoPorPrenda Decimal @map("consumo_por_prenda") @db.Decimal(12, 4)
+  /// 🔑 Entra en el PRE-costeo.
+  paraPreCosto     Boolean @default(true) @map("para_pre_costo")
+  /// 🔑 Se considera al PRODUCIR.
+  paraProduccion   Boolean @default(true) @map("para_produccion")
+  /// 🔑 Entra en el COSTEO real.
+  paraCosto        Boolean @default(true) @map("para_costo")
+
+  modelo Modelo @relation(fields: [idModelo], references: [id], onDelete: Cascade)
+  avio   Avio   @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idModelo, idAvio])
+  @@index([idAvio])
+  @@map("modelo_avio")
+}
+
+/// Puente BOM modelo ↔ bordado/estampado (F1-E4 — ex `ModelosBor`, doc 01-Modelos §2). Un
+/// modelo lleva UNO o VARIOS bordados, SIN cantidad y SIN banderas, pero CON `precio` por
+/// renglón (decisión cerrada con Gabriel). PK compuesta (idModelo, idBordado): un bordado
+/// aparece UNA vez por modelo. `precio` es NULLABLE en BD (relajado para que el ETL de E7
+/// cargue históricos rellenando desde `Bordado.precio`); en la captura por UI es REQUERIDO y
+/// se pre-llena con `Bordado.precio` (editable). Cascade hacia `Modelo`, Restrict hacia
+/// `Bordado`. Auditoría COMPLETA: `precio` editable (A7).
+model ModeloBordado {
+  idModelo  Int      @map("id_modelo")
+  idBordado Int      @map("id_bordado")
+  /// Precio del bordado/estampado en este modelo (nullable en BD para el ETL; requerido en UI).
+  precio    Decimal? @db.Decimal(12, 2)
+
+  modelo  Modelo  @relation(fields: [idModelo], references: [id], onDelete: Cascade)
+  bordado Bordado @relation(fields: [idBordado], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idModelo, idBordado])
+  @@index([idBordado])
+  @@map("modelo_bordado")
 }

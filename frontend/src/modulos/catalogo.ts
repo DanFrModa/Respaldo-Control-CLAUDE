@@ -107,7 +107,7 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Catálogo de modelos con fotos y su receta completa (BOM)',
     ruta: '/modelos',
     icono: 'camisa',
-    permisos: 'autenticado',
+    permisos: ['modelos.ver'],
   },
   {
     clave: 'pedidos',

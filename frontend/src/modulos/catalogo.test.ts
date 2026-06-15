@@ -31,9 +31,11 @@ describe('catalogo de modulos del menu', () => {
 
   it('muestra los modulos "autenticado" con cualquier sesion (incluso sin permisos)', () => {
     const visibles = filtrarModulosVisibles(permisos());
-    // Todos menos Administracion son "autenticado" -> 12 visibles sin permisos.
+    // Administracion (permisos admin) y Modelos (modelos.ver, F1-E4) NO son "autenticado";
+    // el resto sí -> 11 visibles sin permisos.
     expect(visibles.map((m) => m.clave)).not.toContain('administracion');
-    expect(visibles).toHaveLength(12);
+    expect(visibles.map((m) => m.clave)).not.toContain('modelos');
+    expect(visibles).toHaveLength(11);
   });
 
   it('oculta Administracion sin un permiso administrativo', () => {
@@ -57,6 +59,8 @@ describe('catalogo de modulos del menu', () => {
       'roles.administrar',
       'empresas.administrar',
       'almacenes.administrar',
+      // Modelos (F1-E4) requiere `modelos.ver` para verse en el menú.
+      'modelos.ver',
     );
     expect(filtrarModulosVisibles(todos)).toHaveLength(13);
   });
