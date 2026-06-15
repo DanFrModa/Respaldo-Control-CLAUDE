@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7, avíos R1 y **Proveedor enriquecido R15** en E1B) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅ y F1-E2 ✅ hechas** (13-jun-2026, verificadas en `prueba`); sigue **F1-E3**. **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
+> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅, F1-E2 ✅ y F1-E3 ✅ hechas** (F1-E3: 14-jun-2026, verificadas en `prueba`); sigue **F1-E4**. **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
 
 ## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
 
@@ -215,7 +215,12 @@
 
 ---
 
-## F1-E3 · Catálogos de materiales: telas unificadas (D5), avíos R1 y bordados con foto R2 — ⬜ pendiente
+## F1-E3 · Catálogos de materiales: telas unificadas (D5), avíos R1 y bordados con foto R2 — ✅ hecha (14-jun-2026, en `prueba`)
+
+> **CIERRE (14-jun-2026).** Entregada por 3 coders + integrador + reviewer independiente (aprobado), verificada por Gabriel en `prueba` (foto de bordado subiendo a R2 real). PR #29; hotfixes de R2 #30/#31.
+> - **Qué quedó:** 6 tablas de materiales (TelaCategoria, Tela, TelaColor, Avío, AvioProveedor, Bordado) + 2 enums. Telas unificadas (D5); avíos R1 (N proveedores, genéricos R4, `precioReferencia` como fallback de precio, `unidad`/`presentacion` NULLABLE); bordados R2 con foto presigned + galería móvil + componente `SubidaImagen` reutilizable (lo hereda E4). Decisiones en [`docs/arquitectura/ADR-0009`](../arquitectura/ADR-0009-materiales-f1e3.md). 6 permisos nuevos + seed (rol `Basico` sin ellos).
+> - **Trampas de R2 del despliegue real** (para `docs/GUIA-RAILWAY-R2.md` y E4, que también sube fotos): (1) el token S3 debe ser **Object Read & Write** con alcance al bucket — Read-only da `403 AccessDenied` en el PUT (se ve como "error de CORS"); (2) el SDK v3 de AWS añade checksum CRC32 por defecto que R2 rechaza → `requestChecksumCalculation: 'WHEN_REQUIRED'` en el cliente; (3) **no firmar** content-length/content-type en el PUT prefirmado (el navegador los maneja como headers especiales); (4) la política **CORS** del bucket (PUT/GET + el origin del front); (5) `BETTER_AUTH_URL` al dominio público del front (si no, falla cerrar sesión / 401 de sesión).
+> - **Abierto (tarea aparte):** "eliminar definitivamente" en catálogos (solo admin, solo desactivados sin referencias) — pedido por Gabriel, sin arrancar.
 
 **Objetivo:** Construir los tres catálogos complejos que alimentan el BOM. Va después de E1 porque Tela×Color necesita el catálogo Color y AvioProveedor necesita Proveedor. Bordados estrena el flujo real de archivos R2 (presigned URLs, motor de F0) y entrega el componente de subida de imagen que E4 reutiliza. Las decisiones de diseño se cierran con Gabriel ANTES de codificar: criterio de unificación Telas/TelasDis, lista inicial de unidades de medida/presentaciones de avíos, y el fallback del precio histórico de avíos sin proveedor identificable (insumo del ETL de E6 y del costeo de F7 — se decide AQUÍ para no descubrirlo en E6).
 
