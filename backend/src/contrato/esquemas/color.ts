@@ -100,3 +100,43 @@ export const esquemaColoresPagina = z
 
 /** Forma de la respuesta paginada de colores. */
 export type ColoresPagina = z.infer<typeof esquemaColoresPagina>;
+
+/**
+ * Fusión de colores duplicados (F1-E6): reasigna las referencias de uno o varios
+ * colores ORIGEN (duplicados/alias) a un color DESTINO (el canónico que se conserva)
+ * y desactiva los orígenes. Resuelve la deuda de la normalización: en el viejo el
+ * color era texto libre, así que la carga histórica deja alias ("NEGRO A"/"NEGRO B")
+ * que aquí se consolidan en uno solo SIN perder las telas que ya lo usaban.
+ *
+ * `origenes` es ≥1 (varios duplicados de golpe), sin el destino dentro y sin repetir.
+ */
+export const esquemaColorFusionar = z
+  .object({
+    idDestino: z
+      .number({ error: 'El color que se conserva es obligatorio' })
+      .int({ error: 'El id del color destino debe ser entero' })
+      .positive({ error: 'El id del color destino debe ser positivo' })
+      .describe('Id del color CANÓNICO que se conserva (destino de la fusión).'),
+    origenes: z
+      .array(
+        z
+          .number({ error: 'Cada color a fusionar debe ser un número' })
+          .int({ error: 'El id de un color a fusionar debe ser entero' })
+          .positive({ error: 'El id de un color a fusionar debe ser positivo' }),
+      )
+      .min(1, { error: 'Elige al menos un color duplicado para fusionar' })
+      .max(50, { error: 'No se pueden fusionar más de 50 colores de una vez' })
+      .describe('Ids de los colores DUPLICADOS que se absorben en el destino.'),
+  })
+  .refine((datos) => !datos.origenes.includes(datos.idDestino), {
+    error: 'El color que se conserva no puede estar también en la lista de duplicados',
+    path: ['origenes'],
+  })
+  .refine((datos) => new Set(datos.origenes).size === datos.origenes.length, {
+    error: 'No repitas un color en la lista de duplicados',
+    path: ['origenes'],
+  })
+  .describe('Fusión de colores duplicados: orígenes → destino canónico.');
+
+/** Datos validados de una fusión de colores. */
+export type DatosColorFusionar = z.infer<typeof esquemaColorFusionar>;

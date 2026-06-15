@@ -1266,3 +1266,52 @@ model ModeloBordado {
   @@index([idBordado])
   @@map("modelo_bordado")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Migración del sistema viejo (F1-E6, ETL) — tabla de MAPEO clave-vieja → id-nuevo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Mapeo PERSISTIDO entre la clave de un registro del sistema viejo (Access) y el id
+/// de la entidad nueva que lo reemplaza (F1-E6, ETL de catálogos). Es un entregable
+/// CLAVE del ETL: lo reutilizan los ETLs de fases futuras (E7 modelos, F2 pedidos, F4
+/// inventarios, F9 finanzas) para traducir las FKs viejas (p. ej. `OrdenesDet.IdOrdenes`,
+/// `Modelos.IdTemporadas`) sin re-derivar la correspondencia.
+///
+/// Diseño GENÉRICO (una sola tabla para todas las correspondencias) en vez de una columna
+/// `legacyId` por entidad:
+///  • `entidad`     — qué clase de cosa se mapea, en el nombre del modelo nuevo más un
+///                    sufijo de fuente cuando una entidad nueva absorbe varias viejas. Claves
+///                    estables usadas por el ETL (ver `migracion/comun/mapeo.ts`):
+///                    "Color" (texto→idColor), "Tela:IdTelas" y "Tela:IdTelasDis"
+///                    (las DOS tablas viejas que se unifican en `Tela`), "Proveedor:IdProveedor",
+///                    "Proveedor:IdMaquileros", "Proveedor:IdEstampadores", "Proveedor:IdCortadores"
+///                    (la fusión de terceros), "Cliente", "EtiquetaMarca", "Bordado", "Avio",
+///                    "Genero", "Almacen:IPT" / "Almacen:Tela", "TelaCategoria", "Empresa", etc.
+///  • `claveVieja`  — el id (o texto, p. ej. el nombre de color) del sistema viejo, SIEMPRE
+///                    como texto (las PKs viejas son Int; el color es texto libre). Único por
+///                    `(entidad, claveVieja)`.
+///  • `idNuevo`     — id de la entidad nueva, como texto (cubre PKs Int y, a futuro, String).
+///  • `datos`       — JSON opcional con contexto de la decisión (p. ej. el nombre original,
+///                    si hubo dedup/fusión, el sufijo de desambiguación aplicado…). Auditable.
+///
+/// IDEMPOTENCIA (§7): el ETL hace upsert por `(entidad, claveVieja)`, así re-ejecutarlo no
+/// duplica filas ni rompe el mapeo. No lleva auditoría A7 (es metadato técnico de migración,
+/// no una entidad de negocio): solo `creadoEn`/`modificadoEn`.
+model MapeoMigracion {
+  id         Int      @id @default(autoincrement())
+  /// Clase de correspondencia (nombre del modelo nuevo + sufijo de fuente). Ver TSDoc.
+  entidad    String
+  /// Clave del registro viejo (id Int o texto), SIEMPRE como texto.
+  claveVieja String   @map("clave_vieja")
+  /// Id del registro nuevo, como texto (cubre PKs Int y String).
+  idNuevo    String   @map("id_nuevo")
+  /// Contexto de la decisión (nombre original, dedup/fusión, sufijo…), opcional.
+  datos      Json?
+
+  creadoEn     DateTime @default(now()) @map("creado_en")
+  modificadoEn DateTime @updatedAt @map("modificado_en")
+
+  @@unique([entidad, claveVieja])
+  @@index([entidad, idNuevo])
+  @@map("mapeo_migracion")
+}

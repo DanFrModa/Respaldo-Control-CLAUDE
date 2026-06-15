@@ -1,0 +1,89 @@
+/**
+ * Mapeos de códigos del sistema viejo a los enums de v2 (F1-E6, ETL). Funciones puras,
+ * cubiertas por tests unitarios.
+ */
+import type { TipoBordadoClave } from '../../src/contrato/esquemas/bordado.js';
+import type { TipoComponenteTelaClave } from '../../src/contrato/esquemas/tela.js';
+import type { TipoProveedorClave } from '../../src/contrato/esquemas/proveedor.js';
+
+/**
+ * `Proveedores.TipoProv` (H/T/S, doc 03-Producción §Órdenes de Compra) → enum `TipoProveedor`.
+ *  • H → AVIOS (habilitación)
+ *  • T → TELAS
+ *  • S → SERVICIOS
+ *  • vacío / desconocido → SIN_CLASIFICAR
+ */
+export function mapearTipoProveedor(tipoProv: string | undefined | null): TipoProveedorClave {
+  switch ((tipoProv ?? '').trim().toUpperCase()) {
+    case 'H':
+      return 'AVIOS';
+    case 'T':
+      return 'TELAS';
+    case 'S':
+      return 'SERVICIOS';
+    default:
+      return 'SIN_CLASIFICAR';
+  }
+}
+
+/**
+ * `Proveedores.TipoProv` (H/T/S) → CÓDIGO de rol de `RolProveedor` (kebab-case sembrado en
+ * `prisma/seed.ts`, `ROLES_PROVEEDOR_BASE`). A diferencia de `mapearTipoProveedor` (que da el
+ * enum `tipo`, clasificador rápido), este da el ROL de servicio que el proveedor presta —
+ * lo que F4-Compras/MRP filtra:
+ *  • T → `vende-telas`
+ *  • H → `vende-avios` (habilitación)
+ *  • S / vacío / desconocido → `otros-servicios`
+ *
+ * Los tres códigos existen en el catálogo base (seed); el dominio exige ≥1 rol y este SIEMPRE
+ * devuelve uno (nunca cadena vacía), así que cumple la regla.
+ */
+export function mapearRolProveedorComercial(tipoProv: string | undefined | null): string {
+  switch ((tipoProv ?? '').trim().toUpperCase()) {
+    case 'T':
+      return 'vende-telas';
+    case 'H':
+      return 'vende-avios';
+    default:
+      // S, vacío o cualquier otro código no reconocido.
+      return 'otros-servicios';
+  }
+}
+
+/**
+ * `Bordados.BorEst` → enum `TipoBordado`. En el viejo `BorEst` distingue bordado real de
+ * estampado/aplicación: `0`/vacío = BORDADO, distinto de 0 = ESTAMPADO.
+ */
+export function mapearTipoBordado(borEst: string | undefined | null): TipoBordadoClave {
+  const t = (borEst ?? '').trim();
+  if (t === '' || t === '0') {
+    return 'BORDADO';
+  }
+  const n = Number(t);
+  if (Number.isFinite(n)) {
+    return n === 0 ? 'BORDADO' : 'ESTAMPADO';
+  }
+  // Texto no numérico distinto de vacío: lo tratamos como estampado (señal de no-bordado).
+  return 'ESTAMPADO';
+}
+
+/**
+ * `Telas.Texto1`/`Texto2` (etiquetas de componente, p. ej. "Felpa"/"Cardigan", doc
+ * 04-Inventarios §B.1) → enum `TipoComponenteTela`. Heurística: si el texto del componente
+ * principal menciona "cardigan", es CARDIGAN; si menciona cuerpo/felpa/terry (telas de
+ * cuerpo típicas), CUERPO; en otro caso OTRO. Es una clasificación informativa (D5); la
+ * decisión fina la podrá ajustar Gabriel en la UI.
+ */
+export function mapearTipoComponente(
+  texto1: string | undefined | null,
+  texto2: string | undefined | null,
+): TipoComponenteTelaClave {
+  const t = `${texto1 ?? ''} ${texto2 ?? ''}`.toLowerCase();
+  if (t.includes('cardigan')) {
+    return 'CARDIGAN';
+  }
+  if (t.includes('cuerpo') || t.includes('felpa') || t.includes('terry') || t.includes('jersey')) {
+    return 'CUERPO';
+  }
+  return 'OTRO';
+}

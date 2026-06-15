@@ -13,6 +13,7 @@ import {
   esquemaColorEditar,
   esquemaColoresPagina,
   esquemaColoresQuery,
+  esquemaColorFusionar,
   esquemaColorSalida,
   esquemaErrorApi,
 } from '../../contrato/index.js';
@@ -23,6 +24,7 @@ import {
   actualizarColor,
   crearColor,
   desactivarColor,
+  fusionarColores,
   listarColores,
   obtenerColor,
 } from '../../dominio/catalogos/colores.js';
@@ -146,6 +148,24 @@ export const rutasColores: FastifyPluginCallbackZod = (app, _opciones, done) => 
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const color = await actualizarColor(sesion, { ...request.body, id: request.params.id });
       return aColorSalida(color);
+    },
+  });
+
+  // ── Fusionar duplicados (origen(es) → destino canónico) ────────────────────
+  app.route({
+    method: 'POST',
+    url: '/colores/fusionar',
+    preHandler: app.conPermiso('colores.administrar'),
+    schema: {
+      tags: ['colores'],
+      summary: 'Fusionar colores duplicados en uno canónico',
+      security: SEGURIDAD_SESION,
+      body: esquemaColorFusionar,
+      response: { 200: esquemaColorSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return aColorSalida(await fusionarColores(sesion, request.body));
     },
   });
 
