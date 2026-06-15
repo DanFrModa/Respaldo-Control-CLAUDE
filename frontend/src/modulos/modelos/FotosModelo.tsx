@@ -11,11 +11,25 @@ import {
   type TipoFotoModelo,
 } from '@/api/modelos';
 import { SubidaImagen } from '@/componentes/SubidaImagen';
+import { VisorImagen } from '@/componentes/VisorImagen';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { ETIQUETAS_TIPO_FOTO_MODELO, TIPOS_FOTO_MODELO } from './esquemas';
+
+/**
+ * Nombre de archivo para descargar una foto: usa el nombre original del `Archivo` si viene; si
+ * no, arma `<codigoModelo>-<tipo>.<ext>` (la extensión se deriva del `tipoMime`, default jpg).
+ */
+function nombreDescarga(foto: ModeloFoto, codigoModelo: string): string {
+  if (foto.nombreOriginal.trim() !== '') {
+    return foto.nombreOriginal;
+  }
+  const ext = foto.tipoMime.split('/')[1] ?? 'jpg';
+  const codigo = codigoModelo.trim() === '' ? 'modelo' : codigoModelo;
+  return `${codigo}-${foto.tipo.toLowerCase()}.${ext}`;
+}
 
 /**
  * Fotos de UN modelo (F1-E4): la GALERÍA de las N fotos del modelo + un control para subir una
@@ -48,6 +62,8 @@ export function FotosModelo({
 
   // Tipo elegido para la PRÓXIMA foto a subir (por defecto FRENTE: lo más común al empezar).
   const [tipoNueva, setTipoNueva] = useState<TipoFotoModelo>('FRENTE');
+  // Foto abierta en el visor ampliado (lightbox), o `null` si está cerrado.
+  const [fotoAmpliada, setFotoAmpliada] = useState<ModeloFoto | null>(null);
 
   function alElegirArchivo(archivo: File): void {
     subir.mutate(
@@ -116,12 +132,21 @@ export function FotosModelo({
               data-testid={`foto-modelo-${foto.idFoto}`}
             >
               <div className="relative size-32 overflow-hidden rounded-xl border bg-muted">
-                <img
-                  src={foto.urlDescarga}
-                  alt={`${ETIQUETAS_TIPO_FOTO_MODELO[foto.tipo]} de ${nombre}`}
-                  className="size-full object-cover"
-                />
-                <span className="absolute top-1 left-1 rounded-full bg-background/85 px-1.5 text-[10px] font-medium text-foreground">
+                {/* Miniatura clicable: abre el visor ampliado (lightbox). */}
+                <button
+                  type="button"
+                  className="block size-full cursor-zoom-in"
+                  onClick={() => setFotoAmpliada(foto)}
+                  aria-label={`Ver en grande la foto ${ETIQUETAS_TIPO_FOTO_MODELO[foto.tipo]} de ${nombre}`}
+                  data-testid={`ampliar-foto-modelo-${foto.idFoto}`}
+                >
+                  <img
+                    src={foto.urlDescarga}
+                    alt={`${ETIQUETAS_TIPO_FOTO_MODELO[foto.tipo]} de ${nombre}`}
+                    className="size-full object-cover"
+                  />
+                </button>
+                <span className="pointer-events-none absolute top-1 left-1 rounded-full bg-background/85 px-1.5 text-[10px] font-medium text-foreground">
                   {ETIQUETAS_TIPO_FOTO_MODELO[foto.tipo]}
                 </span>
                 {puedeAdministrar ? (
@@ -195,6 +220,23 @@ export function FotosModelo({
             testid="foto-modelo"
           />
         </div>
+      ) : null}
+
+      {/* Visor ampliado (lightbox) con botón Descargar (descarga vía fetch→blob, A5). */}
+      {fotoAmpliada !== null ? (
+        <VisorImagen
+          abierto
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) {
+              setFotoAmpliada(null);
+            }
+          }}
+          url={fotoAmpliada.urlDescarga}
+          textoAlt={`${ETIQUETAS_TIPO_FOTO_MODELO[fotoAmpliada.tipo]} de ${nombre}`}
+          nombreArchivo={nombreDescarga(fotoAmpliada, nombre)}
+          alErrorDescarga={(mensaje) => toast.error(mensaje)}
+          testid="foto-modelo"
+        />
       ) : null}
     </div>
   );
