@@ -77,6 +77,14 @@ export interface PropsListaDetalle<T> {
   /** Texto del estado vacio (cuando no hay coincidencias). */
   textoVacio: string;
   paginacion?: PaginacionListaDetalle | undefined;
+  /**
+   * Id a seleccionar al montar (o cuando cambia): para deep-links (p. ej. abrir la ficha de UN
+   * modelo desde la galeria). Solo surte efecto si ese id esta entre los `registros` visibles;
+   * la pantalla es responsable de asegurarlo (p. ej. inyectando el registro). `null`/`undefined`
+   * = sin seleccion forzada (comportamiento por defecto: el primero). Se respeta la seleccion
+   * manual posterior del usuario (solo dispara cuando el id cambia).
+   */
+  seleccionInicialId?: string | number | null | undefined;
 
   // ── Detalle / acciones ───────────────────────────────────────────────────────
   puedeAdministrar: boolean;
@@ -122,6 +130,7 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     alAlternarInactivos,
     textoVacio,
     paginacion,
+    seleccionInicialId,
     puedeAdministrar,
     alNuevo,
     textoNuevo,
@@ -138,11 +147,37 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
   const [seleccionadoId, setSeleccionadoId] = useState<string | number | null>(null);
   // En movil, que panel se ve (en escritorio ambos son visibles por CSS).
   const [vistaMovil, setVistaMovil] = useState<'lista' | 'detalle'>('lista');
+  // Ultimo deep-link aplicado: evita re-forzar la seleccion tras un cambio manual del usuario
+  // (solo se aplica cuando `seleccionInicialId` cambia a un valor nuevo no nulo).
+  const [ultimoDeepLink, setUltimoDeepLink] = useState<string | number | null>(null);
 
-  // Registro seleccionado derivado: el de `seleccionadoId`, o el primero si ese
-  // ya no esta (se filtro/desactivo). `undefined` si la lista esta vacia.
+  // ¿Hay un deep-link nuevo (no aplicado aun) y ese registro esta visible? Tiene PRIORIDAD sobre
+  // la seleccion derivada para que no la pise el fallback "cae al primero" (evita una carrera
+  // entre efectos). La pantalla asegura que el registro este en `registros` (inyectandolo).
+  const deepLinkPendiente =
+    seleccionInicialId !== null &&
+    seleccionInicialId !== undefined &&
+    seleccionInicialId !== ultimoDeepLink &&
+    registros.some((registro) => obtenerId(registro) === seleccionInicialId)
+      ? seleccionInicialId
+      : null;
+
+  // Registro seleccionado derivado: el deep-link pendiente (prioridad), luego `seleccionadoId`,
+  // y si ese ya no esta (se filtro/desactivo) cae al primero. `undefined` si la lista esta vacia.
+  const idEfectivo = deepLinkPendiente ?? seleccionadoId;
   const seleccionado =
-    registros.find((registro) => obtenerId(registro) === seleccionadoId) ?? registros[0];
+    registros.find((registro) => obtenerId(registro) === idEfectivo) ?? registros[0];
+
+  // Aplica el deep-link UNA vez (marca `ultimoDeepLink`, fija la seleccion y abre el detalle en
+  // movil). Al marcarlo, `deepLinkPendiente` pasa a null y la seleccion la gobierna ya el usuario.
+  useEffect(() => {
+    if (deepLinkPendiente === null) {
+      return;
+    }
+    setSeleccionadoId(deepLinkPendiente);
+    setVistaMovil('detalle');
+    setUltimoDeepLink(deepLinkPendiente);
+  }, [deepLinkPendiente]);
 
   // Si el seleccionado desaparece de la lista, cae al primero (o a ninguno).
   useEffect(() => {

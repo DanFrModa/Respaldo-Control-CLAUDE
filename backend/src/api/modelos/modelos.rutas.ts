@@ -43,6 +43,7 @@ import {
   esquemaModeloSalida,
   esquemaModelosPagina,
   esquemaModelosQuery,
+  esquemaModeloCodigosBarraSalida,
 } from '../../contrato/esquemas/modelo.js';
 import type { Genero } from '../../datos/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -53,6 +54,7 @@ import {
   descontinuarModelo,
   listarGeneros,
   listarModelos,
+  obtenerCodigosBarra,
   type ModeloConRelaciones,
 } from '../../dominio/modelos/modelos.js';
 import {
@@ -92,6 +94,8 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     idGenero: modelo.idGenero,
     genero: modelo.genero?.nombre ?? null,
     cantidadFotos: modelo._count.fotos,
+    // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
+    urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,
     activo: modelo.activo,
     creadoEn: modelo.creadoEn.toISOString(),
     creadoPorId: modelo.creadoPorId,
@@ -283,6 +287,38 @@ export const rutasModelos: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return aModeloFichaSalida(await obtenerFichaModelo(sesion, request.params.id));
+    },
+  });
+
+  // ── Códigos de barra del modelo (EAN-13 + DUN-14) para la empresa activa ────
+  app.route({
+    method: 'GET',
+    url: '/modelos/:id/codigos-barra',
+    preHandler: app.conPermiso('modelos.codigos-barra'),
+    schema: {
+      tags: ['modelos'],
+      summary: 'Generar los códigos de barra (EAN-13 / DUN-14) de un modelo',
+      description:
+        'Calcula el EAN-13 y el DUN-14 del modelo usando el prefijo UPC de la EMPRESA ACTIVA ' +
+        'de la sesión (Empresa.upc). Si la empresa no tiene UPC capturado, o prefijo+código no ' +
+        'suman 12 dígitos, responde 400 con un mensaje legible.',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaModeloCodigosBarraSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const codigos = await obtenerCodigosBarra(sesion, request.params.id);
+      return {
+        idModelo: codigos.idModelo,
+        codigoModelo: codigos.codigoModelo,
+        idEmpresa: codigos.idEmpresa,
+        nombreEmpresa: codigos.nombreEmpresa,
+        prefijo: codigos.prefijo,
+        base12: codigos.base12,
+        ean13: codigos.ean13,
+        dun14: codigos.dun14,
+      };
     },
   });
 

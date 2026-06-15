@@ -24,6 +24,7 @@ import {
 import type { Genero, Modelo, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
+import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
@@ -33,6 +34,7 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { calcularCodigosBarra, ErrorCodigoBarra, type CodigosBarra } from './codigos-barra.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -54,6 +56,12 @@ export type ModeloConRelaciones = Modelo & {
   curvaTalla: { nombre: string } | null;
   genero: { nombre: string } | null;
   _count: { fotos: number };
+  /**
+   * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
+   * fotos. La resuelve el LISTADO en una sola consulta (sin N+1) para la galería; en las demás
+   * salidas (alta/edición/ficha) viene `null` (no aplica) y la proyección la serializa como tal.
+   */
+  urlFotoPrincipal?: string | null;
 };
 
 /** `include` estándar para traer nombres de relaciones + conteo de fotos. */
@@ -459,6 +467,7 @@ export async function listarModelos(
   sesion: SesionUsuario,
   parametros: ParametrosListarModelos = {},
   bd?: ContextoBd,
+  archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<Pagina<ModeloConRelaciones>> {
   verificarPermiso(sesion, 'modelos.ver');
   const filtros = validarEntrada(esquemaListarModelosDominio, parametros);
@@ -487,7 +496,57 @@ export async function listarModelos(
     }),
   ]);
 
-  return armarPagina(datos, total, filtros);
+  const conFoto = await adjuntarFotoPrincipal(cliente, datos, archivos);
+  return armarPagina(conFoto, total, filtros);
+}
+
+/**
+ * Resuelve la FOTO PRINCIPAL de cada modelo de la página en UNA sola consulta (sin N+1) y
+ * adjunta su URL de descarga prefirmada (`urlFotoPrincipal`), para que la galería pinte la
+ * miniatura sin pedir una foto por celda. La "principal" es la primera por `orden` (luego `id`)
+ * — la misma que encabeza el carrusel del modelo. Modelos sin fotos quedan con `null`.
+ *
+ * Detalle de la consulta única: se traen TODAS las fotos de los modelos de la página de un
+ * golpe (`idModelo in [...]`), ordenadas; al recorrerlas, la PRIMERA de cada modelo es su
+ * principal (el resto se ignora). Las URLs prefirmadas se generan en paralelo.
+ */
+async function adjuntarFotoPrincipal(
+  cliente: ReturnType<typeof clienteLectura>,
+  modelos: ModeloConRelaciones[],
+  archivos: ServicioArchivos,
+): Promise<ModeloConRelaciones[]> {
+  const conFotos = modelos.filter((m) => m._count.fotos > 0).map((m) => m.id);
+  if (conFotos.length === 0) {
+    return modelos.map((m) => ({ ...m, urlFotoPrincipal: null }));
+  }
+
+  const fotos = await cliente.modeloFoto.findMany({
+    where: { idModelo: { in: conFotos } },
+    orderBy: [{ orden: 'asc' }, { id: 'asc' }],
+    select: { idModelo: true, archivo: { select: { key: true } } },
+  });
+
+  // La primera foto de cada modelo (por el orden de la consulta) es su principal.
+  const keyPrincipalPorModelo = new Map<number, string>();
+  for (const foto of fotos) {
+    if (!keyPrincipalPorModelo.has(foto.idModelo)) {
+      keyPrincipalPorModelo.set(foto.idModelo, foto.archivo.key);
+    }
+  }
+
+  // Genera las URLs prefirmadas (una por modelo CON foto) en paralelo.
+  const urlPorModelo = new Map<number, string>(
+    await Promise.all(
+      [...keyPrincipalPorModelo.entries()].map(
+        async ([idModelo, key]): Promise<[number, string]> => [
+          idModelo,
+          await archivos.urlDescarga(key),
+        ],
+      ),
+    ),
+  );
+
+  return modelos.map((m) => ({ ...m, urlFotoPrincipal: urlPorModelo.get(m.id) ?? null }));
 }
 
 // ── Género (catálogo selector, R bajo `modelos.ver`) ──────────────────────────
@@ -507,4 +566,68 @@ export async function listarGeneros(
     where: opciones.incluirInactivos === true ? {} : { activo: true },
     orderBy: { nombre: 'asc' },
   });
+}
+
+// ── Códigos de barra (F1-E5 — generador del viejo form `Codigo`) ───────────────
+
+/** Códigos de barra de un modelo + el contexto de empresa (para el impreso y la UI). */
+export interface CodigosBarraModelo extends CodigosBarra {
+  idModelo: number;
+  idEmpresa: number;
+  nombreEmpresa: string;
+}
+
+/**
+ * Genera el EAN-13 y DUN-14 de un modelo para la EMPRESA ACTIVA de la sesión (F1-E5),
+ * usando el prefijo UPC de la empresa (`Empresa.upc`) — NO los prefijos hardcodeados del
+ * viejo form `Codigo` (ese era un bug, ver `codigos-barra.ts`). El cálculo en sí es PURO
+ * (`calcularCodigosBarra`); aquí solo se resuelven los insumos desde BD:
+ *  • el `codigo` del modelo (404 si no existe),
+ *  • el `upc` de la empresa activa de la sesión (404 si la empresa ya no existe).
+ *
+ * Si la empresa no tiene UPC capturado, o si prefijo+código no dan los 12 dígitos exactos,
+ * se lanza `ErrorValidacion` (400) con el MENSAJE legible del cálculo — nunca un 500 técnico —
+ * para que el frontend lo muestre tal cual ("la empresa no tiene prefijo UPC", etc.).
+ * Permiso requerido: `modelos.codigos-barra` (solo lectura).
+ */
+export async function obtenerCodigosBarra(
+  sesion: SesionUsuario,
+  idModelo: number,
+  bd?: ContextoBd,
+): Promise<CodigosBarraModelo> {
+  verificarPermiso(sesion, 'modelos.codigos-barra');
+  const cliente = clienteLectura(bd);
+
+  const modelo = await cliente.modelo.findUnique({
+    where: { id: idModelo },
+    select: { codigo: true },
+  });
+  if (modelo === null) {
+    throw new ErrorNoEncontrado('Modelo', idModelo);
+  }
+
+  const empresa = await cliente.empresa.findUnique({
+    where: { id: sesion.idEmpresaActiva },
+    select: { upc: true, nombre: true },
+  });
+  if (empresa === null) {
+    throw new ErrorNoEncontrado('Empresa', sesion.idEmpresaActiva);
+  }
+
+  try {
+    const codigos = calcularCodigosBarra(empresa.upc ?? '', modelo.codigo);
+    return {
+      ...codigos,
+      idModelo,
+      idEmpresa: sesion.idEmpresaActiva,
+      nombreEmpresa: empresa.nombre,
+    };
+  } catch (error) {
+    if (error instanceof ErrorCodigoBarra) {
+      // Traduce el error PURO a un error de dominio (código estable → 400), conservando
+      // el mensaje legible para el usuario.
+      throw new ErrorValidacion(error.message, { causa: error });
+    }
+    throw error;
+  }
 }

@@ -44,12 +44,15 @@ export function estadoSesionDePrueba(
   };
 }
 
+/** Entrada inicial del router en memoria: una ruta (string) o un objeto con `state` (deep-links). */
+export type EntradaRuta = string | { pathname: string; state?: unknown };
+
 /** Opciones para {@link renderConProveedores}. */
 interface OpcionesRender extends Omit<RenderOptions, 'wrapper'> {
   /** Estado de sesion a proveer (por defecto: sesion cargada sin permisos). */
   sesion?: EstadoSesion;
-  /** Ruta inicial del router en memoria. */
-  rutaInicial?: string;
+  /** Ruta inicial del router en memoria (string o `{ pathname, state }` para deep-links). */
+  rutaInicial?: EntradaRuta;
   /** QueryClient a usar (por defecto uno nuevo y aislado). */
   queryClient?: QueryClient;
 }

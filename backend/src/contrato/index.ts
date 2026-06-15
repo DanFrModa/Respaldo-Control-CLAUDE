@@ -298,6 +298,8 @@ export {
   esquemaModeloFotoSalida,
   esquemaModeloFotosLista,
   esquemaModeloFotoEditarCuerpo,
+  esquemaModeloCodigosBarraSalida,
+  type ModeloCodigosBarraSalida,
   type TipoFotoModeloClave,
   type GeneroSalida,
   type DatosModeloCrear,

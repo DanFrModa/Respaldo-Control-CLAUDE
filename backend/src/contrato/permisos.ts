@@ -638,6 +638,16 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/bordados) y fotos (alta, edición, desactivación)',
   },
+  // ── Generador de códigos de barra (F1-E5, Módulo 1 del viejo → form `Codigo`) ─
+  // Permiso de SOLO LECTURA: generar/ver/imprimir el EAN-13 y DUN-14 de un modelo para la
+  // empresa activa (prefijo de `Empresa.upc`). Es una sub-función del módulo Modelos
+  // (misma fila que `modelos.ver`); no muta datos. Como es de lectura, los roles que ven
+  // modelos lo heredan (el seed lo incluye salvo donde se restrinja explícitamente).
+  {
+    clave: 'modelos.codigos-barra',
+    modulo: 'modelos',
+    descripcion: 'Generar y descargar los códigos de barra (EAN-13 / DUN-14) de un modelo',
+  },
 ] as const satisfies readonly DefinicionPermiso[];
 
 /**

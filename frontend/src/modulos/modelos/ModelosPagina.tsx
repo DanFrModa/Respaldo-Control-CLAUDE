@@ -8,7 +8,8 @@ import {
   Tag,
   Users,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
@@ -45,6 +46,39 @@ function formatearPrecio(precio: number): string {
 }
 
 /**
+ * Lee de forma DEFENSIVA el `idModelo` del state de navegación (deep-link desde la galería).
+ * Devuelve el id si viene un entero positivo válido; si no hay state o no es válido, `null`
+ * (comportamiento por defecto intacto).
+ */
+function leerIdDeepLink(state: unknown): number | null {
+  if (typeof state !== 'object' || state === null || !('idModelo' in state)) {
+    return null;
+  }
+  const id = state.idModelo;
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Devuelve los registros a mostrar, inyectando al principio el modelo del deep-link si su ficha
+ * ya cargó y NO está en la página visible (así `ListaDetalle` puede seleccionarlo y abrir su
+ * ficha aunque la paginación/filtro lo dejen fuera). Si no hay deep-link o ya está presente,
+ * devuelve la lista tal cual.
+ */
+function conDeepLinkInyectado(
+  visibles: readonly Modelo[],
+  fichaDeepLink: Modelo | undefined,
+  idAbrir: number | null,
+): readonly Modelo[] {
+  if (idAbrir === null || fichaDeepLink === undefined || fichaDeepLink.id !== idAbrir) {
+    return visibles;
+  }
+  if (visibles.some((m) => m.id === idAbrir)) {
+    return visibles;
+  }
+  return [fichaDeepLink, ...visibles];
+}
+
+/**
  * Pantalla de Modelos (Módulo 2, F1-E4) sobre el motor LISTA + DETALLE ("Teal fresco"). Lista
  * con búsqueda (debounce, por código/descripción), filtro por temporada, paginación de SERVIDOR
  * (volumen alto) y toggle de descontinuados. El detalle muestra los datos generales, las FOTOS
@@ -57,6 +91,22 @@ function formatearPrecio(precio: number): string {
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('modelos.administrar');
+
+  // Deep-link desde la galería (u otra vista): `state.idModelo` abre la ficha de ESE modelo.
+  const navigate = useNavigate();
+  const location = useLocation();
+  const idDeepLink = leerIdDeepLink(location.state);
+  // Lo guardamos en estado local para que sobreviva al `navigate(..., { state: null })` que
+  // limpia el state del historial (evita re-disparar en un refresh o al volver).
+  const [idAbrir, setIdAbrir] = useState<number | null>(idDeepLink);
+  useEffect(() => {
+    if (idDeepLink !== null) {
+      setIdAbrir(idDeepLink);
+      // Consume el state: limpia el historial para que un refresh/volver no lo re-aplique.
+      // navigate() es asíncrono en React Router 7; no necesitamos esperarlo.
+      void navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [idDeepLink, location.pathname, navigate]);
 
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
@@ -75,6 +125,10 @@ export function ModelosPagina(): React.JSX.Element {
   };
 
   const consulta = useModelos(query);
+  // Deep-link: trae la ficha del modelo a abrir (datos generales + BOM). Sirve para SELECCIONARLO
+  // aunque no esté en la página/filtro visibles (se inyecta en la lista). Deshabilitada si no
+  // hay deep-link. `ModeloFicha` es un superconjunto de `Modelo`, así que sirve como registro.
+  const fichaDeepLink = useFichaModelo(idAbrir ?? undefined);
   const temporadas = useTemporadas({
     pagina: 1,
     porPagina: 100,
@@ -145,6 +199,11 @@ export function ModelosPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Registros a mostrar. Si hay deep-link y el modelo NO está en la página visible, lo
+  // inyectamos al principio para que `ListaDetalle` pueda seleccionarlo y abrir su ficha (sin
+  // depender de la paginación/filtro). El conteo del paginador (servidor) no se altera.
+  const registros = conDeepLinkInyectado(datos?.datos ?? [], fichaDeepLink.data, idAbrir);
+
   return (
     <>
       <ListaDetalle<Modelo>
@@ -152,7 +211,8 @@ export function ModelosPagina(): React.JSX.Element {
         titulo="Modelos"
         descripcion="Catálogo de modelos con sus fotos y su receta (BOM)."
         icono={Shirt}
-        registros={datos?.datos ?? []}
+        registros={registros}
+        seleccionInicialId={idAbrir}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}

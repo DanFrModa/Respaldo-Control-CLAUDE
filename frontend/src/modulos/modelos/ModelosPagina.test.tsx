@@ -93,6 +93,7 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     idGenero: null,
     genero: null,
     cantidadFotos: 0,
+    urlFotoPrincipal: null,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -249,5 +250,70 @@ describe('<ModelosPagina>', () => {
 
     await usuario.selectOptions(screen.getByTestId('filtro-temporada-modelo'), '2');
     expect(ultimaQuery?.idTemporada).toBe(2);
+  });
+
+  it('deep-link: abre la ficha del modelo de `state.idModelo` (estando en la página visible)', async () => {
+    // Lista con dos modelos; el deep-link apunta al SEGUNDO (no al primero/por defecto).
+    const m2 = modelo(2, '777', true, { descripcion: 'Modelo deep-link' });
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '501'), m2]));
+    useFichaModelo.mockImplementation((id) =>
+      id === 2
+        ? fichaCargada(ficha(m2))
+        : id === undefined
+          ? { data: undefined, isPending: false, isError: false, error: null }
+          : fichaCargada(ficha(modelo(id, '501'))),
+    );
+
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+      rutaInicial: { pathname: '/modelos', state: { idModelo: 2 } },
+    });
+
+    // El detalle muestra el modelo 777 (el del deep-link), no el primero (501).
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(await within(detalle).findByRole('heading', { name: '777' })).toBeInTheDocument();
+    expect(within(detalle).getByText('Modelo deep-link')).toBeInTheDocument();
+  });
+
+  it('deep-link: inyecta y abre la ficha aunque el modelo NO esté en la página visible', async () => {
+    // La página visible NO contiene el modelo 999 (otra página/filtro); igual debe abrirse.
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '501')]));
+    useFichaModelo.mockImplementation((id) =>
+      id === 999
+        ? fichaCargada(ficha(modelo(999, 'DEEP-999', true, { descripcion: 'Fuera de página' })))
+        : id === undefined
+          ? { data: undefined, isPending: false, isError: false, error: null }
+          : fichaCargada(ficha(modelo(id, '501'))),
+    );
+
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+      rutaInicial: { pathname: '/modelos', state: { idModelo: 999 } },
+    });
+
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(await within(detalle).findByRole('heading', { name: 'DEEP-999' })).toBeInTheDocument();
+    expect(within(detalle).getByText('Fuera de página')).toBeInTheDocument();
+    // Y aparece como un renglón inyectado en la lista (junto al visible 501): 2 renglones.
+    expect(screen.getAllByTestId('fila-modelo')).toHaveLength(2);
+    expect(screen.getAllByText('DEEP-999').length).toBeGreaterThan(0);
+  });
+
+  it('sin `state.idModelo` selecciona el primero (comportamiento por defecto intacto)', () => {
+    useModelos.mockReturnValue(listaConDatos([modelo(1, '501'), modelo(2, '777')]));
+    useFichaModelo.mockImplementation((id) =>
+      id === undefined
+        ? { data: undefined, isPending: false, isError: false, error: null }
+        : fichaCargada(ficha(modelo(id, id === 1 ? '501' : '777'))),
+    );
+
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver']),
+      rutaInicial: '/modelos',
+    });
+
+    // Sin deep-link, el detalle muestra el PRIMER modelo (501).
+    const detalle = screen.getByTestId('detalle-modelo');
+    expect(within(detalle).getByRole('heading', { name: '501' })).toBeInTheDocument();
   });
 });
