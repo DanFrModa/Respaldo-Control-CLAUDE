@@ -139,11 +139,13 @@ export {
   esquemaColorSalida,
   esquemaColoresQuery,
   esquemaColoresPagina,
+  esquemaColorFusionar,
   type DatosColorCrear,
   type DatosColorEditar,
   type ColorSalida,
   type ColoresQuery,
   type ColoresPagina,
+  type DatosColorFusionar,
 } from './esquemas/color.js';
 
 // ── Catálogos estructurados (F1-E2): maestros globales con relaciones (ADR-0007) ──

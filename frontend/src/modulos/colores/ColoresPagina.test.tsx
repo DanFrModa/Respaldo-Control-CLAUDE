@@ -28,6 +28,7 @@ vi.mock('@/api/colores', () => ({
   useActualizarColor: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarColor: () => ({ mutate: desactivarMutate, isPending: false }),
   useReactivarColor: () => ({ mutate: reactivarMutate, isPending: false }),
+  useFusionarColores: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 /** Color de ejemplo. */
@@ -116,6 +117,19 @@ describe('<ColoresPagina>', () => {
     expect(screen.queryByTestId('nuevo-color')).not.toBeInTheDocument();
     expect(screen.queryByTestId('editar-color')).not.toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-color')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('abrir-fusion-colores')).not.toBeInTheDocument();
+  });
+
+  it('ofrece la acción Fusionar a quien administra y abre el diálogo', async () => {
+    const usuario = userEvent.setup();
+    useColores.mockReturnValue(consultaConDatos([color(1, 'Rojo'), color(2, 'Rojo Vino')]));
+    renderConProveedores(<ColoresPagina />, {
+      sesion: estadoSesionDePrueba(['colores.ver', 'colores.administrar']),
+    });
+
+    await usuario.click(screen.getByTestId('abrir-fusion-colores'));
+    const dialogo = await screen.findByRole('dialog');
+    expect(within(dialogo).getByText('Fusionar colores duplicados')).toBeInTheDocument();
   });
 
   it('pide confirmacion antes de desactivar y llama a la mutacion al confirmar', async () => {

@@ -33,6 +33,7 @@
     "src/**/*.ts",
     "prisma/**/*.ts",
     "scripts/**/*.ts",
+    "migracion/**/*.ts",
     "prisma.config.ts",
     "vitest.config.ts"
   ],

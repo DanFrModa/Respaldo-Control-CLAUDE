@@ -1,4 +1,4 @@
-import { Palette } from 'lucide-react';
+import { MergeIcon, Palette } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -6,12 +6,14 @@ import { useColores, useDesactivarColor, useReactivarColor } from '@/api/colores
 import type { Color, ColoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
+import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/lib/useDebounce';
 import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
 import { Historial } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoColor } from './DialogoColor';
+import { DialogoFusionColores } from './DialogoFusionColores';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -50,6 +52,7 @@ export function ColoresPagina(): React.JSX.Element {
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [colorEnEdicion, setColorEnEdicion] = useState<Color | undefined>(undefined);
   const [aDesactivar, setADesactivar] = useState<Color | null>(null);
+  const [fusionAbierta, setFusionAbierta] = useState(false);
 
   function abrirAlta(): void {
     setColorEnEdicion(undefined);
@@ -134,6 +137,17 @@ export function ColoresPagina(): React.JSX.Element {
         puedeAdministrar={puedeAdministrar}
         alNuevo={abrirAlta}
         textoNuevo="Nuevo color"
+        accionesEncabezado={
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFusionAbierta(true)}
+            data-testid="abrir-fusion-colores"
+          >
+            <MergeIcon aria-hidden />
+            Fusionar
+          </Button>
+        }
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarColor}
@@ -151,6 +165,7 @@ export function ColoresPagina(): React.JSX.Element {
         alCambiarAbierto={setDialogoAbierto}
         color={colorEnEdicion}
       />
+      <DialogoFusionColores abierto={fusionAbierta} alCambiarAbierto={setFusionAbierta} />
       <DialogoConfirmacion
         abierto={aDesactivar !== null}
         alCambiarAbierto={(abierto) => {

@@ -123,6 +123,9 @@ export type ColorCrear =
 /** Cuerpo de edicion de color (`PATCH /api/colores/{id}`). */
 export type ColorEditar =
   paths['/api/colores/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de fusion de colores duplicados (`POST /api/colores/fusionar`). */
+export type ColorFusionar =
+  paths['/api/colores/fusionar']['post']['requestBody']['content']['application/json'];
 
 // ── Catalogos estructurados F1-E2 ─────────────────────────────────────────────
 
