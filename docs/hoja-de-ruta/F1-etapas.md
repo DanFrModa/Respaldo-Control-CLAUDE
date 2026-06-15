@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7, avíos R1 y **Proveedor enriquecido R15** en E1B) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅, F1-E2 ✅ y F1-E3 ✅ hechas** (F1-E3: 14-jun-2026, verificadas en `prueba`); sigue **F1-E4**. **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
+> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅, F1-E2 ✅, F1-E3 ✅ y F1-E4 ✅ hechas** (F1-E4: 14-jun-2026, verificada en `prueba`); sigue **F1-E5**. **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
 
 ## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
 
@@ -274,7 +274,19 @@
 
 ---
 
-## F1-E4 · Modelos: ficha + fotos R2 + BOM completo (la pieza integradora) — ⬜ pendiente
+## F1-E4 · Modelos: ficha + fotos R2 + BOM completo (la pieza integradora) — ✅ hecha (14-jun-2026, en `prueba`)
+
+> **CIERRE (14-jun-2026).** Entregada por 1 coder + 1 reviewer independiente (el lead orquesta, no codea), verificada por Gabriel en `prueba` (Railway) y mergeada vía **PR #36** (+ **#37**, mejora de fotos). Reviewer: **APROBADO** (cazó 1 bloqueante + 3 menores en la 1ª ronda; todos corregidos y re-verificados).
+> - **Qué quedó:** Módulo 2 completo. 6 tablas + 1 enum (`Genero` sembrado, `Modelo`, `ModeloFoto`, `ModeloTela`, `ModeloAvio`, `ModeloBordado`) — migración `f1_e4_modelos`. Dominio (A1) con transacciones A2 (alta/edición, set de cada sección del BOM, **copiar-bom** atómico con reemplazar/fusionar, alta/quita de foto); API con RBAC por ruta (A4: `modelos.ver`/`.administrar`); auditoría + bitácora (A7); fotos por motor R2 + `Archivo` con key por id (A5, nunca por convención de nombre); **lista en modo servidor** (~4,987 modelos). Frontend lista+detalle teal: ficha con datos generales + galería de fotos (reutiliza `SubidaImagen` de E3, **selector de tipo frente/espalda/otro**, placeholder NoFoto) + 3 pestañas de BOM (consumo + 3 banderas 🔑 en telas/avíos; precio por renglón en bordados) + "Copiar receta de…". **Mejora pedida por Gabriel (PR #37):** las fotos se abren en **lightbox** (`frontend/src/componentes/VisorImagen.tsx`, reutilizable) con botón **Descargar** (fetch→blob, resuelve la descarga cross-origin de R2). 2 permisos nuevos + seed (rol `Basico` sin ellos).
+> - **ACTA de decisiones (cerradas con Gabriel ANTES de codificar):**
+>   1. **Género** = catálogo `Genero` (NO enum) sembrado con los 8 del viejo (`IPT_Generos`: Caballero, Dama, Niño/Niña Infantil, Niño/Niña Juvenil, Bebo, Beba); selector `GET /api/generos` bajo `modelos.ver`, **ABM diferido** (patrón `TipoProceso`/`RolProveedor`); `Modelo.idGenero` FK nullable, se puebla en el ETL E7 desde `IPT_Modelos`. *(La pantalla de administración de Géneros se difirió a propósito; el catálogo ya es ilimitado a nivel de datos.)*
+>   2. **BOM bordados** = `ModeloBordado(idModelo, idBordado, precio)`, único por par, **sin cantidad y sin banderas, CON precio** (un modelo lleva uno o varios bordados/estampados). El `precio` es nullable en BD (relajado para el ETL E7, que rellena desde `Bordado.precio`) pero **requerido + pre-llenado** en la captura por UI.
+>   3. **Alta masiva** (`VerificarModelos` del viejo) = NO entra; solo alta normal. La carga de los 4,987 va en el ETL E7.
+>   4. **Etiqueta de marca** = NO se liga al Modelo (no está en la tabla vieja; la relación modelo↔etiqueta y las regalías se definen en F7/Costos).
+> - **Hallazgos del reviewer (corregidos antes del merge):** (bloqueante) el precio del bordado no era requerido en la UI → validación que impide guardar un renglón sin precio; (menores) comentario de la migración ("2 enums"→"1 enum"), exponer el tipo de foto en la UI (el `PATCH` ya existía y quedaba muerto → fotos siempre "Otra"), y completar tests de copiar-bom (fusión `reemplazar:false` + rollback todo-o-nada) y de los 8 géneros en el seed.
+> - **Forma de los endpoints de BOM:** `PUT /api/modelos/:id/bom/{telas|avios|bordados}` reemplaza los renglones de esa sección en una transacción (consistente con el grid de colores/proveedores de E3); `POST /api/modelos/:id/copiar-bom` con bandera `reemplazar` (default true; false = fusiona conservando lo existente).
+> - **Deuda técnica detectada por Gabriel (DIFERIDA a futuro, NO hoy):** borrar una foto/adjunto elimina el registro en BD pero el **objeto físico en R2 queda huérfano** (el motor `backend/src/comun/archivos.ts` no tiene DeleteObject). Fix global (modelos + bordados + proveedores), tras el commit y best-effort; aparcado — ver backlog en [`HOJA-DE-RUTA.md`](../../HOJA-DE-RUTA.md) §4.
+> - **Diferido a fin de fase (F1-E6/E7):** `docs/modulos/` del módulo de modelos y el ETL (modelos + BOM + fotos masivas).
 
 **Objetivo:** Construir el Módulo 2 completo: el modelo con su receta (BOM de telas, avíos y bordados con las 3 banderas) y sus fotos en R2. Va al final de la cadena porque consume todos los catálogos de E1–E3. Antes de codificar se cierran con Gabriel (y Daniel si toca negocio): género del modelo (¿atributo propio? ¿de dónde se puebla?), si ModeloBordado lleva cantidad/banderas para simetría del BOM, y si la alta masiva (VerificarModelos) entra o basta el alta normal.
 
