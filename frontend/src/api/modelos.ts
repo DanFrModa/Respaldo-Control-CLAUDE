@@ -79,6 +79,10 @@ export type GenerosLista =
   paths['/api/generos']['get']['responses']['200']['content']['application/json'];
 export type Genero = GenerosLista[number];
 
+/** Códigos de barra (EAN-13 + DUN-14) de un modelo (`GET /api/modelos/{id}/codigos-barra`). */
+export type ModeloCodigosBarra =
+  paths['/api/modelos/{id}/codigos-barra']['get']['responses']['200']['content']['application/json'];
+
 // ── Llaves de cache ───────────────────────────────────────────────────────────
 
 /** Clave raíz de la cache de modelos en TanStack Query. */
@@ -226,6 +230,34 @@ async function listarGeneros(): Promise<GenerosLista> {
 /** Lista los géneros activos para el selector de la ficha. */
 export function useGeneros(): UseQueryResult<GenerosLista, ErrorDeApi> {
   return useQuery({ queryKey: ['generos'], queryFn: listarGeneros });
+}
+
+// ── Códigos de barra (F1-E5) ──────────────────────────────────────────────────
+
+async function obtenerCodigosBarra(id: number): Promise<ModeloCodigosBarra> {
+  const { data, error } = await api.GET('/api/modelos/{id}/codigos-barra', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Genera los códigos de barra (EAN-13 + DUN-14) de un modelo para la EMPRESA ACTIVA de la
+ * sesión. La query depende de la empresa activa (se envía por header `x-empresa-activa`): la
+ * cache se llava por id de modelo. Deshabilitada si no hay modelo seleccionado. Si la empresa
+ * no tiene UPC, el backend responde 400 y el error trae el mensaje legible.
+ */
+export function useCodigosBarraModelo(
+  id: number | undefined,
+): UseQueryResult<ModeloCodigosBarra, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_MODELOS, 'codigos-barra', id ?? 0],
+    queryFn: () => obtenerCodigosBarra(id as number),
+    enabled: id !== undefined,
+  });
 }
 
 // ── BOM (set-completo por sección) ────────────────────────────────────────────

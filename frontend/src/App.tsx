@@ -10,9 +10,11 @@ import { BordadosPagina } from '@/modulos/bordados/BordadosPagina';
 import { GaleriaBordados } from '@/modulos/bordados/GaleriaBordados';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
+import { CodigosBarraPagina } from '@/modulos/codigos-barra/CodigosBarraPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
@@ -68,6 +70,8 @@ const router = createBrowserRouter([
           { path: 'catalogos/bordados', element: <BordadosPagina /> },
           { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
           { path: 'modelos', element: <ModelosPagina /> },
+          { path: 'modelos/galeria', element: <GaleriaModelos /> },
+          { path: 'modelos/codigos-barra', element: <CodigosBarraPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

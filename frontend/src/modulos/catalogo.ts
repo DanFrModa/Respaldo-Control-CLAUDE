@@ -1,9 +1,11 @@
 import {
   Banknote,
+  Barcode,
   Calculator,
   ChartLine,
   Factory,
   Files,
+  Images,
   Library,
   type LucideIcon,
   Medal,
@@ -34,6 +36,8 @@ import type { ClavePermiso } from '@/api/tipos';
 export type IconoModulo =
   | 'libreria'
   | 'camisa'
+  | 'imagenes'
+  | 'codigo-barra'
   | 'carrito'
   | 'fabrica'
   | 'paquete'
@@ -55,6 +59,8 @@ export type IconoModulo =
 export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
   libreria: Library,
   camisa: Shirt,
+  imagenes: Images,
+  'codigo-barra': Barcode,
   carrito: ShoppingCart,
   fabrica: Factory,
   paquete: Package,
@@ -89,9 +95,18 @@ export interface ModuloMenu {
   permisos: readonly ClavePermiso[] | 'autenticado';
   /** Modulo estrella del plan (la Ruta Critica, D10/D11). */
   destacado?: boolean;
+  /**
+   * `true` si la entrada NO es un módulo del plan §5 sino una SUB-VISTA de uno (p. ej. la
+   * galería de modelos de F1-E5). Solo afecta a la documentación/tests; el menú las pinta igual.
+   */
+  subVista?: boolean;
 }
 
-/** Los 13 modulos en el orden de PLANMAESTRO §5. */
+/**
+ * Entradas del menú: los 13 módulos del plan §5 EN ORDEN, más una sub-vista (la "Galería de
+ * modelos" de F1-E5, que cuelga del módulo Modelos y comparte su permiso). Las entradas que NO
+ * son módulos del plan se marcan con `subVista: true`.
+ */
 export const MODULOS_MENU: readonly ModuloMenu[] = [
   {
     clave: 'catalogos',
@@ -108,6 +123,30 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/modelos',
     icono: 'camisa',
     permisos: ['modelos.ver'],
+  },
+  // Sub-vista de Modelos (F1-E5): la galería visual de fotos, móvil-primero, para enseñar
+  // producto fuera de la oficina. NO es un módulo del plan §5: es una segunda vista del
+  // módulo Modelos (misma `modelos.ver`), enlazada en el menú por descubribilidad.
+  {
+    clave: 'galeria-modelos',
+    titulo: 'Galería de modelos',
+    descripcion: 'Vista visual de los modelos con su foto, para enseñar producto',
+    ruta: '/modelos/galeria',
+    icono: 'imagenes',
+    permisos: ['modelos.ver'],
+    subVista: true,
+  },
+  // Sub-vista de Modelos (F1-E5): el generador de códigos de barra (EAN-13 + DUN-14),
+  // sucesor del form viejo `Codigo` (menú 1). NO es un módulo del plan §5: cuelga del
+  // módulo Modelos, con su propio permiso de lectura `modelos.codigos-barra`.
+  {
+    clave: 'codigos-barra',
+    titulo: 'Códigos de barra',
+    descripcion: 'Genera el EAN-13 (pieza) y DUN-14 (caja) de un modelo y descarga su etiqueta',
+    ruta: '/modelos/codigos-barra',
+    icono: 'codigo-barra',
+    permisos: ['modelos.codigos-barra'],
+    subVista: true,
   },
   {
     clave: 'pedidos',

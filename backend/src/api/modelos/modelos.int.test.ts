@@ -630,4 +630,88 @@ describe('API de modelos (F1-E4)', () => {
       expect(res.statusCode).toBe(400);
     });
   });
+
+  describe('códigos de barra (F1-E5)', () => {
+    /** Forma mínima de la salida de códigos de barra que usan estas pruebas. */
+    interface CodigosApi {
+      idModelo: number;
+      codigoModelo: string;
+      idEmpresa: number;
+      nombreEmpresa: string;
+      prefijo: string;
+      base12: string;
+      ean13: string;
+      dun14: string;
+    }
+
+    it('genera EAN-13 y DUN-14 con el prefijo UPC real de FR Moda (7500092)', async () => {
+      const cookie = await cookieAdmin();
+      // 7500092 (prefijo seed) + 00501 = 12 dígitos → EAN-13 7500092005011, DUN-14 17500092005018.
+      const { body } = await crearModeloApi(cookie, { codigo: '00501' });
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}/codigos-barra`,
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(200);
+      const codigos = res.json<CodigosApi>();
+      expect(codigos).toMatchObject({
+        idModelo: body.id,
+        codigoModelo: '00501',
+        prefijo: '7500092',
+        base12: '750009200501',
+        ean13: '7500092005011',
+        dun14: '17500092005018',
+        nombreEmpresa: 'FR Moda',
+      });
+    });
+
+    it('si el código + prefijo no dan 12 dígitos → 400 con mensaje legible (no 500)', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: '501' }); // 7500092 + 501 = 10 dígitos
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}/codigos-barra`,
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json<{ mensaje: string }>().mensaje).toMatch(/12 dígitos/i);
+    });
+
+    it('si la empresa activa NO tiene UPC capturado → 400 con mensaje legible', async () => {
+      const cookie = await cookieAdmin();
+      const { body } = await crearModeloApi(cookie, { codigo: '00777' });
+      // Quita el UPC de la empresa favorita (FR Moda) para simular una empresa sin prefijo.
+      await cliente.empresa.update({ where: { nombre: 'FR Moda' }, data: { upc: null } });
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/modelos/${body.id}/codigos-barra`,
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(400);
+      expect(res.json<{ mensaje: string }>().mensaje).toMatch(/prefijo UPC/i);
+    });
+
+    it('modelo inexistente → 404', async () => {
+      const cookie = await cookieAdmin();
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/modelos/999999/codigos-barra',
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it('rol Basico (sin permiso) → 403', async () => {
+      await crearUsuarioBasico('barras', 'Clave.1234!');
+      const sesion = await login('barras', 'Clave.1234!');
+      const cookie = comoHeaderCookie(sesion.cookies);
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/modelos/1/codigos-barra',
+        headers: { cookie },
+      });
+      expect(res.statusCode).toBe(403);
+    });
+  });
 });
