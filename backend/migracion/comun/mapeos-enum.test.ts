@@ -5,6 +5,7 @@ import {
   mapearTipoBordado,
   mapearTipoComponente,
   mapearTipoProveedor,
+  rolesDeMaquilero,
 } from './mapeos-enum.js';
 
 describe('migración · mapeos de enum (puros)', () => {
@@ -40,6 +41,26 @@ describe('migración · mapeos de enum (puros)', () => {
       for (const v of ['T', 'H', 'S', '', null, undefined, 'Z']) {
         expect(mapearRolProveedorComercial(v).length).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe('rolesDeMaquilero (Costura/Proceso → roles; Proceso = decorado)', () => {
+    it('Costura → maquila-costura', () => {
+      expect(rolesDeMaquilero(true, false)).toEqual(['maquila-costura']);
+    });
+    it('Proceso (decorado) → estampado, NO maquila-costura', () => {
+      const roles = rolesDeMaquilero(false, true);
+      expect(roles).toContain('estampado');
+      expect(roles).not.toContain('maquila-costura');
+    });
+    it('ambas banderas → ambos roles', () => {
+      const roles = rolesDeMaquilero(true, true);
+      expect(roles).toContain('maquila-costura');
+      expect(roles).toContain('estampado');
+      expect(roles).toHaveLength(2);
+    });
+    it('ninguna bandera → maquila-costura (≥1 rol garantizado)', () => {
+      expect(rolesDeMaquilero(false, false)).toEqual(['maquila-costura']);
     });
   });
 

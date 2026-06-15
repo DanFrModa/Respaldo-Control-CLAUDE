@@ -14,7 +14,6 @@
  */
 import { crearAlmacen } from '../../src/dominio/admin/almacenes.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
-import { ErrorConflicto } from '../../src/comun/errores.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
@@ -27,6 +26,7 @@ import {
   type EntidadMapeo,
 } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearBandera, parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -55,33 +55,37 @@ export async function cargarAlmacenes(
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
+  let omitidosValidacion = 0;
 
   async function crearUno(
-    nombre: string,
+    nombreCrudo: string,
     tipo: 'PT' | 'TELA',
     entidad: EntidadMapeo,
     idViejo: string | undefined,
     datosMapeo: DatosMapeo,
   ): Promise<void> {
+    const nombre =
+      truncarYReportar(
+        reporte,
+        'Almacen',
+        idViejo,
+        'nombre',
+        nombreCrudo,
+        LIMITES.almacen.nombre,
+      ) ?? nombreCrudo;
     let idNuevo = await idAlmacenPorNombre(cliente, idEmpresa, nombre);
     if (idNuevo === null) {
-      try {
-        const creado = await crearAlmacen(sesionEmpresa, { nombre, tipo }, bd);
-        idNuevo = creado.id;
-        creados += 1;
-      } catch (error) {
-        if (error instanceof ErrorConflicto) {
-          // Choque de nombre (p. ej. un PT y un TELA con el mismo nombre en la empresa):
-          // el unique es por (idEmpresa, nombre). Se reporta y se omite.
-          omitidos += 1;
-          reporte.agregar(
-            'Almacenes con nombre duplicado en la empresa (omitidos)',
-            `${nombre} (${tipo})`,
-          );
-          return;
-        }
-        throw error;
+      // Tolerante a cualquier error de fila (incluido el choque de nombre PT vs TELA, que el
+      // unique (idEmpresa, nombre) rechaza): se reporta y se cuenta como omitido por validación.
+      const creado = await intentarCrear(reporte, 'Almacen', idViejo, () =>
+        crearAlmacen(sesionEmpresa, { nombre, tipo }, bd),
+      );
+      if (creado === null) {
+        omitidosValidacion += 1;
+        return;
       }
+      idNuevo = creado.id;
+      creados += 1;
     } else {
       existentes += 1;
     }
@@ -124,5 +128,5 @@ export async function cargarAlmacenes(
     await crearUno(nombre, 'TELA', ENTIDAD_MAPEO.almacenTela, fila.IdAlmacenes, { nombre });
   }
 
-  return { creados, existentes, omitidos };
+  return { creados, existentes, omitidos, omitidosValidacion };
 }

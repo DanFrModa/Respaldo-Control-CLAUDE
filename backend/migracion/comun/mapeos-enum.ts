@@ -51,6 +51,33 @@ export function mapearRolProveedorComercial(tipoProv: string | undefined | null)
 }
 
 /**
+ * `Maquileros.Costura`/`Proceso` → CÓDIGOS de rol de `RolProveedor` (fusión de terceros).
+ * Aclaración de Daniel: "Proceso" = cualquier DECORADO de la prenda (estampado/bordado/
+ * lavado, que usan indistintamente) → rol `estampado` (decoración canónica del seed):
+ *  • `costura` → `maquila-costura`
+ *  • `proceso` → `estampado`
+ *  • ambas → ambos roles
+ *  • ninguna → `maquila-costura` (un taller sin banderas se asume de costura, lo más común;
+ *    el dominio exige ≥1 rol y este SIEMPRE devuelve al menos uno).
+ *
+ * Devuelve los códigos SIN repetir. El sub-servicio fino de la decoración (estampado vs
+ * bordado vs lavado) lo afina Gabriel después; el viejo no lo distingue.
+ */
+export function rolesDeMaquilero(costura: boolean, proceso: boolean): string[] {
+  const roles: string[] = [];
+  if (costura) {
+    roles.push('maquila-costura');
+  }
+  if (proceso) {
+    roles.push('estampado');
+  }
+  if (roles.length === 0) {
+    roles.push('maquila-costura');
+  }
+  return roles;
+}
+
+/**
  * `Bordados.BorEst` → enum `TipoBordado`. En el viejo `BorEst` distingue bordado real de
  * estampado/aplicación: `0`/vacío = BORDADO, distinto de 0 = ESTAMPADO.
  */

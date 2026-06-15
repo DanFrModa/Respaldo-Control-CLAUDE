@@ -119,9 +119,10 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     expect(tras1.generos).toBe(2);
     expect(tras1.temporadas).toBe(0); // fuente VACÍA
     expect(tras1.telaCategorias).toBe(1); // Felpa (la de nombre vacío se limpia)
-    // Fusión de terceros: Alsatex, Eticobar, Servicios Varios, Suano Mujica, Intersew,
-    // Jorge García (maquilero == estampador → 1) y Carlos Núñez = 7.
-    expect(tras1.proveedores).toBe(7);
+    // Fusión de terceros: Alsatex, Eticobar, Servicios Varios, "Telefono Largo" (data sucia,
+    // teléfono truncado, NO aborta), Suano Mujica, Intersew, Jorge García (maquilero ==
+    // estampador → 1), Carlos Núñez y "Decorador Solo" (maquilero con Proceso=1) = 9.
+    expect(tras1.proveedores).toBe(9);
     expect(tras1.almacenes).toBe(4); // 3 PT (IPT) + 1 TELA activo (1 TELA inactivo no migra)
     expect(tras1.bordados).toBe(3); // incl. el duplicado de nombre desambiguado
     expect(tras1.avios).toBe(3);
@@ -153,6 +154,18 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     expect(await rolDe('Servicios Varios')).toContain('otros-servicios'); // TipoProv = S
   });
 
+  it('NO aborta con data sucia: trunca el teléfono >100 chars y crea el proveedor', async () => {
+    await ejecutarEtl(cliente);
+    // "Telefono Largo" trae un teléfono de 146 chars en el fixture: debe existir, con el
+    // teléfono recortado a ≤100 (regla Zod), en vez de abortar la corrida.
+    const prov = await cliente.proveedor.findFirstOrThrow({
+      where: { nombre: 'Telefono Largo' },
+      select: { telefono: true },
+    });
+    expect(prov.telefono).not.toBeNull();
+    expect((prov.telefono ?? '').length).toBeLessThanOrEqual(100);
+  });
+
   it('fusiona terceros: Jorge García queda con maquila-costura Y estampado', async () => {
     await ejecutarEtl(cliente);
     const jorge = await cliente.proveedor.findFirstOrThrow({
@@ -162,6 +175,18 @@ describe('ETL de catálogos F1-E6 (integración, fixtures committeados)', () => 
     const codigos = jorge.roles.map((r) => r.rol.codigo).sort();
     expect(codigos).toContain('maquila-costura');
     expect(codigos).toContain('estampado');
+  });
+
+  it('maquilero con Proceso=1 (decorado) → rol estampado, NO maquila-costura', async () => {
+    await ejecutarEtl(cliente);
+    // "Decorador Solo": Proceso=1, Costura=0 → debe quedar con `estampado` y sin costura.
+    const deco = await cliente.proveedor.findFirstOrThrow({
+      where: { nombre: 'Decorador Solo' },
+      select: { roles: { select: { rol: { select: { codigo: true } } } } },
+    });
+    const codigos = deco.roles.map((r) => r.rol.codigo);
+    expect(codigos).toContain('estampado');
+    expect(codigos).not.toContain('maquila-costura');
   });
 
   it('avío con proveedor que matchea → AvioProveedor; sin match → precioReferencia (fallback)', async () => {

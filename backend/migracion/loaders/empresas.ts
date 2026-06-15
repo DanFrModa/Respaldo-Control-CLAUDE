@@ -18,6 +18,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearBandera, parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -44,14 +45,15 @@ export async function cargarEmpresas(
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
+  let omitidosValidacion = 0;
   let idFrModa: number | null = null;
 
   for (const fila of filas) {
     const idViejo = fila.IdEmpresas;
-    const nombre = parsearTexto(fila.Empresa);
+    const nombreCrudo = parsearTexto(fila.Empresa);
     const activa = parsearBandera(fila.Activa);
 
-    if (nombre === null) {
+    if (nombreCrudo === null) {
       omitidos += 1;
       continue;
     }
@@ -59,27 +61,66 @@ export async function cargarEmpresas(
       omitidos += 1;
       reporte.agregar(
         'Empresas inactivas NO migradas (decisión: solo activas)',
-        `Id=${idViejo ?? '?'} · ${nombre}`,
+        `Id=${idViejo ?? '?'} · ${nombreCrudo}`,
       );
       continue;
     }
+    const nombre =
+      truncarYReportar(
+        reporte,
+        'Empresa',
+        idViejo,
+        'nombre',
+        nombreCrudo,
+        LIMITES.empresa.nombre,
+      ) ?? nombreCrudo;
+    const razonSocial = truncarYReportar(
+      reporte,
+      'Empresa',
+      idViejo,
+      'razonSocial',
+      parsearTexto(fila.RazonSocial),
+      LIMITES.empresa.razonSocial,
+    );
+    const identificador = truncarYReportar(
+      reporte,
+      'Empresa',
+      idViejo,
+      'identificador',
+      parsearTexto(fila.Identificador),
+      LIMITES.empresa.identificador,
+    );
+    const upc = truncarYReportar(
+      reporte,
+      'Empresa',
+      idViejo,
+      'upc',
+      parsearTexto(fila.UPCEmp),
+      LIMITES.empresa.upc,
+    );
 
     let idNuevo = await idPorNombre(cliente, nombre);
     if (idNuevo === null) {
-      const creada = await crearEmpresa(
-        sesion,
-        {
-          nombre,
-          razonSocial: parsearTexto(fila.RazonSocial) ?? undefined,
-          identificador: parsearTexto(fila.Identificador) ?? undefined,
-          upc: parsearTexto(fila.UPCEmp) ?? undefined,
-          // La favorita ya es FR Moda (seed F0): NO la cambiamos aquí.
-          favorita: false,
-          paraIpt: parsearBandera(fila.ParaIPT),
-          paraEdr: parsearBandera(fila.ParaEdoRes),
-        },
-        bd,
+      const creada = await intentarCrear(reporte, 'Empresa', idViejo, () =>
+        crearEmpresa(
+          sesion,
+          {
+            nombre,
+            razonSocial: razonSocial ?? undefined,
+            identificador: identificador ?? undefined,
+            upc: upc ?? undefined,
+            // La favorita ya es FR Moda (seed F0): NO la cambiamos aquí.
+            favorita: false,
+            paraIpt: parsearBandera(fila.ParaIPT),
+            paraEdr: parsearBandera(fila.ParaEdoRes),
+          },
+          bd,
+        ),
       );
+      if (creada === null) {
+        omitidosValidacion += 1;
+        continue;
+      }
       idNuevo = creada.id;
       creados += 1;
     } else {
@@ -106,5 +147,5 @@ export async function cargarEmpresas(
     );
   }
 
-  return { creados, existentes, omitidos, idFrModa };
+  return { creados, existentes, omitidos, omitidosValidacion, idFrModa };
 }

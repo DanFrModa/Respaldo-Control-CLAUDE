@@ -17,6 +17,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearBandera, parsearDinero, parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -38,15 +39,25 @@ export async function cargarEtiquetasMarca(
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
+  let omitidosValidacion = 0;
 
   for (const fila of filas) {
     const idViejo = fila.IdEtiquetasM;
-    const nombre = parsearTexto(fila.EtiquetaM);
-    if (nombre === null) {
+    const nombreCrudo = parsearTexto(fila.EtiquetaM);
+    if (nombreCrudo === null) {
       omitidos += 1;
       reporte.agregar('Etiquetas de marca con nombre vacío (omitidas)', `Id=${idViejo ?? '?'}`);
       continue;
     }
+    const nombre =
+      truncarYReportar(
+        reporte,
+        'EtiquetaMarca',
+        idViejo,
+        'nombre',
+        nombreCrudo,
+        LIMITES.etiquetaMarca.nombre,
+      ) ?? nombreCrudo;
     // Regalías: porcentaje; si no parsea o es <0/>100, se clava a 0 y se reporta.
     let regalias = parsearDinero(fila.Regalias) ?? 0;
     if (regalias < 0 || regalias > 100) {
@@ -60,7 +71,13 @@ export async function cargarEtiquetasMarca(
 
     let idNuevo = await idPorNombre(cliente, nombre);
     if (idNuevo === null) {
-      const creado = await crearEtiquetaMarca(sesion, { nombre, regalias }, bd);
+      const creado = await intentarCrear(reporte, 'EtiquetaMarca', idViejo, () =>
+        crearEtiquetaMarca(sesion, { nombre, regalias }, bd),
+      );
+      if (creado === null) {
+        omitidosValidacion += 1;
+        continue;
+      }
       idNuevo = creado.id;
       creados += 1;
       if (!activa) {
@@ -75,5 +92,5 @@ export async function cargarEtiquetasMarca(
     }
   }
 
-  return { creados, existentes, omitidos };
+  return { creados, existentes, omitidos, omitidosValidacion };
 }
