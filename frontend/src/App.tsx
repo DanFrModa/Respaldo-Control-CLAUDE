@@ -13,6 +13,7 @@ import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -66,6 +67,7 @@ const router = createBrowserRouter([
           { path: 'catalogos/avios', element: <AviosPagina /> },
           { path: 'catalogos/bordados', element: <BordadosPagina /> },
           { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
+          { path: 'modelos', element: <ModelosPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

@@ -62,6 +62,9 @@ describe('catálogo de permisos', () => {
       'empresas.administrar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
+      'modelos.administrar',
+      'modelos.ver',
       'proveedores.administrar',
       'proveedores.ver',
       'roles.administrar',
