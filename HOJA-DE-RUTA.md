@@ -2,13 +2,13 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 10 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas las 8 fichas: solo la de la fase en curso.
-> — *Actualizado: 12-jun-2026.*
+> — *Actualizado: 14-jun-2026.*
 
 ---
 
 ## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
-- **Fase activa:** F1 — Catálogos + Modelos. **`F1-E1` ✅, `F1-E1B` ✅, `F1-E2` ✅ y `F1-E3` ✅ hechas, verificadas y desplegadas en `prueba`** (F1-E3: 14-jun-2026). **Siguiente etapa: `F1-E4`** (Modelos: ficha + fotos R2 + BOM completo; ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)). **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero se da de alta una vez como **Proveedor** y marca sus servicios con casillas de roles (sin duplicar terceros).
+- **Fase activa:** F1 — Catálogos + Modelos. **`F1-E1` ✅, `F1-E1B` ✅, `F1-E2` ✅, `F1-E3` ✅ y `F1-E4` ✅ hechas, verificadas y desplegadas en `prueba`** (F1-E4: 14-jun-2026, PR #36/#37). **Siguiente etapa: `F1-E5`** (Galería de modelos móvil + generador de códigos de barra por empresa; ficha en [`docs/hoja-de-ruta/F1-etapas.md`](docs/hoja-de-ruta/F1-etapas.md)). **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero se da de alta una vez como **Proveedor** y marca sus servicios con casillas de roles (sin duplicar terceros).
 - **Hecho:** ingeniería inversa + diseño ✅ 100 % (validado por Daniel). **F0 (Fundación) ✅ construida y desplegada** — desde el 12-jun-2026 corre en Railway **como ambiente de prueba** (login real funcionando). El despliegue de **producción NO se monta todavía**: se contrata al acercarse el go-live, por costo (decisión de Gabriel, 12-jun-2026).
 - **Pendientes manuales de Gabriel** (no bloquean el arranque de F1): cambiar el password de `admin` (seed `Control.2026!`), activar backups del Postgres en Railway, montar **Cloudflare R2** (⚠️ sí se necesita antes de F1-E3/E4, que suben fotos), borrar el servicio frontend viejo si quedó en el canvas, y proteger las ramas exigiendo los checks del CI.
 
@@ -20,7 +20,7 @@ Construir (F0–F9)     : █░░░░░░░░░  F0 de 10 ✅ — sigue
 | Fase | Etapas | Estado |
 |---|---|---|
 | **F0 · Fundación** | 5 | ✅ **hecha** (construida + desplegada como prueba, 12-jun-2026) |
-| **F1 · Catálogos + Modelos** | 8 | 🔄 **en curso — F1-E1 ✅, F1-E1B ✅, F1-E2 ✅ y F1-E3 ✅ (en prueba); sigue F1-E4** |
+| **F1 · Catálogos + Modelos** | 8 | 🔄 **en curso — F1-E1 ✅, F1-E1B ✅, F1-E2 ✅, F1-E3 ✅ y F1-E4 ✅ (en prueba); sigue F1-E5** |
 | **F2 · Pedidos + Órdenes** | 5 | ⬜ |
 | **F3 · Producción / WIP** | 6 | ⬜ |
 | **F4 · Compras / MRP** | 6 | ⬜ |
@@ -74,7 +74,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **F1-E2** | Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 | 3 coders en paralelo + 1 reviewer | ✅ **13-jun-2026 (en prueba)** · ⚠️ **rectificado 14-jun (D12/R15): se ELIMINÓ el catálogo de Maquilero — un maquilero es un Proveedor con roles de servicio, ver abajo)** |
 | **F1-E3** | Catálogos de materiales: telas unificadas, avíos R1 y bordados con foto R2 | 3 coders en paralelo + 1 reviewer | ✅ **14-jun-2026 (en prueba)** |
 | **Fusión de terceros** | Rectificación D12/R15: se eliminan los catálogos `Maquilero` (de F1-E2) y `Cortador` (de F1-E1) — UN solo catálogo de terceros: el Proveedor con casillas de roles. `precioReferencia` del cortador → desuso; el **costo del corte va en la orden (F2/F3)**. `TipoProceso` se conserva para la Ruta Crítica (F5). | 1 coder + 1 reviewer (rama `tarea/fusion-terceros`) | 🔄 14-jun-2026 |
-| **F1-E4** | Modelos: ficha + fotos R2 + BOM completo | 1 coder + 1 reviewer (cadena sobre los mismos archivos) | ⬜ |
+| **F1-E4** | Modelos: ficha + fotos R2 + BOM completo | 1 coder + 1 reviewer (cadena sobre los mismos archivos) | ✅ **14-jun-2026 (en prueba)** |
 | **F1-E5** | Galería de modelos + generador de códigos de barra por empresa | 2 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E6** | ETL de catálogos y materiales + mapeos reutilizables + fusión de colores | 2 coders en paralelo + 1 reviewer | ⬜ |
 | **F1-E7** | ETL de modelos + BOM + fotos masivas + docs del módulo + cierre de fase en `prueba` | 1 coder + 1 reviewer | ⬜ |
@@ -196,6 +196,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 - **Módulo 13 · Administración (lo que faltaba):** pantallas de usuarios/empresas → **F1-E1** (ya en la ficha) · consulta de bitácora → **F6-E1** (ya en la ficha) · configuración por empresa (ex-`Propiedades`) → **F1** (confirmar al arrancar) · **modo mantenimiento** → **F9**.
 - **Respaldo doble** (job pg-boss con `pg_dump` diario cifrado a R2, §2.2 del plan): etapa chica al **inicio de F1**, en cuanto Gabriel monte R2. Es la mitigación #1 de la tabla de riesgos y hoy nadie la tiene.
 - **Impreso "Lista de precios"** (R9): sin módulo claro — decidir en F1 (si el precio vive en el modelo) o F2 (si es por cliente).
+- **Deuda técnica — borrado físico en R2 (diferido, Gabriel 14-jun-2026):** hoy borrar una foto/adjunto elimina el registro en BD pero deja el objeto **huérfano en R2** (el motor `backend/src/comun/archivos.ts` no tiene `DeleteObject`). Fix **global** para los 3 módulos que suben archivos (modelos, bordados, proveedores): borrar el objeto en R2 **tras el commit** de la transacción y **best-effort** (si R2 falla → log + limpieza posterior; nunca romper el borrado del usuario). Sin fase asignada — retomar cuando se priorice.
 
 ## 5. Fuera de alcance del primer desarrollo (para que nadie lo busque como "hueco")
 
