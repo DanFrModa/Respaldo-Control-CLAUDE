@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulos 1 y 2: todos los catálogos (incl. campos por cliente D7, avíos R1 y **Proveedor enriquecido R15** en E1B) y el catálogo de Modelos con fotos en R2 y BOM completo (R2).
 > **Criterio de salida:** Un modelo real con su receta completa, capturado en el ambiente de prueba.
-> **Estado:** 🔄 en curso — **F1-E1 ✅ y F1-E1B ✅ hechas** (13-jun-2026, verificadas en `prueba`); sigue **F1-E2**.
+> **Estado:** 🔄 en curso — **F1-E1 ✅, F1-E1B ✅, F1-E2 ✅ y F1-E3 ✅ hechas** (F1-E3: 14-jun-2026, verificadas en `prueba`); sigue **F1-E4**. **Rectificación 14-jun (D12/R15, rama `tarea/fusion-terceros`):** se eliminaron los catálogos `Maquilero` y `Cortador` — un tercero es un **Proveedor** con casillas de roles (ver nota en la sección F1-E2).
 
 ## F1-E1 · Catálogos sencillos + mini-pantallas de Administración (consolidación del patrón CRUD) — ✅ hecha (13-jun-2026, en `prueba`)
 
@@ -150,7 +150,24 @@
 
 ---
 
-## F1-E2 · Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 — ⬜ pendiente
+## F1-E2 · Catálogos estructurados: maquila unificada, tallas/curvas D4 y clientes D7 — ✅ hecha (13-jun-2026, en `prueba`)
+
+> **CIERRE (13-jun-2026).** Entregado por 3 coders en paralelo + 1 reviewer independiente (el lead orquesta, no codea), verificado por Gabriel en `prueba` (Railway) y mergeado vía **PR #27**. Reviewer independiente: **aprobado sin hallazgos**.
+> - **Qué quedó (8 tablas + 1 enum, todas GLOBALES ADR-0007, auditoría A7, borrado suave, lógica solo en dominio A1, transacciones A2, RBAC por ruta A4):**
+>   - **Maquila unificada:** `Maquilero` (unifica Maquileros+Estampadores; clave `corto` única, `nombre` NO único por homónimos del viejo) + `TipoProceso` + `MaquileroTipoProceso` (N:N, exige ≥1 tipo, set en una transacción — patrón idéntico a `ProveedorRol`). `GET /api/tipos-proceso` es selector bajo `maquileros.ver`; el ABM fino de tipos-proceso queda diferido (como `roles-proveedor` en E1B). Seed idempotente: costura, estampado, bordado, lavado, aplicación.
+>   - **Tallas/Curvas (D4):** `Talla` (etiqueta única, orden) + `CurvaTalla` + `CurvaTallaItem` (curva = conjunto ORDENADO de tallas; items en una transacción). Una talla EN USO por una curva ACTIVA no se puede desactivar ni borrar (Restrict en BD + bloqueo del borrado suave con mensaje claro).
+>   - **Clientes (D7):** `Cliente` (+ contacto) + `ClienteCampo` (definición de campos de referencia por cliente; etiqueta única DENTRO del cliente). SOLO la definición; los valores (`OrdenReferencia`) son de F2 (documentado: un campo con valores no se borrará físico).
+> - **6 permisos nuevos** (maquileros/tallas/clientes `.ver`/`.administrar`); el rol `Basico` queda SIN ellos (prueba de acceso de Gabriel). Migración única aditiva `f1_e2_catalogos_estructurados` (timestamp > E1B). OpenAPI + cliente del frontend regenerados y sincronizados (27→38 paths). Frontend con el estándar teal **lista+detalle** (`ListaDetalle`): Maquileros (filtro por tipo + selector de tipos), Tallas y curvas (armador visual de curvas en orden) y Clientes (editor inline de campos D7). Pruebas: unit + integración (testcontainers, CI) + componente + E2E Playwright (CI).
+> - **El CI atrapó 1 test inválido** (corregido antes del merge, commit `905ca24`): un test de integración de maquileros afirmaba un escenario imposible por diseño (reusar un `corto` —único GLOBAL— entre un activo y uno desactivado); se reescribió para cubrir la regla real (alta con el `corto` de un desactivado → conflicto que invita a reactivar). El código de dominio estaba correcto.
+> - **PENDIENTE diferido (decisión de Gabriel, "luego se ve el plan"):** el job **e2e** del CI necesita subir el cap del rate-limit de login porque la suite e2e creció (cada test inicia sesión; >20 logins/min desde una sola IP topan `REGLA_RATE_LOGIN` 20/60 s y `tallas.spec`, último alfabético, cae en el paso de login). **Fix ya redactado (guardado en `git stash`, sin commitear):** `AUTH_LOGIN_RATE_MAX` configurable por entorno en `backend/src/auth/config.ts` (default **20**, producción intacta) + `AUTH_LOGIN_RATE_MAX=1000` en `docker-compose.yml` (solo afecta el e2e de CI y el compose local; **Railway queda en 20** porque no usa docker-compose). NO es bug de F1-E2; es infraestructura de e2e que crecerá con cada etapa (valorar `storageState` de Playwright como fix durable). Hay que aplicarlo antes del PR de `prueba`→`main` para tener el CI 100% verde.
+> - **Diferido a fin de fase (F1-E6/E7):** `docs/modulos/catalogos.md` y el ETL de estos catálogos.
+
+> **⚠️ RECTIFICACIÓN (14-jun-2026, D12/R15 — rama `tarea/fusion-terceros`).** La "maquila unificada" de esta etapa se **CONSOLIDA en el catálogo de Proveedores**: se ELIMINARON los modelos `Maquilero` y `MaquileroTipoProceso` (y, de F1-E1, `Cortador`). Un tercero del mundo real (taller de costura, cortador, estampador, bordador, lavandería, vendedor de telas/avíos) se da de alta **UNA sola vez como Proveedor** y marca sus servicios con **casillas de roles** (`RolProveedor`, que ya existía desde E1B), evitando duplicar terceros (un mismo taller puede maquilar **y** cortar). Esto era lo que pedía la propuesta de Finanzas (R15 §4) y es la base correcta para las CxP/EsMa de F8.
+> - Atributos propios del maquilero portados a `Proveedor` (nullable): `corto` (clave corta, `@unique`), `asegurado`, `obsPago`. `nombre/telefono/direccion/notas` ya tenían equivalente — no se duplicaron.
+> - El **`precioReferencia` del cortador NO se portó** (queda en desuso): el **costo del corte se definirá en la orden de producción** — **pendiente F2/F3**.
+> - **`TipoProceso` SE CONSERVA** como catálogo independiente (lo consumirá la **Ruta Crítica, F5**); perdió su relación inversa hacia maquileros y su selector REST `GET /api/tipos-proceso` (sin pantalla propia hoy; su ABM se define en F5).
+> - Permisos `maquileros.*` y `cortadores.*` retirados del catálogo (cubiertos por `proveedores.*`). Los accesos LEGADO 15/37 de `Accesos.csv` (programar maquileros / alta de asegurados) pertenecen a flujos de producción/EsMa y se remapean en el ETL de `UsuAccesos` (F8). Migración `fusion_terceros` (DROP de las 3 tablas — solo traían datos de seed en `prueba`).
+> - **Roles seedeados de servicio** (`RolProveedor`): se siembran `maquila-costura, corte, estampado, aplicacion, bordado, lavado` + venta de telas/avíos + otros. El rol viejo `estampado-aplicacion` (sembrado antes de la separación estampado/aplicación) lo **DESACTIVA automáticamente el seed** (`SEED_ON_START=true`) — no requiere acción manual de Gabriel en `prueba`.
 
 **Objetivo:** Construir los tres catálogos con estructura propia (relación N:N, maestro-detalle ordenado y definición de campos dinámicos), que son independientes entre sí en datos y archivos — por eso van en paralelo. Van después de E1 solo para que el patrón ya esté consolidado con lo simple; no dependen de E1 en datos.
 
@@ -198,7 +215,12 @@
 
 ---
 
-## F1-E3 · Catálogos de materiales: telas unificadas (D5), avíos R1 y bordados con foto R2 — ⬜ pendiente
+## F1-E3 · Catálogos de materiales: telas unificadas (D5), avíos R1 y bordados con foto R2 — ✅ hecha (14-jun-2026, en `prueba`)
+
+> **CIERRE (14-jun-2026).** Entregada por 3 coders + integrador + reviewer independiente (aprobado), verificada por Gabriel en `prueba` (foto de bordado subiendo a R2 real). PR #29; hotfixes de R2 #30/#31.
+> - **Qué quedó:** 6 tablas de materiales (TelaCategoria, Tela, TelaColor, Avío, AvioProveedor, Bordado) + 2 enums. Telas unificadas (D5); avíos R1 (N proveedores, genéricos R4, `precioReferencia` como fallback de precio, `unidad`/`presentacion` NULLABLE); bordados R2 con foto presigned + galería móvil + componente `SubidaImagen` reutilizable (lo hereda E4). Decisiones en [`docs/arquitectura/ADR-0009`](../arquitectura/ADR-0009-materiales-f1e3.md). 6 permisos nuevos + seed (rol `Basico` sin ellos).
+> - **Trampas de R2 del despliegue real** (para `docs/GUIA-RAILWAY-R2.md` y E4, que también sube fotos): (1) el token S3 debe ser **Object Read & Write** con alcance al bucket — Read-only da `403 AccessDenied` en el PUT (se ve como "error de CORS"); (2) el SDK v3 de AWS añade checksum CRC32 por defecto que R2 rechaza → `requestChecksumCalculation: 'WHEN_REQUIRED'` en el cliente; (3) **no firmar** content-length/content-type en el PUT prefirmado (el navegador los maneja como headers especiales); (4) la política **CORS** del bucket (PUT/GET + el origin del front); (5) `BETTER_AUTH_URL` al dominio público del front (si no, falla cerrar sesión / 401 de sesión).
+> - **Abierto (tarea aparte):** "eliminar definitivamente" en catálogos (solo admin, solo desactivados sin referencias) — pedido por Gabriel, sin arrancar.
 
 **Objetivo:** Construir los tres catálogos complejos que alimentan el BOM. Va después de E1 porque Tela×Color necesita el catálogo Color y AvioProveedor necesita Proveedor. Bordados estrena el flujo real de archivos R2 (presigned URLs, motor de F0) y entrega el componente de subida de imagen que E4 reutiliza. Las decisiones de diseño se cierran con Gabriel ANTES de codificar: criterio de unificación Telas/TelasDis, lista inicial de unidades de medida/presentaciones de avíos, y el fallback del precio histórico de avíos sin proveedor identificable (insumo del ETL de E6 y del costeo de F7 — se decide AQUÍ para no descubrirlo en E6).
 

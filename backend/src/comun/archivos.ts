@@ -89,6 +89,16 @@ export function crearClienteR2(config: ConfigR2): S3Client {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
     },
+    // R2 (y demás S3-compatibles) NO soportan los checksums CRC32 que el SDK v3
+    // de AWS agrega por DEFECTO ("WHEN_SUPPORTED") a cada PutObject: el PUT
+    // prefirmado saldría con `x-amz-checksum-crc32`/`x-amz-sdk-checksum-algorithm`
+    // y R2 rechaza la subida (su respuesta de error no trae cabeceras CORS, así
+    // que el navegador lo disfraza de "error de CORS"). "WHEN_REQUIRED" solo los
+    // manda cuando la operación los exige (un PutObject normal no) → URL
+    // prefirmada limpia que R2 acepta. Aplica a fotos de bordado/modelo y a los
+    // adjuntos PDF de proveedor (todos usan este cliente).
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
   });
 }
 
@@ -227,21 +237,19 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
         },
       });
 
-      // ContentType y ContentLength van FIRMADOS: R2 rechaza una subida con
-      // otro tipo u otro tamaño que los declarados. El presigner no firma
-      // content-type salvo que se pida explícito (signableHeaders).
+      // NO firmamos content-type ni content-length. El navegador trata
+      // `Content-Length` como "forbidden header" (lo fija él mismo, el JS no
+      // puede) y maneja content-type de forma especial; firmarlos hace que el
+      // canonical request de SigV4 NO cuadre y R2 rechace el PUT real con
+      // 403 AccessDenied — y como la respuesta de error de R2 no trae cabeceras
+      // CORS, el navegador lo disfraza de "error de CORS". Firmamos solo lo
+      // esencial (host + los query `X-Amz-*`); la integridad se apoya en que la
+      // URL es de un solo uso, con UUID en la key y vida corta. El `Content-Type`
+      // del objeto lo fija el header que manda el navegador (ver api/bordados.ts).
       const urlSubida = await getSignedUrl(
         deps.cliente,
-        new PutObjectCommand({
-          Bucket: deps.bucket,
-          Key: key,
-          ContentType: datos.tipoMime,
-          ContentLength: datos.tamanoBytes,
-        }),
-        {
-          expiresIn: EXPIRACION_SUBIDA_SEGUNDOS,
-          signableHeaders: new Set(['content-type', 'content-length']),
-        },
+        new PutObjectCommand({ Bucket: deps.bucket, Key: key }),
+        { expiresIn: EXPIRACION_SUBIDA_SEGUNDOS },
       );
 
       return { archivo, urlSubida, expiraEnSegundos: EXPIRACION_SUBIDA_SEGUNDOS };

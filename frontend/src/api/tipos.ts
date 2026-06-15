@@ -77,19 +77,8 @@ export type ProveedorAdjuntoCrear =
 export type ProveedorAdjuntoSubida =
   paths['/api/proveedores/{id}/adjuntos']['post']['responses']['201']['content']['application/json'];
 
-/** Pagina de cortadores (`GET /api/cortadores`). */
-export type CortadoresPagina =
-  paths['/api/cortadores']['get']['responses']['200']['content']['application/json'];
-/** Un cortador tal como lo devuelve el API. */
-export type Cortador = CortadoresPagina['datos'][number];
-/** Parametros de consulta del listado de cortadores (querystring). */
-export type CortadoresQuery = NonNullable<paths['/api/cortadores']['get']['parameters']['query']>;
-/** Cuerpo de alta de cortador (`POST /api/cortadores`). */
-export type CortadorCrear =
-  paths['/api/cortadores']['post']['requestBody']['content']['application/json'];
-/** Cuerpo de edicion de cortador (`PATCH /api/cortadores/{id}`). */
-export type CortadorEditar =
-  paths['/api/cortadores/{id}']['patch']['requestBody']['content']['application/json'];
+// NOTA (fusion de terceros, D12/R15): los tipos de Cortador se eliminaron; el cortador es
+// un Proveedor con el rol `corte` (usa los tipos de Proveedor de arriba).
 
 /** Pagina de temporadas (`GET /api/temporadas`). */
 export type TemporadasPagina =
@@ -134,6 +123,74 @@ export type ColorCrear =
 /** Cuerpo de edicion de color (`PATCH /api/colores/{id}`). */
 export type ColorEditar =
   paths['/api/colores/{id}']['patch']['requestBody']['content']['application/json'];
+
+// ── Catalogos estructurados F1-E2 ─────────────────────────────────────────────
+
+// NOTA (fusion de terceros, D12/R15): la "maquila unificada" (Maquilero + TipoProceso) se
+// elimino. Un maquilero es ahora un Proveedor con sus roles de servicio (tipos de Proveedor
+// de arriba). El catalogo TipoProceso se conserva en BD para la Ruta Critica (F5) pero ya no
+// expone selector REST, asi que aqui no hay tipos derivados de el.
+
+// PIEZA B — Tallas / Curvas (D4).
+
+/** Pagina de tallas (`GET /api/tallas`). */
+export type TallasPagina =
+  paths['/api/tallas']['get']['responses']['200']['content']['application/json'];
+/** Una talla tal como la devuelve el API. */
+export type Talla = TallasPagina['datos'][number];
+/** Parametros de consulta del listado de tallas (querystring). */
+export type TallasQuery = NonNullable<paths['/api/tallas']['get']['parameters']['query']>;
+/** Cuerpo de alta de talla (`POST /api/tallas`). */
+export type TallaCrear = paths['/api/tallas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de talla (`PATCH /api/tallas/{id}`). */
+export type TallaEditar =
+  paths['/api/tallas/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Pagina de curvas de tallas (`GET /api/curvas-talla`). */
+export type CurvasPagina =
+  paths['/api/curvas-talla']['get']['responses']['200']['content']['application/json'];
+/** Una curva de tallas tal como la devuelve el API (con sus items ordenados). */
+export type Curva = CurvasPagina['datos'][number];
+/** Un renglon de una curva (talla + posicion). */
+export type CurvaItem = Curva['items'][number];
+/** Parametros de consulta del listado de curvas (querystring). */
+export type CurvasQuery = NonNullable<paths['/api/curvas-talla']['get']['parameters']['query']>;
+/** Cuerpo de alta de curva (`POST /api/curvas-talla`). */
+export type CurvaCrear =
+  paths['/api/curvas-talla']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de curva (`PATCH /api/curvas-talla/{id}`). */
+export type CurvaEditar =
+  paths['/api/curvas-talla/{id}']['patch']['requestBody']['content']['application/json'];
+
+// PIEZA C — Clientes (D7) + campos de referencia.
+
+/** Pagina de clientes (`GET /api/clientes`). */
+export type ClientesPagina =
+  paths['/api/clientes']['get']['responses']['200']['content']['application/json'];
+/** Un cliente tal como lo devuelve el API (con sus campos de referencia). */
+export type Cliente = ClientesPagina['datos'][number];
+/** Parametros de consulta del listado de clientes (querystring). */
+export type ClientesQuery = NonNullable<paths['/api/clientes']['get']['parameters']['query']>;
+/** Cuerpo de alta de cliente (`POST /api/clientes`). */
+export type ClienteCrear =
+  paths['/api/clientes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de cliente (`PATCH /api/clientes/{id}`). */
+export type ClienteEditar =
+  paths['/api/clientes/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Lista de campos de referencia de un cliente (`GET /api/clientes/{id}/campos`). */
+export type ClienteCamposLista =
+  paths['/api/clientes/{id}/campos']['get']['responses']['200']['content']['application/json'];
+/** Un campo de referencia de un cliente (D7). */
+export type ClienteCampo = ClienteCamposLista['datos'][number];
+/** Tipo de dato de un campo de referencia (TEXTO/NUMERO/FECHA). */
+export type TipoCampoCliente = ClienteCampo['tipo'];
+/** Cuerpo de alta de un campo de referencia (`POST /api/clientes/{id}/campos`). */
+export type ClienteCampoCrear =
+  paths['/api/clientes/{id}/campos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de un campo de referencia (`PATCH /api/clientes/{id}/campos/{idCampo}`). */
+export type ClienteCampoEditar =
+  paths['/api/clientes/{id}/campos/{idCampo}']['patch']['requestBody']['content']['application/json'];
 
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las

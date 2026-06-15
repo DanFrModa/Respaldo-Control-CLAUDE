@@ -125,9 +125,15 @@ describe('solicitarSubida', () => {
     expect(url.pathname.endsWith(subida.archivo.key)).toBe(true);
     expect(url.searchParams.get('X-Amz-Signature')).toBeTruthy();
     expect(url.searchParams.get('X-Amz-Expires')).toBe(String(EXPIRACION_SUBIDA_SEGUNDOS));
-    // Content-Type y Content-Length van firmados: no se puede subir otra cosa.
-    expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('content-type');
-    expect(url.searchParams.get('X-Amz-SignedHeaders')).toContain('content-length');
+    // Regresión: la URL prefirmada NO debe firmar content-type ni content-length.
+    // El navegador trata `Content-Length` como "forbidden header" (lo fija él) y
+    // maneja content-type de forma especial; si se firman, el PUT real desde el
+    // navegador no cuadra el SigV4 y R2 lo rechaza con 403 (que el navegador
+    // disfraza de "error de CORS"). Se firma solo lo esencial (host).
+    const firmados = url.searchParams.get('X-Amz-SignedHeaders');
+    expect(firmados).not.toContain('content-type');
+    expect(firmados).not.toContain('content-length');
+    expect(firmados).toContain('host');
     expect(subida.expiraEnSegundos).toBe(EXPIRACION_SUBIDA_SEGUNDOS);
   });
 

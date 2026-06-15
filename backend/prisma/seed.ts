@@ -121,7 +121,9 @@ function definirRoles(): {
   // catálogos (consulta), pero NO su `.administrar`: administrar catálogos maestros
   // (igual que almacenes/usuarios/roles/empresas) queda solo para Administrador y
   // AdministracionDireccion (F1-E1, ADR-0007). Por eso se restan los `*.administrar` de
-  // los 5 catálogos junto con los de administración del sistema.
+  // los catálogos junto con los de administración del sistema. Los catálogos
+  // ESTRUCTURADOS de F1-E2 (maquileros/tallas/clientes) y los de MATERIALES de F1-E3
+  // (telas/avios/bordados) siguen el MISMO reparto.
   const directivo = sin(
     todos,
     'usuarios.administrar',
@@ -129,10 +131,17 @@ function definirRoles(): {
     'almacenes.administrar',
     'empresas.administrar',
     'proveedores.administrar',
-    'cortadores.administrar',
     'temporadas.administrar',
     'etiquetas-marca.administrar',
     'colores.administrar',
+    // F1-E2 — catálogos estructurados. NOTA: maquileros/cortadores se fusionaron en
+    // proveedores (D12/R15) → cubiertos por `proveedores.administrar` de arriba.
+    'tallas.administrar',
+    'clientes.administrar',
+    // F1-E3 — catálogos de materiales.
+    'telas.administrar',
+    'avios.administrar',
+    'bordados.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
@@ -257,13 +266,27 @@ async function sembrarRoles(
  * existe (pudo editarse). NO se borran los que no estén aquí (podrían estar en uso).
  */
 const ROLES_PROVEEDOR_BASE: { codigo: string; nombre: string }[] = [
+  // Servicios de producción (cubren a los antiguos Maquilero y Cortador — fusión de
+  // terceros, D12/R15): un taller marca con casillas qué servicios presta.
   { codigo: 'maquila-costura', nombre: 'Maquila (costura)' },
   { codigo: 'corte', nombre: 'Corte' },
-  { codigo: 'estampado-aplicacion', nombre: 'Estampado / aplicación' },
+  { codigo: 'estampado', nombre: 'Estampado' },
+  { codigo: 'bordado', nombre: 'Bordado' },
+  { codigo: 'lavado', nombre: 'Lavado' },
+  { codigo: 'aplicacion', nombre: 'Aplicación' },
+  // Venta de materiales (proveedores comerciales).
   { codigo: 'vende-telas', nombre: 'Vende telas' },
   { codigo: 'vende-avios', nombre: 'Vende avíos' },
   { codigo: 'otros-servicios', nombre: 'Otros servicios' },
 ];
+
+/**
+ * Roles de proveedor OBSOLETOS que sembrados antiguos pudieron dejar en `prueba` y que
+ * la fusión de terceros (D12/R15) reemplazó. Se DESACTIVAN (no se borran: pudieron
+ * quedar asignados a algún proveedor de prueba; el borrado suave evita dejar pares
+ * colgando). `estampado-aplicacion` se separó en `estampado` + `aplicacion`.
+ */
+const ROLES_PROVEEDOR_OBSOLETOS: string[] = ['estampado-aplicacion'];
 
 async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
   for (const rol of ROLES_PROVEEDOR_BASE) {
@@ -272,6 +295,42 @@ async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
       // No se pisa el nombre/activo si ya existe (pudo editarse en producción).
       update: {},
       create: { codigo: rol.codigo, nombre: rol.nombre },
+    });
+  }
+  // Desactiva los roles obsoletos si existen (idempotente; no falla si no están).
+  await prisma.rolProveedor.updateMany({
+    where: { codigo: { in: ROLES_PROVEEDOR_OBSOLETOS }, activo: true },
+    data: { activo: false },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3c. Tipos de proceso de maquila (F1-E2) — catálogo base, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tipos de proceso de maquila base (maquila unificada — PLANMAESTRO §4;
+ * doc `03-Produccion.md`: M = costura, A = estampado/aplicación, y §324 lista
+ * bordado/lavado como tipos a parametrizar). Catálogo administrable: el ABM fino
+ * queda diferido (como los roles-proveedor en E1B), pero estos son el punto de
+ * partida. Se siembran por `codigo` (clave natural estable), sin pisar el `nombre`
+ * si ya existe (pudo editarse). NO se borran los que no estén aquí (podrían estar en uso).
+ */
+const TIPOS_PROCESO_BASE: { codigo: string; nombre: string }[] = [
+  { codigo: 'costura', nombre: 'Costura' },
+  { codigo: 'estampado', nombre: 'Estampado' },
+  { codigo: 'bordado', nombre: 'Bordado' },
+  { codigo: 'lavado', nombre: 'Lavado' },
+  { codigo: 'aplicacion', nombre: 'Aplicación' },
+];
+
+async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
+  for (const tipo of TIPOS_PROCESO_BASE) {
+    await prisma.tipoProceso.upsert({
+      where: { codigo: tipo.codigo },
+      // No se pisa el nombre/activo si ya existe (pudo editarse en producción).
+      update: {},
+      create: { codigo: tipo.codigo, nombre: tipo.nombre },
     });
   }
 }
@@ -334,6 +393,7 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   const idPermisoPorClave = await sembrarPermisos(prisma);
   await sembrarRoles(prisma, idPermisoPorClave);
   await sembrarRolesProveedor(prisma);
+  await sembrarTiposProceso(prisma);
   await sembrarAdmin(prisma);
 }
 

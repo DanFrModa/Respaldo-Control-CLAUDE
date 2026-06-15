@@ -40,6 +40,9 @@ services:
       # produccion (Railway) se inyecta uno fuerte por variable de entorno.
       BETTER_AUTH_SECRET: secreto-de-desarrollo-local-cambiar-en-produccion
       BETTER_AUTH_URL: http://localhost:8080
+      # Cap alto de logins/min por IP para e2e/local (toda la suite loguea desde
+      # una IP); prod usa el default 20 (Railway no setea esta variable).
+      AUTH_LOGIN_RATE_MAX: '1000'
       # Cloudflare R2 (archivos, F0). Valores DUMMY para local/CI: el firmado de
       # las URLs prefirmadas (presigned PUT/GET) es 100% local y NO contacta a R2,
       # asi que con estos basta para que el flujo de adjuntos (F1-E1B) funcione sin

@@ -1,7 +1,12 @@
 import {
+  Boxes,
   CalendarRange,
+  Contact,
+  Images,
+  Layers,
   Palette,
-  Scissors,
+  Ruler,
+  Stamp,
   Tags,
   Truck,
   Warehouse,
@@ -68,15 +73,6 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     permiso: 'proveedores.ver',
   },
   {
-    clave: 'cortadores',
-    titulo: 'Cortadores',
-    descripcion: 'Talleres de corte y su precio de referencia.',
-    ruta: '/catalogos/cortadores',
-    icono: Scissors,
-    tono: 'servicios',
-    permiso: 'cortadores.ver',
-  },
-  {
     clave: 'temporadas',
     titulo: 'Temporadas',
     descripcion: 'Ciclos comerciales del año.',
@@ -103,16 +99,68 @@ const CATALOGOS_LISTOS: readonly SubcatalogoListo[] = [
     tono: 'servicios',
     permiso: 'colores.ver',
   },
+  // ── Catálogos estructurados (F1-E2) ──────────────────────────────────────────
+  // NOTA (fusión de terceros, D12/R15): "Maquileros" y "Cortadores" se fusionaron en
+  // "Proveedores" (un tercero con sus roles de servicio); ya no tienen tarjeta propia.
+  {
+    clave: 'tallas',
+    titulo: 'Tallas y curvas',
+    descripcion: 'Tallas y curvas de tallas (ilimitadas, D4).',
+    ruta: '/catalogos/tallas',
+    icono: Ruler,
+    tono: 'neutro',
+    permiso: 'tallas.ver',
+  },
+  {
+    clave: 'clientes',
+    titulo: 'Clientes',
+    descripcion: 'Clientes y sus campos de referencia (D7).',
+    ruta: '/catalogos/clientes',
+    icono: Contact,
+    tono: 'avios',
+    permiso: 'clientes.ver',
+  },
+  // ── Catálogos de materiales (F1-E3) ──────────────────────────────────────────
+  {
+    clave: 'telas',
+    titulo: 'Telas',
+    descripcion: 'Catálogo unificado de telas (BOM e inventario) con sus colores.',
+    ruta: '/catalogos/telas',
+    icono: Layers,
+    tono: 'telas',
+    permiso: 'telas.ver',
+  },
+  {
+    clave: 'avios',
+    titulo: 'Avíos',
+    descripcion: 'Habilitación: hilos, botones, etiquetas… con sus proveedores y precios.',
+    ruta: '/catalogos/avios',
+    icono: Boxes,
+    tono: 'avios',
+    permiso: 'avios.ver',
+  },
+  {
+    clave: 'bordados',
+    titulo: 'Bordados y estampados',
+    descripcion: 'Catálogo de bordados y estampados con su foto.',
+    ruta: '/catalogos/bordados',
+    icono: Stamp,
+    tono: 'servicios',
+    permiso: 'bordados.ver',
+  },
+  {
+    clave: 'galeria-bordados',
+    titulo: 'Galería de bordados',
+    descripcion: 'Vista visual de los bordados y estampados con foto.',
+    ruta: '/catalogos/galeria-bordados',
+    icono: Images,
+    tono: 'pt',
+    permiso: 'bordados.ver',
+  },
 ];
 
 /** Catalogos aun por construir (se muestran como "Próximamente"). */
-const CATALOGOS_PENDIENTES: readonly SubcatalogoPendiente[] = [
-  { clave: 'clientes', titulo: 'Clientes', descripcion: 'Catálogo de clientes y sus datos.' },
-  { clave: 'maquileros', titulo: 'Maquileros', descripcion: 'Talleres de costura y estampado.' },
-  { clave: 'telas', titulo: 'Telas', descripcion: 'Catálogo de telas y composiciones.' },
-  { clave: 'avios', titulo: 'Avíos', descripcion: 'Habilitación: hilos, botones, etiquetas…' },
-  { clave: 'tallas', titulo: 'Tallas', descripcion: 'Curvas de tallas (ilimitadas, D4).' },
-];
+const CATALOGOS_PENDIENTES: readonly SubcatalogoPendiente[] = [];
 
 export function CatalogosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();

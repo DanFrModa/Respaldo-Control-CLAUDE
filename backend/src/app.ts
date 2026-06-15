@@ -4,8 +4,10 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { serializerCompiler, validatorCompiler } from 'fastify-type-provider-zod';
 
 import { rutasAlmacenes } from './api/almacenes/almacenes.rutas.js';
+import { rutasAvios } from './api/avios/avios.rutas.js';
+import { rutasBordados } from './api/bordados/bordados.rutas.js';
+import { rutasClientes } from './api/clientes/clientes.rutas.js';
 import { rutasColores } from './api/colores/colores.rutas.js';
-import { rutasCortadores } from './api/cortadores/cortadores.rutas.js';
 import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
 import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas.js';
 import { registrarManejadorErrores } from './api/errores.js';
@@ -13,6 +15,8 @@ import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
 import { rutasSesion } from './api/sesion/sesion.rutas.js';
+import { rutasTallas } from './api/tallas/tallas.rutas.js';
+import { rutasTelas } from './api/telas/telas.rutas.js';
 import { rutasTemporadas } from './api/temporadas/temporadas.rutas.js';
 import { rutasUsuarios } from './api/usuarios/usuarios.rutas.js';
 import { registrarAuth, type OpcionesAuth } from './auth/plugin.js';
@@ -79,12 +83,20 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasSalud, { prefix: '/api' });
   await app.register(rutasSesion, { prefix: '/api' });
   await app.register(rutasAlmacenes, { prefix: '/api' });
-  // Catálogos maestros globales (F1-E1) — patrón CRUD de Almacenes.
+  // Catálogos maestros globales (F1-E1) — patrón CRUD de Almacenes. NOTA: cortadores y
+  // maquileros se fusionaron en proveedores (un tercero con sus roles de servicio, D12/R15).
   await app.register(rutasProveedores, { prefix: '/api' });
-  await app.register(rutasCortadores, { prefix: '/api' });
   await app.register(rutasTemporadas, { prefix: '/api' });
   await app.register(rutasEtiquetasMarca, { prefix: '/api' });
   await app.register(rutasColores, { prefix: '/api' });
+  // Catálogos estructurados (F1-E2) — tallas/curvas (D4), clientes (D7).
+  await app.register(rutasTallas, { prefix: '/api' });
+  await app.register(rutasClientes, { prefix: '/api' });
+  // Catálogos de materiales (F1-E3) — telas unificadas (D5) + colores, avíos (R1) + proveedores,
+  // bordados (R2) + foto. Cada plugin define rutas internas sin `/api`; va bajo el prefijo `/api`.
+  await app.register(rutasTelas, { prefix: '/api' });
+  await app.register(rutasAvios, { prefix: '/api' });
+  await app.register(rutasBordados, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

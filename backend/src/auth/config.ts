@@ -39,6 +39,17 @@ import { aplicarBloqueoAntesDeLogin, aplicarBloqueoDespuesDeLogin } from './bloq
 const RUTA_LOGIN_USERNAME = '/sign-in/username';
 
 /**
+ * Tope de intentos de login por minuto y por IP, configurable por entorno con
+ * `AUTH_LOGIN_RATE_MAX`. **Default 20**: producción (Railway NO setea el env)
+ * queda protegida con el mismo valor de siempre. Solo se sube en escenarios donde
+ * TODO el tráfico viene de UNA IP que scripta logins —el stack de docker compose,
+ * los e2e de CI y el compose local de Gabriel— que de otro modo agotarían la cuota
+ * con logins legítimos repetidos (no es fuerza bruta). El rate limiter sigue
+ * ENCENDIDO en esos entornos: solo cambia el cap.
+ */
+const MAX_LOGIN_ENV = Number.parseInt(process.env.AUTH_LOGIN_RATE_MAX ?? '', 10);
+
+/**
  * Límite de peticiones del login por usuario (rate limit per-IP de better-auth).
  *
  * better-auth trae una regla especial para `/sign-in*` de **3 req / 10 s**; con
@@ -48,9 +59,12 @@ const RUTA_LOGIN_USERNAME = '/sign-in/username';
  * deja holgura para los 5 intentos deterministas y, a la vez, acota el spray
  * (password spraying / lockout-DoS) que el bloqueo per-usuario por sí solo no
  * frena. 20 intentos/min por IP nunca estorba a un usuario legítimo y corta una
- * inundación.
+ * inundación. El cap es ajustable por env (ver {@link MAX_LOGIN_ENV}).
  */
-const REGLA_RATE_LOGIN = { window: 60, max: 20 } as const;
+const REGLA_RATE_LOGIN = {
+  window: 60,
+  max: Number.isInteger(MAX_LOGIN_ENV) && MAX_LOGIN_ENV > 0 ? MAX_LOGIN_ENV : 20,
+} as const;
 
 /** Opciones de construcción de la instancia de better-auth (inyectables en pruebas). */
 export interface OpcionesConstruirAuth {

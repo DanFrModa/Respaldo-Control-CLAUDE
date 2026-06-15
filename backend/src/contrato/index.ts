@@ -108,19 +108,6 @@ export {
 } from './esquemas/fiscal.js';
 
 export {
-  esquemaCortadorCrear,
-  esquemaCortadorEditar,
-  esquemaCortadorSalida,
-  esquemaCortadoresQuery,
-  esquemaCortadoresPagina,
-  type DatosCortadorCrear,
-  type DatosCortadorEditar,
-  type CortadorSalida,
-  type CortadoresQuery,
-  type CortadoresPagina,
-} from './esquemas/cortador.js';
-
-export {
   esquemaTemporadaCrear,
   esquemaTemporadaEditar,
   esquemaTemporadaSalida,
@@ -158,6 +145,128 @@ export {
   type ColoresQuery,
   type ColoresPagina,
 } from './esquemas/color.js';
+
+// ── Catálogos estructurados (F1-E2): maestros globales con relaciones (ADR-0007) ──
+// NOTA (fusión de terceros, D12/R15): maquileros se eliminó como catálogo (un maquilero
+// es ahora un Proveedor con sus roles de servicio).
+export {
+  esquemaTallaCrear,
+  esquemaTallaEditar,
+  esquemaTallaSalida,
+  esquemaListarTallas,
+  esquemaTallasPagina,
+  esquemaCurvaCrear,
+  esquemaCurvaEditar,
+  esquemaCurvaSalida,
+  esquemaCurvaTallaItemSalida,
+  esquemaListarCurvas,
+  esquemaCurvasPagina,
+  type DatosTallaCrear,
+  type DatosTallaEditar,
+  type TallaSalida,
+  type ListarTallas,
+  type TallasPagina,
+  type DatosCurvaCrear,
+  type DatosCurvaEditar,
+  type CurvaSalida,
+  type CurvaTallaItemSalida,
+  type ListarCurvas,
+  type CurvasPagina,
+} from './esquemas/talla.js';
+
+export {
+  TIPOS_CAMPO_CLIENTE,
+  esquemaClienteCrear,
+  esquemaClienteEditar,
+  esquemaClienteSalida,
+  esquemaListarClientes,
+  esquemaClientesPagina,
+  esquemaClienteCampoCrear,
+  esquemaClienteCampoEditar,
+  esquemaClienteCampoSalida,
+  type TipoCampoClienteClave,
+  type DatosClienteCrear,
+  type DatosClienteEditar,
+  type ClienteSalida,
+  type ListarClientes,
+  type ClientesPagina,
+  type DatosClienteCampoCrear,
+  type DatosClienteCampoEditar,
+  type ClienteCampoSalida,
+} from './esquemas/cliente.js';
+
+// ── Catálogos de materiales (F1-E3): globales con relaciones (ADR-0007/ADR-0009) ──
+export {
+  TIPOS_COMPONENTE_TELA,
+  esquemaTelaCrear,
+  esquemaTelaEditar,
+  esquemaTelaSalida,
+  esquemaListarTelas,
+  esquemaTelasPagina,
+  esquemaTelaColorSalida,
+  esquemaTelaColoresLista,
+  esquemaTelaCategoriaCrear,
+  esquemaTelaCategoriaEditar,
+  esquemaTelaCategoriaSalida,
+  esquemaTelasCategoriasQuery,
+  esquemaTelasCategoriasPagina,
+  type TipoComponenteTelaClave,
+  type DatosTelaCrear,
+  type DatosTelaEditar,
+  type TelaSalida,
+  type ListarTelas,
+  type TelasPagina,
+  type TelaColorSalida,
+  type TelaColoresLista,
+  type DatosTelaCategoriaCrear,
+  type DatosTelaCategoriaEditar,
+  type TelaCategoriaSalida,
+  type TelasCategoriasQuery,
+  type TelasCategoriasPagina,
+} from './esquemas/tela.js';
+
+export {
+  esquemaAvioCrear,
+  esquemaAvioEditar,
+  esquemaAvioPatchCuerpo,
+  esquemaAvioSalida,
+  esquemaListarAvios,
+  esquemaAviosPagina,
+  esquemaAvioProveedorSalida,
+  esquemaAvioProveedoresLista,
+  type DatosAvioCrear,
+  type DatosAvioEditar,
+  type DatosAvioPatchCuerpo,
+  type AvioSalida,
+  type ListarAvios,
+  type AviosPagina,
+  type AvioProveedorSalida,
+  type AvioProveedoresLista,
+} from './esquemas/avio.js';
+
+export {
+  TIPOS_BORDADO,
+  ETIQUETAS_TIPO_BORDADO,
+  esquemaBordadoCrear,
+  esquemaBordadoEditar,
+  esquemaBordadoPatchCuerpo,
+  esquemaBordadoSalida,
+  esquemaBordadosQuery,
+  esquemaBordadosPagina,
+  esquemaBordadoFotoCrear,
+  esquemaBordadoFotoSubida,
+  esquemaBordadoFotoSalida,
+  type TipoBordadoClave,
+  type DatosBordadoCrear,
+  type DatosBordadoEditar,
+  type DatosBordadoPatchCuerpo,
+  type BordadoSalida,
+  type BordadosQuery,
+  type BordadosPagina,
+  type DatosBordadoFotoCrear,
+  type BordadoFotoSubida,
+  type BordadoFotoSalida,
+} from './esquemas/bordado.js';
 
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
