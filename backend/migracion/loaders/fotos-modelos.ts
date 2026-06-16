@@ -132,9 +132,7 @@ export async function cargarFotosModelos(
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0, totalSubidas: 0 };
   }
   if (!existsSync(dirFotos)) {
-    reporte.nota(
-      `ETL_FOTOS_MOD_DIR="${dirFotos}" no existe en disco: fotos de modelos OMITIDAS.`,
-    );
+    reporte.nota(`ETL_FOTOS_MOD_DIR="${dirFotos}" no existe en disco: fotos de modelos OMITIDAS.`);
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0, totalSubidas: 0 };
   }
 
@@ -162,10 +160,28 @@ export async function cargarFotosModelos(
       const idModelo = Number(idModeloStr);
 
       const resultFrente = await procesarFotoModelo(
-        sesion, bd, clienteBd, clienteR2, bucket, idModelo, fila.Foto1, 'FRENTE', dirFotos, reporte,
+        sesion,
+        bd,
+        clienteBd,
+        clienteR2,
+        bucket,
+        idModelo,
+        fila.Foto1,
+        'FRENTE',
+        dirFotos,
+        reporte,
       );
       const resultEspalda = await procesarFotoModelo(
-        sesion, bd, clienteBd, clienteR2, bucket, idModelo, fila.Foto2, 'ESPALDA', dirFotos, reporte,
+        sesion,
+        bd,
+        clienteBd,
+        clienteR2,
+        bucket,
+        idModelo,
+        fila.Foto2,
+        'ESPALDA',
+        dirFotos,
+        reporte,
       );
       return { frente: resultFrente, espalda: resultEspalda };
     },
@@ -184,10 +200,16 @@ export async function cargarFotosModelos(
       continue;
     }
     for (const estado of [r.valor.frente, r.valor.espalda]) {
-      if (estado === 'creado') { creados += 1; totalSubidas += 1; }
-      else if (estado === 'existente') { existentes += 1; }
-      else if (estado === 'omitido') { omitidos += 1; }
-      else { omitidosValidacion += 1; }
+      if (estado === 'creado') {
+        creados += 1;
+        totalSubidas += 1;
+      } else if (estado === 'existente') {
+        existentes += 1;
+      } else if (estado === 'omitido') {
+        omitidos += 1;
+      } else {
+        omitidosValidacion += 1;
+      }
     }
   }
 
@@ -249,7 +271,13 @@ async function procesarFotoModelo(
     //    Un objeto R2 huérfano de un intento previo (BD falló tras subir) es inofensivo: la key
     //    lleva `randomUUID`, así que un reintento sube a una key NUEVA, sin colisionar.
     await clienteR2.send(
-      new PutObjectCommand({ Bucket: bucket, Key: key, Body: contenido, ContentType: tipoMime, ContentLength: tamanoBytes }),
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: contenido,
+        ContentType: tipoMime,
+        ContentLength: tamanoBytes,
+      }),
     );
 
     // 2. Solo si la subida fue OK, registrar Archivo + ModeloFoto en BD (en una transacción A2).
@@ -307,9 +335,7 @@ export async function cargarFotosBordados(
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
   }
   if (!existsSync(dirFotos)) {
-    reporte.nota(
-      `ETL_FOTOS_BOR_DIR="${dirFotos}" no existe en disco: fotos de bordados OMITIDAS.`,
-    );
+    reporte.nota(`ETL_FOTOS_BOR_DIR="${dirFotos}" no existe en disco: fotos de bordados OMITIDAS.`);
     return { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
   }
 
@@ -369,13 +395,26 @@ export async function cargarFotosBordados(
         //    re-correr reintenta limpio (el guard `idArchivoFoto != null` sigue null). Un objeto
         //    R2 huérfano de un intento previo es inofensivo: la key lleva `randomUUID`.
         await clienteR2.send(
-          new PutObjectCommand({ Bucket: bucket, Key: key, Body: contenido, ContentType: tipoMime, ContentLength: tamanoBytes }),
+          new PutObjectCommand({
+            Bucket: bucket,
+            Key: key,
+            Body: contenido,
+            ContentType: tipoMime,
+            ContentLength: tamanoBytes,
+          }),
         );
 
         // 2. Solo si la subida fue OK, registrar Archivo + ligar la foto al Bordado (A2).
         await enTransaccion(async (tx) => {
           const archivo = await tx.archivo.create({
-            data: { bucket: bucket, key, nombreOriginal, tipoMime, tamanoBytes, subidoPorId: sesion.id },
+            data: {
+              bucket: bucket,
+              key,
+              nombreOriginal,
+              tipoMime,
+              tamanoBytes,
+              subidoPorId: sesion.id,
+            },
           });
           await tx.bordado.update({
             where: { id: idBordado },

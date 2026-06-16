@@ -124,8 +124,8 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     // Fixtures: 5 filas. M001/M002 = activos (creados), M003 = inactivo (creado y descontinuado),
     // M-DUP dos veces: el primero (IdModelos=4) se crea, el segundo (IdModelos=5) da
     // ErrorConflicto (código duplicado) y se OMITE.
-    expect(tras1.modelos).toBe(4);          // M001, M002, M003, M-DUP (primer ocurrencia)
-    expect(tras1.modelosActivos).toBe(3);   // M001, M002, M-DUP (M003 descontinuado)
+    expect(tras1.modelos).toBe(4); // M001, M002, M003, M-DUP (primer ocurrencia)
+    expect(tras1.modelosActivos).toBe(3); // M001, M002, M-DUP (M003 descontinuado)
     // El mapeo persiste solo los creados correctamente (4 mapeos de Modelo).
     expect(tras1.mapeos).toBe(4);
 

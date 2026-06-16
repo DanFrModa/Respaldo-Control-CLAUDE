@@ -129,7 +129,16 @@ async function cargarTelasBom(
   const filas = leerCsv('ModelosTela.csv');
 
   // Agrupar por IdModelos (el dominio trabaja con set-completo por modelo).
-  const porModelo = new Map<number, Array<{ idTela: number; consumoPorPrenda: number; paraPreCosto: boolean; paraProduccion: boolean; paraCosto: boolean }>>();
+  const porModelo = new Map<
+    number,
+    Array<{
+      idTela: number;
+      consumoPorPrenda: number;
+      paraPreCosto: boolean;
+      paraProduccion: boolean;
+      paraCosto: boolean;
+    }>
+  >();
 
   let sinMapeoModelo = 0;
   let sinMapeoTela = 0;
@@ -160,7 +169,13 @@ async function cargarTelasBom(
     const renglonExistente = porModelo.get(idModeloNuevo);
     const { consumoPorPrenda, paraPreCosto, paraProduccion, paraCosto } =
       transformarRenglonTela(fila);
-    const renglonNuevo = { idTela: idTelaNueva, consumoPorPrenda, paraPreCosto, paraProduccion, paraCosto };
+    const renglonNuevo = {
+      idTela: idTelaNueva,
+      consumoPorPrenda,
+      paraPreCosto,
+      paraProduccion,
+      paraCosto,
+    };
     if (renglonExistente === undefined) {
       porModelo.set(idModeloNuevo, [renglonNuevo]);
     } else {
@@ -215,7 +230,16 @@ async function cargarAviosBom(
 ): Promise<ResultadoLoader> {
   const filas = leerCsv('ModelosHab.csv');
 
-  const porModelo = new Map<number, Array<{ idAvio: number; consumoPorPrenda: number; paraPreCosto: boolean; paraProduccion: boolean; paraCosto: boolean }>>();
+  const porModelo = new Map<
+    number,
+    Array<{
+      idAvio: number;
+      consumoPorPrenda: number;
+      paraPreCosto: boolean;
+      paraProduccion: boolean;
+      paraCosto: boolean;
+    }>
+  >();
 
   let sinMapeoModelo = 0;
   let sinMapeoAvio = 0;
@@ -246,7 +270,13 @@ async function cargarAviosBom(
     const renglonExistente = porModelo.get(idModeloNuevo);
     const { consumoPorPrenda, paraPreCosto, paraProduccion, paraCosto } =
       transformarRenglonAvio(fila);
-    const renglonNuevo = { idAvio: idAvioNuevo, consumoPorPrenda, paraPreCosto, paraProduccion, paraCosto };
+    const renglonNuevo = {
+      idAvio: idAvioNuevo,
+      consumoPorPrenda,
+      paraPreCosto,
+      paraProduccion,
+      paraCosto,
+    };
     if (renglonExistente === undefined) {
       porModelo.set(idModeloNuevo, [renglonNuevo]);
     } else {
@@ -379,4 +409,3 @@ async function cargarBordadosBom(
 
   return { creados, existentes, omitidos, omitidosValidacion };
 }
-

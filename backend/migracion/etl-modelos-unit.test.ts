@@ -13,15 +13,9 @@ import { tmpdir } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import {
-  transformarRenglonTela,
-  transformarRenglonAvio,
-} from './loaders/bom-modelos.js';
+import { transformarRenglonTela, transformarRenglonAvio } from './loaders/bom-modelos.js';
 
-import {
-  parsearNombreFoto,
-  buscarArchivoFoto,
-} from './loaders/fotos-modelos.js';
+import { parsearNombreFoto, buscarArchivoFoto } from './loaders/fotos-modelos.js';
 
 // ── 1. Banderas b* → para* ────────────────────────────────────────────────────
 
