@@ -385,7 +385,9 @@
 
 ---
 
-## F1-E6 · ETL de catálogos y materiales + mapeos reutilizables + fusión de colores — ⬜ pendiente
+## F1-E6 · ETL de catálogos y materiales + mapeos reutilizables + fusión de colores — ✅ hecha (15-jun-2026, en `prueba`)
+
+> **CIERRE (15-jun-2026).** Entregada por 2 coders en paralelo (pieza A: ETL de catálogos/materiales + mapeos + cuadre, en `backend/migracion`; pieza B: fusión de colores end-to-end) + 1 reviewer independiente (el lead orquesta, no codea), verificada por Gabriel en `prueba` (Railway) y mergeada vía **PR #42** (+ **PR #43**, fix de verificación). **Aprendizaje grande: los CSV viejos están en CP850, NO latin-1** — leerlos mal corrompía acentos en silencio (`ñ`=0xA4, `ó`=0xA2: "Montaño"→"Monta¤o", "Algodón"→"Algod¢n"); se corrigió con `iconv-lite` (cp850, `backend/migracion/comun/csv.ts`) y se actualizó CLAUDE.md §4. Quedó persistida la tabla `MapeoMigracion` (texto→idColor, tela vieja→unificada, maquilero/estampador→unificado, etc.) que consumen E7/F2/F4/F9, y la fusión de colores preservando referencias `TelaColor`. Conteos cargados en `prueba` (v2): Clientes 116, Proveedores (fusionados) 962, Telas 976, Avíos 532, Bordados 2792, TelasColores 4094, Colores 5664, Tallas 94 / Curvas 152.
 
 **Objetivo:** Cargar los datos reales del sistema viejo en TODOS los catálogos (sencillos, estructurados y de materiales), producir los MAPEOS que la migración del historial reutiliza de F2 a F9 (texto→idColor, tela vieja→unificada, maquilero/estampador→unificado) y entregar la fusión de colores duplicados. Se separa del ETL de modelos/fotos (E7) porque junto eran 2–3 veces el tamaño de cualquier otra etapa; la cadena de dependencias corta limpio aquí (colores antes que telas; catálogos antes que BOM). Verificable por Gabriel en compose local.
 
@@ -439,7 +441,15 @@
 
 ---
 
-## F1-E7 · ETL de modelos + BOM + fotos masivas + docs del módulo + cierre de fase en `prueba` — ⬜ pendiente
+## F1-E7 · ETL de modelos + BOM + fotos masivas + docs del módulo + cierre de fase en `prueba` — ✅ hecha (15-jun-2026, en `prueba`) — **CIERRE DE FASE F1**
+
+> **CIERRE (15-jun-2026).** Entregada por 1 coder + 1 reviewer independiente (cadena; el lead orquesta, no codea), verificada por Gabriel en `prueba` (Railway): datos reales cargados, idempotencia confirmada EN VIVO (2ª corrida `creados=0 existentes=N` en modelos y BOM) y recetas de modelos revisadas en la app. Mergeada vía **PR #44**. Reviewer: **APROBADO** — en la 1ª ronda cazó 1 MAYOR (el ETL de fotos commiteaba la BD ANTES de subir a R2 → registros huérfanos sin reintento ante fallo; corregido a "R2 primero, BD después") + el conteo `creados` del BOM inflado en re-corridas (corregido con pre-lectura sin N+1) + 1 typo; todos corregidos y re-verificados.
+>
+> **Cuadre v1 (CSV, runtime) vs v2 (Postgres):** Modelos 4987→**4978** · BOM telas 791→**700** · avíos 7163→**5639** · bordados 2378→**2308**. Todo descuadre está **explicado y reportado** (§7, sin null silencioso): son referencias huérfanas del Access viejo (sin FKs). Los 9 modelos faltantes tienen **código vacío**. Descuadre mayor: **842 renglones de BOM-avío apuntan a `IdHabilitacion=12`, un avío BORRADO del catálogo viejo** (la lista salta del 11 al 13) — **DECISIÓN ABIERTA PARA DANIEL**: ¿re-darlo de alta (re-correr el ETL recoge los 842, es idempotente) o dejarlo retirado? El resto de avíos: ~463 renglones a avíos con Clave vacía (E6 no migra) + ~207 con datos sucios.
+>
+> **Decisiones consumidas/resueltas:** **Temporadas** — `IdTemporadas` es 0 en los 4984 registros (vacío en 3): ningún modelo tenía temporada real → se cargan SIN temporada y se reporta (NO eran "colgantes a temporada faltante" como temía el plan; resultó más limpio). **Género** — `Modelos.csv` no trae columna de género → modelos sin género (se asigna por UI). **Primeras/Segundas** — migradas PROVISIONALMENTE como almacenes PT; separación calidad-vs-almacén queda abierta para F3 (registrado en `docs/modulos/catalogos.md`). **Listas de precios / PreCostos** → F7. **Fotos: PENDIENTE EXPLÍCITO** — la carpeta física (`S:\AplicacionesMJD\Control\FotosMod` + bordados) NO está en la máquina de Gabriel (verificado: no hay unidad S: ni la carpeta en disco). El ETL de fotos quedó **construido, con tests y diseño idempotente (R2 primero)**; se corre con `--fotos-modelos` / `--fotos-bordados` cuando se consiga la carpeta. NO bloquea el cierre de datos de la fase.
+>
+> **Operación:** ETL = `npx tsx --env-file=.env migracion/etl-modelos.ts` (¡OJO! los scripts `npm run etl:*` NO auto-cargan `.env`; usar `tsx --env-file`); cuadre completo de fase = `migracion/cuadre-fase.ts`. Docs de módulo: `docs/modulos/catalogos.md` + `docs/modulos/modelos.md`. **Deuda técnica chica:** warning de `pg` (`client.query() ... already executing`) por la carga concurrente — no afectó datos (cuadran exacto), a vigilar. **Criterio de salida F1 CUMPLIDO:** modelos reales con su receta capturados/verificados en `prueba`.
 
 **Objetivo:** Cargar los 4,987 modelos con sus 10,332 renglones de BOM reutilizando los mapeos de E6, subir las fotos masivas a R2, publicar la documentación del módulo y demostrar el criterio de salida de la fase en el environment `prueba`. Es la última etapa: necesita todas las entidades, pantallas y mapeos construidos (E6 entrega colores/telas/avíos/bordados mapeados que el BOM referencia).
 
