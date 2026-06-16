@@ -49,13 +49,15 @@ describe('catalogo de modulos del menu', () => {
 
   it('muestra los modulos "autenticado" con cualquier sesion (incluso sin permisos)', () => {
     const visibles = filtrarModulosVisibles(permisos());
-    // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver) y Códigos de
-    // barra (modelos.codigos-barra) NO son "autenticado"; el resto sí -> 11 visibles sin permisos.
+    // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver), Códigos de
+    // barra (modelos.codigos-barra) y Pedidos (pedidos.ver, F2-E1) NO son "autenticado"; el resto
+    // sí -> 10 visibles sin permisos.
     expect(visibles.map((m) => m.clave)).not.toContain('administracion');
     expect(visibles.map((m) => m.clave)).not.toContain('modelos');
     expect(visibles.map((m) => m.clave)).not.toContain('galeria-modelos');
     expect(visibles.map((m) => m.clave)).not.toContain('codigos-barra');
-    expect(visibles).toHaveLength(11);
+    expect(visibles.map((m) => m.clave)).not.toContain('pedidos');
+    expect(visibles).toHaveLength(10);
   });
 
   it('oculta Administracion sin un permiso administrativo', () => {
@@ -80,9 +82,10 @@ describe('catalogo de modulos del menu', () => {
       'empresas.administrar',
       'almacenes.administrar',
       // Modelos (F1-E4) y su Galería (F1-E5) requieren `modelos.ver`; el generador de códigos de
-      // barra (F1-E5) requiere `modelos.codigos-barra`.
+      // barra (F1-E5) requiere `modelos.codigos-barra`; Pedidos (F2-E1) requiere `pedidos.ver`.
       'modelos.ver',
       'modelos.codigos-barra',
+      'pedidos.ver',
     );
     // 13 módulos del plan + 2 sub-vistas (galería de modelos + códigos de barra) = 15.
     expect(filtrarModulosVisibles(todos)).toHaveLength(15);

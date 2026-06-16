@@ -21,6 +21,10 @@
 export const MODULOS_PERMISO = {
   ordenes: 'Órdenes de producción',
   pedidos: 'Pedidos',
+  // Sub-módulo Pedidos Reales (F2-E1): los pedidos reales (liberaciones del cliente) tienen
+  // su propio permiso de captura porque en el viejo eran un nivel de acceso aparte (≤60,
+  // doc 02-Pedidos §3). Cuelgan del módulo Pedidos en el menú.
+  'pedidos-reales': 'Pedidos reales',
   clientes: 'Clientes',
   proveedores: 'Proveedores',
   // Módulo LEGADO de F0 (solo agrupa `etiquetas.modificar`, sin uso en v2): el
@@ -155,6 +159,35 @@ export const CATALOGO_PERMISOS = [
       formulario: 'PedidosRealesVer',
       descripcion: 'Poder modificar pedidos reales.',
     },
+  },
+
+  // ── Pedidos (Módulo PEDIDOS, F2-E1; doc 02-Pedidos) — permisos NUEVOS de v2 ────
+  // El módulo Pedidos en v2: ver (consulta), administrar (alta/edición/copiar/cancelar el
+  // pedido interno) e importes (ver `precio`/totales en $). En el viejo, los importes se
+  // ocultaban a nivel 45+ (doc 02 §3); aquí es un permiso RBAC propio (A4). El pedido REAL
+  // (liberaciones por CEDIS) lleva su permiso de captura aparte (`pedidos-reales.administrar`),
+  // como en el viejo era un acceso a nivel ≤60.
+  {
+    clave: 'pedidos.ver',
+    modulo: 'pedidos',
+    descripcion: 'Consultar pedidos internos y sus renglones',
+  },
+  {
+    clave: 'pedidos.administrar',
+    modulo: 'pedidos',
+    descripcion:
+      'Administrar pedidos internos: alta, edición de renglones, copiar y cancelar (suave)',
+  },
+  {
+    clave: 'pedidos.importes',
+    modulo: 'pedidos',
+    descripcion: 'Ver los importes (precio por renglón y totales en $) de los pedidos',
+  },
+  {
+    clave: 'pedidos-reales.administrar',
+    modulo: 'pedidos-reales',
+    descripcion:
+      'Administrar pedidos reales: crear desde un pedido y capturar el seguimiento por renglón',
   },
 
   // ── Clientes / Proveedores ───────────────────────────────────────────────────

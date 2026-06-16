@@ -12,6 +12,7 @@ import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
 import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas.js';
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
+import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
@@ -101,6 +102,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // Modelos (Módulo 2, F1-E4) — catálogo de productos + receta/BOM + fotos. Selector de
   // géneros (`GET /api/generos`) bajo `modelos.ver`.
   await app.register(rutasModelos, { prefix: '/api' });
+  // Pedidos (Módulo PEDIDOS, F2-E1) — pedido interno (CRUD + copiar + cancelar) + pedido real
+  // (crear desde pedido, listar, editar, seguimiento). Folio por empresa (A3/A9). Importes
+  // ocultados server-side sin `pedidos.importes`.
+  await app.register(rutasPedidos, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });
