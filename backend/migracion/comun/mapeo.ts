@@ -37,6 +37,8 @@ export const ENTIDAD_MAPEO = {
   proveedorPorIdCortadores: 'Proveedor:IdCortadores',
   almacenIpt: 'Almacen:IPT',
   almacenTela: 'Almacen:Tela',
+  /** E7: IdModelos viejo → id nuevo (lo usan el BOM y las fotos). */
+  modelo: 'Modelo',
 } as const;
 
 /** Una clave de entidad de mapeo. */
