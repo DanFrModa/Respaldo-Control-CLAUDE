@@ -195,6 +195,46 @@ export type ClienteCampoCrear =
 export type ClienteCampoEditar =
   paths['/api/clientes/{id}/campos/{idCampo}']['patch']['requestBody']['content']['application/json'];
 
+// ── Pedidos (Modulo PEDIDOS, F2-E1) — pedido interno + pedido real ────────────
+
+/** Pagina de pedidos internos (`GET /api/pedidos`). */
+export type PedidosPagina =
+  paths['/api/pedidos']['get']['responses']['200']['content']['application/json'];
+/** Un pedido interno tal como lo devuelve el API (con sus renglones). */
+export type Pedido = PedidosPagina['datos'][number];
+/** Un renglon de un pedido interno. */
+export type PedidoLinea = Pedido['lineas'][number];
+/** Parametros de consulta del listado de pedidos (querystring). */
+export type PedidosQuery = NonNullable<paths['/api/pedidos']['get']['parameters']['query']>;
+/** Cuerpo de alta de pedido (`POST /api/pedidos`). */
+export type PedidoCrear =
+  paths['/api/pedidos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de pedido (`PATCH /api/pedidos/{id}`). */
+export type PedidoEditar =
+  paths['/api/pedidos/{id}']['patch']['requestBody']['content']['application/json'];
+/** Un renglon de captura de pedido (modelo + cantidad + precio). */
+export type PedidoLineaEntrada = NonNullable<PedidoCrear['lineas']>[number];
+/** Cuerpo de copiar un pedido (`POST /api/pedidos/{id}/copiar`). */
+export type PedidoCopiar =
+  paths['/api/pedidos/{id}/copiar']['post']['requestBody']['content']['application/json'];
+
+/** Lista de pedidos reales de un pedido (`GET /api/pedidos/{id}/reales`). */
+export type PedidoRealesLista =
+  paths['/api/pedidos/{id}/reales']['get']['responses']['200']['content']['application/json'];
+/** Un pedido real (liberacion del cliente) con su detalle. */
+export type PedidoReal = PedidoRealesLista['datos'][number];
+/** Un renglon de un pedido real. */
+export type PedidoRealLinea = PedidoReal['lineas'][number];
+/** Cuerpo de alta de un pedido real (`POST /api/pedidos/{id}/reales`). */
+export type PedidoRealCrear =
+  paths['/api/pedidos/{id}/reales']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion del encabezado de un pedido real (`PATCH /api/pedidos-reales/{idReal}`). */
+export type PedidoRealEditar =
+  paths['/api/pedidos-reales/{idReal}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo del seguimiento por renglon (`PATCH /api/pedidos-reales/{idReal}/seguimiento`). */
+export type PedidoRealSeguimiento =
+  paths['/api/pedidos-reales/{idReal}/seguimiento']['patch']['requestBody']['content']['application/json'];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

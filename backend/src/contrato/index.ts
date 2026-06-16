@@ -328,6 +328,42 @@ export {
   type DatosModeloFotoEditar,
 } from './esquemas/modelo.js';
 
+// ── Pedidos (Módulo PEDIDOS, F2-E1): pedido interno + pedido real (doc 02-Pedidos) ──
+export {
+  esquemaPedidoLineaEntrada,
+  esquemaPedidoCrear,
+  esquemaPedidoEditar,
+  esquemaPedidoPatchCuerpo,
+  esquemaPedidoCopiarCuerpo,
+  esquemaPedidoLineaSalida,
+  esquemaPedidoSalida,
+  esquemaListarPedidos,
+  esquemaPedidosPagina,
+  esquemaPedidoRealCrear,
+  esquemaPedidoRealEditar,
+  esquemaPedidoRealLineaSeguimiento,
+  esquemaPedidoRealSeguimientoCuerpo,
+  esquemaPedidoRealLineaSalida,
+  esquemaPedidoRealSalida,
+  esquemaPedidoRealesLista,
+  type DatosPedidoLineaEntrada,
+  type DatosPedidoCrear,
+  type DatosPedidoEditar,
+  type DatosPedidoPatchCuerpo,
+  type DatosPedidoCopiar,
+  type PedidoLineaSalida,
+  type PedidoSalida,
+  type ListarPedidos,
+  type PedidosPagina,
+  type DatosPedidoRealCrear,
+  type DatosPedidoRealEditar,
+  type DatosPedidoRealLineaSeguimiento,
+  type DatosPedidoRealSeguimiento,
+  type PedidoRealLineaSalida,
+  type PedidoRealSalida,
+  type PedidoRealesLista,
+} from './esquemas/pedido.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

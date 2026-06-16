@@ -154,7 +154,7 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Pedidos internos (forecast) y pedidos reales por CEDIS',
     ruta: '/pedidos',
     icono: 'carrito',
-    permisos: 'autenticado',
+    permisos: ['pedidos.ver'],
   },
   {
     clave: 'produccion',
