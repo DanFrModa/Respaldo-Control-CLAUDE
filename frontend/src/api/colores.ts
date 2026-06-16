@@ -9,7 +9,14 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
-import type { Color, ColorCrear, ColorEditar, ColoresPagina, ColoresQuery } from './tipos';
+import type {
+  Color,
+  ColorCrear,
+  ColorEditar,
+  ColorFusionar,
+  ColoresPagina,
+  ColoresQuery,
+} from './tipos';
 
 /**
  * Capa de datos de Colores — replica del ESTANDAR de Almacenes (`api/almacenes.ts`).
@@ -61,6 +68,15 @@ async function desactivarColor(id: number): Promise<Color> {
   const { data, error } = await api.DELETE('/api/colores/{id}', {
     params: { path: { id } },
   });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Fusiona colores duplicados en uno canónico (`POST /api/colores/fusionar`). */
+async function fusionarColores(cuerpo: ColorFusionar): Promise<Color> {
+  const { data, error } = await api.POST('/api/colores/fusionar', { body: cuerpo });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -128,6 +144,18 @@ export function useReactivarColor(): UseMutationResult<Color, ErrorDeApi, number
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: reactivarColor,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_COLORES }),
+  });
+}
+
+/**
+ * Fusiona colores duplicados en uno canónico e invalida la lista (las telas que
+ * usaban los duplicados ahora apuntan al destino; los orígenes quedan desactivados).
+ */
+export function useFusionarColores(): UseMutationResult<Color, ErrorDeApi, ColorFusionar> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: fusionarColores,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_COLORES }),
   });
 }

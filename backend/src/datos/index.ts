@@ -16,17 +16,50 @@
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 
-import { PrismaClient } from './generated/prisma/client.js';
+import { type Prisma, PrismaClient } from './generated/prisma/client.js';
 
 export * from './generated/prisma/client.js';
 
+/** Opciones de la fábrica del cliente Prisma (procesos fuera de la app). */
+export interface OpcionesClientePrisma {
+  /**
+   * Opciones de transacción (maxWait/timeout/isolationLevel) para `$transaction`. Las usa
+   * el ETL de migración contra una BD REMOTA (Railway): la latencia del proxy público hace
+   * que los defaults de Prisma (maxWait 2s / timeout 5s) den `P2028` al arrancar la
+   * transacción. NO afecta a la app (singleton {@link prisma}) ni a los tests, que crean el
+   * cliente sin estas opciones.
+   */
+  transactionOptions?: Prisma.PrismaClientOptions['transactionOptions'];
+  /**
+   * Tamaño máximo del pool de conexiones del adapter `pg`. El ETL carga con concurrencia
+   * acotada (ver `migracion/comun/lotes.ts`): el pool debe poder sostenerla, así que se sube
+   * por encima del default (10) para que las tareas en vuelo no se serialicen esperando
+   * conexión. Si se omite, se usa el default de `pg` (sin cambios para tests/seed/app).
+   */
+  poolMax?: number;
+}
+
 /**
  * Crea un cliente Prisma conectado a la URL indicada (driver adapter pg de Prisma 7).
- * Úsalo SOLO fuera de la app (tests, seed, migración F8); la app usa el singleton {@link prisma}.
+ * Úsalo SOLO fuera de la app (tests, seed, migración F1-E6/F8); la app usa el singleton
+ * {@link prisma}. `opciones.transactionOptions` (opcional) sube los tiempos de transacción
+ * para tolerar latencia remota; `opciones.poolMax` sube el pool de `pg` para sostener la
+ * concurrencia del ETL. Si se omiten, el cliente se comporta EXACTAMENTE como antes.
  */
-export function crearClientePrisma(databaseUrl: string): PrismaClient {
-  const adapter = new PrismaPg({ connectionString: databaseUrl });
-  return new PrismaClient({ adapter });
+export function crearClientePrisma(
+  databaseUrl: string,
+  opciones?: OpcionesClientePrisma,
+): PrismaClient {
+  // `PrismaPg` acepta un `pg.PoolConfig` (connectionString + max). `max` solo se incluye si
+  // vino, para no alterar el pool por defecto de tests/seed/app.
+  const adapter = new PrismaPg({
+    connectionString: databaseUrl,
+    ...(opciones?.poolMax === undefined ? {} : { max: opciones.poolMax }),
+  });
+  return new PrismaClient({
+    adapter,
+    ...(opciones?.transactionOptions ? { transactionOptions: opciones.transactionOptions } : {}),
+  });
 }
 
 const globalParaPrisma = globalThis as unknown as { prismaControl?: PrismaClient };

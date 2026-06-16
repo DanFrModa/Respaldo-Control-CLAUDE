@@ -8,7 +8,7 @@
 
 Modernizar **"CONTROL"**, un ERP textil (marca **Marilyn / MJD**, empresa *FR Moda SA de CV*) que Daniel construyó hace ~30 años en **Microsoft Access 97**. La **ingeniería inversa está COMPLETA y validada** (en `Documentacion_MJD/`) y el **plan de construcción está aprobado**: **`PLANMAESTRO.md`** (raíz del repo) — ese plan es LEY.
 
-**Estado actual: CONTROL v2 — F1 (Catálogos + Modelos) EN CURSO.** F0 (Fundación) ✅, **F1-E1 ✅** (catálogos sencillos + Administración) y **F1-E1B ✅** (Proveedor enriquecido R15: fiscal/pago/operativo + roles + adjuntos PDF) construidas, verificadas por Gabriel y desplegadas en **`prueba`** de Railway (13-jun-2026). Detalle en **§8**. **F1-E3 ✅** (catálogos de materiales: telas D5, avíos R1, bordados con foto R2) quedó hecha, verificada por Gabriel y desplegada en `prueba` (14-jun-2026). **F1-E4 ✅** (Modelos: ficha + fotos R2 con lightbox/descarga + BOM completo de telas/avíos/bordados) quedó hecha, verificada por Gabriel y desplegada en `prueba` (14-jun-2026, PR #36/#37). **F1-E5 ✅** (Galería de modelos móvil + generador de códigos de barra EAN-13/DUN-14 por empresa + impreso PDF de etiqueta, R9 — primer impreso del sistema) quedó hecha, verificada por Gabriel y desplegada en `prueba` (14-jun-2026, PR #39); lo siguiente es **F1-E6** (ETL de catálogos y materiales + mapeos + fusión de colores). **F1-E2 ✅** (catálogos estructurados: maquila unificada, tallas/curvas D4, clientes D7) quedó hecha, verificada por Gabriel y desplegada en `prueba` (13-jun-2026). **En paralelo (13-jun-2026):** Gabriel pidió un **rediseño visual** de la UI — estructura "lista + detalle" + tema verde *teal* con menú colapsable, iconos y colores explicativos (la "propuesta 3" del showcase) — que ejecuta **otro chat** con un prompt aparte; cuando aterrice, será el nuevo estándar visual que herede F1-E2+.
+**Estado actual: CONTROL v2 — F0 (Fundación) ✅ y F1 (Catálogos + Modelos) ✅ COMPLETAS y desplegadas en `prueba` de Railway (F1 cerrada el 15-jun-2026).** Las 8 etapas de F1 (catálogos sencillos y estructurados, proveedor enriquecido R15, materiales, modelos con BOM y fotos R2, galería + códigos de barra EAN-13/DUN-14 con impreso PDF R9, y el ETL de migración de datos reales) quedaron construidas, verificadas por Gabriel y en `prueba`. **Siguiente: F2 (Pedidos + Órdenes).** El **detalle por etapa** (qué entregó cada una, decisiones, trampas y notas de cierre) vive en **`HOJA-DE-RUTA.md`** y las fichas de **`docs/hoja-de-ruta/`** — este archivo ya NO lo duplica. La UI ya está en el estándar visual **teal "lista + detalle"** con menú colapsable. **Pendiente explícito de F1 (no bloquea F2):** el ETL de **fotos masivas** quedó listo y probado, pero falta la **carpeta física de fotos** (`S:\...\FotosMod` + bordados); se corre cuando Gabriel la consiga.
 
 > **Integración Finanzas (2026-06-13):** se incorporó al plan la propuesta de **Finanzas** (`Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md`): decisión **D12**, requisitos **R10–R15**, **módulo 14 (Finanzas: CxC/CxP + CFDI, generaliza EsMa)** y una **fase nueva F8 (Finanzas)** entre F7 y Go-live —que pasa a **F9**— (plan ahora F0–F9, 10 fases). El **catálogo de proveedores enriquecido (R15)** entra en **F1, etapa F1-E1B**. La contabilidad NO entra (sigue con el contador); meta de fondo: **apagar SINUBE** por etapas (timbrado vía PAC = R14, posterior). Ver `DECISIONES.md` D12 y `HOJA-DE-RUTA.md`.
 
@@ -43,7 +43,7 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 │   ├── Respaldo CLAUDEConsultas/     161 consultas
 │   ├── Respaldo CLAUDEModulos/       13 módulos VBA
 │   ├── Respaldo CLAUDEReportes/      7 reportes
-│   └── TABLAS/                       116 tablas exportadas a CSV (datos reales, latin-1)
+│   └── TABLAS/                       116 tablas exportadas a CSV (datos reales, CP850)
 └── Documentacion_MJD/             ← LA DOCUMENTACIÓN funcional (fuente de verdad del negocio)
 ```
 
@@ -78,15 +78,15 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 
 ## 4. Cómo leer los archivos del sistema viejo (notas técnicas)
 
-- **⚠️ Encoding:** TODOS los .txt exportados y los .csv de `Respaldo CLAUDE/` están en **latin-1 (ISO-8859-1)**, NO utf-8. En Python: `encoding="latin-1"`; en Node: `fs.readFileSync(ruta, "latin1")`. Leerlos como utf-8 corrompe acentos y eñes en silencio.
+- **⚠️ Encoding (corregido en F1-E6):** los .csv de `Respaldo CLAUDE/TABLAS/` están en **CP850 (codepage DOS)**, NO latin-1 ni utf-8. Leerlos como latin-1 corrompe los acentos **en silencio** (la ñ es el byte `0xA4`, que en latin-1 da `¤`; la ó es `0xA2` → `¢`: "Montaño"→"Monta¤o", "Algodón"→"Algod¢n"). En Node usa **`iconv-lite`** (`iconv.decode(buf, 'cp850')`, ver `backend/migracion/comun/csv.ts`); en Python `encoding="cp850"`. El ETL de F1-E6/E7/F9 ya lee CP850. *(Verificado para los CSV; los .txt de formularios del mismo volcado casi seguro comparten encoding.)*
 - **Datos reales:** las 116 tablas ya están exportadas en `Respaldo CLAUDE/TABLAS/*.csv`. (Si algún día hay que releer un `.mdb`: librería Python `access-parser`.)
-- **⚠️ `grep` puede fallar** leyendo estos archivos por argumento (por el encoding). Lo seguro: **Python** (`re` sobre el texto leído con latin-1), o `grep` por **stdin** (`cat archivo | grep ...`).
+- **⚠️ `grep` puede fallar** leyendo estos archivos por argumento (por el encoding). Lo seguro: **Python** (`re` sobre el texto leído con cp850), o `grep` por **stdin** (`cat archivo | grep ...`).
 - Los formularios exportados (`SaveAsText`) tienen el diseño (controles + propiedades) y, al final, una sección **`CodeBehindForm`** con el código VBA de cada control.
 
 ### Snippet útil (extraer estructura de un formulario)
 ```python
 import re
-t = open("Respaldo CLAUDE/Respaldo CLAUDEFormularios/Ordenes.txt", encoding="latin-1").read()
+t = open("Respaldo CLAUDE/Respaldo CLAUDEFormularios/Ordenes.txt", encoding="cp850").read()
 re.search(r'RecordSource ="([^"]*)"', t)           # origen de datos
 re.findall(r'SourceObject ="([^"]*)"', t)          # subformularios
 re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimientos
@@ -149,12 +149,7 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 | Hito | Estado | Dónde está el detalle |
 |---|---|---|
 | **F0 · Fundación** (E1–E5) | ✅ en `main`, desplegada en Railway como **prueba** (12-jun-2026) | `docs/hoja-de-ruta/F0` + `HOJA-DE-RUTA.md` §3 |
-| **F1-E1** · Catálogos sencillos + Administración | ✅ en `prueba` (13-jun-2026, PR #15) | CIERRE en `docs/hoja-de-ruta/F1-etapas.md` |
-| **F1-E1B** · Proveedor enriquecido (R15) | ✅ en `prueba` (13-jun-2026, PR #21/#22) | CIERRE en `docs/hoja-de-ruta/F1-etapas.md` |
-| **F1-E2** · Catálogos estructurados (maquila, tallas/curvas D4, clientes D7) | ✅ en `prueba` (13-jun-2026, PR #27) | CIERRE en `docs/hoja-de-ruta/F1-etapas.md` |
-| **F1-E3** · Catálogos de materiales (telas D5, avíos R1, bordados con foto R2) | ✅ en `prueba` (14-jun-2026, PR #29; hotfixes R2 #30/#31) | CIERRE en `docs/hoja-de-ruta/F1-etapas.md` |
-| **F1-E4** · Modelos: ficha + fotos R2 (lightbox/descarga) + BOM completo | ✅ en `prueba` (14-jun-2026, PR #36/#37) | CIERRE en `docs/hoja-de-ruta/F1-etapas.md` |
-| **F1-E5** · Galería de modelos (móvil) + generador de códigos de barra (EAN-13/DUN-14) + impreso PDF (R9) | ✅ en `prueba` (14-jun-2026, PR #39) | CIERRE en `docs/hoja-de-ruta/F1-etapas.md` |
+| **F1 · Catálogos + Modelos** (E1–E7) | ✅ **COMPLETA** en `prueba` (15-jun-2026) — catálogos sencillos/estructurados, proveedor R15, materiales, modelos+BOM+fotos R2, galería + códigos de barra EAN-13/DUN-14 con impreso PDF (R9), y ETL de datos reales | CIERRE por etapa (qué entregó, decisiones, trampas) en `docs/hoja-de-ruta/F1-etapas.md` |
 
 **Trampas/recordatorios que aplican a TODA etapa futura (no perder):**
 - **Despliegue:** el backend de `prueba` necesita `SEED_ON_START=true` para sembrar permisos/roles nuevos al arrancar (seed idempotente; NO resetea el password del admin). Sin eso, los menús nuevos no aparecen en `prueba`.
@@ -163,6 +158,6 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 - **Pendiente manual de Gabriel:** cambiar el password de `admin` (seed `Control.2026!`). *(Cloudflare R2 ya quedó montado en `prueba`: las fotos de bordados y modelos suben y se descargan OK.)*
 - **Deuda técnica diferida (Gabriel, 14-jun, a futuro — NO hoy):** borrar una foto/adjunto elimina el registro en BD pero NO el objeto físico en R2 (queda huérfano); el motor `backend/src/comun/archivos.ts` no tiene DeleteObject. Fix global (modelos + bordados + proveedores), tras el commit y best-effort; aparcado — backlog en `HOJA-DE-RUTA.md` §4.
 
-**Rediseño visual (otro chat):** UI a "lista + detalle" + tema **teal** + menú colapsable (propuesta 3, `docs/diseno/propuestas-colores.html`). Es el estándar visual que hereda F1-E2+.
+**Estándar visual (ya aplicado):** UI "lista + detalle" + tema **teal** + menú colapsable (propuesta 3, `docs/diseno/propuestas-colores.html`).
 
 **Versiones verificadas (jun-2026):** Fastify 5.8 · @fastify/swagger 9.7 · fastify-type-provider-zod 6.1 · Vite 8.0 · React 19.2 · react-router-dom 7.17 · openapi-typescript 7.13 · openapi-fetch 0.17 · Prisma 7.8 · better-auth 1.6 · Zod 4.4 · Tailwind 4.3 · TanStack Query 5.101 / Table 8.21 · Vitest 4.1 · Playwright 1.60 · pino 10 · pg-boss 12 · @react-pdf/renderer 4. PostgreSQL 17, Node 22.

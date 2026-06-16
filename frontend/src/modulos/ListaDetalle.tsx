@@ -90,6 +90,13 @@ export interface PropsListaDetalle<T> {
   puedeAdministrar: boolean;
   alNuevo: () => void;
   textoNuevo: string;
+  /**
+   * Acciones EXTRA del encabezado de la pantalla (botones secundarios junto a
+   * "Nuevo"): se pintan a la izquierda del botón "Nuevo", solo si
+   * `puedeAdministrar`. P. ej. "Fusionar" en Colores. Opcional: las pantallas que
+   * no la pasan ven el encabezado idéntico.
+   */
+  accionesEncabezado?: React.ReactNode;
   alEditar: (registro: T) => void;
   alDesactivar: (registro: T) => void;
   alReactivar: (registro: T) => void;
@@ -134,6 +141,7 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     puedeAdministrar,
     alNuevo,
     textoNuevo,
+    accionesEncabezado,
     alEditar,
     alDesactivar,
     alReactivar,
@@ -215,10 +223,13 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
           </div>
         </div>
         {puedeAdministrar ? (
-          <Button onClick={alNuevo} data-testid={`nuevo-${testid}`}>
-            <PlusIcon aria-hidden />
-            {textoNuevo}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {accionesEncabezado}
+            <Button onClick={alNuevo} data-testid={`nuevo-${testid}`}>
+              <PlusIcon aria-hidden />
+              {textoNuevo}
+            </Button>
+          </div>
         ) : null}
       </div>
 

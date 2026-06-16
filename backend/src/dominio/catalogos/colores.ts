@@ -19,7 +19,11 @@
  * `Bitacora`; borrado SUAVE reversible; unicidad respaldada por el unique de la base
  * (P2002 → `ErrorConflicto`); listado paginado/ordenado/buscado en servidor.
  */
-import { esquemaColorCrear, esquemaColorEditar } from '../../contrato/index.js';
+import {
+  esquemaColorCrear,
+  esquemaColorEditar,
+  esquemaColorFusionar,
+} from '../../contrato/index.js';
 import type { Color, Prisma } from '../../datos/index.js';
 import { z } from 'zod';
 
@@ -46,6 +50,9 @@ export type EntradaCrearColor = z.input<typeof esquemaColorCrear>;
 
 /** Edición: `id` + cambios parciales (incluye `activo` para des/reactivar). */
 export type EntradaActualizarColor = z.input<typeof esquemaColorEditar>;
+
+/** Fusión de duplicados: color(es) origen → color destino canónico. */
+export type EntradaFusionarColores = z.input<typeof esquemaColorFusionar>;
 
 /** Parámetros del listado (los reutiliza la ruta REST en su entrada). */
 export const esquemaListarColores = esquemaPaginacion.extend({
@@ -244,6 +251,146 @@ export async function reactivarColor(
       throw new ErrorConflicto(`El color "${actual.nombre}" ya está activo.`);
     }
     return actualizarColor(sesion, { id, activo: true }, { tx });
+  }, bd);
+}
+
+/**
+ * Reasigna TODAS las referencias del color `idOrigen` al color `idDestino`, dentro de
+ * la transacción `tx`. Hoy la ÚNICA tabla que referencia a `Color` es `TelaColor`
+ * (puente Tela↔Color con PK compuesta `[idTela, idColor]`).
+ *
+ * PUNTO CENTRAL DE EXTENSIÓN: cuando en el futuro otras tablas referencien a `Color`
+ * (p. ej. colores de avíos, de modelos, de pedidos), agrega aquí su reasignación —
+ * todas dentro de la MISMA transacción para que la fusión siga siendo todo-o-nada (A2).
+ * Cada referencia con unicidad por color necesita resolver su propia colisión de PK,
+ * igual que se hace abajo con `TelaColor`.
+ *
+ * REGLA DE COLISIÓN DE PK (TelaColor): no se puede mover ciegamente un `TelaColor` de
+ * origen a destino si el destino YA tiene un renglón para la misma tela (violaría la
+ * PK `[idTela, idColor]`). Para esas telas en colisión:
+ *   - GANA EL DESTINO (es el canónico), PERO si el destino tiene `precio` nulo y el
+ *     origen trae precio, se rellena el del origen (no perder un dato que solo existía
+ *     en el duplicado). Si ambos tienen precio, se conserva el del destino.
+ *   - El renglón duplicado del origen se ELIMINA (ya no aporta nada).
+ * Las telas SIN colisión simplemente se mueven (`update` de `idColor`).
+ *
+ * @returns cuántas referencias `TelaColor` se reasignaron o consolidaron (para bitácora).
+ */
+async function reasignarReferenciasColor(
+  tx: Tx,
+  idOrigen: number,
+  idDestino: number,
+): Promise<number> {
+  const referenciasOrigen = await tx.telaColor.findMany({ where: { idColor: idOrigen } });
+  if (referenciasOrigen.length === 0) {
+    return 0;
+  }
+
+  // Telas que el destino YA tiene (para detectar colisiones de PK).
+  const referenciasDestino = await tx.telaColor.findMany({
+    where: { idColor: idDestino },
+    select: { idTela: true, precio: true },
+  });
+  const destinoPorTela = new Map(referenciasDestino.map((r) => [r.idTela, r.precio]));
+
+  for (const ref of referenciasOrigen) {
+    if (!destinoPorTela.has(ref.idTela)) {
+      // Sin colisión: la tela solo existía con el color origen → se mueve al destino.
+      await tx.telaColor.update({
+        where: { idTela_idColor: { idTela: ref.idTela, idColor: idOrigen } },
+        data: { idColor: idDestino },
+      });
+      continue;
+    }
+
+    // Colisión: el destino ya tiene esta tela. Gana el destino; solo rellena su precio
+    // si estaba nulo y el origen sí lo traía. Luego elimina el duplicado del origen.
+    const precioDestino = destinoPorTela.get(ref.idTela) ?? null;
+    if (precioDestino === null && ref.precio !== null) {
+      await tx.telaColor.update({
+        where: { idTela_idColor: { idTela: ref.idTela, idColor: idDestino } },
+        data: { precio: ref.precio },
+      });
+    }
+    await tx.telaColor.delete({
+      where: { idTela_idColor: { idTela: ref.idTela, idColor: idOrigen } },
+    });
+  }
+
+  return referenciasOrigen.length;
+}
+
+/**
+ * Fusiona color(es) DUPLICADOS en un color DESTINO canónico (F1-E6). Reasigna todas
+ * las referencias de cada origen al destino (resolviendo colisiones de PK en el puente
+ * `TelaColor`, ver {@link reasignarReferenciasColor}), DESACTIVA cada origen (borrado
+ * suave, no se borra físico) y registra bitácora de la fusión. Todo en UNA transacción
+ * (A2): o se consolida entero o no se toca nada.
+ *
+ * Reglas: permiso `colores.administrar`; el destino y cada origen deben existir; un
+ * color no puede fusionarse consigo mismo (Zod ya excluye el destino de los orígenes).
+ * El destino se REACTIVA si estaba desactivado (es el canónico que sobrevive).
+ *
+ * @returns el color DESTINO sobreviviente (ya consolidado).
+ */
+export async function fusionarColores(
+  sesion: SesionUsuario,
+  entrada: EntradaFusionarColores,
+  bd?: ContextoBd,
+): Promise<Color> {
+  verificarPermiso(sesion, 'colores.administrar');
+  const datos = validarEntrada(esquemaColorFusionar, entrada);
+
+  return enTransaccion(async (tx) => {
+    const destino = await exigirColor(tx, datos.idDestino);
+
+    let referenciasMovidas = 0;
+    const origenesFusionados: { id: number; nombre: string }[] = [];
+
+    for (const idOrigen of datos.origenes) {
+      const origen = await exigirColor(tx, idOrigen);
+      referenciasMovidas += await reasignarReferenciasColor(tx, idOrigen, datos.idDestino);
+
+      // Borrado suave del origen (solo si seguía activo; idempotente si ya estaba apagado).
+      if (origen.activo) {
+        await tx.color.update({
+          where: { id: idOrigen },
+          data: { activo: false, ...datosModificacion(sesion) },
+        });
+      }
+      origenesFusionados.push({ id: origen.id, nombre: origen.nombre });
+
+      // Bitácora por cada origen absorbido (auditoría granular A7).
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Color',
+        idEntidad: origen.id,
+        accion: 'OTRO',
+        datos: {
+          operacion: 'fusionar',
+          fusionadoEn: { id: destino.id, nombre: destino.nombre },
+        },
+      });
+    }
+
+    // El destino sobrevive y queda activo (es el canónico). Toca `modificadoPor` y, si
+    // estaba apagado, lo reactiva. Bitácora resumen de la consolidación en el destino.
+    const destinoActualizado = await tx.color.update({
+      where: { id: datos.idDestino },
+      data: { activo: true, ...datosModificacion(sesion) },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Color',
+      idEntidad: destino.id,
+      accion: 'MODIFICAR',
+      datos: {
+        operacion: 'fusionar',
+        absorbio: origenesFusionados,
+        referenciasReasignadas: referenciasMovidas,
+      },
+    });
+
+    return destinoActualizado;
   }, bd);
 }
 
