@@ -28,12 +28,16 @@ import {
   listarRolesProveedor,
 } from '../../src/dominio/catalogos/proveedores.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
-import { ErrorConflicto } from '../../src/comun/errores.js';
+import { ErrorConflicto, ErrorDominio } from '../../src/comun/errores.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
-import { mapearRolProveedorComercial, mapearTipoProveedor } from '../comun/mapeos-enum.js';
+import {
+  mapearRolProveedorComercial,
+  mapearTipoProveedor,
+  rolesDeMaquilero,
+} from '../comun/mapeos-enum.js';
 import {
   ENTIDAD_MAPEO,
   guardarMapeo,
@@ -42,6 +46,7 @@ import {
   type EntidadMapeo,
 } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { normalizarParaDedup, parsearBandera, parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -124,6 +129,7 @@ export async function cargarProveedores(
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
+  let omitidosValidacion = 0;
   let fusiones = 0;
 
   function rolId(codigo: string): number {
@@ -142,9 +148,9 @@ export async function cargarProveedores(
    * idProveedor resultante.
    */
   async function crearOFusionar(
-    nombre: string,
+    nombreCrudo: string,
     idsRol: number[],
-    datosExtra: Partial<{
+    datosCrudos: Partial<{
       tipo: ReturnType<typeof mapearTipoProveedor>;
       telefono: string | null;
       contacto: string | null;
@@ -157,7 +163,26 @@ export async function cargarProveedores(
       obsPago: string | null;
     }>,
     origen: string,
+    idViejo: string | undefined,
   ): Promise<number | null> {
+    // Trunca TODOS los textos a su `max` del esquema antes de tocar el dominio (la data del
+    // viejo rebasa varios topes; un teléfono de 137 chars no debe abortar la fila).
+    const lim = LIMITES.proveedor;
+    const tr = (campo: keyof typeof lim, valor: string | null | undefined): string | null =>
+      truncarYReportar(reporte, 'Proveedor', idViejo, campo, valor ?? null, lim[campo]);
+    const nombre = tr('nombre', nombreCrudo) ?? nombreCrudo;
+    const datosExtra = {
+      ...datosCrudos,
+      telefono: tr('telefono', datosCrudos.telefono),
+      contacto: tr('contacto', datosCrudos.contacto),
+      condiciones: tr('condiciones', datosCrudos.condiciones),
+      razonSocial: tr('razonSocial', datosCrudos.razonSocial),
+      direccion: tr('direccion', datosCrudos.direccion),
+      notas: tr('notas', datosCrudos.notas),
+      corto: tr('corto', datosCrudos.corto),
+      obsPago: tr('obsPago', datosCrudos.obsPago),
+    };
+
     const norm = normalizarParaDedup(nombre);
     if (norm === '') {
       return null;
@@ -209,7 +234,7 @@ export async function cargarProveedores(
           `"${nombre}" (${origen}) corto="${datosExtra.corto}"`,
         );
         const sinCorto = { ...datosExtra, corto: null };
-        return crearOFusionar(nombre, idsRol, sinCorto, origen);
+        return crearOFusionar(nombre, idsRol, sinCorto, origen, idViejo);
       }
       if (error instanceof ErrorConflicto) {
         // Choque de nombre case-insensitive no captado por el dedup normalizado: fusionar.
@@ -227,7 +252,16 @@ export async function cargarProveedores(
           return fila.id;
         }
       }
-      throw error;
+      // Cualquier otro error de fila (p. ej. ErrorValidacion por data sucia que sobrevivió al
+      // truncado): se reporta y la fila se OMITE — el ETL NUNCA aborta por un tercero malo.
+      const detalle =
+        error instanceof ErrorDominio ? `${error.codigo}: ${error.message}` : String(error);
+      reporte.agregar(
+        'Proveedor: fila OMITIDA por error (data sucia)',
+        `"${nombre}" (${origen}) · ${detalle}`,
+      );
+      omitidosValidacion += 1;
+      return null;
     }
   }
 
@@ -263,6 +297,7 @@ export async function cargarProveedores(
         razonSocial: parsearTexto(fila.RazonSocialProv),
       },
       'Proveedores',
+      fila.IdProveedor,
     );
     await mapear(ENTIDAD_MAPEO.proveedorPorIdProveedor, fila.IdProveedor, idNuevo, { nombre });
   }
@@ -279,11 +314,12 @@ export async function cargarProveedores(
       [rolId(COD_ROL.corte)],
       { telefono: parsearTexto(fila.Telefonos) },
       'Cortadores',
+      fila.IdCortadores,
     );
     await mapear(ENTIDAD_MAPEO.proveedorPorIdCortadores, fila.IdCortadores, idNuevo, { nombre });
   }
 
-  // ── 3) Maquileros → maquila-costura (+ reporte de "Proceso") ─────────────────
+  // ── 3) Maquileros → costura y/o decoración (estampado) según sus banderas ────
   for (const fila of leerCsv('Maquileros.csv')) {
     const nombre = parsearTexto(`${fila.Nombre ?? ''} ${fila.Apellidos ?? ''}`);
     if (nombre === null) {
@@ -292,15 +328,16 @@ export async function cargarProveedores(
     }
     const costura = parsearBandera(fila.Costura);
     const proceso = parsearBandera(fila.Proceso);
-    // Criterio conservador: tanto Costura como Proceso → rol maquila-costura. "Proceso" no
-    // distingue el sub-servicio en el viejo; se reporta para que Gabriel afine.
-    const idsRol = [rolId(COD_ROL.maquilaCostura)];
-    if (proceso && !costura) {
+    // Aclaración de Daniel: Costura→maquila-costura; Proceso(=decorado)→estampado; ambas→ambos
+    // (ver `rolesDeMaquilero`). Sub-servicio fino de la decoración lo afina Gabriel después.
+    const idsRol = rolesDeMaquilero(costura, proceso).map((codigo) => rolId(codigo));
+    if (proceso) {
       reporte.agregar(
-        'Maquileros con Proceso=1 y Costura=0 (asignado maquila-costura — revisar)',
+        'Maquileros con Proceso=1 (asignado estampado por Proceso — afinar sub-servicio)',
         `"${nombre}" (IdMaquileros=${fila.IdMaquileros ?? '?'})`,
       );
     }
+
     const idNuevo = await crearOFusionar(
       nombre,
       idsRol,
@@ -313,6 +350,7 @@ export async function cargarProveedores(
         obsPago: parsearTexto(fila.ObsPago),
       },
       'Maquileros',
+      fila.IdMaquileros,
     );
     await mapear(ENTIDAD_MAPEO.proveedorPorIdMaquileros, fila.IdMaquileros, idNuevo, { nombre });
   }
@@ -334,11 +372,12 @@ export async function cargarProveedores(
         corto: parsearTexto(fila.Corto),
       },
       'Estampadores',
+      fila.IdEstampadores,
     );
     await mapear(ENTIDAD_MAPEO.proveedorPorIdEstampadores, fila.IdEstampadores, idNuevo, {
       nombre,
     });
   }
 
-  return { creados, existentes, omitidos, fusiones };
+  return { creados, existentes, omitidos, omitidosValidacion, fusiones };
 }

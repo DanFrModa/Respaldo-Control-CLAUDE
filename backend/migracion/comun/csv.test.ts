@@ -7,7 +7,7 @@ import { contarFilasCsv, leerCsv } from './csv.js';
 /** Carpeta de fixtures de la migración (`migracion/__fixtures__/`). */
 const dirFixtures = fileURLToPath(new URL('../__fixtures__', import.meta.url));
 
-describe('migración · lector CSV (parser real + latin-1)', () => {
+describe('migración · lector CSV (parser real + CP850)', () => {
   /** Normaliza CRLF→LF para comparar campos multilínea sin depender del EOL del fixture. */
   const nl = (s: string | undefined): string => (s ?? '').replace(/\r\n/g, '\n');
 
@@ -29,8 +29,11 @@ describe('migración · lector CSV (parser real + latin-1)', () => {
     expect(contarFilasCsv('Multilinea.csv', dirFixtures)).toBe(3);
   });
 
-  it('decodifica en latin-1 (acentos y eñes intactos)', () => {
-    const filas = leerCsv('Latin1.csv', dirFixtures);
+  it('decodifica en CP850 (acentos y eñes intactos; NO latin-1)', () => {
+    // `Cp850.csv` está CODIFICADO en CP850 (el codepage real del dump del sistema viejo).
+    // Estos asserts FALLARÍAN si el lector usara latin-1 (la ñ en CP850 es 0xA4, que en
+    // latin-1 daría '¤'): prueban de verdad el decode de CP850.
+    const filas = leerCsv('Cp850.csv', dirFixtures);
     expect(filas).toHaveLength(2);
     expect(filas[0]?.Proveedor).toBe('José Núñez');
     expect(nl(filas[0]?.Direccion)).toBe('Calle Olivar\n2da Sección');

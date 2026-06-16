@@ -11,6 +11,7 @@ import type { PrismaClient } from '../../src/datos/index.js';
 import { leerCsv } from '../comun/csv.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import { parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -32,11 +33,12 @@ export async function cargarTelaCategorias(
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
+  let omitidosValidacion = 0;
 
   for (const fila of filas) {
     const idViejo = fila.IdTelasCategorias;
-    const nombre = parsearTexto(fila.CategoriaTela);
-    if (nombre === null) {
+    const nombreCrudo = parsearTexto(fila.CategoriaTela);
+    if (nombreCrudo === null) {
       // El viejo tiene una categoría sin nombre: se limpia (no se migra), se reporta.
       omitidos += 1;
       reporte.agregar(
@@ -45,10 +47,25 @@ export async function cargarTelaCategorias(
       );
       continue;
     }
+    const nombre =
+      truncarYReportar(
+        reporte,
+        'TelaCategoria',
+        idViejo,
+        'nombre',
+        nombreCrudo,
+        LIMITES.telaCategoria.nombre,
+      ) ?? nombreCrudo;
 
     let idNuevo = await idPorNombre(cliente, nombre);
     if (idNuevo === null) {
-      const creado = await crearTelaCategoria(sesion, { nombre }, bd);
+      const creado = await intentarCrear(reporte, 'TelaCategoria', idViejo, () =>
+        crearTelaCategoria(sesion, { nombre }, bd),
+      );
+      if (creado === null) {
+        omitidosValidacion += 1;
+        continue;
+      }
       idNuevo = creado.id;
       creados += 1;
     } else {
@@ -60,5 +77,5 @@ export async function cargarTelaCategorias(
     }
   }
 
-  return { creados, existentes, omitidos };
+  return { creados, existentes, omitidos, omitidosValidacion };
 }

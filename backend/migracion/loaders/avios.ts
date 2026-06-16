@@ -20,8 +20,10 @@ import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
 import { decidirPrecioAvio } from '../comun/decisiones.js';
+import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { ENTIDAD_MAPEO, guardarMapeo, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { intentarCrear, LIMITES, truncarYReportar } from '../comun/saneo.js';
 import {
   normalizarParaDedup,
   parsearBandera,
@@ -29,6 +31,10 @@ import {
   parsearTexto,
 } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
+import { ErrorConflicto } from '../../src/comun/errores.js';
+
+/** Desenlace de procesar una fila (para agregar conteos tras los lotes). */
+type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
 
 /** Índice nombreNormalizado → idProveedor (para el match difuso del texto `Proveedor`). */
 async function indiceProveedores(cliente: ClienteMapeo): Promise<Map<string, number>> {
@@ -56,91 +62,146 @@ export async function cargarAvios(
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const idxProv = await indiceProveedores(cliente);
   const filas = leerCsv('Habilitacion.csv');
+
+  // Filas INDEPENDIENTES → carga concurrente acotada.
+  const resultados = await enLotes(
+    filas,
+    (fila): Promise<Desenlace> => procesarAvio(sesion, bd, cliente, reporte, idxProv, fila),
+    CONCURRENCIA_ETL,
+  );
+
   let creados = 0;
   let existentes = 0;
   let omitidos = 0;
+  let omitidosValidacion = 0;
+  for (const r of resultados) {
+    const d = r.ok ? r.valor : 'omitidoValidacion';
+    if (d === 'creado') creados += 1;
+    else if (d === 'existente') existentes += 1;
+    else if (d === 'omitido') omitidos += 1;
+    else omitidosValidacion += 1;
+  }
+  return { creados, existentes, omitidos, omitidosValidacion };
+}
 
-  for (const fila of filas) {
-    const idViejo = fila.IdHabilitacion;
-    const clave = parsearTexto(fila.Clave);
-    if (clave === null) {
-      omitidos += 1;
-      reporte.agregar('Avíos con clave vacía (omitidos)', `Id=${idViejo ?? '?'}`);
-      continue;
-    }
+/** Procesa UNA fila de Habilitacion (idempotente por `clave`, tolerante a carreras). */
+async function procesarAvio(
+  sesion: SesionUsuario,
+  bd: ContextoBd,
+  cliente: ClienteMapeo,
+  reporte: Reporte,
+  idxProv: Map<string, number>,
+  fila: Record<string, string>,
+): Promise<Desenlace> {
+  const idViejo = fila.IdHabilitacion;
+  const claveCruda = parsearTexto(fila.Clave);
+  if (claveCruda === null) {
+    reporte.agregar('Avíos con clave vacía (omitidos)', `Id=${idViejo ?? '?'}`);
+    return 'omitido';
+  }
+  const clave =
+    truncarYReportar(reporte, 'Avio', idViejo, 'clave', claveCruda, LIMITES.avio.clave) ??
+    claveCruda;
 
-    // Idempotencia por clave.
-    const existeId = await idAvioPorClave(cliente, clave);
-    if (existeId !== null) {
-      existentes += 1;
-      if (idViejo !== undefined) {
-        await guardarMapeo(cliente, ENTIDAD_MAPEO.avio, idViejo, existeId, { clave });
-      }
-      continue;
-    }
-
-    let descripcion = parsearTexto(fila.Descripcion);
-    if (descripcion === null) {
-      descripcion = clave; // el dominio exige descripción; se rellena con la clave.
-      reporte.agregar(
-        'Avíos sin descripción (rellenada con la clave)',
-        `clave="${clave}" (Id=${idViejo ?? '?'})`,
-      );
-    }
-
-    const favorito = parsearBandera(fila.Favorito);
-    const cantFavRaw = parsearDinero(fila.CantFav);
-    // favorito ⇒ cantFav>0 (regla del dominio). Si es favorito sin cantFav válida → 1 + reporte.
-    let cantFav = cantFavRaw === null || cantFavRaw <= 0 ? undefined : cantFavRaw;
-    if (favorito && cantFav === undefined) {
-      cantFav = 1;
-      reporte.agregar(
-        'Avíos favoritos sin CantFav válida (clavada a 1)',
-        `clave="${clave}" (Id=${idViejo ?? '?'})`,
-      );
-    }
-    const desactivado = parsearBandera(fila.Desactivado);
-
-    // Match difuso del proveedor texto → renglón AvioProveedor con precio; si no, fallback.
-    const provTexto = parsearTexto(fila.Proveedor);
-    const precio = parsearDinero(fila.Precio);
-    const idProv = provTexto === null ? undefined : idxProv.get(normalizarParaDedup(provTexto));
-
-    // Decisión PURA (probada en decisiones.test.ts): match → AvioProveedor; sin match →
-    // precioReferencia (fallback ADR-0009, decisión 3 — el precio no se pierde).
-    const decision = decidirPrecioAvio(idProv, precio);
-    const proveedores = decision.proveedor === null ? undefined : [decision.proveedor];
-    const precioReferencia = decision.precioReferencia;
-
-    if (provTexto !== null && idProv === undefined) {
-      reporte.agregar(
-        'Avíos: proveedor (texto) sin match → precio a precioReferencia',
-        `clave="${clave}" proveedor="${provTexto}"${precio === null ? '' : ` precio=${String(precio)}`}`,
-      );
-    }
-
-    const creado = await crearAvio(
-      sesion,
-      {
-        clave,
-        descripcion,
-        favorito,
-        ...(cantFav === undefined ? {} : { cantFav }),
-        ...(precioReferencia === undefined ? {} : { precioReferencia }),
-        ...(proveedores === undefined ? {} : { proveedores }),
-      },
-      bd,
-    );
-    creados += 1;
-
-    if (desactivado) {
-      await actualizarAvio(sesion, { id: creado.id, activo: false }, bd);
-    }
-
+  // Idempotencia por clave.
+  const existeId = await idAvioPorClave(cliente, clave);
+  if (existeId !== null) {
     if (idViejo !== undefined) {
-      await guardarMapeo(cliente, ENTIDAD_MAPEO.avio, idViejo, creado.id, { clave });
+      await guardarMapeo(cliente, ENTIDAD_MAPEO.avio, idViejo, existeId, { clave });
     }
+    return 'existente';
   }
 
-  return { creados, existentes, omitidos };
+  let descripcion = truncarYReportar(
+    reporte,
+    'Avio',
+    idViejo,
+    'descripcion',
+    parsearTexto(fila.Descripcion),
+    LIMITES.avio.descripcion,
+  );
+  if (descripcion === null) {
+    descripcion = clave; // el dominio exige descripción; se rellena con la clave.
+    reporte.agregar(
+      'Avíos sin descripción (rellenada con la clave)',
+      `clave="${clave}" (Id=${idViejo ?? '?'})`,
+    );
+  }
+
+  const favorito = parsearBandera(fila.Favorito);
+  const cantFavRaw = parsearDinero(fila.CantFav);
+  // favorito ⇒ cantFav>0 (regla del dominio). Si es favorito sin cantFav válida → 1 + reporte.
+  let cantFav = cantFavRaw === null || cantFavRaw <= 0 ? undefined : cantFavRaw;
+  if (favorito && cantFav === undefined) {
+    cantFav = 1;
+    reporte.agregar(
+      'Avíos favoritos sin CantFav válida (clavada a 1)',
+      `clave="${clave}" (Id=${idViejo ?? '?'})`,
+    );
+  }
+  const desactivado = parsearBandera(fila.Desactivado);
+
+  // Match difuso del proveedor texto → renglón AvioProveedor con precio; si no, fallback.
+  const provTexto = parsearTexto(fila.Proveedor);
+  const precio = parsearDinero(fila.Precio);
+  const idProv = provTexto === null ? undefined : idxProv.get(normalizarParaDedup(provTexto));
+
+  // Decisión PURA (probada en decisiones.test.ts): match → AvioProveedor; sin match →
+  // precioReferencia (fallback ADR-0009, decisión 3 — el precio no se pierde).
+  const decision = decidirPrecioAvio(idProv, precio);
+  const proveedores = decision.proveedor === null ? undefined : [decision.proveedor];
+  const precioReferencia = decision.precioReferencia;
+
+  if (provTexto !== null && idProv === undefined) {
+    reporte.agregar(
+      'Avíos: proveedor (texto) sin match → precio a precioReferencia',
+      `clave="${clave}" proveedor="${provTexto}"${precio === null ? '' : ` precio=${String(precio)}`}`,
+    );
+  }
+
+  // Tolerante a carrera por la `clave` @unique: si otra tarea concurrente creó el mismo avío
+  // entre el chequeo y el create, el dominio lanza ErrorConflicto → re-leer y mapear al existente.
+  const resuelto = await intentarCrear(
+    reporte,
+    'Avio',
+    idViejo,
+    async (): Promise<{ id: number; carrera: boolean }> => {
+      try {
+        const avio = await crearAvio(
+          sesion,
+          {
+            clave,
+            descripcion,
+            favorito,
+            ...(cantFav === undefined ? {} : { cantFav }),
+            ...(precioReferencia === undefined ? {} : { precioReferencia }),
+            ...(proveedores === undefined ? {} : { proveedores }),
+          },
+          bd,
+        );
+        return { id: avio.id, carrera: false };
+      } catch (error) {
+        if (error instanceof ErrorConflicto) {
+          const yaId = await idAvioPorClave(cliente, clave);
+          if (yaId !== null) {
+            return { id: yaId, carrera: true };
+          }
+        }
+        throw error;
+      }
+    },
+  );
+  if (resuelto === null) {
+    return 'omitidoValidacion';
+  }
+
+  // Solo desactiva si lo creamos nosotros (en carrera, el ganador ya lo dejó como toca).
+  if (desactivado && !resuelto.carrera) {
+    await actualizarAvio(sesion, { id: resuelto.id, activo: false }, bd);
+  }
+
+  if (idViejo !== undefined) {
+    await guardarMapeo(cliente, ENTIDAD_MAPEO.avio, idViejo, resuelto.id, { clave });
+  }
+  return resuelto.carrera ? 'existente' : 'creado';
 }

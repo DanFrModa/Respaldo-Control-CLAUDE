@@ -19,8 +19,10 @@ import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
+import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import { cargarMapaNumerico, ENTIDAD_MAPEO, type ClienteMapeo } from '../comun/mapeo.js';
 import type { Reporte } from '../comun/reporte.js';
+import { intentarCrear } from '../comun/saneo.js';
 import { parsearDinero } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
 
@@ -79,16 +81,35 @@ export async function cargarTelasColores(
     porTela.set(idTela, grid);
   }
 
-  // Aplicar el grid completo por tela (un actualizarTela por tela).
+  // Aplicar el grid completo por tela (un actualizarTela por tela). Cada tela es INDEPENDIENTE
+  // (renglones distintos) → carga concurrente acotada. Tolerante por tela: si una falla (data
+  // sucia), se reporta y se sigue con las demás (el ETL no aborta).
+  const entradas = [...porTela.entries()];
+  const resultados = await enLotes(
+    entradas,
+    ([idTela, grid]) => {
+      const colores = [...grid.entries()].map(([idColor, precio]) => ({
+        idColor,
+        ...(precio === undefined ? {} : { precio }),
+      }));
+      return intentarCrear(reporte, 'TelaColor', idTela, () =>
+        actualizarTela(sesion, { id: idTela, colores }, bd),
+      );
+    },
+    CONCURRENCIA_ETL,
+  );
+
   let telasTocadas = 0;
-  for (const [idTela, grid] of porTela) {
-    const colores = [...grid.entries()].map(([idColor, precio]) => ({
-      idColor,
-      ...(precio === undefined ? {} : { precio }),
-    }));
-    await actualizarTela(sesion, { id: idTela, colores }, bd);
-    telasTocadas += 1;
+  let omitidosValidacion = 0;
+  for (const r of resultados) {
+    // `intentarCrear` ya captura errores de fila → devuelve null; `enLotes` solo fallaría por
+    // algo inesperado fuera de `intentarCrear` (también se cuenta como omitido por validación).
+    if (r.ok && r.valor !== null) {
+      telasTocadas += 1;
+    } else {
+      omitidosValidacion += 1;
+    }
   }
 
-  return { creados: telasTocadas, existentes: 0, omitidos };
+  return { creados: telasTocadas, existentes: 0, omitidos, omitidosValidacion };
 }

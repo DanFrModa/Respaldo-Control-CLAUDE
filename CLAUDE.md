@@ -43,7 +43,7 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 │   ├── Respaldo CLAUDEConsultas/     161 consultas
 │   ├── Respaldo CLAUDEModulos/       13 módulos VBA
 │   ├── Respaldo CLAUDEReportes/      7 reportes
-│   └── TABLAS/                       116 tablas exportadas a CSV (datos reales, latin-1)
+│   └── TABLAS/                       116 tablas exportadas a CSV (datos reales, CP850)
 └── Documentacion_MJD/             ← LA DOCUMENTACIÓN funcional (fuente de verdad del negocio)
 ```
 
@@ -78,15 +78,15 @@ Repositorio git: **`DanFrModa/Respaldo-Control-CLAUDE`** en GitHub (se trabaja e
 
 ## 4. Cómo leer los archivos del sistema viejo (notas técnicas)
 
-- **⚠️ Encoding:** TODOS los .txt exportados y los .csv de `Respaldo CLAUDE/` están en **latin-1 (ISO-8859-1)**, NO utf-8. En Python: `encoding="latin-1"`; en Node: `fs.readFileSync(ruta, "latin1")`. Leerlos como utf-8 corrompe acentos y eñes en silencio.
+- **⚠️ Encoding (corregido en F1-E6):** los .csv de `Respaldo CLAUDE/TABLAS/` están en **CP850 (codepage DOS)**, NO latin-1 ni utf-8. Leerlos como latin-1 corrompe los acentos **en silencio** (la ñ es el byte `0xA4`, que en latin-1 da `¤`; la ó es `0xA2` → `¢`: "Montaño"→"Monta¤o", "Algodón"→"Algod¢n"). En Node usa **`iconv-lite`** (`iconv.decode(buf, 'cp850')`, ver `backend/migracion/comun/csv.ts`); en Python `encoding="cp850"`. El ETL de F1-E6/E7/F9 ya lee CP850. *(Verificado para los CSV; los .txt de formularios del mismo volcado casi seguro comparten encoding.)*
 - **Datos reales:** las 116 tablas ya están exportadas en `Respaldo CLAUDE/TABLAS/*.csv`. (Si algún día hay que releer un `.mdb`: librería Python `access-parser`.)
-- **⚠️ `grep` puede fallar** leyendo estos archivos por argumento (por el encoding). Lo seguro: **Python** (`re` sobre el texto leído con latin-1), o `grep` por **stdin** (`cat archivo | grep ...`).
+- **⚠️ `grep` puede fallar** leyendo estos archivos por argumento (por el encoding). Lo seguro: **Python** (`re` sobre el texto leído con cp850), o `grep` por **stdin** (`cat archivo | grep ...`).
 - Los formularios exportados (`SaveAsText`) tienen el diseño (controles + propiedades) y, al final, una sección **`CodeBehindForm`** con el código VBA de cada control.
 
 ### Snippet útil (extraer estructura de un formulario)
 ```python
 import re
-t = open("Respaldo CLAUDE/Respaldo CLAUDEFormularios/Ordenes.txt", encoding="latin-1").read()
+t = open("Respaldo CLAUDE/Respaldo CLAUDEFormularios/Ordenes.txt", encoding="cp850").read()
 re.search(r'RecordSource ="([^"]*)"', t)           # origen de datos
 re.findall(r'SourceObject ="([^"]*)"', t)          # subformularios
 re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimientos

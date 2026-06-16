@@ -51,11 +51,13 @@ import { cargarTelas } from './loaders/telas.js';
 import { cargarTelasColores } from './loaders/telas-colores.js';
 import { cargarTemporadas } from './loaders/temporadas.js';
 
-/** Imprime el resumen de un loader (creados/existentes/omitidos). */
+/** Imprime el resumen de un loader (creados/existentes/omitidos + omitidos por validación). */
 function log(nombre: string, r: ResultadoLoader): void {
+  const omVal = r.omitidosValidacion ?? 0;
   console.log(
     `  ${nombre.padEnd(22)} creados=${String(r.creados).padStart(5)} ` +
-      `existentes=${String(r.existentes).padStart(5)} omitidos=${String(r.omitidos).padStart(5)}`,
+      `existentes=${String(r.existentes).padStart(5)} omitidos=${String(r.omitidos).padStart(5)}` +
+      (omVal > 0 ? ` omitidosValidacion=${String(omVal)}` : ''),
   );
 }
 
@@ -103,7 +105,14 @@ async function main(): Promise<void> {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
-  const cliente = crearClientePrisma(url);
+  // Tiempos de transacción HOLGADOS + pool grande: el ETL corre contra la BD remota de
+  // `prueba` (Railway, proxy público); la latencia hace que los defaults de Prisma
+  // (maxWait 2s / timeout 5s) den `P2028`, y la carga concurrente (lotes.ts) necesita que el
+  // pool de `pg` sostenga ~8 tareas en vuelo (default 10 → 12 con holgura). Solo el ETL.
+  const cliente = crearClientePrisma(url, {
+    transactionOptions: { maxWait: 20_000, timeout: 120_000 },
+    poolMax: 12,
+  });
   try {
     const reporte = await ejecutarEtl(cliente);
 

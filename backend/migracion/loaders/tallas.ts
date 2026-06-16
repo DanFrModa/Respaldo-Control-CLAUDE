@@ -13,7 +13,7 @@
  */
 import { crearCurva, crearTalla } from '../../src/dominio/catalogos/tallas-curvas.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
-import { ErrorConflicto } from '../../src/comun/errores.js';
+import { ErrorConflicto, ErrorDominio } from '../../src/comun/errores.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
@@ -76,6 +76,7 @@ export async function cargarTallas(
   const contTallas = { creados: 0, existentes: 0 };
   const contCurvas = { creados: 0, existentes: 0 };
   let cadenasRaras = 0;
+  let omitidosValidacion = 0;
 
   // Cadenas de talla distintas ya vistas (para no re-procesar las 5451 órdenes una a una).
   const combinacionesVistas = new Set<string>();
@@ -104,38 +105,55 @@ export async function cargarTallas(
       continue;
     }
 
-    // Asegurar cada talla del catálogo.
-    const idsTalla: number[] = [];
-    for (const etiqueta of parsed.etiquetas) {
-      const id = await asegurarTalla(sesion, bd, cliente, cacheTalla, etiqueta, contTallas);
-      idsTalla.push(id);
-    }
-
-    // Crear la curva (nombre determinista por contenido). Idempotente: si ya existe, se cuenta.
-    const nombre = nombreCurva(parsed.etiquetas);
-    const yaExiste = await cliente.curvaTalla.findFirst({
-      where: { nombre: { equals: nombre, mode: 'insensitive' } },
-      select: { id: true },
-    });
-    if (yaExiste !== null) {
-      contCurvas.existentes += 1;
-      continue;
-    }
+    // Toda la combinación (asegurar tallas + crear curva) es tolerante: si algo falla por
+    // data sucia, se reporta y se sigue con la siguiente combinación (el ETL no aborta).
     try {
-      await crearCurva(sesion, { nombre, items: idsTalla }, bd);
-      contCurvas.creados += 1;
-    } catch (error) {
-      if (error instanceof ErrorConflicto) {
-        contCurvas.existentes += 1; // carrera: ya la creó otra orden con la misma combinación
-      } else {
-        throw error;
+      // Asegurar cada talla del catálogo.
+      const idsTalla: number[] = [];
+      for (const etiqueta of parsed.etiquetas) {
+        const id = await asegurarTalla(sesion, bd, cliente, cacheTalla, etiqueta, contTallas);
+        idsTalla.push(id);
       }
+
+      // Crear la curva (nombre determinista por contenido). Idempotente: si ya existe, se cuenta.
+      const nombre = nombreCurva(parsed.etiquetas);
+      const yaExiste = await cliente.curvaTalla.findFirst({
+        where: { nombre: { equals: nombre, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (yaExiste !== null) {
+        contCurvas.existentes += 1;
+        continue;
+      }
+      try {
+        await crearCurva(sesion, { nombre, items: idsTalla }, bd);
+        contCurvas.creados += 1;
+      } catch (error) {
+        if (error instanceof ErrorConflicto) {
+          contCurvas.existentes += 1; // carrera: ya la creó otra orden con la misma combinación
+        } else {
+          throw error;
+        }
+      }
+    } catch (error) {
+      const detalle =
+        error instanceof ErrorDominio ? `${error.codigo}: ${error.message}` : String(error);
+      reporte.agregar(
+        'Tallas/Curva: combinación OMITIDA por error (data sucia)',
+        `"${parsed.original}" · ${detalle}`,
+      );
+      omitidosValidacion += 1;
     }
   }
 
   return {
     tallas: { creados: contTallas.creados, existentes: contTallas.existentes, omitidos: 0 },
-    curvas: { creados: contCurvas.creados, existentes: contCurvas.existentes, omitidos: 0 },
+    curvas: {
+      creados: contCurvas.creados,
+      existentes: contCurvas.existentes,
+      omitidos: 0,
+      omitidosValidacion,
+    },
     cadenasRaras,
   };
 }

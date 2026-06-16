@@ -72,5 +72,15 @@ describe('migración · valores (conversores puros)', () => {
       expect(normalizarParaDedup('Maquilas SA')).toBe(normalizarParaDedup('maquilas sa'));
       expect(normalizarParaDedup('Múñoz')).toBe(normalizarParaDedup('munoz'));
     });
+    it('iguala las formas Unicode NFC y NFD del MISMO texto (fix géneros: el ñ del seed vs CSV)', () => {
+      // "Niño Infantil" precompuesto (ñ = U+00F1, como el CSV latin-1) vs descompuesto
+      // (n + U+0303 combining tilde, como pudo guardarlo el editor del seed). Distintos a
+      // nivel de bytes, pero el MISMO género → no debe duplicarse.
+      const nfc = 'Niño Infantil'; // ñ precompuesto
+      const nfd = 'Niño Infantil'; // n + tilde combinante (̃)
+      expect(nfc).not.toBe(nfd); // de verdad difieren en code points
+      expect(normalizarParaDedup(nfc)).toBe(normalizarParaDedup(nfd));
+      expect(normalizarParaDedup(nfc)).toBe('nino infantil');
+    });
   });
 });
