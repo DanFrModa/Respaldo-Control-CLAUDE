@@ -2,26 +2,27 @@
 
 > **Documento vivo.** Aquí está TODO el camino: las 10 fases divididas en **etapas** con su estado. La ley técnica es `PLANMAESTRO.md`; esto es el mapa y el tracker.
 > **Para cualquier chat/sesión nueva:** lee `CLAUDE.md` → `PLANMAESTRO.md` → este archivo (la sección *¿Dónde vamos?*) → la **ficha completa de la fase activa** en `docs/hoja-de-ruta/` — y con eso sabes exactamente qué sigue y cómo ejecutarlo. No leas las 8 fichas: solo la de la fase en curso.
-> — *Actualizado: 15-jun-2026.*
+> — *Actualizado: 16-jun-2026.*
 
 ---
 
 ## 1. ¿Dónde vamos? (estado vivo — actualizar al cerrar cada etapa)
 
+- **F2 — Pedidos + Órdenes: 🔄 EN CURSO (1/5).** **`F2-E1` ✅ (16-jun-2026, en `prueba`, PR #46)** — módulo Pedidos internos + Pedidos Reales (vertical completo: 4 tablas, dominio, API, UI; folio por secuencia por empresa A3, importes ocultos server-side, snapshots `V1` de solo lectura D3). **Diferido pendiente de Daniel:** la política de cancelación del **Pedido Real** (solo queda un TODO; no bloquea el resto). **Siguiente: `F2-E2`** (Órdenes: datos + dominio + API — matriz D4, referencias D7, folios A3, UPC). **Bloqueantes a confirmar con Daniel antes de E2:** (1) fuente del UPC en v2 y (2) si se permite "orden sin pedido" (26 casos reales). Ficha en [`docs/hoja-de-ruta/F2-etapas.md`](docs/hoja-de-ruta/F2-etapas.md).
 - **F1 — Catálogos + Modelos: ✅ COMPLETA (15-jun-2026, en `prueba`).** Las 8 etapas hechas, verificadas por Gabriel y desplegadas en `prueba`: `F1-E1` ✅, `F1-E1B` ✅, `F1-E2` ✅, `F1-E3` ✅, `F1-E4` ✅, `F1-E5` ✅, `F1-E6` ✅ (ETL de catálogos/materiales + mapeos `MapeoMigracion` + fusión de colores; PR #42/#43) y **`F1-E7` ✅ (ETL de modelos+BOM + cuadre de fase + docs de módulo + cierre; PR #44)**. **Criterio de salida F1 cumplido:** un modelo real con su receta completa capturado y verificado en `prueba`. **Pendiente explícito (no bloquea):** el ETL de **fotos masivas** quedó construido y probado, pero la **carpeta física de fotos** (`S:\...\FotosMod` + bordados) aún no la tiene Gabriel — se corre con `--fotos-modelos`/`--fotos-bordados` cuando la consiga. **Decisión abierta para Daniel:** avío `IdHabilitacion=12` (842 recetas lo usan) fue borrado del catálogo viejo — ¿re-darlo de alta o dejarlo retirado? **Siguiente fase: `F2` — Pedidos + Órdenes** (ficha en [`docs/hoja-de-ruta/F2-etapas.md`](docs/hoja-de-ruta/F2-etapas.md)).
 - **Hecho:** ingeniería inversa + diseño ✅ 100 % (validado por Daniel). **F0 (Fundación) ✅ construida y desplegada** — desde el 12-jun-2026 corre en Railway **como ambiente de prueba** (login real funcionando). El despliegue de **producción NO se monta todavía**: se contrata al acercarse el go-live, por costo (decisión de Gabriel, 12-jun-2026).
 - **Pendientes manuales de Gabriel** (no bloquean el arranque de F1): cambiar el password de `admin` (seed `Control.2026!`), activar backups del Postgres en Railway, montar **Cloudflare R2** (⚠️ sí se necesita antes de F1-E3/E4, que suben fotos), borrar el servicio frontend viejo si quedó en el canvas, y proteger las ramas exigiendo los checks del CI.
 
 ```
 Entender + diseñar    : ██████████  100 %  ✅
-Construir (F0–F9)     : ██░░░░░░░░  F1 de 10 ✅ — siguen F2…F9 (52 etapas planificadas)
+Construir (F0–F9)     : ██░░░░░░░░  F1 de 10 ✅ · F2 en curso (1/5) — siguen F2…F9 (52 etapas planificadas)
 ```
 
 | Fase | Etapas | Estado |
 |---|---|---|
 | **F0 · Fundación** | 5 | ✅ **hecha** (construida + desplegada como prueba, 12-jun-2026) |
 | **F1 · Catálogos + Modelos** | 8 | ✅ **hecha** (8 etapas, verificadas y en prueba, 15-jun-2026) |
-| **F2 · Pedidos + Órdenes** | 5 | 🔄 **siguiente** |
+| **F2 · Pedidos + Órdenes** | 5 | 🔄 **en curso (1/5)** — E1 ✅ |
 | **F3 · Producción / WIP** | 6 | ⬜ |
 | **F4 · Compras / MRP** | 6 | ⬜ |
 | **F5 · Ruta Crítica ⭐** | 7 | ⬜ |
@@ -79,13 +80,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **F1-E6** | ETL de catálogos y materiales + mapeos reutilizables + fusión de colores | 2 coders en paralelo + 1 reviewer | ✅ **15-jun-2026 (en prueba)** · PR #42/#43 |
 | **F1-E7** | ETL de modelos + BOM + fotos masivas + docs del módulo + cierre de fase en `prueba` | 1 coder + 1 reviewer | ✅ **15-jun-2026 (en prueba)** · PR #44 · **cierre de fase F1** |
 
-### F2 · Pedidos + Órdenes — ⬜ pendiente
+### F2 · Pedidos + Órdenes — 🔄 EN CURSO (E1 ✅, 16-jun-2026)
 
 **Salida:** Un pedido fluye hasta su orden; impreso de orden. · **Ficha completa:** [`docs/hoja-de-ruta/F2-etapas.md`](docs/hoja-de-ruta/F2-etapas.md)
 
 | Etapa | Qué entrega | Equipo | Estado |
 |---|---|---|---|
-| **F2-E1** | Pedidos internos + Pedidos Reales | 1 coder + 1 reviewer (con corte de contingencia E1a/E1b previsto) | ⬜ |
+| **F2-E1** | Pedidos internos + Pedidos Reales | 1 coder + 1 reviewer (con corte de contingencia E1a/E1b previsto) | ✅ **16-jun-2026 (en prueba)** · PR #46 |
 | **F2-E2** | Órdenes: datos + dominio + API | 1 coder + 1 reviewer (review en dos cortes) | ⬜ |
 | **F2-E3** | Frontend de órdenes: componente MatrizColorTalla (se reusa en F3/F6) + captura completa | 1 coder + 1 reviewer | ⬜ |
 | **F2-E4** | Consultas, tableros, búsqueda global e impreso de orden | 2 coders en paralelo + 1 reviewer (límites de archivos declarados) | ⬜ |
