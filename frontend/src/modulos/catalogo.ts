@@ -1,12 +1,15 @@
 import {
+  AlertTriangle,
   Banknote,
   Barcode,
+  CalendarRange,
   Calculator,
   ChartLine,
   Factory,
   Files,
   Images,
   Library,
+  ListChecks,
   type LucideIcon,
   Medal,
   Package,
@@ -40,6 +43,9 @@ export type IconoModulo =
   | 'codigo-barra'
   | 'carrito'
   | 'fabrica'
+  | 'lista-tareas'
+  | 'alerta'
+  | 'calendario'
   | 'paquete'
   | 'almacen'
   | 'ruta'
@@ -63,6 +69,9 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
   'codigo-barra': Barcode,
   carrito: ShoppingCart,
   fabrica: Factory,
+  'lista-tareas': ListChecks,
+  alerta: AlertTriangle,
+  calendario: CalendarRange,
   paquete: Package,
   almacen: Warehouse,
   ruta: Route,
@@ -173,6 +182,36 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Captura de órdenes de producción con matriz color × talla',
     ruta: '/produccion/ordenes',
     icono: 'fabrica',
+    permisos: ['ordenes.ver'],
+    subVista: true,
+  },
+  // Sub-vistas de Producción (F2-E4): la operación diaria de ÓRDENES — consultar/imprimir, ver
+  // incompletas con semáforo y el tablero de pedidos por mes. Cuelgan del módulo Producción y
+  // comparten su permiso de lectura `ordenes.ver`.
+  {
+    clave: 'consulta-ordenes',
+    titulo: 'Consulta de órdenes',
+    descripcion: 'Localiza, imprime (individual o en lote) y salta a las órdenes de producción',
+    ruta: '/produccion/consulta',
+    icono: 'lista-tareas',
+    permisos: ['ordenes.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'ordenes-incompletas',
+    titulo: 'Órdenes incompletas',
+    descripcion: 'Órdenes capturadas sin matriz, con semáforo de antigüedad',
+    ruta: '/produccion/incompletas',
+    icono: 'alerta',
+    permisos: ['ordenes.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'pedidos-por-mes',
+    titulo: 'Pedidos por mes',
+    descripcion: 'Tablero de órdenes y piezas agregadas por mes',
+    ruta: '/produccion/pedidos-por-mes',
+    icono: 'calendario',
     permisos: ['ordenes.ver'],
     subVista: true,
   },

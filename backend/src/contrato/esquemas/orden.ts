@@ -487,3 +487,29 @@ export const esquemaOrdenesPagina = z
 
 /** Forma de la respuesta paginada de órdenes. */
 export type OrdenesPagina = z.infer<typeof esquemaOrdenesPagina>;
+
+// ── Impreso de la orden (F2-E4, R9) ────────────────────────────────────────────────────
+
+/**
+ * Cuerpo de la impresión por LOTE de órdenes (`POST /ordenes/impresos`): la lista de ids de
+ * órdenes (de la empresa activa) a consolidar en UN solo PDF (una orden por página). Entre 1 y 100
+ * ids. La respuesta NO es JSON sino `application/pdf` (un Buffer binario), por eso no hay esquema de
+ * respuesta en el contrato — el endpoint solo documenta su cuerpo.
+ */
+export const esquemaOrdenesImpresoCuerpo = z
+  .object({
+    ids: z
+      .array(
+        z
+          .number({ error: 'Cada id de orden debe ser un número' })
+          .int({ error: 'El id de la orden debe ser entero' })
+          .positive({ error: 'El id de la orden debe ser positivo' }),
+      )
+      .min(1, { error: 'Indica al menos una orden a imprimir' })
+      .max(100, { error: 'No se pueden imprimir más de 100 órdenes a la vez' })
+      .describe('Ids de las órdenes a consolidar en el PDF (una por página).'),
+  })
+  .describe('Lote de órdenes a imprimir en un solo PDF.');
+
+/** Datos validados del cuerpo de impresión por lote. */
+export type DatosOrdenesImpreso = z.infer<typeof esquemaOrdenesImpresoCuerpo>;

@@ -17,6 +17,9 @@ import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPa
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
+import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
+import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
+import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
@@ -76,6 +79,9 @@ const router = createBrowserRouter([
           { path: 'modelos/codigos-barra', element: <CodigosBarraPagina /> },
           { path: 'pedidos', element: <PedidosPagina /> },
           { path: 'produccion/ordenes', element: <OrdenesPagina /> },
+          { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
+          { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
+          { path: 'produccion/pedidos-por-mes', element: <TableroPedidosMesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

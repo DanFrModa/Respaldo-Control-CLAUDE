@@ -18164,6 +18164,732 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ordenes/consulta': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Consultar órdenes (listado ligero con filtros) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Texto a buscar (folio, código de modelo, cliente o valor de referencia). */
+          busqueda?: string;
+          /** @description Filtra por modelo. */
+          idModelo?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por año de la fecha. */
+          anio?: number;
+          /** @description Filtra por estado. */
+          estado?: 'capturada' | 'completa' | 'cancelada';
+          /** @description Incluye las órdenes canceladas (cancelación suave). */
+          incluirCanceladas?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'folio' | 'fecha' | 'fechaEntrega' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de órdenes (proyección ligera). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes (ligeras) de la página. */
+              datos: {
+                /** @description Id interno de la orden. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /**
+                 * @description Estado DERIVADO de la orden (no editable).
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Fecha de la orden (YYYY-MM-DD), o null. */
+                fecha: string | null;
+                /** @description Fecha de entrega comprometida, o null. */
+                fechaEntrega: string | null;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Cliente de la orden. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Maquilero asignado (Proveedor), o null. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero, o null. */
+                maquilero: string | null;
+                /** @description Total de prendas de la orden (Σ de todas las tallas), agregado en servidor. */
+                totalPiezas: number;
+              }[];
+              /** @description Total de órdenes que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/incompletas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Dirección por antigüedad (desc = las más viejas/urgentes primero). */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de órdenes incompletas. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes incompletas de la página. */
+              datos: {
+                /** @description Id interno de la orden. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /**
+                 * @description Estado DERIVADO de la orden (no editable).
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Fecha de la orden (YYYY-MM-DD), o null. */
+                fecha: string | null;
+                /** @description Fecha de entrega comprometida, o null. */
+                fechaEntrega: string | null;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Cliente de la orden. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Maquilero asignado (Proveedor), o null. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero, o null. */
+                maquilero: string | null;
+                /** @description Total de prendas de la orden (Σ de todas las tallas), agregado en servidor. */
+                totalPiezas: number;
+                /** @description Días desde el alta de la orden (creadoEn, o fecha como respaldo). */
+                diasAntiguedad: number;
+                /**
+                 * @description Semáforo de antigüedad (verde ≤3d, amarillo 4–7d, urgente >7d). Derivado en servidor.
+                 * @enum {string}
+                 */
+                semaforo: 'verde' | 'amarillo' | 'urgente';
+              }[];
+              /** @description Total de órdenes incompletas. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/tablero/pedidos-por-mes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tablero de pedidos por mes (agregado de órdenes) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por año (de la fecha de la orden). */
+          anio?: number;
+          /** @description Filtra por mes (1-12). */
+          mes?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Incluye las órdenes canceladas en el agregado. */
+          incluirCanceladas?: string;
+          /** @description Bandera de paridad (viejo); sin efecto en F2 (no hay avance todavía). */
+          entregadosTienda?: string;
+          /** @description Bandera de paridad (viejo); sin efecto en F2 (no hay avance todavía). */
+          noProducir?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tablero de pedidos por mes (agregado, extensible a avances en F3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Una fila por mes (orden cronológico). */
+              filas: {
+                /** @description Año del mes agrupado. */
+                anio: number;
+                /** @description Mes (1-12). */
+                mes: number;
+                /** @description Clave estable del mes (YYYY-MM), para saltos/links. */
+                clave: string;
+                /** @description Etiqueta legible del mes (p. ej. "jun 2026"). */
+                etiqueta: string;
+                /** @description Número de órdenes con fecha en ese mes. */
+                numOrdenes: number;
+                /** @description Total de prendas (Σ de tallas) de ese mes. */
+                totalPiezas: number;
+              }[];
+              /** @description Total de órdenes en todo el rango. */
+              totalOrdenes: number;
+              /** @description Total de prendas en todo el rango. */
+              totalPiezas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/buscar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Buscador global de órdenes (hits ligeros para el layout) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Texto a buscar (folio, código de modelo, cliente o valor de referencia D7). */
+          q: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resultados del buscador global de órdenes. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Hits de la búsqueda (limitados). */
+              datos: {
+                /** @description Id interno de la orden (para navegar al detalle). */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Nombre del cliente. */
+                cliente: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Imprimir una orden de producción (PDF de piso de producción) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/impresos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Imprimir varias órdenes en un solo PDF (una por página) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Lote de órdenes a imprimir en un solo PDF. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Ids de las órdenes a consolidar en el PDF (una por página). */
+            ids: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/usuarios': {
     parameters: {
       query?: never;

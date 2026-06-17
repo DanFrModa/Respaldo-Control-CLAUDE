@@ -385,6 +385,7 @@ export {
   esquemaOrdenSalida,
   esquemaListarOrdenes,
   esquemaOrdenesPagina,
+  esquemaOrdenesImpresoCuerpo,
   type DatosOrdenTallaEntrada,
   type DatosOrdenLineaEntrada,
   type DatosOrdenCrear,
@@ -403,7 +404,38 @@ export {
   type OrdenSalida,
   type ListarOrdenes,
   type OrdenesPagina,
+  type DatosOrdenesImpreso,
 } from './esquemas/orden.js';
+
+// ── Consultas/tableros/búsqueda de Órdenes (Módulo ÓRDENES, F2-E4; doc 03-Produccion) ──
+export {
+  esquemaOrdenLigeraSalida,
+  esquemaOrdenesLigerasPagina,
+  esquemaConsultaOrdenes,
+  esquemaSemaforoOrden,
+  esquemaOrdenIncompletaSalida,
+  esquemaOrdenesIncompletasPagina,
+  esquemaIncompletasQuery,
+  esquemaTableroPedidosMesFila,
+  esquemaTableroPedidosMes,
+  esquemaTableroPedidosMesQuery,
+  esquemaOrdenHitSalida,
+  esquemaOrdenesBuscarSalida,
+  esquemaOrdenesBuscarQuery,
+  type OrdenLigeraSalida,
+  type OrdenesLigerasPagina,
+  type ConsultaOrdenes,
+  type SemaforoOrden,
+  type OrdenIncompletaSalida,
+  type OrdenesIncompletasPagina,
+  type IncompletasQuery,
+  type TableroPedidosMesFila,
+  type TableroPedidosMes,
+  type TableroPedidosMesQuery,
+  type OrdenHitSalida,
+  type OrdenesBuscarSalida,
+  type OrdenesBuscarQuery,
+} from './esquemas/orden-consulta.js';
 
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 

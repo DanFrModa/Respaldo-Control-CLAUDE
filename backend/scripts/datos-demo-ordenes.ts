@@ -85,6 +85,8 @@ interface DatosDemo {
   idOrdenConReferencia: number;
   valorReferenciaDemo: string;
   idOrdenCancelada: number;
+  idOrdenIncompletaUrgente: number;
+  folioOrdenIncompletaUrgente: number;
 }
 
 async function sembrarDemo(prisma: PrismaClient): Promise<DatosDemo> {
@@ -244,6 +246,16 @@ async function sembrarDemo(prisma: PrismaClient): Promise<DatosDemo> {
   const ordenCancelar = await crearOrden(sesion, { idPedidoLinea: lineaPedido.id });
   await cancelarOrden(sesion, ordenCancelar.id, { motivo: 'Demo de cancelación' });
 
+  // DEMO-D: INCOMPLETA y ANTIGUA (F2-E4) — se crea SIN matriz (queda en estado 'capturada') y se
+  // retrocede su `creadoEn` 10 días para que el semáforo de antigüedad la marque URGENTE (> 7 días,
+  // regla `EsUrgente`). Así Gabriel ve el estado urgente en la pantalla "Órdenes incompletas".
+  const ordenIncompleta = await crearOrden(sesion, { idPedidoLinea: lineaPedido.id });
+  const hace10Dias = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+  await prisma.orden.update({
+    where: { id: ordenIncompleta.id },
+    data: { creadoEn: hace10Dias },
+  });
+
   return {
     idEmpresa: empresa.id,
     idCliente: cliente.id,
@@ -266,6 +278,8 @@ async function sembrarDemo(prisma: PrismaClient): Promise<DatosDemo> {
     idOrdenConReferencia: ordenRef.id,
     valorReferenciaDemo: valorReferencia,
     idOrdenCancelada: ordenCancelar.id,
+    idOrdenIncompletaUrgente: ordenIncompleta.id,
+    folioOrdenIncompletaUrgente: ordenIncompleta.folio,
   };
 }
 
@@ -298,6 +312,9 @@ function imprimirResumen(d: DatosDemo): void {
     `  • DEMO-B (con referencia D7) .. id ${d.idOrdenConReferencia}  valor "${d.valorReferenciaDemo}"`,
   );
   console.log(`  • DEMO-C (cancelada) .......... id ${d.idOrdenCancelada}`);
+  console.log(
+    `  • DEMO-D (incompleta URGENTE).. id ${d.idOrdenIncompletaUrgente}  folio ${d.folioOrdenIncompletaUrgente}  (sin matriz, creadoEn -10 días → semáforo URGENTE en "Órdenes incompletas")`,
+  );
   console.log('─────────────────────────────────────────────────────────────────────\n');
 }
 

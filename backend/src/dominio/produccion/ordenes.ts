@@ -1014,8 +1014,12 @@ export const buscarOrdenes = listarOrdenes;
 /**
  * Arma el `OR` de búsqueda combinada: folio (si la búsqueda es entero), código de modelo, nombre
  * de cliente y valor de referencia (D7, vía el índice de `OrdenReferencia.valor`). Vacío → sin OR.
+ *
+ * Exportado para reusarse en las CONSULTAS ligeras (F2-E4, `consultas.ts`): la consulta y el
+ * buscador global comparten EXACTAMENTE esta lógica de búsqueda combinada (folio + modelo + cliente
+ * + valor de referencia), con su proyección ligera propia.
  */
-function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereInput {
+export function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
@@ -1043,8 +1047,11 @@ function aFolioBusqueda(busqueda: string): bigint | null {
   }
 }
 
-/** Rango `@db.Date` para filtrar por año natural (de enero 1 a enero 1 del siguiente, exclusivo). */
-function rangoAnio(anio: number): Prisma.DateTimeNullableFilter {
+/**
+ * Rango `@db.Date` para filtrar por año natural (de enero 1 a enero 1 del siguiente, exclusivo).
+ * Exportado para reusarse en las CONSULTAS/tablero (F2-E4): el filtro por año es idéntico.
+ */
+export function rangoAnio(anio: number): Prisma.DateTimeNullableFilter {
   return {
     gte: new Date(`${anio}-01-01T00:00:00.000Z`),
     lt: new Date(`${anio + 1}-01-01T00:00:00.000Z`),
