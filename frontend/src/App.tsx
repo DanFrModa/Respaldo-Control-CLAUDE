@@ -10,13 +10,15 @@ import { BordadosPagina } from '@/modulos/bordados/BordadosPagina';
 import { GaleriaBordados } from '@/modulos/bordados/GaleriaBordados';
 import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
-import { CodigosBarraPagina } from '@/modulos/codigos-barra/CodigosBarraPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
+import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
+import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
+import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
@@ -73,9 +75,11 @@ const router = createBrowserRouter([
           { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
-          { path: 'modelos/codigos-barra', element: <CodigosBarraPagina /> },
           { path: 'pedidos', element: <PedidosPagina /> },
           { path: 'produccion/ordenes', element: <OrdenesPagina /> },
+          { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
+          { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
+          { path: 'produccion/pedidos-por-mes', element: <TableroPedidosMesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

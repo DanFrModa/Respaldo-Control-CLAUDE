@@ -28,7 +28,7 @@ export const LIMITES = {
   cliente: { nombre: 200, contacto: 150, telefono: 100, direccion: 300 },
   color: { nombre: 80 },
   etiquetaMarca: { nombre: 100 },
-  empresa: { nombre: 100, razonSocial: 200, identificador: 20, upc: 20 },
+  empresa: { nombre: 100, razonSocial: 200, identificador: 20 },
   almacen: { nombre: 100 },
   telaCategoria: { nombre: 100 },
   tela: { nombre: 150, descripcion: 500, unidadMedida: 30 },

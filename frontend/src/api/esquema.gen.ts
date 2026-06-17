@@ -147,7 +147,6 @@ export interface paths {
                 | 'bordados.administrar'
                 | 'modelos.ver'
                 | 'modelos.administrar'
-                | 'modelos.codigos-barra'
               )[];
             };
           };
@@ -12227,145 +12226,6 @@ export interface paths {
     };
     trace?: never;
   };
-  '/api/modelos/{id}/codigos-barra': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Generar los códigos de barra (EAN-13 / DUN-14) de un modelo
-     * @description Calcula el EAN-13 y el DUN-14 del modelo usando el prefijo UPC de la EMPRESA ACTIVA de la sesión (Empresa.upc). Si la empresa no tiene UPC capturado, o prefijo+código no suman 12 dígitos, responde 400 con un mensaje legible.
-     */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del modelo. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del modelo. */
-              idModelo: number;
-              /** @description Código del modelo usado para componer la base. */
-              codigoModelo: string;
-              /** @description Id de la empresa activa de la sesión. */
-              idEmpresa: number;
-              /** @description Nombre de la empresa activa (para el impreso). */
-              nombreEmpresa: string;
-              /** @description Prefijo UPC de la empresa (de Empresa.upc). */
-              prefijo: string;
-              /** @description Los 12 dígitos base (prefijo + código) sin verificador. */
-              base12: string;
-              /** @description EAN-13 completo (13 dígitos): base + verificador módulo 10. */
-              ean13: string;
-              /** @description DUN-14 de caja (14 dígitos): indicador 1 + base + verificador. */
-              dun14: string;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/modelos/{id}/bom/telas': {
     parameters: {
       query?: never;
@@ -15898,8 +15758,6 @@ export interface paths {
                 motivoCancelada: string | null;
                 /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
                 tallasV1: string | null;
-                /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-                upc: string | null;
                 /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
                 maquilaOrd: number | null;
                 /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16184,8 +16042,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16432,8 +16288,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16697,8 +16551,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16964,8 +16816,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17222,8 +17072,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17479,8 +17327,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17740,8 +17586,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17998,8 +17842,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -18076,6 +17918,732 @@ export interface paths {
             };
           };
         };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/consulta': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Consultar órdenes (listado ligero con filtros) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Texto a buscar (folio, código de modelo, cliente o valor de referencia). */
+          busqueda?: string;
+          /** @description Filtra por modelo. */
+          idModelo?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por año de la fecha. */
+          anio?: number;
+          /** @description Filtra por estado. */
+          estado?: 'capturada' | 'completa' | 'cancelada';
+          /** @description Incluye las órdenes canceladas (cancelación suave). */
+          incluirCanceladas?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'folio' | 'fecha' | 'fechaEntrega' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de órdenes (proyección ligera). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes (ligeras) de la página. */
+              datos: {
+                /** @description Id interno de la orden. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /**
+                 * @description Estado DERIVADO de la orden (no editable).
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Fecha de la orden (YYYY-MM-DD), o null. */
+                fecha: string | null;
+                /** @description Fecha de entrega comprometida, o null. */
+                fechaEntrega: string | null;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Cliente de la orden. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Maquilero asignado (Proveedor), o null. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero, o null. */
+                maquilero: string | null;
+                /** @description Total de prendas de la orden (Σ de todas las tallas), agregado en servidor. */
+                totalPiezas: number;
+              }[];
+              /** @description Total de órdenes que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/incompletas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Dirección por antigüedad (desc = las más viejas/urgentes primero). */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de órdenes incompletas. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes incompletas de la página. */
+              datos: {
+                /** @description Id interno de la orden. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /**
+                 * @description Estado DERIVADO de la orden (no editable).
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Fecha de la orden (YYYY-MM-DD), o null. */
+                fecha: string | null;
+                /** @description Fecha de entrega comprometida, o null. */
+                fechaEntrega: string | null;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Cliente de la orden. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Maquilero asignado (Proveedor), o null. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero, o null. */
+                maquilero: string | null;
+                /** @description Total de prendas de la orden (Σ de todas las tallas), agregado en servidor. */
+                totalPiezas: number;
+                /** @description Días desde el alta de la orden (creadoEn, o fecha como respaldo). */
+                diasAntiguedad: number;
+                /**
+                 * @description Semáforo de antigüedad (verde ≤3d, amarillo 4–7d, urgente >7d). Derivado en servidor.
+                 * @enum {string}
+                 */
+                semaforo: 'verde' | 'amarillo' | 'urgente';
+              }[];
+              /** @description Total de órdenes incompletas. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/tablero/pedidos-por-mes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tablero de pedidos por mes (agregado de órdenes) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por año (de la fecha de la orden). */
+          anio?: number;
+          /** @description Filtra por mes (1-12). */
+          mes?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Incluye las órdenes canceladas en el agregado. */
+          incluirCanceladas?: string;
+          /** @description Bandera de paridad (viejo); sin efecto en F2 (no hay avance todavía). */
+          entregadosTienda?: string;
+          /** @description Bandera de paridad (viejo); sin efecto en F2 (no hay avance todavía). */
+          noProducir?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tablero de pedidos por mes (agregado, extensible a avances en F3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Una fila por mes (orden cronológico). */
+              filas: {
+                /** @description Año del mes agrupado. */
+                anio: number;
+                /** @description Mes (1-12). */
+                mes: number;
+                /** @description Clave estable del mes (YYYY-MM), para saltos/links. */
+                clave: string;
+                /** @description Etiqueta legible del mes (p. ej. "jun 2026"). */
+                etiqueta: string;
+                /** @description Número de órdenes con fecha en ese mes. */
+                numOrdenes: number;
+                /** @description Total de prendas (Σ de tallas) de ese mes. */
+                totalPiezas: number;
+              }[];
+              /** @description Total de órdenes en todo el rango. */
+              totalOrdenes: number;
+              /** @description Total de prendas en todo el rango. */
+              totalPiezas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/buscar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Buscador global de órdenes (hits ligeros para el layout) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Texto a buscar (folio, código de modelo, cliente o valor de referencia D7). */
+          q: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resultados del buscador global de órdenes. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Hits de la búsqueda (limitados). */
+              datos: {
+                /** @description Id interno de la orden (para navegar al detalle). */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Nombre del cliente. */
+                cliente: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Imprimir una orden de producción (PDF de piso de producción) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/impresos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Imprimir varias órdenes en un solo PDF (una por página) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Lote de órdenes a imprimir en un solo PDF. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Ids de las órdenes a consolidar en el PDF (una por página). */
+            ids: number[];
+          };
+        };
+      };
+      responses: {
         /** @description Respuesta de error de la API. */
         400: {
           headers: {
@@ -19432,8 +20000,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -19556,7 +20122,6 @@ export interface paths {
             nombre: string;
             razonSocial?: string;
             identificador?: string;
-            upc?: string;
             /** @default false */
             favorita?: boolean;
             /** @default false */
@@ -19582,8 +20147,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -19732,8 +20295,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -19871,8 +20432,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -19999,7 +20558,6 @@ export interface paths {
             nombre?: string;
             razonSocial?: string;
             identificador?: string;
-            upc?: string;
             favorita?: boolean;
             paraIpt?: boolean;
             paraEdr?: boolean;
@@ -20023,8 +20581,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */

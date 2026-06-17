@@ -13,9 +13,9 @@ import { z } from 'zod';
  *  • El `estado` (capturada/completa/cancelada) lo DERIVAN los servicios; ningún cuerpo lo lleva.
  *  • El TOTAL de la orden y de cada color se DERIVA por suma de cantidades (D4 + espíritu D3):
  *    NUNCA viaja un `total` de entrada, y en la salida sale calculado.
- *  • Los campos-dato de v1 sin motor (RC=F5; maquilaOrd/aplicacionOrd/pagada=F3/F6; upc histórico;
- *    tallasV1 crudo) son de SOLO LECTURA: salen en respuestas pero NINGÚN cuerpo de entrada los
- *    lleva ni se generan (en particular: NO hay `generarUPC`, decisión Gabriel 16-jun-2026).
+ *  • Los campos-dato de v1 sin motor (RC=F5; maquilaOrd/aplicacionOrd/pagada=F3/F6; tallasV1 crudo)
+ *    son de SOLO LECTURA: salen en respuestas pero NINGÚN cuerpo de entrada los lleva. El `upc`
+ *    histórico (códigos de barra) fue ELIMINADO del modelo (decisión Gabriel 16-jun-2026).
  *
  * Semántica del PATCH parcial (M1, igual que Pedido/Cliente): omitir un campo (`undefined`) = no
  * tocar; mandar `null` en un opcional = vaciarlo. Las fechas date-only viajan como `YYYY-MM-DD`.
@@ -351,7 +351,7 @@ export type OrdenComentarioSalida = z.infer<typeof esquemaOrdenComentarioSalida>
 /**
  * Salida de una orden (proyección a JSON). Incluye el encabezado, la matriz (colores/tallas con
  * total derivado), las referencias y los comentarios. Los campos-dato de v1 sin motor salen como
- * SOLO LECTURA (RC/finanzas/upc/tallasV1).
+ * SOLO LECTURA (RC/finanzas/tallasV1).
  */
 export const esquemaOrdenSalida = z
   .object({
@@ -394,10 +394,6 @@ export const esquemaOrdenSalida = z
       .string()
       .nullable()
       .describe('Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad).'),
-    upc: z
-      .string()
-      .nullable()
-      .describe('Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación).'),
     maquilaOrd: z
       .number()
       .nullable()
@@ -487,3 +483,29 @@ export const esquemaOrdenesPagina = z
 
 /** Forma de la respuesta paginada de órdenes. */
 export type OrdenesPagina = z.infer<typeof esquemaOrdenesPagina>;
+
+// ── Impreso de la orden (F2-E4, R9) ────────────────────────────────────────────────────
+
+/**
+ * Cuerpo de la impresión por LOTE de órdenes (`POST /ordenes/impresos`): la lista de ids de
+ * órdenes (de la empresa activa) a consolidar en UN solo PDF (una orden por página). Entre 1 y 100
+ * ids. La respuesta NO es JSON sino `application/pdf` (un Buffer binario), por eso no hay esquema de
+ * respuesta en el contrato — el endpoint solo documenta su cuerpo.
+ */
+export const esquemaOrdenesImpresoCuerpo = z
+  .object({
+    ids: z
+      .array(
+        z
+          .number({ error: 'Cada id de orden debe ser un número' })
+          .int({ error: 'El id de la orden debe ser entero' })
+          .positive({ error: 'El id de la orden debe ser positivo' }),
+      )
+      .min(1, { error: 'Indica al menos una orden a imprimir' })
+      .max(100, { error: 'No se pueden imprimir más de 100 órdenes a la vez' })
+      .describe('Ids de las órdenes a consolidar en el PDF (una por página).'),
+  })
+  .describe('Lote de órdenes a imprimir en un solo PDF.');
+
+/** Datos validados del cuerpo de impresión por lote. */
+export type DatosOrdenesImpreso = z.infer<typeof esquemaOrdenesImpresoCuerpo>;

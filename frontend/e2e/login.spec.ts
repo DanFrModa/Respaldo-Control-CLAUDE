@@ -43,18 +43,18 @@ test.describe('Inicio de sesión', () => {
     await expect(page.getByText('La contraseña es obligatoria')).toBeVisible();
   });
 
-  test('el admin entra y ve el layout con los 16 módulos', async ({ page }) => {
+  test('el admin entra y ve el layout con los 18 módulos', async ({ page }) => {
     await entrarComoAdmin(page);
 
     // Entró a la app (inicio).
     await expect(page).toHaveURL(/\/$|\/$/);
     await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
 
-    // El admin (todos los permisos) ve los 16 links en la navegación lateral:
-    // 13 módulos del plan §5 + 3 sub-vistas (galería + códigos de barra de Modelos, F1-E5;
-    // órdenes de Producción, F2-E3).
+    // El admin (todos los permisos) ve los 18 links en la navegación lateral:
+    // 13 módulos del plan §5 + 5 sub-vistas (galería de Modelos, F1-E5;
+    // órdenes de Producción, F2-E3; consulta + incompletas + pedidos por mes, F2-E4).
     const navegacion = page.getByRole('navigation', { name: 'Módulos' }).first();
-    await expect(navegacion.getByRole('link')).toHaveCount(16);
+    await expect(navegacion.getByRole('link')).toHaveCount(18);
     await expect(navegacion.getByRole('link', { name: 'Ruta Crítica' })).toBeVisible();
     await expect(navegacion.getByRole('link', { name: 'Administración' })).toBeVisible();
     // La empresa activa aparece en el encabezado.

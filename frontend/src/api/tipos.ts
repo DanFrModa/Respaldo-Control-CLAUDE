@@ -278,6 +278,46 @@ export type OrdenReferencias =
 export type OrdenComentarioCrear =
   paths['/api/ordenes/{id}/comentarios']['post']['requestBody']['content']['application/json'];
 
+// ── Consultas/tableros/busqueda de Ordenes (F2-E4) ─────────────────────────────
+
+/** Pagina de la CONSULTA ligera de ordenes (`GET /api/ordenes/consulta`). */
+export type OrdenesConsultaPagina =
+  paths['/api/ordenes/consulta']['get']['responses']['200']['content']['application/json'];
+/** Una orden en proyeccion LIGERA (para tablas de consulta). */
+export type OrdenLigera = OrdenesConsultaPagina['datos'][number];
+/** Parametros de la consulta ligera (querystring). */
+export type OrdenesConsultaQuery = NonNullable<
+  paths['/api/ordenes/consulta']['get']['parameters']['query']
+>;
+
+/** Pagina de ordenes INCOMPLETAS (`GET /api/ordenes/incompletas`). */
+export type OrdenesIncompletasPagina =
+  paths['/api/ordenes/incompletas']['get']['responses']['200']['content']['application/json'];
+/** Una orden incompleta (con antiguedad + semaforo derivado). */
+export type OrdenIncompleta = OrdenesIncompletasPagina['datos'][number];
+/** Semaforo de antiguedad de una orden incompleta (verde/amarillo/urgente). */
+export type SemaforoOrden = OrdenIncompleta['semaforo'];
+/** Parametros del listado de incompletas (querystring). */
+export type OrdenesIncompletasQuery = NonNullable<
+  paths['/api/ordenes/incompletas']['get']['parameters']['query']
+>;
+
+/** Tablero "pedidos por mes" (`GET /api/ordenes/tablero/pedidos-por-mes`). */
+export type TableroPedidosMes =
+  paths['/api/ordenes/tablero/pedidos-por-mes']['get']['responses']['200']['content']['application/json'];
+/** Una fila del tablero (un mes con sus metricas). */
+export type TableroPedidosMesFila = TableroPedidosMes['filas'][number];
+/** Parametros del tablero (querystring). */
+export type TableroPedidosMesQuery = NonNullable<
+  paths['/api/ordenes/tablero/pedidos-por-mes']['get']['parameters']['query']
+>;
+
+/** Resultados del buscador global de ordenes (`GET /api/ordenes/buscar`). */
+export type OrdenesBuscar =
+  paths['/api/ordenes/buscar']['get']['responses']['200']['content']['application/json'];
+/** Un hit ligero del buscador global. */
+export type OrdenHit = OrdenesBuscar['datos'][number];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

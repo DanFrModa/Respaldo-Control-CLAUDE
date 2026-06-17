@@ -40,7 +40,6 @@ function empresa(id: number, nombre: string, sobre: Partial<Empresa> = {}): Empr
     nombre,
     razonSocial: null,
     identificador: null,
-    upc: null,
     favorita: false,
     paraIpt: false,
     paraEdr: false,
@@ -183,25 +182,29 @@ describe('<EmpresasPagina>', () => {
     expect(within(dialogo).getByText('Configuración de Config SA')).toBeInTheDocument();
   });
 
-  it('edita el UPC de una empresa y lo envía en el cuerpo del PATCH', async () => {
+  it('edita el identificador de una empresa y lo envía en el cuerpo del PATCH', async () => {
     const u = userEvent.setup();
-    useEmpresas.mockReturnValue(consultaConDatos([empresa(3, 'Marca SA', { upc: '750' })]));
+    useEmpresas.mockReturnValue(
+      consultaConDatos([empresa(3, 'Marca SA', { identificador: 'MS-01' })]),
+    );
     renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
 
     // "Editar" es un boton directo del detalle de la empresa auto-seleccionada.
     await u.click(screen.getByTestId('editar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
-    const upc = within(dialogo).getByLabelText('UPC');
-    expect(upc).toHaveValue('750');
+    const identificador = within(dialogo).getByLabelText('Identificador (RFC)');
+    expect(identificador).toHaveValue('MS-01');
 
-    await u.clear(upc);
-    await u.type(upc, '780');
+    await u.clear(identificador);
+    await u.type(identificador, 'MS-02');
     await u.click(screen.getByTestId('guardar-empresa'));
 
     expect(actualizarMutate).toHaveBeenCalledTimes(1);
-    const [args] = actualizarMutate.mock.calls[0] as [{ id: number; cuerpo: { upc?: string } }];
+    const [args] = actualizarMutate.mock.calls[0] as [
+      { id: number; cuerpo: { identificador?: string } },
+    ];
     expect(args.id).toBe(3);
-    expect(args.cuerpo.upc).toBe('780');
+    expect(args.cuerpo.identificador).toBe('MS-02');
   });
 });

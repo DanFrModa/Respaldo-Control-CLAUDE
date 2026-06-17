@@ -1,4 +1,4 @@
-import { Barcode, Building2, FileText, ScrollText, SettingsIcon, StarIcon } from 'lucide-react';
+import { Building2, FileText, ScrollText, SettingsIcon, StarIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -31,12 +31,12 @@ function BadgeFavorita(): React.JSX.Element {
   );
 }
 
-/** ¿Coincide la empresa con el texto buscado (nombre/razón/RFC/UPC)? */
+/** ¿Coincide la empresa con el texto buscado (nombre/razón/RFC)? */
 function coincide(empresa: Empresa, texto: string): boolean {
   if (texto === '') {
     return true;
   }
-  return [empresa.nombre, empresa.razonSocial, empresa.identificador, empresa.upc]
+  return [empresa.nombre, empresa.razonSocial, empresa.identificador]
     .filter((campo): campo is string => typeof campo === 'string')
     .some((campo) => campo.toLowerCase().includes(texto));
 }
@@ -106,7 +106,7 @@ export function EmpresasPagina(): React.JSX.Element {
   }
 
   // Registros filtrados en cliente: oculta inactivas (salvo que se pidan) y aplica
-  // la busqueda por nombre/razon social/identificador/UPC.
+  // la busqueda por nombre/razon social/identificador.
   const empresas = useMemo(() => {
     const todas = consulta.data ?? [];
     return todas.filter(
@@ -171,9 +171,6 @@ export function EmpresasPagina(): React.JSX.Element {
                 </CampoDetalle>
                 <CampoDetalle icono={FileText} etiqueta="Identificador (RFC)">
                   {e.identificador ?? <ValorVacio />}
-                </CampoDetalle>
-                <CampoDetalle icono={Barcode} etiqueta="UPC">
-                  {e.upc ?? <ValorVacio />}
                 </CampoDetalle>
               </RejillaCampos>
             </SeccionDetalle>

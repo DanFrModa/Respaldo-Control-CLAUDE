@@ -151,8 +151,7 @@
                           "bordados.ver",
                           "bordados.administrar",
                           "modelos.ver",
-                          "modelos.administrar",
-                          "modelos.codigos-barra"
+                          "modelos.administrar"
                         ]
                       },
                       "description": "Claves de permiso efectivas del usuario (unión de sus roles)."
@@ -27183,240 +27182,6 @@
         }
       }
     },
-    "/api/modelos/{id}/codigos-barra": {
-      "get": {
-        "summary": "Generar los códigos de barra (EAN-13 / DUN-14) de un modelo",
-        "tags": [
-          "modelos"
-        ],
-        "description": "Calcula el EAN-13 y el DUN-14 del modelo usando el prefijo UPC de la EMPRESA ACTIVA de la sesión (Empresa.upc). Si la empresa no tiene UPC capturado, o prefijo+código no suman 12 dígitos, responde 400 con un mensaje legible.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "description": "Id del modelo."
-          }
-        ],
-        "security": [
-          {
-            "cookieSesion": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "idModelo": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Id del modelo."
-                    },
-                    "codigoModelo": {
-                      "type": "string",
-                      "description": "Código del modelo usado para componer la base."
-                    },
-                    "idEmpresa": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Id de la empresa activa de la sesión."
-                    },
-                    "nombreEmpresa": {
-                      "type": "string",
-                      "description": "Nombre de la empresa activa (para el impreso)."
-                    },
-                    "prefijo": {
-                      "type": "string",
-                      "description": "Prefijo UPC de la empresa (de Empresa.upc)."
-                    },
-                    "base12": {
-                      "type": "string",
-                      "description": "Los 12 dígitos base (prefijo + código) sin verificador."
-                    },
-                    "ean13": {
-                      "type": "string",
-                      "description": "EAN-13 completo (13 dígitos): base + verificador módulo 10."
-                    },
-                    "dun14": {
-                      "type": "string",
-                      "description": "DUN-14 de caja (14 dígitos): indicador 1 + base + verificador."
-                    }
-                  },
-                  "required": [
-                    "idModelo",
-                    "codigoModelo",
-                    "idEmpresa",
-                    "nombreEmpresa",
-                    "prefijo",
-                    "base12",
-                    "ean13",
-                    "dun14"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa."
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/modelos/{id}/bom/telas": {
       "get": {
         "summary": "Listar las telas del BOM de un modelo",
@@ -35872,17 +35637,6 @@
                             ],
                             "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                           },
-                          "upc": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                          },
                           "maquilaOrd": {
                             "anyOf": [
                               {
@@ -36170,7 +35924,6 @@
                           "fechaCompletada",
                           "motivoCancelada",
                           "tallasV1",
-                          "upc",
                           "maquilaOrd",
                           "aplicacionOrd",
                           "pagada",
@@ -36819,17 +36572,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -37117,7 +36859,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -37564,17 +37305,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -37862,7 +37592,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -38428,17 +38157,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -38726,7 +38444,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -39238,17 +38955,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -39536,7 +39242,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -40004,17 +39709,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -40302,7 +39996,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -40770,17 +40463,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -41068,7 +40750,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -41554,17 +41235,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -41852,7 +41522,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -42320,17 +41989,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -42618,7 +42276,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -42640,6 +42297,1523 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/consulta": {
+      "get": {
+        "summary": "Consultar órdenes (listado ligero con filtros)",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar (folio, código de modelo, cliente o valor de referencia)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idModelo",
+            "required": false,
+            "description": "Filtra por modelo."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCliente",
+            "required": false,
+            "description": "Filtra por cliente."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "anio",
+            "required": false,
+            "description": "Filtra por año de la fecha."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "capturada",
+                "completa",
+                "cancelada"
+              ]
+            },
+            "in": "query",
+            "name": "estado",
+            "required": false,
+            "description": "Filtra por estado."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirCanceladas",
+            "required": false,
+            "description": "Incluye las órdenes canceladas (cancelación suave)."
+          },
+          {
+            "schema": {
+              "default": "folio",
+              "type": "string",
+              "enum": [
+                "folio",
+                "fecha",
+                "fechaEntrega",
+                "creadoEn"
+              ]
+            },
+            "in": "query",
+            "name": "ordenarPor",
+            "required": false,
+            "description": "Columna de orden."
+          },
+          {
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "description": "Dirección del orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de órdenes (proyección ligera).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id interno de la orden."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio consecutivo por empresa."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "capturada",
+                              "completa",
+                              "cancelada"
+                            ],
+                            "description": "Estado DERIVADO de la orden (no editable)."
+                          },
+                          "fecha": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de la orden (YYYY-MM-DD), o null."
+                          },
+                          "fechaEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de entrega comprometida, o null."
+                          },
+                          "idModelo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Modelo a producir."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo (para la UI)."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente de la orden."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente (para la UI)."
+                          },
+                          "idMaquilero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Maquilero asignado (Proveedor), o null."
+                          },
+                          "maquilero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del maquilero, o null."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total de prendas de la orden (Σ de todas las tallas), agregado en servidor."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "folio",
+                          "estado",
+                          "fecha",
+                          "fechaEntrega",
+                          "idModelo",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "idCliente",
+                          "cliente",
+                          "idMaquilero",
+                          "maquilero",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Orden en proyección LIGERA (para tablas de consulta)."
+                      },
+                      "description": "Órdenes (ligeras) de la página."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de órdenes que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página de órdenes (proyección ligera)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/incompletas": {
+      "get": {
+        "summary": "Listar órdenes incompletas (capturadas sin matriz) con semáforo de antigüedad",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página."
+          },
+          {
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "description": "Dirección por antigüedad (desc = las más viejas/urgentes primero)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de órdenes incompletas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id interno de la orden."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio consecutivo por empresa."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "capturada",
+                              "completa",
+                              "cancelada"
+                            ],
+                            "description": "Estado DERIVADO de la orden (no editable)."
+                          },
+                          "fecha": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de la orden (YYYY-MM-DD), o null."
+                          },
+                          "fechaEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de entrega comprometida, o null."
+                          },
+                          "idModelo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Modelo a producir."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo (para la UI)."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente de la orden."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente (para la UI)."
+                          },
+                          "idMaquilero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Maquilero asignado (Proveedor), o null."
+                          },
+                          "maquilero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del maquilero, o null."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total de prendas de la orden (Σ de todas las tallas), agregado en servidor."
+                          },
+                          "diasAntiguedad": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Días desde el alta de la orden (creadoEn, o fecha como respaldo)."
+                          },
+                          "semaforo": {
+                            "type": "string",
+                            "enum": [
+                              "verde",
+                              "amarillo",
+                              "urgente"
+                            ],
+                            "description": "Semáforo de antigüedad (verde ≤3d, amarillo 4–7d, urgente >7d). Derivado en servidor."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "folio",
+                          "estado",
+                          "fecha",
+                          "fechaEntrega",
+                          "idModelo",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "idCliente",
+                          "cliente",
+                          "idMaquilero",
+                          "maquilero",
+                          "totalPiezas",
+                          "diasAntiguedad",
+                          "semaforo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Orden incompleta (capturada sin matriz) con su antigüedad y semáforo."
+                      },
+                      "description": "Órdenes incompletas de la página."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de órdenes incompletas."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página de órdenes incompletas."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/tablero/pedidos-por-mes": {
+      "get": {
+        "summary": "Tablero de pedidos por mes (agregado de órdenes)",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "anio",
+            "required": false,
+            "description": "Filtra por año (de la fecha de la orden)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "in": "query",
+            "name": "mes",
+            "required": false,
+            "description": "Filtra por mes (1-12)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCliente",
+            "required": false,
+            "description": "Filtra por cliente."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirCanceladas",
+            "required": false,
+            "description": "Incluye las órdenes canceladas en el agregado."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "entregadosTienda",
+            "required": false,
+            "description": "Bandera de paridad (viejo); sin efecto en F2 (no hay avance todavía)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "noProducir",
+            "required": false,
+            "description": "Bandera de paridad (viejo); sin efecto en F2 (no hay avance todavía)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tablero de pedidos por mes (agregado, extensible a avances en F3).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "anio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Año del mes agrupado."
+                          },
+                          "mes": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 12,
+                            "description": "Mes (1-12)."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave estable del mes (YYYY-MM), para saltos/links."
+                          },
+                          "etiqueta": {
+                            "type": "string",
+                            "description": "Etiqueta legible del mes (p. ej. \"jun 2026\")."
+                          },
+                          "numOrdenes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Número de órdenes con fecha en ese mes."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total de prendas (Σ de tallas) de ese mes."
+                          }
+                        },
+                        "required": [
+                          "anio",
+                          "mes",
+                          "clave",
+                          "etiqueta",
+                          "numOrdenes",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Métricas agregadas de un mes en el tablero de pedidos."
+                      },
+                      "description": "Una fila por mes (orden cronológico)."
+                    },
+                    "totalOrdenes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de órdenes en todo el rango."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de prendas en todo el rango."
+                    }
+                  },
+                  "required": [
+                    "filas",
+                    "totalOrdenes",
+                    "totalPiezas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Tablero de pedidos por mes (agregado, extensible a avances en F3)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/buscar": {
+      "get": {
+        "summary": "Buscador global de órdenes (hits ligeros para el layout)",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "description": "Texto a buscar (folio, código de modelo, cliente o valor de referencia D7)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultados del buscador global de órdenes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id interno de la orden (para navegar al detalle)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio consecutivo por empresa."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "folio",
+                          "codigoModelo",
+                          "cliente"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Hit ligero del buscador global de órdenes."
+                      },
+                      "description": "Hits de la búsqueda (limitados)."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultados del buscador global de órdenes."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/impreso": {
+      "get": {
+        "summary": "Imprimir una orden de producción (PDF de piso de producción)",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/impresos": {
+      "post": {
+        "summary": "Imprimir varias órdenes en un solo PDF (una por página)",
+        "tags": [
+          "ordenes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "description": "Ids de las órdenes a consolidar en el PDF (una por página)."
+                  }
+                },
+                "required": [
+                  "ids"
+                ],
+                "description": "Lote de órdenes a imprimir en un solo PDF."
+              }
+            }
+          },
+          "description": "Lote de órdenes a imprimir en un solo PDF."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {
@@ -45225,17 +46399,6 @@
                         ],
                         "description": "Identificador corto para folios, o null."
                       },
-                      "upc": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "Prefijo UPC de la empresa, o null."
-                      },
                       "favorita": {
                         "type": "boolean",
                         "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -45292,7 +46455,6 @@
                       "nombre",
                       "razonSocial",
                       "identificador",
-                      "upc",
                       "favorita",
                       "paraIpt",
                       "paraEdr",
@@ -45481,10 +46643,6 @@
                     "type": "string",
                     "maxLength": 20
                   },
-                  "upc": {
-                    "type": "string",
-                    "maxLength": 20
-                  },
                   "favorita": {
                     "default": false,
                     "type": "boolean"
@@ -45550,17 +46708,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -45617,7 +46764,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
@@ -45845,17 +46991,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -45912,7 +47047,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
@@ -46100,10 +47234,6 @@
                     "type": "string",
                     "maxLength": 20
                   },
-                  "upc": {
-                    "type": "string",
-                    "maxLength": 20
-                  },
                   "favorita": {
                     "type": "boolean"
                   },
@@ -46179,17 +47309,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -46246,7 +47365,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
@@ -46472,17 +47590,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -46539,7 +47646,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
