@@ -23,6 +23,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { crearPedido } from '../src/dominio/pedidos/pedidos.js';
 import { crearOrden } from '../src/dominio/produccion/ordenes.js';
+import type { ServicioArchivos } from '../src/comun/archivos.js';
 import type { PrismaClient } from '../src/datos/index.js';
 import { clientePruebas, limpiarBaseDatos, sembrarPermisos } from '../src/pruebas/contexto.js';
 
@@ -32,6 +33,24 @@ import { ENTIDAD_MAPEO, guardarMapeo } from './comun/mapeo.js';
 import { CAMPO_D7_PEDIDO_CLIENTE } from './loaders/clientes.js';
 
 let cliente: PrismaClient;
+
+/**
+ * Servicio de archivos NO-OP para los tests: el alta nueva por el servicio normal (`crearPedido`)
+ * NO toca R2 (el modelo no tiene fotos), pero el parámetro `archivos` de `crearPedido` se evalúa
+ * por defecto a `servicioArchivos()`, que valida las vars `R2_*` (ausentes en CI) y truena. Pasar
+ * este stub corta esa dependencia: replica el patrón de `pedidos.int.test.ts`/`ordenes.int.test.ts`
+ * (inyectar `bd` + `archivos` en vez de los defaults que construyen R2).
+ */
+const archivosStub: ServicioArchivos = {
+  solicitarSubida() {
+    throw new Error('archivosStub.solicitarSubida no debe llamarse en este test');
+  },
+  urlDescarga() {
+    throw new Error('archivosStub.urlDescarga no debe llamarse en este test');
+  },
+};
+/** Contexto de BD del testcontainer (mismo `cliente` que usan los loaders), para inyectar a los servicios. */
+const bd = () => ({ cliente });
 
 const DIR_FIXTURES = fileURLToPath(new URL('./__fixtures__/tablas-f2', import.meta.url));
 let tablasDirPrevio: string | undefined;
@@ -256,17 +275,22 @@ describe('ETL de pedidos y órdenes F2-E5 (integración, fixtures committeados)'
     // Nuevo pedido por el servicio normal: folio > 5003 (máximo migrado).
     const idLiverpool = await cliente.cliente.findFirstOrThrow({ where: { nombre: 'Liverpool' } });
     const idModeloM001 = await cliente.modelo.findFirstOrThrow({ where: { codigo: 'M001' } });
-    const nuevoPedido = await crearPedido(sesion, {
-      idCliente: idLiverpool.id,
-      lineas: [{ idModelo: idModeloM001.id, cantidadPedida: 10, precio: 1 }],
-    });
+    const nuevoPedido = await crearPedido(
+      sesion,
+      {
+        idCliente: idLiverpool.id,
+        lineas: [{ idModelo: idModeloM001.id, cantidadPedida: 10, precio: 1 }],
+      },
+      bd(),
+      archivosStub,
+    );
     expect(nuevoPedido.folio).toBeGreaterThan(5003);
 
     // Nueva orden por el servicio normal desde un renglón de pedido NUEVO: folio > 9004.
     const renglon = await cliente.pedidoLinea.findFirstOrThrow({
       where: { idPedido: nuevoPedido.id },
     });
-    const nuevaOrden = await crearOrden(sesion, { idPedidoLinea: renglon.id });
+    const nuevaOrden = await crearOrden(sesion, { idPedidoLinea: renglon.id }, bd());
     expect(nuevaOrden.folio).toBeGreaterThan(9004);
   });
 });

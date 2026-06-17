@@ -13,6 +13,7 @@ import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
+import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import {
   cargarMapaNumerico,
   ENTIDAD_MAPEO,
@@ -20,10 +21,14 @@ import {
   leerMapeo,
   type ClienteMapeo,
 } from '../comun/mapeo.js';
+import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearFecha, parsearTexto } from '../comun/valores.js';
 import type { ResultadoLoader } from './clientes.js';
+
+/** Desenlace de procesar un comentario (para agregar conteos tras los lotes). */
+type Desenlace = 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
 
 export async function cargarComentariosOrden(
   sesion: SesionUsuario,
@@ -33,54 +38,74 @@ export async function cargarComentariosOrden(
   const bd: ContextoBd = { cliente: cliente as PrismaClient };
   const mapaOrden = await cargarMapaNumerico(cliente, ENTIDAD_MAPEO.orden);
 
+  // Cada comentario es una unidad INDEPENDIENTE → carga concurrente acotada (con reintento ante
+  // cortes transitorios de conexión; la unidad es idempotente por el mapeo de IdComentaOrd).
+  const filas = leerCsv('ComentaOrd.csv');
+  const resultados = await enLotes(
+    filas,
+    (f): Promise<Desenlace> =>
+      conReintentoTransitorio(() => procesarComentario(sesion, bd, cliente, reporte, mapaOrden, f)),
+    CONCURRENCIA_ETL,
+  );
+
   const r: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
+  for (const res of resultados) {
+    const d = res.ok ? res.valor : 'omitidoValidacion';
+    if (d === 'creado') r.creados += 1;
+    else if (d === 'existente') r.existentes += 1;
+    else if (d === 'omitido') r.omitidos += 1;
+    else r.omitidosValidacion = (r.omitidosValidacion ?? 0) + 1;
+  }
+  return r;
+}
 
-  for (const f of leerCsv('ComentaOrd.csv')) {
-    const idViejo = (f.IdComentaOrd ?? '').trim();
-    const idOrdenV1 = (f.IdOrdenes ?? '').trim();
-    const comentario = parsearTexto(f.Comentario);
+/** Procesa UNA fila de ComentaOrd (idempotente, tolerante). */
+async function procesarComentario(
+  sesion: SesionUsuario,
+  bd: ContextoBd,
+  cliente: ClienteMapeo,
+  reporte: Reporte,
+  mapaOrden: Map<string, number>,
+  f: Record<string, string>,
+): Promise<Desenlace> {
+  const idViejo = (f.IdComentaOrd ?? '').trim();
+  const idOrdenV1 = (f.IdOrdenes ?? '').trim();
+  const comentario = parsearTexto(f.Comentario);
 
-    if (comentario === null) {
-      r.omitidos += 1;
-      reporte.agregar('Comentario de orden vacío (omitido)', `IdComentaOrd=${idViejo}`);
-      continue;
-    }
-    const idOrden = mapaOrden.get(idOrdenV1);
-    if (idOrden === undefined) {
-      r.omitidos += 1;
-      reporte.agregar(
-        'Comentario con orden sin mapeo (omitido)',
-        `IdComentaOrd=${idViejo} IdOrdenes=${idOrdenV1}`,
-      );
-      continue;
-    }
-
-    const yaMapeado = await leerMapeo(cliente, ENTIDAD_MAPEO.ordenComentario, idViejo);
-    if (yaMapeado !== null) {
-      r.existentes += 1;
-      continue;
-    }
-
-    const id = await intentarCrear(reporte, 'OrdenComentario', idViejo, () =>
-      crearComentarioOrdenMigrado(
-        sesion,
-        {
-          idOrden,
-          idUsuario: parsearTexto(f.IdUsuarios),
-          comentario,
-          fecha: parsearFecha(f.FechaComen),
-          claveVieja: idViejo,
-        },
-        bd,
-      ),
+  if (comentario === null) {
+    reporte.agregar('Comentario de orden vacío (omitido)', `IdComentaOrd=${idViejo}`);
+    return 'omitido';
+  }
+  const idOrden = mapaOrden.get(idOrdenV1);
+  if (idOrden === undefined) {
+    reporte.agregar(
+      'Comentario con orden sin mapeo (omitido)',
+      `IdComentaOrd=${idViejo} IdOrdenes=${idOrdenV1}`,
     );
-    if (id === null) {
-      r.omitidosValidacion = (r.omitidosValidacion ?? 0) + 1;
-      continue;
-    }
-    r.creados += 1;
-    await guardarMapeo(cliente, ENTIDAD_MAPEO.ordenComentario, idViejo, id);
+    return 'omitido';
   }
 
-  return r;
+  const yaMapeado = await leerMapeo(cliente, ENTIDAD_MAPEO.ordenComentario, idViejo);
+  if (yaMapeado !== null) {
+    return 'existente';
+  }
+
+  const id = await intentarCrear(reporte, 'OrdenComentario', idViejo, () =>
+    crearComentarioOrdenMigrado(
+      sesion,
+      {
+        idOrden,
+        idUsuario: parsearTexto(f.IdUsuarios),
+        comentario,
+        fecha: parsearFecha(f.FechaComen),
+        claveVieja: idViejo,
+      },
+      bd,
+    ),
+  );
+  if (id === null) {
+    return 'omitidoValidacion';
+  }
+  await guardarMapeo(cliente, ENTIDAD_MAPEO.ordenComentario, idViejo, id);
+  return 'creado';
 }

@@ -154,6 +154,7 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 
 **Trampas/recordatorios que aplican a TODA etapa futura (no perder):**
 - **Despliegue:** el backend de `prueba` necesita `SEED_ON_START=true` para sembrar permisos/roles nuevos al arrancar (seed idempotente; NO resetea el password del admin). Sin eso, los menús nuevos no aparecen en `prueba`.
+- **Correr el ETL:** SIEMPRE `npx tsx --env-file=.env migracion/<script>.ts` desde `backend/` — **NUNCA `npm run etl:*`** (esos no cargan `.env` → truena con "no DATABASE_URL" aunque sí exista; los `npm run` no llevan `--env-file` a propósito, para no romper el CI). Ver `backend/migracion/README.md`.
 - **Pendiente diferido (aplicar antes del PR `prueba`→`main`):** subir el cap del rate-limit de login del job e2e (la suite e2e crece cada etapa y topa la regla). Fix redactado en `git stash`: `AUTH_LOGIN_RATE_MAX` env-configurable (default 20, prod intacta) + `1000` en `docker-compose.yml`.
 - **Marilyn Fitness = FR Moda** (misma empresa renombrada; NO crear 2ª empresa). Catálogos F1 = GLOBALES (A9 / ADR-0007). `schema.prisma` único (ADR-0008).
 - **Pendiente manual de Gabriel:** cambiar el password de `admin` (seed `Control.2026!`). *(Cloudflare R2 ya quedó montado en `prueba`: las fotos de bordados y modelos suben y se descargan OK.)*

@@ -118,9 +118,19 @@ async function main(): Promise<void> {
     console.error('Falta DATABASE_URL (ver backend/.env.example)');
     process.exit(1);
   }
+  // Tiempos de transacción HOLGADOS + pool grande y ESTABLE: el ETL corre minutos contra la BD
+  // remota de `prueba` (Railway, proxy público). La latencia exige subir maxWait/timeout (los
+  // defaults de Prisma dan `P2028`); la concurrencia (lotes.ts) exige `poolMax`; y el proxy
+  // corta conexiones ociosas, así que `keepAlive` + timeouts mantienen el pool sano durante toda
+  // la corrida. Solo el ETL: la app no pasa estas opciones.
   const cliente = crearClientePrisma(url, {
     transactionOptions: { maxWait: 20_000, timeout: 120_000 },
     poolMax: 12,
+    pool: {
+      keepAlive: true,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 30_000,
+    },
   });
   try {
     const reporte = await ejecutarEtlPedidosOrdenes(cliente);

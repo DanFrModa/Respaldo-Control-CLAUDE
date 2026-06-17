@@ -291,7 +291,9 @@ describe('armarDatosImpresoOrden', () => {
 
     // Solo las telas/avíos paraProduccion entran; los bordados no llevan precio.
     expect(datos.telas).toEqual([{ nombre: 'Jersey', consumoPorPrenda: 0.4 }]);
-    expect(datos.habilitacion).toEqual([{ clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 }]);
+    expect(datos.habilitacion).toEqual([
+      { clave: 'AV-1', descripcion: 'Hilo', consumoPorPrenda: 1 },
+    ]);
     expect(datos.bordados).toEqual([{ nombre: 'Logo', tipo: 'BORDADO' }]);
     expect(JSON.stringify(datos)).not.toContain('12.5'); // ningún precio se filtró al impreso
 
@@ -358,9 +360,9 @@ describe('armarDatosImpresoOrden', () => {
       leerBom: () => Promise.resolve({ telas: [], avios: [], bordados: [] }),
       leerFotosModelo: () => Promise.resolve([]),
     };
-    await expect(armarDatosImpresoOrden(sesionConVer(), 999, undefined, deps)).rejects.toBeInstanceOf(
-      ErrorNoEncontrado,
-    );
+    await expect(
+      armarDatosImpresoOrden(sesionConVer(), 999, undefined, deps),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });
 
