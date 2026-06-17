@@ -23,6 +23,7 @@ import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
+import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
 import { TemporadasPagina } from '@/modulos/temporadas/TemporadasPagina';
 import { UsuariosPagina } from '@/modulos/usuarios/UsuariosPagina';
 import { Inicio } from '@/paginas/Inicio';
@@ -76,6 +77,7 @@ const router = createBrowserRouter([
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
           { path: 'pedidos', element: <PedidosPagina /> },
+          { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
           { path: 'produccion/ordenes', element: <OrdenesPagina /> },
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },

@@ -16,15 +16,15 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
 
 describe('catalogo de modulos del menu', () => {
   it('define los 13 modulos del plan §5 (mas sub-vistas) con rutas y claves unicas', () => {
-    // 13 módulos del plan + 5 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
-    // órdenes + incompletas + pedidos por mes, F2-E4).
+    // 13 módulos del plan + 6 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
+    // órdenes + incompletas + pedidos por mes, F2-E4; tipos de proceso, F3-E1).
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(18);
+    expect(MODULOS_MENU).toHaveLength(19);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(18);
+    expect(new Set(claves).size).toBe(19);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(18);
+    expect(new Set(rutas).size).toBe(19);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -77,7 +77,7 @@ describe('catalogo de modulos del menu', () => {
     expect(esModuloVisible(admin, permisos('usuarios.administrar'))).toBe(true);
   });
 
-  it('un usuario con todos los permisos ve los 13 modulos + las 5 sub-vistas', () => {
+  it('un usuario con todos los permisos ve los 13 modulos + las 6 sub-vistas', () => {
     const todos = permisos(
       'usuarios.administrar',
       'roles.administrar',
@@ -85,14 +85,15 @@ describe('catalogo de modulos del menu', () => {
       'almacenes.administrar',
       // Modelos (F1-E4) y su Galería (F1-E5) requieren `modelos.ver`; Pedidos (F2-E1) requiere
       // `pedidos.ver`; Órdenes (F2-E3) y las consultas/incompletas/tablero (F2-E4) requieren
-      // `ordenes.ver`.
+      // `ordenes.ver`; Tipos de proceso (F3-E1) requiere `tipos-proceso.ver`.
       'modelos.ver',
       'pedidos.ver',
       'ordenes.ver',
+      'tipos-proceso.ver',
     );
-    // 13 módulos del plan + 5 sub-vistas (galería + órdenes + consulta + incompletas +
-    // pedidos por mes) = 18.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(18);
+    // 13 módulos del plan + 6 sub-vistas (galería + órdenes + consulta + incompletas +
+    // pedidos por mes + tipos de proceso) = 19.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(19);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {

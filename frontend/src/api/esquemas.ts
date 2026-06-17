@@ -588,3 +588,30 @@ export type DatosConfiguracionEmpresa = z.infer<typeof esquemaConfiguracionEmpre
 
 // NOTA (fusion de terceros, D12/R15): el formulario de Maquilero se elimino; un maquilero
 // es un Proveedor con sus roles de servicio (usa el formulario de proveedor).
+
+// ── Tipos de proceso de maquila (espejo de `esquemaTipoProcesoCrear`/`Editar`) ─
+
+/**
+ * Captura del formulario de tipo de proceso (F3-E1; alta y edicion comparten forma).
+ * `generaEntradaPt` (decision (e)): solo un admin puede tocarla — la pantalla DESHABILITA el
+ * control para no-admin y el backend descarta cualquier valor que venga sin permiso.
+ */
+export const esquemaTipoProcesoFormulario = z.object({
+  codigo: z
+    .string({ error: 'El código es obligatorio' })
+    .trim()
+    .min(1, { error: 'El código es obligatorio' })
+    .max(50, { error: 'El código no puede tener más de 50 caracteres' })
+    .regex(/^[a-z][a-z0-9-]*$/, {
+      error: 'Usa minúsculas, dígitos y guiones (ej. "costura")',
+    }),
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+  generaEntradaPt: z.boolean(),
+});
+
+/** Datos del formulario de tipo de proceso. */
+export type DatosTipoProcesoFormulario = z.infer<typeof esquemaTipoProcesoFormulario>;

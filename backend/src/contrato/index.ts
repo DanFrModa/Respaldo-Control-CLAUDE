@@ -435,6 +435,32 @@ export {
   type OrdenesBuscarQuery,
 } from './esquemas/orden-consulta.js';
 
+// ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
+export {
+  esquemaTipoProcesoCrear,
+  esquemaTipoProcesoEditar,
+  esquemaTipoProcesoSalida,
+  esquemaTiposProcesoQuery,
+  esquemaTiposProcesoPagina,
+  type DatosTipoProcesoCrear,
+  type DatosTipoProcesoEditar,
+  type TipoProcesoSalida,
+  type TiposProcesoQuery,
+  type TiposProcesoPagina,
+} from './esquemas/tipo-proceso.js';
+
+export {
+  DIRECCIONES_MOVIMIENTO,
+  ETIQUETAS_DIRECCION_MOVIMIENTO,
+  esquemaTipoMovimientoSalida,
+  esquemaTiposMovimientoQuery,
+  esquemaTiposMovimientoLista,
+  type DireccionMovimientoClave,
+  type TipoMovimientoSalida,
+  type TiposMovimientoQuery,
+  type TiposMovimientoLista,
+} from './esquemas/tipo-movimiento.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

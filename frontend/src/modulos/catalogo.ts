@@ -158,6 +158,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     icono: 'fabrica',
     permisos: 'autenticado',
   },
+  // Sub-vista de Producción (F3-E1): catálogo de tipos de proceso de maquila (con la marca
+  // «genera entrada a PT», editable solo por admin). Cuelga del módulo Producción; lo gobierna
+  // su permiso de lectura `tipos-proceso.ver`.
+  {
+    clave: 'tipos-proceso',
+    titulo: 'Tipos de proceso',
+    descripcion: 'Catálogo de procesos de maquila (costura, estampado, bordado, lavado…)',
+    ruta: '/produccion/tipos-proceso',
+    icono: 'engrane',
+    permisos: ['tipos-proceso.ver'],
+    subVista: true,
+  },
   // Sub-vista de Producción (F2-E3): la captura de Órdenes de producción con su matriz color ×
   // talla. NO es un módulo del plan §5: cuelga del módulo Producción, con su propio permiso de
   // lectura `ordenes.ver`.

@@ -13,9 +13,11 @@ import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
+import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
+import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
@@ -120,6 +122,12 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // Órdenes — IMPRESOS (F2-E4 PIEZA A): PDF individual (`/ordenes/:id/impreso`) y lote consolidado
   // (`POST /ordenes/impresos`). Binarios `application/pdf`. Solo lectura (`ordenes.ver`).
   await app.register(rutasImpresosOrden, { prefix: '/api' });
+  // Producción / WIP + kardex (Módulo 4/6, F3-E1): CRUD de tipos de proceso (con la bandera
+  // generaEntradaPt editable solo por admin) y GET solo-lectura de tipos de movimiento de
+  // inventario. El motor (kardex/eventos) vive en comun/; los flujos (corte/recibo/entrega)
+  // llegan en E2–E5.
+  await app.register(rutasTiposProceso, { prefix: '/api' });
+  await app.register(rutasTiposMovimiento, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

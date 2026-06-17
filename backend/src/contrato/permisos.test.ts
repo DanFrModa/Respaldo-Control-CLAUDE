@@ -60,8 +60,13 @@ describe('catálogo de permisos', () => {
       'colores.administrar',
       'colores.ver',
       'empresas.administrar',
+      // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
+      'esma.cargo-validar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Inventario PT por kardex (Módulo 6, F3-E3): ver/mover (nuevos de v2).
+      'inventario-pt.mover',
+      'inventario-pt.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
       'modelos.ver',
@@ -74,6 +79,13 @@ describe('catálogo de permisos', () => {
       'pedidos.administrar',
       'pedidos.importes',
       'pedidos.ver',
+      // Producción / WIP (Módulo 4, F3): corte/envío/recibo/entrega/wip-ver/cancelar (nuevos de v2).
+      'produccion.cancelar',
+      'produccion.corte',
+      'produccion.entrega',
+      'produccion.envio',
+      'produccion.recibo',
+      'produccion.wip-ver',
       'proveedores.administrar',
       'proveedores.ver',
       'roles.administrar',
@@ -84,6 +96,9 @@ describe('catálogo de permisos', () => {
       'telas.ver',
       'temporadas.administrar',
       'temporadas.ver',
+      // Tipos de proceso de maquila (Módulo 4, F3-E1): catálogo CRUD (nuevos de v2).
+      'tipos-proceso.administrar',
+      'tipos-proceso.ver',
       'usuarios.administrar',
     ]);
   });
