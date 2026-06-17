@@ -1,0 +1,3 @@
+"IdPedidosReales","IdPedidos","FechaPedPR","FechaInicioPR","FechaFinPR","NumPedReal","Cedis","FechaEntregadaReal","IdUsuarios","FechaUsuario","Apertura"
+"200","10","05/02/2005 00:00:00","","","PR-AAA","CEDIS Norte","","usr-daniel","06/02/2005 00:00:00","Primavera"
+"201","11","10/04/2006 00:00:00","","","PR-BBB","","","","","Verano"

@@ -3,9 +3,7 @@ import { z } from 'zod';
 /**
  * Esquemas del contrato de Empresas y su configuración (Administración, F1-E1
  * PIEZA C). Reflejan 1:1 lo que aceptan los servicios de dominio
- * `dominio/admin/empresas` (que re-validan y son la autoridad). El prefijo `upc`
- * (viejo `UPCEmp`) se edita aquí y lo consume el generador de códigos de barra
- * de F1-E5.
+ * `dominio/admin/empresas` (que re-validan y son la autoridad).
  *
  * Las empresas son POCAS: el listado del dominio devuelve TODAS (sin paginación),
  * así que el contrato del listado es un arreglo simple, no una página.
@@ -32,11 +30,6 @@ export const esquemaEmpresaCrear = z.object({
     .trim()
     .max(20, { error: 'El identificador no puede tener más de 20 caracteres' })
     .optional(),
-  upc: z
-    .string()
-    .trim()
-    .max(20, { error: 'El prefijo UPC no puede tener más de 20 caracteres' })
-    .optional(),
   favorita: z.boolean({ error: 'Favorita debe ser verdadero o falso' }).default(false),
   paraIpt: z.boolean({ error: 'Para IPT debe ser verdadero o falso' }).default(false),
   paraEdr: z.boolean({ error: 'Para EDR debe ser verdadero o falso' }).default(false),
@@ -53,7 +46,7 @@ export type DatosEmpresaCrear = z.infer<typeof esquemaEmpresaCrear>;
  * Las banderas con `.default(false)` en el alta se sobrescriben aquí como `.optional()`
  * SIN default: en una edición parcial, omitir una bandera NO debe resetearla (Zod
  * `.partial()` NO quita los defaults). Si no se mandan, quedan `undefined` y conservan
- * su valor real en la BD (p. ej. editar el `upc` no borra la marca de favorita).
+ * su valor real en la BD (p. ej. editar el `identificador` no borra la marca de favorita).
  */
 export const esquemaEmpresaEditar = esquemaEmpresaCrear.partial().extend({
   favorita: z.boolean({ error: 'Favorita debe ser verdadero o falso' }).optional(),
@@ -75,7 +68,6 @@ export const esquemaEmpresaSalida = z
     nombre: z.string().describe('Nombre corto de uso diario.'),
     razonSocial: z.string().nullable().describe('Razón social, o null.'),
     identificador: z.string().nullable().describe('Identificador corto para folios, o null.'),
-    upc: z.string().nullable().describe('Prefijo UPC de la empresa, o null.'),
     favorita: z.boolean().describe('Empresa propuesta por defecto al iniciar sesión.'),
     paraIpt: z.boolean().describe('Participa en el inventario de producto terminado.'),
     paraEdr: z.boolean().describe('Participa en el estado de resultados.'),

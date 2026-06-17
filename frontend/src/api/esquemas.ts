@@ -528,10 +528,9 @@ export type DatosContrasena = z.infer<typeof esquemaContrasena>;
 
 /**
  * Captura del formulario de empresa (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; razon social, identificador (RFC) y `upc` son
- * opcionales. El `upc` es clave (lo usara E5): visible y editable. Las banderas
- * (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este schema
- * de texto.
+ * `nombre` es obligatorio; razon social e identificador (RFC) son opcionales. Las
+ * banderas (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este
+ * schema de texto.
  */
 export const esquemaEmpresaFormulario = z.object({
   nombre: z
@@ -547,7 +546,6 @@ export const esquemaEmpresaFormulario = z.object({
     .string()
     .trim()
     .max(50, { error: 'El identificador no puede tener más de 50 caracteres' }),
-  upc: z.string().trim().max(50, { error: 'El UPC no puede tener más de 50 caracteres' }),
 });
 
 /** Datos del formulario de empresa. */

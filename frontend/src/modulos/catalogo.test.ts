@@ -16,15 +16,15 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
 
 describe('catalogo de modulos del menu', () => {
   it('define los 13 modulos del plan §5 (mas sub-vistas) con rutas y claves unicas', () => {
-    // 13 módulos del plan + 6 sub-vistas (galería de modelos + códigos de barra, F1-E5; órdenes,
-    // F2-E3; consulta de órdenes + incompletas + pedidos por mes, F2-E4).
+    // 13 módulos del plan + 5 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
+    // órdenes + incompletas + pedidos por mes, F2-E4).
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(19);
+    expect(MODULOS_MENU).toHaveLength(18);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(19);
+    expect(new Set(claves).size).toBe(18);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(19);
+    expect(new Set(rutas).size).toBe(18);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -32,14 +32,6 @@ describe('catalogo de modulos del menu', () => {
     expect(galeria).toBeDefined();
     expect(galeria?.subVista).toBe(true);
     expect(galeria?.permisos).toEqual(['modelos.ver']);
-  });
-
-  it('marca el generador de codigos de barra como sub-vista con su propio permiso', () => {
-    const barras = MODULOS_MENU.find((m) => m.clave === 'codigos-barra');
-    expect(barras).toBeDefined();
-    expect(barras?.subVista).toBe(true);
-    expect(barras?.permisos).toEqual(['modelos.codigos-barra']);
-    expect(barras?.ruta).toBe('/modelos/codigos-barra');
   });
 
   it('marca las ordenes de produccion como sub-vista con su propio permiso', () => {
@@ -58,9 +50,9 @@ describe('catalogo de modulos del menu', () => {
 
   it('muestra los modulos "autenticado" con cualquier sesion (incluso sin permisos)', () => {
     const visibles = filtrarModulosVisibles(permisos());
-    // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver), Códigos de
-    // barra (modelos.codigos-barra), Pedidos (pedidos.ver, F2-E1) y Órdenes (ordenes.ver, F2-E3)
-    // NO son "autenticado"; el resto sí -> 10 visibles sin permisos.
+    // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver), Pedidos
+    // (pedidos.ver, F2-E1) y Órdenes (ordenes.ver, F2-E3) NO son "autenticado"; el resto sí ->
+    // 10 visibles sin permisos.
     expect(visibles.map((m) => m.clave)).not.toContain('administracion');
     expect(visibles.map((m) => m.clave)).not.toContain('modelos');
     expect(visibles.map((m) => m.clave)).not.toContain('galeria-modelos');
@@ -85,23 +77,22 @@ describe('catalogo de modulos del menu', () => {
     expect(esModuloVisible(admin, permisos('usuarios.administrar'))).toBe(true);
   });
 
-  it('un usuario con todos los permisos ve los 13 modulos + las 6 sub-vistas', () => {
+  it('un usuario con todos los permisos ve los 13 modulos + las 5 sub-vistas', () => {
     const todos = permisos(
       'usuarios.administrar',
       'roles.administrar',
       'empresas.administrar',
       'almacenes.administrar',
-      // Modelos (F1-E4) y su Galería (F1-E5) requieren `modelos.ver`; el generador de códigos de
-      // barra (F1-E5) requiere `modelos.codigos-barra`; Pedidos (F2-E1) requiere `pedidos.ver`;
-      // Órdenes (F2-E3) y las consultas/incompletas/tablero (F2-E4) requieren `ordenes.ver`.
+      // Modelos (F1-E4) y su Galería (F1-E5) requieren `modelos.ver`; Pedidos (F2-E1) requiere
+      // `pedidos.ver`; Órdenes (F2-E3) y las consultas/incompletas/tablero (F2-E4) requieren
+      // `ordenes.ver`.
       'modelos.ver',
-      'modelos.codigos-barra',
       'pedidos.ver',
       'ordenes.ver',
     );
-    // 13 módulos del plan + 6 sub-vistas (galería + códigos de barra + órdenes + consulta +
-    // incompletas + pedidos por mes) = 19.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(19);
+    // 13 módulos del plan + 5 sub-vistas (galería + órdenes + consulta + incompletas +
+    // pedidos por mes) = 18.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(18);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {

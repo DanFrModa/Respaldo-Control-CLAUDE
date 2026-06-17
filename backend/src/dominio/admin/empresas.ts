@@ -33,8 +33,6 @@ const esquemaCrearEmpresa = z.object({
   razonSocial: z.string().trim().max(200).optional(),
   /** Identificador corto para folios e impresos (viejo: `Identificador`). */
   identificador: z.string().trim().max(20).optional(),
-  /** Prefijo UPC de la empresa (viejo: `UPCEmp`). */
-  upc: z.string().trim().max(20).optional(),
   favorita: z.boolean().default(false),
   paraIpt: z.boolean().default(false),
   paraEdr: z.boolean().default(false),
@@ -45,7 +43,7 @@ export type EntradaCrearEmpresa = z.input<typeof esquemaCrearEmpresa>;
 // Las banderas con `.default(false)` en el alta se sobrescriben aquí como `.optional()`
 // SIN default: en una edición parcial, omitir una bandera NO debe resetearla (Zod
 // `.partial()` NO quita los defaults, así que la omitida se rellenaría con `false` y
-// pisaría el valor real en la BD —p. ej. editar el `upc` borraría la marca de favorita).
+// pisaría el valor real en la BD —p. ej. editar el `identificador` borraría la marca de favorita).
 // El `.extend` va ANTES del `.refine` (el refine devuelve un schema sin `.extend`).
 const esquemaActualizarEmpresa = esquemaCrearEmpresa
   .partial()
@@ -129,7 +127,6 @@ export async function crearEmpresa(
           nombre: datos.nombre,
           razonSocial: datos.razonSocial ?? null,
           identificador: datos.identificador ?? null,
-          upc: datos.upc ?? null,
           favorita: datos.favorita,
           paraIpt: datos.paraIpt,
           paraEdr: datos.paraEdr,
@@ -195,7 +192,6 @@ export async function actualizarEmpresa(
           ...(datos.nombre === undefined ? {} : { nombre: datos.nombre }),
           ...(datos.razonSocial === undefined ? {} : { razonSocial: datos.razonSocial }),
           ...(datos.identificador === undefined ? {} : { identificador: datos.identificador }),
-          ...(datos.upc === undefined ? {} : { upc: datos.upc }),
           ...(datos.favorita === undefined ? {} : { favorita: datos.favorita }),
           ...(datos.paraIpt === undefined ? {} : { paraIpt: datos.paraIpt }),
           ...(datos.paraEdr === undefined ? {} : { paraEdr: datos.paraEdr }),

@@ -57,7 +57,6 @@ function bdParaCrear(): ContextoBd {
     fechaCompletada: new Date('2026-06-16T00:00:00Z'),
     motivoCancelada: null,
     tallasV1: null,
-    upc: null,
     maquilaOrd: null,
     aplicacionOrd: null,
     pagada: null,

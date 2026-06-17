@@ -147,7 +147,6 @@ export interface paths {
                 | 'bordados.administrar'
                 | 'modelos.ver'
                 | 'modelos.administrar'
-                | 'modelos.codigos-barra'
               )[];
             };
           };
@@ -12227,145 +12226,6 @@ export interface paths {
     };
     trace?: never;
   };
-  '/api/modelos/{id}/codigos-barra': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /**
-     * Generar los códigos de barra (EAN-13 / DUN-14) de un modelo
-     * @description Calcula el EAN-13 y el DUN-14 del modelo usando el prefijo UPC de la EMPRESA ACTIVA de la sesión (Empresa.upc). Si la empresa no tiene UPC capturado, o prefijo+código no suman 12 dígitos, responde 400 con un mensaje legible.
-     */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id del modelo. */
-          id: number;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa. */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Id del modelo. */
-              idModelo: number;
-              /** @description Código del modelo usado para componer la base. */
-              codigoModelo: string;
-              /** @description Id de la empresa activa de la sesión. */
-              idEmpresa: number;
-              /** @description Nombre de la empresa activa (para el impreso). */
-              nombreEmpresa: string;
-              /** @description Prefijo UPC de la empresa (de Empresa.upc). */
-              prefijo: string;
-              /** @description Los 12 dígitos base (prefijo + código) sin verificador. */
-              base12: string;
-              /** @description EAN-13 completo (13 dígitos): base + verificador módulo 10. */
-              ean13: string;
-              /** @description DUN-14 de caja (14 dígitos): indicador 1 + base + verificador. */
-              dun14: string;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        400: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-        /** @description Respuesta de error de la API. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': {
-              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
-              codigo: string;
-              /** @description Mensaje en español, apto para mostrar al usuario. */
-              mensaje: string;
-              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
-              detalles?: unknown;
-            };
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/modelos/{id}/bom/telas': {
     parameters: {
       query?: never;
@@ -15898,8 +15758,6 @@ export interface paths {
                 motivoCancelada: string | null;
                 /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
                 tallasV1: string | null;
-                /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-                upc: string | null;
                 /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
                 maquilaOrd: number | null;
                 /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16184,8 +16042,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16432,8 +16288,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16697,8 +16551,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -16964,8 +16816,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17222,8 +17072,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17479,8 +17327,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17740,8 +17586,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -17998,8 +17842,6 @@ export interface paths {
               motivoCancelada: string | null;
               /** @description Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad). */
               tallasV1: string | null;
-              /** @description Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación). */
-              upc: string | null;
               /** @description Costo de maquila de v1 (dato; motor en F3/F6), o null. */
               maquilaOrd: number | null;
               /** @description Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null. */
@@ -20158,8 +20000,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -20282,7 +20122,6 @@ export interface paths {
             nombre: string;
             razonSocial?: string;
             identificador?: string;
-            upc?: string;
             /** @default false */
             favorita?: boolean;
             /** @default false */
@@ -20308,8 +20147,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -20458,8 +20295,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -20597,8 +20432,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */
@@ -20725,7 +20558,6 @@ export interface paths {
             nombre?: string;
             razonSocial?: string;
             identificador?: string;
-            upc?: string;
             favorita?: boolean;
             paraIpt?: boolean;
             paraEdr?: boolean;
@@ -20749,8 +20581,6 @@ export interface paths {
               razonSocial: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
-              /** @description Prefijo UPC de la empresa, o null. */
-              upc: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
               favorita: boolean;
               /** @description Participa en el inventario de producto terminado. */

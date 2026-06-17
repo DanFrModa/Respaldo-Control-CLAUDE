@@ -1,0 +1,2481 @@
+{
+  "generado": "F2-E5 analisis catalogo-tallas (Ordenes.csv real)",
+  "totalOrdenes": 5451,
+  "ordenesVacias": 1,
+  "distintas": 183,
+  "ambiguas": 8,
+  "conDobleCurva": 17,
+  "tokensUnicos": [
+    "01",
+    "02",
+    "03",
+    "04",
+    "0X",
+    "1",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "1X",
+    "2",
+    "23",
+    "26",
+    "28",
+    "2A",
+    "2C",
+    "2G",
+    "2X",
+    "2x",
+    "3",
+    "30",
+    "31",
+    "32",
+    "34",
+    "36",
+    "38",
+    "3A",
+    "3M",
+    "3X",
+    "4",
+    "40",
+    "42",
+    "44",
+    "45",
+    "4A",
+    "4X",
+    "5",
+    "56",
+    "5X",
+    "6",
+    "67",
+    "6A",
+    "6M",
+    "6x",
+    "7",
+    "78",
+    "8",
+    "9",
+    "9M",
+    "AD",
+    "CH",
+    "Ch",
+    "DC",
+    "DG",
+    "DM",
+    "EC",
+    "EE",
+    "EG",
+    "EX",
+    "G",
+    "G'",
+    "GA",
+    "GD",
+    "GE",
+    "H",
+    "HO",
+    "L",
+    "M",
+    "M-",
+    "M.",
+    "MC",
+    "MD",
+    "ME",
+    "MN",
+    "MU",
+    "NI",
+    "P",
+    "S",
+    "UT",
+    "VA",
+    "X",
+    "X1",
+    "X2",
+    "X3",
+    "XC",
+    "XG",
+    "XL",
+    "XS",
+    "XX",
+    "Xg",
+    "ch",
+    "eg",
+    "g",
+    "m"
+  ],
+  "cadenas": [
+    {
+      "original": "CHM G EX",
+      "frecuencia": 1927,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EX",
+      "frecuencia": 761,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G XG",
+      "frecuencia": 431,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2 3 3X",
+      "frecuencia": 252,
+      "etiquetas": [
+        "2",
+        "3",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "12141618",
+      "frecuencia": 204,
+      "etiquetas": [
+        "12",
+        "14",
+        "16",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6 8 10",
+      "frecuencia": 198,
+      "etiquetas": [
+        "4",
+        "6",
+        "8",
+        "10"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EG",
+      "frecuencia": 188,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2 233445566778",
+      "frecuencia": 131,
+      "etiquetas": [
+        "2",
+        "23",
+        "34",
+        "45",
+        "56",
+        "67",
+        "78"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 5 7 9 1113",
+      "frecuencia": 94,
+      "etiquetas": [
+        "4",
+        "5",
+        "7",
+        "9",
+        "11",
+        "13"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "7 9 1012",
+      "frecuencia": 68,
+      "etiquetas": [
+        "7",
+        "9",
+        "10",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 7 9 1113",
+      "frecuencia": 63,
+      "etiquetas": [
+        "6",
+        "7",
+        "9",
+        "11",
+        "13"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3M6M9M12182A3A",
+      "frecuencia": 57,
+      "etiquetas": [
+        "3M",
+        "6M",
+        "9M",
+        "12",
+        "18",
+        "2A",
+        "3A"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G XG2X",
+      "frecuencia": 57,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XG",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "34363840",
+      "frecuencia": 50,
+      "etiquetas": [
+        "34",
+        "36",
+        "38",
+        "40"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G ",
+      "frecuencia": 50,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1 2 3 5 ",
+      "frecuencia": 42,
+      "etiquetas": [
+        "1",
+        "2",
+        "3",
+        "5"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 5 6 7 8 9 1113",
+      "frecuencia": 38,
+      "etiquetas": [
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "11",
+        "13"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "ECCHM G EX",
+      "frecuencia": 35,
+      "etiquetas": [
+        "EC",
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G XG",
+      "frecuencia": 32,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "XG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1 2 3 3X",
+      "frecuencia": 30,
+      "etiquetas": [
+        "1",
+        "2",
+        "3",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G XG2G",
+      "frecuencia": 29,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XG",
+        "2G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 1218",
+      "frecuencia": 28,
+      "etiquetas": [
+        "6",
+        "12",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 1218--2 3 3X",
+      "frecuencia": 27,
+      "etiquetas": [
+        "6",
+        "12",
+        "18",
+        "2",
+        "3",
+        "3X"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EX2X",
+      "frecuencia": 26,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "7 8 9 10111214",
+      "frecuencia": 23,
+      "etiquetas": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EG",
+      "frecuencia": 23,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6 8 1012141618",
+      "frecuencia": 22,
+      "etiquetas": [
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G ",
+      "frecuencia": 22,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 1218- 2 3 3X",
+      "frecuencia": 21,
+      "etiquetas": [
+        "6",
+        "12",
+        "18",
+        "2",
+        "3",
+        "3X"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "5 7 1014",
+      "frecuencia": 20,
+      "etiquetas": [
+        "5",
+        "7",
+        "10",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "9 111314",
+      "frecuencia": 17,
+      "etiquetas": [
+        "9",
+        "11",
+        "13",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EX2X",
+      "frecuencia": 17,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EX2X3X",
+      "frecuencia": 17,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2CXCCHM G ",
+      "frecuencia": 16,
+      "etiquetas": [
+        "2C",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1 2 3 5 6 ",
+      "frecuencia": 14,
+      "etiquetas": [
+        "1",
+        "2",
+        "3",
+        "5",
+        "6"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3445566778",
+      "frecuencia": 14,
+      "etiquetas": [
+        "34",
+        "45",
+        "56",
+        "67",
+        "78"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM ",
+      "frecuencia": 12,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2 4 6 8 ",
+      "frecuencia": 11,
+      "etiquetas": [
+        "2",
+        "4",
+        "6",
+        "8"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 10121416",
+      "frecuencia": 11,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XL1X2X3X",
+      "frecuencia": 11,
+      "etiquetas": [
+        "XL",
+        "1X",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "7 8 9 101112",
+      "frecuencia": 10,
+      "etiquetas": [
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "G",
+      "frecuencia": 10,
+      "etiquetas": [
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "ECCHM G EX2X",
+      "frecuencia": 9,
+      "etiquetas": [
+        "EC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "EXCHM G EX",
+      "frecuencia": 9,
+      "etiquetas": [
+        "EX",
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "UT",
+      "frecuencia": 9,
+      "etiquetas": [
+        "UT"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EX2X3X4X",
+      "frecuencia": 9,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "3X",
+        "4X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "101214",
+      "frecuencia": 8,
+      "etiquetas": [
+        "10",
+        "12",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3 6 9 12182A3A",
+      "frecuencia": 8,
+      "etiquetas": [
+        "3",
+        "6",
+        "9",
+        "12",
+        "18",
+        "2A",
+        "3A"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G",
+      "frecuencia": 8,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "XSS M L XL",
+      "frecuencia": 8,
+      "etiquetas": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "010203",
+      "frecuencia": 7,
+      "etiquetas": [
+        "01",
+        "02",
+        "03"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "34455667",
+      "frecuencia": 6,
+      "etiquetas": [
+        "34",
+        "45",
+        "56",
+        "67"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3M6M9M1218",
+      "frecuencia": 6,
+      "etiquetas": [
+        "3M",
+        "6M",
+        "9M",
+        "12",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6M1218",
+      "frecuencia": 6,
+      "etiquetas": [
+        "6M",
+        "12",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "ECCHM G ",
+      "frecuencia": 6,
+      "etiquetas": [
+        "EC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "M G EX2X",
+      "frecuencia": 6,
+      "etiquetas": [
+        "M",
+        "G",
+        "EX",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCH",
+      "frecuencia": 6,
+      "etiquetas": [
+        "XC",
+        "CH"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3 5 7 9 11",
+      "frecuencia": 5,
+      "etiquetas": [
+        "3",
+        "5",
+        "7",
+        "9",
+        "11"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6 8 101214",
+      "frecuencia": 5,
+      "etiquetas": [
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "5 6 7 9 1113",
+      "frecuencia": 5,
+      "etiquetas": [
+        "5",
+        "6",
+        "7",
+        "9",
+        "11",
+        "13"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "P ",
+      "frecuencia": 5,
+      "etiquetas": [
+        "P"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1012141618",
+      "frecuencia": 4,
+      "etiquetas": [
+        "10",
+        "12",
+        "14",
+        "16",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "121416CHM G EX2X",
+      "frecuencia": 4,
+      "etiquetas": [
+        "12",
+        "14",
+        "16",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "121416X ",
+      "frecuencia": 4,
+      "etiquetas": [
+        "12",
+        "14",
+        "16",
+        "X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "13151719",
+      "frecuencia": 4,
+      "etiquetas": [
+        "13",
+        "15",
+        "17",
+        "19"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "141618X ",
+      "frecuencia": 4,
+      "etiquetas": [
+        "14",
+        "16",
+        "18",
+        "X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1X2X3X",
+      "frecuencia": 4,
+      "etiquetas": [
+        "1X",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3 6 9 12",
+      "frecuencia": 4,
+      "etiquetas": [
+        "3",
+        "6",
+        "9",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "7 9 1113",
+      "frecuencia": 4,
+      "etiquetas": [
+        "7",
+        "9",
+        "11",
+        "13"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "7 9 111315",
+      "frecuencia": 4,
+      "etiquetas": [
+        "7",
+        "9",
+        "11",
+        "13",
+        "15"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "8 9 101112",
+      "frecuencia": 4,
+      "etiquetas": [
+        "8",
+        "9",
+        "10",
+        "11",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EXXX",
+      "frecuencia": 4,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "XX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "M G",
+      "frecuencia": 4,
+      "etiquetas": [
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "XCCHM G XG2X3X",
+      "frecuencia": 4,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XG",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "0X1X2X3X",
+      "frecuencia": 3,
+      "etiquetas": [
+        "0X",
+        "1X",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "121416",
+      "frecuencia": 3,
+      "etiquetas": [
+        "12",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1416CHM G EX2X3X",
+      "frecuencia": 3,
+      "etiquetas": [
+        "14",
+        "16",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2628303234",
+      "frecuencia": 3,
+      "etiquetas": [
+        "26",
+        "28",
+        "30",
+        "32",
+        "34"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2CXCCHM G EX2X3X",
+      "frecuencia": 3,
+      "etiquetas": [
+        "2C",
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6 8 1012",
+      "frecuencia": 3,
+      "etiquetas": [
+        "4",
+        "6",
+        "8",
+        "10",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 101214",
+      "frecuencia": 3,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM  G",
+      "frecuencia": 3,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "chm g eg",
+      "frecuencia": 3,
+      "etiquetas": [
+        "ch",
+        "m",
+        "g",
+        "eg"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM GEX",
+      "frecuencia": 3,
+      "etiquetas": [
+        "CH",
+        "M",
+        "GE",
+        "X"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "G XG2X3X--XCCHM ",
+      "frecuencia": 3,
+      "etiquetas": [
+        "G",
+        "XG",
+        "2X",
+        "3X",
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "S M L XL",
+      "frecuencia": 3,
+      "etiquetas": [
+        "S",
+        "M",
+        "L",
+        "XL"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EX2X3X",
+      "frecuencia": 3,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XSS M L XL2X",
+      "frecuencia": 3,
+      "etiquetas": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1214166x",
+      "frecuencia": 2,
+      "etiquetas": [
+        "12",
+        "14",
+        "16",
+        "6x"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "14",
+      "frecuencia": 2,
+      "etiquetas": [
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2CXCCHM G EX",
+      "frecuencia": 2,
+      "etiquetas": [
+        "2C",
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3234363840",
+      "frecuencia": 2,
+      "etiquetas": [
+        "32",
+        "34",
+        "36",
+        "38",
+        "40"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "36384042",
+      "frecuencia": 2,
+      "etiquetas": [
+        "36",
+        "38",
+        "40",
+        "42"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6 8 ",
+      "frecuencia": 2,
+      "etiquetas": [
+        "4",
+        "6",
+        "8"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6 8 1012XCCHM ",
+      "frecuencia": 2,
+      "etiquetas": [
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "5 6 7 9 11",
+      "frecuencia": 2,
+      "etiquetas": [
+        "5",
+        "6",
+        "7",
+        "9",
+        "11"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012",
+      "frecuencia": 2,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012141618",
+      "frecuencia": 2,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 10121416CH",
+      "frecuencia": 2,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "CH"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM",
+      "frecuencia": 2,
+      "etiquetas": [
+        "CH",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "CHM G - CHM ",
+      "frecuencia": 2,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "CH",
+        "M"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EX3842",
+      "frecuencia": 2,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "38",
+        "42"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EXX2X3",
+      "frecuencia": 2,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "X2",
+        "X3"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G XG2X",
+      "frecuencia": 2,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "XG",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM H EG",
+      "frecuencia": 2,
+      "etiquetas": [
+        "CH",
+        "M",
+        "H",
+        "EG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "G EX2XMNXCCHM G ",
+      "frecuencia": 2,
+      "etiquetas": [
+        "G",
+        "EX",
+        "2X",
+        "MN",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "M G ",
+      "frecuencia": 2,
+      "etiquetas": [
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHG XG2X",
+      "frecuencia": 2,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "G",
+        "XG",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G XL",
+      "frecuencia": 2,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XL"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1012- XCCHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "10",
+        "12",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "121618CH G",
+      "frecuencia": 1,
+      "etiquetas": [
+        "12",
+        "16",
+        "18",
+        "CH",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "1416",
+      "frecuencia": 1,
+      "etiquetas": [
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "14MCMDGD",
+      "frecuencia": 1,
+      "etiquetas": [
+        "14",
+        "MC",
+        "MD",
+        "GD"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "16",
+      "frecuencia": 1,
+      "etiquetas": [
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "18323436384042",
+      "frecuencia": 1,
+      "etiquetas": [
+        "18",
+        "32",
+        "34",
+        "36",
+        "38",
+        "40",
+        "42"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "183638",
+      "frecuencia": 1,
+      "etiquetas": [
+        "18",
+        "36",
+        "38"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2 4 6 8",
+      "frecuencia": 1,
+      "etiquetas": [
+        "2",
+        "4",
+        "6",
+        "8"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "2 4 6 8 1012",
+      "frecuencia": 1,
+      "etiquetas": [
+        "2",
+        "4",
+        "6",
+        "8",
+        "10",
+        "12"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2 4 6 8 10121416",
+      "frecuencia": 1,
+      "etiquetas": [
+        "2",
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2 4 6 8 10121418",
+      "frecuencia": 1,
+      "etiquetas": [
+        "2",
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "18"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "262830323436",
+      "frecuencia": 1,
+      "etiquetas": [
+        "26",
+        "28",
+        "30",
+        "32",
+        "34",
+        "36"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "28303132",
+      "frecuencia": 1,
+      "etiquetas": [
+        "28",
+        "30",
+        "31",
+        "32"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "28303234363840",
+      "frecuencia": 1,
+      "etiquetas": [
+        "28",
+        "30",
+        "32",
+        "34",
+        "36",
+        "38",
+        "40"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2CECCHM G EX",
+      "frecuencia": 1,
+      "etiquetas": [
+        "2C",
+        "EC",
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "2CXCCHM G XG",
+      "frecuencia": 1,
+      "etiquetas": [
+        "2C",
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3 4 6 8 10121416",
+      "frecuencia": 1,
+      "etiquetas": [
+        "3",
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "343638404244",
+      "frecuencia": 1,
+      "etiquetas": [
+        "34",
+        "36",
+        "38",
+        "40",
+        "42",
+        "44"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "3638",
+      "frecuencia": 1,
+      "etiquetas": [
+        "36",
+        "38"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 1214303234",
+      "frecuencia": 1,
+      "etiquetas": [
+        "4",
+        "12",
+        "14",
+        "30",
+        "32",
+        "34"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "4 6",
+      "frecuencia": 1,
+      "etiquetas": [
+        "4",
+        "6"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "4 6 8 10121416",
+      "frecuencia": 1,
+      "etiquetas": [
+        "4",
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 1416",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 10",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012- CH",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "CH"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012- CHM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "CH",
+        "M"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012141618CH",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "18",
+        "CH"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012141618M.",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "18",
+        "M."
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012141618ME",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "18",
+        "ME"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 10121416CH G",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "CH",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 10121618M EX",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "16",
+        "18",
+        "M",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6 8 1012XCCHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6",
+        "8",
+        "10",
+        "12",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "6M182A4A6A",
+      "frecuencia": 1,
+      "etiquetas": [
+        "6M",
+        "18",
+        "2A",
+        "4A",
+        "6A"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "8 101214",
+      "frecuencia": 1,
+      "etiquetas": [
+        "8",
+        "10",
+        "12",
+        "14"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "8 1012141618CH",
+      "frecuencia": 1,
+      "etiquetas": [
+        "8",
+        "10",
+        "12",
+        "14",
+        "16",
+        "18",
+        "CH"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "8 101416",
+      "frecuencia": 1,
+      "etiquetas": [
+        "8",
+        "10",
+        "14",
+        "16"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "8 1214G",
+      "frecuencia": 1,
+      "etiquetas": [
+        "8",
+        "12",
+        "14",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": true
+    },
+    {
+      "original": "ADNI",
+      "frecuencia": 1,
+      "etiquetas": [
+        "AD",
+        "NI"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CH M GEX",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G - CHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G CHM G'",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "CH",
+        "M",
+        "G'"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G CHM-",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "CH",
+        "M-"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EGEE",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EG",
+        "EE"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EX2XDCDMDG",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "DC",
+        "DM",
+        "DG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EXCHM G EG",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "CH",
+        "M",
+        "G",
+        "EG"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "CHM G EXEE",
+      "frecuencia": 1,
+      "etiquetas": [
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "EE"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "ChM G Xg",
+      "frecuencia": 1,
+      "etiquetas": [
+        "Ch",
+        "M",
+        "G",
+        "Xg"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "EX2X",
+      "frecuencia": 1,
+      "etiquetas": [
+        "EX",
+        "2X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "G EX2X--XCCHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "G",
+        "EX",
+        "2X",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "G EX2X3X--XCCHM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "G",
+        "EX",
+        "2X",
+        "3X",
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "G EX2X3XM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "G",
+        "EX",
+        "2X",
+        "3X",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "G EX2XVAXCCHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "G",
+        "EX",
+        "2X",
+        "VA",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "M ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "M G --XCCHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M",
+        "G",
+        "XC",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "M G EX- GA",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M",
+        "G",
+        "EX",
+        "GA"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "M G EX--CHM G ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M",
+        "G",
+        "EX",
+        "CH",
+        "M",
+        "G"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "M G EX--XC",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M",
+        "G",
+        "EX",
+        "XC"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "M G EX2X--XCCHM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "M G EX2X3XXCCHM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "3X",
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "MUHONI",
+      "frecuencia": 1,
+      "etiquetas": [
+        "MU",
+        "HO",
+        "NI"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "S M L ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "S",
+        "M",
+        "L"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "X10102",
+      "frecuencia": 1,
+      "etiquetas": [
+        "X1",
+        "01",
+        "02"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "X1010203",
+      "frecuencia": 1,
+      "etiquetas": [
+        "X1",
+        "01",
+        "02",
+        "03"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "X101020304",
+      "frecuencia": 1,
+      "etiquetas": [
+        "X1",
+        "01",
+        "02",
+        "03",
+        "04"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XC",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XC"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XC--XG2X3X",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XC",
+        "XG",
+        "2X",
+        "3X"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EX2x",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2x"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G EX2X5X",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "EX",
+        "2X",
+        "5X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCCHM G XLXX",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XC",
+        "CH",
+        "M",
+        "G",
+        "XL",
+        "XX"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XCM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XC",
+        "M"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XG2X- XCCHM ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XG",
+        "2X",
+        "XC",
+        "CH",
+        "M"
+      ],
+      "separadores": 1,
+      "ambigua": false
+    },
+    {
+      "original": "XSS M L ",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XS",
+        "S",
+        "M",
+        "L"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    },
+    {
+      "original": "XSS M L XL2X3X",
+      "frecuencia": 1,
+      "etiquetas": [
+        "XS",
+        "S",
+        "M",
+        "L",
+        "XL",
+        "2X",
+        "3X"
+      ],
+      "separadores": 0,
+      "ambigua": false
+    }
+  ]
+}

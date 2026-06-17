@@ -33,7 +33,6 @@ async function sembrarEmpresa(prisma: PrismaClient): Promise<number> {
       nombre: 'FR Moda',
       razonSocial: 'FR Moda, S.A. De C.V.',
       identificador: 'FR',
-      upc: '7500092',
       favorita: true,
       paraIpt: true,
       paraEdr: true,

@@ -72,7 +72,7 @@ function aFormulario(config: EmpresaConfiguracion): DatosConfiguracionEmpresa {
  * configuracion (`GET .../configuracion`) y la edita (`PATCH`). Los decimales se
  * capturan con el patron oficial `numeroOpcional` (texto; vacio = limpiar), las
  * fechas como `<input type="date">` y el almacen PT por defecto como id. El foco
- * de E1 es el CRUD + UPC; esta seccion cubre la configuracion de forma directa
+ * de E1 es el CRUD; esta seccion cubre la configuracion de forma directa
  * (sin selector de almacen aun: se captura el id; un selector llegara cuando se
  * crucen los modulos). El backend valida y es la autoridad (A1).
  */

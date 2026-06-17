@@ -151,8 +151,7 @@
                           "bordados.ver",
                           "bordados.administrar",
                           "modelos.ver",
-                          "modelos.administrar",
-                          "modelos.codigos-barra"
+                          "modelos.administrar"
                         ]
                       },
                       "description": "Claves de permiso efectivas del usuario (unión de sus roles)."
@@ -27183,240 +27182,6 @@
         }
       }
     },
-    "/api/modelos/{id}/codigos-barra": {
-      "get": {
-        "summary": "Generar los códigos de barra (EAN-13 / DUN-14) de un modelo",
-        "tags": [
-          "modelos"
-        ],
-        "description": "Calcula el EAN-13 y el DUN-14 del modelo usando el prefijo UPC de la EMPRESA ACTIVA de la sesión (Empresa.upc). Si la empresa no tiene UPC capturado, o prefijo+código no suman 12 dígitos, responde 400 con un mensaje legible.",
-        "parameters": [
-          {
-            "schema": {
-              "type": "integer",
-              "exclusiveMinimum": 0,
-              "maximum": 9007199254740991
-            },
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "description": "Id del modelo."
-          }
-        ],
-        "security": [
-          {
-            "cookieSesion": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "idModelo": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Id del modelo."
-                    },
-                    "codigoModelo": {
-                      "type": "string",
-                      "description": "Código del modelo usado para componer la base."
-                    },
-                    "idEmpresa": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "description": "Id de la empresa activa de la sesión."
-                    },
-                    "nombreEmpresa": {
-                      "type": "string",
-                      "description": "Nombre de la empresa activa (para el impreso)."
-                    },
-                    "prefijo": {
-                      "type": "string",
-                      "description": "Prefijo UPC de la empresa (de Empresa.upc)."
-                    },
-                    "base12": {
-                      "type": "string",
-                      "description": "Los 12 dígitos base (prefijo + código) sin verificador."
-                    },
-                    "ean13": {
-                      "type": "string",
-                      "description": "EAN-13 completo (13 dígitos): base + verificador módulo 10."
-                    },
-                    "dun14": {
-                      "type": "string",
-                      "description": "DUN-14 de caja (14 dígitos): indicador 1 + base + verificador."
-                    }
-                  },
-                  "required": [
-                    "idModelo",
-                    "codigoModelo",
-                    "idEmpresa",
-                    "nombreEmpresa",
-                    "prefijo",
-                    "base12",
-                    "ean13",
-                    "dun14"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa."
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Respuesta de error de la API.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "codigo": {
-                      "type": "string",
-                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
-                    },
-                    "mensaje": {
-                      "type": "string",
-                      "description": "Mensaje en español, apto para mostrar al usuario."
-                    },
-                    "detalles": {
-                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
-                    }
-                  },
-                  "required": [
-                    "codigo",
-                    "mensaje"
-                  ],
-                  "additionalProperties": false,
-                  "description": "Respuesta de error de la API."
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/modelos/{id}/bom/telas": {
       "get": {
         "summary": "Listar las telas del BOM de un modelo",
@@ -35872,17 +35637,6 @@
                             ],
                             "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                           },
-                          "upc": {
-                            "anyOf": [
-                              {
-                                "type": "string"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ],
-                            "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                          },
                           "maquilaOrd": {
                             "anyOf": [
                               {
@@ -36170,7 +35924,6 @@
                           "fechaCompletada",
                           "motivoCancelada",
                           "tallasV1",
-                          "upc",
                           "maquilaOrd",
                           "aplicacionOrd",
                           "pagada",
@@ -36819,17 +36572,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -37117,7 +36859,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -37564,17 +37305,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -37862,7 +37592,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -38428,17 +38157,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -38726,7 +38444,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -39238,17 +38955,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -39536,7 +39242,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -40004,17 +39709,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -40302,7 +39996,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -40770,17 +40463,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -41068,7 +40750,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -41554,17 +41235,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -41852,7 +41522,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -42320,17 +41989,6 @@
                       ],
                       "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación)."
-                    },
                     "maquilaOrd": {
                       "anyOf": [
                         {
@@ -42618,7 +42276,6 @@
                     "fechaCompletada",
                     "motivoCancelada",
                     "tallasV1",
-                    "upc",
                     "maquilaOrd",
                     "aplicacionOrd",
                     "pagada",
@@ -46742,17 +46399,6 @@
                         ],
                         "description": "Identificador corto para folios, o null."
                       },
-                      "upc": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ],
-                        "description": "Prefijo UPC de la empresa, o null."
-                      },
                       "favorita": {
                         "type": "boolean",
                         "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -46809,7 +46455,6 @@
                       "nombre",
                       "razonSocial",
                       "identificador",
-                      "upc",
                       "favorita",
                       "paraIpt",
                       "paraEdr",
@@ -46998,10 +46643,6 @@
                     "type": "string",
                     "maxLength": 20
                   },
-                  "upc": {
-                    "type": "string",
-                    "maxLength": 20
-                  },
                   "favorita": {
                     "default": false,
                     "type": "boolean"
@@ -47067,17 +46708,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -47134,7 +46764,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
@@ -47362,17 +46991,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -47429,7 +47047,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
@@ -47617,10 +47234,6 @@
                     "type": "string",
                     "maxLength": 20
                   },
-                  "upc": {
-                    "type": "string",
-                    "maxLength": 20
-                  },
                   "favorita": {
                     "type": "boolean"
                   },
@@ -47696,17 +47309,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -47763,7 +47365,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",
@@ -47989,17 +47590,6 @@
                       ],
                       "description": "Identificador corto para folios, o null."
                     },
-                    "upc": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ],
-                      "description": "Prefijo UPC de la empresa, o null."
-                    },
                     "favorita": {
                       "type": "boolean",
                       "description": "Empresa propuesta por defecto al iniciar sesión."
@@ -48056,7 +47646,6 @@
                     "nombre",
                     "razonSocial",
                     "identificador",
-                    "upc",
                     "favorita",
                     "paraIpt",
                     "paraEdr",

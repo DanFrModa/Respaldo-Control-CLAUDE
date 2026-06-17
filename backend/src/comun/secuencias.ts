@@ -74,3 +74,51 @@ export async function siguienteFolio(tx: Tx, idEmpresa: number, clave: string): 
   }
   return fila.valor;
 }
+
+/**
+ * SIEMBRA el valor ACTUAL de una secuencia para que el SIGUIENTE folio sea `valorActual + 1`
+ * (MIGRACIÓN — F2-E5). Tras migrar el histórico (que preserva los folios viejos con un valor
+ * EXPLÍCITO, sin pasar por `siguienteFolio`), hay que dejar la secuencia "adelantada" al
+ * máximo folio migrado de cada empresa, o la primera captura nueva chocaría contra el unique
+ * `(idEmpresa, folio)`.
+ *
+ * Es IDEMPOTENTE y MONÓTONO: nunca RETROCEDE la secuencia. Pone `valor = max(valorActual,
+ * valorExistente)` — así re-correr el ETL no la baja, y si captura ya avanzó la serie por
+ * encima del histórico, no la pisa. `valorActual` es el MÁXIMO folio ya migrado (un folio nuevo
+ * será `valorActual + 1`).
+ *
+ * Usa SQL crudo (mismo criterio que `siguienteFolio`: la atomicidad no depende de heurísticas
+ * del upsert de Prisma). Exige `tx` por tipo (debe correr en la transacción/cliente del ETL).
+ *
+ * @param tx          transacción/cliente activo.
+ * @param idEmpresa   empresa dueña de la numeración (A9).
+ * @param clave       serie a sembrar (`"pedido"`, `"orden"`).
+ * @param valorActual máximo folio YA usado (el siguiente será `valorActual + 1`). ≥0.
+ */
+export async function sembrarSecuencia(
+  tx: Tx,
+  idEmpresa: number,
+  clave: string,
+  valorActual: bigint | number,
+): Promise<void> {
+  if (!Number.isInteger(idEmpresa) || idEmpresa <= 0) {
+    throw new ErrorValidacion(`idEmpresa inválido para la secuencia: ${String(idEmpresa)}.`);
+  }
+  if (!PATRON_CLAVE_SECUENCIA.test(clave)) {
+    throw new ErrorValidacion(
+      `Clave de secuencia inválida: "${clave}". Usa minúsculas, dígitos y guiones (ej. "nota-salida").`,
+    );
+  }
+  const valor = BigInt(valorActual);
+  if (valor < 0n) {
+    throw new ErrorValidacion(`Valor de secuencia inválido (negativo): ${String(valor)}.`);
+  }
+
+  // INSERT con el valor sembrado; si ya existe, lo SUBE al máximo (nunca lo baja: GREATEST).
+  await tx.$executeRaw`
+    INSERT INTO "secuencias" ("id_empresa", "clave", "valor")
+    VALUES (${idEmpresa}, ${clave}, ${valor})
+    ON CONFLICT ("id_empresa", "clave")
+    DO UPDATE SET "valor" = GREATEST("secuencias"."valor", ${valor})
+  `;
+}

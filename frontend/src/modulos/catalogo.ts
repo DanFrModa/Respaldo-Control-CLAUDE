@@ -1,7 +1,6 @@
 import {
   AlertTriangle,
   Banknote,
-  Barcode,
   CalendarRange,
   Calculator,
   ChartLine,
@@ -40,7 +39,6 @@ export type IconoModulo =
   | 'libreria'
   | 'camisa'
   | 'imagenes'
-  | 'codigo-barra'
   | 'carrito'
   | 'fabrica'
   | 'lista-tareas'
@@ -66,7 +64,6 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
   libreria: Library,
   camisa: Shirt,
   imagenes: Images,
-  'codigo-barra': Barcode,
   carrito: ShoppingCart,
   fabrica: Factory,
   'lista-tareas': ListChecks,
@@ -143,18 +140,6 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/modelos/galeria',
     icono: 'imagenes',
     permisos: ['modelos.ver'],
-    subVista: true,
-  },
-  // Sub-vista de Modelos (F1-E5): el generador de códigos de barra (EAN-13 + DUN-14),
-  // sucesor del form viejo `Codigo` (menú 1). NO es un módulo del plan §5: cuelga del
-  // módulo Modelos, con su propio permiso de lectura `modelos.codigos-barra`.
-  {
-    clave: 'codigos-barra',
-    titulo: 'Códigos de barra',
-    descripcion: 'Genera el EAN-13 (pieza) y DUN-14 (caja) de un modelo y descarga su etiqueta',
-    ruta: '/modelos/codigos-barra',
-    icono: 'codigo-barra',
-    permisos: ['modelos.codigos-barra'],
     subVista: true,
   },
   {

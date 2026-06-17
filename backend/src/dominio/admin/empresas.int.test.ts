@@ -90,10 +90,15 @@ describe('administración de empresas (doc 10 §5, A9)', () => {
       bd(),
     );
 
-    // Editar solo `upc`: el esquema de edición NO debe rellenar las banderas con su
+    // Editar solo `identificador`: el esquema de edición NO debe rellenar las banderas con su
     // default (false) ni el dominio pisar los valores reales.
-    const actualizada = await actualizarEmpresa(sesion, empresa.id, { upc: '750' }, bd());
-    expect(actualizada.upc).toBe('750');
+    const actualizada = await actualizarEmpresa(
+      sesion,
+      empresa.id,
+      { identificador: 'FRM-01' },
+      bd(),
+    );
+    expect(actualizada.identificador).toBe('FRM-01');
     expect(actualizada.favorita).toBe(true);
     expect(actualizada.paraIpt).toBe(true);
     expect(actualizada.paraEdr).toBe(true);

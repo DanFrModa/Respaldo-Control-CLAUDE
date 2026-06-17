@@ -11,7 +11,7 @@
  *  - reasignar roles y desbloquear;
  *  - cambio de contraseña por administrador → el usuario entra con la nueva clave
  *    y NO con la vieja (el hash scrypt lo verifica el login real de better-auth);
- *  - empresas: crear, editar el prefijo UPC y leer/actualizar la configuración;
+ *  - empresas: crear, editar el identificador y leer/actualizar la configuración;
  *  - roles: el selector lista los roles del seed.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -261,26 +261,26 @@ describe('API de administración (F1-E1 PIEZA C)', () => {
   });
 
   describe('empresas', () => {
-    it('crea una empresa y edita su prefijo UPC', async () => {
+    it('crea una empresa y edita su identificador', async () => {
       const cookie = await cookieAdmin();
       const creada = await app.inject({
         method: 'POST',
         url: '/api/empresas',
         headers: { cookie },
-        payload: { nombre: 'Marilyn Fitness', upc: '7500092' },
+        payload: { nombre: 'Marilyn Fitness', identificador: 'MF-01' },
       });
       expect(creada.statusCode).toBe(201);
-      const empresa = creada.json<{ id: number; upc: string | null }>();
-      expect(empresa.upc).toBe('7500092');
+      const empresa = creada.json<{ id: number; identificador: string | null }>();
+      expect(empresa.identificador).toBe('MF-01');
 
       const editada = await app.inject({
         method: 'PATCH',
         url: `/api/empresas/${String(empresa.id)}`,
         headers: { cookie },
-        payload: { upc: '7500119' },
+        payload: { identificador: 'MF-02' },
       });
       expect(editada.statusCode).toBe(200);
-      expect(editada.json<{ upc: string | null }>().upc).toBe('7500119');
+      expect(editada.json<{ identificador: string | null }>().identificador).toBe('MF-02');
     });
 
     it('lista las empresas (la favorita primero) e incluye FR Moda del seed', async () => {

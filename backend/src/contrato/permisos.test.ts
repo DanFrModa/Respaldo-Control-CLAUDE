@@ -64,8 +64,6 @@ describe('catálogo de permisos', () => {
       'etiquetas-marca.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
-      // Generador de códigos de barra (F1-E5): EAN-13 + DUN-14 (sucesor del form `Codigo`).
-      'modelos.codigos-barra',
       'modelos.ver',
       // Órdenes de producción (Módulo ÓRDENES, F2-E2): ver/administrar/cancelar (nuevos de v2).
       'ordenes.administrar',

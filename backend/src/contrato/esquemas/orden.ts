@@ -13,9 +13,9 @@ import { z } from 'zod';
  *  • El `estado` (capturada/completa/cancelada) lo DERIVAN los servicios; ningún cuerpo lo lleva.
  *  • El TOTAL de la orden y de cada color se DERIVA por suma de cantidades (D4 + espíritu D3):
  *    NUNCA viaja un `total` de entrada, y en la salida sale calculado.
- *  • Los campos-dato de v1 sin motor (RC=F5; maquilaOrd/aplicacionOrd/pagada=F3/F6; upc histórico;
- *    tallasV1 crudo) son de SOLO LECTURA: salen en respuestas pero NINGÚN cuerpo de entrada los
- *    lleva ni se generan (en particular: NO hay `generarUPC`, decisión Gabriel 16-jun-2026).
+ *  • Los campos-dato de v1 sin motor (RC=F5; maquilaOrd/aplicacionOrd/pagada=F3/F6; tallasV1 crudo)
+ *    son de SOLO LECTURA: salen en respuestas pero NINGÚN cuerpo de entrada los lleva. El `upc`
+ *    histórico (códigos de barra) fue ELIMINADO del modelo (decisión Gabriel 16-jun-2026).
  *
  * Semántica del PATCH parcial (M1, igual que Pedido/Cliente): omitir un campo (`undefined`) = no
  * tocar; mandar `null` en un opcional = vaciarlo. Las fechas date-only viajan como `YYYY-MM-DD`.
@@ -351,7 +351,7 @@ export type OrdenComentarioSalida = z.infer<typeof esquemaOrdenComentarioSalida>
 /**
  * Salida de una orden (proyección a JSON). Incluye el encabezado, la matriz (colores/tallas con
  * total derivado), las referencias y los comentarios. Los campos-dato de v1 sin motor salen como
- * SOLO LECTURA (RC/finanzas/upc/tallasV1).
+ * SOLO LECTURA (RC/finanzas/tallasV1).
  */
 export const esquemaOrdenSalida = z
   .object({
@@ -394,10 +394,6 @@ export const esquemaOrdenSalida = z
       .string()
       .nullable()
       .describe('Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad).'),
-    upc: z
-      .string()
-      .nullable()
-      .describe('Código de barra histórico de SOLO LECTURA (ya no se usa; sin generación).'),
     maquilaOrd: z
       .number()
       .nullable()

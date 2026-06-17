@@ -1,0 +1,6 @@
+"IdComentaOrd","IdOrdenes","IdUsuarios","FechaComen","Comentario"
+"400","1","usr-daniel","11/01/2005 09:30:00","Revisar tono del rojo"
+"401","1","usr-gabriel","12/01/2005 10:00:00","Aprobado"
+"402","3","","02/07/2007 00:00:00","Comentario sin usuario"
+"403","999","usr-x","01/01/2005 00:00:00","Comentario de orden inexistente"
+"404","2","usr-x","01/01/2005 00:00:00",""

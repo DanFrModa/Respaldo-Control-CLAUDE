@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulo 3 (pedido interno + pedido real) y órdenes de producción con matriz color×talla ilimitada (D4) y referencias del cliente buscables (D7).
 > **Criterio de salida:** Un pedido fluye hasta su orden; impreso de orden.
-> **Estado:** 🔄 EN CURSO — `F2-E1` ✅ (en `prueba`, PR #46) · `F2-E2` ✅ (en `prueba`, PR #48) · `F2-E3` ✅ (en `prueba`, PR #50) · `F2-E4` ✅ (en `prueba`, PR #52, verificado por Gabriel, 16-jun-2026); sigue E5 (ETL + cierre de fase F2).
+> **Estado:** ✅ **FASE F2 COMPLETA (5/5)** — `F2-E1` ✅ (en `prueba`, PR #46) · `F2-E2` ✅ (en `prueba`, PR #48) · `F2-E3` ✅ (en `prueba`, PR #50) · `F2-E4` ✅ (en `prueba`, PR #52) · `F2-E5` ✅ (17-jun-2026, verificada por Gabriel; reviewer independiente APROBADO). Pendiente operativo de Gabriel: commit → PR a `prueba` → corrida del ETL en Railway.
 
 ## F2-E1 · Pedidos internos + Pedidos Reales (vertical completo) — ✅ 16-jun-2026 (en `prueba`, PR #46)
 
@@ -234,7 +234,60 @@
 
 ---
 
-## F2-E5 · ETL de pedidos y órdenes + documentación + cierre de fase — ⬜ pendiente
+## F2-E5 · ETL de pedidos y órdenes + documentación + cierre de fase — ✅ 17-jun-2026 (verificada por Gabriel) · CIERRE DE FASE F2
+
+> **CIERRE F2-E5 (17-jun-2026, verificada por Gabriel; reviewer independiente APROBADO con 0 bloqueantes + 3 menores corregidos).** ÚLTIMA etapa de F2 → **cierra la fase**. Migra el histórico real de
+> pedidos y órdenes vía un **MODO MIGRACIÓN dedicado en la capa de dominio** (A1): funciones
+> `crearPedidoMigrado`/`crearPedidoRealMigrado` (`src/dominio/pedidos/migracion.ts`) y
+> `crearOrdenMigrada`/`agregarReferenciasOrdenMigrada`/`crearComentarioOrdenMigrado`
+> (`src/dominio/produccion/migracion.ts`). Esas funciones NO se exponen en NINGUNA ruta REST →
+> **E1–E4 y el API quedan INTACTOS**. Relajan SOLO las excepciones históricas documentadas (folio
+> explícito, sin validar activos, idPedidoLinea NULL, estado/fecha desde el viejo, snapshots V1) y
+> siguen siendo **transaccionales (A2)** y **auditadas (A7)** con la auditoría ORIGINAL del viejo
+> donde el CSV la trae.
+>
+> **Orquestador:** `npm run etl:pedidos-ordenes` (`migracion/etl-pedidos-ordenes.ts`). Loaders en
+> `migracion/loaders/{pedidos,pedidos-reales,ordenes,comentarios-orden}.ts`. Cadena de carga:
+> Pedidos→PedidoLinea (mapea `IdPedidosDet`, **crítico**) → PedidosReales → Ordenes (despivote +
+> Monarch) → ComentaOrd → **siembra de secuencias** `pedido`/`orden` por empresa al máximo migrado.
+>
+> **Reportes:** cuadre en DOS niveles (`npm run etl:cuadre-f2`): (1) filas/sumas + la suma de
+> cantidades de matriz v1 (Σ T1..T8) vs v2 (Σ OrdenLineaTalla); (2) checklist columna-v1 → destino-v2
+> con no-vacíos por columna para las 7 tablas. Las inconsistencias (colores/tallas creados al vuelo,
+> Monarch descartados, órdenes sin pedido, cadenas ambiguas) se LISTAN en el `Reporte` del
+> orquestador. **Análisis de tallas** (`npm run etl:analisis-tallas`): catálogo completo de las
+> **183 cadenas distintas** de `Ordenes.Tallas` con frecuencia (committeado como fixture
+> `__fixtures__/catalogo-tallas-real.json` para los tests, CI-safe).
+>
+> **Tests:** unitarios (110 en `migracion/`, verdes en local) — parsing posicional contra el
+> catálogo COMPLETO de 183 cadenas, doble curva, despivote con cuadre de sumas, normalización de
+> color CP850, reglas puras (IdPedidosDet 0/vacío→NULL, Monarch==código→descartado, estado
+> histórico), fechas. Integración (`etl-pedidos-ordenes.int.test.ts`, **corre en CI**, no local —
+> testcontainers prohibido en la máquina de Gabriel): conteos exactos de fixtures, idempotencia,
+> modo migración (folio explícito, idPedidoLinea NULL, estado/fechaCompletada desde el viejo),
+> siembra de secuencias post-máximo.
+>
+> **DESVIACIONES de la ficha original (registradas):**
+> - **Encoding = CP850, NO latin-1.** La ficha decía latin-1; el lector real (`comun/csv.ts`, F1-E6)
+>   decodifica **CP850** (corregido desde F1). El ETL de F2 reusa ese lector.
+> - **UPC EXCLUIDO por decisión (Gabriel, 16-jun-2026).** La ficha pedía normalizar el espacio del
+>   `UPC` y re-validar el verificador; **se ANULÓ**: los códigos de barra están en retiro y NO se
+>   conserva historial. El ETL **NO migra** `Ordenes.UPC` (`Orden.upc` queda null). En el cuadre de
+>   columnas aparece como **EXCLUIDA POR DECISIÓN** (exclusión justificada y registrada, §7), no como
+>   columna tirada en silencio. El algoritmo de re-validación NO se usa. **Además, en este mismo
+>   cambio se hizo el RETIRO TOTAL de los códigos de barra** (decisión de Gabriel, 16-jun-2026): se
+>   ELIMINARON las columnas `Orden.upc` y `Empresa.upc` (migración `20260616140000_retiro_codigos_barra`),
+>   el generador de códigos de barra de F1-E5 con su impreso y UI, y el permiso `modelos.codigos-barra`.
+> - **Tallas: 183 cadenas distintas** (la ficha estimaba ~184). 8 ambiguas + 17 con doble curva.
+> - **Token de talla sin match** (p. ej. `GE` de `"CHM GEX"`, padding perdido): se CREA la talla y se
+>   LISTA para Daniel (preserva la cantidad; no se autocorrige la etiqueta). Igual para colores.
+> - **Verificada por Gabriel (17-jun-2026).** El ETL es **re-ejecutable**: su corrida sobre los datos reales y el cuadre vs CSV se hacen al desplegar a `prueba` (y de nuevo en F9, al corte). Pendiente operativo: commit → PR a `prueba` → `npm run etl:pedidos-ordenes` en Railway.
+>
+> **HALLAZGOS para Daniel (al reporte, no autocorregidos):** **26 órdenes sin pedido**
+> (`IdPedidosDet` 0/vacío → idPedidoLinea NULL); **~1,415 piezas** en columnas `Tn` con cantidad pero
+> SIN etiqueta de talla en `Ordenes.Tallas` (1,307 en 3 órdenes con `Tallas` vacía; 103 con una talla
+> de más sobre `"CHM G EX"`; 5 sobre una curva de 7); **8 cadenas ambiguas** + **17 con doble curva**;
+> Monarch == código del modelo (~3,212 esperados) descartados como default automático.
 
 **Objetivo:** Migrar los datos reales de pedidos y órdenes (idempotente, cargando a través de los servicios de dominio), sembrar las secuencias después del histórico, documentar los módulos y verificar el criterio de salida de F2 completo (un pedido fluye hasta su orden; impreso de orden).
 

@@ -39,6 +39,20 @@ export const ENTIDAD_MAPEO = {
   almacenTela: 'Almacen:Tela',
   /** E7: IdModelos viejo → id nuevo (lo usan el BOM y las fotos). */
   modelo: 'Modelo',
+  /** F2-E5: IdPedidos viejo → Pedido.id nuevo. */
+  pedido: 'Pedido',
+  /** F2-E5: IdPedidosDet viejo → PedidoLinea.id nuevo (CRÍTICO: lo usan las órdenes y los reales). */
+  pedidoLinea: 'PedidoLinea',
+  /** F2-E5: IdPedidosReales viejo → PedidoReal.id nuevo. */
+  pedidoReal: 'PedidoReal',
+  /** F2-E5: IdPedidosRealesDet viejo → PedidoRealLinea.id nuevo. */
+  pedidoRealLinea: 'PedidoRealLinea',
+  /** F2-E5: IdOrdenes viejo → Orden.id nuevo. */
+  orden: 'Orden',
+  /** F2-E5: IdOrdenesDet viejo → OrdenLinea.id nuevo. */
+  ordenLinea: 'OrdenLinea',
+  /** F2-E5: IdComentaOrd viejo → OrdenComentario.id nuevo. */
+  ordenComentario: 'OrdenComentario',
 } as const;
 
 /** Una clave de entidad de mapeo. */

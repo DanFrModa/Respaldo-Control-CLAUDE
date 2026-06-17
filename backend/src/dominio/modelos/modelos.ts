@@ -34,7 +34,6 @@ import {
   type Pagina,
 } from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
-import { calcularCodigosBarra, ErrorCodigoBarra, type CodigosBarra } from './codigos-barra.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
   clienteLectura,
@@ -566,68 +565,4 @@ export async function listarGeneros(
     where: opciones.incluirInactivos === true ? {} : { activo: true },
     orderBy: { nombre: 'asc' },
   });
-}
-
-// ── Códigos de barra (F1-E5 — generador del viejo form `Codigo`) ───────────────
-
-/** Códigos de barra de un modelo + el contexto de empresa (para el impreso y la UI). */
-export interface CodigosBarraModelo extends CodigosBarra {
-  idModelo: number;
-  idEmpresa: number;
-  nombreEmpresa: string;
-}
-
-/**
- * Genera el EAN-13 y DUN-14 de un modelo para la EMPRESA ACTIVA de la sesión (F1-E5),
- * usando el prefijo UPC de la empresa (`Empresa.upc`) — NO los prefijos hardcodeados del
- * viejo form `Codigo` (ese era un bug, ver `codigos-barra.ts`). El cálculo en sí es PURO
- * (`calcularCodigosBarra`); aquí solo se resuelven los insumos desde BD:
- *  • el `codigo` del modelo (404 si no existe),
- *  • el `upc` de la empresa activa de la sesión (404 si la empresa ya no existe).
- *
- * Si la empresa no tiene UPC capturado, o si prefijo+código no dan los 12 dígitos exactos,
- * se lanza `ErrorValidacion` (400) con el MENSAJE legible del cálculo — nunca un 500 técnico —
- * para que el frontend lo muestre tal cual ("la empresa no tiene prefijo UPC", etc.).
- * Permiso requerido: `modelos.codigos-barra` (solo lectura).
- */
-export async function obtenerCodigosBarra(
-  sesion: SesionUsuario,
-  idModelo: number,
-  bd?: ContextoBd,
-): Promise<CodigosBarraModelo> {
-  verificarPermiso(sesion, 'modelos.codigos-barra');
-  const cliente = clienteLectura(bd);
-
-  const modelo = await cliente.modelo.findUnique({
-    where: { id: idModelo },
-    select: { codigo: true },
-  });
-  if (modelo === null) {
-    throw new ErrorNoEncontrado('Modelo', idModelo);
-  }
-
-  const empresa = await cliente.empresa.findUnique({
-    where: { id: sesion.idEmpresaActiva },
-    select: { upc: true, nombre: true },
-  });
-  if (empresa === null) {
-    throw new ErrorNoEncontrado('Empresa', sesion.idEmpresaActiva);
-  }
-
-  try {
-    const codigos = calcularCodigosBarra(empresa.upc ?? '', modelo.codigo);
-    return {
-      ...codigos,
-      idModelo,
-      idEmpresa: sesion.idEmpresaActiva,
-      nombreEmpresa: empresa.nombre,
-    };
-  } catch (error) {
-    if (error instanceof ErrorCodigoBarra) {
-      // Traduce el error PURO a un error de dominio (código estable → 400), conservando
-      // el mensaje legible para el usuario.
-      throw new ErrorValidacion(error.message, { causa: error });
-    }
-    throw error;
-  }
 }

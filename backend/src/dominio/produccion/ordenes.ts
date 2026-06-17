@@ -26,8 +26,8 @@
  * `Ordenes.FechaDet = Now()` al insertar el primer renglón del detalle) — ahí se sella
  * `fechaCompletada` y NO se re-sella después; `cancelada` por `cancelarOrden`.
  *
- * UPC: NO se construye `generarUPC` (decisión Gabriel 16-jun-2026). Los códigos de barra de orden
- * ya no se usan; `upc` es solo un dato histórico de lectura (sin endpoint de escritura/generación).
+ * UPC: ELIMINADO. Los códigos de barra de orden ya no se usan y la columna `Orden.upc` fue
+ * borrada del modelo (decisión Gabriel 16-jun-2026): no hay dato, endpoint ni generación.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * MAPEO DE COLUMNAS v1→v2 (contrato del ETL futuro). Verificado contra el encabezado REAL de
@@ -57,7 +57,7 @@
  *  | OrdCancelada       | estado=cancelada    | + motivoCancelada                                  |
  *  | MotivoCancelada    | motivoCancelada     | String?                                            |
  *  | IdEmpresas         | idEmpresa           | FK Empresa (A9)                                    |
- *  | UPC                | upc (String?)       | dato histórico, sin generación                     |
+ *  | UPC                | — (EXCLUIDA)        | códigos de barra en retiro: columna eliminada      |
  *  | IdCP_Articulos     | idTipoArticuloRC    | Int? SIN FK (F5)                                   |
  *  | IdRC_Aplicaciones  | idRcAplicaciones    | Int? SIN FK (F5)                                   |
  *  | IdRC_TipoTelas     | idRcTipoTelas       | Int? SIN FK (F5)                                   |
@@ -483,7 +483,6 @@ function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
     fechaCompletada: orden.fechaCompletada === null ? null : orden.fechaCompletada.toISOString(),
     motivoCancelada: orden.motivoCancelada,
     tallasV1: orden.tallasV1,
-    upc: orden.upc,
     maquilaOrd: orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
     aplicacionOrd: orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
     pagada: orden.pagada,

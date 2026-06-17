@@ -556,28 +556,3 @@ export const esquemaModeloFotoEditarCuerpo = z
 
 /** Datos validados de edición de metadatos de una foto. */
 export type DatosModeloFotoEditar = z.infer<typeof esquemaModeloFotoEditarCuerpo>;
-
-// ── Códigos de barra (F1-E5, `GET /api/modelos/:id/codigos-barra`) ─────────────
-
-/**
- * Códigos de barra calculados de un modelo para la EMPRESA ACTIVA de la sesión (F1-E5).
- * Réplica del form viejo `Codigo` corrigiendo su bug de prefijos hardcodeados: el prefijo
- * sale SIEMPRE de `Empresa.upc`. Si la empresa no tiene UPC capturado, el endpoint NO
- * devuelve esto: lanza un error de dominio legible (400) que el front muestra como mensaje.
- * La pantalla dibuja `ean13` como EAN-13 y `dun14` como ITF-14, con el número legible debajo.
- */
-export const esquemaModeloCodigosBarraSalida = z
-  .object({
-    idModelo: z.number().int().describe('Id del modelo.'),
-    codigoModelo: z.string().describe('Código del modelo usado para componer la base.'),
-    idEmpresa: z.number().int().describe('Id de la empresa activa de la sesión.'),
-    nombreEmpresa: z.string().describe('Nombre de la empresa activa (para el impreso).'),
-    prefijo: z.string().describe('Prefijo UPC de la empresa (de Empresa.upc).'),
-    base12: z.string().describe('Los 12 dígitos base (prefijo + código) sin verificador.'),
-    ean13: z.string().describe('EAN-13 completo (13 dígitos): base + verificador módulo 10.'),
-    dun14: z.string().describe('DUN-14 de caja (14 dígitos): indicador 1 + base + verificador.'),
-  })
-  .describe('Códigos de barra (EAN-13 y DUN-14) de un modelo para la empresa activa.');
-
-/** Forma de la salida de los códigos de barra de un modelo. */
-export type ModeloCodigosBarraSalida = z.infer<typeof esquemaModeloCodigosBarraSalida>;

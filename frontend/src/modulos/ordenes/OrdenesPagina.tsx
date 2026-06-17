@@ -270,10 +270,6 @@ function DetalleOrden({
         ) : null}
 
         <FotosModeloOrden idModelo={orden.idModelo} codigoModelo={orden.codigoModelo} />
-
-        {orden.upc ? (
-          <p className="text-xs text-muted-foreground">Código histórico (UPC): {orden.upc}</p>
-        ) : null}
       </SeccionDetalle>
 
       <SeccionDetalle titulo="Encabezado" icono={Tags}>

@@ -50,8 +50,6 @@ model Empresa {
   razonSocial   String? @map("razon_social")
   /// Identificador corto usado en folios e impresos (viejo: `Identificador`).
   identificador String?
-  /// Prefijo UPC de la empresa (viejo: `UPCEmp`).
-  upc           String?
   /// Empresa propuesta por defecto al iniciar sesión (viejo: `Importancia = 1`).
   favorita      Boolean @default(false)
   /// Participa en el inventario de producto terminado (viejo: `ParaIPT`).
@@ -1542,8 +1540,9 @@ model PedidoRealLinea {
 //    la secuencia atómica "orden". Reemplaza el `AumentarNumOrd`/Max()+1 del viejo.
 //  • Snapshots/datos conservados de v1 SIN motor (catálogos RC/finanzas aún no existen): columnas
 //    escalares nullable SIN FK (idTipoArticuloRC, idRcAplicaciones, idRcTipoTelas, fechas RC,
-//    enRiesgo, siRC, rcViva = F5; maquilaOrd, aplicacionOrd, pagada = F3/F6; upc = histórico sin
-//    generación; tallasV1 = cadena cruda de trazabilidad). Mismo espíritu que `idOrdCompraV1`.
+//    enRiesgo, siRC, rcViva = F5; maquilaOrd, aplicacionOrd, pagada = F3/F6; tallasV1 = cadena
+//    cruda de trazabilidad). Mismo espíritu que `idOrdCompraV1`. El `upc` (códigos de barra) fue
+//    ELIMINADO (decisión Gabriel 16-jun-2026).
 //  • Orden sin pedido = SOLO HISTÓRICO: `idPedidoLinea` es NULLABLE (el ETL migra ~26 casos
 //    huérfanos del viejo), pero el servicio `crearOrden` EXIGE un renglón de pedido válido y
 //    rechaza la captura nueva sin pedido.
@@ -1635,10 +1634,8 @@ model Orden {
   /// Motivo de la cancelación suave (viejo: `MotivoCancelada`; `OrdCancelada` → estado=cancelada).
   motivoCancelada String?     @map("motivo_cancelada") @db.Text
 
-  /// Código de barra de la orden (viejo: `UPC`). DATO HISTÓRICO de SOLO LECTURA: los códigos de
-  /// barra de orden ya no se usan (decisión Gabriel 16-jun-2026). Sin endpoint de escritura ni de
-  /// generación; el ETL lo pobla para no tirar el dato.
-  upc String? @map("upc")
+  // El código de barra de la orden (viejo: `UPC`) fue ELIMINADO (decisión Gabriel 16-jun-2026):
+  // los códigos de barra están en retiro; la columna no se conserva ni se migra.
 
   // ── Datos de Ruta Crítica (F5) — conservados de v1 SIN FK ni motor (los catálogos RC aún no
   //    existen). Columnas escalares nullable; su lógica/relaciones llegan en F5.
