@@ -332,7 +332,15 @@ const estilos = StyleSheet.create({
   filaTotales: { backgroundColor: '#f8fafc' },
   listaTexto: { fontSize: 8, marginBottom: 2 },
   vacio: { fontSize: 8, color: GRIS },
-  pie: { position: 'absolute', bottom: 20, left: 40, right: 40, fontSize: 7, color: '#94a3b8', textAlign: 'center' },
+  pie: {
+    position: 'absolute',
+    bottom: 20,
+    left: 40,
+    right: 40,
+    fontSize: 7,
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
@@ -385,7 +393,11 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
     { style: estilos.filaTabla, key: 'enc' },
     h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaColor] }, 'Color'),
     ...datos.tallas.map((t, i) =>
-      h(Text, { key: `th-${i}`, style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTalla] }, t),
+      h(
+        Text,
+        { key: `th-${i}`, style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTalla] },
+        t,
+      ),
     ),
     h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTotal] }, 'Total'),
   );
@@ -396,7 +408,11 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
       { style: estilos.filaTabla, key: `fila-${fila}` },
       h(Text, { style: [estilos.celda, estilos.celdaColor] }, r.color),
       ...r.cantidades.map((c, i) =>
-        h(Text, { key: `c-${fila}-${i}`, style: [estilos.celda, estilos.celdaTalla] }, c === 0 ? '' : String(c)),
+        h(
+          Text,
+          { key: `c-${fila}-${i}`, style: [estilos.celda, estilos.celdaTalla] },
+          c === 0 ? '' : String(c),
+        ),
       ),
       h(Text, { style: [estilos.celda, estilos.celdaTotal] }, String(r.totalFila)),
     ),
@@ -407,9 +423,17 @@ function tablaMatriz(datos: DatosImpresoOrden): ReactElement {
     { style: [estilos.filaTabla, estilos.filaTotales], key: 'tot' },
     h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaColor] }, 'Total'),
     ...datos.totalesColumna.map((c, i) =>
-      h(Text, { key: `tc-${i}`, style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTalla] }, String(c)),
+      h(
+        Text,
+        { key: `tc-${i}`, style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTalla] },
+        String(c),
+      ),
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTotal] }, String(datos.totalPiezas)),
+    h(
+      Text,
+      { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaTotal] },
+      String(datos.totalPiezas),
+    ),
   );
 
   const cuerpo =
@@ -469,7 +493,11 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
       campo('Fecha', datos.fecha),
       campo('Fecha de entrega', datos.fechaEntrega),
       campo('Estado', datos.estado),
-      campo('Modelo', `${datos.codigoModelo}${datos.descripcionModelo ? ` — ${datos.descripcionModelo}` : ''}`, true),
+      campo(
+        'Modelo',
+        `${datos.codigoModelo}${datos.descripcionModelo ? ` — ${datos.descripcionModelo}` : ''}`,
+        true,
+      ),
       campo('Composición', datos.composicion, true),
     ),
     datos.observaciones
@@ -495,11 +523,15 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     ),
     seccionLista(
       'Bordados',
-      datos.bordados.map((b) => `${b.nombre} (${b.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`),
+      datos.bordados.map(
+        (b) => `${b.nombre} (${b.tipo === 'ESTAMPADO' ? 'Estampado' : 'Bordado'})`,
+      ),
     ),
     seccionLista(
       'Habilitación',
-      datos.habilitacion.map((a) => `${a.clave} — ${a.descripcion} (consumo ${a.consumoPorPrenda} / prenda)`),
+      datos.habilitacion.map(
+        (a) => `${a.clave} — ${a.descripcion} (consumo ${a.consumoPorPrenda} / prenda)`,
+      ),
     ),
     h(
       Text,
@@ -508,7 +540,11 @@ function paginaOrden(datos: DatosImpresoOrden, clave: string): ReactElement {
     ),
   ];
 
-  return h(Page, { key: clave, size: 'A4', style: estilos.pagina }, ...hijos.filter((x) => x !== null));
+  return h(
+    Page,
+    { key: clave, size: 'A4', style: estilos.pagina },
+    ...hijos.filter((x) => x !== null),
+  );
 }
 
 /** Documento de N órdenes (una por página). */

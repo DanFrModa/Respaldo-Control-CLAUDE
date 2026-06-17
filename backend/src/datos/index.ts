@@ -37,6 +37,21 @@ export interface OpcionesClientePrisma {
    * conexión. Si se omite, se usa el default de `pg` (sin cambios para tests/seed/app).
    */
   poolMax?: number;
+  /**
+   * Opciones del POOL de `pg` para una conexión REMOTA estable (solo el ETL contra Railway).
+   * El proxy público corta conexiones ociosas a media corrida de minutos; estas opciones hacen
+   * el pool más resistente sin afectar a la app (singleton {@link prisma}) ni a los tests, que
+   * no las pasan. Todas son OPCIONALES y aditivas (si se omiten, el pool de `pg` se comporta
+   * como antes):
+   *  • `keepAlive`: activa TCP keep-alive (evita que el proxy mate sockets ociosos).
+   *  • `idleTimeoutMillis`: cuánto vive una conexión ociosa en el pool antes de cerrarse.
+   *  • `connectionTimeoutMillis`: cuánto esperar a ABRIR una conexión nueva antes de fallar.
+   */
+  pool?: {
+    keepAlive?: boolean;
+    idleTimeoutMillis?: number;
+    connectionTimeoutMillis?: number;
+  };
 }
 
 /**
@@ -50,11 +65,18 @@ export function crearClientePrisma(
   databaseUrl: string,
   opciones?: OpcionesClientePrisma,
 ): PrismaClient {
-  // `PrismaPg` acepta un `pg.PoolConfig` (connectionString + max). `max` solo se incluye si
-  // vino, para no alterar el pool por defecto de tests/seed/app.
+  // `PrismaPg` acepta un `pg.PoolConfig` (connectionString + max + opciones de pool). Cada
+  // opción se incluye SOLO si vino, para no alterar el pool por defecto de tests/seed/app.
   const adapter = new PrismaPg({
     connectionString: databaseUrl,
     ...(opciones?.poolMax === undefined ? {} : { max: opciones.poolMax }),
+    ...(opciones?.pool?.keepAlive === undefined ? {} : { keepAlive: opciones.pool.keepAlive }),
+    ...(opciones?.pool?.idleTimeoutMillis === undefined
+      ? {}
+      : { idleTimeoutMillis: opciones.pool.idleTimeoutMillis }),
+    ...(opciones?.pool?.connectionTimeoutMillis === undefined
+      ? {}
+      : { connectionTimeoutMillis: opciones.pool.connectionTimeoutMillis }),
   });
   return new PrismaClient({
     adapter,

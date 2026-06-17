@@ -14,18 +14,23 @@
  * 2ª corrida no duplica y re-guarda los mapeos (por si el primer corrido se cortó). Las filas con
  * cliente/empresa/modelo sin mapeo, o con NumeroPed no numérico, se LISTAN al reporte (§7).
  */
-import { crearPedidoMigrado, type LineaPedidoMigrada } from '../../src/dominio/pedidos/migracion.js';
+import {
+  crearPedidoMigrado,
+  type LineaPedidoMigrada,
+} from '../../src/dominio/pedidos/migracion.js';
 import type { SesionUsuario } from '../../src/comun/permisos.js';
 import type { ContextoBd } from '../../src/comun/transaccion.js';
 import type { PrismaClient } from '../../src/datos/index.js';
 
 import { leerCsv } from '../comun/csv.js';
+import { CONCURRENCIA_ETL, enLotes } from '../comun/lotes.js';
 import {
   cargarMapaNumerico,
   ENTIDAD_MAPEO,
   guardarMapeo,
   type ClienteMapeo,
 } from '../comun/mapeo.js';
+import { conReintentoTransitorio } from '../comun/reintentos.js';
 import type { Reporte } from '../comun/reporte.js';
 import { intentarCrear } from '../comun/saneo.js';
 import { parsearEntero, parsearFechaSoloDia, parsearBandera } from '../comun/valores.js';
@@ -45,6 +50,16 @@ interface DetCrudo {
   precio: number;
   entregadoParcial: number | null;
   cantFalt: number | null;
+}
+
+/** Contribución de UN pedido a los conteos (se suma tras los lotes). */
+interface ContribPedido {
+  /** Desenlace del documento pedido. */
+  pedido: 'creado' | 'existente' | 'omitido' | 'omitidoValidacion';
+  /** Renglones creados / existentes / omitidos de ESTE pedido. */
+  lineasCreadas: number;
+  lineasExistentes: number;
+  lineasOmitidas: number;
 }
 
 export async function cargarPedidos(
@@ -70,128 +85,180 @@ export async function cargarPedidos(
       idPedidosDet: (f.IdPedidosDet ?? '').trim(),
       idModelos: (f.IdModelos ?? '').trim(),
       cantPed: parsearEntero(f.CantPed) ?? 0,
-      precio: Number(((f.Precio ?? '').replace(/[$\s,]/g, '').trim()) || '0') || 0,
+      precio: Number((f.Precio ?? '').replace(/[$\s,]/g, '').trim() || '0') || 0,
       entregadoParcial: parsearEntero(f.EntregadoParcial),
       cantFalt: parsearEntero(f.CantFalt),
     });
     detPorPedido.set(idPed, lista);
   }
 
-  const pedidos: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
-  const lineas: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
-
+  // Cada pedido + sus renglones es una unidad INDEPENDIENTE → carga concurrente acotada (con
+  // reintento ante cortes transitorios; la unidad es idempotente por (idEmpresa, folio)).
   const filas = leerCsv('Pedidos.csv');
-  for (const f of filas) {
-    const idViejo = (f.IdPedidos ?? '').trim();
-    const folio = parsearEntero(f.NumeroPed);
-    const idClienteV1 = (f.IdClientes ?? '').trim();
-    const idEmpresaV1 = (f.IdEmpresas ?? '').trim();
-
-    if (folio === null) {
-      pedidos.omitidos += 1;
-      reporte.agregar('Pedido sin NumeroPed numérico (omitido)', `IdPedidos=${idViejo}`);
-      continue;
-    }
-    const idCliente = mapaCliente.get(idClienteV1);
-    if (idCliente === undefined) {
-      pedidos.omitidos += 1;
-      reporte.agregar(
-        'Pedido con cliente sin mapeo (omitido)',
-        `IdPedidos=${idViejo} IdClientes=${idClienteV1}`,
-      );
-      continue;
-    }
-    const idEmpresa = mapaEmpresa.get(idEmpresaV1);
-    if (idEmpresa === undefined) {
-      pedidos.omitidos += 1;
-      reporte.agregar(
-        'Pedido con empresa sin mapeo (omitido)',
-        `IdPedidos=${idViejo} IdEmpresas=${idEmpresaV1}`,
-      );
-      continue;
-    }
-
-    // Renglones: resolver idModelo; los sin mapeo se LISTAN y se descartan (el pedido sí entra).
-    const detCrudo = detPorPedido.get(idViejo) ?? [];
-    const lineasMigradas: LineaPedidoMigrada[] = [];
-    let lineasOmitidas = 0;
-    for (const d of detCrudo) {
-      const idModelo = mapaModelo.get(d.idModelos);
-      if (idModelo === undefined) {
-        lineasOmitidas += 1;
-        reporte.agregar(
-          'PedidoLinea con modelo sin mapeo (omitida)',
-          `IdPedidos=${idViejo} IdPedidosDet=${d.idPedidosDet} IdModelos=${d.idModelos}`,
-        );
-        continue;
-      }
-      lineasMigradas.push({
-        idModelo,
-        cantidadPedida: d.cantPed,
-        precio: d.precio,
-        entregadoParcialV1: d.entregadoParcial,
-        cantFaltanteV1: d.cantFalt,
-        claveVieja: d.idPedidosDet,
-      });
-    }
-    lineas.omitidos += lineasOmitidas;
-
-    // Idempotencia: ¿ya existe el pedido por (idEmpresa, folio)?
-    const existente = await cliente.pedido.findUnique({
-      where: { idEmpresa_folio: { idEmpresa, folio: BigInt(folio) } },
-      select: { id: true, lineas: { select: { id: true, idModelo: true }, orderBy: { id: 'asc' } } },
-    });
-    if (existente !== null) {
-      pedidos.existentes += 1;
-      // Re-guardar mapeos (por si la 1ª corrida se cortó tras crear pero antes de mapear).
-      await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, existente.id);
-      // Mapear cada renglón existente a su IdPedidosDet por orden (mismo orden de creación).
-      const lineasExist = existente.lineas;
-      for (let i = 0; i < lineasMigradas.length && i < lineasExist.length; i += 1) {
-        const clave = lineasMigradas[i]?.claveVieja;
-        const existeLinea = lineasExist[i];
-        if (clave !== undefined && existeLinea !== undefined) {
-          await guardarMapeo(cliente, ENTIDAD_MAPEO.pedidoLinea, clave, existeLinea.id);
-          lineas.existentes += 1;
-        }
-      }
-      continue;
-    }
-
-    const resultado = await intentarCrear(reporte, 'Pedido', idViejo, () =>
-      crearPedidoMigrado(
-        sesion,
-        {
-          folio,
-          idEmpresa,
-          idCliente,
-          fechaPedido: parsearFechaSoloDia(f.FechaPedido),
-          fechaDe: parsearFechaSoloDia(f.FechaDe),
-          fechaHasta: parsearFechaSoloDia(f.FechaHasta),
-          fechaTela: parsearFechaSoloDia(f.FechaTela),
-          fechaElaboracion: parsearFechaSoloDia(f.FechaElaboracion),
-          entregadoTienda: parsearBandera(f.EntregadoTienda),
-          noProducir: parsearBandera(f.NoProducir),
-          pedCancelado: parsearBandera(f.PedCancelado),
-          idOrdCompraV1: parsearEntero(f.IdOrdCompra),
-          lineas: lineasMigradas,
-        },
-        bd,
+  const contribs = await enLotes(
+    filas,
+    (f): Promise<ContribPedido> =>
+      conReintentoTransitorio(() =>
+        procesarPedido(
+          sesion,
+          bd,
+          cliente,
+          reporte,
+          { mapaCliente, mapaEmpresa, mapaModelo },
+          detPorPedido,
+          f,
+        ),
       ),
-    );
-    if (resultado === null) {
+    CONCURRENCIA_ETL,
+  );
+
+  const pedidos: ResultadoLoader = {
+    creados: 0,
+    existentes: 0,
+    omitidos: 0,
+    omitidosValidacion: 0,
+  };
+  const lineas: ResultadoLoader = { creados: 0, existentes: 0, omitidos: 0, omitidosValidacion: 0 };
+  for (const res of contribs) {
+    // Un fallo de `enLotes` (tras agotar reintentos) cuenta como pedido omitido por validación.
+    if (!res.ok) {
       pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
       continue;
     }
-    pedidos.creados += 1;
-    await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, resultado.idPedido);
-    for (const l of resultado.lineas) {
-      if (l.claveVieja !== undefined) {
-        await guardarMapeo(cliente, ENTIDAD_MAPEO.pedidoLinea, l.claveVieja, l.id);
-        lineas.creados += 1;
-      }
-    }
+    const c = res.valor;
+    if (c.pedido === 'creado') pedidos.creados += 1;
+    else if (c.pedido === 'existente') pedidos.existentes += 1;
+    else if (c.pedido === 'omitido') pedidos.omitidos += 1;
+    else pedidos.omitidosValidacion = (pedidos.omitidosValidacion ?? 0) + 1;
+    lineas.creados += c.lineasCreadas;
+    lineas.existentes += c.lineasExistentes;
+    lineas.omitidos += c.lineasOmitidas;
   }
 
   return { pedidos, lineas };
+}
+
+/** Mapeos de F1 que necesita cada pedido (clave vieja → id nuevo). */
+interface MapeosPedido {
+  mapaCliente: Map<string, number>;
+  mapaEmpresa: Map<string, number>;
+  mapaModelo: Map<string, number>;
+}
+
+/** Procesa UN pedido + sus renglones (idempotente, tolerante). Devuelve su contribución. */
+async function procesarPedido(
+  sesion: SesionUsuario,
+  bd: ContextoBd,
+  cliente: ClienteMapeo,
+  reporte: Reporte,
+  mapeos: MapeosPedido,
+  detPorPedido: Map<string, DetCrudo[]>,
+  f: Record<string, string>,
+): Promise<ContribPedido> {
+  const { mapaCliente, mapaEmpresa, mapaModelo } = mapeos;
+  const idViejo = (f.IdPedidos ?? '').trim();
+  const folio = parsearEntero(f.NumeroPed);
+  const idClienteV1 = (f.IdClientes ?? '').trim();
+  const idEmpresaV1 = (f.IdEmpresas ?? '').trim();
+
+  if (folio === null) {
+    reporte.agregar('Pedido sin NumeroPed numérico (omitido)', `IdPedidos=${idViejo}`);
+    return { pedido: 'omitido', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas: 0 };
+  }
+  const idCliente = mapaCliente.get(idClienteV1);
+  if (idCliente === undefined) {
+    reporte.agregar(
+      'Pedido con cliente sin mapeo (omitido)',
+      `IdPedidos=${idViejo} IdClientes=${idClienteV1}`,
+    );
+    return { pedido: 'omitido', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas: 0 };
+  }
+  const idEmpresa = mapaEmpresa.get(idEmpresaV1);
+  if (idEmpresa === undefined) {
+    reporte.agregar(
+      'Pedido con empresa sin mapeo (omitido)',
+      `IdPedidos=${idViejo} IdEmpresas=${idEmpresaV1}`,
+    );
+    return { pedido: 'omitido', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas: 0 };
+  }
+
+  // Renglones: resolver idModelo; los sin mapeo se LISTAN y se descartan (el pedido sí entra).
+  const detCrudo = detPorPedido.get(idViejo) ?? [];
+  const lineasMigradas: LineaPedidoMigrada[] = [];
+  let lineasOmitidas = 0;
+  for (const d of detCrudo) {
+    const idModelo = mapaModelo.get(d.idModelos);
+    if (idModelo === undefined) {
+      lineasOmitidas += 1;
+      reporte.agregar(
+        'PedidoLinea con modelo sin mapeo (omitida)',
+        `IdPedidos=${idViejo} IdPedidosDet=${d.idPedidosDet} IdModelos=${d.idModelos}`,
+      );
+      continue;
+    }
+    lineasMigradas.push({
+      idModelo,
+      cantidadPedida: d.cantPed,
+      precio: d.precio,
+      entregadoParcialV1: d.entregadoParcial,
+      cantFaltanteV1: d.cantFalt,
+      claveVieja: d.idPedidosDet,
+    });
+  }
+
+  // Idempotencia: ¿ya existe el pedido por (idEmpresa, folio)?
+  const existente = await cliente.pedido.findUnique({
+    where: { idEmpresa_folio: { idEmpresa, folio: BigInt(folio) } },
+    select: { id: true, lineas: { select: { id: true, idModelo: true }, orderBy: { id: 'asc' } } },
+  });
+  if (existente !== null) {
+    // Re-guardar mapeos (por si la 1ª corrida se cortó tras crear pero antes de mapear).
+    await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, existente.id);
+    // Mapear cada renglón existente a su IdPedidosDet por orden (mismo orden de creación).
+    const lineasExist = existente.lineas;
+    let lineasExistentes = 0;
+    for (let i = 0; i < lineasMigradas.length && i < lineasExist.length; i += 1) {
+      const clave = lineasMigradas[i]?.claveVieja;
+      const existeLinea = lineasExist[i];
+      if (clave !== undefined && existeLinea !== undefined) {
+        await guardarMapeo(cliente, ENTIDAD_MAPEO.pedidoLinea, clave, existeLinea.id);
+        lineasExistentes += 1;
+      }
+    }
+    return { pedido: 'existente', lineasCreadas: 0, lineasExistentes, lineasOmitidas };
+  }
+
+  const resultado = await intentarCrear(reporte, 'Pedido', idViejo, () =>
+    crearPedidoMigrado(
+      sesion,
+      {
+        folio,
+        idEmpresa,
+        idCliente,
+        fechaPedido: parsearFechaSoloDia(f.FechaPedido),
+        fechaDe: parsearFechaSoloDia(f.FechaDe),
+        fechaHasta: parsearFechaSoloDia(f.FechaHasta),
+        fechaTela: parsearFechaSoloDia(f.FechaTela),
+        fechaElaboracion: parsearFechaSoloDia(f.FechaElaboracion),
+        entregadoTienda: parsearBandera(f.EntregadoTienda),
+        noProducir: parsearBandera(f.NoProducir),
+        pedCancelado: parsearBandera(f.PedCancelado),
+        idOrdCompraV1: parsearEntero(f.IdOrdCompra),
+        lineas: lineasMigradas,
+      },
+      bd,
+    ),
+  );
+  if (resultado === null) {
+    return { pedido: 'omitidoValidacion', lineasCreadas: 0, lineasExistentes: 0, lineasOmitidas };
+  }
+  await guardarMapeo(cliente, ENTIDAD_MAPEO.pedido, idViejo, resultado.idPedido);
+  let lineasCreadas = 0;
+  for (const l of resultado.lineas) {
+    if (l.claveVieja !== undefined) {
+      await guardarMapeo(cliente, ENTIDAD_MAPEO.pedidoLinea, l.claveVieja, l.id);
+      lineasCreadas += 1;
+    }
+  }
+  return { pedido: 'creado', lineasCreadas, lineasExistentes: 0, lineasOmitidas };
 }
