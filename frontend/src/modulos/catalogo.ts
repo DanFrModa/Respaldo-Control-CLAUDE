@@ -154,7 +154,7 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Pedidos internos (forecast) y pedidos reales por CEDIS',
     ruta: '/pedidos',
     icono: 'carrito',
-    permisos: 'autenticado',
+    permisos: ['pedidos.ver'],
   },
   {
     clave: 'produccion',
@@ -163,6 +163,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/produccion',
     icono: 'fabrica',
     permisos: 'autenticado',
+  },
+  // Sub-vista de Producción (F2-E3): la captura de Órdenes de producción con su matriz color ×
+  // talla. NO es un módulo del plan §5: cuelga del módulo Producción, con su propio permiso de
+  // lectura `ordenes.ver`.
+  {
+    clave: 'ordenes',
+    titulo: 'Órdenes',
+    descripcion: 'Captura de órdenes de producción con matriz color × talla',
+    ruta: '/produccion/ordenes',
+    icono: 'fabrica',
+    permisos: ['ordenes.ver'],
+    subVista: true,
   },
   {
     clave: 'compras',

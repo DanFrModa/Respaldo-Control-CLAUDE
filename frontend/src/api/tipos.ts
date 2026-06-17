@@ -195,6 +195,89 @@ export type ClienteCampoCrear =
 export type ClienteCampoEditar =
   paths['/api/clientes/{id}/campos/{idCampo}']['patch']['requestBody']['content']['application/json'];
 
+// ── Pedidos (Modulo PEDIDOS, F2-E1) — pedido interno + pedido real ────────────
+
+/** Pagina de pedidos internos (`GET /api/pedidos`). */
+export type PedidosPagina =
+  paths['/api/pedidos']['get']['responses']['200']['content']['application/json'];
+/** Un pedido interno tal como lo devuelve el API (con sus renglones). */
+export type Pedido = PedidosPagina['datos'][number];
+/** Un renglon de un pedido interno. */
+export type PedidoLinea = Pedido['lineas'][number];
+/** Parametros de consulta del listado de pedidos (querystring). */
+export type PedidosQuery = NonNullable<paths['/api/pedidos']['get']['parameters']['query']>;
+/** Cuerpo de alta de pedido (`POST /api/pedidos`). */
+export type PedidoCrear =
+  paths['/api/pedidos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de pedido (`PATCH /api/pedidos/{id}`). */
+export type PedidoEditar =
+  paths['/api/pedidos/{id}']['patch']['requestBody']['content']['application/json'];
+/** Un renglon de captura de pedido (modelo + cantidad + precio). */
+export type PedidoLineaEntrada = NonNullable<PedidoCrear['lineas']>[number];
+/** Cuerpo de copiar un pedido (`POST /api/pedidos/{id}/copiar`). */
+export type PedidoCopiar =
+  paths['/api/pedidos/{id}/copiar']['post']['requestBody']['content']['application/json'];
+
+/** Lista de pedidos reales de un pedido (`GET /api/pedidos/{id}/reales`). */
+export type PedidoRealesLista =
+  paths['/api/pedidos/{id}/reales']['get']['responses']['200']['content']['application/json'];
+/** Un pedido real (liberacion del cliente) con su detalle. */
+export type PedidoReal = PedidoRealesLista['datos'][number];
+/** Un renglon de un pedido real. */
+export type PedidoRealLinea = PedidoReal['lineas'][number];
+/** Cuerpo de alta de un pedido real (`POST /api/pedidos/{id}/reales`). */
+export type PedidoRealCrear =
+  paths['/api/pedidos/{id}/reales']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion del encabezado de un pedido real (`PATCH /api/pedidos-reales/{idReal}`). */
+export type PedidoRealEditar =
+  paths['/api/pedidos-reales/{idReal}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo del seguimiento por renglon (`PATCH /api/pedidos-reales/{idReal}/seguimiento`). */
+export type PedidoRealSeguimiento =
+  paths['/api/pedidos-reales/{idReal}/seguimiento']['patch']['requestBody']['content']['application/json'];
+
+// ── Ordenes (Modulo PRODUCCION, F2-E2/E3) — orden de produccion + matriz ──────
+
+/** Pagina de ordenes (`GET /api/ordenes`). */
+export type OrdenesPagina =
+  paths['/api/ordenes']['get']['responses']['200']['content']['application/json'];
+/** Una orden de produccion completa tal como la devuelve el API. */
+export type Orden = OrdenesPagina['datos'][number];
+/** Un renglon de la matriz (un color con sus tallas). */
+export type OrdenLinea = Orden['lineas'][number];
+/** Una talla con su cantidad dentro de un renglon de la matriz. */
+export type OrdenTalla = OrdenLinea['tallas'][number];
+/** Un valor de referencia D7 de la orden. */
+export type OrdenReferencia = Orden['referencias'][number];
+/** Un comentario (inmutable) de la orden. */
+export type OrdenComentario = Orden['comentarios'][number];
+/** Estado DERIVADO de la orden (capturada/completa/cancelada). */
+export type EstadoOrden = Orden['estado'];
+/** Parametros de consulta del listado de ordenes (querystring). */
+export type OrdenesQuery = NonNullable<paths['/api/ordenes']['get']['parameters']['query']>;
+/** Cuerpo de alta de orden (`POST /api/ordenes`). */
+export type OrdenCrear =
+  paths['/api/ordenes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion del encabezado (`PATCH /api/ordenes/{id}`). */
+export type OrdenEditar =
+  paths['/api/ordenes/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo del set COMPLETO de la matriz (`PUT /api/ordenes/{id}/matriz`). */
+export type OrdenMatriz =
+  paths['/api/ordenes/{id}/matriz']['put']['requestBody']['content']['application/json'];
+/** Un renglon de captura de la matriz (color con sus tallas/cantidades). */
+export type OrdenMatrizLinea = OrdenMatriz['lineas'][number];
+/** Cuerpo de copiar la matriz de otra orden (`POST /api/ordenes/{id}/copiar-matriz`). */
+export type OrdenCopiarMatriz =
+  paths['/api/ordenes/{id}/copiar-matriz']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelacion de orden (`POST /api/ordenes/{id}/cancelar`). */
+export type OrdenCancelar =
+  paths['/api/ordenes/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo del set COMPLETO de referencias D7 (`PUT /api/ordenes/{id}/referencias`). */
+export type OrdenReferencias =
+  paths['/api/ordenes/{id}/referencias']['put']['requestBody']['content']['application/json'];
+/** Cuerpo de alta de un comentario (`POST /api/ordenes/{id}/comentarios`). */
+export type OrdenComentarioCrear =
+  paths['/api/ordenes/{id}/comentarios']['post']['requestBody']['content']['application/json'];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

@@ -63,6 +63,11 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
         name: 'clientes',
         description: 'Catálogo de clientes y sus campos de referencia (D7).',
       },
+      // Órdenes de producción (F2-E2).
+      {
+        name: 'ordenes',
+        description: 'Órdenes de producción: alta desde pedido, matriz colores × tallas, cancelar.',
+      },
     ],
     components: {
       securitySchemes: {

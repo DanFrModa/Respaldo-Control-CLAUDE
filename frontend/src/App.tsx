@@ -16,6 +16,8 @@ import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
+import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
+import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -72,6 +74,8 @@ const router = createBrowserRouter([
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
           { path: 'modelos/codigos-barra', element: <CodigosBarraPagina /> },
+          { path: 'pedidos', element: <PedidosPagina /> },
+          { path: 'produccion/ordenes', element: <OrdenesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

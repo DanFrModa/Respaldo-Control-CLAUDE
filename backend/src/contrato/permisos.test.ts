@@ -67,6 +67,15 @@ describe('catálogo de permisos', () => {
       // Generador de códigos de barra (F1-E5): EAN-13 + DUN-14 (sucesor del form `Codigo`).
       'modelos.codigos-barra',
       'modelos.ver',
+      // Órdenes de producción (Módulo ÓRDENES, F2-E2): ver/administrar/cancelar (nuevos de v2).
+      'ordenes.administrar',
+      'ordenes.cancelar',
+      'ordenes.ver',
+      // Pedidos (Módulo PEDIDOS, F2-E1): ver/administrar/importes + pedidos reales.
+      'pedidos-reales.administrar',
+      'pedidos.administrar',
+      'pedidos.importes',
+      'pedidos.ver',
       'proveedores.administrar',
       'proveedores.ver',
       'roles.administrar',

@@ -72,7 +72,10 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
       .getByRole('navigation', { name: 'Módulos' })
       .first()
       .getByRole('link', {
+        // exact: el menú también tiene "Galería de modelos" (sub-vista F1-E5), que haría
+        // match parcial con "Modelos" y violaría el strict mode de Playwright.
         name: 'Modelos',
+        exact: true,
       })
       .click();
     await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
