@@ -111,6 +111,12 @@ export interface PropsListaDetalle<T> {
    * pantallas que no la pasan ven el hero idéntico.
    */
   accionesExtra?: ((registro: T) => React.ReactNode) | undefined;
+  /**
+   * Oculta los botones BASE del hero (Editar y Desactivar/Activar): para pantallas cuyo flujo no
+   * encaja en el CRUD genérico (p. ej. Órdenes edita el encabezado en el cuerpo del detalle y
+   * cancela con un diálogo que exige motivo, vía `accionesExtra`). Por defecto se muestran.
+   */
+  ocultarAccionesBase?: boolean | undefined;
   /** Cuerpo del detalle (secciones que arma la pantalla). */
   renderDetalle: (registro: T) => React.ReactNode;
 }
@@ -148,6 +154,7 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     renderAvatarDetalle,
     renderMeta,
     accionesExtra,
+    ocultarAccionesBase = false,
     renderDetalle,
   } = props;
 
@@ -383,6 +390,7 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
               renderAvatarDetalle={renderAvatarDetalle}
               renderMeta={renderMeta}
               accionesExtra={accionesExtra}
+              ocultarAccionesBase={ocultarAccionesBase}
               renderDetalle={renderDetalle}
             />
           )}
@@ -406,6 +414,7 @@ function Detalle<T>({
   renderAvatarDetalle,
   renderMeta,
   accionesExtra,
+  ocultarAccionesBase = false,
   renderDetalle,
 }: {
   testid: string;
@@ -420,6 +429,7 @@ function Detalle<T>({
   renderAvatarDetalle: (registro: T) => React.ReactNode;
   renderMeta?: ((registro: T) => React.ReactNode) | undefined;
   accionesExtra?: ((registro: T) => React.ReactNode) | undefined;
+  ocultarAccionesBase?: boolean | undefined;
   renderDetalle: (registro: T) => React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -446,35 +456,39 @@ function Detalle<T>({
         </div>
         {puedeAdministrar ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => alEditar(registro)}
-              data-testid={`editar-${testid}`}
-            >
-              <PencilIcon aria-hidden />
-              Editar
-            </Button>
-            {activo ? (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => alDesactivar(registro)}
-                data-testid={`desactivar-${testid}`}
-              >
-                <PowerOffIcon aria-hidden />
-                Desactivar
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => alReactivar(registro)}
-                data-testid={`activar-${testid}`}
-              >
-                <PowerIcon aria-hidden />
-                Activar
-              </Button>
+            {ocultarAccionesBase ? null : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => alEditar(registro)}
+                  data-testid={`editar-${testid}`}
+                >
+                  <PencilIcon aria-hidden />
+                  Editar
+                </Button>
+                {activo ? (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => alDesactivar(registro)}
+                    data-testid={`desactivar-${testid}`}
+                  >
+                    <PowerOffIcon aria-hidden />
+                    Desactivar
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => alReactivar(registro)}
+                    data-testid={`activar-${testid}`}
+                  >
+                    <PowerIcon aria-hidden />
+                    Activar
+                  </Button>
+                )}
+              </>
             )}
             {accionesExtra ? accionesExtra(registro) : null}
           </div>
