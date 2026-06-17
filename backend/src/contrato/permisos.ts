@@ -60,6 +60,13 @@ export const MODULOS_PERMISO = {
   bordados: 'Bordados y estampados',
   // ── Modelos (Módulo 2, F1-E4) ──────────────────────────────────────────────
   modelos: 'Modelos',
+  // ── Producción / WIP (Módulo 4, F3) ────────────────────────────────────────
+  // Catálogo de tipos de proceso de maquila (F3-E1): hasta F3 solo se sembraba; E1 le da CRUD.
+  // Su consumidor real (la RC) llega en F5; aquí es un catálogo administrable más.
+  'tipos-proceso': 'Tipos de proceso',
+  // Inventario de PRODUCTO TERMINADO operable por kardex (F3-E3). `ipt` (arriba) son los accesos
+  // granulares LEGADO del viejo; `inventario-pt` es el módulo NUEVO del kardex de v2 (D3).
+  'inventario-pt': 'Inventario de producto terminado (kardex)',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -695,6 +702,74 @@ export const CATALOGO_PERMISOS = [
     modulo: 'modelos',
     descripcion:
       'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/bordados) y fotos (alta, edición, desactivación)',
+  },
+
+  // ── Producción / WIP (Módulo 4, F3 — doc 03-Produccion) ──────────────────────
+  // Permisos NUEVOS de v2 (A4). El esquema y motor nacen en F3-E1; los flujos que cada permiso
+  // gobierna se construyen en E2 (corte/envío), E4 (recibo/cargo) y E5 (entrega/WIP). El catálogo
+  // de tipos de proceso (F3-E1) tiene su `ver`/`administrar` como cualquier catálogo; la bandera
+  // `generaEntradaPt` es EDITABLE solo por admin (se exige `roles.administrar`, ver dominio).
+  {
+    clave: 'tipos-proceso.ver',
+    modulo: 'tipos-proceso',
+    descripcion: 'Consultar el catálogo de tipos de proceso de maquila',
+  },
+  {
+    clave: 'tipos-proceso.administrar',
+    modulo: 'tipos-proceso',
+    descripcion:
+      'Administrar el catálogo de tipos de proceso (alta, edición, desactivación). La bandera "genera entrada a PT" solo la edita un administrador',
+  },
+  {
+    clave: 'produccion.corte',
+    modulo: 'produccion',
+    descripcion: 'Capturar el corte de una orden de producción (F3-E2)',
+  },
+  {
+    clave: 'produccion.envio',
+    modulo: 'produccion',
+    descripcion: 'Capturar envíos de maquila (costura/estampado/…) de una orden (F3-E2)',
+  },
+  {
+    clave: 'produccion.recibo',
+    modulo: 'produccion',
+    descripcion:
+      'Capturar recibos de maquila (WIP + entrada a PT + cargo EsMa según proceso) (F3-E4)',
+  },
+  {
+    clave: 'produccion.entrega',
+    modulo: 'produccion',
+    descripcion: 'Capturar entregas a cliente (salida de PT) (F3-E5)',
+  },
+  {
+    clave: 'produccion.wip-ver',
+    modulo: 'produccion',
+    descripcion: 'Consultar el avance (WIP) y los pendientes por etapa de las órdenes (F3-E5)',
+  },
+  {
+    clave: 'produccion.cancelar',
+    modulo: 'produccion',
+    descripcion: 'Cancelar (suave, con inverso auditado) corte, envíos, recibos o entregas (F3)',
+  },
+
+  // ── Inventario de producto terminado por kardex (Módulo 6, F3-E3 — doc 04-Inventarios) ──
+  {
+    clave: 'inventario-pt.ver',
+    modulo: 'inventario-pt',
+    descripcion: 'Consultar existencias y kardex de producto terminado (F3-E3)',
+  },
+  {
+    clave: 'inventario-pt.mover',
+    modulo: 'inventario-pt',
+    descripcion: 'Capturar movimientos manuales y traspasos de producto terminado (F3-E3)',
+  },
+
+  // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permiso NUEVO de v2 ──────
+  {
+    clave: 'esma.cargo-validar',
+    modulo: 'esma',
+    descripcion:
+      'Validar (o ajustar/cancelar) los cargos propuestos de EsMa desde los recibos (F3-E4)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

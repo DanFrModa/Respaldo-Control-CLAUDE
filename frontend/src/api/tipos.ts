@@ -371,3 +371,29 @@ export type EmpresaConfiguracion =
 /** Cuerpo de edicion de la configuracion (`PATCH /api/empresas/{id}/configuracion`). */
 export type EmpresaConfiguracionEditar =
   paths['/api/empresas/{id}/configuracion']['patch']['requestBody']['content']['application/json'];
+
+// ── Tipos de proceso de maquila (Módulo 4, F3-E1; CRUD patrón Almacenes) ─────
+
+/** Pagina de tipos de proceso (`GET /api/tipos-proceso`). */
+export type TiposProcesoPagina =
+  paths['/api/tipos-proceso']['get']['responses']['200']['content']['application/json'];
+/** Un tipo de proceso tal como lo devuelve el API. */
+export type TipoProceso = TiposProcesoPagina['datos'][number];
+/** Parametros de consulta del listado de tipos de proceso (querystring). */
+export type TiposProcesoQuery = NonNullable<
+  paths['/api/tipos-proceso']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de tipo de proceso (`POST /api/tipos-proceso`). */
+export type TipoProcesoCrear =
+  paths['/api/tipos-proceso']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de tipo de proceso (`PATCH /api/tipos-proceso/{id}`). */
+export type TipoProcesoEditar =
+  paths['/api/tipos-proceso/{id}']['patch']['requestBody']['content']['application/json'];
+
+// ── Tipos de movimiento de inventario (Módulo 6, F3-E1; solo lectura) ────────
+
+/** Lista de tipos de movimiento de inventario (`GET /api/tipos-movimiento`). */
+export type TiposMovimientoLista =
+  paths['/api/tipos-movimiento']['get']['responses']['200']['content']['application/json'];
+/** Un tipo de movimiento de inventario del catalogo. */
+export type TipoMovimiento = TiposMovimientoLista['datos'][number];

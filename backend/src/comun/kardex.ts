@@ -1,0 +1,408 @@
+/**
+ * Motor de KARDEX único (F3-E1, ADR-0010; D3 — PLANMAESTRO §4).
+ *
+ * La existencia NUNCA se edita: es la SUMA de los movimientos (D3). Este módulo es el ÚNICO
+ * lugar que escribe en `Movimiento`/`MovimientoDet*` y la base de "no entregar lo que no existe"
+ * (E5) y "no recibir lo no enviado" (E4). Es GENÉRICO para PT/tela/avío (un encabezado
+ * `Movimiento` + un detalle por tipo de artículo, ADR-0010 §2), pero en F3 solo se ejercita la
+ * dimensión PT (modelo×color×talla, D4). El motor vive en `comun/` (A1): la orquestación de
+ * negocio (qué tipo de movimiento, contra qué orden, validaciones de pendientes) va en
+ * `dominio/`; las rutas REST son delgadas.
+ *
+ * Garantías:
+ *  • A2 — encabezado + detalle + bitácora en UNA transacción (o todo o nada). El traspaso son
+ *    DOS movimientos (salida origen + entrada destino) en la MISMA transacción.
+ *  • A3 — folio por secuencia atómica (`siguienteFolio`, clave "movimiento"), NUNCA Max()+1.
+ *  • A7 — `Bitacora` del movimiento dentro de la transacción.
+ *  • D1/D2 — `costoUnit` queda NULL en toda F3 (la valuación llega en F7). El motor NO lo recibe.
+ *  • D3/§3 del ADR — la lectura de existencia para VALIDAR sucede DENTRO de la transacción,
+ *    sumando `MovimientoDet` DIRECTO bajo bloqueo (advisory lock por artículo×almacén), NUNCA la
+ *    vista `existencia_pt` (que es solo para consulta/tableros).
+ *  • Cancelación = movimiento INVERSO auditado (D3/A7), JAMÁS edición/borrado del original.
+ */
+import { DireccionMovimiento, type Movimiento, type Prisma } from '../datos/index.js';
+
+import { registrarBitacora } from './auditoria.js';
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from './errores.js';
+import { ORIGEN, type OrigenMovimiento } from './origenes.js';
+import type { SesionUsuario } from './permisos.js';
+import { siguienteFolio } from './secuencias.js';
+import { enTransaccion, type ContextoBd, type Tx } from './transaccion.js';
+
+/** Clave de la secuencia de folios del kardex (A3, por empresa). */
+const CLAVE_SECUENCIA_MOVIMIENTO = 'movimiento';
+
+/**
+ * Un renglón de detalle de PT de un movimiento (D4). `cantidad` SIEMPRE positiva (el signo lo da
+ * la dirección del tipo de movimiento). `costoUnit` NO se acepta en F3 (queda NULL — D1/D2).
+ */
+export interface LineaMovimientoPt {
+  idModelo: number;
+  idColor: number;
+  idTalla: number;
+  /** Cantidad de prendas, entera y POSITIVA (≥1). El signo lo aplica el kardex por la dirección. */
+  cantidad: number;
+}
+
+/**
+ * Datos para registrar UN movimiento de PT (encabezado + detalle). El tipo de movimiento
+ * (`idTipoMov`) determina la dirección (entrada/salida); el origen (`origenTipo`/`origenId`)
+ * traza el hecho que lo generó (referencia polimórfica, ADR-0010 §1).
+ */
+export interface EntradaMovimientoPt {
+  /** Empresa dueña del movimiento y de su folio (A9). */
+  idEmpresa: number;
+  /** Tipo de movimiento del catálogo `TipoMovimientoInventario` (define la dirección). */
+  idTipoMov: number;
+  /** Almacén afectado (D4: existencia por …×almacén). */
+  idAlmacen: number;
+  /** Fecha del movimiento (solo fecha). */
+  fecha: Date;
+  /** Discriminador del origen (de `ORIGEN`, nunca un literal — nit #4). */
+  origenTipo: OrigenMovimiento;
+  /** Id de la fila de origen (texto; cubre PKs Int/String). Opcional. */
+  origenId?: string;
+  /** Renglones color×talla del movimiento (al menos uno). */
+  lineas: LineaMovimientoPt[];
+  observaciones?: string;
+}
+
+/** Valida que las líneas existan, no se repitan vacías y traigan cantidades positivas enteras. */
+function validarLineasPt(lineas: LineaMovimientoPt[]): void {
+  if (lineas.length === 0) {
+    throw new ErrorValidacion('Un movimiento de inventario necesita al menos un renglón.');
+  }
+  for (const linea of lineas) {
+    if (!Number.isInteger(linea.cantidad) || linea.cantidad <= 0) {
+      throw new ErrorValidacion(
+        `La cantidad de un renglón de kardex debe ser un entero positivo (recibido: ${String(linea.cantidad)}).`,
+      );
+    }
+  }
+}
+
+/** Lee la dirección del tipo de movimiento o lanza si no existe/está inactivo. */
+async function direccionDelTipo(tx: Tx, idTipoMov: number): Promise<DireccionMovimiento> {
+  const tipo = await tx.tipoMovimientoInventario.findUnique({
+    where: { id: idTipoMov },
+    select: { direccion: true, activo: true, nombre: true },
+  });
+  if (tipo === null) {
+    throw new ErrorNoEncontrado('TipoMovimientoInventario', idTipoMov);
+  }
+  if (!tipo.activo) {
+    throw new ErrorValidacion(`El tipo de movimiento "${tipo.nombre}" está desactivado.`);
+  }
+  return tipo.direccion;
+}
+
+/**
+ * Bloqueo por artículo×almacén DENTRO de la transacción, para que dos salidas/entregas del MISMO
+ * artículo no corran en paralelo y dejen existencia negativa (ADR-0010 §3; base de E4/E5). Se usa
+ * un **advisory lock transaccional** (`pg_advisory_xact_lock`) con una llave derivada de
+ * empresa+almacén+modelo+color+talla: el segundo en llegar espera al primero hasta su commit. El
+ * lock se libera SOLO al terminar la transacción (no hay que soltarlo a mano).
+ *
+ * Se usa advisory lock y no `SELECT … FOR UPDATE` porque el detalle de kardex no tiene una fila
+ * "ancla" por artículo (la existencia es una suma de N movimientos): no hay qué bloquear con FOR
+ * UPDATE sin materializar un saldo (que D3 prohíbe).
+ */
+export async function bloquearArticuloPt(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  idColor: number,
+  idTalla: number,
+): Promise<void> {
+  // Dos claves int4 estables a partir de las 5 dimensiones (pg_advisory_xact_lock(int4, int4)).
+  // No precisa ser criptográfico ni libre de colisiones: una colisión (dos artículos×almacén
+  // distintos que caigan en la misma pareja de claves) solo hace que dos transacciones que NO
+  // competían por el mismo saldo se serialicen de más (pierden algo de paralelismo) — NUNCA
+  // afecta la correctitud (la suma de `existenciaPtBloqueada` se filtra por las 5 dimensiones
+  // reales, no por la clave del lock). Se combinan con mezclas simples para que colisione poco.
+  const clave1 = (idEmpresa * 1_000_003 + idAlmacen) | 0;
+  const clave2 = ((idModelo * 1_000_003 + idColor) * 31 + idTalla) | 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
+}
+
+/**
+ * Existencia ACTUAL de un artículo PT en un almacén, sumando `MovimientoDet` DIRECTO (NUNCA la
+ * vista — ADR-0010 §3). Pensada para validar dentro de una transacción; tómala SIEMPRE después de
+ * {@link bloquearArticuloPt} para que el cálculo sea consistente bajo concurrencia (E4/E5).
+ *
+ * El signo se aplica por la dirección del tipo de movimiento (entrada +, salida −; cualquier otra
+ * cuenta 0, defensivo — los traspasos se materializan como dos patas entrada/salida, nit #1).
+ */
+export async function existenciaPtBloqueada(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idModelo: number,
+  idColor: number,
+  idTalla: number,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: bigint | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0)::bigint AS existencia
+    FROM "movimiento_det_pt" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_modelo" = ${idModelo}
+      AND d."id_color" = ${idColor}
+      AND d."id_talla" = ${idTalla}
+  `;
+  return Number(filas[0]?.existencia ?? 0n);
+}
+
+/**
+ * Registra UN movimiento de PT (encabezado + detalle + bitácora) en UNA transacción (A2), con
+ * folio atómico (A3). Es el primitivo que usan los servicios de dominio (movimiento manual de
+ * E3, entrada del recibo de E4, salida de la entrega de E5). NO valida pendientes ni existencia:
+ * esa lógica de negocio vive en `dominio/` (el motor solo escribe correcto y consistente).
+ *
+ * `costoUnit` se deja NULL (D1/D2 — F7): por eso no se recibe.
+ *
+ * @returns el `Movimiento` creado (encabezado).
+ */
+export async function registrarMovimientoPt(
+  sesion: SesionUsuario,
+  entrada: EntradaMovimientoPt,
+  bd?: ContextoBd,
+): Promise<Movimiento> {
+  validarLineasPt(entrada.lineas);
+  return enTransaccion(async (tx) => {
+    // Valida tipo activo y RECHAZA la dirección `traspaso` (nit del reviewer): un movimiento
+    // simple con un tipo de dirección `traspaso` contaría 0 en la vista y en
+    // `existenciaPtBloqueada` (`ELSE 0`) → existencia perdida en silencio. Los traspasos van por
+    // `registrarTraspasoPt` (dos patas salida/entrada). Las patas de un traspaso entran aquí con
+    // dirección `salida`/`entrada` (ya validadas en `registrarTraspasoPt`), así que pasan.
+    const direccion = await direccionDelTipo(tx, entrada.idTipoMov);
+    if (direccion === DireccionMovimiento.traspaso) {
+      throw new ErrorValidacion(
+        'Un tipo de movimiento de dirección "traspaso" no se registra como movimiento simple: usa registrarTraspasoPt (salida de origen + entrada de destino).',
+      );
+    }
+    const folio = await siguienteFolio(tx, entrada.idEmpresa, CLAVE_SECUENCIA_MOVIMIENTO);
+
+    const movimiento = await tx.movimiento.create({
+      data: {
+        folio,
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMov,
+        idAlmacen: entrada.idAlmacen,
+        fecha: entrada.fecha,
+        origenTipo: entrada.origenTipo,
+        ...(entrada.origenId === undefined ? {} : { origenId: entrada.origenId }),
+        idUsuario: sesion.id,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+        // costoUnit NULL en F3 (D1/D2): no se setea ningún costo.
+        detallesPt: {
+          create: entrada.lineas.map((linea) => ({
+            idModelo: linea.idModelo,
+            idColor: linea.idColor,
+            idTalla: linea.idTalla,
+            cantidad: linea.cantidad,
+          })),
+        },
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Movimiento',
+      idEntidad: movimiento.id,
+      accion: 'CREAR',
+      datos: {
+        folio: folio.toString(),
+        idTipoMov: entrada.idTipoMov,
+        idAlmacen: entrada.idAlmacen,
+        origenTipo: entrada.origenTipo,
+        renglones: entrada.lineas.length,
+      },
+    });
+
+    return movimiento;
+  }, bd);
+}
+
+/** Datos de un traspaso de PT entre dos almacenes de la misma empresa. */
+export interface EntradaTraspasoPt {
+  idEmpresa: number;
+  /** Tipo de movimiento de SALIDA (dirección `salida`) para la pata de origen. */
+  idTipoMovSalida: number;
+  /** Tipo de movimiento de ENTRADA (dirección `entrada`) para la pata de destino. */
+  idTipoMovEntrada: number;
+  idAlmacenOrigen: number;
+  idAlmacenDestino: number;
+  fecha: Date;
+  lineas: LineaMovimientoPt[];
+  observaciones?: string;
+}
+
+/**
+ * Traspaso de PT entre almacenes (nit #1 / ADR-0010 §1): se materializa como DOS `Movimiento` —
+ * una SALIDA del almacén origen y una ENTRADA al almacén destino— en LA MISMA transacción (A2:
+ * si una falla, no queda ninguna). Así la existencia TOTAL no cambia (la cantidad pasa de origen
+ * a destino) y la vista nunca ve una dirección `traspaso` con signo plano. Cada pata lleva su
+ * folio propio y `origenTipo = traspaso`; se enlazan informativamente por el `origenId` (el id
+ * de la pata de salida).
+ *
+ * TODO (F3-E3 — "no traspasar más de lo que hay"): cuando E3 agregue la validación de existencia,
+ * debe tomar `bloquearArticuloPt` + `existenciaPtBloqueada` sobre el almacén ORIGEN (por cada
+ * artículo) ANTES de crear la pata de salida, dentro de esta misma transacción (igual que el
+ * recibo de E4 y la entrega de E5). En F3-E1 aún NO se valida existencia, por eso el traspaso no
+ * toma todavía el lock; el hueco se cierra en E3 sin tocar el núcleo de este motor.
+ *
+ * @returns `{ salida, entrada }` con los dos movimientos creados.
+ */
+export async function registrarTraspasoPt(
+  sesion: SesionUsuario,
+  entrada: EntradaTraspasoPt,
+  bd?: ContextoBd,
+): Promise<{ salida: Movimiento; entrada: Movimiento }> {
+  if (entrada.idAlmacenOrigen === entrada.idAlmacenDestino) {
+    throw new ErrorValidacion(
+      'El traspaso necesita un almacén de origen y otro de destino distintos.',
+    );
+  }
+  validarLineasPt(entrada.lineas);
+
+  return enTransaccion(async (tx) => {
+    if ((await direccionDelTipo(tx, entrada.idTipoMovSalida)) !== DireccionMovimiento.salida) {
+      throw new ErrorValidacion(
+        'El tipo de la pata de salida del traspaso debe ser de dirección "salida".',
+      );
+    }
+    if ((await direccionDelTipo(tx, entrada.idTipoMovEntrada)) !== DireccionMovimiento.entrada) {
+      throw new ErrorValidacion(
+        'El tipo de la pata de entrada del traspaso debe ser de dirección "entrada".',
+      );
+    }
+
+    const salida = await registrarMovimientoPt(
+      sesion,
+      {
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMovSalida,
+        idAlmacen: entrada.idAlmacenOrigen,
+        fecha: entrada.fecha,
+        origenTipo: ORIGEN.traspaso,
+        lineas: entrada.lineas,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+      },
+      { tx },
+    );
+
+    const entradaMov = await registrarMovimientoPt(
+      sesion,
+      {
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMovEntrada,
+        idAlmacen: entrada.idAlmacenDestino,
+        fecha: entrada.fecha,
+        origenTipo: ORIGEN.traspaso,
+        origenId: String(salida.id), // enlaza la entrada con su pata de salida (informativo)
+        lineas: entrada.lineas,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+      },
+      { tx },
+    );
+
+    return { salida, entrada: entradaMov };
+  }, bd);
+}
+
+/**
+ * CANCELA un movimiento de PT generando su INVERSO auditado (D3/A7): NUNCA se edita ni se borra el
+ * original. El inverso copia el detalle del original con un tipo de movimiento de dirección OPUESTA
+ * (lo provee el llamador: el dominio sabe qué tipo "Error de Entrada/Salida"/inverso usar) y queda
+ * enlazado al original por `idMovimientoInverso`. Un movimiento ya anulado no se puede volver a
+ * anular (`ErrorConflicto`).
+ *
+ * @param idMovimiento   movimiento original a anular.
+ * @param idTipoMovInverso tipo de movimiento (dirección opuesta) para el inverso.
+ * @returns el movimiento INVERSO creado.
+ */
+export async function cancelarMovimientoPt(
+  sesion: SesionUsuario,
+  idMovimiento: number,
+  idTipoMovInverso: number,
+  bd?: ContextoBd,
+): Promise<Movimiento> {
+  return enTransaccion(async (tx) => {
+    const original = await tx.movimiento.findUnique({
+      where: { id: idMovimiento },
+      include: { detallesPt: true, anuladoPor: { select: { id: true } } },
+    });
+    if (original === null) {
+      throw new ErrorNoEncontrado('Movimiento', idMovimiento);
+    }
+    if (original.anuladoPor.length > 0) {
+      throw new ErrorConflicto('Ese movimiento ya fue cancelado (tiene un movimiento inverso).');
+    }
+    if (original.detallesPt.length === 0) {
+      throw new ErrorValidacion('Solo se pueden cancelar movimientos de producto terminado en F3.');
+    }
+
+    const direccionInversa = await direccionDelTipo(tx, idTipoMovInverso);
+    const direccionOriginal = await direccionDelTipo(tx, original.idTipoMov);
+    // El inverso debe oponerse al original (entrada↔salida); evita "cancelar" sin neutralizar.
+    const opuestas =
+      (direccionOriginal === DireccionMovimiento.entrada &&
+        direccionInversa === DireccionMovimiento.salida) ||
+      (direccionOriginal === DireccionMovimiento.salida &&
+        direccionInversa === DireccionMovimiento.entrada);
+    if (!opuestas) {
+      throw new ErrorValidacion(
+        'El tipo de movimiento inverso debe tener la dirección OPUESTA a la del movimiento original.',
+      );
+    }
+
+    const folio = await siguienteFolio(tx, original.idEmpresa, CLAVE_SECUENCIA_MOVIMIENTO);
+    const inverso = await tx.movimiento.create({
+      data: {
+        folio,
+        idEmpresa: original.idEmpresa,
+        idTipoMov: idTipoMovInverso,
+        idAlmacen: original.idAlmacen,
+        fecha: new Date(),
+        origenTipo: ORIGEN.cancelacion,
+        origenId: String(original.id),
+        idUsuario: sesion.id,
+        idMovimientoInverso: original.id,
+        detallesPt: {
+          create: original.detallesPt.map((det) => ({
+            idModelo: det.idModelo,
+            idColor: det.idColor,
+            idTalla: det.idTalla,
+            cantidad: det.cantidad,
+          })),
+        },
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Movimiento',
+      idEntidad: original.id,
+      accion: 'CANCELAR',
+      datos: { folioInverso: folio.toString(), idMovimientoInverso: inverso.id },
+    });
+
+    return inverso;
+  }, bd);
+}
+
+/** Re-export para que los servicios de dominio referencien la dirección sin importar `datos`. */
+export { DireccionMovimiento };
+export type { Prisma };
