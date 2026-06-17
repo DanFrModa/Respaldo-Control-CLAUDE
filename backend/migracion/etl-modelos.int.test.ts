@@ -185,21 +185,27 @@ describe('ETL de modelos F1-E7 (integración, fixtures commiteados)', () => {
     expect(m003?.activo).toBe(false);
   }, 60_000);
 
-  it('código duplicado: el segundo modelo (M-DUP IdModelos=5) se omite con reporte', async () => {
+  it('código duplicado: solo UNO de los dos M-DUP (IdModelos 4/5) se crea; el otro se omite', async () => {
     await ejecutarEtlModelos(cliente);
     const dups = await cliente.modelo.findMany({ where: { codigo: 'M-DUP' } });
-    // Solo uno de los dos M-DUP se crea.
+    // Solo uno de los dos M-DUP se crea (el otro da ErrorConflicto por código duplicado y se omite).
     expect(dups).toHaveLength(1);
-    // El primero (IdModelos=4) tiene mapeo.
+
+    // El loader carga las filas en PARALELO (enLotes/CONCURRENCIA_ETL), así que CUÁL de las dos
+    // (IdModelos=4 o =5) gana la creación es NO DETERMINISTA. La invariante real: de las dos claves
+    // viejas {'4','5'}, EXACTAMENTE UNA tiene mapeo (la que ganó) y la otra es null (la omitida).
     const mapeo4 = await cliente.mapeoMigracion.findUnique({
       where: { entidad_claveVieja: { entidad: ENTIDAD_MAPEO.modelo, claveVieja: '4' } },
     });
-    expect(mapeo4).not.toBeNull();
-    // El segundo (IdModelos=5) NO tiene mapeo (omitido por conflicto).
     const mapeo5 = await cliente.mapeoMigracion.findUnique({
       where: { entidad_claveVieja: { entidad: ENTIDAD_MAPEO.modelo, claveVieja: '5' } },
     });
-    expect(mapeo5).toBeNull();
+    // XOR: uno y solo uno de los dos mapeos existe.
+    expect((mapeo4 === null) !== (mapeo5 === null)).toBe(true);
+
+    // El mapeo que existe apunta al único modelo M-DUP creado (idNuevo se guarda como texto).
+    const mapeoExistente = mapeo4 ?? mapeo5;
+    expect(mapeoExistente?.idNuevo).toBe(String(dups[0]?.id));
   }, 60_000);
 
   it('renglones BOM con IdModelos=0 o sin mapeo se omiten sin abortar', async () => {
