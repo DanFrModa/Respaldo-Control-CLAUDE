@@ -364,6 +364,47 @@ export {
   type PedidoRealesLista,
 } from './esquemas/pedido.js';
 
+// ── Órdenes de producción (Módulo ÓRDENES, F2-E2; doc 03-Produccion) ──────────
+export {
+  esquemaOrdenTallaEntrada,
+  esquemaOrdenLineaEntrada,
+  esquemaOrdenCrear,
+  esquemaOrdenEditar,
+  esquemaOrdenPatchCuerpo,
+  esquemaOrdenMatrizCuerpo,
+  esquemaOrdenCopiarMatrizCuerpo,
+  esquemaOrdenCancelarCuerpo,
+  esquemaOrdenReferenciaEntrada,
+  esquemaOrdenReferenciasCuerpo,
+  esquemaOrdenComentarioCuerpo,
+  esquemaEstadoOrden,
+  esquemaOrdenTallaSalida,
+  esquemaOrdenLineaSalida,
+  esquemaOrdenReferenciaSalida,
+  esquemaOrdenComentarioSalida,
+  esquemaOrdenSalida,
+  esquemaListarOrdenes,
+  esquemaOrdenesPagina,
+  type DatosOrdenTallaEntrada,
+  type DatosOrdenLineaEntrada,
+  type DatosOrdenCrear,
+  type DatosOrdenEditar,
+  type DatosOrdenPatchCuerpo,
+  type DatosOrdenMatriz,
+  type DatosOrdenCopiarMatriz,
+  type DatosOrdenCancelar,
+  type DatosOrdenReferenciaEntrada,
+  type DatosOrdenReferencias,
+  type DatosOrdenComentario,
+  type OrdenTallaSalida,
+  type OrdenLineaSalida,
+  type OrdenReferenciaSalida,
+  type OrdenComentarioSalida,
+  type OrdenSalida,
+  type ListarOrdenes,
+  type OrdenesPagina,
+} from './esquemas/orden.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

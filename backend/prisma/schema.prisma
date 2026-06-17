@@ -71,6 +71,8 @@ model Empresa {
   secuencias    Secuencia[]
   /// Pedidos internos de esta empresa (F2-E1, A9 — folio por empresa). Restrict.
   pedidos       Pedido[]
+  /// Órdenes de producción de esta empresa (F2-E2, A9 — folio por empresa). Restrict.
+  ordenes       Orden[]
 
   @@map("empresas")
 }
@@ -511,6 +513,8 @@ model Proveedor {
   archivos ProveedorArchivo[]
   /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
   avios    AvioProveedor[]
+  /// Órdenes de producción donde está asignado como maquilero (F2-E2, Restrict).
+  ordenes  Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -636,6 +640,9 @@ model EtiquetaMarca {
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo   Boolean @default(true)
 
+  /// Órdenes de producción con esta etiqueta de marca (F2-E2, Restrict).
+  ordenes Orden[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -656,7 +663,9 @@ model Color {
   activo Boolean @default(true)
 
   /// Telas que tienen este color con su precio (F1-E3, N:N vía `TelaColor`).
-  telas TelaColor[]
+  telas       TelaColor[]
+  /// Renglones de matriz de órdenes en este color (F2-E2, Restrict).
+  ordenLineas OrdenLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -718,7 +727,9 @@ model Talla {
   orden    Int     @default(0)
   activo   Boolean @default(true)
 
-  curvas CurvaTallaItem[]
+  curvas           CurvaTallaItem[]
+  /// Cantidades de matriz de órdenes en esta talla (F2-E2, Restrict).
+  ordenLineasTalla OrdenLineaTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -791,6 +802,8 @@ model Cliente {
   campos  ClienteCampo[]
   /// Pedidos internos del cliente (F2-E1, Restrict hacia el cliente).
   pedidos Pedido[]
+  /// Órdenes de producción del cliente (F2-E2, Restrict hacia el cliente).
+  ordenes Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -813,7 +826,10 @@ model ClienteCampo {
   orden     Int              @default(0)
   activo    Boolean          @default(true)
 
-  cliente Cliente @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  cliente          Cliente           @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  /// Valores de este campo capturados en órdenes (F2-E2, D7 — Restrict: un campo con valores
+  /// en órdenes no se borra físico → se desactiva).
+  referenciasOrden OrdenReferencia[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -919,6 +935,8 @@ model Tela {
   colores TelaColor[]
   /// Renglones del BOM de modelos que usan esta tela (F1-E4, Restrict hacia la tela).
   modelos ModeloTela[]
+  /// Órdenes de producción que disponen de esta tela (F2-E2, Restrict).
+  ordenes Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1134,15 +1152,17 @@ model Modelo {
   activo Boolean @default(true)
 
   /// Fotos del modelo en R2 (N por modelo).
-  fotos    ModeloFoto[]
+  fotos        ModeloFoto[]
   /// BOM — telas del modelo (N:N a Tela con consumo + banderas).
-  telas    ModeloTela[]
+  telas        ModeloTela[]
   /// BOM — avíos del modelo (N:N a Avio con consumo + banderas).
-  avios    ModeloAvio[]
+  avios        ModeloAvio[]
   /// BOM — bordados/estampados del modelo (N:N a Bordado con precio).
-  bordados ModeloBordado[]
+  bordados     ModeloBordado[]
   /// Renglones de pedidos internos que piden este modelo (F2-E1, Restrict hacia el modelo).
   pedidoLineas PedidoLinea[]
+  /// Órdenes de producción de este modelo (F2-E2, Restrict hacia el modelo).
+  ordenes      Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1304,13 +1324,13 @@ model ModeloBordado {
 /// duplica filas ni rompe el mapeo. No lleva auditoría A7 (es metadato técnico de migración,
 /// no una entidad de negocio): solo `creadoEn`/`modificadoEn`.
 model MapeoMigracion {
-  id         Int      @id @default(autoincrement())
+  id         Int    @id @default(autoincrement())
   /// Clase de correspondencia (nombre del modelo nuevo + sufijo de fuente). Ver TSDoc.
   entidad    String
   /// Clave del registro viejo (id Int o texto), SIEMPRE como texto.
-  claveVieja String   @map("clave_vieja")
+  claveVieja String @map("clave_vieja")
   /// Id del registro nuevo, como texto (cubre PKs Int y String).
-  idNuevo    String   @map("id_nuevo")
+  idNuevo    String @map("id_nuevo")
   /// Contexto de la decisión (nombre original, dedup/fusión, sufijo…), opcional.
   datos      Json?
 
@@ -1428,6 +1448,8 @@ model PedidoLinea {
   cantFaltanteV1     Int? @map("cant_faltante_v1")
 
   realLineas PedidoRealLinea[]
+  /// Órdenes de producción que salen de este renglón (F2-E2, N órdenes por renglón). Restrict.
+  ordenes    Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1483,9 +1505,9 @@ model PedidoReal {
 /// `PedidoLinea` del pedido interno) la hace el dominio en una transacción (doc 02 §4.4).
 /// Cascade hacia `PedidoReal`; Restrict hacia `PedidoLinea`.
 model PedidoRealLinea {
-  id           Int        @id @default(autoincrement())
-  idPedidoReal Int        @map("id_pedido_real")
-  pedidoReal   PedidoReal @relation(fields: [idPedidoReal], references: [id], onDelete: Cascade)
+  id            Int         @id @default(autoincrement())
+  idPedidoReal  Int         @map("id_pedido_real")
+  pedidoReal    PedidoReal  @relation(fields: [idPedidoReal], references: [id], onDelete: Cascade)
   /// Renglón del pedido interno del que cuelga (viejo: `IdPedidosDet`). Restrict.
   idPedidoLinea Int         @map("id_pedido_linea")
   pedidoLinea   PedidoLinea @relation(fields: [idPedidoLinea], references: [id], onDelete: Restrict)
@@ -1507,4 +1529,247 @@ model PedidoRealLinea {
   @@index([idPedidoReal])
   @@index([idPedidoLinea])
   @@map("pedido_real_linea")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Órdenes de producción (Módulo ÓRDENES, F2-E2) — doc `Documentacion_MJD/03-Produccion.md`
+// y `02-Pedidos.md`. La orden es el documento con el que se MANDA A PRODUCIR un renglón de
+// un pedido (ex `Ordenes`/`OrdenesDet`). 5 tablas + 1 enum.
+//
+// Mapeo de columnas v1→v2 (el contrato del ETL futuro; el detalle vive en el TSDoc de
+// `src/dominio/produccion/ordenes.ts`). Ninguna columna con datos se tira en silencio (plan §7):
+//  • Folio por empresa (A3/A9): `ordenes` lleva un unique (id_empresa, folio); el valor sale de
+//    la secuencia atómica "orden". Reemplaza el `AumentarNumOrd`/Max()+1 del viejo.
+//  • Snapshots/datos conservados de v1 SIN motor (catálogos RC/finanzas aún no existen): columnas
+//    escalares nullable SIN FK (idTipoArticuloRC, idRcAplicaciones, idRcTipoTelas, fechas RC,
+//    enRiesgo, siRC, rcViva = F5; maquilaOrd, aplicacionOrd, pagada = F3/F6; upc = histórico sin
+//    generación; tallasV1 = cadena cruda de trazabilidad). Mismo espíritu que `idOrdCompraV1`.
+//  • Orden sin pedido = SOLO HISTÓRICO: `idPedidoLinea` es NULLABLE (el ETL migra ~26 casos
+//    huérfanos del viejo), pero el servicio `crearOrden` EXIGE un renglón de pedido válido y
+//    rechaza la captura nueva sin pedido.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estado de la orden de producción (F2-E2). NO editable por el usuario: lo DERIVAN los
+/// servicios. `capturada` = recién abierta sin matriz; `completa` = ya tiene su matriz de
+/// colores/tallas (paridad con `Ordenes.FechaDet` del viejo, que se sellaba al meter el
+/// primer renglón del detalle); `cancelada` = cancelación suave (`Ordenes.OrdCancelada`).
+enum EstadoOrden {
+  capturada
+  completa
+  cancelada
+
+  @@map("estado_orden")
+}
+
+/// Orden de producción (F2-E2 — ex `Ordenes`, doc 03-Produccion §Orden). Documento con el
+/// que se manda a producir un renglón de un pedido. Folio consecutivo POR EMPRESA (A3/A9).
+/// AUTORELLENO al crear desde un renglón de pedido: modelo/cliente/empresa derivan del
+/// renglón→pedido (comportamiento `IdPedidosDet_AfterUpdate` del viejo). Ver el mapeo de las
+/// 34 columnas v1 en el TSDoc de `src/dominio/produccion/ordenes.ts`.
+model Orden {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — viejo: `Ordenes.Numero`).
+  folio     BigInt
+  /// Empresa dueña de la orden y de su numeración (A9 — viejo: `IdEmpresas`).
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Renglón del pedido del que sale la orden (viejo: `IdPedidosDet`). NULLABLE en el esquema
+  /// para que el ETL migre las órdenes huérfanas del viejo (~26 casos); pero la captura NUEVA
+  /// lo EXIGE (orden sin pedido = solo histórico). N órdenes por renglón (resurtidos). Restrict.
+  idPedidoLinea Int?         @map("id_pedido_linea")
+  pedidoLinea   PedidoLinea? @relation(fields: [idPedidoLinea], references: [id], onDelete: Restrict)
+
+  /// Modelo a producir (viejo: `IdModelos`). Autorrellenado del renglón de pedido. Restrict.
+  idModelo  Int     @map("id_modelo")
+  modelo    Modelo  @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  /// Cliente de la orden (viejo: `IdClientes`). Autorrellenado del pedido. Restrict.
+  idCliente Int     @map("id_cliente")
+  cliente   Cliente @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+
+  /// Maquilero asignado (viejo: `IdMaquileros`). El maquilero es un Proveedor con rol de maquila
+  /// tras la fusión de terceros (D12/R15); en F2 es SOLO asignación (no se valida el rol).
+  /// Nullable (en datos viejos hay 0 = sin asignar). Restrict.
+  idMaquilero     Int?           @map("id_maquilero")
+  maquilero       Proveedor?     @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+  /// Etiqueta de marca de la orden (viejo: `IdEtiquetasM`). Nullable (hay nulos en datos). Restrict.
+  idEtiquetaMarca Int?           @map("id_etiqueta_marca")
+  etiquetaMarca   EtiquetaMarca? @relation(fields: [idEtiquetaMarca], references: [id], onDelete: Restrict)
+  /// Tela dispuesta para la orden (viejo: `IdTelasDis`). Nullable. Restrict.
+  idTela          Int?           @map("id_tela")
+  tela            Tela?          @relation(fields: [idTela], references: [id], onDelete: Restrict)
+
+  /// Fecha de la orden (viejo: `Fecha`).
+  fecha         DateTime? @db.Date
+  /// Fecha de entrega comprometida (viejo: `FechaEntrega`).
+  fechaEntrega  DateTime? @map("fecha_entrega") @db.Date
+  /// Observaciones generales (viejo: `Observaciones`).
+  observaciones String?   @db.Text
+
+  /// CADENA CRUDA de tallas del viejo (viejo: `Tallas`, p. ej. "CHM G EX"). De SOLO LECTURA, se
+  /// conserva para trazabilidad; el despivote a `OrdenLineaTalla` (matriz real) lo hace el ETL.
+  tallasV1 String? @map("tallas_v1")
+
+  /// Costo de maquila de la orden (viejo: `MaquilaOrd`). DATO conservado de v1; su motor (costeo)
+  /// llega en F3/F6 — sin lógica en F2.
+  maquilaOrd    Decimal? @map("maquila_ord") @db.Decimal(12, 2)
+  /// Costo de aplicación/estampado (viejo: `AplicacionOrd`). DATO de v1; motor en F3/F6.
+  aplicacionOrd Decimal? @map("aplicacion_ord") @db.Decimal(12, 2)
+  /// No costear esta orden (viejo: `NoCost`). Bandera conservada (consumidor real: el costeo, F6).
+  noCostear     Boolean  @default(false) @map("no_costear")
+  /// Composición textil (viejo: `Composicion`).
+  composicion   String?  @db.Text
+  /// Composición forzada (viejo: `CompForzada`): la composición se capturó a mano, no derivó del BOM.
+  compForzada   Boolean  @default(false) @map("comp_forzada")
+  /// Observaciones de maquila (viejo: `ObsMaquila`).
+  obsMaquila    String?  @map("obs_maquila") @db.Text
+  /// Maquila ya pagada (viejo: `Pagada`). DATO conservado; su motor (EsMa/finanzas) llega en F6.
+  pagada        Boolean? @map("pagada")
+
+  /// Estado DERIVADO (no editable): capturada/completa/cancelada (ver enum `EstadoOrden`).
+  estado          EstadoOrden @default(capturada)
+  /// Fecha en que la orden quedó COMPLETA — se sella al primer guardado de matriz con líneas
+  /// (paridad con `Ordenes.FechaDet` del viejo, sellado en el primer renglón del detalle). De ahí
+  /// deriva `estado='completa'`. NO se re-sella en guardados posteriores.
+  fechaCompletada DateTime?   @map("fecha_completada")
+  /// Motivo de la cancelación suave (viejo: `MotivoCancelada`; `OrdCancelada` → estado=cancelada).
+  motivoCancelada String?     @map("motivo_cancelada") @db.Text
+
+  /// Código de barra de la orden (viejo: `UPC`). DATO HISTÓRICO de SOLO LECTURA: los códigos de
+  /// barra de orden ya no se usan (decisión Gabriel 16-jun-2026). Sin endpoint de escritura ni de
+  /// generación; el ETL lo pobla para no tirar el dato.
+  upc String? @map("upc")
+
+  // ── Datos de Ruta Crítica (F5) — conservados de v1 SIN FK ni motor (los catálogos RC aún no
+  //    existen). Columnas escalares nullable; su lógica/relaciones llegan en F5.
+  /// viejo: `IdCP_Articulos` (tipo de artículo RC). Sin FK hasta F5.
+  idTipoArticuloRC Int?      @map("id_tipo_articulo_rc")
+  /// viejo: `IdRC_Aplicaciones`. Sin FK hasta F5.
+  idRcAplicaciones Int?      @map("id_rc_aplicaciones")
+  /// viejo: `IdRC_TipoTelas`. Sin FK hasta F5.
+  idRcTipoTelas    Int?      @map("id_rc_tipo_telas")
+  /// viejo: `FechaInicioRC`. Dato RC (F5).
+  fechaInicioRC    DateTime? @map("fecha_inicio_rc")
+  /// viejo: `FechaEntregaRC`. Dato RC (F5).
+  fechaEntregaRC   DateTime? @map("fecha_entrega_rc")
+  /// viejo: `FechaProg`. Dato RC (F5).
+  fechaProg        DateTime? @map("fecha_prog")
+  /// viejo: `EnRiesgo`. Dato RC (F5).
+  enRiesgo         Boolean?  @map("en_riesgo")
+  /// viejo: `SI_RC`. Dato RC (F5).
+  siRC             Boolean?  @map("si_rc")
+  /// viejo: `RC_Viva`. Dato RC (F5).
+  rcViva           Boolean?  @map("rc_viva")
+
+  lineas      OrdenLinea[]
+  referencias OrdenReferencia[]
+  comentarios OrdenComentario[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idPedidoLinea])
+  @@index([idModelo])
+  @@index([idCliente])
+  @@index([idMaquilero])
+  @@index([estado])
+  @@map("ordenes")
+}
+
+/// Renglón de la matriz de una orden = un COLOR (F2-E2 — ex `OrdenesDet`, doc 03-Produccion).
+/// En v1 el color era texto libre; en v2 es FK al catálogo `Color` (F1). Color ÚNICO por orden
+/// (@@unique). Las cantidades por talla cuelgan en `OrdenLineaTalla` (NUNCA una columna `total`:
+/// el total se deriva por suma, D4 + espíritu D3). Cascade hacia `Orden`; Restrict hacia `Color`.
+model OrdenLinea {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  idColor Int   @map("id_color")
+  color   Color @relation(fields: [idColor], references: [id], onDelete: Restrict)
+
+  tallas OrdenLineaTalla[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idColor])
+  @@index([idOrden])
+  @@index([idColor])
+  @@map("orden_linea")
+}
+
+/// Cantidad de una talla dentro de un renglón (color) de la matriz (F2-E2 — despivota las
+/// columnas fijas `T1..T8` del viejo, D4: tallas ilimitadas por catálogo). Una talla aparece UNA
+/// vez por renglón (@@unique). `cantidad` entera ≥0. NUNCA hay un `total` persistido: el total se
+/// deriva por suma (D4 + espíritu D3). Cascade hacia `OrdenLinea`; Restrict hacia `Talla`.
+model OrdenLineaTalla {
+  id           Int        @id @default(autoincrement())
+  idOrdenLinea Int        @map("id_orden_linea")
+  ordenLinea   OrdenLinea @relation(fields: [idOrdenLinea], references: [id], onDelete: Cascade)
+  idTalla      Int        @map("id_talla")
+  talla        Talla      @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// Cantidad de prendas de esta talla en este color (viejo: `T1..T8`). Entera ≥0.
+  cantidad Int
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrdenLinea, idTalla])
+  @@index([idOrdenLinea])
+  @@index([idTalla])
+  @@map("orden_linea_talla")
+}
+
+/// Valor de un campo de referencia del cliente en una orden (F2-E2, D7 — generaliza el
+/// `Monarch` del viejo a campos por cliente). Cada valor corresponde a un `ClienteCampo` (la
+/// DEFINICIÓN está en F1-E2) ACTIVO del cliente de la orden. Índice dedicado sobre `valor` para
+/// la búsqueda GLOBAL de órdenes por referencia (D7). Cascade hacia `Orden`; Restrict hacia
+/// `ClienteCampo`. Un campo se llena UNA vez por orden (@@unique).
+model OrdenReferencia {
+  id             Int          @id @default(autoincrement())
+  idOrden        Int          @map("id_orden")
+  orden          Orden        @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  idClienteCampo Int          @map("id_cliente_campo")
+  clienteCampo   ClienteCampo @relation(fields: [idClienteCampo], references: [id], onDelete: Restrict)
+  /// Valor capturado para ese campo en esta orden (texto; el tipo lo valida el dominio según
+  /// `ClienteCampo.tipo`). Indexado para búsqueda global por referencia (D7).
+  valor          String
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idClienteCampo])
+  @@index([idOrden])
+  @@index([valor])
+  @@index([idClienteCampo, valor])
+  @@map("orden_referencia")
+}
+
+/// Comentario INMUTABLE de una orden (F2-E2 — ex `ComentaOrd`, doc 03-Produccion). Cada
+/// comentario lleva su autor y su fecha; una vez puesto NO se edita ni se borra (es un hilo de
+/// bitácora del usuario). Cascade hacia `Orden`. `idUsuario` sin FK físico (mismo criterio que
+/// la bitácora: log inmutable, los usuarios no se borran).
+model OrdenComentario {
+  id         Int      @id @default(autoincrement())
+  idOrden    Int      @map("id_orden")
+  orden      Orden    @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  /// Usuario que escribió el comentario (viejo: `IdUsuarios`). Sin FK físico (log inmutable).
+  idUsuario  String?  @map("id_usuario")
+  /// Texto del comentario (viejo: `Comentario`). Inmutable.
+  comentario String   @db.Text
+  /// Fecha del comentario (viejo: `FechaComen`).
+  fecha      DateTime @default(now())
+
+  @@index([idOrden])
+  @@map("orden_comentario")
 }

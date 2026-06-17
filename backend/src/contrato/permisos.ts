@@ -190,6 +190,31 @@ export const CATALOGO_PERMISOS = [
       'Administrar pedidos reales: crear desde un pedido y capturar el seguimiento por renglón',
   },
 
+  // ── Órdenes de producción (Módulo ÓRDENES, F2-E2; doc 03-Produccion) — permisos NUEVOS de v2 ──
+  // El módulo Órdenes en v2: ver (consulta), administrar (alta desde un renglón de pedido,
+  // edición del encabezado, captura de la matriz colores/tallas, copiar matriz, referencias y
+  // comentarios) y cancelar (cancelación suave con motivo). Igual reparto que Pedidos: ver es
+  // lectura, administrar muta, y cancelar es su propio permiso (acción crítica e irreversible).
+  // Los permisos LEGADOS `ordenes.modificar`/`.precio-maquila`/etc. (arriba, de Accesos.csv)
+  // pertenecen a sub-funciones (precio de maquila, costos, habilitación) que se modelarán en sus
+  // fases (F3/F6); NO se reutilizan para el CRUD nuevo de la orden.
+  {
+    clave: 'ordenes.ver',
+    modulo: 'ordenes',
+    descripcion: 'Consultar órdenes de producción, su matriz, referencias y comentarios',
+  },
+  {
+    clave: 'ordenes.administrar',
+    modulo: 'ordenes',
+    descripcion:
+      'Administrar órdenes de producción: alta desde un pedido, edición, matriz (colores/tallas), copiar, referencias y comentarios',
+  },
+  {
+    clave: 'ordenes.cancelar',
+    modulo: 'ordenes',
+    descripcion: 'Cancelar (suave) una orden de producción con su motivo',
+  },
+
   // ── Clientes / Proveedores ───────────────────────────────────────────────────
   {
     clave: 'clientes.modificar',

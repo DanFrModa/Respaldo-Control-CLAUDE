@@ -156,12 +156,16 @@ function definirRoles(): {
   const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes');
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera
-  // modificar órdenes y los precios de maquila (importes de la orden).
+  // modificar órdenes y los precios de maquila (importes de la orden). En v2 (F2-E2) "no
+  // crear/modificar órdenes" se traduce además a quitar el CRUD nuevo de la orden
+  // (`ordenes.administrar`/`.cancelar`); conserva `ordenes.ver` (consulta).
   const logistica = sin(
     ventas,
     'ordenes.modificar',
     'ordenes.precio-maquila',
     'ordenes.ver-precio-real-maquila',
+    'ordenes.administrar',
+    'ordenes.cancelar',
   );
 
   // Nivel 50 — Asistente: su única restricción extra era el MENÚ de catálogos de la RC
