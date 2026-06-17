@@ -211,6 +211,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **D2** — detalles de por qué Costos/EDR no se usa hoy | antes de abrir **F7** (sesión durante F5/F6) |
 | **D8** — ubicación final de Control de Calidad (¿proceso de la RC?) | al cerrar **F5** |
 | **A9** — qué catálogos son por empresa vs globales | en **F1-E1** (la firma Gabriel) |
+| **Historia de las 6 empresas viejas INACTIVAS** (MJD, Zipora, Skintex, Free Ride, Corporativo MJD, Marilyn — **444 pedidos / ~1,528 órdenes**, casi todo **2005–2012**) — ¿migrar a v2 y a qué empresa? **POR AHORA NO SE MIGRA** (decisión Gabriel 17-jun-2026; el ETL F2-E5 las omite y las lista en el reporte de cuadre). Solo se migró el negocio reciente (Marilyn Fitness + FR Moda, 2012→2026). MJD/Corporativo/Marilyn son el linaje viejo de FR Moda (candidatos a folder ahí); Zipora/Skintex/Free Ride eran empresas aparte. | revisar con Daniel **antes de F9** (el ETL se re-corre al corte; ahí se decide si se rescata esa historia) |
 
 ## 7. ¿Cuánto tarda? (gruesa, honesta)
 

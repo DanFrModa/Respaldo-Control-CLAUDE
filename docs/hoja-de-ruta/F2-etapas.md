@@ -288,6 +288,8 @@
 > SIN etiqueta de talla en `Ordenes.Tallas` (1,307 en 3 órdenes con `Tallas` vacía; 103 con una talla
 > de más sobre `"CHM G EX"`; 5 sobre una curva de 7); **8 cadenas ambiguas** + **17 con doble curva**;
 > Monarch == código del modelo (~3,212 esperados) descartados como default automático.
+>
+> **CORRIDA REAL del ETL (17-jun-2026, contra `prueba`):** cargó 1,084 pedidos / 3,923 órdenes / 6,818 renglones-color / 29,258 celdas de talla / 1,920 referencias Monarch / 505 comentarios. **DECISIÓN de Gabriel (17-jun): la historia de las 6 empresas viejas INACTIVAS NO se migra por ahora** — eso dejó fuera 444 pedidos y ~1,528 órdenes (`IdEmpresas` ∈ {1..6}: MJD/Zipora/Skintex/Free Ride/Corporativo/Marilyn), **casi todo de 2005–2012** (historia antigua de empresas extintas; el negocio reciente 2012→2026 sí migró bajo Marilyn Fitness + FR Moda). Pendiente: revisar con Daniel **antes de F9** si se rescata (MJD/Corporativo/Marilyn = linaje de FR Moda; Zipora/Skintex/Free Ride eran aparte). Anotado en `HOJA-DE-RUTA.md` §6.
 
 **Objetivo:** Migrar los datos reales de pedidos y órdenes (idempotente, cargando a través de los servicios de dominio), sembrar las secuencias después del histórico, documentar los módulos y verificar el criterio de salida de F2 completo (un pedido fluye hasta su orden; impreso de orden).
 
