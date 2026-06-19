@@ -20,6 +20,9 @@ import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdene
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
+import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
+import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
+import { EnvioMaquilaPagina } from '@/modulos/produccion/EnvioMaquilaPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -79,6 +82,9 @@ const router = createBrowserRouter([
           { path: 'pedidos', element: <PedidosPagina /> },
           { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
           { path: 'produccion/ordenes', element: <OrdenesPagina /> },
+          { path: 'produccion/corte', element: <CapturaCortePagina /> },
+          { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
+          { path: 'produccion/corte-semanal', element: <CorteSemanalPagina /> },
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
           { path: 'produccion/pedidos-por-mes', element: <TableroPedidosMesPagina /> },

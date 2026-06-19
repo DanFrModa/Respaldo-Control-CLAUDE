@@ -16,15 +16,16 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
 
 describe('catalogo de modulos del menu', () => {
   it('define los 13 modulos del plan §5 (mas sub-vistas) con rutas y claves unicas', () => {
-    // 13 módulos del plan + 6 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
-    // órdenes + incompletas + pedidos por mes, F2-E4; tipos de proceso, F3-E1).
+    // 13 módulos del plan + 9 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
+    // órdenes + incompletas + pedidos por mes, F2-E4; tipos de proceso, F3-E1; captura de corte +
+    // envío a maquila + corte semanal, F3-E2).
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(19);
+    expect(MODULOS_MENU).toHaveLength(22);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(19);
+    expect(new Set(claves).size).toBe(22);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(19);
+    expect(new Set(rutas).size).toBe(22);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

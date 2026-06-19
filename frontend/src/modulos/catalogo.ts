@@ -212,6 +212,36 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['ordenes.ver'],
     subVista: true,
   },
+  // Sub-vistas de Producción (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8) y
+  // la consulta de corte semanal por cortador. Cuelgan del módulo Producción con sus permisos
+  // operativos (la captura de corte/envío, la consulta del WIP).
+  {
+    clave: 'corte',
+    titulo: 'Captura de corte',
+    descripcion: 'Registra el corte de una orden por color × talla',
+    ruta: '/produccion/corte',
+    icono: 'fabrica',
+    permisos: ['produccion.corte'],
+    subVista: true,
+  },
+  {
+    clave: 'envios',
+    titulo: 'Envío a maquila',
+    descripcion: 'Envía a costura, estampado, bordado o lavado desde una sola pantalla',
+    ruta: '/produccion/envios',
+    icono: 'paquete',
+    permisos: ['produccion.envio'],
+    subVista: true,
+  },
+  {
+    clave: 'corte-semanal',
+    titulo: 'Corte semanal',
+    descripcion: 'Piezas cortadas por cortador y por semana',
+    ruta: '/produccion/corte-semanal',
+    icono: 'calendario',
+    permisos: ['produccion.wip-ver'],
+    subVista: true,
+  },
   {
     clave: 'compras',
     titulo: 'Compras y Materiales',

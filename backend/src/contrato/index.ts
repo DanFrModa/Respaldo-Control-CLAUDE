@@ -461,6 +461,27 @@ export {
   type TiposMovimientoLista,
 } from './esquemas/tipo-movimiento.js';
 
+// ── Etapas de producción: corte + envío a maquila (F3-E2; doc 03-Produccion) ──
+export {
+  esquemaCorteCrear,
+  esquemaEnvioCrear,
+  esquemaEtapaCancelarCuerpo,
+  esquemaEtapaSalida,
+  esquemaEtapasOrdenLista,
+  esquemaPendientesOrden,
+  esquemaCorteSemanalQuery,
+  esquemaCorteSemanalLista,
+  type DatosCorteCrear,
+  type DatosEnvioCrear,
+  type DatosEtapaCancelar,
+  type DatosEtapaLineaEntrada,
+  type EtapaSalida,
+  type EtapasOrdenLista,
+  type PendientesOrden,
+  type CorteSemanalQuery,
+  type CorteSemanalLista,
+} from './esquemas/etapa.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';
