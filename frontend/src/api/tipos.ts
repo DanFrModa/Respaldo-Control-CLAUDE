@@ -397,3 +397,33 @@ export type TiposMovimientoLista =
   paths['/api/tipos-movimiento']['get']['responses']['200']['content']['application/json'];
 /** Un tipo de movimiento de inventario del catalogo. */
 export type TipoMovimiento = TiposMovimientoLista['datos'][number];
+
+// ── Etapas de producción: corte + envío a maquila (F3-E2) ────────────────────
+
+/** Una etapa de producción (corte/envío) tal como la devuelve el API. */
+export type Etapa =
+  paths['/api/produccion/cortes']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de alta de un corte (`POST /api/produccion/cortes`). */
+export type CorteCrear =
+  paths['/api/produccion/cortes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de alta de un envío a maquila (`POST /api/produccion/envios`). */
+export type EnvioCrear =
+  paths['/api/produccion/envios']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación de una etapa (`POST /api/produccion/{cortes|envios}/{id}/cancelar`). */
+export type EtapaCancelar =
+  paths['/api/produccion/cortes/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Pendientes derivados de una orden (`GET /api/produccion/ordenes/{id}/pendientes`). */
+export type PendientesOrden =
+  paths['/api/produccion/ordenes/{id}/pendientes']['get']['responses']['200']['content']['application/json'];
+/** Historial de etapas (cortes/envíos) de una orden (`GET /api/produccion/ordenes/{id}/etapas`). */
+export type EtapasOrden =
+  paths['/api/produccion/ordenes/{id}/etapas']['get']['responses']['200']['content']['application/json'];
+/** Una etapa del historial de una orden (corte o envío, viva o cancelada). */
+export type EtapaHistorial = EtapasOrden['etapas'][number];
+/** Corte semanal por cortador (`GET /api/produccion/corte-semanal`). */
+export type CorteSemanal =
+  paths['/api/produccion/corte-semanal']['get']['responses']['200']['content']['application/json'];
+/** Parámetros del corte semanal (querystring). */
+export type CorteSemanalQuery = NonNullable<
+  paths['/api/produccion/corte-semanal']['get']['parameters']['query']
+>;
