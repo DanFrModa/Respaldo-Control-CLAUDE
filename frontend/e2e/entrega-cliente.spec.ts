@@ -127,7 +127,10 @@ test.describe('Entrega a cliente y tablero WIP (F3-E5)', () => {
     await expect(page.getByTestId('entrega-pdf')).toBeVisible();
     // La entrega aparece en el historial de la orden.
     await expect(
-      page.getByTestId('historial-entrega').filter({ hasText: `${ENTREGA} pzas` }).first(),
+      page
+        .getByTestId('historial-entrega')
+        .filter({ hasText: `${ENTREGA} pzas` })
+        .first(),
     ).toBeVisible();
 
     // ── EXISTENCIAS (E3): la existencia del modelo BAJÓ a RESTANTE ──────────────

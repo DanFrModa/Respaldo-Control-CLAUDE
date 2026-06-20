@@ -533,7 +533,9 @@ export type TableroWip =
 /** Una fila del tablero WIP (una orden con su avance por etapa). */
 export type WipOrdenFila = TableroWip['datos'][number];
 /** Parámetros del tablero WIP (querystring). */
-export type TableroWipQuery = NonNullable<paths['/api/produccion/wip']['get']['parameters']['query']>;
+export type TableroWipQuery = NonNullable<
+  paths['/api/produccion/wip']['get']['parameters']['query']
+>;
 /** Drill-down del avance de una orden (`GET /api/produccion/wip/ordenes/{id}`). */
 export type WipOrden =
   paths['/api/produccion/wip/ordenes/{id}']['get']['responses']['200']['content']['application/json'];

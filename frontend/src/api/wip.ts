@@ -1,8 +1,4 @@
-import {
-  keepPreviousData,
-  useQuery,
-  type UseQueryResult,
-} from '@tanstack/react-query';
+import { keepPreviousData, useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';

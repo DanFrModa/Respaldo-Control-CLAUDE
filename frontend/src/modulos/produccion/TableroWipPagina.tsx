@@ -190,7 +190,10 @@ export function TableroWipPagina(): React.JSX.Element {
           </div>
 
           {/* Escritorio: tabla. */}
-          <div className="hidden overflow-x-auto rounded-md border md:block" data-testid="wip-tabla">
+          <div
+            className="hidden overflow-x-auto rounded-md border md:block"
+            data-testid="wip-tabla"
+          >
             <Table>
               <TableHeader>
                 <TableRow>
@@ -326,7 +329,9 @@ function DrillDownOrden({
             {detalle ? `Avance de la orden #${detalle.folio}` : 'Avance de la orden'}
           </DialogTitle>
           <DialogDescription>
-            {detalle ? `${detalle.codigoModelo} · ${detalle.cliente}` : 'Pendientes por etapa y color × talla.'}
+            {detalle
+              ? `${detalle.codigoModelo} · ${detalle.cliente}`
+              : 'Pendientes por etapa y color × talla.'}
           </DialogDescription>
         </DialogHeader>
 
