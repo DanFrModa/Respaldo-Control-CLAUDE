@@ -6,7 +6,12 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
-import { ErrorConflicto, ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { clientePruebas, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import {
@@ -90,11 +95,24 @@ describe('CRUD Tipos de proceso (F3-E1, CRUD patrón)', () => {
       expect(tipo.generaEntradaPt).toBe(false); // el servidor descarta la bandera para no-admin
     });
 
-    it('rechaza código duplicado sin importar mayúsculas → ErrorConflicto', async () => {
-      await crearTipoProceso(sesionAdmin(), { codigo: 'costura', nombre: 'Costura' }, bd());
+    it('rechaza código duplicado → ErrorConflicto', async () => {
+      // Unicidad REAL: el mismo código válido (lowercase) creado dos veces → conflicto.
+      await crearTipoProceso(
+        sesionAdmin(),
+        { codigo: 'proceso-dup-test', nombre: 'Proceso dup' },
+        bd(),
+      );
       await expect(
-        crearTipoProceso(sesionAdmin(), { codigo: 'COSTURA', nombre: 'Otra' }, bd()),
+        crearTipoProceso(sesionAdmin(), { codigo: 'proceso-dup-test', nombre: 'Otra' }, bd()),
       ).rejects.toBeInstanceOf(ErrorConflicto);
+    });
+
+    it('rechaza código en mayúsculas → ErrorValidacion (el código es lowercase-only por diseño)', async () => {
+      // El `codigo` valida con regex `^[a-z][a-z0-9-]*$`: las mayúsculas se rechazan ANTES de la
+      // comprobación de unicidad. Documenta que minúsculas-only es el diseño correcto.
+      await expect(
+        crearTipoProceso(sesionAdmin(), { codigo: 'COSTURA', nombre: 'Costura' }, bd()),
+      ).rejects.toBeInstanceOf(ErrorValidacion);
     });
   });
 
