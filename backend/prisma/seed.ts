@@ -486,12 +486,38 @@ async function verificarTiposMovimientoContraCsv(): Promise<void> {
   });
 }
 
+/**
+ * Tipos de movimiento NUEVOS de v2 que NO vienen del CSV viejo (F3-E3). El viejo modelaba la
+ * "Transferencia entre almacenes" con UN tipo de dirección `traspaso`; v2 la materializa como DOS
+ * patas (salida del origen + entrada al destino) para que la vista `existencia_pt` sume +1/−1 por
+ * almacén (ADR-0010 §1/§5). El traspaso de dominio resuelve estas patas POR `codigo`. NO entran en
+ * {@link TIPOS_MOVIMIENTO_BASE} (esa es la lista canónica verificada 1:1 contra el CSV de 19); el
+ * tipo viejo `transferencia-almacenes` (dirección `traspaso`) se conserva y NO se usa como pata.
+ */
+const TIPOS_MOVIMIENTO_V2: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  {
+    codigo: 'transferencia-salida',
+    nombre: 'Transferencia entre Almacenes (Salida)',
+    direccion: 'salida',
+  },
+  {
+    codigo: 'transferencia-entrada',
+    nombre: 'Transferencia entre Almacenes (Entrada)',
+    direccion: 'entrada',
+  },
+];
+
 async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
   await verificarTiposMovimientoContraCsv();
-  for (const tipo of TIPOS_MOVIMIENTO_BASE) {
+  // Los 19 canónicos del CSV + los 2 nuevos de v2 (patas del traspaso, F3-E3). Idempotente: el
+  // `update: {}` no pisa nombre/dirección/activo si ya existen (pudieron editarse en producción).
+  for (const tipo of [...TIPOS_MOVIMIENTO_BASE, ...TIPOS_MOVIMIENTO_V2]) {
     await prisma.tipoMovimientoInventario.upsert({
       where: { codigo: tipo.codigo },
-      // No se pisa nombre/dirección/activo si ya existe (idempotente, pudo editarse).
       update: {},
       create: { codigo: tipo.codigo, nombre: tipo.nombre, direccion: tipo.direccion },
     });

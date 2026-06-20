@@ -427,3 +427,39 @@ export type CorteSemanal =
 export type CorteSemanalQuery = NonNullable<
   paths['/api/produccion/corte-semanal']['get']['parameters']['query']
 >;
+
+// ── Inventario PT operable: movimientos, traspasos, existencias y kardex (F3-E3) ──────
+
+/** Un movimiento de inventario PT tal como lo devuelve el API (con su matriz color×talla). */
+export type MovimientoPt =
+  paths['/api/inventarios/pt/movimientos']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de alta de un movimiento manual (`POST /api/inventarios/pt/movimientos`). */
+export type MovimientoPtCrear =
+  paths['/api/inventarios/pt/movimientos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de alta de un traspaso entre almacenes (`POST /api/inventarios/pt/traspasos`). */
+export type TraspasoPtCrear =
+  paths['/api/inventarios/pt/traspasos']['post']['requestBody']['content']['application/json'];
+/** Resultado de un traspaso: las dos patas creadas (salida + entrada). */
+export type TraspasoPt =
+  paths['/api/inventarios/pt/traspasos']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de cancelación de un movimiento (`POST /api/inventarios/pt/movimientos/{id}/cancelar`). */
+export type MovimientoPtCancelar =
+  paths['/api/inventarios/pt/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Existencias de PT (`GET /api/inventarios/pt/existencias`). */
+export type ExistenciasPt =
+  paths['/api/inventarios/pt/existencias']['get']['responses']['200']['content']['application/json'];
+/** Una fila de existencia (un artículo en un almacén con su cantidad). */
+export type ExistenciaPtFila = ExistenciasPt['filas'][number];
+/** Parámetros de la consulta de existencias (querystring). */
+export type ExistenciasPtQuery = NonNullable<
+  paths['/api/inventarios/pt/existencias']['get']['parameters']['query']
+>;
+/** Kardex de un modelo (`GET /api/inventarios/pt/kardex`). */
+export type KardexPt =
+  paths['/api/inventarios/pt/kardex']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del kardex (un movimiento con su efecto + saldo corrido). */
+export type KardexPtRenglon = KardexPt['renglones'][number];
+/** Parámetros del kardex por modelo (querystring). */
+export type KardexPtQuery = NonNullable<
+  paths['/api/inventarios/pt/kardex']['get']['parameters']['query']
+>;

@@ -19558,6 +19558,1170 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/inventarios/pt/movimientos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Registrar un movimiento manual de inventario PT (entrada/salida/ajuste) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Datos de un movimiento manual de inventario PT (color×talla, D4). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Tipo de movimiento del catálogo (dirección entrada o salida; nunca traspaso). */
+            idTipoMov: number;
+            /** @description Almacén afectado (existencia por …×almacén, D4). */
+            idAlmacen: number;
+            /** @description Modelo del movimiento (un movimiento manual es de UN modelo). */
+            idModelo: number;
+            /**
+             * Format: date
+             * @description Fecha del movimiento (YYYY-MM-DD).
+             */
+            fecha: string;
+            observaciones?: string;
+            /** @description Matriz color×talla del movimiento (D4). */
+            lineas: {
+              idColor: number;
+              /** @description Cantidades por talla de este color. */
+              tallas: {
+                idTalla: number;
+                cantidad: number;
+              }[];
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario PT con su matriz color×talla. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del movimiento. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Tipo de movimiento. */
+              idTipoMov: number;
+              /** @description Nombre del tipo de movimiento. */
+              tipoMov: string;
+              /**
+               * @description Dirección del tipo.
+               * @enum {string}
+               */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              /** @description Almacén afectado. */
+              idAlmacen: number;
+              /** @description Nombre del almacén. */
+              almacen: string;
+              /** @description Modelo del movimiento. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description Discriminador del hecho de origen o null. */
+              origenTipo: string | null;
+              /** @description Si el movimiento ya fue anulado por un inverso. */
+              cancelado: boolean;
+              /** @description Si este movimiento ES un inverso, el id del original que anula; si no, null. */
+              idMovimientoInverso: number | null;
+              /** @description Matriz color×talla del movimiento. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total de piezas del movimiento (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo capturó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/pt/traspasos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Traspasar PT entre almacenes (salida del origen + entrada al destino) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Datos de un traspaso de PT entre almacenes (color×talla, D4). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Almacén desde el que sale la mercancía. */
+            idAlmacenOrigen: number;
+            /** @description Almacén al que entra la mercancía (distinto del origen). */
+            idAlmacenDestino: number;
+            /** @description Modelo a traspasar (un traspaso es de UN modelo). */
+            idModelo: number;
+            /**
+             * Format: date
+             * @description Fecha del traspaso (YYYY-MM-DD).
+             */
+            fecha: string;
+            observaciones?: string;
+            /** @description Matriz color×talla del movimiento (D4). */
+            lineas: {
+              idColor: number;
+              /** @description Cantidades por talla de este color. */
+              tallas: {
+                idTalla: number;
+                cantidad: number;
+              }[];
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Las dos patas de un traspaso de PT. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Pata de SALIDA del almacén origen. */
+              salida: {
+                /** @description Id del movimiento. */
+                id: number;
+                /** @description Folio consecutivo por empresa (A3). */
+                folio: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Tipo de movimiento. */
+                idTipoMov: number;
+                /** @description Nombre del tipo de movimiento. */
+                tipoMov: string;
+                /**
+                 * @description Dirección del tipo.
+                 * @enum {string}
+                 */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                /** @description Almacén afectado. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Modelo del movimiento. */
+                idModelo: number;
+                /** @description Código del modelo. */
+                modelo: string;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /** @description Discriminador del hecho de origen o null. */
+                origenTipo: string | null;
+                /** @description Si el movimiento ya fue anulado por un inverso. */
+                cancelado: boolean;
+                /** @description Si este movimiento ES un inverso, el id del original que anula; si no, null. */
+                idMovimientoInverso: number | null;
+                /** @description Matriz color×talla del movimiento. */
+                lineas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color. */
+                  color: string;
+                  /** @description Cantidades por talla. */
+                  tallas: {
+                    /** @description Id de la talla. */
+                    idTalla: number;
+                    /** @description Etiqueta visible de la talla. */
+                    etiquetaTalla: string;
+                    /** @description Cantidad de la talla. */
+                    cantidad: number;
+                  }[];
+                  /** @description Total del renglón (derivado por suma). */
+                  totalPiezas: number;
+                }[];
+                /** @description Total de piezas del movimiento (derivado). */
+                totalPiezas: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de captura (ISO).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo capturó. */
+                creadoPorId: string | null;
+              };
+              /** @description Pata de ENTRADA al almacén destino. */
+              entrada: {
+                /** @description Id del movimiento. */
+                id: number;
+                /** @description Folio consecutivo por empresa (A3). */
+                folio: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Tipo de movimiento. */
+                idTipoMov: number;
+                /** @description Nombre del tipo de movimiento. */
+                tipoMov: string;
+                /**
+                 * @description Dirección del tipo.
+                 * @enum {string}
+                 */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                /** @description Almacén afectado. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Modelo del movimiento. */
+                idModelo: number;
+                /** @description Código del modelo. */
+                modelo: string;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /** @description Discriminador del hecho de origen o null. */
+                origenTipo: string | null;
+                /** @description Si el movimiento ya fue anulado por un inverso. */
+                cancelado: boolean;
+                /** @description Si este movimiento ES un inverso, el id del original que anula; si no, null. */
+                idMovimientoInverso: number | null;
+                /** @description Matriz color×talla del movimiento. */
+                lineas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color. */
+                  color: string;
+                  /** @description Cantidades por talla. */
+                  tallas: {
+                    /** @description Id de la talla. */
+                    idTalla: number;
+                    /** @description Etiqueta visible de la talla. */
+                    etiquetaTalla: string;
+                    /** @description Cantidad de la talla. */
+                    cantidad: number;
+                  }[];
+                  /** @description Total del renglón (derivado por suma). */
+                  totalPiezas: number;
+                }[];
+                /** @description Total de piezas del movimiento (derivado). */
+                totalPiezas: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de captura (ISO).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo capturó. */
+                creadoPorId: string | null;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/pt/movimientos/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar un movimiento PT (genera el inverso auditado; no edita ni borra) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo de la cancelación del movimiento. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario PT con su matriz color×talla. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del movimiento. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Tipo de movimiento. */
+              idTipoMov: number;
+              /** @description Nombre del tipo de movimiento. */
+              tipoMov: string;
+              /**
+               * @description Dirección del tipo.
+               * @enum {string}
+               */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              /** @description Almacén afectado. */
+              idAlmacen: number;
+              /** @description Nombre del almacén. */
+              almacen: string;
+              /** @description Modelo del movimiento. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description Discriminador del hecho de origen o null. */
+              origenTipo: string | null;
+              /** @description Si el movimiento ya fue anulado por un inverso. */
+              cancelado: boolean;
+              /** @description Si este movimiento ES un inverso, el id del original que anula; si no, null. */
+              idMovimientoInverso: number | null;
+              /** @description Matriz color×talla del movimiento. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total de piezas del movimiento (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo capturó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/pt/existencias': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Existencias de PT por modelo×color×talla×almacén (consulta) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por un modelo. */
+          idModelo?: number;
+          /** @description Filtra por un color. */
+          idColor?: number;
+          /** @description Filtra por una talla. */
+          idTalla?: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+          /** @description Incluye filas con existencia 0 ("true"/"false"). Por defecto se omiten. */
+          incluirCeros?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Existencias de producto terminado (consulta de solo lectura, D3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Existencias por modelo×color×talla×almacén. */
+              filas: {
+                /** @description Id del modelo. */
+                idModelo: number;
+                /** @description Código del modelo. */
+                modelo: string;
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Orden del catálogo de la talla (para ordenar columnas). */
+                ordenTalla: number;
+                /** @description Id del almacén. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Existencia actual (Σ de movimientos, D3). */
+                existencia: number;
+              }[];
+              /** @description Suma de la existencia de todas las filas. */
+              totalExistencia: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/pt/kardex': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Kardex de un modelo (movimientos cronológicos con saldo corrido) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Modelo del kardex (obligatorio). */
+          idModelo: number;
+          /** @description Filtra por un color. */
+          idColor?: number;
+          /** @description Filtra por una talla. */
+          idTalla?: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Kardex de un modelo (movimientos con saldo corrido). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Modelo del kardex. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Movimientos en orden cronológico. */
+              renglones: {
+                /** @description Id del movimiento. */
+                idMovimiento: number;
+                /** @description Folio del movimiento. */
+                folio: number;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Tipo de movimiento. */
+                idTipoMov: number;
+                /** @description Nombre del tipo de movimiento. */
+                tipoMov: string;
+                /**
+                 * @description Dirección del tipo.
+                 * @enum {string}
+                 */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                /** @description Almacén del movimiento. */
+                idAlmacen: number;
+                /** @description Nombre del almacén. */
+                almacen: string;
+                /** @description Color del renglón. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Talla del renglón. */
+                idTalla: number;
+                /** @description Etiqueta de la talla. */
+                etiquetaTalla: string;
+                /** @description Piezas que entran en este renglón (0 si es salida). */
+                entrada: number;
+                /** @description Piezas que salen en este renglón (0 si es entrada). */
+                salida: number;
+                /** @description Saldo corrido del artículo tras este movimiento. */
+                saldo: number;
+                /** @description Si el movimiento fue anulado por un inverso. */
+                cancelado: boolean;
+                /** @description Observaciones del movimiento o null. */
+                observaciones: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/pt/kardex/folio/{folio}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Detalle de un movimiento PT por su folio (empresa activa) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Folio del movimiento (consecutivo por empresa). */
+          folio: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Movimiento de inventario PT con su matriz color×talla. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del movimiento. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Tipo de movimiento. */
+              idTipoMov: number;
+              /** @description Nombre del tipo de movimiento. */
+              tipoMov: string;
+              /**
+               * @description Dirección del tipo.
+               * @enum {string}
+               */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              /** @description Almacén afectado. */
+              idAlmacen: number;
+              /** @description Nombre del almacén. */
+              almacen: string;
+              /** @description Modelo del movimiento. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description Discriminador del hecho de origen o null. */
+              origenTipo: string | null;
+              /** @description Si el movimiento ya fue anulado por un inverso. */
+              cancelado: boolean;
+              /** @description Si este movimiento ES un inverso, el id del original que anula; si no, null. */
+              idMovimientoInverso: number | null;
+              /** @description Matriz color×talla del movimiento. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total de piezas del movimiento (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo capturó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/produccion/cortes': {
     parameters: {
       query?: never;
