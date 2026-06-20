@@ -701,7 +701,9 @@ export async function seguimientoEntregaOrden(
   // una CONSULTA, ADR-0010 §3). Solo si la pantalla pasó un almacén.
   const disponible = new Map<string, number>();
   if (filtros.idAlmacen !== undefined) {
-    const filas = await cliente.$queryRaw<{ idColor: number; idTalla: number; existencia: bigint }[]>`
+    const filas = await cliente.$queryRaw<
+      { idColor: number; idTalla: number; existencia: bigint }[]
+    >`
       SELECT e."id_color" AS "idColor", e."id_talla" AS "idTalla", e."existencia" AS "existencia"
       FROM "existencia_pt" e
       WHERE e."id_empresa" = ${idEmpresa}

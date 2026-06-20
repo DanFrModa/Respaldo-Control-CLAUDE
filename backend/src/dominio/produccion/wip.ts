@@ -31,11 +31,7 @@
  */
 import { z } from 'zod';
 
-import type {
-  ExistenciaMaquileroLista,
-  TableroWipPagina,
-  WipOrden,
-} from '../../contrato/index.js';
+import type { ExistenciaMaquileroLista, TableroWipPagina, WipOrden } from '../../contrato/index.js';
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 
 import { ErrorNoEncontrado } from '../../comun/errores.js';
@@ -209,9 +205,7 @@ export function pendientesDerivados(t: TotalesOrden): {
 /** ¿La orden tiene ALGO pendiente en cualquier etapa? (filtro `soloPendientes`). Pura. */
 export function tienePendiente(t: TotalesOrden): boolean {
   const p = pendientesDerivados(t);
-  return (
-    p.porCortar !== 0 || p.cortadoPorEnviar !== 0 || p.porRecibir !== 0 || p.porEntregar !== 0
-  );
+  return p.porCortar !== 0 || p.cortadoPorEnviar !== 0 || p.porRecibir !== 0 || p.porEntregar !== 0;
 }
 
 /**
@@ -236,14 +230,18 @@ export async function consultarWip(
 
   const where: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
-    ...(filtros.estado === undefined ? { estado: { not: 'cancelada' } } : { estado: filtros.estado }),
+    ...(filtros.estado === undefined
+      ? { estado: { not: 'cancelada' } }
+      : { estado: filtros.estado }),
     ...(filtros.idModelo === undefined ? {} : { idModelo: filtros.idModelo }),
     ...(filtros.idCliente === undefined ? {} : { idCliente: filtros.idCliente }),
     ...armarBusqueda(filtros.busqueda),
   };
 
   const paginacion: Paginacion = { pagina: filtros.pagina, porPagina: filtros.porPagina };
-  const orderBy = { [filtros.ordenarPor]: filtros.direccion } as Prisma.OrdenOrderByWithRelationInput;
+  const orderBy = {
+    [filtros.ordenarPor]: filtros.direccion,
+  } as Prisma.OrdenOrderByWithRelationInput;
 
   const seleccion = {
     id: true,
@@ -478,7 +476,11 @@ export async function wipDeOrden(
 
   // Sumas por etapa (color×talla). Corte, recibido total/costura y entregado no dependen del proceso.
   const cortado = await sumarCeldasOrden(cliente, idOrden, TipoEtapaMovimiento.corte);
-  const entregadoMapa = await sumarCeldasOrden(cliente, idOrden, TipoEtapaMovimiento.entrega_cliente);
+  const entregadoMapa = await sumarCeldasOrden(
+    cliente,
+    idOrden,
+    TipoEtapaMovimiento.entrega_cliente,
+  );
 
   // Procesos efectivamente usados (envíos vivos): enumera cortadoPorEnviar/porRecibir.
   const procesos = await cliente.etapaMovimiento.findMany({
@@ -638,7 +640,11 @@ const esquemaExistenciaMaquileroDominio = z.object({
 export type ParametrosExistenciaMaquilero = z.input<typeof esquemaExistenciaMaquileroDominio>;
 
 /** Clave estable de un grupo maquilero × proceso × orden. */
-function claveGrupoMaquilero(idMaquilero: number | null, idTipoProceso: number, idOrden: number): string {
+function claveGrupoMaquilero(
+  idMaquilero: number | null,
+  idTipoProceso: number,
+  idOrden: number,
+): string {
   return `${idMaquilero ?? 'sin'}|${idTipoProceso}|${idOrden}`;
 }
 
@@ -709,9 +715,7 @@ export async function consultarExistenciaMaquilero(
   }
   const grupos = new Map<string, Acum>();
 
-  const tomar = (
-    fila: (typeof envios)[number],
-  ): { clave: string; acum: Acum } | null => {
+  const tomar = (fila: (typeof envios)[number]): { clave: string; acum: Acum } | null => {
     const e = fila.etapaMov;
     if (e.idTipoProceso === null) return null;
     const clave = claveGrupoMaquilero(e.idTercero, e.idTipoProceso, e.idOrden);

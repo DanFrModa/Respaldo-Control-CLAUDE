@@ -123,7 +123,10 @@ export function EntregaClientePagina(): React.JSX.Element {
     !crear.isPending;
 
   /** Convierte la matriz al cuerpo `lineas` que espera el API (descartando ceros). */
-  function construirLineas(): { idColor: number; tallas: { idTalla: number; cantidad: number }[] }[] {
+  function construirLineas(): {
+    idColor: number;
+    tallas: { idTalla: number; cantidad: number }[];
+  }[] {
     return lineas
       .map((linea) => ({
         idColor: linea.idColor,
@@ -237,7 +240,9 @@ export function EntregaClientePagina(): React.JSX.Element {
                     />
                   </Field>
                   <Field className="sm:col-span-2">
-                    <FieldLabel htmlFor="obs-entrega">Observaciones / referencia de pedido</FieldLabel>
+                    <FieldLabel htmlFor="obs-entrega">
+                      Observaciones / referencia de pedido
+                    </FieldLabel>
                     <Input
                       id="obs-entrega"
                       value={observaciones}
@@ -252,7 +257,8 @@ export function EntregaClientePagina(): React.JSX.Element {
                 {seguimiento.data ? (
                   <div className="grid gap-3 rounded-md border bg-muted/40 p-3 text-sm sm:grid-cols-3">
                     <span>
-                      Pedido: <strong>{seguimiento.data.totalPedido.toLocaleString('es-MX')}</strong>
+                      Pedido:{' '}
+                      <strong>{seguimiento.data.totalPedido.toLocaleString('es-MX')}</strong>
                     </span>
                     <span>
                       Entregado:{' '}
@@ -396,7 +402,8 @@ function HistorialEntregasOrden({ idOrden }: { idOrden: number }): React.JSX.Ele
                         ) : null}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {entrega.cliente ?? 'Cliente'} · {entrega.totalPiezas} pzas · {entrega.fecha}
+                        {entrega.cliente ?? 'Cliente'} · {entrega.totalPiezas} pzas ·{' '}
+                        {entrega.fecha}
                         {entrega.cancelado && entrega.motivoCancelacion
                           ? ` · Motivo: ${entrega.motivoCancelacion}`
                           : ''}

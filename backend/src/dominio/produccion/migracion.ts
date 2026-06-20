@@ -31,11 +31,14 @@
  * claro/lo confía el loader que ya resolvió los ids vía MapeoMigracion): color del catálogo,
  * talla del catálogo, unicidad de color por orden y de talla por color (las protege el @@unique).
  */
-import type { EstadoOrden, Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type EstadoOrden, type Prisma } from '../../datos/index.js';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
+import { siguienteFolio } from '../../comun/secuencias.js';
 import { enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
+
+import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
 
 /** Una celda de la matriz a migrar: color + talla + cantidad (ya resueltos a ids del catálogo). */
 export interface CeldaOrdenMigrada {
@@ -286,4 +289,203 @@ export async function crearComentarioOrdenMigrado(
     });
     return com.id;
   }, bd);
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+// MODO MIGRACIÓN de las ETAPAS de producción (F3-E6 — corte / envío / recibo de maquila).
+//
+// El servicio normal (`etapas.ts`/`recibos.ts`) está afinado para la CAPTURA nueva: folio de la
+// secuencia, valida que la orden no esté cancelada, que el tercero tenga el rol correcto, sobre-corte
+// libre/sobre-envío estricto/recibido≤enviado por suma directa bajo lock, y —en el recibo de
+// costura— DERIVA efectos: ENTRADA al kardex PT (`generaEntradaPt`) + `EsMaCargo` propuesto. Todo
+// correcto para el día a día. El ETL del histórico, en cambio, debe PRESERVAR los datos viejos tal
+// cual y, sobre todo, NO derivar esos efectos.
+//
+// ⭐ VARIANTE SIN EFECTOS DERIVADOS (excepción JUSTIFICADA a PLANMAESTRO §7 — DECISIONES.md F3-E6):
+// el recibo migrado crea SOLO `EtapaMovimiento(recibo_maquila)` + detalle con calidad. NO genera
+// entrada al kardex PT NI crea `EsMaCargo`. Razón de no-doble-conteo: el kardex histórico se migra
+// ÚNICAMENTE de `IPT_Movs` (Pieza B, `origenTipo = migracion`) y los cargos ÚNICAMENTE de
+// `EsMa_Recibos` (loader `esma-cargos`). Si los recibos pasaran por el servicio completo, las 2,468
+// entradas tipo 2 'Entrada de Maquila' del viejo se DUPLICARÍAN (ya vienen en `IPT_Movs`), y cada
+// recibo crearía un cargo que también nace de `EsMa_Recibos`. La liga informativa `IPT_Movs.IdRecibos`
+// la conserva la Pieza B como referencia; el recibo migrado NO escribe Movimiento ni cargo.
+//
+// Lo que RELAJAN respecto al servicio normal (excepciones históricas, documentadas):
+//  • Folio de la SECUENCIA atómica "etapa-mov" POR EMPRESA (A3), igual que la captura nueva. El
+//    identificador VIEJO (`IdCorte`/`IdEntregas`+`Consecutivo`/`IdRecibos`) NO sirve como folio:
+//    `Entregas.Consecutivo` es el N-ésimo envío DE LA ORDEN (1,2,3…), no un consecutivo global —
+//    usarlo como folio colisionaría masivamente bajo el unique (idEmpresa, folio). Por eso el folio
+//    se asigna de la secuencia y el id viejo se PRESERVA en el MapeoMigracion + la bitácora.
+//  • NO valida orden cancelada, ni rol del tercero, ni tolerancias (recibido≤enviado / sobre-envío):
+//    los datos viejos pueden violarlas (el loader las LISTA como incidencias; nunca trunca el dato).
+//  • `idTercero` puede ser NULL (envíos/cortes viejos sin tercero mapeable).
+//  • Recibo: SIN entrada a PT, SIN EsMaCargo, SIN almacenes destino (la calidad sí se preserva,
+//    SEPARADA del almacén — el almacén nace en v2).
+//
+// Lo que CONSERVAN (siguen siendo del dominio, A1/A2/A7/A9):
+//  • Transaccionales (A2): encabezado + detalle + bitácora en UNA transacción.
+//  • Auditadas (A7): `creadoPorId`/`modificadoPorId` + `Bitacora` (origen ETL).
+//  • Por empresa (A9): `idEmpresa` EXPLÍCITO (el histórico abarca varias empresas; el loader lo
+//    deriva de la orden, igual que el servicio normal).
+//  • Detalle color×talla (D4); la cantidad por celda se SUMA si el despivote del viejo repitiera
+//    una talla (defensa del `@@unique(idEtapaMov, idColor, idTalla)`).
+//
+// Idempotencia: el LOADER resuelve "ya existe" por el unique `(idEmpresa, folio)` ANTES de llamar
+// (preservando `Consecutivo`); aquí solo se crea.
+// ════════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Una celda color×talla a migrar para una etapa (ya resuelta a ids del catálogo). */
+export interface CeldaEtapaMigrada {
+  idColor: number;
+  idTalla: number;
+  cantidad: number;
+  /** Solo recibos: piezas de PRIMERA. NULL en corte/envío. */
+  cantidadPrimeras?: number | null;
+  /** Solo recibos: piezas de SEGUNDA. NULL en corte/envío. */
+  cantidadSegundas?: number | null;
+}
+
+/** Encabezado + matriz de una etapa de producción a migrar (snapshot del viejo). */
+export interface EtapaMigrada {
+  idEmpresa: number;
+  idOrden: number;
+  tipo: TipoEtapaMovimiento;
+  /** Identificador VIEJO de la etapa (IdCorte / IdEntregas+Consecutivo / IdRecibos) para la bitácora. */
+  claveVieja?: string;
+  /** Proceso de maquila (costura/estampado). OBLIGATORIO en envío/recibo, NULL en corte. */
+  idTipoProceso?: number | null;
+  /** Cortador (corte) o maquilero (envío/recibo). NULL si el viejo no lo trae/mapea. */
+  idTercero?: number | null;
+  /** Fecha original de la etapa (de la tabla vieja). */
+  fecha: Date;
+  /** Fecha compromiso del maquilero (envíos: `Entregas.FechaEntregaM`). Solo día. */
+  fechaCompromiso?: Date | null;
+  /** Precio pactado de maquila (envíos: `Entregas.PrecioPactado`). Decimal o NULL. */
+  precioPactado?: number | null;
+  observaciones?: string | null;
+  /** Matriz despivotada (celdas color×talla con cantidad >0). */
+  celdas: CeldaEtapaMigrada[];
+}
+
+/** Resultado de migrar una etapa. */
+export interface ResultadoEtapaMigrada {
+  idEtapa: number;
+  /** # de celdas (color×talla) creadas. */
+  celdas: number;
+}
+
+/**
+ * Crea una etapa de producción HISTÓRICA (corte/envío/recibo) con su encabezado y matriz despivotada,
+ * en UNA transacción (A2/A7). SIN efectos derivados (ver el bloque de TSDoc de arriba). Folio de la
+ * secuencia atómica "etapa-mov" POR EMPRESA (A3). La matriz se agrupa por (color, talla) sumando
+ * cantidades repetidas (defensa del `@@unique`). Idempotencia: el loader resuelve "ya existe" por su
+ * `MapeoMigracion` ANTES de llamar; aquí solo se crea.
+ */
+async function crearEtapaMigrada(
+  sesion: SesionUsuario,
+  entrada: EtapaMigrada,
+  bd?: ContextoBd,
+): Promise<ResultadoEtapaMigrada> {
+  return enTransaccion(async (tx) => {
+    // Suma celdas repetidas (mismo color×talla) — el despivote posicional del viejo podría repetir
+    // una talla si dos columnas TCn mapean a la misma etiqueta; el @@unique lo exige.
+    const porClave = new Map<string, CeldaEtapaMigrada>();
+    for (const c of entrada.celdas) {
+      const clave = `${String(c.idColor)}:${String(c.idTalla)}`;
+      const prev = porClave.get(clave);
+      if (prev === undefined) {
+        porClave.set(clave, { ...c });
+      } else {
+        prev.cantidad += c.cantidad;
+        if (prev.cantidadPrimeras != null || c.cantidadPrimeras != null) {
+          prev.cantidadPrimeras = (prev.cantidadPrimeras ?? 0) + (c.cantidadPrimeras ?? 0);
+        }
+        if (prev.cantidadSegundas != null || c.cantidadSegundas != null) {
+          prev.cantidadSegundas = (prev.cantidadSegundas ?? 0) + (c.cantidadSegundas ?? 0);
+        }
+      }
+    }
+    const celdas = [...porClave.values()];
+
+    const folio = await siguienteFolio(tx, entrada.idEmpresa, CLAVE_SECUENCIA_ETAPA);
+    const etapa = await tx.etapaMovimiento.create({
+      data: {
+        folio,
+        idEmpresa: entrada.idEmpresa,
+        idOrden: entrada.idOrden,
+        tipo: entrada.tipo,
+        idTipoProceso: entrada.idTipoProceso ?? null,
+        idTercero: entrada.idTercero ?? null,
+        fecha: entrada.fecha,
+        fechaCompromiso: entrada.fechaCompromiso ?? null,
+        ...(entrada.precioPactado == null ? {} : { precioPactado: entrada.precioPactado }),
+        observaciones: entrada.observaciones ?? null,
+        detalles: {
+          create: celdas.map((c) => ({
+            idColor: c.idColor,
+            idTalla: c.idTalla,
+            cantidad: c.cantidad,
+            ...(c.cantidadPrimeras == null ? {} : { cantidadPrimeras: c.cantidadPrimeras }),
+            ...(c.cantidadSegundas == null ? {} : { cantidadSegundas: c.cantidadSegundas }),
+          })),
+        },
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'EtapaMovimiento',
+      idEntidad: etapa.id,
+      accion: 'CREAR',
+      datos: {
+        operacion: 'migracion',
+        tipo: entrada.tipo,
+        folio: Number(folio),
+        idEmpresa: entrada.idEmpresa,
+        idOrden: entrada.idOrden,
+        celdas: celdas.length,
+        ...(entrada.claveVieja === undefined ? {} : { claveVieja: entrada.claveVieja }),
+      },
+    });
+
+    return { idEtapa: etapa.id, celdas: celdas.length };
+  }, bd);
+}
+
+/** Migra un CORTE histórico (`Corte` + `OrdenesDetCorte`). Folio de la secuencia A3 (el `IdCorte` se preserva en MapeoMigracion). idTipoProceso NULL. */
+export async function crearCorteMigrado(
+  sesion: SesionUsuario,
+  entrada: Omit<EtapaMigrada, 'tipo' | 'idTipoProceso'>,
+  bd?: ContextoBd,
+): Promise<ResultadoEtapaMigrada> {
+  return crearEtapaMigrada(sesion, { ...entrada, tipo: TipoEtapaMovimiento.corte }, bd);
+}
+
+/**
+ * Migra un ENVÍO a maquila histórico (`Entregas`/`EntregasEst` + sus detalles). Folio de la secuencia
+ * A3; el id viejo se preserva en MapeoMigracion (`Consecutivo` es el N-ésimo envío DE LA ORDEN, no un
+ * folio global). `idTipoProceso` = costura (M) o estampado (A). En el viejo "Entregas" = envío AL maquilero.
+ */
+export async function crearEnvioMigrado(
+  sesion: SesionUsuario,
+  entrada: Omit<EtapaMigrada, 'tipo'> & { idTipoProceso: number },
+  bd?: ContextoBd,
+): Promise<ResultadoEtapaMigrada> {
+  return crearEtapaMigrada(sesion, { ...entrada, tipo: TipoEtapaMovimiento.envio_maquila }, bd);
+}
+
+/**
+ * Migra un RECIBO de maquila histórico (`Recibos`/`RecibosEst` + sus detalles). Folio de la secuencia
+ * A3 (el `IdRecibos`/`IdRecibosEst` se preserva en MapeoMigracion). VARIANTE SIN EFECTOS: NO genera
+ * entrada al kardex PT NI `EsMaCargo` (ver el bloque de TSDoc — no-doble-conteo contra IPT_Movs/
+ * EsMa_Recibos). La calidad primeras/segundas se preserva en el detalle, SEPARADA del almacén destino
+ * (que nace en v2).
+ */
+export async function crearReciboMigrado(
+  sesion: SesionUsuario,
+  entrada: Omit<EtapaMigrada, 'tipo'> & { idTipoProceso: number },
+  bd?: ContextoBd,
+): Promise<ResultadoEtapaMigrada> {
+  return crearEtapaMigrada(sesion, { ...entrada, tipo: TipoEtapaMovimiento.recibo_maquila }, bd);
 }

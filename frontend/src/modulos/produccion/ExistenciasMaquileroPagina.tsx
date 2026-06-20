@@ -58,7 +58,8 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
         <div>
           <h1 className="text-xl font-semibold">Existencias en poder del maquilero</h1>
           <p className="text-sm text-muted-foreground">
-            Piezas enviadas que el maquilero aún no devuelve (enviado − recibido), por orden y proceso.
+            Piezas enviadas que el maquilero aún no devuelve (enviado − recibido), por orden y
+            proceso.
           </p>
         </div>
       </header>

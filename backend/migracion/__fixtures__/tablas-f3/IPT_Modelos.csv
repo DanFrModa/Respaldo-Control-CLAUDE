@@ -1,0 +1,5 @@
+"IdIPT_Modelos","NumMod","IdOrdenes","Ubicacion","IdEmpresas","IdIPT_Generos","IdEtiquetasM","IdIPT_TipoProd","IdIPT_TipoPiezas","MarcaImpresa","IdClientes"
+1,"M001",100,,8,2,42,1,1,0,75
+2,"M002",101,,8,2,57,1,1,0,80
+3,"M999",102,,8,2,42,1,1,0,75
+4,"M004",103,,0,2,42,1,1,0,75
