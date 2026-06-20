@@ -27,9 +27,12 @@ import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedid
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
+import { EntregaClientePagina } from '@/modulos/produccion/EntregaClientePagina';
 import { EnvioMaquilaPagina } from '@/modulos/produccion/EnvioMaquilaPagina';
+import { ExistenciasMaquileroPagina } from '@/modulos/produccion/ExistenciasMaquileroPagina';
 import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
+import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -93,6 +96,9 @@ const router = createBrowserRouter([
           { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
           { path: 'produccion/recibos', element: <ReciboMaquilaPagina /> },
           { path: 'produccion/recibos-semanales', element: <RecibosSemanalesPagina /> },
+          { path: 'produccion/entregas', element: <EntregaClientePagina /> },
+          { path: 'produccion/wip', element: <TableroWipPagina /> },
+          { path: 'produccion/existencias-maquilero', element: <ExistenciasMaquileroPagina /> },
           { path: 'produccion/corte-semanal', element: <CorteSemanalPagina /> },
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },

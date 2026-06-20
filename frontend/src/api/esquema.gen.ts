@@ -23092,6 +23092,1379 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/produccion/entregas-cliente': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Registrar una entrega a cliente (salida de PT no-negativa; cierra el pedido) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Datos de una entrega a cliente (color×talla, D4; salida de PT no-negativa). */
+      requestBody: {
+        content: {
+          'application/json': {
+            idOrden: number;
+            /** @description Almacén PT de donde sale la entrega. */
+            idAlmacen: number;
+            /**
+             * Format: date
+             * @description Fecha de la entrega (YYYY-MM-DD).
+             */
+            fecha: string;
+            /** @description Observaciones / referencia de pedido del cliente (texto libre), opcional. */
+            observaciones?: string;
+            /** @description Matriz color×talla de la entrega (D4). */
+            lineas: {
+              idColor: number;
+              /** @description Cantidades por talla de este color. */
+              tallas: {
+                idTalla: number;
+                cantidad: number;
+              }[];
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Entrega a cliente con su matriz color×talla. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la entrega (EtapaMovimiento). */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Modelo entregado (el de la orden). */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Cliente de la orden (a quien se entrega). */
+              idCliente: number | null;
+              /** @description Nombre del cliente o null. */
+              cliente: string | null;
+              /** @description Almacén de origen de la salida o null. */
+              idAlmacen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacen: string | null;
+              /** @description Fecha de la entrega (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Observaciones / referencia de pedido o null. */
+              observaciones: string | null;
+              /** @description Si la entrega está cancelada (suave). */
+              cancelado: boolean;
+              /** @description Cuándo se canceló (ISO) o null. */
+              canceladoEn: string | null;
+              /** @description Id del usuario que canceló o null. */
+              canceladoPorId: string | null;
+              /** @description Motivo de cancelación o null. */
+              motivoCancelacion: string | null;
+              /** @description Movimiento de kardex (salida de PT) generado por la entrega, o null. */
+              idMovimientoSalida: number | null;
+              /** @description Matriz color×talla de la entrega. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad entregada de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total entregado (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la capturó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/entregas-cliente/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar (suave + inverso de kardex) una entrega a cliente */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo de la cancelación de la entrega. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Entrega a cliente con su matriz color×talla. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la entrega (EtapaMovimiento). */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Orden a la que pertenece. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Modelo entregado (el de la orden). */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Cliente de la orden (a quien se entrega). */
+              idCliente: number | null;
+              /** @description Nombre del cliente o null. */
+              cliente: string | null;
+              /** @description Almacén de origen de la salida o null. */
+              idAlmacen: number | null;
+              /** @description Nombre del almacén de origen o null. */
+              almacen: string | null;
+              /** @description Fecha de la entrega (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Observaciones / referencia de pedido o null. */
+              observaciones: string | null;
+              /** @description Si la entrega está cancelada (suave). */
+              cancelado: boolean;
+              /** @description Cuándo se canceló (ISO) o null. */
+              canceladoEn: string | null;
+              /** @description Id del usuario que canceló o null. */
+              canceladoPorId: string | null;
+              /** @description Motivo de cancelación o null. */
+              motivoCancelacion: string | null;
+              /** @description Movimiento de kardex (salida de PT) generado por la entrega, o null. */
+              idMovimientoSalida: number | null;
+              /** @description Matriz color×talla de la entrega. */
+              lineas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Cantidades por talla. */
+                tallas: {
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad entregada de la talla. */
+                  cantidad: number;
+                }[];
+                /** @description Total del renglón (derivado por suma). */
+                totalPiezas: number;
+              }[];
+              /** @description Total entregado (derivado). */
+              totalPiezas: number;
+              /**
+               * Format: date-time
+               * @description Fecha de captura (ISO).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la capturó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/ordenes/{id}/entregas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Historial de entregas a cliente de una orden (vivas y canceladas) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Historial de entregas a cliente de una orden. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Entregas de la orden (vivas y canceladas). */
+              entregas: {
+                /** @description Id de la entrega (EtapaMovimiento). */
+                id: number;
+                /** @description Folio consecutivo por empresa (A3). */
+                folio: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Orden a la que pertenece. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folioOrden: number;
+                /** @description Modelo entregado (el de la orden). */
+                idModelo: number;
+                /** @description Código del modelo. */
+                modelo: string;
+                /** @description Cliente de la orden (a quien se entrega). */
+                idCliente: number | null;
+                /** @description Nombre del cliente o null. */
+                cliente: string | null;
+                /** @description Almacén de origen de la salida o null. */
+                idAlmacen: number | null;
+                /** @description Nombre del almacén de origen o null. */
+                almacen: string | null;
+                /** @description Fecha de la entrega (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Observaciones / referencia de pedido o null. */
+                observaciones: string | null;
+                /** @description Si la entrega está cancelada (suave). */
+                cancelado: boolean;
+                /** @description Cuándo se canceló (ISO) o null. */
+                canceladoEn: string | null;
+                /** @description Id del usuario que canceló o null. */
+                canceladoPorId: string | null;
+                /** @description Motivo de cancelación o null. */
+                motivoCancelacion: string | null;
+                /** @description Movimiento de kardex (salida de PT) generado por la entrega, o null. */
+                idMovimientoSalida: number | null;
+                /** @description Matriz color×talla de la entrega. */
+                lineas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color. */
+                  color: string;
+                  /** @description Cantidades por talla. */
+                  tallas: {
+                    /** @description Id de la talla. */
+                    idTalla: number;
+                    /** @description Etiqueta visible de la talla. */
+                    etiquetaTalla: string;
+                    /** @description Cantidad entregada de la talla. */
+                    cantidad: number;
+                  }[];
+                  /** @description Total del renglón (derivado por suma). */
+                  totalPiezas: number;
+                }[];
+                /** @description Total entregado (derivado). */
+                totalPiezas: number;
+                /**
+                 * Format: date-time
+                 * @description Fecha de captura (ISO).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que la capturó. */
+                creadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/ordenes/{id}/seguimiento-entrega': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Seguimiento derivado de la entrega de una orden (pedido − entregado + disponible) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Almacén para calcular el disponible por celda (opcional). */
+          idAlmacen?: number;
+        };
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Seguimiento derivado de la entrega de una orden (pedido − entregado). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Cliente de la orden o null. */
+              idCliente: number | null;
+              /** @description Nombre del cliente o null. */
+              cliente: string | null;
+              /** @description Modelo de la orden. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Seguimiento por color×talla (pedido/entregado/faltante/disponible). */
+              celdas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Cantidad pedida (de la orden) para esa celda. */
+                pedido: number;
+                /** @description Σ entregas vivas de la orden para esa celda. */
+                entregado: number;
+                /** @description pedido − entregado (negativo si se entregó de más). */
+                faltante: number;
+                /** @description Existencia disponible en el almacén filtrado (si se pidió). */
+                disponible: number;
+              }[];
+              /** @description Total pedido de la orden (derivado). */
+              totalPedido: number;
+              /** @description Total entregado (derivado de entregas vivas). */
+              totalEntregado: number;
+              /** @description Total faltante (pedido − entregado). */
+              totalFaltante: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/entregas-cliente/{id}/comprobante': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Comprobante de entrega a cliente (PDF) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/wip': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tablero WIP: órdenes con su avance derivado por etapa (corte/envío/recibo/entrega) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Texto a buscar (folio, código de modelo, cliente o valor de referencia D7). */
+          busqueda?: string;
+          /** @description Filtra por modelo. */
+          idModelo?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por estado de la orden. */
+          estado?: 'capturada' | 'completa' | 'cancelada';
+          /** @description Si true, solo órdenes con algo pendiente (por cortar/enviar/recibir/entregar). */
+          soloPendientes?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'folio' | 'fecha' | 'fechaEntrega';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página del tablero WIP (órdenes con su avance). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes (con avance) de la página. */
+              datos: {
+                /** @description Id de la orden. */
+                idOrden: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /**
+                 * @description Estado de la orden.
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Fecha de la orden (YYYY-MM-DD) o null. */
+                fecha: string | null;
+                /** @description Fecha de entrega comprometida o null. */
+                fechaEntrega: string | null;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo (para la UI). */
+                codigoModelo: string;
+                /** @description Cliente de la orden. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Total pedido por la orden (Σ de la matriz). */
+                pedido: number;
+                /** @description Total cortado (Σ etapas de corte vivas). */
+                cortado: number;
+                /** @description Total enviado a maquila (Σ envíos vivos, todos los procesos). */
+                enviado: number;
+                /** @description Total recibido de maquila (Σ recibos vivos, todos los procesos). */
+                recibido: number;
+                /** @description Recibido de procesos que meten a PT (costura) — base de "por entregar". */
+                recibidoCostura: number;
+                /** @description Total entregado a cliente (Σ entregas vivas). */
+                entregado: number;
+                /** @description pedido − cortado (negativo si hubo sobre-corte). */
+                porCortar: number;
+                /** @description cortado − enviado (total, todos los procesos). */
+                cortadoPorEnviar: number;
+                /** @description enviado − recibido (total, todos los procesos). */
+                porRecibir: number;
+                /** @description recibido(costura) − entregado a cliente (lo que falta entregar). */
+                porEntregar: number;
+              }[];
+              /** @description Total de órdenes que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/wip/ordenes/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Drill-down del avance de una orden (pendientes por etapa, color×talla + entregado) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Drill-down del avance de una orden (totales + pendientes por etapa, color×talla). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folio: number;
+              /**
+               * @description Estado de la orden.
+               * @enum {string}
+               */
+              estado: 'capturada' | 'completa' | 'cancelada';
+              /** @description Modelo a producir. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              codigoModelo: string;
+              /** @description Cliente de la orden. */
+              idCliente: number;
+              /** @description Nombre del cliente. */
+              cliente: string;
+              /** @description Total pedido. */
+              pedido: number;
+              /** @description Total cortado. */
+              cortado: number;
+              /** @description Total enviado. */
+              enviado: number;
+              /** @description Total recibido. */
+              recibido: number;
+              /** @description Recibido de costura (mete a PT). */
+              recibidoCostura: number;
+              /** @description Total entregado a cliente. */
+              entregado: number;
+              /** @description recibido(costura) − entregado. */
+              porEntregar: number;
+              /** @description pedido − cortado por color×talla (negativo si sobre-corte). */
+              porCortar: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Cantidad (puede ser negativa por sobre-corte). */
+                cantidad: number;
+              }[];
+              /** @description cortado − enviado por proceso, color×talla. */
+              cortadoPorEnviar: {
+                /** @description Id del tipo de proceso. */
+                idTipoProceso: number;
+                /** @description Nombre del proceso. */
+                tipoProceso: string;
+                /** @description Código del proceso (kebab-case). */
+                codigoProceso: string;
+                /** @description Si el proceso mete a PT (costura). */
+                generaEntradaPt: boolean;
+                /** @description Celdas pendientes (≠ 0) de este proceso. */
+                celdas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color. */
+                  color: string;
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad (puede ser negativa por sobre-corte). */
+                  cantidad: number;
+                }[];
+                /** @description Total pendiente de este proceso (derivado). */
+                totalPendiente: number;
+              }[];
+              /** @description enviado − recibido por proceso, color×talla. */
+              porRecibir: {
+                /** @description Id del tipo de proceso. */
+                idTipoProceso: number;
+                /** @description Nombre del proceso. */
+                tipoProceso: string;
+                /** @description Código del proceso (kebab-case). */
+                codigoProceso: string;
+                /** @description Si el proceso mete a PT (costura). */
+                generaEntradaPt: boolean;
+                /** @description Celdas pendientes (≠ 0) de este proceso. */
+                celdas: {
+                  /** @description Id del color. */
+                  idColor: number;
+                  /** @description Nombre del color. */
+                  color: string;
+                  /** @description Id de la talla. */
+                  idTalla: number;
+                  /** @description Etiqueta visible de la talla. */
+                  etiquetaTalla: string;
+                  /** @description Cantidad (puede ser negativa por sobre-corte). */
+                  cantidad: number;
+                }[];
+                /** @description Total pendiente de este proceso (derivado). */
+                totalPendiente: number;
+              }[];
+              /** @description Entregado a cliente por color×talla (Σ de entregas vivas). */
+              entregadoCeldas: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Cantidad (puede ser negativa por sobre-corte). */
+                cantidad: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/produccion/existencias-maquilero': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Existencias en poder del maquilero (enviado − recibido, por orden y proceso) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por un maquilero. */
+          idMaquilero?: number;
+          /** @description Filtra por un tipo de proceso. */
+          idTipoProceso?: number;
+          /** @description Filtra por una orden. */
+          idOrden?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Existencias en poder del maquilero (enviado − recibido). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Existencias en poder por maquilero × proceso × orden (saldo ≠ 0). */
+              filas: {
+                /** @description Maquilero (Proveedor) o null si no se asignó. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero (o "Sin asignar"). */
+                maquilero: string;
+                /** @description Tipo de proceso. */
+                idTipoProceso: number;
+                /** @description Nombre del proceso. */
+                tipoProceso: string;
+                /** @description Orden. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folioOrden: number;
+                /** @description Código del modelo de la orden. */
+                codigoModelo: string;
+                /** @description Piezas enviadas (Σ envíos vivos). */
+                enviado: number;
+                /** @description Piezas recibidas (Σ recibos vivos). */
+                recibido: number;
+                /** @description enviado − recibido (lo que el maquilero tiene pendiente). */
+                enPoder: number;
+              }[];
+              /** @description Total de piezas en poder de maquileros (derivado). */
+              totalEnPoder: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/esma/cargos': {
     parameters: {
       query?: never;
