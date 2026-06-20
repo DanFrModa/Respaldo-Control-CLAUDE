@@ -236,6 +236,15 @@ describe('API de autenticación (E3)', () => {
       const sesion = await login('admin', PASSWORD_ADMIN);
       const cookie = comoHeaderCookie(sesion.cookies);
 
+      // Total activo ANTES de crear (robusto al seed: F3-E1 siembra almacenes PT activos).
+      const listaInicial = await app.inject({
+        method: 'GET',
+        url: '/api/almacenes',
+        headers: { cookie },
+      });
+      expect(listaInicial.statusCode).toBe(200);
+      const totalInicial = listaInicial.json<{ total: number }>().total;
+
       // Crear
       const creado = await app.inject({
         method: 'POST',
@@ -283,13 +292,17 @@ describe('API de autenticación (E3)', () => {
       expect(desactivado.statusCode).toBe(200);
       expect(desactivado.json<{ activo: boolean }>().activo).toBe(false);
 
-      // Ya no aparece en el listado por defecto (solo activos).
+      // Ya no aparece en el listado por defecto (solo activos): el efecto neto de crear + desactivar
+      // sobre el total activo es CERO, así que vuelve a ser el total inicial (robusto al seed).
       const listaFinal = await app.inject({
         method: 'GET',
         url: '/api/almacenes',
         headers: { cookie },
       });
-      expect(listaFinal.json<{ total: number }>().total).toBe(0);
+      const finalBody = listaFinal.json<{ total: number; datos: { id: number }[] }>();
+      expect(finalBody.total).toBe(totalInicial);
+      // Y el almacén que creamos+desactivamos NO está entre los activos.
+      expect(finalBody.datos.some((a) => a.id === almacen.id)).toBe(false);
     });
 
     it('valida la entrada (Zod) → 400 con detalles', async () => {
