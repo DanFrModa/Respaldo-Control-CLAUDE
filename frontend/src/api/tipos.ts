@@ -463,3 +463,38 @@ export type KardexPtRenglon = KardexPt['renglones'][number];
 export type KardexPtQuery = NonNullable<
   paths['/api/inventarios/pt/kardex']['get']['parameters']['query']
 >;
+
+// ── Recibo de maquila + cargos EsMa (F3-E4) ──────────────────────────────────
+
+/** Un recibo de maquila tal como lo devuelve el API (con su matriz color×talla y calidad). */
+export type Recibo =
+  paths['/api/produccion/recibos']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de alta de un recibo (`POST /api/produccion/recibos`). */
+export type ReciboCrear =
+  paths['/api/produccion/recibos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación de un recibo (`POST /api/produccion/recibos/{id}/cancelar`). */
+export type ReciboCancelar =
+  paths['/api/produccion/recibos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Pendientes por recibir de una orden (`GET /api/produccion/ordenes/{id}/pendientes-recibir`). */
+export type PendientesRecibir =
+  paths['/api/produccion/ordenes/{id}/pendientes-recibir']['get']['responses']['200']['content']['application/json'];
+/** Recibos semanales por maquilero (`GET /api/produccion/recibos-semanales`). */
+export type RecibosSemanales =
+  paths['/api/produccion/recibos-semanales']['get']['responses']['200']['content']['application/json'];
+/** Parámetros de los recibos semanales (querystring). */
+export type RecibosSemanalesQuery = NonNullable<
+  paths['/api/produccion/recibos-semanales']['get']['parameters']['query']
+>;
+/** Un cargo EsMa (cuenta de maquila) tal como lo devuelve el API. */
+export type CargoEsMa =
+  paths['/api/esma/cargos/{id}']['get']['responses']['200']['content']['application/json'];
+/** Cola de cargos EsMa por estado (`GET /api/esma/cargos`). */
+export type CargosEsMa =
+  paths['/api/esma/cargos']['get']['responses']['200']['content']['application/json'];
+/** Una fila de la cola de cargos EsMa. */
+export type CargoEsMaFila = CargosEsMa['filas'][number];
+/** Parámetros de la cola de cargos EsMa (querystring). */
+export type CargosEsMaQuery = NonNullable<paths['/api/esma/cargos']['get']['parameters']['query']>;
+/** Cuerpo de validación de un cargo EsMa (`POST /api/esma/cargos/{id}/validar`). */
+export type CargoEsMaValidar =
+  paths['/api/esma/cargos/{id}/validar']['post']['requestBody']['content']['application/json'];

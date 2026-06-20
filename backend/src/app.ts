@@ -15,10 +15,12 @@ import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
 import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
 import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
+import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
 import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
+import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
@@ -139,6 +141,14 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // (documento de envío + ficha de estampado). RBAC por ruta (produccion.corte/.envio/.cancelar/
   // .wip-ver). El corte/envío NO tocan el kardex PT (eso entra en E4 recibo / E5 entrega).
   await app.register(rutasEtapasProduccion, { prefix: '/api' });
+  // Producción / WIP — RECIBO de maquila (F3-E4, etapa ⭐ central): de UNA captura se derivan WIP +
+  // entrada a PT (solo costura, generaEntradaPt) + cargo EsMa propuesto. Cancelación con inverso de
+  // kardex; pendientes por recibir; recibos semanales por maquilero; PDF de recibo. RBAC por ruta
+  // (produccion.recibo/.cancelar/.wip-ver).
+  await app.register(rutasRecibosProduccion, { prefix: '/api' });
+  // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
+  // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.
+  await app.register(rutasCargosEsMa, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

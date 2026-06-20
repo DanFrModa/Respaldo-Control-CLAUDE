@@ -508,6 +508,35 @@ export {
   type CorteSemanalLista,
 } from './esquemas/etapa.js';
 
+// ── Recibo de maquila (F3-E4; doc 03-Produccion Paso 5) ──────────────────────
+export {
+  esquemaReciboCrear,
+  esquemaReciboCancelarCuerpo,
+  esquemaReciboSalida,
+  esquemaPendientesRecibir,
+  esquemaRecibosSemanalesQuery,
+  esquemaRecibosSemanalesLista,
+  type DatosReciboLineaEntrada,
+  type DatosReciboCrear,
+  type DatosReciboCancelar,
+  type ReciboSalida,
+  type PendientesRecibir,
+  type RecibosSemanalesQuery,
+  type RecibosSemanalesLista,
+} from './esquemas/recibo.js';
+
+// ── Cargos EsMa: cola de validación derivada de los recibos (F3-E4; doc 07-EsMa) ──
+export {
+  esquemaCargoEsMaValidarCuerpo,
+  esquemaCargosEsMaQuery,
+  esquemaCargoEsMaSalida,
+  esquemaCargosEsMaLista,
+  type DatosCargoEsMaValidar,
+  type CargosEsMaQuery,
+  type CargoEsMaSalida,
+  type CargosEsMaLista,
+} from './esquemas/esma.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

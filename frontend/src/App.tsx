@@ -12,6 +12,7 @@ import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
+import { ValidacionCargosPagina } from '@/modulos/esma/ValidacionCargosPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
 import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
@@ -27,6 +28,8 @@ import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
 import { EnvioMaquilaPagina } from '@/modulos/produccion/EnvioMaquilaPagina';
+import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
+import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -88,6 +91,8 @@ const router = createBrowserRouter([
           { path: 'produccion/ordenes', element: <OrdenesPagina /> },
           { path: 'produccion/corte', element: <CapturaCortePagina /> },
           { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
+          { path: 'produccion/recibos', element: <ReciboMaquilaPagina /> },
+          { path: 'produccion/recibos-semanales', element: <RecibosSemanalesPagina /> },
           { path: 'produccion/corte-semanal', element: <CorteSemanalPagina /> },
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
@@ -96,6 +101,7 @@ const router = createBrowserRouter([
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
           { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },
           { path: 'inventarios/kardex', element: <KardexPtPagina /> },
+          { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
