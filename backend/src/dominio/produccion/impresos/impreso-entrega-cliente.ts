@@ -321,11 +321,7 @@ function paginaEntrega(datos: DatosImpresoEntrega, clave: string): ReactElement 
     h(
       View,
       { style: estilos.firmas, key: 'firmas' },
-      h(
-        View,
-        { style: estilos.firma },
-        h(Text, { style: estilos.firmaEtiqueta }, 'Entregó'),
-      ),
+      h(View, { style: estilos.firma }, h(Text, { style: estilos.firmaEtiqueta }, 'Entregó')),
       h(
         View,
         { style: estilos.firma },

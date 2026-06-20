@@ -394,7 +394,9 @@ describe('Tablero WIP (totales y pendientes derivados)', () => {
         estado: 'completa',
         fecha: new Date('2026-06-01T00:00:00.000Z'),
         lineas: {
-          create: [{ idColor: colorAzul.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: 5 }] } }],
+          create: [
+            { idColor: colorAzul.id, tallas: { create: [{ idTalla: tallaM.id, cantidad: 5 }] } },
+          ],
         },
       },
     });

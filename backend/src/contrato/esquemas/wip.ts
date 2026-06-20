@@ -80,8 +80,14 @@ export const esquemaWipOrdenFila = z
     cliente: z.string().describe('Nombre del cliente (para la UI).'),
     pedido: z.number().int().describe('Total pedido por la orden (Σ de la matriz).'),
     cortado: z.number().int().describe('Total cortado (Σ etapas de corte vivas).'),
-    enviado: z.number().int().describe('Total enviado a maquila (Σ envíos vivos, todos los procesos).'),
-    recibido: z.number().int().describe('Total recibido de maquila (Σ recibos vivos, todos los procesos).'),
+    enviado: z
+      .number()
+      .int()
+      .describe('Total enviado a maquila (Σ envíos vivos, todos los procesos).'),
+    recibido: z
+      .number()
+      .int()
+      .describe('Total recibido de maquila (Σ recibos vivos, todos los procesos).'),
     recibidoCostura: z
       .number()
       .int()
@@ -205,7 +211,11 @@ export type ExistenciaMaquileroQuery = z.infer<typeof esquemaExistenciaMaquilero
  */
 export const esquemaExistenciaMaquileroFila = z
   .object({
-    idMaquilero: z.number().int().nullable().describe('Maquilero (Proveedor) o null si no se asignó.'),
+    idMaquilero: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Maquilero (Proveedor) o null si no se asignó.'),
     maquilero: z.string().describe('Nombre del maquilero (o "Sin asignar").'),
     idTipoProceso: z.number().int().describe('Tipo de proceso.'),
     tipoProceso: z.string().describe('Nombre del proceso.'),

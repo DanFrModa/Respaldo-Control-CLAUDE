@@ -53,6 +53,18 @@ export const ENTIDAD_MAPEO = {
   ordenLinea: 'OrdenLinea',
   /** F2-E5: IdComentaOrd viejo → OrdenComentario.id nuevo. */
   ordenComentario: 'OrdenComentario',
+  /** F3-E6: IdCorte viejo → EtapaMovimiento(corte).id nuevo. */
+  etapaCorte: 'EtapaCorte',
+  /** F3-E6: Consecutivo de Entregas (costura) viejo → EtapaMovimiento(envio_maquila costura).id. */
+  etapaEnvioCostura: 'EtapaEnvioCostura',
+  /** F3-E6: Consecutivo de EntregasEst (estampado) viejo → EtapaMovimiento(envio_maquila estampado).id. */
+  etapaEnvioEstampado: 'EtapaEnvioEstampado',
+  /** F3-E6: IdRecibos (costura) viejo → EtapaMovimiento(recibo_maquila costura).id. */
+  etapaReciboCostura: 'EtapaReciboCostura',
+  /** F3-E6: IdRecibosEst (estampado) viejo → EtapaMovimiento(recibo_maquila estampado).id. */
+  etapaReciboEstampado: 'EtapaReciboEstampado',
+  /** F3-E6: IdEsMa_Recibos viejo → EsMaCargo.id nuevo. */
+  cargoEsMa: 'CargoEsMa',
 } as const;
 
 /** Una clave de entidad de mapeo. */

@@ -190,7 +190,10 @@ const esquemaSeguimientoCelda = z.object({
   pedido: z.number().int().describe('Cantidad pedida (de la orden) para esa celda.'),
   entregado: z.number().int().describe('Σ entregas vivas de la orden para esa celda.'),
   faltante: z.number().int().describe('pedido − entregado (negativo si se entregó de más).'),
-  disponible: z.number().int().describe('Existencia disponible en el almacén filtrado (si se pidió).'),
+  disponible: z
+    .number()
+    .int()
+    .describe('Existencia disponible en el almacén filtrado (si se pidió).'),
 });
 
 /**
