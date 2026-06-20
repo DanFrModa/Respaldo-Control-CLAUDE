@@ -13,6 +13,7 @@ import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
+import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
 import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
@@ -129,6 +130,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // llegan en E2–E5.
   await app.register(rutasTiposProceso, { prefix: '/api' });
   await app.register(rutasTiposMovimiento, { prefix: '/api' });
+  // Inventario PT operable (Módulo 6, F3-E3): movimientos manuales (entrada/salida/ajuste),
+  // traspasos entre almacenes (dos patas), cancelación por inverso auditado (D3), existencias
+  // (vista) y kardex (por modelo con saldo corrido + por folio). RBAC inventario-pt.ver/.mover.
+  await app.register(rutasMovimientosPt, { prefix: '/api' });
   // Producción / WIP — ETAPAS (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8),
   // cancelación suave, pendientes derivados por orden, corte semanal por cortador y los 2 PDFs
   // (documento de envío + ficha de estampado). RBAC por ruta (produccion.corte/.envio/.cancelar/

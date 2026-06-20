@@ -13,6 +13,10 @@ import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
+import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
+import { MovimientosPtPagina } from '@/modulos/inventarios/MovimientosPtPagina';
+import { TraspasosPtPagina } from '@/modulos/inventarios/TraspasosPtPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
@@ -88,6 +92,10 @@ const router = createBrowserRouter([
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
           { path: 'produccion/pedidos-por-mes', element: <TableroPedidosMesPagina /> },
+          { path: 'inventarios/movimientos', element: <MovimientosPtPagina /> },
+          { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
+          { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },
+          { path: 'inventarios/kardex', element: <KardexPtPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

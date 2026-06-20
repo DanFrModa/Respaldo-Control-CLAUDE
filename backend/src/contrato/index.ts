@@ -461,6 +461,32 @@ export {
   type TiposMovimientoLista,
 } from './esquemas/tipo-movimiento.js';
 
+// ── Inventario PT operable: movimientos, traspasos, existencias y kardex (F3-E3; doc 04-Inventarios) ──
+export {
+  esquemaMovimientoPtCrear,
+  esquemaTraspasoPtCrear,
+  esquemaMovimientoPtCancelarCuerpo,
+  esquemaMovimientoPtSalida,
+  esquemaTraspasoPtSalida,
+  esquemaExistenciasPtQuery,
+  esquemaExistenciasPtLista,
+  esquemaKardexPtQuery,
+  esquemaKardexPtLista,
+  esquemaParamFolio,
+  type DatosMovPtLineaEntrada,
+  type DatosMovimientoPtCrear,
+  type DatosTraspasoPtCrear,
+  type DatosMovimientoPtCancelar,
+  type MovimientoPtSalida,
+  type TraspasoPtSalida,
+  type ExistenciasPtQuery,
+  type ExistenciaPtFila,
+  type ExistenciasPtLista,
+  type KardexPtQuery,
+  type KardexPtRenglon,
+  type KardexPtLista,
+} from './esquemas/movimiento-pt.js';
+
 // ── Etapas de producción: corte + envío a maquila (F3-E2; doc 03-Produccion) ──
 export {
   esquemaCorteCrear,
