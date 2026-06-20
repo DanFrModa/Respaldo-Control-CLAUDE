@@ -18,14 +18,13 @@
  * cliente + valor de `OrdenReferencia`, D7) y el filtro por año son los MISMOS de `ordenes.ts`
  * (`armarBusqueda`, `rangoAnio`), reexportados desde allí.
  */
+import { z } from 'zod';
+
 import {
-  esquemaConsultaOrdenes,
   esquemaIncompletasQuery,
   esquemaOrdenesBuscarQuery,
-  esquemaTableroPedidosMesQuery,
 } from '../../contrato/esquemas/orden-consulta.js';
 import type {
-  ConsultaOrdenes,
   IncompletasQuery,
   OrdenesBuscarQuery,
   OrdenesBuscarSalida,
@@ -36,11 +35,17 @@ import type {
   SemaforoOrden,
   TableroPedidosMes,
   TableroPedidosMesFila,
-  TableroPedidosMesQuery,
 } from '../../contrato/esquemas/orden-consulta.js';
+import { esquemaEstadoOrden } from '../../contrato/esquemas/orden.js';
 import type { Prisma } from '../../datos/index.js';
 
-import { armarPagina, rangoPrisma, type Pagina, type Paginacion } from '../../comun/paginacion.js';
+import {
+  armarPagina,
+  esquemaPaginacion,
+  rangoPrisma,
+  type Pagina,
+  type Paginacion,
+} from '../../comun/paginacion.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
@@ -170,6 +175,28 @@ export function semaforoPorDias(dias: number): SemaforoOrden {
 // ── Consulta (listado ligero con filtros de servidor) ───────────────────────────────
 
 /**
+ * Parámetros de la CONSULTA de órdenes EN DOMINIO (tipos ya nativos: `boolean`/`number`), distinto
+ * del esquema de la URL del contrato (`esquemaConsultaOrdenes`, con `z.coerce`/`z.stringbool` para
+ * el texto del querystring). La ruta valida/coacciona la querystring y pasa AQUÍ el resultado nativo;
+ * los tests llaman con valores nativos. Re-validar el contrato (stringbool) sobre un booleano ya
+ * coaccionado lanzaría (Zod 4.4.x: `stringbool` solo acepta texto) → 400 espurio; por eso el dominio
+ * tiene su propio esquema con `z.boolean()` — mismo patrón que `esquemaListarTallas`/`*Dominio`.
+ */
+const esquemaConsultaOrdenesDominio = esquemaPaginacion.extend({
+  busqueda: z.string().trim().max(200).optional(),
+  idModelo: z.number().int().positive().optional(),
+  idCliente: z.number().int().positive().optional(),
+  anio: z.number().int().min(2000).max(2100).optional(),
+  estado: esquemaEstadoOrden.optional(),
+  incluirCanceladas: z.boolean().default(false),
+  ordenarPor: z.enum(['folio', 'fecha', 'fechaEntrega', 'creadoEn']).default('folio'),
+  direccion: z.enum(['asc', 'desc']).default('desc'),
+});
+
+/** Parámetros que acepta `consultarOrdenes` (forma nativa, no la de la URL). */
+export type ParametrosConsultaOrdenes = z.input<typeof esquemaConsultaOrdenesDominio>;
+
+/**
  * CONSULTA de órdenes de la empresa activa (A9) con búsqueda combinada y proyección LIGERA. Mismos
  * filtros que el listado de captura (modelo/cliente/año/estado/canceladas + búsqueda) pero sin
  * embeber la matriz: el `totalPiezas` se agrega aparte (Σ de tallas en la base). Para tablas de
@@ -177,11 +204,11 @@ export function semaforoPorDias(dias: number): SemaforoOrden {
  */
 export async function consultarOrdenes(
   sesion: SesionUsuario,
-  parametros: Partial<ConsultaOrdenes> = {},
+  parametros: ParametrosConsultaOrdenes = {},
   bd?: ContextoBd,
 ): Promise<Pagina<OrdenLigeraSalida>> {
   verificarPermiso(sesion, 'ordenes.ver');
-  const filtros = validarEntrada(esquemaConsultaOrdenes, parametros);
+  const filtros = validarEntrada(esquemaConsultaOrdenesDominio, parametros);
 
   const where: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
@@ -330,6 +357,27 @@ export function agruparPorMes(filas: FilaTablero[]): TableroPedidosMesFila[] {
 }
 
 /**
+ * Filtros del TABLERO "pedidos por mes" EN DOMINIO (tipos ya nativos: `boolean`/`number`), distinto
+ * del esquema de la URL del contrato (`esquemaTableroPedidosMesQuery`, con `z.coerce`/`z.stringbool`
+ * para el texto del querystring). La ruta coacciona la querystring y pasa AQUÍ el valor nativo; los
+ * tests llaman con valores nativos. Re-validar el contrato (stringbool) sobre el booleano ya
+ * coaccionado lanzaría (Zod 4.4.x) → 400 espurio; por eso el dominio tiene su propio esquema con
+ * `z.boolean()` — mismo patrón que `esquemaConsultaOrdenesDominio`/`*Dominio`.
+ */
+const esquemaTableroPedidosMesDominio = z.object({
+  anio: z.number().int().min(2000).max(2100).optional(),
+  mes: z.number().int().min(1).max(12).optional(),
+  idCliente: z.number().int().positive().optional(),
+  incluirCanceladas: z.boolean().default(false),
+  // Banderas de paridad (viejo); sin efecto en F2 (no hay avance todavía). Se aceptan pero no se usan.
+  entregadosTienda: z.boolean().optional(),
+  noProducir: z.boolean().optional(),
+});
+
+/** Parámetros que acepta `tableroPedidosPorMes` (forma nativa, no la de la URL). */
+export type ParametrosTableroPedidosMes = z.input<typeof esquemaTableroPedidosMesDominio>;
+
+/**
  * TABLERO "pedidos por mes" de la empresa activa: agrega las órdenes por mes de su `fecha` con
  * métricas (número de órdenes + total de piezas). Filtros por año/mes/cliente/canceladas.
  *
@@ -345,11 +393,11 @@ export function agruparPorMes(filas: FilaTablero[]): TableroPedidosMesFila[] {
  */
 export async function tableroPedidosPorMes(
   sesion: SesionUsuario,
-  parametros: Partial<TableroPedidosMesQuery> = {},
+  parametros: ParametrosTableroPedidosMes = {},
   bd?: ContextoBd,
 ): Promise<TableroPedidosMes> {
   verificarPermiso(sesion, 'ordenes.ver');
-  const filtros = validarEntrada(esquemaTableroPedidosMesQuery, parametros);
+  const filtros = validarEntrada(esquemaTableroPedidosMesDominio, parametros);
 
   const where: Prisma.OrdenWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
