@@ -322,6 +322,11 @@ model Almacen {
   /// movimientos no se borra físico → se desactiva.
   movimientos Movimiento[]
 
+  /// Recibos de maquila que mandan sus PRIMERAS a este almacén (F3-E4). Restrict.
+  recibosAlmacenPrimeras EtapaMovimiento[] @relation("ReciboAlmacenPrimeras")
+  /// Recibos de maquila que mandan sus SEGUNDAS a este almacén (F3-E4). Restrict.
+  recibosAlmacenSegundas EtapaMovimiento[] @relation("ReciboAlmacenSegundas")
+
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
 }
@@ -1955,6 +1960,18 @@ model EtapaMovimiento {
   etapaEnvio   EtapaMovimiento?  @relation("ReciboDeEnvio", fields: [idEtapaEnvio], references: [id], onDelete: Restrict)
   recibos      EtapaMovimiento[] @relation("ReciboDeEnvio")
 
+  /// Almacén destino de las PRIMERAS de un RECIBO de costura (F3-E4). Solo se usa cuando el
+  /// recibo genera entrada a PT (`TipoProceso.generaEntradaPt`); NULL en corte/envío y en los
+  /// recibos de procesos que NO meten a PT (estampado/bordado/lavado). La CALIDAD (primeras/
+  /// segundas) se captura SEPARADA del almacén destino (decisión Gabriel F3-E4): lo bueno va a
+  /// "Primeras", lo defectuoso a "Segundas". Restrict.
+  idAlmacenPrimeras Int?     @map("id_almacen_primeras")
+  almacenPrimeras   Almacen? @relation("ReciboAlmacenPrimeras", fields: [idAlmacenPrimeras], references: [id], onDelete: Restrict)
+  /// Almacén destino de las SEGUNDAS de un RECIBO de costura (F3-E4). NULL si el recibo no
+  /// reportó segundas o no genera entrada a PT. Restrict.
+  idAlmacenSegundas Int?     @map("id_almacen_segundas")
+  almacenSegundas   Almacen? @relation("ReciboAlmacenSegundas", fields: [idAlmacenSegundas], references: [id], onDelete: Restrict)
+
   /// Cancelación SUAVE (plan §4): la etapa nunca se borra ni se edita; se cancela con motivo
   /// y queda en el historial (A7). El kardex/efectos se revierten con movimiento inverso (E4/E5).
   canceladoEn       DateTime? @map("cancelado_en")
@@ -1978,6 +1995,8 @@ model EtapaMovimiento {
   @@index([idTipoProceso])
   @@index([idTercero])
   @@index([idEtapaEnvio])
+  @@index([idAlmacenPrimeras])
+  @@index([idAlmacenSegundas])
   @@map("etapa_movimiento")
 }
 
@@ -1996,8 +2015,19 @@ model EtapaMovimientoDet {
   idTalla    Int             @map("id_talla")
   talla      Talla           @relation(fields: [idTalla], references: [id], onDelete: Restrict)
 
-  /// Cantidad de prendas de esta talla en este color para la etapa. Entera ≥0.
+  /// Cantidad de prendas de esta talla en este color para la etapa. Entera ≥0. En un RECIBO
+  /// de maquila es el TOTAL recibido (= primeras + segundas); en corte/envío es la cantidad
+  /// cortada/enviada (sin desglose de calidad).
   cantidad Int
+
+  /// CALIDAD del recibo (F3-E4, decisión Gabriel): cuántas de las `cantidad` recibidas son
+  /// PRIMERAS (buenas) y cuántas SEGUNDAS (defectuosas). Solo se llenan en recibos; NULL en
+  /// corte/envío. Cuando ambas vienen, `cantidadPrimeras + cantidadSegundas = cantidad` (lo
+  /// valida el dominio). La calidad es DATO del WIP, SEPARADA del almacén destino (que vive en
+  /// el encabezado). El kardex de costura mete las primeras al almacén de primeras y las
+  /// segundas al de segundas (F3-E4).
+  cantidadPrimeras Int? @map("cantidad_primeras")
+  cantidadSegundas Int? @map("cantidad_segundas")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")

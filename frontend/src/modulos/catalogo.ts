@@ -242,6 +242,27 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['produccion.wip-ver'],
     subVista: true,
   },
+  // Sub-vistas de Producción (F3-E4): recibo de maquila unificado (recibe costura/estampado; lo de
+  // costura entra a PT) y la consulta de recibos semanales por maquilero. Cuelgan del módulo
+  // Producción con sus permisos operativos (la captura del recibo, la consulta del WIP).
+  {
+    clave: 'recibos',
+    titulo: 'Recibo de maquila',
+    descripcion: 'Recibe prenda terminada de costura/estampado y mete a inventario lo de costura',
+    ruta: '/produccion/recibos',
+    icono: 'paquete',
+    permisos: ['produccion.recibo'],
+    subVista: true,
+  },
+  {
+    clave: 'recibos-semanales',
+    titulo: 'Recibos semanales',
+    descripcion: 'Piezas recibidas por maquilero y por semana',
+    ruta: '/produccion/recibos-semanales',
+    icono: 'calendario',
+    permisos: ['produccion.wip-ver'],
+    subVista: true,
+  },
   {
     clave: 'compras',
     titulo: 'Compras y Materiales',
@@ -321,6 +342,17 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/esma',
     icono: 'billete',
     permisos: 'autenticado',
+  },
+  // Sub-vista de EsMa (F3-E4): la cola de validación de cargos de maquila que proponen los recibos.
+  // Cuelga del módulo EsMa con su permiso operativo `esma.cargo-validar`.
+  {
+    clave: 'validacion-cargos',
+    titulo: 'Validación de cargos',
+    descripcion: 'Revisa y valida los cargos de maquila propuestos por los recibos',
+    ruta: '/esma/validacion-cargos',
+    icono: 'billete',
+    permisos: ['esma.cargo-validar'],
+    subVista: true,
   },
   {
     clave: 'costos',
