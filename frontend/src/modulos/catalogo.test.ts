@@ -16,17 +16,18 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
 
 describe('catalogo de modulos del menu', () => {
   it('define los 13 modulos del plan §5 (mas sub-vistas) con rutas y claves unicas', () => {
-    // 13 módulos del plan + 16 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
+    // 13 módulos del plan + 19 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
     // órdenes + incompletas + pedidos por mes, F2-E4; tipos de proceso, F3-E1; captura de corte +
     // envío a maquila + corte semanal, F3-E2; movimientos + traspasos + existencias + kardex de
-    // inventario PT, F3-E3; recibo + recibos semanales + validación de cargos EsMa, F3-E4).
+    // inventario PT, F3-E3; recibo + recibos semanales + validación de cargos EsMa, F3-E4; entrega a
+    // cliente + tablero WIP + existencias en poder del maquilero, F3-E5).
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(29);
+    expect(MODULOS_MENU).toHaveLength(32);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(29);
+    expect(new Set(claves).size).toBe(32);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(29);
+    expect(new Set(rutas).size).toBe(32);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -79,7 +80,7 @@ describe('catalogo de modulos del menu', () => {
     expect(esModuloVisible(admin, permisos('usuarios.administrar'))).toBe(true);
   });
 
-  it('un usuario con todos los permisos ve los 13 modulos + las 16 sub-vistas', () => {
+  it('un usuario con todos los permisos ve los 13 modulos + las 19 sub-vistas', () => {
     const todos = permisos(
       'usuarios.administrar',
       'roles.administrar',
@@ -90,7 +91,8 @@ describe('catalogo de modulos del menu', () => {
       // `ordenes.ver`; Tipos de proceso (F3-E1) requiere `tipos-proceso.ver`; corte/envío/corte
       // semanal (F3-E2) requieren `produccion.*`; inventario PT (F3-E3) requiere `inventario-pt.*`;
       // recibo + recibos semanales (F3-E4) requieren `produccion.recibo`/`.wip-ver`; la validación
-      // de cargos EsMa (F3-E4) requiere `esma.cargo-validar`.
+      // de cargos EsMa (F3-E4) requiere `esma.cargo-validar`; la entrega a cliente (F3-E5) requiere
+      // `produccion.entrega` (el tablero WIP y existencias del maquilero usan `produccion.wip-ver`).
       'modelos.ver',
       'pedidos.ver',
       'ordenes.ver',
@@ -98,15 +100,17 @@ describe('catalogo de modulos del menu', () => {
       'produccion.corte',
       'produccion.envio',
       'produccion.recibo',
+      'produccion.entrega',
       'produccion.wip-ver',
       'inventario-pt.ver',
       'inventario-pt.mover',
       'esma.cargo-validar',
     );
-    // 13 módulos del plan + 16 sub-vistas (galería + órdenes + consulta + incompletas + pedidos por
+    // 13 módulos del plan + 19 sub-vistas (galería + órdenes + consulta + incompletas + pedidos por
     // mes + tipos de proceso + corte + envíos + corte semanal + 4 de inventario PT + recibo +
-    // recibos semanales + validación de cargos EsMa) = 29.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(29);
+    // recibos semanales + validación de cargos EsMa + entrega + tablero WIP + existencias del
+    // maquilero) = 32.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(32);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {

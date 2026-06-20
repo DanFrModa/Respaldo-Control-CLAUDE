@@ -24,6 +24,7 @@ export const EVENTOS_PRODUCCION = {
   corteRegistrado: 'corte-registrado',
   envioRegistrado: 'envio-registrado',
   reciboRegistrado: 'recibo-registrado',
+  entregaRegistrado: 'entrega-registrado',
 } as const;
 
 /** Nombre de evento válido. */

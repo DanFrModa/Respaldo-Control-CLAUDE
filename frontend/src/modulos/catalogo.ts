@@ -16,6 +16,7 @@ import {
   Settings,
   Shirt,
   ShoppingCart,
+  Truck,
   Warehouse,
 } from 'lucide-react';
 
@@ -46,6 +47,7 @@ export type IconoModulo =
   | 'calendario'
   | 'paquete'
   | 'almacen'
+  | 'camion'
   | 'ruta'
   | 'medalla'
   | 'billete'
@@ -71,6 +73,7 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
   calendario: CalendarRange,
   paquete: Package,
   almacen: Warehouse,
+  camion: Truck,
   ruta: Route,
   medalla: Medal,
   billete: Banknote,
@@ -260,6 +263,36 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Piezas recibidas por maquilero y por semana',
     ruta: '/produccion/recibos-semanales',
     icono: 'calendario',
+    permisos: ['produccion.wip-ver'],
+    subVista: true,
+  },
+  // Sub-vistas de Producción (F3-E5): la ENTREGA a cliente (cierra el ciclo de la orden; saca de PT),
+  // el TABLERO de avance (WIP por orden, derivado) y las existencias EN PODER del maquilero (enviado
+  // − recibido). Cuelgan del módulo Producción con sus permisos operativos.
+  {
+    clave: 'entregas',
+    titulo: 'Entrega a cliente',
+    descripcion: 'Entrega producto terminado al cliente y cierra el pedido (salida de inventario)',
+    ruta: '/produccion/entregas',
+    icono: 'camion',
+    permisos: ['produccion.entrega'],
+    subVista: true,
+  },
+  {
+    clave: 'wip',
+    titulo: 'Tablero WIP',
+    descripcion: 'Avance de las órdenes en producción (corte, maquila, recibo y entrega)',
+    ruta: '/produccion/wip',
+    icono: 'lista-tareas',
+    permisos: ['produccion.wip-ver'],
+    subVista: true,
+  },
+  {
+    clave: 'existencias-maquilero',
+    titulo: 'En poder del maquilero',
+    descripcion: 'Piezas enviadas a maquila aún no recibidas, por maquilero y orden',
+    ruta: '/produccion/existencias-maquilero',
+    icono: 'paquete',
     permisos: ['produccion.wip-ver'],
     subVista: true,
   },

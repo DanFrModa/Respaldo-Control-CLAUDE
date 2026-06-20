@@ -498,3 +498,55 @@ export type CargosEsMaQuery = NonNullable<paths['/api/esma/cargos']['get']['para
 /** Cuerpo de validación de un cargo EsMa (`POST /api/esma/cargos/{id}/validar`). */
 export type CargoEsMaValidar =
   paths['/api/esma/cargos/{id}/validar']['post']['requestBody']['content']['application/json'];
+
+// ── Entrega a cliente (F3-E5) — cierre del ciclo de la orden ──────────────────
+
+/** Una entrega a cliente tal como la devuelve el API (con su matriz color×talla). */
+export type EntregaCliente =
+  paths['/api/produccion/entregas-cliente']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de alta de una entrega (`POST /api/produccion/entregas-cliente`). */
+export type EntregaClienteCrear =
+  paths['/api/produccion/entregas-cliente']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación de una entrega (`POST /api/produccion/entregas-cliente/{id}/cancelar`). */
+export type EntregaClienteCancelar =
+  paths['/api/produccion/entregas-cliente/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Historial de entregas de una orden (`GET /api/produccion/ordenes/{id}/entregas`). */
+export type EntregasOrden =
+  paths['/api/produccion/ordenes/{id}/entregas']['get']['responses']['200']['content']['application/json'];
+/** Una entrega del historial de una orden (viva o cancelada). */
+export type EntregaHistorial = EntregasOrden['entregas'][number];
+/** Seguimiento derivado de la entrega de una orden (`GET .../seguimiento-entrega`). */
+export type SeguimientoEntrega =
+  paths['/api/produccion/ordenes/{id}/seguimiento-entrega']['get']['responses']['200']['content']['application/json'];
+/** Una celda del seguimiento (pedido/entregado/faltante/disponible). */
+export type SeguimientoEntregaCelda = SeguimientoEntrega['celdas'][number];
+/** Parámetros del seguimiento de entrega (querystring). */
+export type SeguimientoEntregaQuery = NonNullable<
+  paths['/api/produccion/ordenes/{id}/seguimiento-entrega']['get']['parameters']['query']
+>;
+
+// ── Tablero WIP + existencias en poder del maquilero (F3-E5) ──────────────────
+
+/** Tablero WIP: órdenes con su avance derivado (`GET /api/produccion/wip`). */
+export type TableroWip =
+  paths['/api/produccion/wip']['get']['responses']['200']['content']['application/json'];
+/** Una fila del tablero WIP (una orden con su avance por etapa). */
+export type WipOrdenFila = TableroWip['datos'][number];
+/** Parámetros del tablero WIP (querystring). */
+export type TableroWipQuery = NonNullable<paths['/api/produccion/wip']['get']['parameters']['query']>;
+/** Drill-down del avance de una orden (`GET /api/produccion/wip/ordenes/{id}`). */
+export type WipOrden =
+  paths['/api/produccion/wip/ordenes/{id}']['get']['responses']['200']['content']['application/json'];
+/** Una celda color×talla del drill-down WIP. */
+export type WipCelda = WipOrden['porCortar'][number];
+/** Un proceso pendiente del drill-down (cortado por enviar / por recibir). */
+export type WipProcesoPendiente = WipOrden['cortadoPorEnviar'][number];
+/** Existencias en poder del maquilero (`GET /api/produccion/existencias-maquilero`). */
+export type ExistenciaMaquilero =
+  paths['/api/produccion/existencias-maquilero']['get']['responses']['200']['content']['application/json'];
+/** Una fila de existencia en poder del maquilero (enviado − recibido). */
+export type ExistenciaMaquileroFila = ExistenciaMaquilero['filas'][number];
+/** Parámetros de las existencias en poder del maquilero (querystring). */
+export type ExistenciaMaquileroQuery = NonNullable<
+  paths['/api/produccion/existencias-maquilero']['get']['parameters']['query']
+>;

@@ -537,6 +537,41 @@ export {
   type CargosEsMaLista,
 } from './esquemas/esma.js';
 
+// ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
+export {
+  esquemaEntregaClienteCrear,
+  esquemaEntregaClienteCancelarCuerpo,
+  esquemaEntregaClienteSalida,
+  esquemaEntregasOrdenLista,
+  esquemaSeguimientoEntregaOrden,
+  esquemaSeguimientoEntregaQuery,
+  type DatosEntregaLineaEntrada,
+  type DatosEntregaClienteCrear,
+  type DatosEntregaClienteCancelar,
+  type EntregaClienteSalida,
+  type EntregasOrdenLista,
+  type SeguimientoEntregaOrden,
+  type SeguimientoEntregaQuery,
+} from './esquemas/entrega-cliente.js';
+
+// ── Tablero WIP + existencias en poder del maquilero (F3-E5; doc 03-Produccion form Proceso/MaqExis) ──
+export {
+  esquemaTableroWipQuery,
+  esquemaWipOrdenFila,
+  esquemaTableroWipPagina,
+  esquemaWipOrden,
+  esquemaExistenciaMaquileroQuery,
+  esquemaExistenciaMaquileroFila,
+  esquemaExistenciaMaquileroLista,
+  type TableroWipQuery,
+  type WipOrdenFila,
+  type TableroWipPagina,
+  type WipOrden,
+  type ExistenciaMaquileroQuery,
+  type ExistenciaMaquileroFila,
+  type ExistenciaMaquileroLista,
+} from './esquemas/wip.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';
