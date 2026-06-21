@@ -464,6 +464,78 @@ export type KardexPtQuery = NonNullable<
   paths['/api/inventarios/pt/kardex']['get']['parameters']['query']
 >;
 
+// ── Inventario de TELAS por kardex (Módulo 4, F4-E1; tela×lote, D5) ───────────
+
+/** Un movimiento de inventario de tela tal como lo devuelve el API. */
+export type MovimientoTela =
+  paths['/api/inventarios/telas/ajustes']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de un ajuste de tela (`POST /api/inventarios/telas/ajustes`). */
+export type AjusteTelaCrear =
+  paths['/api/inventarios/telas/ajustes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de una salida de tela a orden (`POST /api/inventarios/telas/salidas-orden`). */
+export type SalidaTelaCrear =
+  paths['/api/inventarios/telas/salidas-orden']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de un traspaso de tela (`POST /api/inventarios/telas/traspasos`). */
+export type TraspasoTelaCrear =
+  paths['/api/inventarios/telas/traspasos']['post']['requestBody']['content']['application/json'];
+/** Resultado de un traspaso de tela: las dos patas. */
+export type TraspasoTela =
+  paths['/api/inventarios/telas/traspasos']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de cancelación de un movimiento de material (compartido tela/avío). */
+export type MovimientoMaterialCancelar =
+  paths['/api/inventarios/telas/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Existencias de tela (`GET /api/inventarios/telas/existencias`). */
+export type ExistenciasTela =
+  paths['/api/inventarios/telas/existencias']['get']['responses']['200']['content']['application/json'];
+/** Una fila de existencia de tela (tela×lote×almacén + componentes del lote). */
+export type ExistenciaTelaFila = ExistenciasTela['filas'][number];
+/** Parámetros de la consulta de existencias de tela (querystring). */
+export type ExistenciasTelaQuery = NonNullable<
+  paths['/api/inventarios/telas/existencias']['get']['parameters']['query']
+>;
+/** Kardex de una tela (`GET /api/inventarios/telas/kardex`). */
+export type KardexTela =
+  paths['/api/inventarios/telas/kardex']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del kardex de tela. */
+export type KardexTelaRenglon = KardexTela['renglones'][number];
+/** Parámetros del kardex de tela (querystring). */
+export type KardexTelaQuery = NonNullable<
+  paths['/api/inventarios/telas/kardex']['get']['parameters']['query']
+>;
+
+// ── Inventario de AVÍOS por kardex (Módulo 4, F4-E1; multi-almacén, R4) ───────
+
+/** Un movimiento de inventario de avío tal como lo devuelve el API. */
+export type MovimientoAvio =
+  paths['/api/inventarios/avios/ajustes']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de un ajuste de avío (`POST /api/inventarios/avios/ajustes`). */
+export type AjusteAvioCrear =
+  paths['/api/inventarios/avios/ajustes']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de un traspaso de avío (`POST /api/inventarios/avios/traspasos`). */
+export type TraspasoAvioCrear =
+  paths['/api/inventarios/avios/traspasos']['post']['requestBody']['content']['application/json'];
+/** Resultado de un traspaso de avío: las dos patas. */
+export type TraspasoAvio =
+  paths['/api/inventarios/avios/traspasos']['post']['responses']['201']['content']['application/json'];
+/** Existencias de avío (`GET /api/inventarios/avios/existencias`). */
+export type ExistenciasAvio =
+  paths['/api/inventarios/avios/existencias']['get']['responses']['200']['content']['application/json'];
+/** Una fila de existencia de avío (avío×almacén). */
+export type ExistenciaAvioFila = ExistenciasAvio['filas'][number];
+/** Parámetros de la consulta de existencias de avío (querystring). */
+export type ExistenciasAvioQuery = NonNullable<
+  paths['/api/inventarios/avios/existencias']['get']['parameters']['query']
+>;
+/** Kardex de un avío (`GET /api/inventarios/avios/kardex`). */
+export type KardexAvio =
+  paths['/api/inventarios/avios/kardex']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del kardex de avío. */
+export type KardexAvioRenglon = KardexAvio['renglones'][number];
+/** Parámetros del kardex de avío (querystring). */
+export type KardexAvioQuery = NonNullable<
+  paths['/api/inventarios/avios/kardex']['get']['parameters']['query']
+>;
+
 // ── Recibo de maquila + cargos EsMa (F3-E4) ──────────────────────────────────
 
 /** Un recibo de maquila tal como lo devuelve el API (con su matriz color×talla y calidad). */

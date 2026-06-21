@@ -67,6 +67,12 @@ export const MODULOS_PERMISO = {
   // Inventario de PRODUCTO TERMINADO operable por kardex (F3-E3). `ipt` (arriba) son los accesos
   // granulares LEGADO del viejo; `inventario-pt` es el módulo NUEVO del kardex de v2 (D3).
   'inventario-pt': 'Inventario de producto terminado (kardex)',
+  // ── Inventario de TELAS y AVÍOS operable por kardex (Módulo 4, F4-E1, D5/R4) ──
+  // `telas` (arriba) son los accesos granulares LEGADO del viejo (incl. el ex-acceso #7
+  // `telas.ver-totales`, que oculta importes); `inventario-telas`/`inventario-avios` son los
+  // módulos NUEVOS del kardex de materiales de v2 (D3). Mismo esquema ver/mover que `inventario-pt`.
+  'inventario-telas': 'Inventario de telas (kardex)',
+  'inventario-avios': 'Inventario de avíos (kardex)',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -762,6 +768,31 @@ export const CATALOGO_PERMISOS = [
     clave: 'inventario-pt.mover',
     modulo: 'inventario-pt',
     descripcion: 'Capturar movimientos manuales y traspasos de producto terminado (F3-E3)',
+  },
+
+  // ── Inventario de TELAS y AVÍOS por kardex (Módulo 4, F4-E1 — doc 04-Inventarios §B; D5/R4) ──
+  // Mismo esquema ver/mover que inventario-pt. El ex-acceso #7 (telas.ver-totales) es APARTE: sobre
+  // estos permisos, controla si las consultas de TELAS muestran o no los importes/costos en dinero
+  // (las cantidades sí se ven con `inventario-telas.ver`).
+  {
+    clave: 'inventario-telas.ver',
+    modulo: 'inventario-telas',
+    descripcion: 'Consultar existencias y kardex de telas por lote (F4-E1, D5)',
+  },
+  {
+    clave: 'inventario-telas.mover',
+    modulo: 'inventario-telas',
+    descripcion: 'Capturar ajustes, traspasos y salidas a orden de telas (F4-E1)',
+  },
+  {
+    clave: 'inventario-avios.ver',
+    modulo: 'inventario-avios',
+    descripcion: 'Consultar existencias y kardex de avíos multi-almacén (F4-E1, R4)',
+  },
+  {
+    clave: 'inventario-avios.mover',
+    modulo: 'inventario-avios',
+    descripcion: 'Capturar ajustes y traspasos de avíos (F4-E1, R4)',
   },
 
   // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permiso NUEVO de v2 ──────

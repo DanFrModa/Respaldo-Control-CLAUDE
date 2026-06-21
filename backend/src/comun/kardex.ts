@@ -403,6 +403,601 @@ export async function cancelarMovimientoPt(
   }, bd);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// DIMENSIÓN TELA (tela × lote, D5) — F4-E1
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Mismo motor genérico que PT (un encabezado `Movimiento` + un detalle por tipo de artículo,
+// ADR-0010 §2), ahora ejercitando `MovimientoDetTela`. Diferencias con PT:
+//  • La dimensión es tela × LOTE (D5: el lote define el teñido/color y agrupa N telas
+//    acompañantes); la existencia es por tela×lote×almacén.
+//  • `cantidad` es Decimal (telas se miden en kg/m): se pasa como `number` y la columna Decimal la
+//    guarda. La suma directa bajo lock se hace con SQL numérico (no bigint como en PT).
+//  • `costoUnit` SÍ se acepta (D1: la entrada-recepción valuará con el costo por unidad de consumo
+//    ya convertido — E3). En un ajuste/salida puede ir NULL.
+//  • El advisory lock es por empresa+almacén+tela+lote (NULL→0 para la clave; una colisión solo
+//    serializa de más, nunca afecta la correctitud — la suma se filtra por las dimensiones reales).
+
+/**
+ * Un renglón de detalle de TELA de un movimiento (D5). `cantidad` SIEMPRE positiva (el signo lo da
+ * la dirección del tipo). `costoUnit` opcional (valuación en E3). `idLote` opcional a nivel motor
+ * (el dominio de telas lo exige; un ajuste sin lote puede no traerlo).
+ */
+export interface LineaMovimientoTela {
+  idTela: number;
+  /** Lote de la tela (D5). Opcional a nivel motor; el dominio de telas lo requiere. */
+  idLote?: number | null;
+  /** Cantidad de tela, POSITIVA (> 0). El signo lo aplica el kardex por la dirección. */
+  cantidad: number;
+  /** Costo unitario (por unidad de consumo) al momento del movimiento. NULL si no aplica (D1). */
+  costoUnit?: number | null;
+}
+
+/** Datos para registrar UN movimiento de TELA (encabezado + detalle). Análogo a {@link EntradaMovimientoPt}. */
+export interface EntradaMovimientoTela {
+  idEmpresa: number;
+  idTipoMov: number;
+  idAlmacen: number;
+  fecha: Date;
+  origenTipo: OrigenMovimiento;
+  origenId?: string;
+  lineas: LineaMovimientoTela[];
+  observaciones?: string;
+}
+
+/** Valida líneas de tela: al menos una, cantidades finitas y positivas. */
+function validarLineasTela(lineas: LineaMovimientoTela[]): void {
+  if (lineas.length === 0) {
+    throw new ErrorValidacion('Un movimiento de inventario de tela necesita al menos un renglón.');
+  }
+  for (const linea of lineas) {
+    if (!Number.isFinite(linea.cantidad) || linea.cantidad <= 0) {
+      throw new ErrorValidacion(
+        `La cantidad de un renglón de kardex de tela debe ser un número positivo (recibido: ${String(linea.cantidad)}).`,
+      );
+    }
+  }
+}
+
+/**
+ * Bloqueo por tela×lote×almacén DENTRO de la transacción (advisory lock transaccional), para que dos
+ * salidas/traspasos de la MISMA tela/lote no corran en paralelo y dejen existencia negativa
+ * (ADR-0010 §3). Mismo criterio que {@link bloquearArticuloPt}: la clave no precisa ser libre de
+ * colisiones (una colisión solo serializa de más). `idLote` NULL se mapea a 0 para la clave.
+ */
+export async function bloquearTela(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTela: number,
+  idLote: number | null,
+): Promise<void> {
+  const clave1 = (idEmpresa * 1_000_003 + idAlmacen) | 0;
+  const clave2 = (idTela * 1_000_003 + (idLote ?? 0)) | 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
+}
+
+/**
+ * Existencia ACTUAL de una tela/lote en un almacén, sumando `movimiento_det_tela` DIRECTO (NUNCA la
+ * vista — ADR-0010 §3). Decimal: se devuelve `number`. Tómala SIEMPRE tras {@link bloquearTela}.
+ * El `idLote` NULL se compara con `IS NOT DISTINCT FROM` para que el ajuste sin lote case consigo
+ * mismo.
+ */
+export async function existenciaTelaBloqueada(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idTela: number,
+  idLote: number | null,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: Prisma.Decimal | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0) AS existencia
+    FROM "movimiento_det_tela" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_tela" = ${idTela}
+      AND d."id_lote" IS NOT DISTINCT FROM ${idLote}
+  `;
+  return Number(filas[0]?.existencia ?? 0);
+}
+
+/**
+ * Registra UN movimiento de TELA (encabezado + detalle + bitácora) en UNA transacción (A2), con
+ * folio atómico (A3). Primitivo de los servicios de dominio de telas (ajuste/salida-a-orden de E1,
+ * entrada-recepción de E3). NO valida existencia: esa lógica vive en `dominio/` (el motor solo
+ * escribe correcto). RECHAZA la dirección `traspaso` (va por {@link registrarTraspasoTela}).
+ */
+export async function registrarMovimientoTela(
+  sesion: SesionUsuario,
+  entrada: EntradaMovimientoTela,
+  bd?: ContextoBd,
+): Promise<Movimiento> {
+  validarLineasTela(entrada.lineas);
+  return enTransaccion(async (tx) => {
+    const direccion = await direccionDelTipo(tx, entrada.idTipoMov);
+    if (direccion === DireccionMovimiento.traspaso) {
+      throw new ErrorValidacion(
+        'Un tipo de movimiento de dirección "traspaso" no se registra como movimiento simple: usa registrarTraspasoTela (salida de origen + entrada de destino).',
+      );
+    }
+    const folio = await siguienteFolio(tx, entrada.idEmpresa, CLAVE_SECUENCIA_MOVIMIENTO);
+
+    const movimiento = await tx.movimiento.create({
+      data: {
+        folio,
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMov,
+        idAlmacen: entrada.idAlmacen,
+        fecha: entrada.fecha,
+        origenTipo: entrada.origenTipo,
+        ...(entrada.origenId === undefined ? {} : { origenId: entrada.origenId }),
+        idUsuario: sesion.id,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+        detallesTela: {
+          create: entrada.lineas.map((linea) => ({
+            idTela: linea.idTela,
+            idLote: linea.idLote ?? null,
+            cantidad: linea.cantidad,
+            costoUnit: linea.costoUnit ?? null,
+          })),
+        },
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Movimiento',
+      idEntidad: movimiento.id,
+      accion: 'CREAR',
+      datos: {
+        folio: folio.toString(),
+        dimension: 'tela',
+        idTipoMov: entrada.idTipoMov,
+        idAlmacen: entrada.idAlmacen,
+        origenTipo: entrada.origenTipo,
+        renglones: entrada.lineas.length,
+      },
+    });
+
+    return movimiento;
+  }, bd);
+}
+
+/** Datos de un traspaso de TELA entre dos almacenes de la misma empresa. */
+export interface EntradaTraspasoTela {
+  idEmpresa: number;
+  idTipoMovSalida: number;
+  idTipoMovEntrada: number;
+  idAlmacenOrigen: number;
+  idAlmacenDestino: number;
+  fecha: Date;
+  lineas: LineaMovimientoTela[];
+  observaciones?: string;
+}
+
+/**
+ * Traspaso de TELA entre almacenes: DOS `Movimiento` (salida del origen + entrada al destino) en LA
+ * MISMA transacción (A2). Análogo a {@link registrarTraspasoPt}. La validación de existencia del
+ * origen (no dejar negativo) la hace el dominio bajo lock ANTES de llamar aquí (suma directa).
+ */
+export async function registrarTraspasoTela(
+  sesion: SesionUsuario,
+  entrada: EntradaTraspasoTela,
+  bd?: ContextoBd,
+): Promise<{ salida: Movimiento; entrada: Movimiento }> {
+  if (entrada.idAlmacenOrigen === entrada.idAlmacenDestino) {
+    throw new ErrorValidacion(
+      'El traspaso necesita un almacén de origen y otro de destino distintos.',
+    );
+  }
+  validarLineasTela(entrada.lineas);
+
+  return enTransaccion(async (tx) => {
+    if ((await direccionDelTipo(tx, entrada.idTipoMovSalida)) !== DireccionMovimiento.salida) {
+      throw new ErrorValidacion(
+        'El tipo de la pata de salida del traspaso debe ser de dirección "salida".',
+      );
+    }
+    if ((await direccionDelTipo(tx, entrada.idTipoMovEntrada)) !== DireccionMovimiento.entrada) {
+      throw new ErrorValidacion(
+        'El tipo de la pata de entrada del traspaso debe ser de dirección "entrada".',
+      );
+    }
+
+    const salida = await registrarMovimientoTela(
+      sesion,
+      {
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMovSalida,
+        idAlmacen: entrada.idAlmacenOrigen,
+        fecha: entrada.fecha,
+        origenTipo: ORIGEN.traspaso,
+        lineas: entrada.lineas,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+      },
+      { tx },
+    );
+
+    const entradaMov = await registrarMovimientoTela(
+      sesion,
+      {
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMovEntrada,
+        idAlmacen: entrada.idAlmacenDestino,
+        fecha: entrada.fecha,
+        origenTipo: ORIGEN.traspaso,
+        origenId: String(salida.id),
+        lineas: entrada.lineas,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+      },
+      { tx },
+    );
+
+    return { salida, entrada: entradaMov };
+  }, bd);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// DIMENSIÓN AVÍO (avío × lote opcional, R4) — F4-E1
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Igual que tela pero la dimensión operativa es avío × almacén (R4: inventario de avíos
+// multi-almacén). El lote del avío es opcional y NO entra en la dimensión de existencia (la vista
+// `existencia_avio` agrega por avío×almacén); el lock y la suma son por avío×almacén. `esGenerico`
+// se copia de `Avio.esGenerico` (R4) para consultas de kardex sin join.
+
+/** Un renglón de detalle de AVÍO de un movimiento (R4). `cantidad` POSITIVA; `costoUnit` opcional. */
+export interface LineaMovimientoAvio {
+  idAvio: number;
+  /** Lote del avío (opcional, R4). No entra en la dimensión de existencia (avío×almacén). */
+  idLote?: number | null;
+  /** Avío genérico de stock (copiado de `Avio.esGenerico` para consultas sin join). */
+  esGenerico?: boolean;
+  /** Cantidad de avío, POSITIVA (> 0). */
+  cantidad: number;
+  /** Costo unitario al momento del movimiento. NULL si no aplica (D1). */
+  costoUnit?: number | null;
+}
+
+/** Datos para registrar UN movimiento de AVÍO (encabezado + detalle). */
+export interface EntradaMovimientoAvio {
+  idEmpresa: number;
+  idTipoMov: number;
+  idAlmacen: number;
+  fecha: Date;
+  origenTipo: OrigenMovimiento;
+  origenId?: string;
+  lineas: LineaMovimientoAvio[];
+  observaciones?: string;
+}
+
+/** Valida líneas de avío: al menos una, cantidades finitas y positivas. */
+function validarLineasAvio(lineas: LineaMovimientoAvio[]): void {
+  if (lineas.length === 0) {
+    throw new ErrorValidacion('Un movimiento de inventario de avío necesita al menos un renglón.');
+  }
+  for (const linea of lineas) {
+    if (!Number.isFinite(linea.cantidad) || linea.cantidad <= 0) {
+      throw new ErrorValidacion(
+        `La cantidad de un renglón de kardex de avío debe ser un número positivo (recibido: ${String(linea.cantidad)}).`,
+      );
+    }
+  }
+}
+
+/**
+ * Bloqueo por avío×almacén DENTRO de la transacción (la existencia de avíos es por avío×almacén,
+ * R4; el lote no entra en la dimensión). Mismo criterio de claves que {@link bloquearArticuloPt}.
+ */
+export async function bloquearAvio(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idAvio: number,
+): Promise<void> {
+  const clave1 = (idEmpresa * 1_000_003 + idAlmacen) | 0;
+  const clave2 = idAvio | 0;
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
+}
+
+/**
+ * Existencia ACTUAL de un avío en un almacén, sumando `movimiento_det_avio` DIRECTO (NUNCA la vista
+ * — ADR-0010 §3). Decimal → `number`. Tómala SIEMPRE tras {@link bloquearAvio}. Agrega por
+ * avío×almacén (NO por lote — R4).
+ */
+export async function existenciaAvioBloqueada(
+  tx: Tx,
+  idEmpresa: number,
+  idAlmacen: number,
+  idAvio: number,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: Prisma.Decimal | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0) AS existencia
+    FROM "movimiento_det_avio" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND m."id_almacen" = ${idAlmacen}
+      AND d."id_avio" = ${idAvio}
+  `;
+  return Number(filas[0]?.existencia ?? 0);
+}
+
+/**
+ * Registra UN movimiento de AVÍO (encabezado + detalle + bitácora) en UNA transacción (A2), con
+ * folio atómico (A3). Primitivo de los servicios de dominio de avíos. NO valida existencia (lo hace
+ * el dominio). RECHAZA la dirección `traspaso` (va por {@link registrarTraspasoAvio}).
+ */
+export async function registrarMovimientoAvio(
+  sesion: SesionUsuario,
+  entrada: EntradaMovimientoAvio,
+  bd?: ContextoBd,
+): Promise<Movimiento> {
+  validarLineasAvio(entrada.lineas);
+  return enTransaccion(async (tx) => {
+    const direccion = await direccionDelTipo(tx, entrada.idTipoMov);
+    if (direccion === DireccionMovimiento.traspaso) {
+      throw new ErrorValidacion(
+        'Un tipo de movimiento de dirección "traspaso" no se registra como movimiento simple: usa registrarTraspasoAvio (salida de origen + entrada de destino).',
+      );
+    }
+    const folio = await siguienteFolio(tx, entrada.idEmpresa, CLAVE_SECUENCIA_MOVIMIENTO);
+
+    const movimiento = await tx.movimiento.create({
+      data: {
+        folio,
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMov,
+        idAlmacen: entrada.idAlmacen,
+        fecha: entrada.fecha,
+        origenTipo: entrada.origenTipo,
+        ...(entrada.origenId === undefined ? {} : { origenId: entrada.origenId }),
+        idUsuario: sesion.id,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+        detallesAvio: {
+          create: entrada.lineas.map((linea) => ({
+            idAvio: linea.idAvio,
+            idLote: linea.idLote ?? null,
+            esGenerico: linea.esGenerico ?? false,
+            cantidad: linea.cantidad,
+            costoUnit: linea.costoUnit ?? null,
+          })),
+        },
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Movimiento',
+      idEntidad: movimiento.id,
+      accion: 'CREAR',
+      datos: {
+        folio: folio.toString(),
+        dimension: 'avio',
+        idTipoMov: entrada.idTipoMov,
+        idAlmacen: entrada.idAlmacen,
+        origenTipo: entrada.origenTipo,
+        renglones: entrada.lineas.length,
+      },
+    });
+
+    return movimiento;
+  }, bd);
+}
+
+/** Datos de un traspaso de AVÍO entre dos almacenes de la misma empresa. */
+export interface EntradaTraspasoAvio {
+  idEmpresa: number;
+  idTipoMovSalida: number;
+  idTipoMovEntrada: number;
+  idAlmacenOrigen: number;
+  idAlmacenDestino: number;
+  fecha: Date;
+  lineas: LineaMovimientoAvio[];
+  observaciones?: string;
+}
+
+/**
+ * Traspaso de AVÍO entre almacenes: DOS `Movimiento` (salida del origen + entrada al destino) en LA
+ * MISMA transacción (A2). Análogo a {@link registrarTraspasoTela}. La validación de existencia del
+ * origen la hace el dominio bajo lock antes de llamar aquí.
+ */
+export async function registrarTraspasoAvio(
+  sesion: SesionUsuario,
+  entrada: EntradaTraspasoAvio,
+  bd?: ContextoBd,
+): Promise<{ salida: Movimiento; entrada: Movimiento }> {
+  if (entrada.idAlmacenOrigen === entrada.idAlmacenDestino) {
+    throw new ErrorValidacion(
+      'El traspaso necesita un almacén de origen y otro de destino distintos.',
+    );
+  }
+  validarLineasAvio(entrada.lineas);
+
+  return enTransaccion(async (tx) => {
+    if ((await direccionDelTipo(tx, entrada.idTipoMovSalida)) !== DireccionMovimiento.salida) {
+      throw new ErrorValidacion(
+        'El tipo de la pata de salida del traspaso debe ser de dirección "salida".',
+      );
+    }
+    if ((await direccionDelTipo(tx, entrada.idTipoMovEntrada)) !== DireccionMovimiento.entrada) {
+      throw new ErrorValidacion(
+        'El tipo de la pata de entrada del traspaso debe ser de dirección "entrada".',
+      );
+    }
+
+    const salida = await registrarMovimientoAvio(
+      sesion,
+      {
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMovSalida,
+        idAlmacen: entrada.idAlmacenOrigen,
+        fecha: entrada.fecha,
+        origenTipo: ORIGEN.traspaso,
+        lineas: entrada.lineas,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+      },
+      { tx },
+    );
+
+    const entradaMov = await registrarMovimientoAvio(
+      sesion,
+      {
+        idEmpresa: entrada.idEmpresa,
+        idTipoMov: entrada.idTipoMovEntrada,
+        idAlmacen: entrada.idAlmacenDestino,
+        fecha: entrada.fecha,
+        origenTipo: ORIGEN.traspaso,
+        origenId: String(salida.id),
+        lineas: entrada.lineas,
+        ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+      },
+      { tx },
+    );
+
+    return { salida, entrada: entradaMov };
+  }, bd);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CANCELACIÓN GENÉRICA (tela/avío) — F4-E1
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * CANCELA un movimiento de TELA o AVÍO generando su INVERSO auditado (D3/A7): NUNCA edita ni borra
+ * el original. Copia el detalle (de la dimensión que tenga el movimiento) con un tipo de dirección
+ * OPUESTA (lo provee el dominio) y lo enlaza por `idMovimientoInverso`. Un movimiento ya anulado no
+ * se vuelve a anular (`ErrorConflicto`). Es el equivalente para tela/avío de
+ * {@link cancelarMovimientoPt}: detecta la dimensión por cuál detalle trae el original.
+ *
+ * @param idMovimiento     movimiento original a anular (debe ser de tela o avío).
+ * @param idTipoMovInverso tipo de movimiento (dirección opuesta) para el inverso.
+ * @returns el movimiento INVERSO creado.
+ */
+export async function cancelarMovimientoMaterial(
+  sesion: SesionUsuario,
+  idMovimiento: number,
+  idTipoMovInverso: number,
+  bd?: ContextoBd,
+): Promise<Movimiento> {
+  return enTransaccion(async (tx) => {
+    const original = await tx.movimiento.findUnique({
+      where: { id: idMovimiento },
+      include: {
+        detallesTela: true,
+        detallesAvio: true,
+        anuladoPor: { select: { id: true } },
+      },
+    });
+    if (original === null) {
+      throw new ErrorNoEncontrado('Movimiento', idMovimiento);
+    }
+    if (original.anuladoPor.length > 0) {
+      throw new ErrorConflicto('Ese movimiento ya fue cancelado (tiene un movimiento inverso).');
+    }
+    // RECHAZA cancelar UNA SOLA PATA de un traspaso (D3 — reviewer F4-E1 obs. #2): un traspaso son
+    // DOS `Movimiento` independientes (salida del origen + entrada del destino, `origenTipo =
+    // traspaso`). Cancelar solo una pata re-entra/saca de un lado y deja viva la otra → inventario
+    // descuadrado entre los dos almacenes. La reversión correcta es un TRASPASO inverso (destino→
+    // origen), no una cancelación parcial.
+    if (original.origenTipo === ORIGEN.traspaso) {
+      throw new ErrorConflicto(
+        'Este movimiento es una pata de un traspaso entre almacenes: no se cancela una sola pata ' +
+          '(dejaría el inventario descuadrado). Revierte el traspaso con un traspaso inverso ' +
+          '(del destino al origen).',
+      );
+    }
+    const esTela = original.detallesTela.length > 0;
+    const esAvio = original.detallesAvio.length > 0;
+    if (!esTela && !esAvio) {
+      throw new ErrorValidacion(
+        'Solo se pueden cancelar por esta vía movimientos de TELA o AVÍO (los de PT van por su propia ruta).',
+      );
+    }
+
+    const direccionInversa = await direccionDelTipo(tx, idTipoMovInverso);
+    const direccionOriginal = await direccionDelTipo(tx, original.idTipoMov);
+    const opuestas =
+      (direccionOriginal === DireccionMovimiento.entrada &&
+        direccionInversa === DireccionMovimiento.salida) ||
+      (direccionOriginal === DireccionMovimiento.salida &&
+        direccionInversa === DireccionMovimiento.entrada);
+    if (!opuestas) {
+      throw new ErrorValidacion(
+        'El tipo de movimiento inverso debe tener la dirección OPUESTA a la del movimiento original.',
+      );
+    }
+
+    const folio = await siguienteFolio(tx, original.idEmpresa, CLAVE_SECUENCIA_MOVIMIENTO);
+    const inverso = await tx.movimiento.create({
+      data: {
+        folio,
+        idEmpresa: original.idEmpresa,
+        idTipoMov: idTipoMovInverso,
+        idAlmacen: original.idAlmacen,
+        fecha: new Date(),
+        origenTipo: ORIGEN.cancelacion,
+        origenId: String(original.id),
+        idUsuario: sesion.id,
+        idMovimientoInverso: original.id,
+        ...(esTela
+          ? {
+              detallesTela: {
+                create: original.detallesTela.map((det) => ({
+                  idTela: det.idTela,
+                  idLote: det.idLote,
+                  cantidad: det.cantidad,
+                  costoUnit: det.costoUnit,
+                })),
+              },
+            }
+          : {
+              detallesAvio: {
+                create: original.detallesAvio.map((det) => ({
+                  idAvio: det.idAvio,
+                  idLote: det.idLote,
+                  esGenerico: det.esGenerico,
+                  cantidad: det.cantidad,
+                  costoUnit: det.costoUnit,
+                })),
+              },
+            }),
+        creadoPorId: sesion.id,
+        modificadoPorId: sesion.id,
+      },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Movimiento',
+      idEntidad: original.id,
+      accion: 'CANCELAR',
+      datos: {
+        dimension: esTela ? 'tela' : 'avio',
+        folioInverso: folio.toString(),
+        idMovimientoInverso: inverso.id,
+      },
+    });
+
+    return inverso;
+  }, bd);
+}
+
 /** Re-export para que los servicios de dominio referencien la dirección sin importar `datos`. */
 export { DireccionMovimiento };
 export type { Prisma };

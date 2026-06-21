@@ -21,13 +21,14 @@ describe('catalogo de modulos del menu', () => {
     // envío a maquila + corte semanal, F3-E2; movimientos + traspasos + existencias + kardex de
     // inventario PT, F3-E3; recibo + recibos semanales + validación de cargos EsMa, F3-E4; entrega a
     // cliente + tablero WIP + existencias en poder del maquilero, F3-E5).
+    // 13 módulos del plan + 25 sub-vistas (las 19 previas + 6 de inventario de telas/avíos, F4-E1).
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(32);
+    expect(MODULOS_MENU).toHaveLength(38);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(32);
+    expect(new Set(claves).size).toBe(38);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(32);
+    expect(new Set(rutas).size).toBe(38);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -104,13 +105,17 @@ describe('catalogo de modulos del menu', () => {
       'produccion.wip-ver',
       'inventario-pt.ver',
       'inventario-pt.mover',
+      // Inventario de telas/avíos (F4-E1): sus 6 sub-vistas requieren `inventario-telas/avios.*`.
+      'inventario-telas.ver',
+      'inventario-telas.mover',
+      'inventario-avios.ver',
+      'inventario-avios.mover',
       'esma.cargo-validar',
     );
-    // 13 módulos del plan + 19 sub-vistas (galería + órdenes + consulta + incompletas + pedidos por
-    // mes + tipos de proceso + corte + envíos + corte semanal + 4 de inventario PT + recibo +
-    // recibos semanales + validación de cargos EsMa + entrega + tablero WIP + existencias del
-    // maquilero) = 32.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(32);
+    // 13 módulos del plan + 25 sub-vistas (las 19 previas + las 6 de inventario de telas/avíos de
+    // F4-E1: existencias de telas, existencias de avíos, kardex de materiales, salida de tela a
+    // orden, traspaso de materiales y ajuste de materiales) = 38.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(38);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {

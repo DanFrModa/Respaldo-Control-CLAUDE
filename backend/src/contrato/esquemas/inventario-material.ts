@@ -1,0 +1,558 @@
+import { z } from 'zod';
+
+/**
+ * Esquemas Zod del INVENTARIO de TELAS y AVÍOS por kardex (F4-E1; doc 04-Inventarios §B; D5/R4).
+ * UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). La existencia es SIEMPRE
+ * Σ de movimientos (D3): aquí NO hay esquema que edite/borre una existencia — la corrección es un
+ * movimiento INVERSO auditado (cancelación con motivo).
+ *
+ * Dimensiones:
+ *  • TELA: existencia por tela × LOTE × almacén (D5 — el lote define el teñido/color y agrupa N
+ *    telas acompañantes). El movimiento de ajuste puede CREAR el lote (con sus componentes).
+ *  • AVÍO: existencia por avío × almacén (R4 — multi-almacén; el lote del avío es opcional y no
+ *    entra en la dimensión de existencia).
+ *
+ * Importes (ex-acceso #7 `telas.ver-totales`): en las consultas de TELAS, los campos de costo/
+ * importe son NULLABLE — el servidor los pone en null para quien no tenga el permiso (las
+ * cantidades sí se ven). La UI los oculta cuando vienen null. Es ocultamiento server-side (A4), no
+ * CSS.
+ */
+
+// ── Helpers de campos comunes ──────────────────────────────────────────────────────────────────
+
+const idPositivo = (campo: string) =>
+  z
+    .number({ error: `El id de ${campo} es obligatorio` })
+    .int({ error: `El id de ${campo} debe ser entero` })
+    .positive({ error: `El id de ${campo} debe ser positivo` });
+
+const idPositivoOpcionalCoerce = z.coerce.number().int().positive().optional();
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// TELAS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+// ── Lote (encabezado + componentes) para el ajuste de ENTRADA de tela ────────────────────────────
+
+/** Un componente del lote en la captura de un ajuste de entrada de tela (D5: 1..N por lote). */
+export const esquemaLoteComponenteEntrada = z.object({
+  idTela: idPositivo('la tela'),
+  cantidad: z
+    .number({ error: 'La cantidad es obligatoria' })
+    .positive({ error: 'La cantidad del componente debe ser mayor que 0' }),
+  peso: z.number().nonnegative({ error: 'El peso no puede ser negativo' }).optional(),
+});
+
+/** Datos de un componente de lote en la entrada. */
+export type DatosLoteComponenteEntrada = z.infer<typeof esquemaLoteComponenteEntrada>;
+
+/**
+ * Lote a CREAR en un ajuste de entrada de tela (D5). Define el color (teñido) y trae 1..N
+ * componentes del mismo lote y color. La clave se autogenera en el dominio si no se manda.
+ */
+export const esquemaLoteEntrada = z
+  .object({
+    clave: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('Clave del lote (autogenerada si falta).'),
+    idColor: idPositivo('el color'),
+    idProveedor: idPositivo('el proveedor').optional(),
+    factura: z.string().trim().max(100).optional(),
+    fecha: z.iso.date({ error: 'La fecha del lote debe ser YYYY-MM-DD' }).optional(),
+    observaciones: z.string().trim().max(1000).optional(),
+    componentes: z
+      .array(esquemaLoteComponenteEntrada)
+      .min(1, { error: 'El lote necesita al menos un componente (tela)' }),
+  })
+  .describe('Lote de tela a crear con sus componentes (D5).');
+
+/** Datos de un lote a crear en una entrada. */
+export type DatosLoteEntrada = z.infer<typeof esquemaLoteEntrada>;
+
+// ── Ajuste de inventario de TELA (entrada o salida) ──────────────────────────────────────────────
+
+/** Una línea de ajuste de tela sobre un lote YA existente (tela×lote×cantidad). */
+export const esquemaAjusteTelaLinea = z.object({
+  idTela: idPositivo('la tela'),
+  idLote: idPositivo('el lote'),
+  cantidad: z.number().positive({ error: 'La cantidad del ajuste debe ser mayor que 0' }),
+});
+
+/** Datos de una línea de ajuste de tela. */
+export type DatosAjusteTelaLinea = z.infer<typeof esquemaAjusteTelaLinea>;
+
+/**
+ * Alta de un AJUSTE de inventario de TELA (base del conteo físico — doc 04-Inventarios §B). El tipo
+ * de movimiento define la dirección (`ajuste-entrada`/`ajuste-salida`). El motivo es OBLIGATORIO
+ * (A7). Una entrada puede CREAR un lote nuevo (`lote`); una salida o un ajuste sobre lo existente
+ * usa `lineas` (tela×lote). Exactamente UNO de `lote` / `lineas` (xor) — lo refuerza el dominio.
+ */
+export const esquemaAjusteTelaCrear = z
+  .object({
+    idTipoMov: idPositivo('el tipo de movimiento').describe(
+      'Tipo de movimiento (dirección entrada o salida; nunca traspaso).',
+    ),
+    idAlmacen: idPositivo('el almacén'),
+    fecha: z.iso.date({ error: 'La fecha del ajuste es obligatoria (YYYY-MM-DD)' }),
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+      .max(500),
+    lote: esquemaLoteEntrada
+      .optional()
+      .describe('Lote nuevo a crear (solo en ajustes de entrada).'),
+    lineas: z
+      .array(esquemaAjusteTelaLinea)
+      .optional()
+      .describe('Renglones tela×lote sobre lotes existentes.'),
+  })
+  .describe('Ajuste de inventario de tela (conteo físico/corrección). Lote nuevo XOR líneas.');
+
+/** Datos validados de un ajuste de tela. */
+export type DatosAjusteTelaCrear = z.infer<typeof esquemaAjusteTelaCrear>;
+
+// ── Salida de TELA a una orden de producción ─────────────────────────────────────────────────────
+
+/** Una línea de salida de tela a orden (tela×lote×cantidad). */
+export const esquemaSalidaTelaLinea = esquemaAjusteTelaLinea;
+
+/**
+ * Alta de una SALIDA de TELA hacia una orden de producción (`Salidas.IdOrdenes` del viejo —
+ * 04-Inventarios §B.3/§"Cómo conecta"). Es LA única vía que descuenta tela hacia una orden; la nota
+ * de salida (E5) la referencia sin generar segundo movimiento. No deja existencia negativa
+ * (validado bajo lock por el dominio).
+ */
+export const esquemaSalidaTelaCrear = z
+  .object({
+    idOrden: idPositivo('la orden').describe('Orden de producción que consume la tela.'),
+    idAlmacen: idPositivo('el almacén'),
+    fecha: z.iso.date({ error: 'La fecha de la salida es obligatoria (YYYY-MM-DD)' }),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: z
+      .array(esquemaSalidaTelaLinea)
+      .min(1, { error: 'Captura al menos un renglón de tela' }),
+  })
+  .describe('Salida de tela ligada a una orden de producción.');
+
+/** Datos validados de una salida de tela a orden. */
+export type DatosSalidaTelaCrear = z.infer<typeof esquemaSalidaTelaCrear>;
+
+// ── Traspaso de TELA entre almacenes ─────────────────────────────────────────────────────────────
+
+/** Alta de un TRASPASO de TELA entre dos almacenes (salida del origen + entrada al destino). */
+export const esquemaTraspasoTelaCrear = z
+  .object({
+    idAlmacenOrigen: idPositivo('el almacén de origen'),
+    idAlmacenDestino: idPositivo('el almacén de destino'),
+    fecha: z.iso.date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' }),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: z
+      .array(esquemaSalidaTelaLinea)
+      .min(1, { error: 'Captura al menos un renglón de tela' }),
+  })
+  .describe('Traspaso de tela entre almacenes (tela×lote).');
+
+/** Datos validados de un traspaso de tela. */
+export type DatosTraspasoTelaCrear = z.infer<typeof esquemaTraspasoTelaCrear>;
+
+// ── Cancelación (motivo) — compartida por tela y avío ────────────────────────────────────────────
+
+/** Cuerpo de la cancelación de un movimiento de material (motivo obligatorio, A7). */
+export const esquemaMovimientoMaterialCancelarCuerpo = z
+  .object({
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+      .max(500),
+  })
+  .describe('Motivo de la cancelación del movimiento de material.');
+
+/** Datos validados de la cancelación. */
+export type DatosMovimientoMaterialCancelar = z.infer<
+  typeof esquemaMovimientoMaterialCancelarCuerpo
+>;
+
+// ── Salida de un movimiento de TELA (encabezado + renglones) ─────────────────────────────────────
+
+/** Un renglón de la salida de un movimiento de tela. Costo/importe nullables (ex-acceso #7). */
+const esquemaMovTelaRenglonSalida = z.object({
+  idTela: z.number().int().describe('Id de la tela.'),
+  tela: z.string().describe('Nombre de la tela.'),
+  idLote: z.number().int().nullable().describe('Id del lote o null.'),
+  loteClave: z.string().nullable().describe('Clave del lote o null.'),
+  cantidad: z.number().describe('Cantidad del renglón (positiva; la dirección da el signo).'),
+  costoUnit: z.number().nullable().describe('Costo unitario o null (sin permiso de importes).'),
+  importe: z.number().nullable().describe('Importe (cantidad × costoUnit) o null.'),
+});
+
+/** Salida de un movimiento de TELA: encabezado + renglones. */
+export const esquemaMovimientoTelaSalida = z
+  .object({
+    id: z.number().int(),
+    folio: z.number().int().describe('Folio consecutivo por empresa (A3).'),
+    idEmpresa: z.number().int(),
+    idTipoMov: z.number().int(),
+    tipoMov: z.string(),
+    direccion: z.enum(['entrada', 'salida', 'traspaso']),
+    idAlmacen: z.number().int(),
+    almacen: z.string(),
+    fecha: z.string().describe('Fecha (YYYY-MM-DD).'),
+    origenTipo: z.string().nullable(),
+    origenId: z.string().nullable().describe('Id del hecho de origen (p. ej. orden) o null.'),
+    observaciones: z.string().nullable(),
+    cancelado: z.boolean(),
+    idMovimientoInverso: z.number().int().nullable(),
+    renglones: z.array(esquemaMovTelaRenglonSalida),
+    totalCantidad: z.number().describe('Suma de las cantidades del movimiento (derivada).'),
+    totalImporte: z.number().nullable().describe('Suma de importes o null (sin permiso).'),
+    creadoEn: z.iso.datetime(),
+    creadoPorId: z.string().nullable(),
+  })
+  .describe('Movimiento de inventario de tela con sus renglones (tela×lote).');
+
+/** Forma de un movimiento de tela tal como lo devuelve la API. */
+export type MovimientoTelaSalida = z.infer<typeof esquemaMovimientoTelaSalida>;
+
+/** Resultado de un traspaso de tela: las dos patas. */
+export const esquemaTraspasoTelaSalida = z
+  .object({
+    salida: esquemaMovimientoTelaSalida.describe('Pata de SALIDA del almacén origen.'),
+    entrada: esquemaMovimientoTelaSalida.describe('Pata de ENTRADA al almacén destino.'),
+  })
+  .describe('Las dos patas de un traspaso de tela.');
+
+/** Forma del resultado de un traspaso de tela. */
+export type TraspasoTelaSalida = z.infer<typeof esquemaTraspasoTelaSalida>;
+
+// ── Existencias de TELA ──────────────────────────────────────────────────────────────────────────
+
+/** Filtros de la consulta de existencias de tela (querystring). */
+export const esquemaExistenciasTelaQuery = z
+  .object({
+    idTela: idPositivoOpcionalCoerce.describe('Filtra por una tela.'),
+    idLote: idPositivoOpcionalCoerce.describe('Filtra por un lote.'),
+    idColor: idPositivoOpcionalCoerce.describe('Filtra por el color del lote.'),
+    idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+    incluirCeros: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye filas con existencia 0. Por defecto se omiten.'),
+  })
+  .describe('Filtros de la consulta de existencias de tela.');
+
+/** Parámetros de existencias de tela ya coaccionados. */
+export type ExistenciasTelaQuery = z.infer<typeof esquemaExistenciasTelaQuery>;
+
+/** Un componente del lote en la fila de existencias (para expandir en la UI). */
+const esquemaExistenciaTelaComponente = z.object({
+  idTela: z.number().int(),
+  tela: z.string(),
+  cantidad: z.number().describe('Cantidad ORIGINAL que entró del componente (dato del lote).'),
+  peso: z.number().nullable(),
+});
+
+/** Una fila de existencia de tela: tela×lote×almacén con su cantidad + datos del lote. */
+const esquemaExistenciaTelaFila = z.object({
+  idTela: z.number().int(),
+  tela: z.string(),
+  idLote: z.number().int().nullable().describe('Id del lote o null (ajuste sin lote).'),
+  loteClave: z.string().nullable(),
+  idColor: z.number().int().nullable(),
+  color: z.string().nullable(),
+  idProveedor: z.number().int().nullable(),
+  proveedor: z.string().nullable(),
+  factura: z.string().nullable(),
+  idAlmacen: z.number().int(),
+  almacen: z.string(),
+  existencia: z.number().describe('Existencia actual (Σ de movimientos, D3).'),
+  componentes: z
+    .array(esquemaExistenciaTelaComponente)
+    .describe('Componentes del lote (D5: para expandir en la UI; vacío si no hay lote).'),
+});
+
+/** Una fila de existencia de tela tal como la devuelve la API. */
+export type ExistenciaTelaFila = z.infer<typeof esquemaExistenciaTelaFila>;
+
+/** Respuesta de la consulta de existencias de tela (filas + total). */
+export const esquemaExistenciasTelaLista = z
+  .object({
+    filas: z.array(esquemaExistenciaTelaFila),
+    totalExistencia: z.number().describe('Suma de la existencia de todas las filas.'),
+  })
+  .describe('Existencias de tela (consulta de solo lectura, D3).');
+
+/** Forma de la respuesta de existencias de tela. */
+export type ExistenciasTelaLista = z.infer<typeof esquemaExistenciasTelaLista>;
+
+// ── Kardex de TELA ───────────────────────────────────────────────────────────────────────────────
+
+/** Filtros del kardex de tela (querystring). `idTela` obligatorio. */
+export const esquemaKardexTelaQuery = z
+  .object({
+    idTela: z.coerce
+      .number({ error: 'La tela es obligatoria' })
+      .int()
+      .positive()
+      .describe('Tela del kardex (obligatorio).'),
+    idLote: idPositivoOpcionalCoerce.describe('Filtra por un lote.'),
+    idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+  })
+  .describe('Filtros del kardex de una tela.');
+
+/** Parámetros del kardex de tela ya coaccionados. */
+export type KardexTelaQuery = z.infer<typeof esquemaKardexTelaQuery>;
+
+/** Un renglón del kardex de tela: un movimiento (su efecto + saldo corrido). */
+const esquemaKardexTelaRenglon = z.object({
+  idMovimiento: z.number().int(),
+  folio: z.number().int(),
+  fecha: z.string(),
+  idTipoMov: z.number().int(),
+  tipoMov: z.string(),
+  direccion: z.enum(['entrada', 'salida', 'traspaso']),
+  idAlmacen: z.number().int(),
+  almacen: z.string(),
+  idLote: z.number().int().nullable(),
+  loteClave: z.string().nullable(),
+  entrada: z.number().describe('Cantidad que entra (0 si es salida).'),
+  salida: z.number().describe('Cantidad que sale (0 si es entrada).'),
+  saldo: z.number().describe('Saldo corrido de la tela×lote×almacén tras este movimiento.'),
+  costoUnit: z.number().nullable().describe('Costo unitario o null (sin permiso de importes).'),
+  importe: z.number().nullable().describe('Importe del renglón o null.'),
+  origenTipo: z.string().nullable(),
+  origenId: z.string().nullable().describe('Id del hecho de origen (p. ej. orden) o null.'),
+  cancelado: z.boolean(),
+  observaciones: z.string().nullable(),
+});
+
+/** Un renglón del kardex de tela tal como lo devuelve la API. */
+export type KardexTelaRenglon = z.infer<typeof esquemaKardexTelaRenglon>;
+
+/** Respuesta del kardex de tela (movimientos cronológicos con saldo corrido). */
+export const esquemaKardexTelaLista = z
+  .object({
+    idTela: z.number().int(),
+    tela: z.string(),
+    renglones: z.array(esquemaKardexTelaRenglon),
+  })
+  .describe('Kardex de una tela (movimientos con saldo corrido).');
+
+/** Forma de la respuesta del kardex de tela. */
+export type KardexTelaLista = z.infer<typeof esquemaKardexTelaLista>;
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// AVÍOS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Una línea de ajuste/traspaso de avío (avío×cantidad; lote opcional). */
+export const esquemaAjusteAvioLinea = z.object({
+  idAvio: idPositivo('el avío'),
+  idLote: idPositivo('el lote').optional(),
+  cantidad: z.number().positive({ error: 'La cantidad del ajuste debe ser mayor que 0' }),
+});
+
+/** Datos de una línea de ajuste de avío. */
+export type DatosAjusteAvioLinea = z.infer<typeof esquemaAjusteAvioLinea>;
+
+/**
+ * Alta de un AJUSTE de inventario de AVÍO (conteo físico inicial / corrección — R4). El tipo de
+ * movimiento define la dirección; motivo OBLIGATORIO (A7). Las entradas no validan existencia; las
+ * salidas no dejan negativo (dominio, bajo lock).
+ */
+export const esquemaAjusteAvioCrear = z
+  .object({
+    idTipoMov: idPositivo('el tipo de movimiento'),
+    idAlmacen: idPositivo('el almacén'),
+    fecha: z.iso.date({ error: 'La fecha del ajuste es obligatoria (YYYY-MM-DD)' }),
+    motivo: z
+      .string({ error: 'El motivo es obligatorio' })
+      .trim()
+      .min(3, { error: 'Explica el motivo (mínimo 3 caracteres)' })
+      .max(500),
+    lineas: z
+      .array(esquemaAjusteAvioLinea)
+      .min(1, { error: 'Captura al menos un renglón de avío' }),
+  })
+  .describe('Ajuste de inventario de avío (R4).');
+
+/** Datos validados de un ajuste de avío. */
+export type DatosAjusteAvioCrear = z.infer<typeof esquemaAjusteAvioCrear>;
+
+/** Alta de un TRASPASO de AVÍO entre almacenes. */
+export const esquemaTraspasoAvioCrear = z
+  .object({
+    idAlmacenOrigen: idPositivo('el almacén de origen'),
+    idAlmacenDestino: idPositivo('el almacén de destino'),
+    fecha: z.iso.date({ error: 'La fecha del traspaso es obligatoria (YYYY-MM-DD)' }),
+    observaciones: z.string().trim().max(1000).optional(),
+    lineas: z
+      .array(esquemaAjusteAvioLinea)
+      .min(1, { error: 'Captura al menos un renglón de avío' }),
+  })
+  .describe('Traspaso de avío entre almacenes (R4).');
+
+/** Datos validados de un traspaso de avío. */
+export type DatosTraspasoAvioCrear = z.infer<typeof esquemaTraspasoAvioCrear>;
+
+/** Un renglón de la salida de un movimiento de avío. */
+const esquemaMovAvioRenglonSalida = z.object({
+  idAvio: z.number().int(),
+  avio: z.string().describe('Clave del avío.'),
+  descripcion: z.string().describe('Descripción del avío.'),
+  esGenerico: z.boolean(),
+  idLote: z.number().int().nullable(),
+  cantidad: z.number(),
+  costoUnit: z.number().nullable(),
+  importe: z.number().nullable(),
+});
+
+/** Salida de un movimiento de AVÍO: encabezado + renglones. */
+export const esquemaMovimientoAvioSalida = z
+  .object({
+    id: z.number().int(),
+    folio: z.number().int(),
+    idEmpresa: z.number().int(),
+    idTipoMov: z.number().int(),
+    tipoMov: z.string(),
+    direccion: z.enum(['entrada', 'salida', 'traspaso']),
+    idAlmacen: z.number().int(),
+    almacen: z.string(),
+    fecha: z.string(),
+    origenTipo: z.string().nullable(),
+    origenId: z.string().nullable(),
+    observaciones: z.string().nullable(),
+    cancelado: z.boolean(),
+    idMovimientoInverso: z.number().int().nullable(),
+    renglones: z.array(esquemaMovAvioRenglonSalida),
+    totalCantidad: z.number(),
+    totalImporte: z.number().nullable(),
+    creadoEn: z.iso.datetime(),
+    creadoPorId: z.string().nullable(),
+  })
+  .describe('Movimiento de inventario de avío con sus renglones.');
+
+/** Forma de un movimiento de avío tal como lo devuelve la API. */
+export type MovimientoAvioSalida = z.infer<typeof esquemaMovimientoAvioSalida>;
+
+/** Resultado de un traspaso de avío: las dos patas. */
+export const esquemaTraspasoAvioSalida = z
+  .object({
+    salida: esquemaMovimientoAvioSalida,
+    entrada: esquemaMovimientoAvioSalida,
+  })
+  .describe('Las dos patas de un traspaso de avío.');
+
+/** Forma del resultado de un traspaso de avío. */
+export type TraspasoAvioSalida = z.infer<typeof esquemaTraspasoAvioSalida>;
+
+/** Filtros de existencias de avío (querystring). */
+export const esquemaExistenciasAvioQuery = z
+  .object({
+    idAvio: idPositivoOpcionalCoerce.describe('Filtra por un avío.'),
+    idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+    soloGenericos: z.stringbool().default(false).describe('Solo avíos genéricos de stock (R4).'),
+    incluirCeros: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye filas con existencia 0. Por defecto se omiten.'),
+  })
+  .describe('Filtros de la consulta de existencias de avío.');
+
+/** Parámetros de existencias de avío ya coaccionados. */
+export type ExistenciasAvioQuery = z.infer<typeof esquemaExistenciasAvioQuery>;
+
+/** Una fila de existencia de avío: avío×almacén con su cantidad. */
+const esquemaExistenciaAvioFila = z.object({
+  idAvio: z.number().int(),
+  avio: z.string().describe('Clave del avío.'),
+  descripcion: z.string(),
+  unidad: z.string().nullable(),
+  esGenerico: z.boolean(),
+  idAlmacen: z.number().int(),
+  almacen: z.string(),
+  existencia: z.number().describe('Existencia actual (Σ de movimientos, D3).'),
+});
+
+/** Una fila de existencia de avío tal como la devuelve la API. */
+export type ExistenciaAvioFila = z.infer<typeof esquemaExistenciaAvioFila>;
+
+/** Respuesta de la consulta de existencias de avío. */
+export const esquemaExistenciasAvioLista = z
+  .object({
+    filas: z.array(esquemaExistenciaAvioFila),
+    totalExistencia: z.number(),
+  })
+  .describe('Existencias de avío (consulta de solo lectura, D3).');
+
+/** Forma de la respuesta de existencias de avío. */
+export type ExistenciasAvioLista = z.infer<typeof esquemaExistenciasAvioLista>;
+
+/** Filtros del kardex de avío (querystring). `idAvio` obligatorio. */
+export const esquemaKardexAvioQuery = z
+  .object({
+    idAvio: z.coerce
+      .number({ error: 'El avío es obligatorio' })
+      .int()
+      .positive()
+      .describe('Avío del kardex (obligatorio).'),
+    idAlmacen: idPositivoOpcionalCoerce.describe('Filtra por un almacén.'),
+  })
+  .describe('Filtros del kardex de un avío.');
+
+/** Parámetros del kardex de avío ya coaccionados. */
+export type KardexAvioQuery = z.infer<typeof esquemaKardexAvioQuery>;
+
+/** Un renglón del kardex de avío. */
+const esquemaKardexAvioRenglon = z.object({
+  idMovimiento: z.number().int(),
+  folio: z.number().int(),
+  fecha: z.string(),
+  idTipoMov: z.number().int(),
+  tipoMov: z.string(),
+  direccion: z.enum(['entrada', 'salida', 'traspaso']),
+  idAlmacen: z.number().int(),
+  almacen: z.string(),
+  idLote: z.number().int().nullable(),
+  entrada: z.number(),
+  salida: z.number(),
+  saldo: z.number(),
+  costoUnit: z.number().nullable(),
+  importe: z.number().nullable(),
+  origenTipo: z.string().nullable(),
+  origenId: z.string().nullable(),
+  cancelado: z.boolean(),
+  observaciones: z.string().nullable(),
+});
+
+/** Un renglón del kardex de avío tal como lo devuelve la API. */
+export type KardexAvioRenglon = z.infer<typeof esquemaKardexAvioRenglon>;
+
+/** Respuesta del kardex de avío. */
+export const esquemaKardexAvioLista = z
+  .object({
+    idAvio: z.number().int(),
+    avio: z.string(),
+    descripcion: z.string(),
+    renglones: z.array(esquemaKardexAvioRenglon),
+  })
+  .describe('Kardex de un avío (movimientos con saldo corrido).');
+
+/** Forma de la respuesta del kardex de avío. */
+export type KardexAvioLista = z.infer<typeof esquemaKardexAvioLista>;
+
+// ── Parámetro de ruta `:id` (movimiento de material) ─────────────────────────────────────────────
+
+/** Parámetro de ruta `:id` del movimiento de material. */
+export const esquemaParamIdMaterial = z.object({
+  id: z.coerce
+    .number({ error: 'El id debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del movimiento de material.'),
+});

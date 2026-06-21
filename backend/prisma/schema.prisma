@@ -533,6 +533,8 @@ model Proveedor {
   etapasMovimiento EtapaMovimiento[]
   /// Cargos a su cuenta de maquila (EsMa) como maquilero (F3-E1). Restrict.
   cargosEsMa       EsMaCargo[]
+  /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
+  lotes            Lote[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -688,6 +690,8 @@ model Color {
   etapasMovimientoDet EtapaMovimientoDet[]
   /// Renglones de kardex PT en este color (F3-E1, D4). Restrict.
   movimientosDetPt    MovimientoDetPt[]
+  /// Lotes de tela teñidos en este color (F4-E1, D5: el lote define el teñido). Restrict.
+  lotes               Lote[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -985,6 +989,8 @@ model Tela {
   /// ejercita F4 (el inventario de telas); la tabla nace en F3-E1 para fijar el motor
   /// genérico. Restrict.
   movimientosDetTela MovimientoDetTela[]
+  /// Componentes de lote que usan esta tela (F4-E1, D5: un lote trae N telas). Restrict.
+  loteComponentes    LoteComponente[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1021,6 +1027,77 @@ model TelaColor {
   @@map("telas_colores")
 }
 
+/// LOTE de tela (F4-E1, D5 — doc 04-Inventarios §B.1/§B.3). Un lote es una compra/teñido
+/// concreto que ENTRA al inventario: define el COLOR (el teñido) y trae 1..N telas
+/// acompañantes (cuerpo + cardigan + …) del MISMO lote y color, para que casen los colores
+/// (D5 elimina el límite viejo de 2 componentes `ExTela1/ExTela2`). El lote es la dimensión de
+/// trazabilidad del kardex de telas: la existencia es por tela × lote × almacén (Σ de
+/// movimientos, D3). `proveedor`/`factura`/`fecha` son los datos de la entrada (el viejo los
+/// llevaba en `Entradas`); en v2 la entrada-recepción (E3) crea el lote en la MISMA transacción
+/// que el movimiento de kardex. GLOBAL (sin idEmpresa — catálogo de materiales, ADR-0007: el
+/// inventario por empresa lo da `Movimiento.idEmpresa`). Auditoría A7.
+model Lote {
+  id        Int    @id @default(autoincrement())
+  /// Clave de negocio del lote (estable, p. ej. número de lote/teñido del proveedor). Única
+  /// global. Para el ETL de lotes legacy sintetizados (E6) se genera una clave determinista.
+  clave     String @unique
+  /// Color (teñido) del lote: TODOS sus componentes comparten este color (D5). Restrict.
+  idColor   Int    @map("id_color")
+  color     Color  @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  /// Proveedor que surtió el lote (opcional: el histórico legacy puede no mapearlo). Restrict.
+  idProveedor Int?       @map("id_proveedor")
+  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Factura de la entrada del lote (texto del proveedor; opcional para el legacy).
+  factura     String?
+  /// Fecha de la entrada/teñido del lote (solo fecha).
+  fecha       DateTime? @db.Date
+  observaciones String? @db.Text
+
+  /// Componentes (telas) que llegaron en este lote (1..N, mismo color — D5).
+  componentes LoteComponente[]
+  /// Renglones de kardex de TELA ligados a este lote (existencia por tela×lote×almacén, D3).
+  movimientosDetTela MovimientoDetTela[]
+  /// Renglones de kardex de AVÍO ligados a este lote (opcional, R4 — pocos avíos por lote).
+  movimientosDetAvio MovimientoDetAvio[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idColor])
+  @@index([idProveedor])
+  @@map("lotes")
+}
+
+/// COMPONENTE de un lote (F4-E1, D5): una tela concreta dentro del lote, con la cantidad y el
+/// peso que llegaron. Reemplaza el par fijo `ExTela1/ExTela2` del viejo por N renglones (un
+/// lote puede traer cuerpo + cardigan + más). PK compuesta (idLote, idTela): una tela aparece
+/// UNA vez por lote. `onDelete`: Cascade hacia `Lote` (los componentes son parte del lote; se
+/// reescriben en la transacción A2 de la recepción); Restrict hacia `Tela` (una tela en uso no
+/// se borra físico). La EXISTENCIA NO vive aquí (sería un saldo editable, prohibido por D3):
+/// `cantidad` es la cantidad ORIGINAL que entró (dato de la entrada); el saldo real es Σ de
+/// `MovimientoDetTela` por tela×lote×almacén. Auditoría A7.
+model LoteComponente {
+  idLote   Int  @map("id_lote")
+  lote     Lote @relation(fields: [idLote], references: [id], onDelete: Cascade)
+  idTela   Int  @map("id_tela")
+  tela     Tela @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Cantidad de esta tela que ENTRÓ en el lote (dato de la entrada; NO es la existencia — D3).
+  cantidad Decimal  @db.Decimal(14, 4)
+  /// Peso de esta tela en el lote (kg), informativo (ex `Entradas...Peso`). Opcional.
+  peso     Decimal? @db.Decimal(14, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idLote, idTela])
+  @@index([idTela])
+  @@map("lote_componentes")
+}
+
 /// Avío / habilitación (catálogo global, F1-E3, R1). Equivale a `Habilitacion` del viejo
 /// (doc 01-Modelos §2, con Favorito/CantFav). `unidad` y `presentacion` son campos NUEVOS
 /// que el viejo no tiene: NULLABLE en BD a propósito (obligatorios SOLO en altas nuevas por
@@ -1044,6 +1121,14 @@ model Avio {
   esGenerico       Boolean  @default(false) @map("es_generico")
   /// Precio de referencia (fallback de precio sin proveedor mapeable — ADR-0009).
   precioReferencia Decimal? @map("precio_referencia") @db.Decimal(12, 2)
+  /// FACTOR de conversión por DEFECTO presentación→unidad de consumo (F4-E1, R1): cuántas
+  /// `unidad` (m, pza…) trae una `presentacion` (rollo, caja…). Es el fallback cuando el
+  /// `AvioProveedor` del precio no define su propio factor (un proveedor puede vender el mismo
+  /// avío en presentaciones distintas — por eso el factor "fino" vive en `AvioProveedor`). Lo
+  /// usa el motor de conversión (`comun/conversion.ts`) para convertir CANTIDADES y PRECIOS
+  /// (E3: costo por unidad = precio por presentación ÷ factor). NULL = sin conversión (1:1).
+  /// Debe ser > 0 si viene (lo valida el dominio/Zod). NO se compra para stock con mínimos (R4).
+  factorConversion Decimal? @map("factor_conversion") @db.Decimal(14, 6)
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo           Boolean  @default(true)
 
@@ -1075,8 +1160,17 @@ model Avio {
 model AvioProveedor {
   idAvio      Int      @map("id_avio")
   idProveedor Int      @map("id_proveedor")
-  /// Precio al que ESTE proveedor surte el avío.
+  /// Precio al que ESTE proveedor surte el avío (por PRESENTACIÓN de compra — p. ej. por rollo).
   precio      Decimal? @db.Decimal(12, 2)
+  /// FACTOR de conversión presentación→unidad de consumo PARA ESTE PROVEEDOR (F4-E1, R1):
+  /// cuántas unidades del BOM (m, pza…) trae UNA presentación de compra de este proveedor
+  /// (p. ej. 50 = un rollo de 50 m). Vive aquí porque el mismo avío se compra a varios
+  /// proveedores en presentaciones distintas (R1, insight del dueño). Si es NULL, el motor de
+  /// conversión cae al `Avio.factorConversion` por defecto, y si ese también es NULL, asume 1:1.
+  /// El motor lo usa para convertir CANTIDADES y PRECIOS: la recepción (E3) calcula el costo por
+  /// unidad de consumo = `precio` ÷ factor (precio por rollo ÷ m por rollo = costo por metro).
+  /// Debe ser > 0 si viene (lo valida el dominio/Zod).
+  factorConversion Decimal? @map("factor_conversion") @db.Decimal(14, 6)
   /// Condiciones comerciales de este proveedor para este avío (texto libre).
   condiciones String?
 
@@ -2184,8 +2278,11 @@ model MovimientoDetTela {
   movimiento   Movimiento @relation(fields: [idMovimiento], references: [id], onDelete: Cascade)
   idTela       Int        @map("id_tela")
   tela         Tela       @relation(fields: [idTela], references: [id], onDelete: Restrict)
-  /// Lote de la tela (D5). Escalar sin FK en F3; la FK `→ Lote` la agrega F4 (ALTER aditivo).
+  /// Lote de la tela (D5). En F4-E1 se agrega la FK `→ Lote` (ALTER aditivo): el lote es la
+  /// dimensión de trazabilidad de la existencia (tela×lote×almacén). NULLABLE: un ajuste
+  /// inicial sin lote conocido puede no traerlo (el dominio decide). Restrict.
   idLote       Int?       @map("id_lote")
+  lote         Lote?      @relation(fields: [idLote], references: [id], onDelete: Restrict)
 
   /// Cantidad de tela (positiva; el signo lo da la dirección del tipo de movimiento). Decimal.
   cantidad  Decimal  @db.Decimal(14, 4)
@@ -2215,8 +2312,11 @@ model MovimientoDetAvio {
   movimiento   Movimiento @relation(fields: [idMovimiento], references: [id], onDelete: Cascade)
   idAvio       Int        @map("id_avio")
   avio         Avio       @relation(fields: [idAvio], references: [id], onDelete: Restrict)
-  /// Lote del avío (opcional, R4). Escalar sin FK en F3; la FK `→ Lote` la agrega F4.
+  /// Lote del avío (opcional, R4 — pocos avíos se manejan por lote). En F4-E1 se agrega la FK
+  /// `→ Lote` (ALTER aditivo). NULLABLE: el inventario de avíos suele ser por avío×almacén sin
+  /// lote (la vista `ExistenciaAvio` agrega por avío×almacén). Restrict.
   idLote       Int?       @map("id_lote")
+  lote         Lote?      @relation(fields: [idLote], references: [id], onDelete: Restrict)
   /// Avío genérico de stock (R4 — copiado de `Avio.esGenerico` para consultas sin join).
   esGenerico   Boolean    @default(false) @map("es_generico")
 

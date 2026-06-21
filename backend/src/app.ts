@@ -13,7 +13,9 @@ import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
+import { rutasInventarioAvios } from './api/inventarios/avios.rutas.js';
 import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
+import { rutasInventarioTelas } from './api/inventarios/telas.rutas.js';
 import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
@@ -138,6 +140,12 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // traspasos entre almacenes (dos patas), cancelación por inverso auditado (D3), existencias
   // (vista) y kardex (por modelo con saldo corrido + por folio). RBAC inventario-pt.ver/.mover.
   await app.register(rutasMovimientosPt, { prefix: '/api' });
+  // Inventario de TELAS y AVÍOS por kardex (Módulo 4, F4-E1, D5/R4): ajustes (telas con lote
+  // multi-componente), salida de tela a orden (traza Salidas.IdOrdenes), traspasos, cancelación por
+  // inverso (D3), existencias (vistas) y kardex. Importes de telas ocultos sin telas.ver-totales
+  // (ex-acceso #7). RBAC inventario-telas/.avios ver/.mover.
+  await app.register(rutasInventarioTelas, { prefix: '/api' });
+  await app.register(rutasInventarioAvios, { prefix: '/api' });
   // Producción / WIP — ETAPAS (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8),
   // cancelación suave, pendientes derivados por orden, corte semanal por cortador y los 2 PDFs
   // (documento de envío + ficha de estampado). RBAC por ruta (produccion.corte/.envio/.cancelar/
