@@ -100,6 +100,7 @@ export interface paths {
                 | 'compras.ver'
                 | 'compras.administrar'
                 | 'compras.cancelar'
+                | 'compras.recibir'
                 | 'produccion.corte-salidas'
                 | 'produccion.entradas-maquila'
                 | 'telas.ver-totales'
@@ -20467,6 +20468,803 @@ export interface paths {
               modificadoEn: string;
               /** @description Id del último usuario que la modificó. */
               modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes-compra/{idOrdenCompra}/recepciones': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar las recepciones de una orden de compra */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de compra. */
+          idOrdenCompra: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Recepciones de una orden de compra. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Recepciones de la OC (orden cronológico). */
+              recepciones: {
+                /** @description Id interno de la recepción. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description OC contra la que se recibió. */
+                idOrdenCompra: number;
+                /** @description Folio de la OC (para la UI). */
+                numCompra: number;
+                /** @description Almacén destino. */
+                idAlmacen: number;
+                /** @description Nombre del almacén destino. */
+                almacen: string;
+                /** @description Factura del proveedor, o null. */
+                factura: string | null;
+                /**
+                 * Format: date
+                 * @description Fecha de la recepción (YYYY-MM-DD).
+                 */
+                fecha: string;
+                /** @description Observaciones, o null. */
+                observaciones: string | null;
+                /** @description ¿La recepción fue reversada (D3)? */
+                reversada: boolean;
+                /** @description Fecha del reverso (ISO), o null. */
+                reversadaEn: string | null;
+                /** @description Usuario que reversó, o null. */
+                reversadaPorId: string | null;
+                /** @description Motivo del reverso, o null. */
+                motivoReverso: string | null;
+                /** @description Renglones recibidos. */
+                lineas: {
+                  /** @description Id del renglón de recepción. */
+                  id: number;
+                  /** @description Renglón de OC que se recibió. */
+                  idOrdenCompraLinea: number;
+                  /**
+                   * @description Tipo del material recibido.
+                   * @enum {string}
+                   */
+                  tipo: 'tela' | 'avio' | 'libre';
+                  /** @description Tela del catálogo, o null. */
+                  idTela: number | null;
+                  /** @description Nombre de la tela, o null. */
+                  tela: string | null;
+                  /** @description Avío del catálogo, o null. */
+                  idAvio: number | null;
+                  /** @description Clave/descripción del avío, o null. */
+                  avio: string | null;
+                  /** @description Descripción libre (líneas libres), o null. */
+                  descripcionLibre: string | null;
+                  /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                  cantidadRecibida: number;
+                  /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                  costoUnit: number | null;
+                  /** @description Lote creado (telas), o null. */
+                  idLote: number | null;
+                  /** @description Clave del lote, o null. */
+                  loteClave: string | null;
+                  /** @description Movimiento de kardex generado, o null. */
+                  idMovimiento: number | null;
+                  /** @description Folio del movimiento de kardex, o null. */
+                  folioMovimiento: number | null;
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que la creó. */
+                creadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Recibir material contra una orden de compra (recepción) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de compra. */
+          idOrdenCompra: number;
+        };
+        cookie?: never;
+      };
+      /** @description Recepción de material contra una OC autorizada (decisión b). */
+      requestBody: {
+        content: {
+          'application/json': {
+            idOrdenCompra: number;
+            idAlmacen: number;
+            /** @description Factura del proveedor de esta recepción. */
+            factura?: string | null;
+            /** Format: date */
+            fecha: string;
+            observaciones?: string | null;
+            /** @description Renglones de OC que se reciben (parcial o total). */
+            lineas: {
+              idOrdenCompraLinea: number;
+              /** @description Cantidad recibida en la PRESENTACIÓN de compra (se convierte a consumo, R1). */
+              cantidad: number;
+              /** @description Lote a crear (OBLIGATORIO en líneas de tela, D5). */
+              lote?: {
+                /** @description Clave del lote (autogenerada si falta). */
+                clave?: string;
+                idColor: number;
+                idProveedor?: number;
+                factura?: string;
+                /** Format: date */
+                fecha?: string;
+                observaciones?: string;
+                componentes: {
+                  idTela: number;
+                  cantidad: number;
+                  peso?: number;
+                }[];
+              };
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Recepción de compra (encabezado + renglones). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la recepción. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description OC contra la que se recibió. */
+              idOrdenCompra: number;
+              /** @description Folio de la OC (para la UI). */
+              numCompra: number;
+              /** @description Almacén destino. */
+              idAlmacen: number;
+              /** @description Nombre del almacén destino. */
+              almacen: string;
+              /** @description Factura del proveedor, o null. */
+              factura: string | null;
+              /**
+               * Format: date
+               * @description Fecha de la recepción (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description ¿La recepción fue reversada (D3)? */
+              reversada: boolean;
+              /** @description Fecha del reverso (ISO), o null. */
+              reversadaEn: string | null;
+              /** @description Usuario que reversó, o null. */
+              reversadaPorId: string | null;
+              /** @description Motivo del reverso, o null. */
+              motivoReverso: string | null;
+              /** @description Renglones recibidos. */
+              lineas: {
+                /** @description Id del renglón de recepción. */
+                id: number;
+                /** @description Renglón de OC que se recibió. */
+                idOrdenCompraLinea: number;
+                /**
+                 * @description Tipo del material recibido.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'libre';
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Descripción libre (líneas libres), o null. */
+                descripcionLibre: string | null;
+                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                cantidadRecibida: number;
+                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                costoUnit: number | null;
+                /** @description Lote creado (telas), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento de kardex generado, o null. */
+                idMovimiento: number | null;
+                /** @description Folio del movimiento de kardex, o null. */
+                folioMovimiento: number | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/recepciones-compra/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener una recepción de compra */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la recepción de compra. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Recepción de compra (encabezado + renglones). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la recepción. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description OC contra la que se recibió. */
+              idOrdenCompra: number;
+              /** @description Folio de la OC (para la UI). */
+              numCompra: number;
+              /** @description Almacén destino. */
+              idAlmacen: number;
+              /** @description Nombre del almacén destino. */
+              almacen: string;
+              /** @description Factura del proveedor, o null. */
+              factura: string | null;
+              /**
+               * Format: date
+               * @description Fecha de la recepción (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description ¿La recepción fue reversada (D3)? */
+              reversada: boolean;
+              /** @description Fecha del reverso (ISO), o null. */
+              reversadaEn: string | null;
+              /** @description Usuario que reversó, o null. */
+              reversadaPorId: string | null;
+              /** @description Motivo del reverso, o null. */
+              motivoReverso: string | null;
+              /** @description Renglones recibidos. */
+              lineas: {
+                /** @description Id del renglón de recepción. */
+                id: number;
+                /** @description Renglón de OC que se recibió. */
+                idOrdenCompraLinea: number;
+                /**
+                 * @description Tipo del material recibido.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'libre';
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Descripción libre (líneas libres), o null. */
+                descripcionLibre: string | null;
+                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                cantidadRecibida: number;
+                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                costoUnit: number | null;
+                /** @description Lote creado (telas), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento de kardex generado, o null. */
+                idMovimiento: number | null;
+                /** @description Folio del movimiento de kardex, o null. */
+                folioMovimiento: number | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/recepciones-compra/{id}/reversar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reversar una recepción de compra (inverso auditado, motivo obligatorio) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la recepción de compra. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo del reverso (obligatorio). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Recepción de compra (encabezado + renglones). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la recepción. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description OC contra la que se recibió. */
+              idOrdenCompra: number;
+              /** @description Folio de la OC (para la UI). */
+              numCompra: number;
+              /** @description Almacén destino. */
+              idAlmacen: number;
+              /** @description Nombre del almacén destino. */
+              almacen: string;
+              /** @description Factura del proveedor, o null. */
+              factura: string | null;
+              /**
+               * Format: date
+               * @description Fecha de la recepción (YYYY-MM-DD).
+               */
+              fecha: string;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description ¿La recepción fue reversada (D3)? */
+              reversada: boolean;
+              /** @description Fecha del reverso (ISO), o null. */
+              reversadaEn: string | null;
+              /** @description Usuario que reversó, o null. */
+              reversadaPorId: string | null;
+              /** @description Motivo del reverso, o null. */
+              motivoReverso: string | null;
+              /** @description Renglones recibidos. */
+              lineas: {
+                /** @description Id del renglón de recepción. */
+                id: number;
+                /** @description Renglón de OC que se recibió. */
+                idOrdenCompraLinea: number;
+                /**
+                 * @description Tipo del material recibido.
+                 * @enum {string}
+                 */
+                tipo: 'tela' | 'avio' | 'libre';
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Descripción libre (líneas libres), o null. */
+                descripcionLibre: string | null;
+                /** @description Cantidad recibida en unidad de consumo (ya convertida, R1). */
+                cantidadRecibida: number;
+                /** @description Costo por unidad de consumo (precio ÷ factor), o null. */
+                costoUnit: number | null;
+                /** @description Lote creado (telas), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento de kardex generado, o null. */
+                idMovimiento: number | null;
+                /** @description Folio del movimiento de kardex, o null. */
+                folioMovimiento: number | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
             };
           };
         };

@@ -21,14 +21,14 @@ describe('catalogo de modulos del menu', () => {
     // envío a maquila + corte semanal, F3-E2; movimientos + traspasos + existencias + kardex de
     // inventario PT, F3-E3; recibo + recibos semanales + validación de cargos EsMa, F3-E4; entrega a
     // cliente + tablero WIP + existencias en poder del maquilero, F3-E5).
-    // 13 módulos del plan + 28 sub-vistas (las 25 previas + 3 de órdenes de compra/compras, F4-E2).
+    // 13 módulos del plan + 29 sub-vistas (las 28 previas + la recepción de compras, F4-E3).
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(41);
+    expect(MODULOS_MENU).toHaveLength(42);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(41);
+    expect(new Set(claves).size).toBe(42);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(41);
+    expect(new Set(rutas).size).toBe(42);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

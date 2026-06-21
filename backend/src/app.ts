@@ -18,6 +18,7 @@ import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
 import { rutasInventarioTelas } from './api/inventarios/telas.rutas.js';
 import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
 import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
+import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
@@ -135,6 +136,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // (encabezado + líneas tela/avío/libre + matriz talla×color opcional + órdenes ligadas R7),
   // autorización, cancelación suave y duplicado. Folio por empresa (A3/A9). NO mueve kardex (E3).
   await app.register(rutasOrdenesCompra, { prefix: '/api' });
+  // RECEPCIÓN de compras (Módulo 3, F4-E3): el hecho que conecta la OC con el kardex de
+  // materiales — recibir (parcial/total) crea el lote de tela (D5) y mueve el kardex de
+  // telas/avíos con cantidad/costo ya convertidos a unidad de consumo (R1); reverso suave (D3).
+  // Solo se recibe contra una OC autorizada/recibida_parcial (decisión b, server-side).
+  await app.register(rutasRecepcionesCompra, { prefix: '/api' });
   // Producción / WIP + kardex (Módulo 4/6, F3-E1): CRUD de tipos de proceso (con la bandera
   // generaEntradaPt editable solo por admin) y GET solo-lectura de tipos de movimiento de
   // inventario. El motor (kardex/eventos) vive en comun/; los flujos (corte/recibo/entrega)

@@ -79,6 +79,10 @@ model Empresa {
   cargosEsMa       EsMaCargo[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
   ordenesCompra    OrdenCompra[]
+  /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
+  recepcionesCompra RecepcionCompra[]
+  /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
+  eventosOutbox    EventoOutbox[]
 
   @@map("empresas")
 }
@@ -328,6 +332,9 @@ model Almacen {
   recibosAlmacenPrimeras EtapaMovimiento[] @relation("ReciboAlmacenPrimeras")
   /// Recibos de maquila que mandan sus SEGUNDAS a este almacén (F3-E4). Restrict.
   recibosAlmacenSegundas EtapaMovimiento[] @relation("ReciboAlmacenSegundas")
+
+  /// Recepciones de compra cuyo material entra a este almacén destino (F4-E3). Restrict.
+  recepcionesCompra RecepcionCompra[]
 
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
@@ -1069,6 +1076,8 @@ model Lote {
   movimientosDetTela MovimientoDetTela[]
   /// Renglones de kardex de AVÍO ligados a este lote (opcional, R4 — pocos avíos por lote).
   movimientosDetAvio MovimientoDetAvio[]
+  /// Renglones de recepción de compra que crearon/usaron este lote (F4-E3, D5). Restrict.
+  recepcionLineas    RecepcionCompraLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2235,6 +2244,11 @@ model Movimiento {
   detallesTela MovimientoDetTela[]
   detallesAvio MovimientoDetAvio[]
 
+  /// Renglones de recepción de compra que GENERARON este movimiento de entrada (F4-E3): traza
+  /// del movimiento de kardex a su renglón de recepción. SetNull al borrar el movimiento (que
+  /// nunca pasa — D3: los movimientos no se borran). Relación inversa informativa.
+  recepcionLineas RecepcionCompraLinea[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -2492,6 +2506,9 @@ model OrdenCompra {
   lineas         OrdenCompraLinea[]
   /// Ligas N:N (a nivel encabezado) a las órdenes de producción de la OC (F4-E2). Cascade.
   ordenesLigadas OrdenCompraOrden[]
+  /// Recepciones de material contra esta OC (F4-E3, R7). Restrict: una OC con recepciones
+  /// no se borra; la cancelación de la OC se bloquea si hay recepciones activas (decisión b).
+  recepciones    RecepcionCompra[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2547,6 +2564,10 @@ model OrdenCompraLinea {
 
   /// Matriz talla×color OPCIONAL del renglón (decisión (c)). Cuando se usa, `cantidad` = Σ.
   tallas OrdenCompraLineaTalla[]
+  /// Renglones de recepción que recibieron (parcial o total) contra este renglón de OC
+  /// (F4-E3, R7). Restrict hacia la línea de OC. La suma de lo recibido por esta línea define
+  /// el estatus de la OC (parcial/total).
+  recepcionLineas RecepcionCompraLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2609,4 +2630,150 @@ model OrdenCompraOrden {
   @@index([idOrdenCompra])
   @@index([idOrden])
   @@map("orden_compra_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECEPCIÓN de compras (Módulo 3, F4-E3 — doc `Documentacion_MJD/03-Produccion.md` §OC;
+// R7 — REQUISITOS-NUEVOS.md). La recepción es el HECHO que conecta la OC con el kardex de
+// materiales: recibe (parcial o total) el material de una OC AUTORIZADA, crea el lote de la
+// tela (D5), registra la ENTRADA al kardex (`entrada-recepcion`) con cantidad y costo YA
+// convertidos a unidad de consumo (R1: factor presentación→consumo, costo ÷ factor, D1), y
+// recalcula el estatus de la OC (parcial/total, R7). Decisión (b) cerrada con Daniel: SOLO se
+// recibe contra una OC `autorizada`/`recibida_parcial` (server-side, A4). Reverso SUAVE: nada
+// se borra (D3) — la reversión genera el movimiento INVERSO de kardex y marca la recepción
+// como reversada (A7). Folio por empresa (A3/A9, secuencia "recepcion-compra").
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Recepción de material contra una orden de compra (F4-E3, R7). Encabezado del documento de
+/// entrada: factura del proveedor, fecha, almacén DESTINO y empresa (A9). Folio `folio`
+/// consecutivo POR EMPRESA (A3/A9). SIEMPRE ligada a una OC (`idOrdenCompra` obligatorio: las
+/// recepciones de v2 nacen de una OC, no hay entrada "suelta"). Reverso suave (`reversadaEn`):
+/// la recepción reversada sigue consultable; sus movimientos de kardex se neutralizan con su
+/// inverso (D3). Auditoría A7.
+model RecepcionCompra {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — secuencia "recepcion-compra").
+  folio     BigInt
+  /// Empresa dueña de la recepción y de su numeración (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Orden de compra que se recibe (OBLIGATORIO — recepciones v2 siempre ligadas a OC). Restrict.
+  idOrdenCompra Int         @map("id_orden_compra")
+  ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Restrict)
+
+  /// Almacén DESTINO al que entra el material recibido (D4: existencia por …×almacén). Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  /// Factura del proveedor de esta recepción (texto; opcional). El lote de tela también la guarda.
+  factura String?
+  /// Fecha de la recepción (solo fecha).
+  fecha   DateTime @db.Date
+
+  observaciones String? @db.Text
+
+  /// Reverso SUAVE (D3): cuándo, quién y por qué se reversó. NULL si está activa. Al reversar se
+  /// genera el movimiento INVERSO de kardex (la recepción NO se borra). SIN FK física al usuario
+  /// (mismo criterio que OrdenCompra.canceladaPorId — ADR-0005).
+  reversadaEn    DateTime? @map("reversada_en")
+  reversadaPorId String?   @map("reversada_por_id")
+  motivoReverso  String?   @map("motivo_reverso") @db.Text
+
+  /// Renglones recibidos (uno por renglón de OC recibido, parcial o total).
+  lineas RecepcionCompraLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idOrdenCompra])
+  @@index([idAlmacen])
+  @@index([reversadaEn])
+  @@map("recepciones_compra")
+}
+
+/// Renglón de una recepción (F4-E3): cuánto se recibió contra un renglón de OC. `cantidadRecibida`
+/// está en UNIDAD DE CONSUMO ya convertida (R1: cantidad × factor) — es la que cuenta para el
+/// estatus de la OC y la que entró al kardex. `idLote` (telas) = el lote creado en esta recepción;
+/// `idMovimiento` = el movimiento de kardex de ENTRADA que generó (traza). Las líneas LIBRES de la
+/// OC (sin tela/avío) se registran con cantidad pero SIN lote ni movimiento (no inventarían).
+/// Cascade hacia la recepción; Restrict hacia la línea de OC/lote; SetNull hacia el movimiento (que
+/// nunca se borra — D3). `costoUnit` = costo por unidad de consumo (precio ÷ factor, D1).
+model RecepcionCompraLinea {
+  id                 Int             @id @default(autoincrement())
+  idRecepcionCompra  Int             @map("id_recepcion_compra")
+  recepcionCompra    RecepcionCompra @relation(fields: [idRecepcionCompra], references: [id], onDelete: Cascade)
+
+  /// Renglón de la OC que se recibe (R7). Restrict.
+  idOrdenCompraLinea Int              @map("id_orden_compra_linea")
+  ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Restrict)
+
+  /// Cantidad recibida en UNIDAD DE CONSUMO (ya convertida: cantidadPresentación × factor, R1).
+  /// Para líneas de catálogo es lo que entró al kardex; para líneas libres es informativa.
+  cantidadRecibida Decimal @map("cantidad_recibida") @db.Decimal(14, 4)
+  /// Costo por unidad de consumo (precioPresentación ÷ factor, D1). NULL en líneas libres.
+  costoUnit        Decimal? @map("costo_unit") @db.Decimal(12, 4)
+
+  /// Lote creado/usado para esta línea de TELA (D5). NULL en avío/libre. Restrict.
+  idLote Int?  @map("id_lote")
+  lote   Lote? @relation(fields: [idLote], references: [id], onDelete: Restrict)
+
+  /// Movimiento de kardex de ENTRADA que generó esta línea (tela/avío). NULL en líneas libres y
+  /// tras un reverso conceptual (el movimiento sigue existiendo; aquí se conserva la traza).
+  /// SetNull: los movimientos nunca se borran (D3), pero el FK es defensivo.
+  idMovimiento Int?        @map("id_movimiento")
+  movimiento   Movimiento? @relation(fields: [idMovimiento], references: [id], onDelete: SetNull)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idRecepcionCompra])
+  @@index([idOrdenCompraLinea])
+  @@index([idLote])
+  @@index([idMovimiento])
+  @@map("recepcion_compra_linea")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTBOX de eventos de dominio (F4-E3 — ADR-0011: patrón outbox transaccional + pg-boss).
+// La fila se inserta DENTRO de la transacción de negocio (atómica con la recepción): el evento
+// NUNCA se pierde aunque el proceso muera tras el commit. Un relay (`comun/cola-eventos.ts`)
+// publica las filas pendientes a pg-boss (sobre el MISMO Postgres) y marca `publicadoEn`; un
+// barrido periódico reintenta las no publicadas (durabilidad). El consumidor de negocio es de
+// F5 (RC/MRP) — aquí SOLO se publica.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Evento de dominio pendiente de publicar (F4-E3, ADR-0011 — patrón OUTBOX). Se escribe en la
+/// MISMA transacción que el hecho de negocio (atómico); el relay lo publica a la cola pg-boss y
+/// marca `publicadoEn`. `tipo` = nombre del evento (p. ej. "material-recibido"); `version` =
+/// versión del contrato del payload; `payload` = la carga JSON versionada. `intentos`/`error`
+/// registran los reintentos del relay. GLOBAL por empresa (A9: `idEmpresa` para trazar/segmentar).
+model EventoOutbox {
+  id          Int       @id @default(autoincrement())
+  /// Nombre del evento (contrato versionado, p. ej. "material-recibido"). Ver ADR-0011.
+  tipo        String
+  /// Versión del contrato del payload (para evolucionar el evento sin romper consumidores).
+  version     Int       @default(1)
+  /// Empresa dueña del hecho (A9). Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Carga del evento (JSON). Lo MÍNIMO para que el consumidor reaccione (ids + material).
+  payload     Json
+  /// Cuándo se publicó a la cola (NULL = pendiente). El relay lo sella tras encolar.
+  publicadoEn DateTime? @map("publicado_en")
+  /// Número de intentos de publicación (el barrido lo incrementa al reintentar).
+  intentos    Int       @default(0)
+  /// Último error de publicación (texto), si lo hubo. NULL si nunca falló.
+  error       String?   @db.Text
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@index([publicadoEn])
+  @@index([idEmpresa])
+  @@map("eventos_outbox")
 }

@@ -638,12 +638,12 @@ export async function autorizarOC(
  * `motivoCancelacion` (OBLIGATORIO) + bitácora CANCELAR. La OC sigue consultable; no se borra.
  * Cancelar dos veces es conflicto.
  *
- * REGLA "no cancelable con recepciones": una OC con recepciones registradas no se puede cancelar
- * (hay que reversar primero). En E2 la tabla de recepciones (`RecepcionCompra`) aún NO existe, por
- * eso el chequeo de hoy se reduce a rechazar los estatus `recibida_parcial`/`recibida_total` (que
- * solo los pondrá la recepción de E3). PUNTO DE EXTENSIÓN: cuando E3 cree la tabla de recepciones,
- * aquí debe agregarse la consulta `count(recepciones donde idOrdenCompra=id) > 0 → rechazar`.
- * Permiso PROPIO `compras.cancelar`.
+ * REGLA "no cancelable con recepciones" (F4-E3): una OC con recepciones ACTIVAS (no reversadas) no
+ * se puede cancelar — hay que reversarlas primero (D3: nada se borra; la reversión genera el inverso
+ * de kardex). El chequeo es por CONTEO de `RecepcionCompra` activas (no solo por estatus): aunque el
+ * estatus normalmente refleja las recepciones, el conteo es la verdad y cubre cualquier desfase. Un
+ * estatus `recibida_*` también se rechaza por seguridad. Tras reversar TODAS, la OC vuelve a
+ * `autorizada` y entonces sí se puede cancelar. Permiso PROPIO `compras.cancelar`.
  */
 export async function cancelarOC(
   sesion: SesionUsuario,
@@ -659,8 +659,19 @@ export async function cancelarOC(
     if (actual.estatus === 'cancelada') {
       throw new ErrorConflicto(`La orden de compra ${Number(actual.numCompra)} ya está cancelada.`);
     }
+    // F4-E3: hay que reversar las recepciones ACTIVAS antes de cancelar (D3). Se cuenta directo,
+    // sin confiar solo en el estatus (que normalmente lo refleja, pero el conteo es la verdad).
+    const recepcionesActivas = await tx.recepcionCompra.count({
+      where: { idOrdenCompra: id, reversadaEn: null },
+    });
+    if (recepcionesActivas > 0) {
+      throw new ErrorConflicto(
+        'La orden de compra tiene recepciones; reversa las recepciones antes de cancelarla.',
+      );
+    }
     if (actual.estatus === 'recibida_parcial' || actual.estatus === 'recibida_total') {
-      // Punto de extensión E3: con recepciones formales, hay que reversarlas primero.
+      // Defensa adicional: si el estatus quedó en recibida_* sin recepciones activas (desfase),
+      // se rechaza igual; primero hay que dejar la OC consistente.
       throw new ErrorConflicto(
         'La orden de compra tiene recepciones; reversa las recepciones antes de cancelarla.',
       );

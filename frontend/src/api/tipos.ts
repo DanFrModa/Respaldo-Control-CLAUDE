@@ -349,6 +349,26 @@ export type OrdenCompraEditar =
 export type OrdenCompraCancelar =
   paths['/api/ordenes-compra/{id}/cancelar']['post']['requestBody']['content']['application/json'];
 
+// ── Recepción de compras (Módulo 3 · Compras, F4-E3) ──────────────────────────
+
+/** Lista de recepciones de una OC (`GET /api/ordenes-compra/{idOrdenCompra}/recepciones`). */
+export type RecepcionesLista =
+  paths['/api/ordenes-compra/{idOrdenCompra}/recepciones']['get']['responses']['200']['content']['application/json'];
+/** Una recepción de compra (encabezado + renglones recibidos). */
+export type Recepcion = RecepcionesLista['recepciones'][number];
+/** Un renglón recibido de una recepción (material + cantidad + lote/movimiento). */
+export type RecepcionLinea = Recepcion['lineas'][number];
+/** Cuerpo de alta de una recepción (`POST /api/ordenes-compra/{idOrdenCompra}/recepciones`). */
+export type RecepcionCrear =
+  paths['/api/ordenes-compra/{idOrdenCompra}/recepciones']['post']['requestBody']['content']['application/json'];
+/** Un renglón de captura de la recepción (renglón de OC + cantidad + lote opcional). */
+export type RecepcionLineaEntrada = NonNullable<RecepcionCrear['lineas']>[number];
+/** Lote a capturar en una línea de tela de la recepción (color + componentes, D5). */
+export type RecepcionLoteEntrada = NonNullable<RecepcionLineaEntrada['lote']>;
+/** Cuerpo del reverso de una recepción (`POST /api/recepciones-compra/{id}/reversar`). */
+export type RecepcionReversar =
+  paths['/api/recepciones-compra/{id}/reversar']['post']['requestBody']['content']['application/json'];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

@@ -334,6 +334,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['compras.ver'],
     subVista: true,
   },
+  // Recepción de compras (F4-E3): recibe (parcial/total) el material de una OC autorizada, crea el
+  // lote de tela (D5) y da entrada al kardex de telas/avíos. `compras.recibir` la gobierna.
+  {
+    clave: 'recepcion-compras',
+    titulo: 'Recepción de compras',
+    descripcion:
+      'Recibe material contra una OC autorizada: crea el lote y da entrada al inventario',
+    ruta: '/compras/recepcion',
+    icono: 'paquete',
+    permisos: ['compras.recibir'],
+    subVista: true,
+  },
   {
     clave: 'inventarios',
     titulo: 'Inventarios',

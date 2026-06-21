@@ -462,6 +462,24 @@ export {
   type ComprasPagina,
 } from './esquemas/compra.js';
 
+// ── Recepción de compras (Módulo 3, F4-E3; doc 03-Produccion §OC; R7) ─────────
+export {
+  esquemaRecepcionLoteEntrada,
+  esquemaRecepcionLineaEntrada,
+  esquemaRecepcionCrear,
+  esquemaRecepcionReversarCuerpo,
+  esquemaRecepcionLineaSalida,
+  esquemaRecepcionSalida,
+  esquemaRecepcionesLista,
+  type DatosRecepcionLoteEntrada,
+  type DatosRecepcionLineaEntrada,
+  type DatosRecepcionCrear,
+  type DatosRecepcionReversar,
+  type RecepcionLineaSalida,
+  type RecepcionSalida,
+  type RecepcionesLista,
+} from './esquemas/recepcion.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,
