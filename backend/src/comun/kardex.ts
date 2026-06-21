@@ -739,6 +739,35 @@ export async function existenciaAvioBloqueada(
 }
 
 /**
+ * Existencia TOTAL de un avío en la empresa (Σ de movimientos en TODOS los almacenes, D3) — lectura
+ * de PLANEACIÓN (NO toma lock; NO valida no-negativo). La usa el MRP (F4-E4) para netear los avíos
+ * genéricos contra el stock real (decisión d) cuando el usuario YA está autorizado por `compras.ver`
+ * (no debe exigir además `inventario-avios.ver`). Para validar salidas/traspasos sí se usa la versión
+ * BLOQUEADA por almacén ({@link existenciaAvioBloqueada}); esta NO sirve para eso (no serializa).
+ */
+export async function existenciaAvioTotalEmpresa(
+  tx: Tx,
+  idEmpresa: number,
+  idAvio: number,
+): Promise<number> {
+  const filas = await tx.$queryRaw<{ existencia: Prisma.Decimal | null }[]>`
+    SELECT COALESCE(SUM(
+      d."cantidad" * CASE t."direccion"
+        WHEN 'entrada' THEN 1
+        WHEN 'salida'  THEN -1
+        ELSE 0
+      END
+    ), 0) AS existencia
+    FROM "movimiento_det_avio" d
+    JOIN "movimientos" m ON m."id" = d."id_movimiento"
+    JOIN "tipos_movimiento_inventario" t ON t."id" = m."id_tipo_mov"
+    WHERE m."id_empresa" = ${idEmpresa}
+      AND d."id_avio" = ${idAvio}
+  `;
+  return Number(filas[0]?.existencia ?? 0);
+}
+
+/**
  * Registra UN movimiento de AVÍO (encabezado + detalle + bitácora) en UNA transacción (A2), con
  * folio atómico (A3). Primitivo de los servicios de dominio de avíos. NO valida existencia (lo hace
  * el dominio). RECHAZA la dirección `traspaso` (va por {@link registrarTraspasoAvio}).

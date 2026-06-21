@@ -369,6 +369,27 @@ export type RecepcionLoteEntrada = NonNullable<RecepcionLineaEntrada['lote']>;
 export type RecepcionReversar =
   paths['/api/recepciones-compra/{id}/reversar']['post']['requestBody']['content']['application/json'];
 
+// ── Explosión MRP (F4-E4, R3/R7) ──────────────────────────────────────────────
+
+/** Resultado de explosionar una orden (`POST /api/ordenes/{id}/explosion`). */
+export type Explosion =
+  paths['/api/ordenes/{id}/explosion']['post']['responses']['200']['content']['application/json'];
+/** Un grupo de materiales por proveedor sugerido en la explosión. */
+export type ExplosionGrupo = Explosion['grupos'][number];
+/** Un material requerido (renglón de la explosión). */
+export type Requerimiento = ExplosionGrupo['renglones'][number];
+/** Cuerpo de generar OC desde la explosión (`POST .../explosion/generar-oc`). */
+export type GenerarOcCuerpo =
+  paths['/api/ordenes/{id}/explosion/generar-oc']['post']['requestBody']['content']['application/json'];
+/** Resultado de generar OC (las OC creadas, una por proveedor). */
+export type GenerarOcResultado =
+  paths['/api/ordenes/{id}/explosion/generar-oc']['post']['responses']['201']['content']['application/json'];
+/** Tablero "qué tengo / qué falta" de una orden (`GET .../estatus-materiales`). */
+export type EstatusMateriales =
+  paths['/api/ordenes/{id}/estatus-materiales']['get']['responses']['200']['content']['application/json'];
+/** Una fila del tablero de estatus de materiales. */
+export type EstatusMaterialFila = EstatusMateriales['filas'][number];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

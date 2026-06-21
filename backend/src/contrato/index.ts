@@ -480,6 +480,32 @@ export {
   type RecepcionesLista,
 } from './esquemas/recepcion.js';
 
+// ── Explosión MRP / requerimiento de materiales por orden (Módulo 3, F4-E4; R3/R7) ──
+export {
+  esquemaEstadoGenerico,
+  esquemaDiffRequerimiento,
+  esquemaRequerimientoSalida,
+  esquemaGrupoProveedorSalida,
+  esquemaExplosionSalida,
+  esquemaGenerarOcCuerpo,
+  esquemaOcGeneradaSalida,
+  esquemaGenerarOcResultado,
+  esquemaEstatusMaterial,
+  esquemaEstatusMaterialFila,
+  esquemaEstatusMaterialesSalida,
+  type EstadoGenerico,
+  type DiffRequerimiento,
+  type RequerimientoSalida,
+  type GrupoProveedorSalida,
+  type ExplosionSalida,
+  type DatosGenerarOc,
+  type OcGeneradaSalida,
+  type GenerarOcResultado,
+  type EstatusMaterial,
+  type EstatusMaterialFila,
+  type EstatusMaterialesSalida,
+} from './esquemas/mrp.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,

@@ -19,6 +19,7 @@ import { rutasInventarioTelas } from './api/inventarios/telas.rutas.js';
 import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
 import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
 import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
+import { rutasMrp } from './api/compras/mrp.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
@@ -141,6 +142,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // telas/avíos con cantidad/costo ya convertidos a unidad de consumo (R1); reverso suave (D3).
   // Solo se recibe contra una OC autorizada/recibida_parcial (decisión b, server-side).
   await app.register(rutasRecepcionesCompra, { prefix: '/api' });
+  // EXPLOSIÓN MRP (Módulo 3, F4-E4, R3/R7): explosiona el BOM del modelo contra la matriz de la
+  // orden → qué/cuánto comprar (netea genéricos contra el kardex, decisión d), genera OC por
+  // proveedor en un clic, y el tablero "qué tengo / qué falta" (cruce requerido/en-oc/recibido).
+  // NO crea permisos nuevos (usa los compras.* de E2).
+  await app.register(rutasMrp, { prefix: '/api' });
   // Producción / WIP + kardex (Módulo 4/6, F3-E1): CRUD de tipos de proceso (con la bandera
   // generaEntradaPt editable solo por admin) y GET solo-lectura de tipos de movimiento de
   // inventario. El motor (kardex/eventos) vive en comun/; los flujos (corte/recibo/entrega)
