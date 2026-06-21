@@ -289,6 +289,26 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Poder autorizar Ordenes de Compra',
     },
   },
+  // Permisos NUEVOS de v2 (F4-E2, A4): el CRUD de la orden de compra. `ver` (consulta),
+  // `administrar` (alta/edición/duplicado) y `cancelar` (cancelación suave con motivo). La
+  // autorización tiene su permiso propio LEGADO (`compras.autorizar`, arriba). La edición de una
+  // OC YA autorizada queda reservada al admin (decisión (a)): el dominio usa `roles.administrar`
+  // como marcador de admin (mismo criterio que `generaEntradaPt` de tipos-proceso, F3-E1).
+  {
+    clave: 'compras.ver',
+    modulo: 'compras',
+    descripcion: 'Consultar órdenes de compra',
+  },
+  {
+    clave: 'compras.administrar',
+    modulo: 'compras',
+    descripcion: 'Crear y editar órdenes de compra (y duplicarlas a un borrador nuevo)',
+  },
+  {
+    clave: 'compras.cancelar',
+    modulo: 'compras',
+    descripcion: 'Cancelar (suave, con motivo) órdenes de compra',
+  },
 
   // ── Producción (corte y maquila) ─────────────────────────────────────────────
   {

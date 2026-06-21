@@ -435,6 +435,33 @@ export {
   type OrdenesBuscarQuery,
 } from './esquemas/orden-consulta.js';
 
+// ── Órdenes de COMPRA (Módulo 3, F4-E2; doc 03-Produccion §OC) ────────────────
+export {
+  esquemaCompraLineaTallaEntrada,
+  esquemaCompraLineaEntrada,
+  esquemaCompraCrear,
+  esquemaCompraEditarCuerpo,
+  esquemaCompraCancelarCuerpo,
+  esquemaEstatusOrdenCompra,
+  esquemaCompraLineaTallaSalida,
+  esquemaCompraLineaSalida,
+  esquemaCompraOrdenLigadaSalida,
+  esquemaCompraSalida,
+  esquemaListarCompras,
+  esquemaComprasPagina,
+  type DatosCompraLineaTallaEntrada,
+  type DatosCompraLineaEntrada,
+  type DatosCompraCrear,
+  type DatosCompraEditarCuerpo,
+  type DatosCompraCancelar,
+  type CompraLineaTallaSalida,
+  type CompraLineaSalida,
+  type CompraOrdenLigadaSalida,
+  type CompraSalida,
+  type ListarCompras,
+  type ComprasPagina,
+} from './esquemas/compra.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,

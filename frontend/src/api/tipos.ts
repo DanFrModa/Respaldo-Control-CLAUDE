@@ -318,6 +318,37 @@ export type OrdenesBuscar =
 /** Un hit ligero del buscador global. */
 export type OrdenHit = OrdenesBuscar['datos'][number];
 
+// ── Órdenes de compra (Módulo 4 · Compras, F4-E2) ─────────────────────────────
+
+/** Página de órdenes de compra (`GET /api/ordenes-compra`). */
+export type OrdenesCompraPagina =
+  paths['/api/ordenes-compra']['get']['responses']['200']['content']['application/json'];
+/** Una orden de compra completa tal como la devuelve el API (encabezado + líneas + total). */
+export type OrdenCompra = OrdenesCompraPagina['datos'][number];
+/** Un renglón de una orden de compra (material + cantidad + precio + matriz opcional). */
+export type OrdenCompraLinea = OrdenCompra['lineas'][number];
+/** Una celda talla×color de un renglón de OC. */
+export type OrdenCompraLineaTalla = OrdenCompraLinea['tallas'][number];
+/** Una orden de producción ligada a la OC (encabezado). */
+export type OrdenCompraOrdenLigada = OrdenCompra['ordenesLigadas'][number];
+/** Estatus de la OC (controlado por los servicios del backend). */
+export type EstatusOrdenCompra = OrdenCompra['estatus'];
+/** Parámetros de consulta del listado de OC (querystring). */
+export type OrdenesCompraQuery = NonNullable<
+  paths['/api/ordenes-compra']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de OC (`POST /api/ordenes-compra`). */
+export type OrdenCompraCrear =
+  paths['/api/ordenes-compra']['post']['requestBody']['content']['application/json'];
+/** Un renglón de captura de la OC (material + cantidad + precio + matriz opcional). */
+export type OrdenCompraLineaEntrada = NonNullable<OrdenCompraCrear['lineas']>[number];
+/** Cuerpo de edición de OC (`PATCH /api/ordenes-compra/{id}`; las líneas reemplazan al set). */
+export type OrdenCompraEditar =
+  paths['/api/ordenes-compra/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación de OC (`POST /api/ordenes-compra/{id}/cancelar`). */
+export type OrdenCompraCancelar =
+  paths['/api/ordenes-compra/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+
 // ── Administracion F1-E1: Usuarios ────────────────────────────────────────────
 // OJO: lista PAGINADA (`{datos,total,...}`) e `id` = string (cuid). Todas las
 // rutas exigen `usuarios.administrar` (no existe `usuarios.ver`).

@@ -1,0 +1,402 @@
+import { z } from 'zod';
+
+/**
+ * Contrato Zod del módulo ÓRDENES DE COMPRA (F4-E2 — doc `Documentacion_MJD/03-Produccion.md`
+ * §OC). La OC es el documento con el que se COMPRA material (telas/avíos) a un proveedor (ex
+ * `OrdCompra`/`OrdCompraDet`). Reglas de captura aquí (las repite el dominio, A1):
+ *
+ *  • El folio `numCompra` lo asigna la secuencia atómica POR EMPRESA (A3/A9) — NO se captura.
+ *  • El `idEmpresa` lo toma el dominio de la sesión activa (A9) — NO viaja en el cuerpo.
+ *  • El `estatus` (borrador / pendiente_autorizacion / autorizada / recibida parcial o total /
+ *    cancelada) lo DERIVAN/controlan los servicios; ningún cuerpo de captura lo lleva.
+ *  • El TOTAL de la OC y de cada renglón se DERIVA por suma (Σ cantidad×precio): NUNCA viaja
+ *    un total de entrada; en la salida sale calculado (D3).
+ *  • Cada renglón es de CATÁLOGO (`idTela` XOR `idAvio`) o LIBRE (`descripcionLibre`):
+ *    exactamente una de las tres (lo valida el dominio). Decisión (c): el renglón puede llevar
+ *    matriz talla×color NATIVA; cuando la lleva, su `cantidad` = Σ de la matriz (valida el dominio).
+ *  • La autorización/cancelación/duplicado son operaciones propias (no van por el PATCH).
+ *
+ * Semántica del PATCH parcial (igual que Orden/Pedido): omitir un campo (`undefined`) = no tocar;
+ * mandar `null` en un opcional = vaciarlo. Las fechas date-only viajan como `YYYY-MM-DD`.
+ */
+
+// ── Matriz talla×color del renglón (decisión c) ──────────────────────────────────────
+
+/**
+ * Cantidad de una talla×color dentro de un renglón de OC (decisión (c)). `idColor`/`idTalla` del
+ * catálogo + `cantidad` entera ≥0. El par (color, talla) aparece UNA vez por renglón (lo valida el
+ * dominio); la suma de la matriz = `cantidad` del renglón.
+ */
+export const esquemaCompraLineaTallaEntrada = z.object({
+  idColor: z
+    .number({ error: 'El color es obligatorio' })
+    .int({ error: 'El id del color debe ser entero' })
+    .positive({ error: 'El id del color debe ser positivo' })
+    .describe('Color del catálogo (F1).'),
+  idTalla: z
+    .number({ error: 'La talla es obligatoria' })
+    .int({ error: 'El id de la talla debe ser entero' })
+    .positive({ error: 'El id de la talla debe ser positivo' })
+    .describe('Talla del catálogo (D4).'),
+  cantidad: z
+    .number({ error: 'La cantidad es obligatoria' })
+    .int({ error: 'La cantidad debe ser un número entero' })
+    .min(0, { error: 'La cantidad no puede ser negativa' })
+    .describe('Cantidad de esta talla×color.'),
+});
+
+/** Datos validados de una cantidad de la matriz talla×color. */
+export type DatosCompraLineaTallaEntrada = z.infer<typeof esquemaCompraLineaTallaEntrada>;
+
+// ── Renglón de la OC ──────────────────────────────────────────────────────────────────
+
+/**
+ * Renglón de la OC: un material a comprar. De CATÁLOGO (`idTela` XOR `idAvio`) o LIBRE
+ * (`descripcionLibre`); exactamente una de las tres (lo valida el dominio). `cantidad`/`precio`
+ * son decimales positivos. `idOrden` (orden de PRODUCCIÓN) liga POR LÍNEA para R7 (opcional).
+ * `tallas` es la matriz opcional (decisión (c)); si viene, Σ = `cantidad`.
+ */
+export const esquemaCompraLineaEntrada = z.object({
+  idTela: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe('Tela del catálogo (XOR avío/libre).'),
+  idAvio: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe('Avío del catálogo (XOR tela/libre).'),
+  idAvioProveedor: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe('Avío del AvioProveedor que da el precio R1 (traza; solo en líneas de avío).'),
+  cantidad: z
+    .number({ error: 'La cantidad es obligatoria' })
+    .positive({ error: 'La cantidad debe ser mayor a cero' })
+    .describe('Cantidad a comprar (en unidad). Si usa matriz, debe ser Σ de la matriz.'),
+  unidad: z
+    .string()
+    .trim()
+    .max(50, { error: 'La unidad no puede tener más de 50 caracteres' })
+    .nullable()
+    .optional()
+    .describe('Unidad/presentación de compra (rollo, m, pza…).'),
+  precio: z
+    .number({ error: 'El precio es obligatorio' })
+    .min(0, { error: 'El precio no puede ser negativo' })
+    .describe('Precio unitario de la línea (D1: precio actual).'),
+  idOrden: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .optional()
+    .describe('Orden de PRODUCCIÓN ligada (R7, liga por línea; opcional).'),
+  descripcionLibre: z
+    .string()
+    .trim()
+    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' })
+    .nullable()
+    .optional()
+    .describe('Descripción libre (SOLO líneas no catalogadas; con tela/avío null).'),
+  tallas: z
+    .array(esquemaCompraLineaTallaEntrada)
+    .optional()
+    .describe('Matriz talla×color opcional (decisión c); si viene, Σ = cantidad.'),
+});
+
+/** Datos validados de un renglón de OC. */
+export type DatosCompraLineaEntrada = z.infer<typeof esquemaCompraLineaEntrada>;
+
+// ── Encabezado: campos comunes a alta/edición ────────────────────────────────────────
+
+/**
+ * Campos de fecha del encabezado de la OC (date-only). Devueltos por una función para no reusar la
+ * MISMA instancia de ZodObject en alta y edición. Ambas variantes aceptan `null` (vaciar) y
+ * `undefined` (no tocar).
+ */
+function camposFechasCompra() {
+  return {
+    fecha: z.iso
+      .date({ error: 'La fecha de la OC no es válida' })
+      .nullable()
+      .optional()
+      .describe('Fecha de emisión (YYYY-MM-DD).'),
+    fechaEntrega: z.iso
+      .date({ error: 'La fecha de entrega no es válida' })
+      .nullable()
+      .optional()
+      .describe('Fecha de entrega esperada (YYYY-MM-DD).'),
+  } as const;
+}
+
+// ── Alta de una OC ────────────────────────────────────────────────────────────────────
+
+/**
+ * Alta de una orden de compra. `idProveedor` obligatorio; el resto del encabezado opcional. Las
+ * `lineas` pueden venir en el alta (al menos una recomendada, pero el dominio permite OC vacía en
+ * borrador). El estado inicial es `borrador` (lo pone el dominio).
+ */
+export const esquemaCompraCrear = z.object({
+  idProveedor: z
+    .number({ error: 'El proveedor es obligatorio' })
+    .int({ error: 'El id del proveedor debe ser entero' })
+    .positive({ error: 'El id del proveedor debe ser positivo' })
+    .describe('Proveedor al que se le compra.'),
+  ...camposFechasCompra(),
+  entregaEn: z
+    .string()
+    .trim()
+    .max(500, { error: 'El lugar de entrega no puede tener más de 500 caracteres' })
+    .nullable()
+    .optional()
+    .describe('Dónde se entrega el material (texto libre).'),
+  observaciones: z
+    .string()
+    .trim()
+    .max(2000, { error: 'Las observaciones no pueden tener más de 2000 caracteres' })
+    .nullable()
+    .optional()
+    .describe('Observaciones generales.'),
+  correspondeA: z
+    .string()
+    .trim()
+    .max(500, { error: 'El campo "corresponde a" no puede tener más de 500 caracteres' })
+    .nullable()
+    .optional()
+    .describe('A qué corresponde la compra (texto libre).'),
+  lineas: z
+    .array(esquemaCompraLineaEntrada)
+    .default([])
+    .describe('Renglones de la OC (materiales a comprar).'),
+});
+
+/** Datos validados de alta de OC. */
+export type DatosCompraCrear = z.infer<typeof esquemaCompraCrear>;
+
+/**
+ * Edición de una OC (encabezado + reemplazo del SET de líneas). Campos de encabezado opcionales
+ * (nullable para vaciar). `lineas`, si viene, REEMPLAZA el set completo (el dominio sincroniza). El
+ * `id` va en la URL (no en el cuerpo del PATCH).
+ */
+export const esquemaCompraEditarCuerpo = z.object({
+  idProveedor: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Proveedor (solo editable en borrador/pendiente).'),
+  ...camposFechasCompra(),
+  entregaEn: esquemaCompraCrear.shape.entregaEn,
+  observaciones: esquemaCompraCrear.shape.observaciones,
+  correspondeA: esquemaCompraCrear.shape.correspondeA,
+  lineas: z
+    .array(esquemaCompraLineaEntrada)
+    .optional()
+    .describe('Set COMPLETO de renglones (si viene, reemplaza los actuales).'),
+});
+
+/** Datos validados del cuerpo del PATCH de OC. */
+export type DatosCompraEditarCuerpo = z.infer<typeof esquemaCompraEditarCuerpo>;
+
+// ── Cancelar ──────────────────────────────────────────────────────────────────────────
+
+/** Cuerpo de cancelar una OC (cancelación SUAVE): el motivo es OBLIGATORIO. */
+export const esquemaCompraCancelarCuerpo = z.object({
+  motivo: z
+    .string({ error: 'El motivo de cancelación es obligatorio' })
+    .trim()
+    .min(1, { error: 'El motivo de cancelación es obligatorio' })
+    .max(2000, { error: 'El motivo no puede tener más de 2000 caracteres' })
+    .describe('Motivo de la cancelación (obligatorio).'),
+});
+
+/** Datos validados del cuerpo de cancelar. */
+export type DatosCompraCancelar = z.infer<typeof esquemaCompraCancelarCuerpo>;
+
+// ── Salidas ─────────────────────────────────────────────────────────────────────────────
+
+/** Estatus de la OC tal como sale al cliente. */
+export const esquemaEstatusOrdenCompra = z
+  .enum([
+    'borrador',
+    'pendiente_autorizacion',
+    'autorizada',
+    'recibida_parcial',
+    'recibida_total',
+    'cancelada',
+  ])
+  .describe('Estatus de la orden de compra (controlado por los servicios).');
+
+/** Cantidad de la matriz talla×color en la salida (con etiquetas para la UI). */
+export const esquemaCompraLineaTallaSalida = z
+  .object({
+    idColor: z.number().int().describe('Id del color.'),
+    color: z.string().describe('Nombre del color (para la UI).'),
+    idTalla: z.number().int().describe('Id de la talla.'),
+    etiquetaTalla: z.string().describe('Etiqueta de la talla (para la UI).'),
+    cantidad: z.number().int().describe('Cantidad de esta talla×color.'),
+  })
+  .describe('Cantidad de la matriz talla×color de un renglón de OC.');
+
+/** Forma de una cantidad de la matriz en la API. */
+export type CompraLineaTallaSalida = z.infer<typeof esquemaCompraLineaTallaSalida>;
+
+/** Renglón de la OC en la salida (con nombres del material y subtotal derivado). */
+export const esquemaCompraLineaSalida = z
+  .object({
+    id: z.number().int().describe('Id del renglón.'),
+    idTela: z.number().int().nullable().describe('Tela del catálogo, o null.'),
+    tela: z.string().nullable().describe('Nombre de la tela, o null.'),
+    idAvio: z.number().int().nullable().describe('Avío del catálogo, o null.'),
+    avio: z.string().nullable().describe('Clave/descripción del avío, o null.'),
+    idAvioProveedor: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Avío del AvioProveedor del precio, o null.'),
+    descripcionLibre: z
+      .string()
+      .nullable()
+      .describe('Descripción libre (líneas no catalogadas), o null.'),
+    cantidad: z.number().describe('Cantidad a comprar.'),
+    unidad: z.string().nullable().describe('Unidad/presentación de compra, o null.'),
+    precio: z.number().describe('Precio unitario de la línea.'),
+    subtotal: z.number().describe('Subtotal derivado del renglón (cantidad × precio).'),
+    idOrden: z.number().int().nullable().describe('Orden de producción ligada (R7), o null.'),
+    folioOrden: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Folio de la orden ligada (para la UI), o null.'),
+    tallas: z
+      .array(esquemaCompraLineaTallaSalida)
+      .describe('Matriz talla×color (vacía si no aplica).'),
+  })
+  .describe('Renglón de una orden de compra.');
+
+/** Forma de un renglón de OC en la API. */
+export type CompraLineaSalida = z.infer<typeof esquemaCompraLineaSalida>;
+
+/** Orden de producción ligada a la OC (a nivel encabezado). */
+export const esquemaCompraOrdenLigadaSalida = z
+  .object({
+    idOrden: z.number().int().describe('Id de la orden de producción.'),
+    folio: z.number().int().describe('Folio de la orden de producción.'),
+  })
+  .describe('Liga (encabezado) a una orden de producción.');
+
+/** Forma de una liga a orden en la API. */
+export type CompraOrdenLigadaSalida = z.infer<typeof esquemaCompraOrdenLigadaSalida>;
+
+/**
+ * Salida de una OC (proyección a JSON). Incluye el encabezado, las líneas (con matriz y subtotal
+ * derivado), las órdenes ligadas y el TOTAL derivado por suma (Σ subtotales).
+ */
+export const esquemaCompraSalida = z
+  .object({
+    id: z.number().int().describe('Id interno de la OC.'),
+    numCompra: z.number().int().describe('Folio consecutivo por empresa.'),
+    idEmpresa: z.number().int().describe('Empresa dueña de la OC y del folio.'),
+    estatus: esquemaEstatusOrdenCompra,
+    idProveedor: z.number().int().describe('Proveedor.'),
+    proveedor: z.string().describe('Nombre del proveedor (para la UI).'),
+    fecha: z.iso.date().nullable().describe('Fecha de emisión (YYYY-MM-DD), o null.'),
+    fechaEntrega: z.iso.date().nullable().describe('Fecha de entrega esperada, o null.'),
+    entregaEn: z.string().nullable().describe('Dónde se entrega, o null.'),
+    observaciones: z.string().nullable().describe('Observaciones, o null.'),
+    correspondeA: z.string().nullable().describe('A qué corresponde la compra, o null.'),
+    facturasAmparadasLegacy: z
+      .string()
+      .nullable()
+      .describe('Facturas amparadas en v1 (solo lectura, lo llena el ETL), o null.'),
+    idUsuAutorizado: z.string().nullable().describe('Usuario que autorizó, o null.'),
+    fechaAutorizado: z.iso.datetime().nullable().describe('Fecha de autorización (ISO), o null.'),
+    canceladaEn: z.iso.datetime().nullable().describe('Fecha de cancelación (ISO), o null.'),
+    canceladaPorId: z.string().nullable().describe('Usuario que canceló, o null.'),
+    motivoCancelacion: z.string().nullable().describe('Motivo de la cancelación, o null.'),
+    lineas: z.array(esquemaCompraLineaSalida).describe('Renglones de la OC.'),
+    ordenesLigadas: z
+      .array(esquemaCompraOrdenLigadaSalida)
+      .describe('Órdenes de producción ligadas (encabezado).'),
+    total: z.number().describe('Total derivado de la OC (Σ cantidad×precio).'),
+    creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
+    creadoPorId: z.string().nullable().describe('Id del usuario que la creó.'),
+    modificadoEn: z.iso.datetime().describe('Fecha de la última modificación (ISO 8601).'),
+    modificadoPorId: z.string().nullable().describe('Id del último usuario que la modificó.'),
+  })
+  .describe('Orden de compra (encabezado + líneas + matriz + órdenes ligadas + total).');
+
+/** Forma de una OC en la API. */
+export type CompraSalida = z.infer<typeof esquemaCompraSalida>;
+
+// ── Listado / búsqueda ────────────────────────────────────────────────────────────────
+
+/**
+ * Parámetros del listado de OC EN LA URL (querystring). Filtros por proveedor/estatus/rango de
+ * fechas + búsqueda (folio o nombre de proveedor), orden y paginación de servidor.
+ */
+export const esquemaListarCompras = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página.'),
+    busqueda: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .describe('Texto a buscar (folio o nombre de proveedor).'),
+    idProveedor: z.coerce.number().int().positive().optional().describe('Filtra por proveedor.'),
+    estatus: esquemaEstatusOrdenCompra.optional().describe('Filtra por estatus.'),
+    fechaDesde: z.iso.date().optional().describe('Filtra por fecha de emisión ≥ (YYYY-MM-DD).'),
+    fechaHasta: z.iso.date().optional().describe('Filtra por fecha de emisión ≤ (YYYY-MM-DD).'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Filtra las OC ligadas a una orden de producción (R7; pantalla "Compras por orden").',
+      ),
+    incluirCanceladas: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye las OC canceladas (cancelación suave).'),
+    ordenarPor: z
+      .enum(['numCompra', 'fecha', 'fechaEntrega', 'creadoEn'])
+      .default('numCompra')
+      .describe('Columna de orden.'),
+    direccion: z.enum(['asc', 'desc']).default('desc').describe('Dirección del orden.'),
+  })
+  .describe('Filtros, orden y paginación del listado de OC.');
+
+/** Parámetros de listado de OC ya coaccionados desde la URL. */
+export type ListarCompras = z.infer<typeof esquemaListarCompras>;
+
+/** Respuesta paginada del listado de OC (forma estándar `Pagina<T>`). */
+export const esquemaComprasPagina = z
+  .object({
+    datos: z.array(esquemaCompraSalida).describe('OC de la página.'),
+    total: z.number().int().describe('Total de OC que cumplen el filtro.'),
+    pagina: z.number().int().describe('Página devuelta.'),
+    porPagina: z.number().int().describe('Renglones por página.'),
+    totalPaginas: z.number().int().describe('Total de páginas.'),
+  })
+  .describe('Página de órdenes de compra.');
+
+/** Forma de la respuesta paginada de OC. */
+export type ComprasPagina = z.infer<typeof esquemaComprasPagina>;
