@@ -18,6 +18,7 @@ import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPa
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
 import { ExistenciasTelasPagina } from '@/modulos/inventarios/ExistenciasTelasPagina';
+import { InventariosPagina } from '@/modulos/inventarios/InventariosPagina';
 import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
 import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
 import { MovimientosPtPagina } from '@/modulos/inventarios/MovimientosPtPagina';
@@ -116,6 +117,7 @@ const router = createBrowserRouter([
           { path: 'compras/ordenes', element: <OrdenesCompraPagina /> },
           { path: 'compras/autorizacion', element: <BandejaAutorizacionPagina /> },
           { path: 'compras/por-orden', element: <ComprasPorOrdenPagina /> },
+          { path: 'inventarios', element: <InventariosPagina /> },
           { path: 'inventarios/movimientos', element: <MovimientosPtPagina /> },
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
           { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },
