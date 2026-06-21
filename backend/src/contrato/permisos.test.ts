@@ -64,9 +64,15 @@ describe('catálogo de permisos', () => {
       'esma.cargo-validar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Inventario de avíos por kardex (Módulo 4, F4-E1, R4): ver/mover (nuevos de v2).
+      'inventario-avios.mover',
+      'inventario-avios.ver',
       // Inventario PT por kardex (Módulo 6, F3-E3): ver/mover (nuevos de v2).
       'inventario-pt.mover',
       'inventario-pt.ver',
+      // Inventario de telas por kardex (Módulo 4, F4-E1, D5): ver/mover (nuevos de v2).
+      'inventario-telas.mover',
+      'inventario-telas.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
       'modelos.ver',

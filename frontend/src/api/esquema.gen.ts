@@ -157,6 +157,10 @@ export interface paths {
                 | 'produccion.cancelar'
                 | 'inventario-pt.ver'
                 | 'inventario-pt.mover'
+                | 'inventario-telas.ver'
+                | 'inventario-telas.mover'
+                | 'inventario-avios.ver'
+                | 'inventario-avios.mover'
                 | 'esma.cargo-validar'
               )[];
             };
@@ -20629,6 +20633,2000 @@ export interface paths {
               creadoEn: string;
               /** @description Id del usuario que lo capturó. */
               creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/ajustes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Registrar un ajuste de inventario de tela (entrada con lote nuevo o salida/corrección) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Ajuste de inventario de tela (conteo físico/corrección). Lote nuevo XOR líneas. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Tipo de movimiento (dirección entrada o salida; nunca traspaso). */
+            idTipoMov: number;
+            idAlmacen: number;
+            /** Format: date */
+            fecha: string;
+            motivo: string;
+            /** @description Lote nuevo a crear (solo en ajustes de entrada). */
+            lote?: {
+              /** @description Clave del lote (autogenerada si falta). */
+              clave?: string;
+              idColor: number;
+              idProveedor?: number;
+              factura?: string;
+              /** Format: date */
+              fecha?: string;
+              observaciones?: string;
+              componentes: {
+                idTela: number;
+                cantidad: number;
+                peso?: number;
+              }[];
+            };
+            /** @description Renglones tela×lote sobre lotes existentes. */
+            lineas?: {
+              idTela: number;
+              idLote: number;
+              cantidad: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario de tela con sus renglones (tela×lote). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              idTipoMov: number;
+              tipoMov: string;
+              /** @enum {string} */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              idAlmacen: number;
+              almacen: string;
+              /** @description Fecha (YYYY-MM-DD). */
+              fecha: string;
+              origenTipo: string | null;
+              /** @description Id del hecho de origen (p. ej. orden) o null. */
+              origenId: string | null;
+              observaciones: string | null;
+              cancelado: boolean;
+              idMovimientoInverso: number | null;
+              renglones: {
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Id del lote o null. */
+                idLote: number | null;
+                /** @description Clave del lote o null. */
+                loteClave: string | null;
+                /** @description Cantidad del renglón (positiva; la dirección da el signo). */
+                cantidad: number;
+                /** @description Costo unitario o null (sin permiso de importes). */
+                costoUnit: number | null;
+                /** @description Importe (cantidad × costoUnit) o null. */
+                importe: number | null;
+              }[];
+              /** @description Suma de las cantidades del movimiento (derivada). */
+              totalCantidad: number;
+              /** @description Suma de importes o null (sin permiso). */
+              totalImporte: number | null;
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/salidas-orden': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Registrar una salida de tela ligada a una orden de producción (única vía que descuenta) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Salida de tela ligada a una orden de producción. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Orden de producción que consume la tela. */
+            idOrden: number;
+            idAlmacen: number;
+            /** Format: date */
+            fecha: string;
+            observaciones?: string;
+            lineas: {
+              idTela: number;
+              idLote: number;
+              cantidad: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario de tela con sus renglones (tela×lote). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              idTipoMov: number;
+              tipoMov: string;
+              /** @enum {string} */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              idAlmacen: number;
+              almacen: string;
+              /** @description Fecha (YYYY-MM-DD). */
+              fecha: string;
+              origenTipo: string | null;
+              /** @description Id del hecho de origen (p. ej. orden) o null. */
+              origenId: string | null;
+              observaciones: string | null;
+              cancelado: boolean;
+              idMovimientoInverso: number | null;
+              renglones: {
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Id del lote o null. */
+                idLote: number | null;
+                /** @description Clave del lote o null. */
+                loteClave: string | null;
+                /** @description Cantidad del renglón (positiva; la dirección da el signo). */
+                cantidad: number;
+                /** @description Costo unitario o null (sin permiso de importes). */
+                costoUnit: number | null;
+                /** @description Importe (cantidad × costoUnit) o null. */
+                importe: number | null;
+              }[];
+              /** @description Suma de las cantidades del movimiento (derivada). */
+              totalCantidad: number;
+              /** @description Suma de importes o null (sin permiso). */
+              totalImporte: number | null;
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/traspasos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Traspasar tela entre almacenes (salida del origen + entrada al destino) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Traspaso de tela entre almacenes (tela×lote). */
+      requestBody: {
+        content: {
+          'application/json': {
+            idAlmacenOrigen: number;
+            idAlmacenDestino: number;
+            /** Format: date */
+            fecha: string;
+            observaciones?: string;
+            lineas: {
+              idTela: number;
+              idLote: number;
+              cantidad: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Las dos patas de un traspaso de tela. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Pata de SALIDA del almacén origen. */
+              salida: {
+                id: number;
+                /** @description Folio consecutivo por empresa (A3). */
+                folio: number;
+                idEmpresa: number;
+                idTipoMov: number;
+                tipoMov: string;
+                /** @enum {string} */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                idAlmacen: number;
+                almacen: string;
+                /** @description Fecha (YYYY-MM-DD). */
+                fecha: string;
+                origenTipo: string | null;
+                /** @description Id del hecho de origen (p. ej. orden) o null. */
+                origenId: string | null;
+                observaciones: string | null;
+                cancelado: boolean;
+                idMovimientoInverso: number | null;
+                renglones: {
+                  /** @description Id de la tela. */
+                  idTela: number;
+                  /** @description Nombre de la tela. */
+                  tela: string;
+                  /** @description Id del lote o null. */
+                  idLote: number | null;
+                  /** @description Clave del lote o null. */
+                  loteClave: string | null;
+                  /** @description Cantidad del renglón (positiva; la dirección da el signo). */
+                  cantidad: number;
+                  /** @description Costo unitario o null (sin permiso de importes). */
+                  costoUnit: number | null;
+                  /** @description Importe (cantidad × costoUnit) o null. */
+                  importe: number | null;
+                }[];
+                /** @description Suma de las cantidades del movimiento (derivada). */
+                totalCantidad: number;
+                /** @description Suma de importes o null (sin permiso). */
+                totalImporte: number | null;
+                /** Format: date-time */
+                creadoEn: string;
+                creadoPorId: string | null;
+              };
+              /** @description Pata de ENTRADA al almacén destino. */
+              entrada: {
+                id: number;
+                /** @description Folio consecutivo por empresa (A3). */
+                folio: number;
+                idEmpresa: number;
+                idTipoMov: number;
+                tipoMov: string;
+                /** @enum {string} */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                idAlmacen: number;
+                almacen: string;
+                /** @description Fecha (YYYY-MM-DD). */
+                fecha: string;
+                origenTipo: string | null;
+                /** @description Id del hecho de origen (p. ej. orden) o null. */
+                origenId: string | null;
+                observaciones: string | null;
+                cancelado: boolean;
+                idMovimientoInverso: number | null;
+                renglones: {
+                  /** @description Id de la tela. */
+                  idTela: number;
+                  /** @description Nombre de la tela. */
+                  tela: string;
+                  /** @description Id del lote o null. */
+                  idLote: number | null;
+                  /** @description Clave del lote o null. */
+                  loteClave: string | null;
+                  /** @description Cantidad del renglón (positiva; la dirección da el signo). */
+                  cantidad: number;
+                  /** @description Costo unitario o null (sin permiso de importes). */
+                  costoUnit: number | null;
+                  /** @description Importe (cantidad × costoUnit) o null. */
+                  importe: number | null;
+                }[];
+                /** @description Suma de las cantidades del movimiento (derivada). */
+                totalCantidad: number;
+                /** @description Suma de importes o null (sin permiso). */
+                totalImporte: number | null;
+                /** Format: date-time */
+                creadoEn: string;
+                creadoPorId: string | null;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/movimientos/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar un movimiento de tela (genera el inverso auditado; no edita ni borra) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento de material. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo de la cancelación del movimiento de material. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario de tela con sus renglones (tela×lote). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Folio consecutivo por empresa (A3). */
+              folio: number;
+              idEmpresa: number;
+              idTipoMov: number;
+              tipoMov: string;
+              /** @enum {string} */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              idAlmacen: number;
+              almacen: string;
+              /** @description Fecha (YYYY-MM-DD). */
+              fecha: string;
+              origenTipo: string | null;
+              /** @description Id del hecho de origen (p. ej. orden) o null. */
+              origenId: string | null;
+              observaciones: string | null;
+              cancelado: boolean;
+              idMovimientoInverso: number | null;
+              renglones: {
+                /** @description Id de la tela. */
+                idTela: number;
+                /** @description Nombre de la tela. */
+                tela: string;
+                /** @description Id del lote o null. */
+                idLote: number | null;
+                /** @description Clave del lote o null. */
+                loteClave: string | null;
+                /** @description Cantidad del renglón (positiva; la dirección da el signo). */
+                cantidad: number;
+                /** @description Costo unitario o null (sin permiso de importes). */
+                costoUnit: number | null;
+                /** @description Importe (cantidad × costoUnit) o null. */
+                importe: number | null;
+              }[];
+              /** @description Suma de las cantidades del movimiento (derivada). */
+              totalCantidad: number;
+              /** @description Suma de importes o null (sin permiso). */
+              totalImporte: number | null;
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/existencias': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Existencias de tela por tela×lote×almacén (consulta, con componentes del lote) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por una tela. */
+          idTela?: number;
+          /** @description Filtra por un lote. */
+          idLote?: number;
+          /** @description Filtra por el color del lote. */
+          idColor?: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+          /** @description Incluye filas con existencia 0. Por defecto se omiten. */
+          incluirCeros?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Existencias de tela (consulta de solo lectura, D3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              filas: {
+                idTela: number;
+                tela: string;
+                /** @description Id del lote o null (ajuste sin lote). */
+                idLote: number | null;
+                loteClave: string | null;
+                idColor: number | null;
+                color: string | null;
+                idProveedor: number | null;
+                proveedor: string | null;
+                factura: string | null;
+                idAlmacen: number;
+                almacen: string;
+                /** @description Existencia actual (Σ de movimientos, D3). */
+                existencia: number;
+                /** @description Componentes del lote (D5: para expandir en la UI; vacío si no hay lote). */
+                componentes: {
+                  idTela: number;
+                  tela: string;
+                  /** @description Cantidad ORIGINAL que entró del componente (dato del lote). */
+                  cantidad: number;
+                  peso: number | null;
+                }[];
+              }[];
+              /** @description Suma de la existencia de todas las filas. */
+              totalExistencia: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/kardex': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Kardex de una tela (movimientos cronológicos con saldo corrido por lote) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Tela del kardex (obligatorio). */
+          idTela: number;
+          /** @description Filtra por un lote. */
+          idLote?: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Kardex de una tela (movimientos con saldo corrido). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idTela: number;
+              tela: string;
+              renglones: {
+                idMovimiento: number;
+                folio: number;
+                fecha: string;
+                idTipoMov: number;
+                tipoMov: string;
+                /** @enum {string} */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                idAlmacen: number;
+                almacen: string;
+                idLote: number | null;
+                loteClave: string | null;
+                /** @description Cantidad que entra (0 si es salida). */
+                entrada: number;
+                /** @description Cantidad que sale (0 si es entrada). */
+                salida: number;
+                /** @description Saldo corrido de la tela×lote×almacén tras este movimiento. */
+                saldo: number;
+                /** @description Costo unitario o null (sin permiso de importes). */
+                costoUnit: number | null;
+                /** @description Importe del renglón o null. */
+                importe: number | null;
+                origenTipo: string | null;
+                /** @description Id del hecho de origen (p. ej. orden) o null. */
+                origenId: string | null;
+                cancelado: boolean;
+                observaciones: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/telas/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Imprimir el inventario de telas (PDF de existencias por tela × lote × almacén) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por una tela. */
+          idTela?: number;
+          /** @description Filtra por un lote. */
+          idLote?: number;
+          /** @description Filtra por el color del lote. */
+          idColor?: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+          /** @description Incluye filas con existencia 0. Por defecto se omiten. */
+          incluirCeros?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/avios/ajustes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Registrar un ajuste de inventario de avío (conteo físico inicial / corrección) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Ajuste de inventario de avío (R4). */
+      requestBody: {
+        content: {
+          'application/json': {
+            idTipoMov: number;
+            idAlmacen: number;
+            /** Format: date */
+            fecha: string;
+            motivo: string;
+            lineas: {
+              idAvio: number;
+              idLote?: number;
+              cantidad: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario de avío con sus renglones. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              folio: number;
+              idEmpresa: number;
+              idTipoMov: number;
+              tipoMov: string;
+              /** @enum {string} */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              idAlmacen: number;
+              almacen: string;
+              fecha: string;
+              origenTipo: string | null;
+              origenId: string | null;
+              observaciones: string | null;
+              cancelado: boolean;
+              idMovimientoInverso: number | null;
+              renglones: {
+                idAvio: number;
+                /** @description Clave del avío. */
+                avio: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                esGenerico: boolean;
+                idLote: number | null;
+                cantidad: number;
+                costoUnit: number | null;
+                importe: number | null;
+              }[];
+              totalCantidad: number;
+              totalImporte: number | null;
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/avios/traspasos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Traspasar avío entre almacenes (salida del origen + entrada al destino) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Traspaso de avío entre almacenes (R4). */
+      requestBody: {
+        content: {
+          'application/json': {
+            idAlmacenOrigen: number;
+            idAlmacenDestino: number;
+            /** Format: date */
+            fecha: string;
+            observaciones?: string;
+            lineas: {
+              idAvio: number;
+              idLote?: number;
+              cantidad: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Las dos patas de un traspaso de avío. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Movimiento de inventario de avío con sus renglones. */
+              salida: {
+                id: number;
+                folio: number;
+                idEmpresa: number;
+                idTipoMov: number;
+                tipoMov: string;
+                /** @enum {string} */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                idAlmacen: number;
+                almacen: string;
+                fecha: string;
+                origenTipo: string | null;
+                origenId: string | null;
+                observaciones: string | null;
+                cancelado: boolean;
+                idMovimientoInverso: number | null;
+                renglones: {
+                  idAvio: number;
+                  /** @description Clave del avío. */
+                  avio: string;
+                  /** @description Descripción del avío. */
+                  descripcion: string;
+                  esGenerico: boolean;
+                  idLote: number | null;
+                  cantidad: number;
+                  costoUnit: number | null;
+                  importe: number | null;
+                }[];
+                totalCantidad: number;
+                totalImporte: number | null;
+                /** Format: date-time */
+                creadoEn: string;
+                creadoPorId: string | null;
+              };
+              /** @description Movimiento de inventario de avío con sus renglones. */
+              entrada: {
+                id: number;
+                folio: number;
+                idEmpresa: number;
+                idTipoMov: number;
+                tipoMov: string;
+                /** @enum {string} */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                idAlmacen: number;
+                almacen: string;
+                fecha: string;
+                origenTipo: string | null;
+                origenId: string | null;
+                observaciones: string | null;
+                cancelado: boolean;
+                idMovimientoInverso: number | null;
+                renglones: {
+                  idAvio: number;
+                  /** @description Clave del avío. */
+                  avio: string;
+                  /** @description Descripción del avío. */
+                  descripcion: string;
+                  esGenerico: boolean;
+                  idLote: number | null;
+                  cantidad: number;
+                  costoUnit: number | null;
+                  importe: number | null;
+                }[];
+                totalCantidad: number;
+                totalImporte: number | null;
+                /** Format: date-time */
+                creadoEn: string;
+                creadoPorId: string | null;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/avios/movimientos/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar un movimiento de avío (genera el inverso auditado; no edita ni borra) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento de material. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Motivo de la cancelación del movimiento de material. */
+      requestBody: {
+        content: {
+          'application/json': {
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Movimiento de inventario de avío con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              folio: number;
+              idEmpresa: number;
+              idTipoMov: number;
+              tipoMov: string;
+              /** @enum {string} */
+              direccion: 'entrada' | 'salida' | 'traspaso';
+              idAlmacen: number;
+              almacen: string;
+              fecha: string;
+              origenTipo: string | null;
+              origenId: string | null;
+              observaciones: string | null;
+              cancelado: boolean;
+              idMovimientoInverso: number | null;
+              renglones: {
+                idAvio: number;
+                /** @description Clave del avío. */
+                avio: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                esGenerico: boolean;
+                idLote: number | null;
+                cantidad: number;
+                costoUnit: number | null;
+                importe: number | null;
+              }[];
+              totalCantidad: number;
+              totalImporte: number | null;
+              /** Format: date-time */
+              creadoEn: string;
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/avios/existencias': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Existencias de avío por avío×almacén (consulta multi-almacén, distingue genéricos) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por un avío. */
+          idAvio?: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+          /** @description Solo avíos genéricos de stock (R4). */
+          soloGenericos?: string;
+          /** @description Incluye filas con existencia 0. Por defecto se omiten. */
+          incluirCeros?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Existencias de avío (consulta de solo lectura, D3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              filas: {
+                idAvio: number;
+                /** @description Clave del avío. */
+                avio: string;
+                descripcion: string;
+                unidad: string | null;
+                esGenerico: boolean;
+                idAlmacen: number;
+                almacen: string;
+                /** @description Existencia actual (Σ de movimientos, D3). */
+                existencia: number;
+              }[];
+              totalExistencia: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/inventarios/avios/kardex': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Kardex de un avío (movimientos cronológicos con saldo corrido por almacén) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Avío del kardex (obligatorio). */
+          idAvio: number;
+          /** @description Filtra por un almacén. */
+          idAlmacen?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Kardex de un avío (movimientos con saldo corrido). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idAvio: number;
+              avio: string;
+              descripcion: string;
+              renglones: {
+                idMovimiento: number;
+                folio: number;
+                fecha: string;
+                idTipoMov: number;
+                tipoMov: string;
+                /** @enum {string} */
+                direccion: 'entrada' | 'salida' | 'traspaso';
+                idAlmacen: number;
+                almacen: string;
+                idLote: number | null;
+                entrada: number;
+                salida: number;
+                saldo: number;
+                costoUnit: number | null;
+                importe: number | null;
+                origenTipo: string | null;
+                origenId: string | null;
+                cancelado: boolean;
+                observaciones: string | null;
+              }[];
             };
           };
         };

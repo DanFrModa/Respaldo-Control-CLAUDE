@@ -116,6 +116,7 @@ re.findall(r'(?:Private|Public) (?:Sub|Function) [^\(\r\n]+', t)  # procedimient
 - **Español, tono cercano y claro.** El negocio ya está **validado por Daniel**: la documentación funcional (`Documentacion_MJD/`) es la verdad del negocio y **no hay que re-validar módulos con él**. Gabriel coordina, **verifica los avances por etapas** y hace los pasos manuales de infraestructura.
 - El sistema viejo es **solo referencia de la lógica del negocio (el QUÉ)**, no de cómo programar (el CÓMO): v2 se construye 100 % nuevo (D0), corrigiendo de raíz las limitaciones de Access (ver D# y A#).
 - Decisiones de negocio nuevas → `DECISIONES.md`/`MEJORAS.md`/`REQUISITOS-NUEVOS.md`. Decisiones **técnicas** → ADR en `docs/arquitectura/`.
+- **Preguntas a Daniel: TODAS de una vez al arrancar cada FASE (no etapa por etapa).** Al empezar una fase, el lead lee la **ficha completa** (`docs/hoja-de-ruta/F#-etapas.md`) — todas sus etapas y sus *"Decisiones a cerrar con Daniel"* — y le entrega a Gabriel **en el chat** (NO en un documento suelto) **una sola lista** con TODAS las decisiones de negocio que la fase va a necesitar, cada una con un **default propuesto** para que Daniel solo confirme o ajuste. Así Gabriel le pregunta a Daniel **una vez por fase** y no lo interrumpe en cada etapa. Al cerrarse, las respuestas se registran en `DECISIONES.md`. *(Estrenado en F4, 20-jun-2026.)*
 - La numeración de los docs es organizativa ≠ estructura final (la estructura de módulos es la del plan §5, D8).
 
 ---

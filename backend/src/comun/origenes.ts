@@ -27,7 +27,13 @@ export const ORIGEN = {
   reciboMaquila: 'recibo-maquila',
   /** Salida de PT por una entrega a cliente (F3-E5). */
   entregaCliente: 'entrega-cliente',
-  /** Carga del ETL histórico de inventario (F3-E6 — IPT_Movs). */
+  /** Salida de TELA ligada a una orden de producción (F4-E1 — `Salidas.IdOrdenes`). El `origenId` es el id de la orden. */
+  salidaTelaOrden: 'salida-tela-orden',
+  /** Entrada de tela/avío por recepción de compra (F4-E3 — el `origenId` es la recepción/OC). */
+  recepcionCompra: 'recepcion-compra',
+  /** Salida de avío por una nota de salida a maquilero (F4-E5 — el `origenId` es la nota). */
+  notaSalida: 'nota-salida',
+  /** Carga del ETL histórico de inventario (F3-E6 — IPT_Movs; F4-E6 — telas/avíos). */
   migracion: 'migracion',
 } as const;
 

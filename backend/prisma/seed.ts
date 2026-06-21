@@ -511,11 +511,36 @@ const TIPOS_MOVIMIENTO_V2: {
   },
 ];
 
+/**
+ * Tipos de movimiento NUEVOS de F4-E1 (kardex de telas y avíos). El viejo registraba las entradas
+ * de tela con factura, las salidas ligadas a la orden (`Salidas.IdOrdenes`) y los consumos por nota
+ * en tablas SEPARADAS sin un tipo de movimiento explícito; v2 los modela como tipos de kardex con su
+ * dirección (D3, ADR-0010). El traspaso reusa `transferencia-salida`/`-entrada` (ya sembrados en
+ * F3-E3) y el ajuste reusa `ajuste-entrada`/`-salida` (de los 19 canónicos): NO se duplican aquí.
+ *  • `entrada-recepcion` — entrada de tela/avío por recepción de compra (E3, con factor de
+ *    conversión y costo por unidad de consumo). Dirección entrada.
+ *  • `salida-a-orden` — salida de TELA hacia una orden de producción (`Salidas.IdOrdenes`, E1). Es
+ *    LA única vía que descuenta tela hacia una orden; la nota (E5) la referencia sin segundo
+ *    movimiento. Dirección salida.
+ *  • `salida-por-nota` — salida de AVÍO por una nota de salida a maquilero (E5: el consumo de avíos
+ *    va ligado a las notas, R4). Dirección salida.
+ */
+const TIPOS_MOVIMIENTO_F4: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  { codigo: 'entrada-recepcion', nombre: 'Entrada por Recepción de Compra', direccion: 'entrada' },
+  { codigo: 'salida-a-orden', nombre: 'Salida de Tela a Orden', direccion: 'salida' },
+  { codigo: 'salida-por-nota', nombre: 'Salida de Avío por Nota', direccion: 'salida' },
+];
+
 async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
   await verificarTiposMovimientoContraCsv();
-  // Los 19 canónicos del CSV + los 2 nuevos de v2 (patas del traspaso, F3-E3). Idempotente: el
-  // `update: {}` no pisa nombre/dirección/activo si ya existen (pudieron editarse en producción).
-  for (const tipo of [...TIPOS_MOVIMIENTO_BASE, ...TIPOS_MOVIMIENTO_V2]) {
+  // Los 19 canónicos del CSV + los 2 nuevos de F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex
+  // de telas y avíos). Idempotente: el `update: {}` no pisa nombre/dirección/activo si ya existen
+  // (pudieron editarse en producción).
+  for (const tipo of [...TIPOS_MOVIMIENTO_BASE, ...TIPOS_MOVIMIENTO_V2, ...TIPOS_MOVIMIENTO_F4]) {
     await prisma.tipoMovimientoInventario.upsert({
       where: { codigo: tipo.codigo },
       update: {},

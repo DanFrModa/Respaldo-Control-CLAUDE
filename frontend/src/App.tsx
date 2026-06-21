@@ -14,9 +14,15 @@ import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { ValidacionCargosPagina } from '@/modulos/esma/ValidacionCargosPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
+import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
+import { ExistenciasTelasPagina } from '@/modulos/inventarios/ExistenciasTelasPagina';
+import { KardexMaterialesPagina } from '@/modulos/inventarios/KardexMaterialesPagina';
 import { KardexPtPagina } from '@/modulos/inventarios/KardexPtPagina';
 import { MovimientosPtPagina } from '@/modulos/inventarios/MovimientosPtPagina';
+import { SalidaTelaOrdenPagina } from '@/modulos/inventarios/SalidaTelaOrdenPagina';
+import { TraspasoMaterialesPagina } from '@/modulos/inventarios/TraspasoMaterialesPagina';
 import { TraspasosPtPagina } from '@/modulos/inventarios/TraspasosPtPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
@@ -107,6 +113,13 @@ const router = createBrowserRouter([
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
           { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },
           { path: 'inventarios/kardex', element: <KardexPtPagina /> },
+          // Inventario de telas y avíos (Módulo 4, F4-E1, D5/R4).
+          { path: 'inventarios/telas/existencias', element: <ExistenciasTelasPagina /> },
+          { path: 'inventarios/avios/existencias', element: <ExistenciasAviosPagina /> },
+          { path: 'inventarios/materiales/kardex', element: <KardexMaterialesPagina /> },
+          { path: 'inventarios/telas/salida-orden', element: <SalidaTelaOrdenPagina /> },
+          { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
+          { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
           { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
