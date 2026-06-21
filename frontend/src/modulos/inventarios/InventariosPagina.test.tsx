@@ -24,7 +24,9 @@ describe('<InventariosPagina>', () => {
     expect(screen.queryByTestId('inventarios-inventario-movimientos')).not.toBeInTheDocument();
     expect(screen.queryByTestId('inventarios-inventario-traspasos')).not.toBeInTheDocument();
     // Sin permiso de telas, las vistas de telas tampoco.
-    expect(screen.queryByTestId('inventarios-inventario-telas-existencias')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('inventarios-inventario-telas-existencias'),
+    ).not.toBeInTheDocument();
   });
 
   it('muestra la captura de movimientos PT con inventario-pt.mover', () => {
@@ -62,7 +64,9 @@ describe('<InventariosPagina>', () => {
     renderConProveedores(<InventariosPagina />, { sesion: estadoSesionDePrueba([]) });
 
     expect(screen.queryByTestId('inventarios-inventario-existencias')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('inventarios-inventario-telas-existencias')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('inventarios-inventario-telas-existencias'),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Inventarios' })).toBeInTheDocument();
   });
 });
