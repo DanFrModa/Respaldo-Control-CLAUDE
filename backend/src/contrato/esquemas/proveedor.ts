@@ -413,9 +413,9 @@ export const esquemaProveedoresQuery = z
       .number()
       .int()
       .min(1)
-      .max(100)
+      .max(500)
       .default(20)
-      .describe('Renglones por página (máx 100).'),
+      .describe('Renglones por página (máx 500).'),
     busqueda: z
       .string()
       .trim()

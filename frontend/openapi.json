@@ -1970,12 +1970,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 500
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 100)."
+            "description": "Renglones por página (máx 500)."
           },
           {
             "schema": {
@@ -8919,12 +8919,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 500
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 100)."
+            "description": "Renglones por página (máx 500)."
           },
           {
             "schema": {
@@ -17837,12 +17837,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 500
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 100)."
+            "description": "Renglones por página (máx 500)."
           },
           {
             "schema": {
@@ -20154,12 +20154,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 500
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página (máx 100)."
+            "description": "Renglones por página (máx 500)."
           },
           {
             "schema": {
@@ -42487,12 +42487,12 @@
               "default": 20,
               "type": "integer",
               "minimum": 1,
-              "maximum": 100
+              "maximum": 500
             },
             "in": "query",
             "name": "porPagina",
             "required": false,
-            "description": "Renglones por página."
+            "description": "Renglones por página (máx 500)."
           },
           {
             "schema": {
