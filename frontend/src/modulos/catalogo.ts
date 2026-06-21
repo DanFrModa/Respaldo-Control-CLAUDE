@@ -334,6 +334,27 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['compras.ver'],
     subVista: true,
   },
+  // Explosión MRP (F4-E4, R3): cruza el BOM del modelo con la matriz de la orden → qué/cuánto
+  // comprar, netea genéricos contra el stock y genera la OC por proveedor en un clic. `compras.ver`.
+  {
+    clave: 'explosion-materiales',
+    titulo: 'Explosión de materiales',
+    descripcion: 'Qué y cuánto comprar por orden (BOM × cantidades) y generar la OC en un clic',
+    ruta: '/compras/explosion',
+    icono: 'calculadora',
+    permisos: ['compras.ver'],
+    subVista: true,
+  },
+  // Tablero "qué tengo / qué falta" (F4-E4, R7): cruce requerido vs en-OC vs recibido por material.
+  {
+    clave: 'estatus-materiales',
+    titulo: 'Qué tengo / qué falta',
+    descripcion: 'Semáforo de materiales por orden: requerido vs en órdenes de compra vs recibido',
+    ruta: '/compras/estatus-materiales',
+    icono: 'grafica',
+    permisos: ['compras.ver'],
+    subVista: true,
+  },
   // Recepción de compras (F4-E3): recibe (parcial/total) el material de una OC autorizada, crea el
   // lote de tela (D5) y da entrada al kardex de telas/avíos. `compras.recibir` la gobierna.
   {

@@ -29,6 +29,8 @@ import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
 import { BandejaAutorizacionPagina } from '@/modulos/ordenes-compra/BandejaAutorizacionPagina';
 import { ComprasPorOrdenPagina } from '@/modulos/ordenes-compra/ComprasPorOrdenPagina';
+import { EstatusMaterialesPagina } from '@/modulos/ordenes-compra/EstatusMaterialesPagina';
+import { ExplosionMaterialesPagina } from '@/modulos/ordenes-compra/ExplosionMaterialesPagina';
 import { OrdenesCompraPagina } from '@/modulos/ordenes-compra/OrdenesCompraPagina';
 import { RecepcionComprasPagina } from '@/modulos/ordenes-compra/RecepcionComprasPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
@@ -118,6 +120,9 @@ const router = createBrowserRouter([
           { path: 'compras/ordenes', element: <OrdenesCompraPagina /> },
           { path: 'compras/autorizacion', element: <BandejaAutorizacionPagina /> },
           { path: 'compras/por-orden', element: <ComprasPorOrdenPagina /> },
+          // Explosión MRP + tablero "qué tengo / qué falta" (Módulo 3 · Compras, F4-E4, R3/R7).
+          { path: 'compras/explosion', element: <ExplosionMaterialesPagina /> },
+          { path: 'compras/estatus-materiales', element: <EstatusMaterialesPagina /> },
           // Recepción de compras (Módulo 3 · Compras, F4-E3).
           { path: 'compras/recepcion', element: <RecepcionComprasPagina /> },
           { path: 'inventarios', element: <InventariosPagina /> },

@@ -64,25 +64,25 @@ model Empresa {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  configuracion    ConfiguracionEmpresa?
-  almacenes        Almacen[]
-  secuencias       Secuencia[]
+  configuracion     ConfiguracionEmpresa?
+  almacenes         Almacen[]
+  secuencias        Secuencia[]
   /// Pedidos internos de esta empresa (F2-E1, A9 — folio por empresa). Restrict.
-  pedidos          Pedido[]
+  pedidos           Pedido[]
   /// Órdenes de producción de esta empresa (F2-E2, A9 — folio por empresa). Restrict.
-  ordenes          Orden[]
+  ordenes           Orden[]
   /// Etapas de producción (corte/envío/recibo/entrega) de esta empresa (F3-E1, A9). Restrict.
-  etapasMovimiento EtapaMovimiento[]
+  etapasMovimiento  EtapaMovimiento[]
   /// Movimientos de kardex de esta empresa (F3-E1, A9 — folio por empresa). Restrict.
-  movimientos      Movimiento[]
+  movimientos       Movimiento[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
-  cargosEsMa       EsMaCargo[]
+  cargosEsMa        EsMaCargo[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
-  ordenesCompra    OrdenCompra[]
+  ordenesCompra     OrdenCompra[]
   /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
   recepcionesCompra RecepcionCompra[]
   /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
-  eventosOutbox    EventoOutbox[]
+  eventosOutbox     EventoOutbox[]
 
   @@map("empresas")
 }
@@ -530,22 +530,24 @@ model Proveedor {
   activo Boolean @default(true)
 
   /// Roles/servicios multi-valor del proveedor (F1-E1B, N:N vía `ProveedorRol`).
-  roles            ProveedorRol[]
+  roles                   ProveedorRol[]
   /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
-  archivos         ProveedorArchivo[]
+  archivos                ProveedorArchivo[]
   /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
-  avios            AvioProveedor[]
+  avios                   AvioProveedor[]
   /// Órdenes de producción donde está asignado como maquilero (F2-E2, Restrict).
-  ordenes          Orden[]
+  ordenes                 Orden[]
   /// Etapas de producción donde es el TERCERO (cortador/maquilero/estampador) (F3-E1,
   /// fusión de terceros D12/R15: el tercero es un Proveedor con su rol de servicio). Restrict.
-  etapasMovimiento EtapaMovimiento[]
+  etapasMovimiento        EtapaMovimiento[]
   /// Cargos a su cuenta de maquila (EsMa) como maquilero (F3-E1). Restrict.
-  cargosEsMa       EsMaCargo[]
+  cargosEsMa              EsMaCargo[]
   /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
-  lotes            Lote[]
+  lotes                   Lote[]
   /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
-  ordenesCompra    OrdenCompra[]
+  ordenesCompra           OrdenCompra[]
+  /// Requerimientos de explosión MRP donde es el proveedor SUGERIDO (F4-E4, R1/R3). Restrict.
+  requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -694,15 +696,15 @@ model Color {
   activo Boolean @default(true)
 
   /// Telas que tienen este color con su precio (F1-E3, N:N vía `TelaColor`).
-  telas               TelaColor[]
+  telas                  TelaColor[]
   /// Renglones de matriz de órdenes en este color (F2-E2, Restrict).
-  ordenLineas         OrdenLinea[]
+  ordenLineas            OrdenLinea[]
   /// Renglones de etapas de producción (corte/envío/recibo/entrega) en este color (F3-E1, D4). Restrict.
-  etapasMovimientoDet EtapaMovimientoDet[]
+  etapasMovimientoDet    EtapaMovimientoDet[]
   /// Renglones de kardex PT en este color (F3-E1, D4). Restrict.
-  movimientosDetPt    MovimientoDetPt[]
+  movimientosDetPt       MovimientoDetPt[]
   /// Lotes de tela teñidos en este color (F4-E1, D5: el lote define el teñido). Restrict.
-  lotes               Lote[]
+  lotes                  Lote[]
   /// Cantidades de la matriz talla×color de renglones de OC en este color (F4-E2). Restrict.
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
 
@@ -784,13 +786,13 @@ model Talla {
   orden    Int     @default(0)
   activo   Boolean @default(true)
 
-  curvas              CurvaTallaItem[]
+  curvas                 CurvaTallaItem[]
   /// Cantidades de matriz de órdenes en esta talla (F2-E2, Restrict).
-  ordenLineasTalla    OrdenLineaTalla[]
+  ordenLineasTalla       OrdenLineaTalla[]
   /// Renglones de etapas de producción en esta talla (F3-E1, D4). Restrict.
-  etapasMovimientoDet EtapaMovimientoDet[]
+  etapasMovimientoDet    EtapaMovimientoDet[]
   /// Renglones de kardex PT en esta talla (F3-E1, D4). Restrict.
-  movimientosDetPt    MovimientoDetPt[]
+  movimientosDetPt       MovimientoDetPt[]
   /// Cantidades de la matriz talla×color de renglones de OC en esta talla (F4-E2). Restrict.
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
 
@@ -1008,6 +1010,8 @@ model Tela {
   loteComponentes    LoteComponente[]
   /// Renglones de orden de compra que piden esta tela (F4-E2). Restrict.
   ordenCompraLineas  OrdenCompraLinea[]
+  /// Renglones de explosión MRP que requieren esta tela (F4-E4, R3). Restrict.
+  requerimientos     RequerimientoOrden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1054,24 +1058,24 @@ model TelaColor {
 /// que el movimiento de kardex. GLOBAL (sin idEmpresa — catálogo de materiales, ADR-0007: el
 /// inventario por empresa lo da `Movimiento.idEmpresa`). Auditoría A7.
 model Lote {
-  id        Int    @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   /// Clave de negocio del lote (estable, p. ej. número de lote/teñido del proveedor). Única
   /// global. Para el ETL de lotes legacy sintetizados (E6) se genera una clave determinista.
-  clave     String @unique
+  clave         String     @unique
   /// Color (teñido) del lote: TODOS sus componentes comparten este color (D5). Restrict.
-  idColor   Int    @map("id_color")
-  color     Color  @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idColor       Int        @map("id_color")
+  color         Color      @relation(fields: [idColor], references: [id], onDelete: Restrict)
   /// Proveedor que surtió el lote (opcional: el histórico legacy puede no mapearlo). Restrict.
-  idProveedor Int?       @map("id_proveedor")
-  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  idProveedor   Int?       @map("id_proveedor")
+  proveedor     Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
   /// Factura de la entrada del lote (texto del proveedor; opcional para el legacy).
-  factura     String?
+  factura       String?
   /// Fecha de la entrada/teñido del lote (solo fecha).
-  fecha       DateTime? @db.Date
-  observaciones String? @db.Text
+  fecha         DateTime?  @db.Date
+  observaciones String?    @db.Text
 
   /// Componentes (telas) que llegaron en este lote (1..N, mismo color — D5).
-  componentes LoteComponente[]
+  componentes        LoteComponente[]
   /// Renglones de kardex de TELA ligados a este lote (existencia por tela×lote×almacén, D3).
   movimientosDetTela MovimientoDetTela[]
   /// Renglones de kardex de AVÍO ligados a este lote (opcional, R4 — pocos avíos por lote).
@@ -1098,10 +1102,10 @@ model Lote {
 /// `cantidad` es la cantidad ORIGINAL que entró (dato de la entrada); el saldo real es Σ de
 /// `MovimientoDetTela` por tela×lote×almacén. Auditoría A7.
 model LoteComponente {
-  idLote   Int  @map("id_lote")
-  lote     Lote @relation(fields: [idLote], references: [id], onDelete: Cascade)
-  idTela   Int  @map("id_tela")
-  tela     Tela @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  idLote   Int      @map("id_lote")
+  lote     Lote     @relation(fields: [idLote], references: [id], onDelete: Cascade)
+  idTela   Int      @map("id_tela")
+  tela     Tela     @relation(fields: [idTela], references: [id], onDelete: Restrict)
   /// Cantidad de esta tela que ENTRÓ en el lote (dato de la entrada; NO es la existencia — D3).
   cantidad Decimal  @db.Decimal(14, 4)
   /// Peso de esta tela en el lote (kg), informativo (ex `Entradas...Peso`). Opcional.
@@ -1161,6 +1165,8 @@ model Avio {
   movimientosDetAvio MovimientoDetAvio[]
   /// Renglones de orden de compra que piden este avío (F4-E2). Restrict.
   ordenCompraLineas  OrdenCompraLinea[]
+  /// Renglones de explosión MRP que requieren este avío (F4-E4, R3). Restrict.
+  requerimientos     RequerimientoOrden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1179,10 +1185,10 @@ model Avio {
 ///    desactiva), para no dejar el par colgando.
 /// Auditoría COMPLETA: `precio`/`condiciones` son editables (A7).
 model AvioProveedor {
-  idAvio      Int      @map("id_avio")
-  idProveedor Int      @map("id_proveedor")
+  idAvio           Int      @map("id_avio")
+  idProveedor      Int      @map("id_proveedor")
   /// Precio al que ESTE proveedor surte el avío (por PRESENTACIÓN de compra — p. ej. por rollo).
-  precio      Decimal? @db.Decimal(12, 2)
+  precio           Decimal? @db.Decimal(12, 2)
   /// FACTOR de conversión presentación→unidad de consumo PARA ESTE PROVEEDOR (F4-E1, R1):
   /// cuántas unidades del BOM (m, pza…) trae UNA presentación de compra de este proveedor
   /// (p. ej. 50 = un rollo de 50 m). Vive aquí porque el mismo avío se compra a varios
@@ -1193,7 +1199,7 @@ model AvioProveedor {
   /// Debe ser > 0 si viene (lo valida el dominio/Zod).
   factorConversion Decimal? @map("factor_conversion") @db.Decimal(14, 6)
   /// Condiciones comerciales de este proveedor para este avío (texto libre).
-  condiciones String?
+  condiciones      String?
 
   avio      Avio      @relation(fields: [idAvio], references: [id], onDelete: Cascade)
   proveedor Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
@@ -1829,18 +1835,20 @@ model Orden {
   /// viejo: `RC_Viva`. Dato RC (F5).
   rcViva           Boolean?  @map("rc_viva")
 
-  lineas           OrdenLinea[]
-  referencias      OrdenReferencia[]
-  comentarios      OrdenComentario[]
+  lineas            OrdenLinea[]
+  referencias       OrdenReferencia[]
+  comentarios       OrdenComentario[]
   /// Etapas de producción de esta orden (corte/envío/recibo/entrega) (F3-E1, D4). Restrict.
-  etapasMovimiento EtapaMovimiento[]
+  etapasMovimiento  EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) derivados de los recibos de esta orden (F3-E1). Restrict.
-  cargosEsMa       EsMaCargo[]
+  cargosEsMa        EsMaCargo[]
   /// Renglones de orden de compra ligados a esta orden de producción (F4-E2, R7: la
   /// liga es POR LÍNEA para cruzar gasto↔producción sin prorrateos). Restrict.
   ordenCompraLineas OrdenCompraLinea[]
   /// Ligas N:N (a nivel encabezado) entre esta orden de producción y sus OC (F4-E2). Restrict.
   ordenesCompra     OrdenCompraOrden[]
+  /// Snapshot de explosión MRP de esta orden (F4-E4, R3). Se reemplaza al regenerar. Cascade.
+  requerimientos    RequerimientoOrden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2492,13 +2500,13 @@ model OrdenCompra {
 
   /// Cancelación suave: cuándo, quién y por qué. NULL si no está cancelada. Motivo obligatorio
   /// al cancelar (lo exige el dominio). SIN FK física al usuario (ADR-0005).
-  canceladaEn        DateTime? @map("cancelada_en")
-  canceladaPorId     String?   @map("cancelada_por_id")
-  motivoCancelacion  String?   @map("motivo_cancelacion") @db.Text
+  canceladaEn       DateTime? @map("cancelada_en")
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
 
-  observaciones String? @db.Text
+  observaciones           String? @db.Text
   /// A qué corresponde la compra (texto libre; viejo: `OrdCompra.CorrespondeA`).
-  correspondeA  String? @map("corresponde_a")
+  correspondeA            String? @map("corresponde_a")
   /// Facturas que amparaba la OC en v1 (viejo: texto). SOLO LECTURA, lo llena el ETL de E6;
   /// en v2 lo supera la factura por recepción (E3+). No se captura por UI.
   facturasAmparadasLegacy String? @map("facturas_amparadas_legacy") @db.Text
@@ -2536,15 +2544,15 @@ model OrdenCompraLinea {
   ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Cascade)
 
   /// Tela pedida (catálogo). XOR con `idAvio`/`descripcionLibre`. Restrict.
-  idTela Int?  @map("id_tela")
-  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  idTela          Int?  @map("id_tela")
+  tela            Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
   /// Avío pedido (catálogo). XOR con `idTela`/`descripcionLibre`. Restrict.
-  idAvio Int?  @map("id_avio")
-  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+  idAvio          Int?  @map("id_avio")
+  avio            Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
   /// Avío del `AvioProveedor` que da el precio R1 (traza el origen del precio). Solo se
   /// guarda cuando la línea es de avío; el proveedor es el de la OC. SIN FK (el par vive
   /// en `AvioProveedor` con PK compuesta; aquí basta el idAvio para reconstruir el par).
-  idAvioProveedor Int? @map("id_avio_proveedor")
+  idAvioProveedor Int?  @map("id_avio_proveedor")
 
   /// Cantidad a comprar (en `unidad`). Decimal. Si la línea usa matriz, = Σ de la matriz.
   cantidad Decimal @db.Decimal(14, 2)
@@ -2563,7 +2571,7 @@ model OrdenCompraLinea {
   descripcionLibre String? @map("descripcion_libre")
 
   /// Matriz talla×color OPCIONAL del renglón (decisión (c)). Cuando se usa, `cantidad` = Σ.
-  tallas OrdenCompraLineaTalla[]
+  tallas          OrdenCompraLineaTalla[]
   /// Renglones de recepción que recibieron (parcial o total) contra este renglón de OC
   /// (F4-E3, R7). Restrict hacia la línea de OC. La suma de lo recibido por esta línea define
   /// el estatus de la OC (parcial/total).
@@ -2703,9 +2711,9 @@ model RecepcionCompra {
 /// Cascade hacia la recepción; Restrict hacia la línea de OC/lote; SetNull hacia el movimiento (que
 /// nunca se borra — D3). `costoUnit` = costo por unidad de consumo (precio ÷ factor, D1).
 model RecepcionCompraLinea {
-  id                 Int             @id @default(autoincrement())
-  idRecepcionCompra  Int             @map("id_recepcion_compra")
-  recepcionCompra    RecepcionCompra @relation(fields: [idRecepcionCompra], references: [id], onDelete: Cascade)
+  id                Int             @id @default(autoincrement())
+  idRecepcionCompra Int             @map("id_recepcion_compra")
+  recepcionCompra   RecepcionCompra @relation(fields: [idRecepcionCompra], references: [id], onDelete: Cascade)
 
   /// Renglón de la OC que se recibe (R7). Restrict.
   idOrdenCompraLinea Int              @map("id_orden_compra_linea")
@@ -2713,7 +2721,7 @@ model RecepcionCompraLinea {
 
   /// Cantidad recibida en UNIDAD DE CONSUMO (ya convertida: cantidadPresentación × factor, R1).
   /// Para líneas de catálogo es lo que entró al kardex; para líneas libres es informativa.
-  cantidadRecibida Decimal @map("cantidad_recibida") @db.Decimal(14, 4)
+  cantidadRecibida Decimal  @map("cantidad_recibida") @db.Decimal(14, 4)
   /// Costo por unidad de consumo (precioPresentación ÷ factor, D1). NULL en líneas libres.
   costoUnit        Decimal? @map("costo_unit") @db.Decimal(12, 4)
 
@@ -2776,4 +2784,72 @@ model EventoOutbox {
   @@index([publicadoEn])
   @@index([idEmpresa])
   @@map("eventos_outbox")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPLOSIÓN MRP / requerimiento de materiales por orden (F4-E4 — REQUISITOS-NUEVOS.md
+// §R3/R7 + principio Make-to-Order; doc `Documentacion_MJD/01-Modelos.md §2`). La explosión
+// cruza el BOM del modelo (telas+avíos `paraProduccion`) contra las cantidades color×talla de
+// la orden para obtener QUÉ y CUÁNTO material hace falta comprar. El resultado se PERSISTE como
+// un SNAPSHOT regenerable: congela lo requerido aunque el BOM cambie después (R3 — el cálculo
+// que originó la compra queda trazable). Regenerar = borrar el snapshot anterior de la orden y
+// reescribirlo en una transacción (D3: nada se edita en sitio). El cruce con OC/recepciones (R7)
+// es on-demand (no se materializa aquí).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Renglón del SNAPSHOT de explosión de una orden (F4-E4, R3). Un material (tela XOR avío) con la
+/// cantidad requerida YA en unidad de consumo del BOM (consumoPorPrenda × Σ piezas color×talla de
+/// la orden). `idProveedorSugerido` viene del `AvioProveedor` más barato para avíos (R1); para
+/// telas es NULL (no hay liga directa tela→proveedor en v2 — el proveedor se decide al comprar el
+/// lote, D5). `esGenerico`/`cubiertoPorStock`/`cantidadAComprar` registran el NETEO contra el
+/// kardex de avíos genéricos (decisión (d) de Daniel): un genérico solo manda a compra el faltante.
+/// El snapshot se REEMPLAZA al regenerar (se borra y reescribe en la misma tx, A2/D3). Auditoría A7.
+model RequerimientoOrden {
+  id      Int   @id @default(autoincrement())
+  /// Orden de producción a la que pertenece este requerimiento (R3). Cascade: el snapshot es
+  /// configuración derivada de la orden; al borrar la orden se va con ella.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Tela requerida (catálogo). XOR con `idAvio`. Restrict. NULL si el renglón es de avío.
+  idTela Int?  @map("id_tela")
+  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Avío requerido (catálogo). XOR con `idTela`. Restrict. NULL si el renglón es de tela.
+  idAvio Int?  @map("id_avio")
+  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Cantidad requerida en UNIDAD DE CONSUMO del BOM (consumoPorPrenda × piezas de la orden, R3).
+  cantidadRequerida Decimal @map("cantidad_requerida") @db.Decimal(14, 4)
+  /// Unidad de consumo del material (m, kg, pza…), copiada del catálogo para mostrar sin join.
+  unidad            String?
+
+  /// ¿El avío es genérico (de stock, R4)? Copiado de `Avio.esGenerico`. FALSE para telas.
+  esGenerico       Boolean @default(false) @map("es_generico")
+  /// Existencia REAL del kardex de avíos (Σ de movimientos, D3) al momento del snapshot — solo se
+  /// llena para genéricos (decisión (d)); 0 para el resto. Informativa (el neteo ya se aplicó).
+  existenciaStock  Decimal @default(0) @map("existencia_stock") @db.Decimal(14, 4)
+  /// Cantidad que realmente va a COMPRA = requerida − existencia (solo genéricos netean; el resto
+  /// va completo). NUNCA negativa. Es la base de la generación de OC y del cruce R7.
+  cantidadAComprar Decimal @map("cantidad_a_comprar") @db.Decimal(14, 4)
+
+  /// Proveedor SUGERIDO para comprar este material (avíos: el `AvioProveedor` más barato, R1).
+  /// NULL para telas (sin liga directa tela→proveedor) o si el avío no tiene proveedor mapeado.
+  /// SIN FK de relación inversa nombrada al revés: Restrict para no perder la sugerencia.
+  idProveedorSugerido Int?       @map("id_proveedor_sugerido")
+  proveedorSugerido   Proveedor? @relation("RequerimientoProveedorSugerido", fields: [idProveedorSugerido], references: [id], onDelete: Restrict)
+
+  /// Precio unitario sugerido (por unidad de consumo) del proveedor sugerido (R1: precio ÷ factor),
+  /// para pre-llenar la OC. NULL si no hay proveedor/precio mapeado.
+  precioSugerido Decimal? @map("precio_sugerido") @db.Decimal(12, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idOrden])
+  @@index([idTela])
+  @@index([idAvio])
+  @@index([idProveedorSugerido])
+  @@map("requerimiento_orden")
 }
