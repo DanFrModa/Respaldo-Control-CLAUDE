@@ -43,6 +43,7 @@ import {
 import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
+import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
@@ -655,23 +656,6 @@ async function tipoPorCodigo(tx: Tx, codigo: string): Promise<{ id: number; nomb
     throw new ErrorValidacion(`El tipo de movimiento "${tipo.nombre}" está desactivado.`);
   }
   return { id: tipo.id, nombre: tipo.nombre };
-}
-
-/** Verifica que un almacén exista, esté activo y sea global o de la empresa de la orden (A9). */
-async function exigirAlmacen(tx: Tx, idAlmacen: number, idEmpresa: number): Promise<void> {
-  const almacen = await tx.almacen.findUnique({
-    where: { id: idAlmacen },
-    select: { activo: true, idEmpresa: true, nombre: true },
-  });
-  if (almacen === null) {
-    throw new ErrorNoEncontrado('Almacen', idAlmacen);
-  }
-  if (!almacen.activo) {
-    throw new ErrorValidacion(`El almacén "${almacen.nombre}" está desactivado.`);
-  }
-  if (almacen.idEmpresa !== null && almacen.idEmpresa !== idEmpresa) {
-    throw new ErrorValidacion(`El almacén "${almacen.nombre}" no es de esta empresa.`);
-  }
 }
 
 /**

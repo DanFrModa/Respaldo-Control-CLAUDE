@@ -309,6 +309,15 @@ export const CATALOGO_PERMISOS = [
     modulo: 'compras',
     descripcion: 'Cancelar (suave, con motivo) órdenes de compra',
   },
+  // Permiso NUEVO de v2 (F4-E3, A4): RECIBIR material contra una OC autorizada (recepción que
+  // crea el lote de tela y mueve el kardex de telas/avíos) y REVERSAR una recepción (inverso
+  // auditado, D3). Se da a quien administra compras (mismo reparto que `compras.administrar`).
+  {
+    clave: 'compras.recibir',
+    modulo: 'compras',
+    descripcion:
+      'Recibir material contra una OC autorizada (recepción + entrada al kardex) y reversar recepciones (F4-E3)',
+  },
 
   // ── Producción (corte y maquila) ─────────────────────────────────────────────
   {
