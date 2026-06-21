@@ -304,6 +304,36 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     icono: 'paquete',
     permisos: 'autenticado',
   },
+  // Sub-vistas de Compras (F4-E2): órdenes de compra (listado/captura), bandeja de autorización
+  // (usable en móvil) y compras por orden de producción. Cuelgan del módulo Compras con sus
+  // permisos (`compras.ver` para el listado; `compras.autorizar` para la bandeja).
+  {
+    clave: 'ordenes-compra',
+    titulo: 'Órdenes de compra',
+    descripcion: 'Captura, autoriza, duplica e imprime órdenes de compra a proveedores',
+    ruta: '/compras/ordenes',
+    icono: 'carrito',
+    permisos: ['compras.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'autorizacion-compras',
+    titulo: 'Autorización de compras',
+    descripcion: 'Bandeja de órdenes de compra pendientes de autorizar (desde el móvil)',
+    ruta: '/compras/autorizacion',
+    icono: 'lista-tareas',
+    permisos: ['compras.autorizar'],
+    subVista: true,
+  },
+  {
+    clave: 'compras-por-orden',
+    titulo: 'Compras por orden',
+    descripcion: 'Órdenes de compra ligadas a una orden de producción',
+    ruta: '/compras/por-orden',
+    icono: 'fabrica',
+    permisos: ['compras.ver'],
+    subVista: true,
+  },
   {
     clave: 'inventarios',
     titulo: 'Inventarios',

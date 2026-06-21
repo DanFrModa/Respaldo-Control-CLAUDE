@@ -77,6 +77,8 @@ model Empresa {
   movimientos      Movimiento[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
   cargosEsMa       EsMaCargo[]
+  /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
+  ordenesCompra    OrdenCompra[]
 
   @@map("empresas")
 }
@@ -535,6 +537,8 @@ model Proveedor {
   cargosEsMa       EsMaCargo[]
   /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
   lotes            Lote[]
+  /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
+  ordenesCompra    OrdenCompra[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -692,6 +696,8 @@ model Color {
   movimientosDetPt    MovimientoDetPt[]
   /// Lotes de tela teñidos en este color (F4-E1, D5: el lote define el teñido). Restrict.
   lotes               Lote[]
+  /// Cantidades de la matriz talla×color de renglones de OC en este color (F4-E2). Restrict.
+  ordenCompraLineasTalla OrdenCompraLineaTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -778,6 +784,8 @@ model Talla {
   etapasMovimientoDet EtapaMovimientoDet[]
   /// Renglones de kardex PT en esta talla (F3-E1, D4). Restrict.
   movimientosDetPt    MovimientoDetPt[]
+  /// Cantidades de la matriz talla×color de renglones de OC en esta talla (F4-E2). Restrict.
+  ordenCompraLineasTalla OrdenCompraLineaTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -991,6 +999,8 @@ model Tela {
   movimientosDetTela MovimientoDetTela[]
   /// Componentes de lote que usan esta tela (F4-E1, D5: un lote trae N telas). Restrict.
   loteComponentes    LoteComponente[]
+  /// Renglones de orden de compra que piden esta tela (F4-E2). Restrict.
+  ordenCompraLineas  OrdenCompraLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1140,6 +1150,8 @@ model Avio {
   /// R4). Las filas las ejercita F4 (el inventario de avíos); la tabla nace en F3-E1 para
   /// fijar el motor genérico. Restrict.
   movimientosDetAvio MovimientoDetAvio[]
+  /// Renglones de orden de compra que piden este avío (F4-E2). Restrict.
+  ordenCompraLineas  OrdenCompraLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1815,6 +1827,11 @@ model Orden {
   etapasMovimiento EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) derivados de los recibos de esta orden (F3-E1). Restrict.
   cargosEsMa       EsMaCargo[]
+  /// Renglones de orden de compra ligados a esta orden de producción (F4-E2, R7: la
+  /// liga es POR LÍNEA para cruzar gasto↔producción sin prorrateos). Restrict.
+  ordenCompraLineas OrdenCompraLinea[]
+  /// Ligas N:N (a nivel encabezado) entre esta orden de producción y sus OC (F4-E2). Restrict.
+  ordenesCompra     OrdenCompraOrden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2392,4 +2409,204 @@ model EsMaCargo {
   @@index([idTipoProceso])
   @@index([estado])
   @@map("esma_cargo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Órdenes de COMPRA (Módulo 3, F4-E2 — doc `Documentacion_MJD/03-Produccion.md` §OC).
+// El documento con el que se COMPRA material (telas/avíos) a un proveedor. Folio
+// consecutivo POR EMPRESA (A3/A9). Documento por empresa (A9), catálogos globales.
+// E2 captura/autoriza/cancela/duplica la OC; E3 conectará la RECEPCIÓN al kardex de
+// telas/avíos (aquí NO se mueve inventario todavía, D3). Decisiones cerradas con el
+// dueño (DECISIONES.md §"Decisiones de diseño F4"):
+//  • (a) Una OC AUTORIZADA queda bloqueada para el usuario normal (el admin sí la edita,
+//    cada cambio a Bitácora). "Duplicar a nueva OC" (todos) copia a un `borrador` nuevo.
+//  • (c) Se ELIMINA el Excel: el renglón que lo requiera lleva matriz talla×color NATIVA
+//    (análoga a OrdenLineaTalla de F2); la suma de la matriz = cantidad del renglón.
+//    Renglones que no la necesiten = cantidad simple.
+// Totales NO se persisten: se derivan por suma (Σ cantidad×precio) al proyectar (D3).
+// onDelete: Restrict hacia empresa/proveedor/tela/avío/orden y los catálogos en uso
+// (Color/Talla en la matriz). Cascade del detalle (líneas, matriz, ligas N:N) hacia su
+// OC padre (permite reescribir el set completo en la transacción A2, igual que F2).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estatus de la orden de compra (F4-E2). `borrador` recién capturada (editable);
+/// `pendiente_autorizacion` lista para revisión; `autorizada` aprobada y bloqueada para
+/// el usuario normal (decisión (a)); `recibida_parcial`/`recibida_total` los pondrá la
+/// RECEPCIÓN de E3 (aquí solo se declaran); `cancelada` = cancelación suave con motivo.
+enum EstatusOrdenCompra {
+  borrador
+  pendiente_autorizacion
+  autorizada
+  recibida_parcial
+  recibida_total
+  cancelada
+
+  @@map("estatus_orden_compra")
+}
+
+/// Orden de compra (F4-E2 — ex `OrdCompra`, doc 03-Produccion §OC). Encabezado del
+/// documento de compra de material a un proveedor. Folio `numCompra` consecutivo POR
+/// EMPRESA (A3/A9, secuencia "orden-compra"). El TOTAL no se almacena: se deriva de las
+/// líneas (Σ cantidad×precio). El ETL de E6 llenará `facturasAmparadasLegacy` (solo
+/// lectura; en v2 lo supera la factura por recepción).
+model OrdenCompra {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — viejo: `OrdCompra.NumCompra`).
+  numCompra BigInt  @map("num_compra")
+  /// Empresa dueña de la OC y de su numeración (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Proveedor al que se le compra. Restrict.
+  idProveedor Int       @map("id_proveedor")
+  proveedor   Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+
+  /// Fecha de emisión de la OC.
+  fecha        DateTime? @db.Date
+  /// Fecha de entrega esperada del material.
+  fechaEntrega DateTime? @map("fecha_entrega") @db.Date
+  /// Dónde se entrega el material (texto libre).
+  entregaEn    String?   @map("entrega_en")
+
+  /// Estatus del documento (ver enum). DERIVADO/controlado por los servicios; default borrador.
+  estatus EstatusOrdenCompra @default(borrador)
+
+  /// Autorización (decisión (a)): quién y cuándo autorizó. NULL mientras no se autorice.
+  /// SIN FK física al usuario (mismo criterio que EsMaCargo.validadoPorId — ADR-0005).
+  idUsuAutorizado String?   @map("id_usu_autorizado")
+  fechaAutorizado DateTime? @map("fecha_autorizado")
+
+  /// Cancelación suave: cuándo, quién y por qué. NULL si no está cancelada. Motivo obligatorio
+  /// al cancelar (lo exige el dominio). SIN FK física al usuario (ADR-0005).
+  canceladaEn        DateTime? @map("cancelada_en")
+  canceladaPorId     String?   @map("cancelada_por_id")
+  motivoCancelacion  String?   @map("motivo_cancelacion") @db.Text
+
+  observaciones String? @db.Text
+  /// A qué corresponde la compra (texto libre; viejo: `OrdCompra.CorrespondeA`).
+  correspondeA  String? @map("corresponde_a")
+  /// Facturas que amparaba la OC en v1 (viejo: texto). SOLO LECTURA, lo llena el ETL de E6;
+  /// en v2 lo supera la factura por recepción (E3+). No se captura por UI.
+  facturasAmparadasLegacy String? @map("facturas_amparadas_legacy") @db.Text
+
+  lineas         OrdenCompraLinea[]
+  /// Ligas N:N (a nivel encabezado) a las órdenes de producción de la OC (F4-E2). Cascade.
+  ordenesLigadas OrdenCompraOrden[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, numCompra])
+  @@index([idProveedor])
+  @@index([estatus])
+  @@index([fecha])
+  @@map("ordenes_compra")
+}
+
+/// Renglón de una orden de compra (F4-E2 — ex `OrdCompraDet`). Un material a comprar:
+/// de catálogo (`idTela` XOR `idAvio`) o LIBRE (`descripcionLibre`, fallback para
+/// servicios/no-catalogados — esas líneas NO cruzan en R7). EXACTAMENTE una de las tres
+/// (lo valida el dominio). El `precio` es el unitario de la línea (D1: precio actual);
+/// `idAvioProveedor` se conserva para trazar el origen del precio R1 (es el idAvio del
+/// `AvioProveedor` cuyo proveedor = el de la OC). La liga `idOrden` (orden de PRODUCCIÓN)
+/// es POR LÍNEA para que R7 cruce gasto↔producción sin prorrateos. Cascade hacia la OC;
+/// Restrict hacia tela/avío/orden.
+model OrdenCompraLinea {
+  id            Int         @id @default(autoincrement())
+  idOrdenCompra Int         @map("id_orden_compra")
+  ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Cascade)
+
+  /// Tela pedida (catálogo). XOR con `idAvio`/`descripcionLibre`. Restrict.
+  idTela Int?  @map("id_tela")
+  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Avío pedido (catálogo). XOR con `idTela`/`descripcionLibre`. Restrict.
+  idAvio Int?  @map("id_avio")
+  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+  /// Avío del `AvioProveedor` que da el precio R1 (traza el origen del precio). Solo se
+  /// guarda cuando la línea es de avío; el proveedor es el de la OC. SIN FK (el par vive
+  /// en `AvioProveedor` con PK compuesta; aquí basta el idAvio para reconstruir el par).
+  idAvioProveedor Int? @map("id_avio_proveedor")
+
+  /// Cantidad a comprar (en `unidad`). Decimal. Si la línea usa matriz, = Σ de la matriz.
+  cantidad Decimal @db.Decimal(14, 2)
+  /// Unidad/presentación de compra (texto: rollo, m, pza…).
+  unidad   String?
+  /// Precio unitario de la línea (D1: precio actual). Decimal.
+  precio   Decimal @db.Decimal(12, 2)
+
+  /// Orden de PRODUCCIÓN a la que se liga este renglón (R7, liga por línea). NULLABLE
+  /// (compras genéricas/stock no ligan). Restrict.
+  idOrden Int?   @map("id_orden")
+  orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Descripción libre (SOLO si la línea NO es de catálogo: servicios/no-catalogados).
+  /// Cuando viene, `idTela`/`idAvio` van NULL (XOR validado en dominio). No cruza en R7.
+  descripcionLibre String? @map("descripcion_libre")
+
+  /// Matriz talla×color OPCIONAL del renglón (decisión (c)). Cuando se usa, `cantidad` = Σ.
+  tallas OrdenCompraLineaTalla[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idOrdenCompra])
+  @@index([idTela])
+  @@index([idAvio])
+  @@index([idOrden])
+  @@map("orden_compra_linea")
+}
+
+/// Cantidad de una talla×color dentro de un renglón de OC (F4-E2, decisión (c) —
+/// análoga a `OrdenLineaTalla` de F2 pero con color EN la misma fila, porque el renglón
+/// de OC ya es de un material, no de un color). El par (color, talla) aparece UNA vez
+/// por renglón (@@unique). `cantidad` entera ≥0. Cascade hacia el renglón; Restrict hacia
+/// Color/Talla. La suma de la matriz = `cantidad` del renglón (lo valida el dominio).
+model OrdenCompraLineaTalla {
+  id                 Int              @id @default(autoincrement())
+  idOrdenCompraLinea Int              @map("id_orden_compra_linea")
+  ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Cascade)
+  idColor            Int              @map("id_color")
+  color              Color            @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla            Int              @map("id_talla")
+  talla              Talla            @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// Cantidad de esta talla×color. Entera ≥0.
+  cantidad Int
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrdenCompraLinea, idColor, idTalla])
+  @@index([idOrdenCompraLinea])
+  @@index([idColor])
+  @@index([idTalla])
+  @@map("orden_compra_linea_talla")
+}
+
+/// Liga N:N (a nivel ENCABEZADO) entre una orden de compra y una orden de producción
+/// (F4-E2 — ex `OrdCom-Ord`). Informativo/derivado: se deriva de los `idOrden` de las
+/// líneas pero se persiste a nivel encabezado (la ficha lo pide). Una orden de producción
+/// aparece UNA vez por OC (@@unique). Cascade hacia la OC; Restrict hacia la orden.
+model OrdenCompraOrden {
+  id            Int         @id @default(autoincrement())
+  idOrdenCompra Int         @map("id_orden_compra")
+  ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Cascade)
+  idOrden       Int         @map("id_orden")
+  orden         Orden       @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrdenCompra, idOrden])
+  @@index([idOrdenCompra])
+  @@index([idOrden])
+  @@map("orden_compra_orden")
 }

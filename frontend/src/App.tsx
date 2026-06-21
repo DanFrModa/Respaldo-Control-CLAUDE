@@ -26,6 +26,9 @@ import { TraspasoMaterialesPagina } from '@/modulos/inventarios/TraspasoMaterial
 import { TraspasosPtPagina } from '@/modulos/inventarios/TraspasosPtPagina';
 import { GaleriaModelos } from '@/modulos/modelos/GaleriaModelos';
 import { ModelosPagina } from '@/modulos/modelos/ModelosPagina';
+import { BandejaAutorizacionPagina } from '@/modulos/ordenes-compra/BandejaAutorizacionPagina';
+import { ComprasPorOrdenPagina } from '@/modulos/ordenes-compra/ComprasPorOrdenPagina';
+import { OrdenesCompraPagina } from '@/modulos/ordenes-compra/OrdenesCompraPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
@@ -109,6 +112,10 @@ const router = createBrowserRouter([
           { path: 'produccion/consulta', element: <ConsultaOrdenesPagina /> },
           { path: 'produccion/incompletas', element: <OrdenesIncompletasPagina /> },
           { path: 'produccion/pedidos-por-mes', element: <TableroPedidosMesPagina /> },
+          // Órdenes de compra (Módulo 4 · Compras, F4-E2).
+          { path: 'compras/ordenes', element: <OrdenesCompraPagina /> },
+          { path: 'compras/autorizacion', element: <BandejaAutorizacionPagina /> },
+          { path: 'compras/por-orden', element: <ComprasPorOrdenPagina /> },
           { path: 'inventarios/movimientos', element: <MovimientosPtPagina /> },
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },
           { path: 'inventarios/existencias', element: <ExistenciasPtPagina /> },

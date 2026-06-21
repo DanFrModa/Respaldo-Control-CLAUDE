@@ -59,6 +59,11 @@ describe('catálogo de permisos', () => {
       // Catálogos maestros globales (F1-E1, ADR-0007): ver + administrar por catálogo.
       'colores.administrar',
       'colores.ver',
+      // Órdenes de compra (Módulo 3, F4-E2): ver/administrar/cancelar (nuevos de v2;
+      // la autorización tiene su permiso LEGADO `compras.autorizar`, con origen).
+      'compras.administrar',
+      'compras.cancelar',
+      'compras.ver',
       'empresas.administrar',
       // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
       'esma.cargo-validar',

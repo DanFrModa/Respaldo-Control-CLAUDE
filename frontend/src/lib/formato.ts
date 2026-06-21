@@ -53,6 +53,22 @@ export function formatearFechaHora(valor: string | null | undefined): string {
 }
 
 /**
+ * Formatea un monto como moneda mexicana (p. ej. 1234.5 -> "$1,234.50"). No finito -> "—".
+ * Solo presentación: el backend deriva todos los totales/subtotales (A1).
+ */
+export function formatearMoneda(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined || !Number.isFinite(valor)) {
+    return SIN_DATO;
+  }
+  return valor.toLocaleString('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
  * Formatea un tamaño en bytes a una unidad legible (B, KB, MB, GB) con una cifra
  * decimal a partir de KB (p. ej. 1536 -> "1.5 KB"). Se usa para mostrar el tamaño
  * de los adjuntos PDF de un proveedor.
