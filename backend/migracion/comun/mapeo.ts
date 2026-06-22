@@ -65,6 +65,20 @@ export const ENTIDAD_MAPEO = {
   etapaReciboEstampado: 'EtapaReciboEstampado',
   /** F3-E6: IdEsMa_Recibos viejo → EsMaCargo.id nuevo. */
   cargoEsMa: 'CargoEsMa',
+  /** F4-E6: IdOrdCompra viejo → OrdenCompra.id nuevo. */
+  ordenCompra: 'OrdenCompra',
+  /** F4-E6: IdNotas viejo → NotaSalida.id nuevo. */
+  notaSalida: 'NotaSalida',
+  /** F4-E6 (telas): IdEntradasDet (entrada de compra legacy) → Movimiento(entrada de tela).id. */
+  movEntradaTela: 'MovEntradaTela',
+  /** F4-E6 (telas): IdSalidasDet (salida a orden legacy) → Movimiento(salida de tela a orden).id. */
+  movSalidaTela: 'MovSalidaTela',
+  /** F4-E6 (telas): clave del par de traspaso de tela legacy (pata SALIDA) → Movimiento.id. */
+  movTraspasoTelaSalida: 'MovTraspasoTelaSalida',
+  /** F4-E6 (telas): clave del par de traspaso de tela legacy (pata ENTRADA) → Movimiento.id. */
+  movTraspasoTelaEntrada: 'MovTraspasoTelaEntrada',
+  /** F4-E6 (telas): IdTelasColores legacy → Lote sintetizado (lote-por-color, decisión f). */
+  loteLegacyTela: 'LoteLegacyTela',
 } as const;
 
 /** Una clave de entidad de mapeo. */

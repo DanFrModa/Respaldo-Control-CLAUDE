@@ -229,3 +229,44 @@ Surgidas al revisar el cuadre del ETL de producción/inventario PT en `prueba`. 
 - **Relación con F4 (f) y F9:** el ETL de telas (F4-E6) puede sintetizar los lotes/movimientos legacy para preservar el **histórico de consumos por orden**, pero el **saldo de existencia de telas al corte = 0**. El equipo de F4-E6/F9 reconcilia la mecánica (consumos como histórico/referencia vs movimientos vivos) sin que el saldo inicial herede stock viejo de telas.
 - **Aplica en:** F4-E6 (conservar consumos por orden) y F9 (saldo inicial de telas = 0).
 - **Fecha:** 2026-06-21.
+
+---
+
+### Hallazgos y decisiones del ETL de F4-E6 (cierre de fase) — 2026-06-22
+
+Tomadas por el equipo al construir el ETL del histórico de Compras/Notas/Telas. Las marcadas
+**(a ratificar con Daniel)** son refinamientos técnicos de decisiones ya cerradas o defaults seguros;
+no bloquean el cierre de F4 pero conviene confirmarlas antes de F9 (corte de go-live).
+
+#### (E6.1) — Refinamiento de la decisión (f): lotes legacy POR COLOR, no por entrada/factura — **a ratificar con Daniel**
+- **Decisión (f) original:** lotes legacy sintetizados *por entrada/factura*.
+- **Refinamiento aplicado:** se sintetizan **por color** (`IdTelasColores`, clave `LEGACY-TELA-<id>`),
+  un lote por color reusado por las entradas y salidas de ese color.
+- **Por qué:** (1) v2 unificó `Telas`+`TelasDis` en UNA `Tela` con `tipoComponente` (ADR-0009) → no
+  hay 2 telas por renglón; (2) las **salidas legacy NO referencian lote** → sintetizar por
+  entrada/factura dejaría las salidas sin lote del cual descontar. Por-color es lo único que hace
+  cuadrar la existencia v2 **1:1 con `TelasColAlm`** (que es por tela×color×almacén). El reviewer
+  independiente lo avaló como técnicamente sólido. `costoUnit = TelasColores.Precio` solo en las
+  entradas; NULL en salidas/traspasos (D1).
+- **Aplica en:** F4-E6 (ETL de telas).
+
+#### (E6.2) — Entradas de compra legacy: entrada DIRECTA al kardex, SIN RecepcionCompra
+- **Decisión:** las entradas legacy de tela entran como movimiento `entrada-recepcion` directo; **no**
+  se crea `RecepcionCompra` (el viejo no liga entrada↔OC: `RecepcionCompra` queda solo para
+  operaciones v2). Las OC y notas legacy tampoco mueven kardex (anti-doble-conteo). El cuadre verifica
+  0 telas con origen `recepcion-compra` y `movimiento=0` para OC/notas legacy.
+- **Aplica en:** F4-E6.
+
+#### (E6.3) — Defaults de migración (nada se pierde en silencio, §7)
+- **Usuarios viejos** sin mapeo → `IdUsuAutorizado`/`IdUsuCancelado` preservados como texto
+  `legacy:<id>` (columnas sin FK, ADR-0005). *(A ratificar: `legacy:` vs NULL.)*
+- **Almacén sentinela** `(histórico — sin almacén)` global+inactivo para las notas legacy (el viejo no
+  tenía almacén origen y `NotaSalida.idAlmacen` es NOT NULL), espejo del Color/Talla sentinela de
+  F3-E6.
+- **Ventana temporal CONFIGURABLE** (`ETL_VENTANA_ANIOS`, default **0 = sin recorte**): el recorte real
+  lo hace el mapeo de empresas (solo migran las activas 7=Marilyn Fitness / 8=FR Moda; las 6 viejas se
+  omiten y listan). El reporte siempre imprime la config y lo excluido. *(A ratificar si Daniel quiere
+  un recorte temporal real además del de empresas.)*
+- **Líneas legacy = texto libre** (`descripcionLibre`/`descripcionLegacy`), NO mapeadas a catálogo;
+  `Totales` NO se migra (derivado).
+- **Fecha:** 2026-06-22.

@@ -39,10 +39,16 @@
  * La integridad referencial (modelo/almacén/color/talla del catálogo, tipo de movimiento) la
  * garantizan las FK de la BD y el loader, que YA resolvió los ids vía `MapeoMigracion`/seed.
  */
-import { registrarMovimientoPt, type LineaMovimientoPt } from '../../comun/kardex.js';
+import {
+  registrarMovimientoPt,
+  registrarMovimientoTela,
+  registrarTraspasoTela,
+  type LineaMovimientoPt,
+  type LineaMovimientoTela,
+} from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
-import type { ContextoBd } from '../../comun/transaccion.js';
+import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
 /**
  * Un movimiento de IPT histórico a migrar (snapshot de UN `IPT_MovsDet` ligado a su `IPT_Movs`),
@@ -107,3 +113,191 @@ export async function crearMovimientoIptMigrado(
   );
   return movimiento.id;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// MODO MIGRACIÓN del INVENTARIO de TELAS (kardex histórico — F4-E6, Pieza B)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// Migra el histórico de TELAS (Entradas/Salidas/EntradasDet/SalidasDet del viejo) al kardex de v2
+// (D3), vía el motor de kardex de tela (`comun/kardex.ts`, A1: el ÚNICO que escribe). Espejo del
+// modo-migración de PT (arriba) pero para la dimensión tela×lote×almacén (D5). Igual que en PT:
+//  • Transaccional (A2) / folio atómico (A3) / auditado (A7) — lo da el motor.
+//  • `origenTipo = ORIGEN.migracion`, `origenId` = clave vieja (idempotencia + trazabilidad).
+//  • Fecha y tipo de movimiento EXPLÍCITOS (el histórico preserva la fecha de `Entradas`/`Salidas`).
+//  • NO valida existencia no-negativo (es histórico: un descuadre del viejo se preserva y se LISTA
+//    en el cuadre, JAMÁS se corrige en silencio — §7).
+//
+// MODELO de los DOS COMPONENTES (ExTela1/ExTela2, decisión documentada en el reporte F4-E6):
+//  el viejo guardaba dos sub-existencias por tela×color×almacén (`TelaEnt1`/`TelaEnt2`, las dos
+//  partes físicas de la MISMA tela — p. ej. Felpa + Cardigan). v2 UNIFICÓ Telas+TelasDis en UNA
+//  `Tela` con un `tipoComponente` (ADR-0009/D5): NO hay dos telas por renglón. Por eso el loader
+//  suma `TelaEnt1+TelaEnt2` en UNA cantidad de la tela parent y preserva el desglose en las
+//  observaciones del lote/movimiento. El motor recibe ya esa cantidad sumada (este helper no decide
+//  el desglose: solo escribe la línea tela×lote que el loader le arma).
+
+/** Una línea de tela ya resuelta por el loader (ids del catálogo + lote + cantidad sumada). */
+export interface LineaTelaMigrada {
+  idTela: number;
+  /** Lote legacy sintetizado (define el color/teñido, D5). */
+  idLote: number;
+  /** Cantidad de tela (= `TelaEnt1+TelaEnt2` / `TelaSal1+TelaSal2`), POSITIVA. */
+  cantidad: number;
+  /** Costo unitario del movimiento de ENTRADA legacy (de `TelasColores.Precio`); NULL en salidas (D1). */
+  costoUnit?: number | null;
+}
+
+/** Un movimiento de TELA histórico (entrada de compra o salida a orden) a migrar. */
+export interface MovimientoTelaMigrado {
+  idEmpresa: number;
+  /** Tipo de movimiento del catálogo (define la dirección: entrada/salida). */
+  idTipoMov: number;
+  idAlmacen: number;
+  fecha: Date;
+  /** Clave vieja estable (idempotencia/trazabilidad). */
+  origenId: string;
+  /** Origen del hecho: `migracion` (default) o `salida-tela-orden` para salidas ligadas a orden. */
+  origenTipo?: typeof ORIGEN.migracion | typeof ORIGEN.salidaTelaOrden;
+  lineas: LineaTelaMigrada[];
+  observaciones?: string;
+}
+
+/**
+ * Crea UN movimiento de kardex de TELA HISTÓRICO (una entrada de compra legacy o una salida a
+ * orden), con su fecha/tipo ORIGINALES, en UNA transacción (A2/A3/A7) vía el motor. NO valida
+ * existencia (histórico). Idempotencia: el loader verifica que el `origenId` no exista ANTES de
+ * llamar. Devuelve el id del `Movimiento` creado.
+ */
+export async function crearMovimientoTelaMigrado(
+  sesion: SesionUsuario,
+  entrada: MovimientoTelaMigrado,
+  bd?: ContextoBd,
+): Promise<number> {
+  const lineas: LineaMovimientoTela[] = entrada.lineas.map((l) => ({
+    idTela: l.idTela,
+    idLote: l.idLote,
+    cantidad: l.cantidad,
+    costoUnit: l.costoUnit ?? null,
+  }));
+  const movimiento = await registrarMovimientoTela(
+    sesion,
+    {
+      idEmpresa: entrada.idEmpresa,
+      idTipoMov: entrada.idTipoMov,
+      idAlmacen: entrada.idAlmacen,
+      fecha: entrada.fecha,
+      origenTipo: entrada.origenTipo ?? ORIGEN.migracion,
+      origenId: entrada.origenId,
+      lineas,
+      ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+    },
+    bd,
+  );
+  return movimiento.id;
+}
+
+/** Un PAR de traspaso de tela histórico (salida del origen + entrada al destino) a migrar. */
+export interface TraspasoTelaMigrado {
+  idEmpresa: number;
+  /** Tipo de la pata de SALIDA (dirección `salida`, p. ej. `transferencia-salida`). */
+  idTipoMovSalida: number;
+  /** Tipo de la pata de ENTRADA (dirección `entrada`, p. ej. `transferencia-entrada`). */
+  idTipoMovEntrada: number;
+  idAlmacenOrigen: number;
+  idAlmacenDestino: number;
+  fecha: Date;
+  /** Clave vieja estable de la SALIDA (idempotencia de la pata de salida). */
+  origenIdSalida: string;
+  /** Clave vieja estable de la ENTRADA (idempotencia de la pata de entrada). */
+  origenIdEntrada: string;
+  /** Renglones (tela×lote×cantidad) — los mismos en ambas patas (el viejo movía igual cantidad). */
+  lineas: LineaTelaMigrada[];
+  observaciones?: string;
+}
+
+/**
+ * Migra UN par de traspaso de TELA legacy como DOS patas (salida del origen + entrada al destino)
+ * en LA MISMA transacción (A2), vía el motor (`registrarTraspasoTela`). Espejo del traspaso normal
+ * de telas pero con fecha/origen históricos: NO valida existencia (histórico) y sella cada pata con
+ * su `origenId` legacy para idempotencia (el loader verifica AMBOS antes de llamar). El `origenTipo`
+ * de las patas lo pone el motor (`traspaso`); el loader marca el mapeo legacy aparte. Devuelve los
+ * ids de las dos patas creadas.
+ */
+export async function crearTraspasoTelaMigrado(
+  sesion: SesionUsuario,
+  entrada: TraspasoTelaMigrado,
+  bd?: ContextoBd,
+): Promise<{ idSalida: number; idEntrada: number }> {
+  const lineas: LineaMovimientoTela[] = entrada.lineas.map((l) => ({
+    idTela: l.idTela,
+    idLote: l.idLote,
+    cantidad: l.cantidad,
+    // El traspaso no revalúa: el costo viaja en la entrada de compra, no en el movimiento interno.
+    costoUnit: null,
+  }));
+  const { salida, entrada: entradaMov } = await registrarTraspasoTela(
+    sesion,
+    {
+      idEmpresa: entrada.idEmpresa,
+      idTipoMovSalida: entrada.idTipoMovSalida,
+      idTipoMovEntrada: entrada.idTipoMovEntrada,
+      idAlmacenOrigen: entrada.idAlmacenOrigen,
+      idAlmacenDestino: entrada.idAlmacenDestino,
+      fecha: entrada.fecha,
+      lineas,
+      ...(entrada.observaciones === undefined ? {} : { observaciones: entrada.observaciones }),
+    },
+    bd,
+  );
+  return { idSalida: salida.id, idEntrada: entradaMov.id };
+}
+
+/**
+ * Crea (idempotente) el LOTE legacy de un color de tela (D5) — el lote sintetizado que agrupa la
+ * existencia histórica de esa tela×color (decisión (f) de Daniel). En el viejo NO había lotes: la
+ * existencia era por tela×color×almacén (`TelasColAlm`). Para que v2 (existencia por tela×lote×
+ * almacén) cuadre con el viejo, se sintetiza UN lote por color (clave determinista pasada por el
+ * loader), reusado por TODAS las entradas/salidas de ese color. La PRIMERA entrada lo materializa
+ * (factura/proveedor/fecha de esa entrada); las siguientes lo reusan. El componente del lote es la
+ * tela parent (v2 unificó los dos componentes en una sola Tela, ADR-0009).
+ *
+ * Se hace por acceso DIRECTO a la tabla (no por el dominio de telas, que crea lotes en un ajuste
+ * con su propia clave aleatoria): el lote legacy es un artefacto de la migración con clave estable.
+ * Idempotente por `Lote.clave` (@unique): si ya existe, devuelve su id sin tocar nada.
+ */
+export async function asegurarLoteLegacyTela(
+  tx: Tx,
+  sesion: SesionUsuario,
+  datos: {
+    clave: string;
+    idColor: number;
+    idTela: number;
+    cantidadComponente: number;
+    idProveedor?: number;
+    factura?: string;
+    fecha?: Date;
+    observaciones?: string;
+  },
+): Promise<number> {
+  const existe = await tx.lote.findUnique({ where: { clave: datos.clave }, select: { id: true } });
+  if (existe !== null) return existe.id;
+  const creado = await tx.lote.create({
+    data: {
+      clave: datos.clave,
+      idColor: datos.idColor,
+      ...(datos.idProveedor === undefined ? {} : { idProveedor: datos.idProveedor }),
+      ...(datos.factura === undefined ? {} : { factura: datos.factura }),
+      ...(datos.fecha === undefined ? {} : { fecha: datos.fecha }),
+      ...(datos.observaciones === undefined ? {} : { observaciones: datos.observaciones }),
+      componentes: {
+        create: [{ idTela: datos.idTela, cantidad: datos.cantidadComponente }],
+      },
+      creadoPorId: sesion.id,
+      modificadoPorId: sesion.id,
+    },
+    select: { id: true },
+  });
+  return creado.id;
+}
+
+/** Re-export para que el loader pueda abrir/componer la transacción del lote legacy. */
+export { enTransaccion };
