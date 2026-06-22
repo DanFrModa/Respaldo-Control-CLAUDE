@@ -65,7 +65,9 @@ describe('seed de fundación', () => {
 
     expect(segunda).toEqual(primera);
     expect(primera.permisos).toBe(CATALOGO_PERMISOS.length);
-    expect(primera.roles).toBe(9);
+    // 9 roles de sistema (niveles viejos absorbidos) + 17 roles funcionales de la RC
+    // (F5-E1, desde RC_TipoUsuarios; "Administrador" se reutiliza, no se duplica) = 26.
+    expect(primera.roles).toBe(26);
     expect(primera.empresas).toBeGreaterThanOrEqual(1);
   });
 

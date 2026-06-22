@@ -328,7 +328,9 @@ describe('API de administración (F1-E1 PIEZA C)', () => {
       const roles = res.json<{ nombre: string; esSistema: boolean }[]>();
       expect(roles.some((r) => r.nombre === 'Administrador')).toBe(true);
       expect(roles.some((r) => r.nombre === 'Basico')).toBe(true);
-      expect(roles.every((r) => r.esSistema)).toBe(true);
+      // F5-E1 agregó roles funcionales (esSistema=false) al selector; los de sistema sí lo son.
+      expect(roles.find((r) => r.nombre === 'Administrador')?.esSistema).toBe(true);
+      expect(roles.find((r) => r.nombre === 'Basico')?.esSistema).toBe(true);
     });
   });
 });

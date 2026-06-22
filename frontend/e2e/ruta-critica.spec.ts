@@ -57,7 +57,7 @@ test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
     for (const [codigo, nombre] of [
       [codigoA, nombreA],
       [codigoB, nombreB],
-    ]) {
+    ] as const) {
       await page.getByTestId('nuevo-proceso-rc').click();
       const dlg = page.getByRole('dialog');
       await dlg.getByLabel('Código').fill(codigo);
