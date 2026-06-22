@@ -10,15 +10,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/useDebounce';
 
 /** Estatus → etiqueta + color del semáforo (R7). */
-const SEMAFORO: Record<
-  EstatusMaterialFila['estatus'],
-  { etiqueta: string; clase: string }
-> = {
+const SEMAFORO: Record<EstatusMaterialFila['estatus'], { etiqueta: string; clase: string }> = {
   pendiente: { etiqueta: 'Pendiente', clase: 'bg-red-100 text-red-800' },
   'en-oc': { etiqueta: 'En OC', clase: 'bg-amber-100 text-amber-800' },
   'recibido-parcial': { etiqueta: 'Recibido parcial', clase: 'bg-sky-100 text-sky-800' },
   completo: { etiqueta: 'Completo', clase: 'bg-emerald-100 text-emerald-800' },
-  'cubierto-por-stock': { etiqueta: 'Cubierto por stock', clase: 'bg-emerald-100 text-emerald-800' },
+  'cubierto-por-stock': {
+    etiqueta: 'Cubierto por stock',
+    clase: 'bg-emerald-100 text-emerald-800',
+  },
 };
 
 /**
@@ -129,8 +129,8 @@ export function EstatusMaterialesPagina(): React.JSX.Element {
                 className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800"
                 data-testid="est-sin-snapshot"
               >
-                Esta orden aún no se ha explosionado: el cruce solo muestra lo que ya esté en órdenes
-                de compra. Explosiona la orden para ver el requerido.
+                Esta orden aún no se ha explosionado: el cruce solo muestra lo que ya esté en
+                órdenes de compra. Explosiona la orden para ver el requerido.
               </p>
             ) : null}
 
@@ -153,7 +153,11 @@ export function EstatusMaterialesPagina(): React.JSX.Element {
                 {/* MÓVIL: tarjetas (cada material con su semáforo). */}
                 <ul className="space-y-2 md:hidden" data-testid="est-tarjetas">
                   {filas.map((f, i) => (
-                    <li key={`${f.material}-${i}`} className="rounded-lg border p-3" data-testid="est-fila">
+                    <li
+                      key={`${f.material}-${i}`}
+                      className="rounded-lg border p-3"
+                      data-testid="est-fila"
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <span className="min-w-0 truncate font-medium">{f.material}</span>
                         <SemaforoBadge estatus={f.estatus} tipo={f.tipo} />
@@ -168,7 +172,10 @@ export function EstatusMaterialesPagina(): React.JSX.Element {
                 </ul>
 
                 {/* ESCRITORIO: tabla. */}
-                <div className="hidden overflow-x-auto rounded-lg border md:block" data-testid="est-tabla">
+                <div
+                  className="hidden overflow-x-auto rounded-lg border md:block"
+                  data-testid="est-tabla"
+                >
                   <table className="w-full text-sm">
                     <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
                       <tr>

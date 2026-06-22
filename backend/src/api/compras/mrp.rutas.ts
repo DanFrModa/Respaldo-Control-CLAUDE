@@ -167,7 +167,10 @@ export const rutasMrp: FastifyPluginCallbackZod = (app, _opciones, done) => {
       const { buffer, folioOrden } = await impresoEstatusMateriales(sesion, request.params.id);
       reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', `inline; filename="estatus-materiales-orden-${folioOrden}.pdf"`);
+        .header(
+          'Content-Disposition',
+          `inline; filename="estatus-materiales-orden-${folioOrden}.pdf"`,
+        );
       return reply.send(buffer as unknown as never);
     },
   });

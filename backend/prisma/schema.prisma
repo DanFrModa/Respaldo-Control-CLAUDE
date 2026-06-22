@@ -83,6 +83,8 @@ model Empresa {
   recepcionesCompra RecepcionCompra[]
   /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
   eventosOutbox     EventoOutbox[]
+  /// Notas de salida de materiales a maquileros de esta empresa (F4-E5, A9 — folio por empresa). Restrict.
+  notasSalida       NotaSalida[]
 
   @@map("empresas")
 }
@@ -336,6 +338,9 @@ model Almacen {
   /// Recepciones de compra cuyo material entra a este almacén destino (F4-E3). Restrict.
   recepcionesCompra RecepcionCompra[]
 
+  /// Notas de salida cuyos avíos salen de este almacén origen (F4-E5, decisión (g)). Restrict.
+  notasSalida NotaSalida[]
+
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
 }
@@ -548,6 +553,8 @@ model Proveedor {
   ordenesCompra           OrdenCompra[]
   /// Requerimientos de explosión MRP donde es el proveedor SUGERIDO (F4-E4, R1/R3). Restrict.
   requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
+  /// Notas de salida donde este proveedor es el MAQUILERO destino del envío (F4-E5). Restrict.
+  notasSalida             NotaSalida[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1012,6 +1019,8 @@ model Tela {
   ordenCompraLineas  OrdenCompraLinea[]
   /// Renglones de explosión MRP que requieren esta tela (F4-E4, R3). Restrict.
   requerimientos     RequerimientoOrden[]
+  /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
+  notaSalidaLineas   NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1082,6 +1091,8 @@ model Lote {
   movimientosDetAvio MovimientoDetAvio[]
   /// Renglones de recepción de compra que crearon/usaron este lote (F4-E3, D5). Restrict.
   recepcionLineas    RecepcionCompraLinea[]
+  /// Renglones de nota de salida que envían tela de este lote a maquila (F4-E5, D5). Restrict.
+  notaSalidaLineas   NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1167,6 +1178,8 @@ model Avio {
   ordenCompraLineas  OrdenCompraLinea[]
   /// Renglones de explosión MRP que requieren este avío (F4-E4, R3). Restrict.
   requerimientos     RequerimientoOrden[]
+  /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.
+  notaSalidaLineas   NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1849,6 +1862,8 @@ model Orden {
   ordenesCompra     OrdenCompraOrden[]
   /// Snapshot de explosión MRP de esta orden (F4-E4, R3). Se reemplaza al regenerar. Cascade.
   requerimientos    RequerimientoOrden[]
+  /// Renglones de nota de salida (avíos/telas enviados a maquila) ligados a esta orden (F4-E5). Restrict.
+  notaSalidaLineas  NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2256,6 +2271,13 @@ model Movimiento {
   /// del movimiento de kardex a su renglón de recepción. SetNull al borrar el movimiento (que
   /// nunca pasa — D3: los movimientos no se borran). Relación inversa informativa.
   recepcionLineas RecepcionCompraLinea[]
+
+  /// Renglones de nota de salida de TELA que REFERENCIAN este movimiento `salida-tela-orden` como
+  /// documento de envío (F4-E5, decisión (e): la nota no descuenta tela, la referencia). Inversa.
+  notaLineasSalidaTela NotaSalidaLinea[] @relation("NotaLineaSalidaTela")
+  /// Renglones de nota de salida de AVÍO cuyo descuento (`salida-por-nota`) GENERÓ este movimiento
+  /// al confirmar la nota (F4-E5, R4). Inversa informativa.
+  notaLineasAvio       NotaSalidaLinea[] @relation("NotaLineaAvio")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2852,4 +2874,155 @@ model RequerimientoOrden {
   @@index([idAvio])
   @@index([idProveedorSugerido])
   @@map("requerimiento_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTAS DE SALIDA estructuradas (Módulo 5, F4-E5 — doc `Documentacion_MJD/03-Produccion.md`
+// §"Submódulo — Notas de Salida (Menú 3.4)"; 04-Inventarios.md §"Cómo conecta"; MEJORAS §03;
+// R4/R9). Una nota de salida documenta el ENVÍO de materiales a un maquilero contra una orden de
+// producción. Sustituye las notas de TEXTO LIBRE del viejo (`Notas`/`NotasDet`, 11,459 renglones)
+// por renglones ESTRUCTURADOS contra catálogo, ligados a la orden. Dos tipos de renglón:
+//  • AVÍO: al CONFIRMAR la nota descuenta el kardex de avíos con un movimiento `salida-por-nota`
+//    (R4 — el consumo de avíos va ligado a las notas).
+//  • TELA: la tela YA se descontó UNA sola vez con `registrarSalidaTelaAOrden` (E1, traza
+//    `origenTipo=salida-tela-orden`, `origenId=idOrden`). La nota solo REFERENCIA ese movimiento
+//    como documento de envío y NO genera segundo movimiento de kardex (DECISIÓN (e) de Daniel).
+// Folio `NumNota` por secuencia atómica por empresa (A3/A9, clave "nota-salida"). Cancelación
+// suave (D3): reversa SOLO los movimientos de avíos que la nota generó; la tela no se toca.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estatus de una nota de salida. Nace `borrador` (capturable/editable); al CONFIRMAR pasa a
+/// `confirmada` y se descuentan los avíos del kardex (A2). `cancelada` = cancelación suave
+/// (reverso auditado de los avíos, D3). Mismo patrón de enum que `EstatusOrdenCompra`.
+enum EstatusNotaSalida {
+  borrador
+  confirmada
+  cancelada
+
+  @@map("estatus_nota_salida")
+}
+
+/// Nota de salida de materiales a un maquilero (F4-E5, R4/R9). Encabezado del documento de envío:
+/// el maquilero (un Proveedor/tercero — fusión D12/R15), fechas de elaboración y envío, empresa
+/// (A9) y folio `numNota` consecutivo POR EMPRESA (A3/A9, secuencia "nota-salida"). El consumo
+/// real (descuento de avíos) sucede al CONFIRMAR (`estatus=confirmada`); la cancelación es SUAVE
+/// (`canceladaEn` + reverso auditado de los avíos, D3 — nada se borra). Auditoría A7.
+model NotaSalida {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — viejo: `Notas.NumNota`). Secuencia "nota-salida".
+  numNota   BigInt  @map("num_nota")
+  /// Empresa dueña de la nota y de su numeración (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Maquilero al que se le envían los materiales (un Proveedor/tercero — fusión D12/R15). Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Almacén ORIGEN del que salen los avíos al CONFIRMAR la nota (un almacén por nota, en el
+  /// ENCABEZADO — decisión (g) de Daniel, espejo de la recepción de compra; la tela no descuenta,
+  /// decisión (e)). El inventario de avíos es multi-almacén (R4). Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  /// Fecha de elaboración de la nota (solo fecha).
+  fechaElaboracion DateTime  @map("fecha_elaboracion") @db.Date
+  /// Fecha de envío real de los materiales (solo fecha; opcional hasta que salga el envío).
+  fechaEnvio       DateTime? @map("fecha_envio") @db.Date
+
+  /// Estatus del documento (ver enum). Controlado por el dominio; default borrador.
+  estatus EstatusNotaSalida @default(borrador)
+
+  observaciones String? @db.Text
+
+  /// Confirmación: cuándo se confirmó (se descontaron los avíos). NULL mientras esté en borrador.
+  /// SIN FK física al usuario (mismo criterio que OrdenCompra.idUsuAutorizado — ADR-0005).
+  confirmadaEn    DateTime? @map("confirmada_en")
+  confirmadaPorId String?   @map("confirmada_por_id")
+
+  /// Cancelación SUAVE (D3): cuándo, quién y por qué. NULL si no está cancelada. Motivo obligatorio
+  /// al cancelar (lo exige el dominio). SIN FK física al usuario (ADR-0005). Al cancelar una nota
+  /// confirmada se generan los movimientos INVERSOS de los avíos (la tela NO se toca).
+  canceladaEn       DateTime? @map("cancelada_en")
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden).
+  lineas NotaSalidaLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, numNota])
+  @@index([idMaquilero])
+  @@index([idAlmacen])
+  @@index([estatus])
+  @@index([fechaElaboracion])
+  @@map("notas_salida")
+}
+
+/// Renglón de una nota de salida (F4-E5). XOR de material: AVÍO (`idAvio`, del catálogo) o TELA
+/// (`idTela` + `idLote` + `idMovimientoSalidaTela` → liga al movimiento `salida-tela-orden` de E1).
+/// SIEMPRE ligado a una `idOrden` de producción destino (R7/04-Inventarios §"Cómo conecta").
+///  • AVÍO: al confirmar la nota, el dominio crea el movimiento `salida-por-nota` y lo guarda en
+///    `idMovimientoAvio` (traza del descuento; NULL en borrador y para renglones de tela).
+///  • TELA: `idMovimientoSalidaTela` apunta al movimiento de salida-a-orden YA registrado (E1) —
+///    la base del ANTI-DOBLE-DESCUENTO (la nota REFERENCIA, no descuenta otra vez; decisión (e)).
+/// `descripcionLegacy` es SOLO para el texto libre que migrará E6 (la captura nueva no la usa).
+/// Cascade hacia la nota; Restrict hacia avío/tela/lote/orden; SetNull hacia los movimientos (que
+/// nunca se borran — D3). Auditoría A7.
+model NotaSalidaLinea {
+  id           Int        @id @default(autoincrement())
+  idNotaSalida Int        @map("id_nota_salida")
+  notaSalida   NotaSalida @relation(fields: [idNotaSalida], references: [id], onDelete: Cascade)
+
+  /// Orden de PRODUCCIÓN destino del envío (R7). Restrict.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Avío enviado (catálogo). XOR con `idTela`. Restrict. NULL si el renglón es de tela.
+  idAvio Int?  @map("id_avio")
+  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Tela enviada (catálogo). XOR con `idAvio`. Restrict. NULL si el renglón es de avío.
+  idTela Int?  @map("id_tela")
+  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Lote de la tela enviada (D5). Obligatorio (dominio) en renglones de tela; NULL en avío. Restrict.
+  idLote Int?  @map("id_lote")
+  lote   Lote? @relation(fields: [idLote], references: [id], onDelete: Restrict)
+
+  /// Movimiento `salida-tela-orden` de E1 que esta línea de TELA referencia (decisión (e): la nota
+  /// NO descuenta tela; documenta el envío de una salida YA registrada). NULL en renglones de avío.
+  /// SetNull: el movimiento nunca se borra (D3); el FK es defensivo.
+  idMovimientoSalidaTela Int?        @map("id_movimiento_salida_tela")
+  movimientoSalidaTela   Movimiento? @relation("NotaLineaSalidaTela", fields: [idMovimientoSalidaTela], references: [id], onDelete: SetNull)
+
+  /// Movimiento `salida-por-nota` que el descuento de AVÍO de esta línea generó al CONFIRMAR la
+  /// nota (R4). NULL en borrador y en renglones de tela. SetNull (el movimiento no se borra — D3).
+  idMovimientoAvio Int?        @map("id_movimiento_avio")
+  movimientoAvio   Movimiento? @relation("NotaLineaAvio", fields: [idMovimientoAvio], references: [id], onDelete: SetNull)
+
+  /// Cantidad enviada (en `unidad`). Decimal (avíos en pza; telas en kg/m).
+  cantidad Decimal @db.Decimal(14, 4)
+  /// Unidad de medida del renglón (texto: pza, m, kg…), copiada del catálogo para mostrar sin join.
+  unidad   String?
+
+  /// Texto libre del renglón en v1 — SOLO para lo que migrará E6 (la captura nueva NO la usa).
+  descripcionLegacy String? @map("descripcion_legacy") @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idNotaSalida])
+  @@index([idOrden])
+  @@index([idAvio])
+  @@index([idTela])
+  @@index([idLote])
+  @@index([idMovimientoSalidaTela])
+  @@index([idMovimientoAvio])
+  @@map("nota_salida_linea")
 }

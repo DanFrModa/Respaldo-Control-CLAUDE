@@ -58,10 +58,7 @@ async function obtenerEstatus(idOrden: number): Promise<EstatusMateriales> {
 // ── Escrituras ──────────────────────────────────────────────────────────────────
 
 /** Genera una OC por proveedor desde la explosión (`POST .../explosion/generar-oc`). */
-async function generarOc(
-  idOrden: number,
-  cuerpo: GenerarOcCuerpo,
-): Promise<GenerarOcResultado> {
+async function generarOc(idOrden: number, cuerpo: GenerarOcCuerpo): Promise<GenerarOcResultado> {
   const { data, error } = await api.POST('/api/ordenes/{id}/explosion/generar-oc', {
     params: { path: { id: idOrden } },
     body: cuerpo,
@@ -78,9 +75,7 @@ async function generarOc(
  * Obtiene la explosión de una orden (regenera el snapshot). Usa `useQuery` con `enabled` para que
  * solo dispare cuando hay una orden elegida; al reintentar muestra el diff contra el snapshot previo.
  */
-export function useExplosion(
-  idOrden: number | undefined,
-): UseQueryResult<Explosion, ErrorDeApi> {
+export function useExplosion(idOrden: number | undefined): UseQueryResult<Explosion, ErrorDeApi> {
   return useQuery({
     queryKey: claveExplosion(idOrden ?? 0),
     queryFn: () => obtenerExplosion(idOrden as number),

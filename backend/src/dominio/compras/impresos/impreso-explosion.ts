@@ -204,7 +204,11 @@ function tablaGrupo(grupo: GrupoImpresoExplosion, idx: number): ReactElement {
       ),
       h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.requerido)),
       h(Text, { style: [estilos.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, l.esGenerico ? num(l.existenciaStock) : '—'),
+      h(
+        Text,
+        { style: [estilos.celda, estilos.celdaNum] },
+        l.esGenerico ? num(l.existenciaStock) : '—',
+      ),
       h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.aComprar)),
     ),
   );
@@ -221,7 +225,13 @@ function tablaGrupo(grupo: GrupoImpresoExplosion, idx: number): ReactElement {
 function paginaExplosion(datos: DatosImpresoExplosion): ReactElement {
   const cuerpo: ReactElement[] =
     datos.grupos.length === 0
-      ? [h(Text, { style: estilos.vacio, key: 'vacio' }, 'La orden no requiere materiales (BOM vacío o sin piezas).')]
+      ? [
+          h(
+            Text,
+            { style: estilos.vacio, key: 'vacio' },
+            'La orden no requiere materiales (BOM vacío o sin piezas).',
+          ),
+        ]
       : datos.grupos.map((g, i) => tablaGrupo(g, i));
 
   return h(

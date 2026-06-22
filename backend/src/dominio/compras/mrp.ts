@@ -155,7 +155,11 @@ const seleccionOrdenExplosion = {
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────
 
 /** Carga la orden (de la empresa activa, A9) con su BOM y matriz, o lanza `ErrorNoEncontrado`. */
-async function cargarOrden(tx: Tx, idOrden: number, idEmpresa: number): Promise<OrdenParaExplosion> {
+async function cargarOrden(
+  tx: Tx,
+  idOrden: number,
+  idEmpresa: number,
+): Promise<OrdenParaExplosion> {
   const orden = await tx.orden.findFirst({
     where: { id: idOrden, idEmpresa },
     select: seleccionOrdenExplosion,
@@ -210,7 +214,11 @@ async function proveedorSugeridoAvio(
     const empateMenorId =
       mejor !== null && precioConsumo === mejor.precio && op.idProveedor < mejor.idProveedor;
     if (ganaPorPrecio || empateMenorId) {
-      mejor = { idProveedor: op.idProveedor, proveedor: op.proveedor.nombre, precio: precioConsumo };
+      mejor = {
+        idProveedor: op.idProveedor,
+        proveedor: op.proveedor.nombre,
+        precio: precioConsumo,
+      };
     }
   }
   return mejor === null
@@ -468,7 +476,9 @@ export async function explosionarOrden(
           proveedorSugerido: { select: { nombre: true } },
         },
       });
-      filas.push(aRequerimientoSalida(creada, diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio'));
+      filas.push(
+        aRequerimientoSalida(creada, diffPorClave.get(claveRequerimiento(c)) ?? 'sin-cambio'),
+      );
     }
 
     await registrarBitacora(tx, sesion, {
@@ -524,7 +534,10 @@ export async function generarOCDesdeExplosion(
 
   return enTransaccion(async (tx) => {
     // La orden debe ser de la empresa activa (A9).
-    const orden = await tx.orden.findFirst({ where: { id: idOrden, idEmpresa }, select: { id: true } });
+    const orden = await tx.orden.findFirst({
+      where: { id: idOrden, idEmpresa },
+      select: { id: true },
+    });
     if (orden === null) {
       throw new ErrorNoEncontrado('Orden', idOrden);
     }
@@ -679,14 +692,12 @@ export async function estatusMaterialesOrden(
   const claveLibre = 'libre';
   for (const l of lineasOc) {
     const clave =
-      l.idTela !== null
-        ? `tela-${l.idTela}`
-        : l.idAvio !== null
-          ? `avio-${l.idAvio}`
-          : claveLibre;
+      l.idTela !== null ? `tela-${l.idTela}` : l.idAvio !== null ? `avio-${l.idAvio}` : claveLibre;
     const material =
       l.tela?.nombre ??
-      (l.avio === null ? (l.descripcionLibre ?? '(libre)') : `${l.avio.clave} — ${l.avio.descripcion}`);
+      (l.avio === null
+        ? (l.descripcionLibre ?? '(libre)')
+        : `${l.avio.clave} — ${l.avio.descripcion}`);
     const recibido = l.recepcionLineas.reduce((s, r) => s + Number(r.cantidadRecibida), 0);
     const acum = porMaterial.get(clave) ?? {
       enOc: 0,
@@ -713,8 +724,7 @@ export async function estatusMaterialesOrden(
     const recibido = acum?.recibido ?? 0;
     const esGenericoCubierto = r.esGenerico && aComprar <= TOLERANCIA;
     const material =
-      r.tela?.nombre ??
-      (r.avio === null ? '—' : `${r.avio.clave} — ${r.avio.descripcion}`);
+      r.tela?.nombre ?? (r.avio === null ? '—' : `${r.avio.clave} — ${r.avio.descripcion}`);
     filas.push({
       tipo: r.idTela !== null ? 'tela' : 'avio',
       idTela: r.idTela,

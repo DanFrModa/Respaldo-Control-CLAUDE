@@ -166,6 +166,9 @@ export interface paths {
                 | 'inventario-avios.ver'
                 | 'inventario-avios.mover'
                 | 'esma.cargo-validar'
+                | 'notas.ver'
+                | 'notas.administrar'
+                | 'notas.cancelar'
               )[];
             };
           };
@@ -22057,6 +22060,1436 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notas-salida': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar notas de salida (paginado, con filtros) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Texto a buscar (folio o nombre del maquilero). */
+          busqueda?: string;
+          /** @description Filtra por maquilero. */
+          idMaquilero?: number;
+          /** @description Notas que envían material a esta orden de producción. */
+          idOrden?: number;
+          /** @description Filtra por estatus. */
+          estatus?: 'borrador' | 'confirmada' | 'cancelada';
+          /** @description Incluye las notas canceladas (cancelación suave). */
+          incluirCanceladas?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'numNota' | 'fechaElaboracion' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de notas de salida. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Notas de la página. */
+              datos: {
+                /** @description Id interno de la nota. */
+                id: number;
+                /** @description Folio consecutivo por empresa (A3/A9). */
+                numNota: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /**
+                 * @description Estatus del documento.
+                 * @enum {string}
+                 */
+                estatus: 'borrador' | 'confirmada' | 'cancelada';
+                /** @description Maquilero destino (Proveedor/tercero). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Almacén origen de los avíos (encabezado, decisión g). */
+                idAlmacen: number;
+                /** @description Nombre del almacén origen. */
+                almacen: string;
+                /**
+                 * Format: date
+                 * @description Fecha de elaboración (YYYY-MM-DD).
+                 */
+                fechaElaboracion: string;
+                /** @description Fecha de envío (YYYY-MM-DD), o null. */
+                fechaEnvio: string | null;
+                /** @description Observaciones, o null. */
+                observaciones: string | null;
+                /** @description Fecha de confirmación (ISO), o null. */
+                confirmadaEn: string | null;
+                /** @description Usuario que confirmó, o null. */
+                confirmadaPorId: string | null;
+                /** @description Fecha de cancelación (ISO), o null. */
+                canceladaEn: string | null;
+                /** @description Usuario que canceló, o null. */
+                canceladaPorId: string | null;
+                /** @description Motivo de la cancelación, o null. */
+                motivoCancelacion: string | null;
+                /** @description Renglones de la nota. */
+                lineas: {
+                  /** @description Id del renglón. */
+                  id: number;
+                  /** @description Orden de producción destino. */
+                  idOrden: number;
+                  /** @description Folio de la orden destino, o null. */
+                  folioOrden: number | null;
+                  /**
+                   * @description Tipo del material del renglón.
+                   * @enum {string}
+                   */
+                  tipo: 'avio' | 'tela';
+                  /** @description Avío del catálogo, o null. */
+                  idAvio: number | null;
+                  /** @description Clave/descripción del avío, o null. */
+                  avio: string | null;
+                  /** @description Tela del catálogo, o null. */
+                  idTela: number | null;
+                  /** @description Nombre de la tela, o null. */
+                  tela: string | null;
+                  /** @description Lote de la tela enviada (D5), o null. */
+                  idLote: number | null;
+                  /** @description Clave del lote, o null. */
+                  loteClave: string | null;
+                  /** @description Movimiento `salida-tela-orden` de E1 que el renglón de tela referencia, o null. */
+                  idMovimientoSalidaTela: number | null;
+                  /** @description Folio del movimiento de salida de tela referenciado, o null. */
+                  folioMovimientoSalidaTela: number | null;
+                  /** @description Movimiento `salida-por-nota` generado al confirmar (avío), o null. */
+                  idMovimientoAvio: number | null;
+                  /** @description Folio del movimiento de descuento de avío, o null. */
+                  folioMovimientoAvio: number | null;
+                  /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+                  cantidad: number;
+                  /** @description Unidad del renglón, o null. */
+                  unidad: string | null;
+                  /** @description Texto libre legado (solo migración E6), o null. */
+                  descripcionLegacy: string | null;
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que la creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del usuario que la modificó. */
+                modificadoPorId: string | null;
+              }[];
+              /** @description Total de notas que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Crear una nota de salida (borrador) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Alta de una nota de salida en borrador. */
+      requestBody: {
+        content: {
+          'application/json': {
+            idMaquilero: number;
+            idAlmacen: number;
+            /** Format: date */
+            fechaElaboracion: string;
+            fechaEnvio?: string | null;
+            observaciones?: string | null;
+            /** @description Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden). */
+            lineas: {
+              idOrden: number;
+              idAvio?: number;
+              idTela?: number;
+              idLote?: number;
+              idMovimientoSalidaTela?: number;
+              /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+              cantidad: number;
+              /** @description Unidad del renglón (pza, m, kg…), para mostrar sin join. */
+              unidad?: string | null;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Nota de salida (encabezado + renglones). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la nota. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3/A9). */
+              numNota: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /**
+               * @description Estatus del documento.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Maquilero destino (Proveedor/tercero). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Almacén origen de los avíos (encabezado, decisión g). */
+              idAlmacen: number;
+              /** @description Nombre del almacén origen. */
+              almacen: string;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /** @description Fecha de envío (YYYY-MM-DD), o null. */
+              fechaEnvio: string | null;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description Fecha de confirmación (ISO), o null. */
+              confirmadaEn: string | null;
+              /** @description Usuario que confirmó, o null. */
+              confirmadaPorId: string | null;
+              /** @description Fecha de cancelación (ISO), o null. */
+              canceladaEn: string | null;
+              /** @description Usuario que canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelacion: string | null;
+              /** @description Renglones de la nota. */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Orden de producción destino. */
+                idOrden: number;
+                /** @description Folio de la orden destino, o null. */
+                folioOrden: number | null;
+                /**
+                 * @description Tipo del material del renglón.
+                 * @enum {string}
+                 */
+                tipo: 'avio' | 'tela';
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Lote de la tela enviada (D5), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento `salida-tela-orden` de E1 que el renglón de tela referencia, o null. */
+                idMovimientoSalidaTela: number | null;
+                /** @description Folio del movimiento de salida de tela referenciado, o null. */
+                folioMovimientoSalidaTela: number | null;
+                /** @description Movimiento `salida-por-nota` generado al confirmar (avío), o null. */
+                idMovimientoAvio: number | null;
+                /** @description Folio del movimiento de descuento de avío, o null. */
+                folioMovimientoAvio: number | null;
+                /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+                cantidad: number;
+                /** @description Unidad del renglón, o null. */
+                unidad: string | null;
+                /** @description Texto libre legado (solo migración E6), o null. */
+                descripcionLegacy: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notas-salida/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener una nota de salida */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la nota de salida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Nota de salida (encabezado + renglones). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la nota. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3/A9). */
+              numNota: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /**
+               * @description Estatus del documento.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Maquilero destino (Proveedor/tercero). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Almacén origen de los avíos (encabezado, decisión g). */
+              idAlmacen: number;
+              /** @description Nombre del almacén origen. */
+              almacen: string;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /** @description Fecha de envío (YYYY-MM-DD), o null. */
+              fechaEnvio: string | null;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description Fecha de confirmación (ISO), o null. */
+              confirmadaEn: string | null;
+              /** @description Usuario que confirmó, o null. */
+              confirmadaPorId: string | null;
+              /** @description Fecha de cancelación (ISO), o null. */
+              canceladaEn: string | null;
+              /** @description Usuario que canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelacion: string | null;
+              /** @description Renglones de la nota. */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Orden de producción destino. */
+                idOrden: number;
+                /** @description Folio de la orden destino, o null. */
+                folioOrden: number | null;
+                /**
+                 * @description Tipo del material del renglón.
+                 * @enum {string}
+                 */
+                tipo: 'avio' | 'tela';
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Lote de la tela enviada (D5), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento `salida-tela-orden` de E1 que el renglón de tela referencia, o null. */
+                idMovimientoSalidaTela: number | null;
+                /** @description Folio del movimiento de salida de tela referenciado, o null. */
+                folioMovimientoSalidaTela: number | null;
+                /** @description Movimiento `salida-por-nota` generado al confirmar (avío), o null. */
+                idMovimientoAvio: number | null;
+                /** @description Folio del movimiento de descuento de avío, o null. */
+                folioMovimientoAvio: number | null;
+                /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+                cantidad: number;
+                /** @description Unidad del renglón, o null. */
+                unidad: string | null;
+                /** @description Texto libre legado (solo migración E6), o null. */
+                descripcionLegacy: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Editar una nota de salida en borrador */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la nota de salida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Edición del cuerpo de una nota de salida en borrador. */
+      requestBody: {
+        content: {
+          'application/json': {
+            idMaquilero?: number;
+            idAlmacen?: number;
+            /** Format: date */
+            fechaElaboracion?: string;
+            fechaEnvio?: string | null;
+            observaciones?: string | null;
+            /** @description Si viene, REEMPLAZA todo el set de renglones de la nota. */
+            lineas?: {
+              idOrden: number;
+              idAvio?: number;
+              idTela?: number;
+              idLote?: number;
+              idMovimientoSalidaTela?: number;
+              /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+              cantidad: number;
+              /** @description Unidad del renglón (pza, m, kg…), para mostrar sin join. */
+              unidad?: string | null;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Nota de salida (encabezado + renglones). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la nota. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3/A9). */
+              numNota: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /**
+               * @description Estatus del documento.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Maquilero destino (Proveedor/tercero). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Almacén origen de los avíos (encabezado, decisión g). */
+              idAlmacen: number;
+              /** @description Nombre del almacén origen. */
+              almacen: string;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /** @description Fecha de envío (YYYY-MM-DD), o null. */
+              fechaEnvio: string | null;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description Fecha de confirmación (ISO), o null. */
+              confirmadaEn: string | null;
+              /** @description Usuario que confirmó, o null. */
+              confirmadaPorId: string | null;
+              /** @description Fecha de cancelación (ISO), o null. */
+              canceladaEn: string | null;
+              /** @description Usuario que canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelacion: string | null;
+              /** @description Renglones de la nota. */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Orden de producción destino. */
+                idOrden: number;
+                /** @description Folio de la orden destino, o null. */
+                folioOrden: number | null;
+                /**
+                 * @description Tipo del material del renglón.
+                 * @enum {string}
+                 */
+                tipo: 'avio' | 'tela';
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Lote de la tela enviada (D5), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento `salida-tela-orden` de E1 que el renglón de tela referencia, o null. */
+                idMovimientoSalidaTela: number | null;
+                /** @description Folio del movimiento de salida de tela referenciado, o null. */
+                folioMovimientoSalidaTela: number | null;
+                /** @description Movimiento `salida-por-nota` generado al confirmar (avío), o null. */
+                idMovimientoAvio: number | null;
+                /** @description Folio del movimiento de descuento de avío, o null. */
+                folioMovimientoAvio: number | null;
+                /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+                cantidad: number;
+                /** @description Unidad del renglón, o null. */
+                unidad: string | null;
+                /** @description Texto libre legado (solo migración E6), o null. */
+                descripcionLegacy: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/notas-salida/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Imprimir una nota de salida (PDF) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la nota de salida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notas-salida/{id}/confirmar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Confirmar una nota de salida (descuenta los avíos del kardex, R4) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la nota de salida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Nota de salida (encabezado + renglones). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la nota. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3/A9). */
+              numNota: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /**
+               * @description Estatus del documento.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Maquilero destino (Proveedor/tercero). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Almacén origen de los avíos (encabezado, decisión g). */
+              idAlmacen: number;
+              /** @description Nombre del almacén origen. */
+              almacen: string;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /** @description Fecha de envío (YYYY-MM-DD), o null. */
+              fechaEnvio: string | null;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description Fecha de confirmación (ISO), o null. */
+              confirmadaEn: string | null;
+              /** @description Usuario que confirmó, o null. */
+              confirmadaPorId: string | null;
+              /** @description Fecha de cancelación (ISO), o null. */
+              canceladaEn: string | null;
+              /** @description Usuario que canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelacion: string | null;
+              /** @description Renglones de la nota. */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Orden de producción destino. */
+                idOrden: number;
+                /** @description Folio de la orden destino, o null. */
+                folioOrden: number | null;
+                /**
+                 * @description Tipo del material del renglón.
+                 * @enum {string}
+                 */
+                tipo: 'avio' | 'tela';
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Lote de la tela enviada (D5), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento `salida-tela-orden` de E1 que el renglón de tela referencia, o null. */
+                idMovimientoSalidaTela: number | null;
+                /** @description Folio del movimiento de salida de tela referenciado, o null. */
+                folioMovimientoSalidaTela: number | null;
+                /** @description Movimiento `salida-por-nota` generado al confirmar (avío), o null. */
+                idMovimientoAvio: number | null;
+                /** @description Folio del movimiento de descuento de avío, o null. */
+                folioMovimientoAvio: number | null;
+                /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+                cantidad: number;
+                /** @description Unidad del renglón, o null. */
+                unidad: string | null;
+                /** @description Texto libre legado (solo migración E6), o null. */
+                descripcionLegacy: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notas-salida/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar una nota de salida (reverso auditado de avíos, motivo obligatorio) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la nota de salida. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cancelación suave de una nota de salida (reverso auditado de avíos, D3). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo de la cancelación (obligatorio). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Nota de salida (encabezado + renglones). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno de la nota. */
+              id: number;
+              /** @description Folio consecutivo por empresa (A3/A9). */
+              numNota: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /**
+               * @description Estatus del documento.
+               * @enum {string}
+               */
+              estatus: 'borrador' | 'confirmada' | 'cancelada';
+              /** @description Maquilero destino (Proveedor/tercero). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Almacén origen de los avíos (encabezado, decisión g). */
+              idAlmacen: number;
+              /** @description Nombre del almacén origen. */
+              almacen: string;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /** @description Fecha de envío (YYYY-MM-DD), o null. */
+              fechaEnvio: string | null;
+              /** @description Observaciones, o null. */
+              observaciones: string | null;
+              /** @description Fecha de confirmación (ISO), o null. */
+              confirmadaEn: string | null;
+              /** @description Usuario que confirmó, o null. */
+              confirmadaPorId: string | null;
+              /** @description Fecha de cancelación (ISO), o null. */
+              canceladaEn: string | null;
+              /** @description Usuario que canceló, o null. */
+              canceladaPorId: string | null;
+              /** @description Motivo de la cancelación, o null. */
+              motivoCancelacion: string | null;
+              /** @description Renglones de la nota. */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Orden de producción destino. */
+                idOrden: number;
+                /** @description Folio de la orden destino, o null. */
+                folioOrden: number | null;
+                /**
+                 * @description Tipo del material del renglón.
+                 * @enum {string}
+                 */
+                tipo: 'avio' | 'tela';
+                /** @description Avío del catálogo, o null. */
+                idAvio: number | null;
+                /** @description Clave/descripción del avío, o null. */
+                avio: string | null;
+                /** @description Tela del catálogo, o null. */
+                idTela: number | null;
+                /** @description Nombre de la tela, o null. */
+                tela: string | null;
+                /** @description Lote de la tela enviada (D5), o null. */
+                idLote: number | null;
+                /** @description Clave del lote, o null. */
+                loteClave: string | null;
+                /** @description Movimiento `salida-tela-orden` de E1 que el renglón de tela referencia, o null. */
+                idMovimientoSalidaTela: number | null;
+                /** @description Folio del movimiento de salida de tela referenciado, o null. */
+                folioMovimientoSalidaTela: number | null;
+                /** @description Movimiento `salida-por-nota` generado al confirmar (avío), o null. */
+                idMovimientoAvio: number | null;
+                /** @description Folio del movimiento de descuento de avío, o null. */
+                folioMovimientoAvio: number | null;
+                /** @description Cantidad enviada (avíos en pza; telas en kg/m). */
+                cantidad: number;
+                /** @description Unidad del renglón, o null. */
+                unidad: string | null;
+                /** @description Texto libre legado (solo migración E6), o null. */
+                descripcionLegacy: string | null;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que la creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del usuario que la modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;

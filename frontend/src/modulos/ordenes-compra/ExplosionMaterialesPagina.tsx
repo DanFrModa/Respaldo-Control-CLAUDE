@@ -182,7 +182,10 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
                 data-testid="exp-ok-generar"
               >
                 Se generaron {generar.data.ordenesCompra.length} orden(es) de compra:{' '}
-                {generar.data.ordenesCompra.map((oc) => `OC ${oc.numCompra} (${oc.proveedor})`).join(', ')}.
+                {generar.data.ordenesCompra
+                  .map((oc) => `OC ${oc.numCompra} (${oc.proveedor})`)
+                  .join(', ')}
+                .
               </p>
             ) : null}
 
@@ -269,9 +272,7 @@ function RenglonRequerimiento({
         <p className="text-xs text-muted-foreground">
           Requerido {formatearCantidad(renglon.cantidadRequerida)}
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
-          {renglon.esGenerico
-            ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}`
-            : ''}
+          {renglon.esGenerico ? ` · en stock ${formatearCantidad(renglon.existenciaStock)}` : ''}
         </p>
       </div>
       <div className="text-right">
@@ -280,7 +281,9 @@ function RenglonRequerimiento({
           {renglon.unidad ? ` ${renglon.unidad}` : ''}
         </p>
         <p className="text-xs text-muted-foreground">
-          {renglon.precioSugerido === null ? 'sin precio' : `${formatearMoneda(renglon.precioSugerido)} c/u`}
+          {renglon.precioSugerido === null
+            ? 'sin precio'
+            : `${formatearMoneda(renglon.precioSugerido)} c/u`}
         </p>
       </div>
     </li>

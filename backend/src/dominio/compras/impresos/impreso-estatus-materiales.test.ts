@@ -106,8 +106,8 @@ describe('armarDatosImpresoEstatus', () => {
     const deps: DepsImpresoEstatus = {
       estatusMaterialesOrden: () => Promise.reject(new ErrorNoEncontrado('Orden', 999)),
     };
-    await expect(armarDatosImpresoEstatus(sesionConVer(), 999, undefined, deps)).rejects.toBeInstanceOf(
-      ErrorNoEncontrado,
-    );
+    await expect(
+      armarDatosImpresoEstatus(sesionConVer(), 999, undefined, deps),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });

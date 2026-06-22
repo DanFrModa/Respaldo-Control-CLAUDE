@@ -82,6 +82,10 @@ describe('catálogo de permisos', () => {
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
       'modelos.ver',
+      // Notas de salida (Módulo 5, F4-E5, R4/R9): ver/administrar/cancelar (nuevos de v2).
+      'notas.administrar',
+      'notas.cancelar',
+      'notas.ver',
       // Órdenes de producción (Módulo ÓRDENES, F2-E2): ver/administrar/cancelar (nuevos de v2).
       'ordenes.administrar',
       'ordenes.cancelar',

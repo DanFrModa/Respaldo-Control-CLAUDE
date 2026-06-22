@@ -73,6 +73,9 @@ export const MODULOS_PERMISO = {
   // módulos NUEVOS del kardex de materiales de v2 (D3). Mismo esquema ver/mover que `inventario-pt`.
   'inventario-telas': 'Inventario de telas (kardex)',
   'inventario-avios': 'Inventario de avíos (kardex)',
+  // ── Notas de salida estructuradas (Módulo 5, F4-E5, R4/R9) ──
+  // El documento de envío de materiales a un maquilero contra una orden de producción.
+  notas: 'Notas de salida',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -830,6 +833,29 @@ export const CATALOGO_PERMISOS = [
     modulo: 'esma',
     descripcion:
       'Validar (o ajustar/cancelar) los cargos propuestos de EsMa desde los recibos (F3-E4)',
+  },
+
+  // ── Notas de salida estructuradas (Módulo 5, F4-E5 — doc 03-Produccion §Notas de Salida; R4/R9) ──
+  // Permisos NUEVOS de v2 (A4). `ver` (consulta), `administrar` (alta/edición/confirmar la nota — el
+  // confirmar descuenta los avíos del kardex; la tela solo se referencia, decisión (e)) y `cancelar`
+  // (cancelación suave con motivo + reverso auditado de los avíos, D3). Mismo reparto que compras:
+  // ver es lectura, administrar muta/confirma, cancelar es su propio permiso (acción que revierte
+  // movimientos de kardex). Operativos (no se restan a los roles bajos, como `compras.recibir`).
+  {
+    clave: 'notas.ver',
+    modulo: 'notas',
+    descripcion: 'Consultar notas de salida y sus renglones',
+  },
+  {
+    clave: 'notas.administrar',
+    modulo: 'notas',
+    descripcion:
+      'Crear, editar y CONFIRMAR notas de salida (confirmar descuenta los avíos del kardex, R4)',
+  },
+  {
+    clave: 'notas.cancelar',
+    modulo: 'notas',
+    descripcion: 'Cancelar (suave, con motivo) notas de salida; reversa los avíos descontados (D3)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

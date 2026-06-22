@@ -349,6 +349,33 @@ export type OrdenCompraEditar =
 export type OrdenCompraCancelar =
   paths['/api/ordenes-compra/{id}/cancelar']['post']['requestBody']['content']['application/json'];
 
+// ── Notas de salida estructuradas (Módulo 5, F4-E5) ───────────────────────────
+
+/** Página de notas de salida (`GET /api/notas-salida`). */
+export type NotasSalidaPagina =
+  paths['/api/notas-salida']['get']['responses']['200']['content']['application/json'];
+/** Una nota de salida completa tal como la devuelve el API (encabezado + renglones). */
+export type NotaSalida = NotasSalidaPagina['datos'][number];
+/** Un renglón de una nota de salida (avío o tela/lote, con sus trazas a kardex). */
+export type NotaSalidaLinea = NotaSalida['lineas'][number];
+/** Estatus de la nota (controlado por los servicios del backend). */
+export type EstatusNotaSalida = NotaSalida['estatus'];
+/** Parámetros de consulta del listado de notas (querystring). */
+export type NotasSalidaQuery = NonNullable<
+  paths['/api/notas-salida']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de nota de salida (`POST /api/notas-salida`). */
+export type NotaSalidaCrear =
+  paths['/api/notas-salida']['post']['requestBody']['content']['application/json'];
+/** Un renglón de captura de la nota (orden destino + material avío XOR tela). */
+export type NotaSalidaLineaEntrada = NonNullable<NotaSalidaCrear['lineas']>[number];
+/** Cuerpo de edición de nota (`PATCH /api/notas-salida/{id}`; las líneas reemplazan al set). */
+export type NotaSalidaEditar =
+  paths['/api/notas-salida/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación de nota (`POST /api/notas-salida/{id}/cancelar`). */
+export type NotaSalidaCancelar =
+  paths['/api/notas-salida/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+
 // ── Recepción de compras (Módulo 3 · Compras, F4-E3) ──────────────────────────
 
 /** Lista de recepciones de una OC (`GET /api/ordenes-compra/{idOrdenCompra}/recepciones`). */
