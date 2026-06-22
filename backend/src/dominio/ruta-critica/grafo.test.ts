@@ -4,7 +4,12 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { construirGrafoSucesores, esAlcanzable, validarDependencias } from './grafo.js';
+import {
+  construirGrafoSucesores,
+  esAlcanzable,
+  validarDependencias,
+  validarRedefinicionesAcumulado,
+} from './grafo.js';
 
 /** Aristas `antecesor → proceso` (el antecesor va antes que el proceso). */
 type Arista = { idProceso: number; idAntecesor: number };
@@ -78,6 +83,67 @@ describe('grafo de dependencias de la RC (lógica pura)', () => {
     it('un set vacío siempre es válido (quitar todos los antecesores)', () => {
       const aristas: Arista[] = [{ idProceso: 2, idAntecesor: 1 }];
       expect(validarDependencias(2, [], aristas).ok).toBe(true);
+    });
+  });
+
+  describe('validarRedefinicionesAcumulado (lote de un PATCH de ajuste, F5-E3)', () => {
+    it('acepta redefiniciones independientes que NO cierran ciclo', () => {
+      // Base: 1 y 2 sueltos. Lote: 3→[1], 3→ no; redefinir 2→[1] y 1→[] (válido).
+      const r = validarRedefinicionesAcumulado(
+        [],
+        [
+          { idProceso: 2, idsAntecesores: [1] },
+          { idProceso: 3, idsAntecesores: [1, 2] },
+        ],
+      );
+      expect(r.ok).toBe(true);
+    });
+
+    it('RECHAZA el ciclo CRUZADO entre dos redefiniciones del mismo lote (a→[b] y b→[a])', () => {
+      // Base vacía (a y b independientes): cada redefinición SOLA es válida, pero juntas cierran a↔b.
+      // Sin acumulación esto colaría; con acumulación, la 2ª (b→[a]) ya ve a→b y se rechaza.
+      const r = validarRedefinicionesAcumulado(
+        [],
+        [
+          { idProceso: 1, idsAntecesores: [2] }, // a → depende de b
+          { idProceso: 2, idsAntecesores: [1] }, // b → depende de a  ⇒ ciclo
+        ],
+      );
+      expect(r.ok).toBe(false);
+      expect(r.conflicto).toEqual({ idProceso: 2, idAntecesor: 1, razon: 'ciclo' });
+    });
+
+    it('detecta el ciclo cruzado aunque haya un tercer nodo en medio (a→[b], b→[c], c→[a])', () => {
+      const r = validarRedefinicionesAcumulado(
+        [],
+        [
+          { idProceso: 1, idsAntecesores: [2] },
+          { idProceso: 2, idsAntecesores: [3] },
+          { idProceso: 3, idsAntecesores: [1] }, // cierra 1→2→3→1
+        ],
+      );
+      expect(r.ok).toBe(false);
+    });
+
+    it('la redefinición REEMPLAZA las aristas viejas del proceso (no las acumula con las propuestas)', () => {
+      // Base: 2→1 (2 depende de 1). Redefinir 2→[] (quitar su antecesor) y luego 1→[2] NO es ciclo,
+      // porque al redefinir 2 se quitó 2→1; el grafo final es solo 1→2.
+      const base: Arista[] = [{ idProceso: 2, idAntecesor: 1 }];
+      const r = validarRedefinicionesAcumulado(base, [
+        { idProceso: 2, idsAntecesores: [] },
+        { idProceso: 1, idsAntecesores: [2] },
+      ]);
+      expect(r.ok).toBe(true);
+    });
+
+    it('un proceso que es su propio antecesor en el lote se rechaza (auto)', () => {
+      const r = validarRedefinicionesAcumulado([], [{ idProceso: 5, idsAntecesores: [5] }]);
+      expect(r.ok).toBe(false);
+      expect(r.conflicto?.razon).toBe('auto');
+    });
+
+    it('un lote vacío es válido', () => {
+      expect(validarRedefinicionesAcumulado([], []).ok).toBe(true);
     });
   });
 });

@@ -1,5 +1,6 @@
 import { construirApp } from './app.js';
 import { detenerColaEventos, iniciarColaEventos } from './comun/cola-eventos.js';
+import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
 
 /**
  * Punto de entrada del servicio de API.
@@ -26,11 +27,19 @@ await iniciarColaEventos((mensaje, error) => {
   app.log.error({ error }, mensaje);
 });
 
+// Arranque del MOTOR DE JOBS (pg-boss sobre el mismo Postgres, F5-E3 / ADR-0012): tareas durables
+// en segundo plano (CPM de la RC, E4; auto-avance, E6). Best-effort; NO-OP en tests/CI
+// (JOBS_ACTIVOS=false). En E3 solo se ENCOLA el recálculo; el worker del CPM lo monta E4.
+await iniciarMotorJobs((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
 /** Cierra la app de forma ordenada y termina el proceso. */
 async function apagar(senal: NodeJS.Signals): Promise<void> {
   app.log.info({ senal }, 'Apagando el servidor...');
   try {
     await detenerColaEventos();
+    await detenerMotorJobs();
     await app.close();
     app.log.info('Servidor apagado correctamente.');
     process.exit(0);

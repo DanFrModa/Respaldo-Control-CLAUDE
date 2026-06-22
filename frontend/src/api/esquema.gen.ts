@@ -116,6 +116,8 @@ export interface paths {
                 | 'rc.fecha-libre-cumplimiento'
                 | 'rc.catalogo-ver'
                 | 'rc.catalogo-administrar'
+                | 'rc.programar'
+                | 'rc.ruta-ver'
                 | 'calidad.generar-auditorias'
                 | 'calidad.modificar-auditorias'
                 | 'calidad.actualizar-auditorias'
@@ -37681,6 +37683,566 @@ export interface paths {
               modificadoEn: string;
               /** @description Id del último usuario que lo modificó. */
               modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/ruta-critica/ordenes/{id}/programar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Programar (generar/re-generar) la Ruta Crítica de una orden */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para programar (generar/re-generar) la Ruta Crítica de una orden. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Artículo RC elegido (resuelve la plantilla aplicable). */
+            idArticuloRC: number;
+            /**
+             * Format: date
+             * @description Fecha de entrega de la RC (YYYY-MM-DD).
+             */
+            fechaEntregaRC: string;
+            /** @description Tipo de tela elegido (DuracionPorTipoTela). */
+            idTipoTela: number;
+            /** @description Aplicación elegida (DuracionPorAplicacion). */
+            idAplicacion: number;
+            /**
+             * @description ¿La orden se programa como resurtido?
+             * @default false
+             */
+            esResurtido?: boolean;
+            /**
+             * Format: date
+             * @description Fecha de inicio de la RC (YYYY-MM-DD); por defecto hoy.
+             */
+            fechaInicioRC?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Ruta Crítica viva de una orden (F5-E3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              /** @description ¿La RC está generada y vigente? */
+              rcActiva: boolean;
+              fechaInicioRC: string | null;
+              fechaEntregaRC: string | null;
+              fechaProgramada: string | null;
+              esResurtido: boolean;
+              idArticuloRC: number | null;
+              idTipoTela: number | null;
+              idAplicacion: number | null;
+              /**
+               * @description Estado del cálculo de fechas; en E3 siempre "pendiente-de-calculo" (lo hace E4).
+               * @enum {string}
+               */
+              estadoRecalculo: 'pendiente-de-calculo' | 'sin-ruta';
+              procesos: {
+                /** @description Id del renglón de ruta. */
+                id: number;
+                /** @description Id del proceso (ProcesoDef). */
+                idProcesoDef: number;
+                codigoProceso: string;
+                nombreProceso: string;
+                secuencia: number;
+                critico: boolean;
+                ultimoProceso: boolean;
+                esResurtido: boolean;
+                /** @enum {string} */
+                condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /** @description Duración estimada del proceso (días). */
+                duracionDias: number;
+                /** @description Días acumulados (lo llena el CPM, E4). */
+                acumuladoDias: number | null;
+                /** @description Planeada original (CPM, E4). */
+                fechaPlaneadaOriginal: string | null;
+                /** @description Planeada vigente (CPM, E4). */
+                fechaPlaneadaVigente: string | null;
+                /** @description Fecha real de cumplimiento, o null. */
+                fechaReal: string | null;
+                /** @enum {string} */
+                estado: 'pendiente' | 'activo' | 'completado';
+                capturadoPorId: string | null;
+                capturadoEn: string | null;
+                origenCaptura: ('manual' | 'evento') | null;
+                /** @description Antecesores en la ruta (idProcesoDef). */
+                idsAntecesores: number[];
+                checklist: {
+                  id: number;
+                  descripcion: string;
+                  orden: number;
+                  hecho: boolean;
+                }[];
+              }[];
+              /** @description Avisos no fatales del cálculo de duraciones. */
+              advertencias: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/ordenes/{id}/ruta': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener la Ruta Crítica viva de una orden (procesos, duraciones, dependencias) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Ruta Crítica viva de una orden (F5-E3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              /** @description ¿La RC está generada y vigente? */
+              rcActiva: boolean;
+              fechaInicioRC: string | null;
+              fechaEntregaRC: string | null;
+              fechaProgramada: string | null;
+              esResurtido: boolean;
+              idArticuloRC: number | null;
+              idTipoTela: number | null;
+              idAplicacion: number | null;
+              /**
+               * @description Estado del cálculo de fechas; en E3 siempre "pendiente-de-calculo" (lo hace E4).
+               * @enum {string}
+               */
+              estadoRecalculo: 'pendiente-de-calculo' | 'sin-ruta';
+              procesos: {
+                /** @description Id del renglón de ruta. */
+                id: number;
+                /** @description Id del proceso (ProcesoDef). */
+                idProcesoDef: number;
+                codigoProceso: string;
+                nombreProceso: string;
+                secuencia: number;
+                critico: boolean;
+                ultimoProceso: boolean;
+                esResurtido: boolean;
+                /** @enum {string} */
+                condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /** @description Duración estimada del proceso (días). */
+                duracionDias: number;
+                /** @description Días acumulados (lo llena el CPM, E4). */
+                acumuladoDias: number | null;
+                /** @description Planeada original (CPM, E4). */
+                fechaPlaneadaOriginal: string | null;
+                /** @description Planeada vigente (CPM, E4). */
+                fechaPlaneadaVigente: string | null;
+                /** @description Fecha real de cumplimiento, o null. */
+                fechaReal: string | null;
+                /** @enum {string} */
+                estado: 'pendiente' | 'activo' | 'completado';
+                capturadoPorId: string | null;
+                capturadoEn: string | null;
+                origenCaptura: ('manual' | 'evento') | null;
+                /** @description Antecesores en la ruta (idProcesoDef). */
+                idsAntecesores: number[];
+                checklist: {
+                  id: number;
+                  descripcion: string;
+                  orden: number;
+                  hecho: boolean;
+                }[];
+              }[];
+              /** @description Avisos no fatales del cálculo de duraciones. */
+              advertencias: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Ajustar la Ruta Crítica de una orden (agregar/quitar procesos, editar dependencias) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Ajustes a la ruta de una orden (sin tocar la plantilla, D10). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Procesos a agregar. */
+            agregar?: {
+              /** @description Proceso del catálogo a agregar. */
+              idProcesoDef: number;
+              /** @description Duración del proceso agregado (días). */
+              duracionDias: number;
+              /**
+               * @description Procesos (de la ruta de la orden) que lo anteceden.
+               * @default []
+               */
+              idsAntecesores?: number[];
+            }[];
+            /** @description Procesos (idProcesoDef) a quitar de la ruta. */
+            quitar?: number[];
+            /** @description Re-definiciones de antecesores por proceso. */
+            dependencias?: {
+              /** @description Proceso de la ruta cuyos antecesores se redefinen. */
+              idProcesoDef: number;
+              /** @description Set COMPLETO de antecesores (en términos de procesos de la ruta). */
+              idsAntecesores: number[];
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Ruta Crítica viva de una orden (F5-E3). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              /** @description ¿La RC está generada y vigente? */
+              rcActiva: boolean;
+              fechaInicioRC: string | null;
+              fechaEntregaRC: string | null;
+              fechaProgramada: string | null;
+              esResurtido: boolean;
+              idArticuloRC: number | null;
+              idTipoTela: number | null;
+              idAplicacion: number | null;
+              /**
+               * @description Estado del cálculo de fechas; en E3 siempre "pendiente-de-calculo" (lo hace E4).
+               * @enum {string}
+               */
+              estadoRecalculo: 'pendiente-de-calculo' | 'sin-ruta';
+              procesos: {
+                /** @description Id del renglón de ruta. */
+                id: number;
+                /** @description Id del proceso (ProcesoDef). */
+                idProcesoDef: number;
+                codigoProceso: string;
+                nombreProceso: string;
+                secuencia: number;
+                critico: boolean;
+                ultimoProceso: boolean;
+                esResurtido: boolean;
+                /** @enum {string} */
+                condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /** @description Duración estimada del proceso (días). */
+                duracionDias: number;
+                /** @description Días acumulados (lo llena el CPM, E4). */
+                acumuladoDias: number | null;
+                /** @description Planeada original (CPM, E4). */
+                fechaPlaneadaOriginal: string | null;
+                /** @description Planeada vigente (CPM, E4). */
+                fechaPlaneadaVigente: string | null;
+                /** @description Fecha real de cumplimiento, o null. */
+                fechaReal: string | null;
+                /** @enum {string} */
+                estado: 'pendiente' | 'activo' | 'completado';
+                capturadoPorId: string | null;
+                capturadoEn: string | null;
+                origenCaptura: ('manual' | 'evento') | null;
+                /** @description Antecesores en la ruta (idProcesoDef). */
+                idsAntecesores: number[];
+                checklist: {
+                  id: number;
+                  descripcion: string;
+                  orden: number;
+                  hecho: boolean;
+                }[];
+              }[];
+              /** @description Avisos no fatales del cálculo de duraciones. */
+              advertencias: string[];
             };
           };
         };
