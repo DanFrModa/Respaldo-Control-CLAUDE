@@ -19,7 +19,7 @@
  */
 import { fileURLToPath } from 'node:url';
 
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../src/datos/index.js';
 import { clientePruebas, limpiarBaseDatos, sembrarPermisos } from '../src/pruebas/contexto.js';
@@ -37,13 +37,20 @@ let idEmpresaFR: number;
 let idOrden839: number;
 let idOrden840: number;
 
-beforeEach(async () => {
+// UN solo cliente para todo el describe (beforeAll), con disconnect en afterAll: recrearlo por
+// test (beforeEach) fugaba ~1 conexión por test. El estado limpio entre tests lo da `beforeEach`
+// (limpia + re-siembra la BD), NO recrear el cliente. Las env (proceso-global) se fijan/restauran
+// aquí también (beforeAll/afterAll), no por test.
+beforeAll(() => {
   cliente = clientePruebas();
   tablasDirPrevio = process.env.TABLAS_DIR;
   ventanaPrevia = process.env.ETL_VENTANA_ANIOS;
   process.env.TABLAS_DIR = DIR_FIXTURES;
   // Ventana DESACTIVADA para estos fixtures (datos de 2005-2010): probamos la carga completa.
   delete process.env.ETL_VENTANA_ANIOS;
+});
+
+beforeEach(async () => {
   await limpiarBaseDatos(cliente);
   await sembrarEstado();
 });
