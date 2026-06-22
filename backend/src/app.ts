@@ -30,6 +30,7 @@ import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
+import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
 import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
@@ -196,6 +197,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias
   // por orden, fechas/semáforos) y las plantillas llegan en E2+.
   await app.register(rutasProcesosRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E2) — plantillas de ruta (procesos + tiempo estándar + encadenamiento
+  // propio DAG), reglas de duración (cantidad/tela/aplicación), familias/artículos y calendario
+  // laboral por empresa (días hábiles + festivos). RBAC reusa rc.catalogo-ver / rc.catalogo-administrar.
+  await app.register(rutasPlantillasRc, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

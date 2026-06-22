@@ -528,6 +528,86 @@ export type ProcesoRcDependencias =
 export type ProcesoRcChecklist =
   paths['/api/ruta-critica/procesos/{id}/checklist']['put']['requestBody']['content']['application/json'];
 
+// ── Ruta Crítica: plantillas, reglas de duración y calendario (Módulo 8, F5-E2) ──
+
+/** Familia de artículos de la RC. */
+export type FamiliaRc =
+  paths['/api/ruta-critica/familias']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de familia. */
+export type FamiliaRcCrear =
+  paths['/api/ruta-critica/familias']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de familia. */
+export type FamiliaRcEditar =
+  paths['/api/ruta-critica/familias/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Artículo (tipo de artículo) de la RC. */
+export type ArticuloRc =
+  paths['/api/ruta-critica/articulos']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de artículo. */
+export type ArticuloRcCrear =
+  paths['/api/ruta-critica/articulos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de artículo. */
+export type ArticuloRcEditar =
+  paths['/api/ruta-critica/articulos/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Plantilla de ruta completa (con sus procesos). */
+export type PlantillaRc =
+  paths['/api/ruta-critica/plantillas']['get']['responses']['200']['content']['application/json'][number];
+/** Un renglón (proceso) de una plantilla. */
+export type PlantillaRcProceso = PlantillaRc['procesos'][number];
+/** Cuerpo de alta de plantilla. */
+export type PlantillaRcCrear =
+  paths['/api/ruta-critica/plantillas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de plantilla. */
+export type PlantillaRcEditar =
+  paths['/api/ruta-critica/plantillas/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Factor de duración por cantidad. */
+export type FactorCantidadRc =
+  paths['/api/ruta-critica/reglas-duracion/cantidad']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de factor por cantidad. */
+export type FactorCantidadRcCrear =
+  paths['/api/ruta-critica/reglas-duracion/cantidad']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de factor por cantidad. */
+export type FactorCantidadRcEditar =
+  paths['/api/ruta-critica/reglas-duracion/cantidad/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Días de duración por tipo de tela. */
+export type DuracionTelaRc =
+  paths['/api/ruta-critica/reglas-duracion/tela']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de duración por tela. */
+export type DuracionTelaRcCrear =
+  paths['/api/ruta-critica/reglas-duracion/tela']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de duración por tela. */
+export type DuracionTelaRcEditar =
+  paths['/api/ruta-critica/reglas-duracion/tela/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Días de duración por aplicación. */
+export type DuracionAplicacionRc =
+  paths['/api/ruta-critica/reglas-duracion/aplicacion']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de duración por aplicación. */
+export type DuracionAplicacionRcCrear =
+  paths['/api/ruta-critica/reglas-duracion/aplicacion']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de duración por aplicación. */
+export type DuracionAplicacionRcEditar =
+  paths['/api/ruta-critica/reglas-duracion/aplicacion/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Calendario laboral de una empresa. */
+export type CalendarioRc =
+  paths['/api/ruta-critica/calendario/{idEmpresa}']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo para fijar el calendario laboral. */
+export type CalendarioRcActualizar =
+  paths['/api/ruta-critica/calendario/{idEmpresa}']['put']['requestBody']['content']['application/json'];
+/** Día festivo de una empresa. */
+export type FestivoRc =
+  paths['/api/ruta-critica/calendario/{idEmpresa}/festivos']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de festivo. */
+export type FestivoRcCrear =
+  paths['/api/ruta-critica/calendario/{idEmpresa}/festivos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de festivo. */
+export type FestivoRcEditar =
+  paths['/api/ruta-critica/calendario/festivos/{id}']['patch']['requestBody']['content']['application/json'];
+
 // ── Tipos de movimiento de inventario (Módulo 6, F3-E1; solo lectura) ────────
 
 /** Lista de tipos de movimiento de inventario (`GET /api/tipos-movimiento`). */

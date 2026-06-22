@@ -532,6 +532,26 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['rc.catalogo-ver'],
     subVista: true,
   },
+  // Sub-vistas de Ruta Crítica (F5-E2): plantillas de ruta (procesos + tiempo estándar +
+  // encadenamiento propio por artículo/familia) y reglas de duración (cantidad/tela/aplicación).
+  {
+    clave: 'rc-plantillas',
+    titulo: 'Plantillas de ruta',
+    descripcion: 'Qué procesos lleva cada artículo, su tiempo estándar y su encadenamiento',
+    ruta: '/ruta-critica/plantillas',
+    icono: 'lista-tareas',
+    permisos: ['rc.catalogo-ver'],
+    subVista: true,
+  },
+  {
+    clave: 'rc-reglas-duracion',
+    titulo: 'Reglas de duración',
+    descripcion: 'Factores por cantidad y días por tipo de tela o aplicación',
+    ruta: '/ruta-critica/reglas-duracion',
+    icono: 'calendario',
+    permisos: ['rc.catalogo-ver'],
+    subVista: true,
+  },
   {
     clave: 'calidad',
     titulo: 'Calidad',
@@ -595,6 +615,17 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
       'empresas.administrar',
       'almacenes.administrar',
     ],
+  },
+  // Sub-vista de Administración (F5-E2): configuración de la RC por empresa — colchón de costura,
+  // calendario laboral (días hábiles) y días festivos. La gobierna `empresas.administrar`.
+  {
+    clave: 'config-ruta-critica',
+    titulo: 'Configuración de Ruta Crítica',
+    descripcion: 'Colchón de costura, calendario laboral y festivos por empresa',
+    ruta: '/administracion/ruta-critica',
+    icono: 'calendario',
+    permisos: ['empresas.administrar'],
+    subVista: true,
   },
 ] as const;
 

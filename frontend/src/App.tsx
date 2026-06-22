@@ -50,8 +50,11 @@ import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
 import { DependenciasPagina } from '@/modulos/ruta-critica/DependenciasPagina';
+import { PlantillasPagina } from '@/modulos/ruta-critica/PlantillasPagina';
 import { ProcesosPagina } from '@/modulos/ruta-critica/ProcesosPagina';
+import { ReglasDuracionPagina } from '@/modulos/ruta-critica/ReglasDuracionPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
@@ -150,9 +153,14 @@ const router = createBrowserRouter([
           // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.
           { path: 'ruta-critica/procesos', element: <ProcesosPagina /> },
           { path: 'ruta-critica/dependencias', element: <DependenciasPagina /> },
+          // Ruta Crítica (Módulo 8, F5-E2) — plantillas de ruta y reglas de duración.
+          { path: 'ruta-critica/plantillas', element: <PlantillasPagina /> },
+          { path: 'ruta-critica/reglas-duracion', element: <ReglasDuracionPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
+          // Configuración de la RC por empresa (colchón + calendario + festivos).
+          { path: 'administracion/ruta-critica', element: <ConfiguracionRcPagina /> },
           { path: ':modulo', element: <Proximamente /> },
           { path: '*', element: <NoEncontrado /> },
         ],

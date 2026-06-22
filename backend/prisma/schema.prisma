@@ -85,6 +85,10 @@ model Empresa {
   eventosOutbox     EventoOutbox[]
   /// Notas de salida de materiales a maquileros de esta empresa (F4-E5, A9 — folio por empresa). Restrict.
   notasSalida       NotaSalida[]
+  /// Calendario laboral de la RC de esta empresa (F5-E2, 1:1). Restrict.
+  calendario        CalendarioEmpresa?
+  /// Días festivos de la RC de esta empresa (F5-E2). Restrict.
+  diasFestivos      DiaFestivo[]
 
   @@map("empresas")
 }
@@ -3125,13 +3129,15 @@ model ProcesoDef {
   activo Boolean @default(true)
 
   /// Roles RESPONSABLES del proceso (N:M sobre el RBAC único, A4).
-  roles       ProcesoDefRol[]
+  roles        ProcesoDefRol[]
   /// Dependencias en las que ESTE proceso es el sucesor (sus antecesores).
-  antecesores ProcesoDep[]       @relation("ProcesoComoSucesor")
+  antecesores  ProcesoDep[]           @relation("ProcesoComoSucesor")
   /// Dependencias en las que ESTE proceso es el antecesor (sus sucesores).
-  sucesores   ProcesoDep[]       @relation("ProcesoComoAntecesor")
+  sucesores    ProcesoDep[]           @relation("ProcesoComoAntecesor")
   /// Ítems de checklist configurable del proceso.
-  checklist   ProcesoChecklist[]
+  checklist    ProcesoChecklist[]
+  /// Renglones de plantilla de ruta que usan este proceso (F5-E2). Restrict.
+  enPlantillas PlantillaRutaProceso[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3197,4 +3203,241 @@ model ProcesoChecklist {
 
   @@index([idProcesoDef])
   @@map("proceso_checklist")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUTA CRÍTICA · F5-E2 — Plantillas de ruta, reglas de duración y calendario
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Familia de artículos de la Ruta Crítica (ex `CP_Familia`). Agrupa los `ArticuloRC`
+/// (tipos de artículo del CPM). Catálogo GLOBAL, borrado SUAVE (`activo`), auditoría A7.
+model FamiliaArticulo {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  activo Boolean @default(true)
+
+  /// Artículos RC de esta familia (Restrict: una familia con artículos no se borra física).
+  articulos ArticuloRC[]
+
+  creadoEn        DateTime        @default(now()) @map("creado_en")
+  creadoPorId     String?         @map("creado_por_id")
+  modificadoEn    DateTime        @updatedAt @map("modificado_en")
+  modificadoPorId String?         @map("modificado_por_id")
+  plantillaRutas  PlantillaRuta[]
+
+  @@map("familia_articulo")
+}
+
+/// Tipo de artículo de la Ruta Crítica (ex `CP_Articulos`, viejo `IdCP_Articulos`). Es la
+/// dimensión por la que el CPM viejo variaba sus tiempos (p. ej. "SENCILLO 1/6", "DIFICIL 6/6").
+/// Pertenece a una `FamiliaArticulo`. NO se conecta por FK desde `Orden` en esta etapa: la orden
+/// guarda `idTipoArticuloRC` como escalar nullable sin FK (prueba ya tiene órdenes ETL con valores
+/// ahí; el enganche formal llega cuando el motor lo necesite). Catálogo GLOBAL, borrado SUAVE.
+model ArticuloRC {
+  id                Int             @id @default(autoincrement())
+  nombre            String
+  idFamiliaArticulo Int             @map("id_familia_articulo")
+  familia           FamiliaArticulo @relation(fields: [idFamiliaArticulo], references: [id], onDelete: Restrict)
+  activo            Boolean         @default(true)
+
+  /// Plantillas de ruta que aplican específicamente a este artículo (Restrict).
+  plantillas PlantillaRuta[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idFamiliaArticulo])
+  @@map("articulo_rc")
+}
+
+/// PLANTILLA de ruta: qué procesos lleva un artículo/familia, con qué tiempo estándar y con qué
+/// ENCADENAMIENTO PROPIO (puede diferir del DAG genérico de `ProcesoDep`, porque el viejo
+/// `CP_Tiempos.Antecesor` se capturaba por artículo). Identifica a qué aplica por familia y/o
+/// artículo (ambos opcionales: una plantilla puede ser de toda una familia o de un artículo
+/// concreto). Catálogo GLOBAL, borrado SUAVE, auditoría A7.
+model PlantillaRuta {
+  id     Int    @id @default(autoincrement())
+  nombre String
+
+  /// Familia a la que aplica (opcional). Restrict.
+  idFamiliaArticulo Int?             @map("id_familia_articulo")
+  familia           FamiliaArticulo? @relation(fields: [idFamiliaArticulo], references: [id], onDelete: Restrict)
+  /// Artículo concreto al que aplica (opcional). Restrict.
+  idArticuloRC      Int?             @map("id_articulo_rc")
+  articulo          ArticuloRC?      @relation(fields: [idArticuloRC], references: [id], onDelete: Restrict)
+
+  activo Boolean @default(true)
+
+  /// Procesos de la plantilla (su tiempo estándar + posición). Cascade: al borrar la plantilla.
+  procesos PlantillaRutaProceso[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idFamiliaArticulo])
+  @@index([idArticuloRC])
+  @@map("plantilla_ruta")
+}
+
+/// Renglón de una `PlantillaRuta`: un proceso del catálogo con su TIEMPO ESTÁNDAR (días) y su
+/// posición (`orden`) dentro de la plantilla (ex `CP_Tiempos`). El encadenamiento PROPIO de la
+/// plantilla se modela aparte en `PlantillaRutaDep` (un renglón puede tener antecesores distintos
+/// a los del DAG genérico). Cascade desde la plantilla; Restrict hacia el `ProcesoDef`.
+model PlantillaRutaProceso {
+  id              Int           @id @default(autoincrement())
+  idPlantillaRuta Int           @map("id_plantilla_ruta")
+  plantilla       PlantillaRuta @relation(fields: [idPlantillaRuta], references: [id], onDelete: Cascade)
+  idProcesoDef    Int           @map("id_proceso_def")
+  procesoDef      ProcesoDef    @relation(fields: [idProcesoDef], references: [id], onDelete: Restrict)
+
+  /// Tiempo estándar del proceso en esta plantilla, en días (ex `CP_Tiempos.Tiempo`).
+  tiempoEstandar Int @map("tiempo_estandar")
+  /// Posición del renglón dentro de la plantilla (lo gestiona el dominio).
+  orden          Int @default(0)
+
+  /// Dependencias en las que ESTE renglón es el sucesor (sus antecesores en la plantilla).
+  antecesores PlantillaRutaDep[] @relation("PlantillaProcesoComoSucesor")
+  /// Dependencias en las que ESTE renglón es el antecesor (sus sucesores en la plantilla).
+  sucesores   PlantillaRutaDep[] @relation("PlantillaProcesoComoAntecesor")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idPlantillaRuta, idProcesoDef])
+  @@index([idProcesoDef])
+  @@map("plantilla_ruta_proceso")
+}
+
+/// Arista del DAG de encadenamiento PROPIO de una plantilla: `idAntecesor` (renglón de la plantilla)
+/// debe ocurrir antes que `idPlantillaRutaProceso` (otro renglón de la MISMA plantilla). Se valida
+/// acíclico en el dominio (reusa `grafo.ts`). Ambos extremos Cascade desde sus renglones (al borrar
+/// la plantilla caen sus renglones y con ellos sus aristas). Solo auditoría de creación.
+model PlantillaRutaDep {
+  idPlantillaRutaProceso Int                  @map("id_plantilla_ruta_proceso")
+  proceso                PlantillaRutaProceso @relation("PlantillaProcesoComoSucesor", fields: [idPlantillaRutaProceso], references: [id], onDelete: Cascade)
+  idAntecesor            Int                  @map("id_antecesor")
+  antecesor              PlantillaRutaProceso @relation("PlantillaProcesoComoAntecesor", fields: [idAntecesor], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idPlantillaRutaProceso, idAntecesor])
+  @@index([idAntecesor])
+  @@map("plantilla_ruta_dep")
+}
+
+/// Factor de duración POR CANTIDAD de piezas (ex `CP_Cant`, 11 rangos). El motor de E4 multiplica
+/// el tiempo base por el `factor` del rango `[deCant, aCant]` en el que cae la cantidad de la orden.
+/// Catálogo GLOBAL, borrado SUAVE, auditoría A7.
+model FactorCantidad {
+  id     Int     @id @default(autoincrement())
+  /// Límite inferior del rango (inclusive) (ex `CP_Cant.DeCant`).
+  deCant Int     @map("de_cant")
+  /// Límite superior del rango (inclusive) (ex `CP_Cant.ACant`).
+  aCant  Int     @map("a_cant")
+  /// Factor multiplicador para ese rango (ex `CP_Cant.FactorCant`).
+  factor Decimal @db.Decimal(10, 4)
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([deCant, aCant])
+  @@map("factor_cantidad")
+}
+
+/// Duración (días de espera) POR TIPO DE TELA (ex `RC_TipoTelas`, 7). El `factorTela` se guarda
+/// aunque el viejo NO lo aplicaba (decisión (b)): queda disponible para el motor de E4. Catálogo
+/// GLOBAL, borrado SUAVE, auditoría A7.
+model DuracionPorTipoTela {
+  id         Int     @id @default(autoincrement())
+  /// Nombre del tipo de tela (ex `RC_TipoTelas.TipoTela`). Único.
+  nombre     String  @unique
+  /// Días de espera que suma este tipo de tela (ex `RC_TipoTelas.Dias`).
+  dias       Int
+  /// Factor de la tela (ex `RC_TipoTelas.FactorTela`). Se conserva aunque el viejo no lo aplicara.
+  factorTela Decimal @map("factor_tela") @db.Decimal(10, 4)
+  activo     Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("duracion_tipo_tela")
+}
+
+/// Duración (días de espera) POR APLICACIÓN/estampado (ex `RC_Aplicaciones`, 9). El origen NO trae
+/// factor (solo `Dias`): `factor` queda OPCIONAL (decisión (b)) para el motor de E4. Catálogo
+/// GLOBAL, borrado SUAVE, auditoría A7.
+model DuracionPorAplicacion {
+  id     Int      @id @default(autoincrement())
+  /// Nombre de la aplicación (ex `RC_Aplicaciones.TipoAplicacion`). Único.
+  nombre String   @unique
+  /// Clave corta de la aplicación (ex `RC_Aplicaciones.ClaveAplicacion`, p. ej. "A1").
+  clave  String?
+  /// Días de espera que suma esta aplicación (ex `RC_Aplicaciones.Dias`).
+  dias   Int
+  /// Factor (no existe en el origen; opcional para el motor de E4, decisión (b)).
+  factor Decimal? @db.Decimal(10, 4)
+  activo Boolean  @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("duracion_aplicacion")
+}
+
+/// CALENDARIO LABORAL por empresa (decisión (a)): qué días de la semana son hábiles. Un registro
+/// por empresa (1:1). Los 7 booleanos default L–V hábiles, sáb/dom no. Las funciones puras de
+/// `díasHábiles` lo consultan junto con los `DiaFestivo`. Auditoría A7.
+model CalendarioEmpresa {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @unique @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  lunes     Boolean @default(true)
+  martes    Boolean @default(true)
+  miercoles Boolean @default(true)
+  jueves    Boolean @default(true)
+  viernes   Boolean @default(true)
+  sabado    Boolean @default(false)
+  domingo   Boolean @default(false)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("calendario_empresa")
+}
+
+/// DÍA FESTIVO (no laborable) de una empresa (decisión (a)). Fecha + descripción. El motor de E4 lo
+/// salta al contar días hábiles. Único por empresa+fecha. Borrado SUAVE, auditoría A7.
+model DiaFestivo {
+  id          Int      @id @default(autoincrement())
+  idEmpresa   Int      @map("id_empresa")
+  empresa     Empresa  @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  fecha       DateTime @db.Date
+  descripcion String
+  activo      Boolean  @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, fecha])
+  @@index([idEmpresa])
+  @@map("dia_festivo")
 }
