@@ -238,7 +238,10 @@ describe('generarRutaOrden (F5-E3)', () => {
     );
 
     expect(ruta.rcActiva).toBe(true);
-    expect(ruta.estadoRecalculo).toBe('pendiente-de-calculo');
+    // Tras programar, el CPM aún no ha fechado (job encolado; en tests el motor está inactivo): los
+    // procesos no tienen fechaPlaneadaVigente todavía → estado 'recalculando' (lo que E5 muestra como
+    // "recalculando…"). El tri-estado de E4 reemplazó el 'pendiente-de-calculo' de E3.
+    expect(ruta.estadoRecalculo).toBe('recalculando');
     const porCodigo = new Map(ruta.procesos.map((p) => [p.codigoProceso, p]));
     expect(porCodigo.get('a')!.duracionDias).toBe(3); // fija
     expect(porCodigo.get('b')!.duracionDias).toBe(7); // round(5×1.0 + 2)

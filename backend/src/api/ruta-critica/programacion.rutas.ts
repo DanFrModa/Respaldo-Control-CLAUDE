@@ -1,11 +1,12 @@
 /**
  * Rutas REST del MOTOR de la RUTA VIVA por orden (Módulo 8, F5-E3; doc `08-Ruta-Critica.md`
- * §2.3/§4). Handlers delgados (A1): validan (Zod compartido), autorizan (`conPermiso`, A4) y
- * delegan al dominio. RBAC por ruta: GET → `rc.ruta-ver`; mutaciones → `rc.programar`.
+ * §2.3/§4; captura del cumplimiento + semáforo en F5-E4). Handlers delgados (A1): validan (Zod
+ * compartido), autorizan (`conPermiso`, A4) y delegan al dominio. RBAC por ruta: GET → `rc.ruta-ver`;
+ * programar/ajustar → `rc.programar`; capturar cumplimiento/checklist → `rc.capturar`.
  *
  * La PROGRAMACIÓN responde de INMEDIATO con la ruta generada y el estado del recálculo
- * ('pendiente-de-calculo'): la captura NUNCA espera al CPM (§11) — el job de cálculo de fechas (E4)
- * corre en segundo plano (pg-boss).
+ * ('recalculando' mientras el CPM aún no ha fechado los procesos): la captura NUNCA espera al CPM
+ * (§11) — el job de cálculo de fechas (E4) corre en segundo plano (pg-boss).
  */
 import type { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
