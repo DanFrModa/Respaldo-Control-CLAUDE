@@ -37,6 +37,11 @@ import {
 
 import { calcularDuracion, type RangoFactorCantidad } from './calcularDuracion.js';
 import { validarRedefinicionesAcumulado, type RedefinicionAntecesores } from './grafo.js';
+import {
+  estadoSemaforoOrden,
+  estadoSemaforoProceso,
+  type EstadoSemaforo,
+} from './semaforoYRiesgo.js';
 
 // ── Tipos de entrada ────────────────────────────────────────────────────────────
 
@@ -78,6 +83,8 @@ export interface RutaOrdenProcesoDto {
   capturadoPorId: string | null;
   capturadoEn: Date | null;
   origenCaptura: 'manual' | 'evento' | null;
+  /** Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4). */
+  semaforo: EstadoSemaforo;
   idsAntecesores: number[];
   checklist: { id: number; descripcion: string; orden: number; hecho: boolean }[];
 }
@@ -93,8 +100,14 @@ export interface RutaOrdenDto {
   idArticuloRC: number | null;
   idTipoTela: number | null;
   idAplicacion: number | null;
-  /** Estado del cálculo de fechas: en E3 siempre "fechas pendientes de cálculo" (lo hace E4). */
-  estadoRecalculo: 'pendiente-de-calculo' | 'sin-ruta';
+  /**
+   * Estado del cálculo de fechas (F5-E4): `calculado` (todos los procesos tienen fecha vigente),
+   * `recalculando` (hay procesos sin fecha vigente: el CPM aún no terminó tras programar/ajustar) o
+   * `sin-ruta` (la orden no tiene ruta generada).
+   */
+  estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta';
+  /** Semáforo de cumplimiento de la orden (el peor de sus procesos) (F5-E4). */
+  semaforo: EstadoSemaforo;
   procesos: RutaOrdenProcesoDto[];
   advertencias: string[];
 }
@@ -846,6 +859,18 @@ function armarDto(
 ): RutaOrdenDto {
   // idProcesoDef por id de RutaOrden, para traducir las aristas a idProcesoDef.
   const procesoPorIdRuta = new Map(filas.map((f) => [f.id, f.idProcesoDef]));
+
+  // Semáforo (F5-E4): HOY vs fechaPlaneadaVigente de cada proceso. Estado del recálculo: si algún
+  // proceso aún NO tiene fecha vigente, el CPM no ha terminado de fechar ("recalculando…", E5).
+  const hoy = new Date();
+  const semaforoOrden = estadoSemaforoOrden(
+    filas.map((f) => ({ fechaPlaneadaVigente: f.fechaPlaneadaVigente, fechaReal: f.fechaReal })),
+    hoy,
+  );
+  const algunSinFechar = filas.some((f) => f.fechaPlaneadaVigente === null);
+  const estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta' =
+    filas.length === 0 ? 'sin-ruta' : algunSinFechar ? 'recalculando' : 'calculado';
+
   return {
     idOrden: orden.id,
     rcActiva: orden.rcActiva ?? false,
@@ -856,7 +881,8 @@ function armarDto(
     idArticuloRC: orden.idArticuloRcProg,
     idTipoTela: orden.idDuracionTela,
     idAplicacion: orden.idDuracionAplicacion,
-    estadoRecalculo: filas.length === 0 ? 'sin-ruta' : 'pendiente-de-calculo',
+    estadoRecalculo,
+    semaforo: semaforoOrden,
     procesos: filas.map((f) => ({
       id: f.id,
       idProcesoDef: f.idProcesoDef,
@@ -876,6 +902,10 @@ function armarDto(
       capturadoPorId: f.capturadoPorId,
       capturadoEn: f.capturadoEn,
       origenCaptura: f.origenCaptura,
+      semaforo: estadoSemaforoProceso(
+        { fechaPlaneadaVigente: f.fechaPlaneadaVigente, fechaReal: f.fechaReal },
+        hoy,
+      ),
       idsAntecesores: f.antecesores
         .map((a) => procesoPorIdRuta.get(a.idAntecesor))
         .filter((x): x is number => x !== undefined),

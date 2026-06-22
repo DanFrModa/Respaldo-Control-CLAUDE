@@ -818,15 +818,22 @@ export {
 // ── Ruta Crítica: motor de la ruta viva por orden (Módulo 8, F5-E3) ──
 export {
   esquemaParamOrdenRc,
+  esquemaParamRutaProceso,
+  esquemaParamChecklistItem,
   esquemaProgramarRc,
   esquemaAjusteAgregar,
   esquemaAjusteDependencia,
   esquemaAjustarRuta,
+  esquemaCapturarProceso,
+  esquemaMarcarChecklist,
+  esquemaEstadoSemaforo,
   esquemaRutaChecklistSalida,
   esquemaRutaProcesoSalida,
   esquemaRutaOrdenSalida,
   type DatosProgramarRc,
   type DatosAjustarRuta as DatosAjustarRutaContrato,
+  type DatosCapturarProceso,
+  type DatosMarcarChecklist,
   type RutaOrdenSalida,
 } from './esquemas/ruta-critica-programacion.js';
 

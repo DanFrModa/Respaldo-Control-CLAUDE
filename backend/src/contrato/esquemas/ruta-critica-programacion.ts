@@ -96,6 +96,50 @@ export const esquemaAjustarRuta = z
 /** Datos validados de ajuste. */
 export type DatosAjustarRuta = z.infer<typeof esquemaAjustarRuta>;
 
+// ── Captura del cumplimiento (F5-E4) ──────────────────────────────────────────
+
+/** Parámetro de ruta `:idRuta` (un renglón de RutaOrden = proceso×orden). */
+export const esquemaParamRutaProceso = z.object({
+  idRuta: idParamPositivo.describe('Id del renglón de ruta (proceso de la ruta viva).'),
+});
+
+/** Parámetro de ruta `:idItem` (un ítem de RutaOrdenChecklist). */
+export const esquemaParamChecklistItem = z.object({
+  idItem: idParamPositivo.describe('Id del ítem de checklist de la ruta viva.'),
+});
+
+/**
+ * Cuerpo para capturar/revertir el CUMPLIMIENTO de un proceso (F5-E4). `cumplido = true` marca la
+ * `fechaReal` (default hoy si no se manda fecha) y activa los sucesores listos; `false` la revierte.
+ */
+export const esquemaCapturarProceso = z
+  .object({
+    cumplido: z
+      .boolean({ error: 'cumplido debe ser verdadero o falso' })
+      .describe('Marcar (true) o revertir (false) el cumplimiento.'),
+    fechaReal: z.iso
+      .date({ error: 'La fecha real debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha real de cumplimiento (YYYY-MM-DD); por defecto hoy. Ignorada al revertir.'),
+  })
+  .describe('Captura o reversión del cumplimiento de un proceso de la ruta viva.');
+/** Datos validados de captura de cumplimiento. */
+export type DatosCapturarProceso = z.infer<typeof esquemaCapturarProceso>;
+
+/** Cuerpo para marcar/desmarcar un ítem de checklist (F5-E4). */
+export const esquemaMarcarChecklist = z
+  .object({
+    hecho: z
+      .boolean({ error: 'hecho debe ser verdadero o falso' })
+      .describe('Nuevo valor del ítem.'),
+  })
+  .describe('Marcar o desmarcar un ítem de checklist de la ruta viva.');
+/** Datos validados de marcado de checklist. */
+export type DatosMarcarChecklist = z.infer<typeof esquemaMarcarChecklist>;
+
+/** Estados del semáforo de cumplimiento (F5-E4). */
+export const esquemaEstadoSemaforo = z.enum(['aTiempo', 'enRiesgo', 'atrasado']);
+
 // ── Salida: la ruta viva de una orden ─────────────────────────────────────────
 
 /** Un ítem de checklist de un proceso de la ruta viva. */
@@ -127,6 +171,9 @@ export const esquemaRutaProcesoSalida = z
     capturadoPorId: z.string().nullable(),
     capturadoEn: z.iso.datetime().nullable(),
     origenCaptura: z.enum(['manual', 'evento']).nullable(),
+    semaforo: esquemaEstadoSemaforo.describe(
+      'Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).',
+    ),
     idsAntecesores: z.array(z.number().int()).describe('Antecesores en la ruta (idProcesoDef).'),
     checklist: z.array(esquemaRutaChecklistSalida),
   })
@@ -145,11 +192,16 @@ export const esquemaRutaOrdenSalida = z
     idTipoTela: z.number().int().nullable(),
     idAplicacion: z.number().int().nullable(),
     estadoRecalculo: z
-      .enum(['pendiente-de-calculo', 'sin-ruta'])
-      .describe('Estado del cálculo de fechas; en E3 siempre "pendiente-de-calculo" (lo hace E4).'),
+      .enum(['calculado', 'recalculando', 'sin-ruta'])
+      .describe(
+        'Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).',
+      ),
+    semaforo: esquemaEstadoSemaforo.describe(
+      'Semáforo de cumplimiento de la orden (el peor de sus procesos) (F5-E4).',
+    ),
     procesos: z.array(esquemaRutaProcesoSalida),
     advertencias: z.array(z.string()).describe('Avisos no fatales del cálculo de duraciones.'),
   })
-  .describe('Ruta Crítica viva de una orden (F5-E3).');
+  .describe('Ruta Crítica viva de una orden (F5-E3/E4).');
 /** Forma de la ruta viva en la API. */
 export type RutaOrdenSalida = z.infer<typeof esquemaRutaOrdenSalida>;

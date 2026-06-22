@@ -28,6 +28,12 @@ export const COLAS_JOBS = {
    * / `ajustarRutaOrden` (F5-E3); el HANDLER que calcula las fechas lo implementa E4.
    */
   recalcularRutaOrden: 'rc-recalcular-ruta',
+  /**
+   * BARRIDO RECURRENTE del semáforo de riesgo de la RC (F5-E4): recorre las órdenes con RC activa y
+   * actualiza su estado de riesgo (incl. la regla "EnRiesgo nace ANTES de programar"). Lo programa
+   * el bootstrap con `schedule` (pg-boss); el handler vive en `comun/jobs/riesgo-rc.ts`.
+   */
+  barridoRiesgoRc: 'rc-barrido-riesgo',
 } as const;
 
 /** Nombre válido de cola de jobs. */

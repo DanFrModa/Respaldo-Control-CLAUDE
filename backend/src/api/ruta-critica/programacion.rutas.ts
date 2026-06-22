@@ -1,19 +1,24 @@
 /**
  * Rutas REST del MOTOR de la RUTA VIVA por orden (Módulo 8, F5-E3; doc `08-Ruta-Critica.md`
- * §2.3/§4). Handlers delgados (A1): validan (Zod compartido), autorizan (`conPermiso`, A4) y
- * delegan al dominio. RBAC por ruta: GET → `rc.ruta-ver`; mutaciones → `rc.programar`.
+ * §2.3/§4; captura del cumplimiento + semáforo en F5-E4). Handlers delgados (A1): validan (Zod
+ * compartido), autorizan (`conPermiso`, A4) y delegan al dominio. RBAC por ruta: GET → `rc.ruta-ver`;
+ * programar/ajustar → `rc.programar`; capturar cumplimiento/checklist → `rc.capturar`.
  *
  * La PROGRAMACIÓN responde de INMEDIATO con la ruta generada y el estado del recálculo
- * ('pendiente-de-calculo'): la captura NUNCA espera al CPM (§11) — el job de cálculo de fechas (E4)
- * corre en segundo plano (pg-boss).
+ * ('recalculando' mientras el CPM aún no ha fechado los procesos): la captura NUNCA espera al CPM
+ * (§11) — el job de cálculo de fechas (E4) corre en segundo plano (pg-boss).
  */
 import type { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   esquemaAjustarRuta,
+  esquemaCapturarProceso,
   esquemaErrorApi,
+  esquemaMarcarChecklist,
+  esquemaParamChecklistItem,
   esquemaParamOrdenRc,
+  esquemaParamRutaProceso,
   esquemaProgramarRc,
   esquemaRutaOrdenSalida,
 } from '../../contrato/index.js';
@@ -25,6 +30,11 @@ import {
   obtenerRutaOrden,
   type RutaOrdenDto,
 } from '../../dominio/ruta-critica/rutaOrden.js';
+import {
+  completarProceso,
+  marcarChecklistItem,
+  revertirProceso,
+} from '../../dominio/ruta-critica/cumplimiento.js';
 
 /** Proyecta el DTO de dominio (fechas Date) al JSON del contrato (fechas ISO). */
 function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
@@ -40,6 +50,7 @@ function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
     idTipoTela: r.idTipoTela,
     idAplicacion: r.idAplicacion,
     estadoRecalculo: r.estadoRecalculo,
+    semaforo: r.semaforo,
     procesos: r.procesos.map((p) => ({
       id: p.id,
       idProcesoDef: p.idProcesoDef,
@@ -59,6 +70,7 @@ function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
       capturadoPorId: p.capturadoPorId,
       capturadoEn: iso(p.capturadoEn),
       origenCaptura: p.origenCaptura,
+      semaforo: p.semaforo,
       idsAntecesores: p.idsAntecesores,
       checklist: p.checklist,
     })),
@@ -164,6 +176,53 @@ export const rutasProgramacionRc: FastifyPluginCallbackZod = (app, _opciones, do
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return aRutaSalida(await obtenerRutaOrden(sesion, request.params.id));
+    },
+  });
+
+  // ── Capturar / revertir el cumplimiento de un proceso (F5-E4) ────────────────
+  app.route({
+    method: 'PUT',
+    url: '/ruta-critica/procesos/:idRuta/cumplimiento',
+    preHandler: app.conPermiso('rc.capturar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Capturar o revertir el cumplimiento de un proceso de la Ruta Crítica de una orden',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamRutaProceso,
+      body: esquemaCapturarProceso,
+      response: { 200: esquemaRutaOrdenSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const cuerpo = request.body;
+      const idOrden = cuerpo.cumplido
+        ? await completarProceso(
+            sesion,
+            request.params.idRuta,
+            cuerpo.fechaReal === undefined ? undefined : fechaUtc(cuerpo.fechaReal),
+          )
+        : await revertirProceso(sesion, request.params.idRuta);
+      return aRutaSalida(await obtenerRutaOrden(sesion, idOrden));
+    },
+  });
+
+  // ── Marcar / desmarcar un ítem de checklist (F5-E4) ──────────────────────────
+  app.route({
+    method: 'PUT',
+    url: '/ruta-critica/checklist/:idItem',
+    preHandler: app.conPermiso('rc.capturar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Marcar o desmarcar un ítem de checklist de un proceso de la Ruta Crítica',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamChecklistItem,
+      body: esquemaMarcarChecklist,
+      response: { 200: esquemaRutaOrdenSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const idOrden = await marcarChecklistItem(sesion, request.params.idItem, request.body.hecho);
+      return aRutaSalida(await obtenerRutaOrden(sesion, idOrden));
     },
   });
 

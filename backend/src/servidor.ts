@@ -1,6 +1,8 @@
 import { construirApp } from './app.js';
 import { detenerColaEventos, iniciarColaEventos } from './comun/cola-eventos.js';
 import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
+import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
+import { registrarBarridoRiesgoRc } from './comun/jobs/riesgo-rc.js';
 
 /**
  * Punto de entrada del servicio de API.
@@ -31,6 +33,15 @@ await iniciarColaEventos((mensaje, error) => {
 // en segundo plano (CPM de la RC, E4; auto-avance, E6). Best-effort; NO-OP en tests/CI
 // (JOBS_ACTIVOS=false). En E3 solo se ENCOLA el recálculo; el worker del CPM lo monta E4.
 await iniciarMotorJobs((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra los HANDLERS de jobs de la Ruta Crítica (F5-E4): el CPM (recálculo de fechas de la ruta
+// viva, serializado por orden) y el BARRIDO RECURRENTE de riesgo (recalcula el semáforo de las
+// órdenes con RC activa, incl. la regla "EnRiesgo antes de programar"). NO-OP si el motor está
+// inactivo (tests/CI). Best-effort: si fallan, la app sigue (el job se puede re-disparar).
+await registrarHandlerCpm();
+await registrarBarridoRiesgoRc((mensaje, error) => {
   app.log.error({ error }, mensaje);
 });
 

@@ -41,6 +41,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "demo:ordenes": "tsx scripts/datos-demo-ordenes.ts",
+    "demo:rc": "tsx scripts/demo-rc.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {
