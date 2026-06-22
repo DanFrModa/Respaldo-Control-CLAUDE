@@ -489,6 +489,45 @@ export type TipoProcesoCrear =
 export type TipoProcesoEditar =
   paths['/api/tipos-proceso/{id}']['patch']['requestBody']['content']['application/json'];
 
+// ── Ruta Crítica: catálogo configurable de procesos (Módulo 8, F5-E1) ─────────
+
+/** Página de procesos de la RC (`GET /api/ruta-critica/procesos`). */
+export type ProcesosRcPagina =
+  paths['/api/ruta-critica/procesos']['get']['responses']['200']['content']['application/json'];
+/** Un proceso de la RC completo (con roles, antecesores y checklist). */
+export type ProcesoRc = ProcesosRcPagina['datos'][number];
+/** Un rol responsable de un proceso. */
+export type ProcesoRcRol = ProcesoRc['roles'][number];
+/** Un antecesor (dependencia) de un proceso. */
+export type ProcesoRcAntecesor = ProcesoRc['antecesores'][number];
+/** Un ítem de checklist de un proceso. */
+export type ProcesoRcChecklistItem = ProcesoRc['checklist'][number];
+/** Condición de aplicabilidad de un proceso. */
+export type CondicionAplicabilidad = ProcesoRc['condicionAplicabilidad'];
+/** Tipo de evento de un proceso. */
+export type TipoEventoProceso = ProcesoRc['tipoEvento'];
+/** Tipo de duración de un proceso. */
+export type TipoDuracionProceso = ProcesoRc['tipoDuracion'];
+/** Parámetros de consulta del listado de procesos (querystring). */
+export type ProcesosRcQuery = NonNullable<
+  paths['/api/ruta-critica/procesos']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de proceso (`POST /api/ruta-critica/procesos`). */
+export type ProcesoRcCrear =
+  paths['/api/ruta-critica/procesos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de proceso (`PATCH /api/ruta-critica/procesos/{id}`). */
+export type ProcesoRcEditar =
+  paths['/api/ruta-critica/procesos/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo del set de roles responsables (`PUT .../{id}/roles`). */
+export type ProcesoRcRoles =
+  paths['/api/ruta-critica/procesos/{id}/roles']['put']['requestBody']['content']['application/json'];
+/** Cuerpo del set de dependencias (`PUT .../{id}/dependencias`). */
+export type ProcesoRcDependencias =
+  paths['/api/ruta-critica/procesos/{id}/dependencias']['put']['requestBody']['content']['application/json'];
+/** Cuerpo del set de checklist (`PUT .../{id}/checklist`). */
+export type ProcesoRcChecklist =
+  paths['/api/ruta-critica/procesos/{id}/checklist']['put']['requestBody']['content']['application/json'];
+
 // ── Tipos de movimiento de inventario (Módulo 6, F3-E1; solo lectura) ────────
 
 /** Lista de tipos de movimiento de inventario (`GET /api/tipos-movimiento`). */

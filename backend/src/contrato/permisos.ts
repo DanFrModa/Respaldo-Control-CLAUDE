@@ -457,6 +457,23 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Poder meter la fecha que sea en el cumplimiento',
     },
   },
+  // Catálogo configurable de la Ruta Crítica (Módulo 8, F5-E1, A4) — permisos NUEVOS de v2.
+  // Gobiernan el "corazón configurable": el catálogo de procesos, sus roles responsables (N:M),
+  // las dependencias (DAG) y los checklists. Mismo reparto que un catálogo maestro: `ver`
+  // (consulta) y `administrar` (alta/edición/des-reactivación + roles + dependencias + checklist).
+  // Los `rc.*` LEGADO de arriba (ver-botones/fechas-retraso/fecha-libre-cumplimiento) son del
+  // MOTOR de la RC (instancias por orden, E2+); NO se reutilizan para el catálogo configurable.
+  {
+    clave: 'rc.catalogo-ver',
+    modulo: 'rc',
+    descripcion: 'Consultar el catálogo de procesos, dependencias y checklists de la Ruta Crítica',
+  },
+  {
+    clave: 'rc.catalogo-administrar',
+    modulo: 'rc',
+    descripcion:
+      'Administrar procesos, roles responsables, dependencias y checklists de la Ruta Crítica',
+  },
 
   // ── Control de calidad ───────────────────────────────────────────────────────
   {

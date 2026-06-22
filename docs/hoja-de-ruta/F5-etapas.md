@@ -5,9 +5,20 @@
 >
 > **Entrega de la fase (plan §6):** Motor de workflow + CPM + plantillas + bandeja con semáforo + auto-avance desde F3/F4.
 > **Criterio de salida:** Una orden corre con su RC y las fechas se llenan solas donde aplica.
-> **Estado:** ⬜ pendiente — el desglose se confirma/ajusta al arrancar la fase.
+> **Estado:** 🔄 EN CURSO — **F5-E1 ✅ (22-jun-2026)**; decisiones de fase (a–h) cerradas con Daniel (`Documentacion_MJD/DECISIONES.md` §"Decisiones de negocio de F5"). Resto E2–E7 ⬜.
 
-## F5-E1 · Procesos como datos: catálogo de procesos + roles responsables N:M + DAG de dependencias + checklists configurables — ⬜ pendiente
+## F5-E1 · Procesos como datos: catálogo de procesos + roles responsables N:M + DAG de dependencias + checklists configurables — ✅ COMPLETA (22-jun-2026)
+
+> **✅ Nota de cierre (22-jun-2026; 1 coder + 1 reviewer independiente — APROBADO; pendiente verificación de Gabriel en `prueba`).** Corazón configurable del workflow construido:
+> - **Esquema + migración aditiva `20260622120000_f5_e1_ruta_critica_procesos`:** 3 enums (`CondicionAplicabilidad {ninguna|soloSiLlevaAplicacion}` TIPADO, NO motor de expresiones; `TipoEventoProceso`; `TipoDuracionProceso`) + 4 modelos GLOBALES — `ProcesoDef` (banderas `critico`/`ultimoProceso`/`esResurtido` + `condicionAplicabilidad`/`tipoEvento`/`tipoDuracion`), `ProcesoDefRol` (N:M sobre el `Rol` del **RBAC único** de F0, sin catálogo paralelo A4), `ProcesoDep` (DAG self-relation, FK Restrict), `ProcesoChecklist` (FK Cascade, `orden`, borrado suave).
+> - **Dominio `dominio/ruta-critica/catalogoProcesos.ts` (A1)** + `grafo.ts` (detección de ciclos PURA y testeable: **auto-antecedencia, ciclo directo A↔B y transitivo A→B→C→A**; DFS iterativo; ignora las aristas previas del propio proceso al re-definir → sin falsos positivos; mensaje claro en español). Todo cambio en `enTransaccion` (A2) con `registrarBitacora` + `datosCreacion/datosModificacion` (A7). Borrado SUAVE (proceso y checklist).
+> - **API:** 8 endpoints `/api/ruta-critica/procesos*` (procesos + roles + dependencias + checklist por sub-recursos PUT de set completo), RBAC server-side por ruta — GET→`rc.catalogo-ver`, mutaciones→`rc.catalogo-administrar` (**2 permisos nuevos**). Contrato `openapi.json` + cliente `esquema.gen.ts` regenerados en la etapa.
+> - **RBAC:** alta de los **18 roles funcionales reales** (`RC_TipoUsuarios`: Ventas, IP, Diseño, Producción, Corte, Calidad, Telas, Moldes…) en el RBAC único; reusa "Administrador" de F0 (no lo duplica).
+> - **Frontend:** 2 pantallas teal — `ProcesosPagina` (CRUD con banderas, multi-rol responsable, `tipoEvento`/`tipoDuracion`, checklist editable) y `DependenciasPagina` (N antecesores, **rechazo de ciclos en vivo**) + menú + ruta + e2e Playwright.
+> - **Seed de DESARROLLO:** 26 procesos reales + **54 asignaciones N:M** + dependencias (de `AntecesorRef`) + checklist de IP, con **datos BAKEADOS** (transcritos, NO lee CSV en runtime → corre en Railway). Mapeo `TipoProceso`→`tipoEvento` documentado (AP→autorizacionArte, T→recepcionTela, CO→corte, EP→envioEstampado, RP→reciboEstampado, CP→auditoria, EC→envioCostura, C→reciboCostura, F/M/vacío→manual). Idempotente. **Cuadre seed↔CSV reales 1:1 verificado por el reviewer (0 mismatches).**
+> - **CI:** type-check back+front, 548 unit backend (+ `grafo.test.ts`), tests de página + catálogo en verde; integración (testcontainers: CRUD, N:M, ciclos auto/directo/transitivo, soft delete, bitácora) y e2e corren en CI.
+> - **Deuda explícita (menor del review, ACEPTABLE para E1):** el editor de roles y la pantalla de dependencias consumen `GET /api/roles`, que hoy exige `roles.administrar`; el admin de RC tiene ambos permisos, así que funciona. **Para E2+:** exponer un `GET` de roles ligero bajo `rc.catalogo-ver` para desacoplar.
+> - **Deploy a `prueba`:** requiere **`SEED_ON_START=true`** (2 permisos + 18 roles + 26 procesos nuevos; seed idempotente, no resetea el password del admin).
 
 **Objetivo:** Construir el corazón configurable del workflow (D10): el catálogo de procesos con sus banderas, los roles responsables por proceso en relación N:M sobre el RBAC único (los 26 procesos vigentes tienen TODOS 2–3 roles responsables en RC_ProcUsua — verificado), el grafo de dependencias con N antecesores y validación de ciclos, y los checklists configurables que reemplazan las columnas fijas RC_IP2..5 (A6). Va primero porque TODO lo demás de la fase (plantillas, motor, rutas vivas) referencia estas tablas.
 
@@ -51,7 +62,7 @@
 - PLANMAESTRO.md §4 'Ruta Crítica como workflow configurable' (ProcesoDef/ProcesoDep) y §5 fila 7
 - Documentacion_MJD/DECISIONES.md D10; MEJORAS.md A4 (RBAC único), A6 (checklists configurables), A7 (auditoría)
 - docs/modulos/patron-crud.md (patrón de referencia F0)
-- Respaldo CLAUDE/TABLAS/CP_Procesos.csv, RC_TipoUsuarios.csv, RC_ProcUsua.csv (datos reales, latin-1; RC_ProcUsua = 68 filas, todo proceso con 2–3 roles)
+- Respaldo CLAUDE/TABLAS/CP_Procesos.csv, RC_TipoUsuarios.csv, RC_ProcUsua.csv (datos reales, **CP850** — ver CLAUDE.md §4; RC_ProcUsua = 68 filas, todo proceso con 2–3 roles)
 
 ---
 

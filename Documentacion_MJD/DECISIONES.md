@@ -270,3 +270,92 @@ no bloquean el cierre de F4 pero conviene confirmarlas antes de F9 (corte de go-
 - **Líneas legacy = texto libre** (`descripcionLibre`/`descripcionLegacy`), NO mapeadas a catálogo;
   `Totales` NO se migra (derivado).
 - **Fecha:** 2026-06-22.
+
+---
+
+### Decisiones de negocio de F5 (Ruta Crítica) — 2026-06-22
+
+Reglas nuevas del motor de workflow/CPM, auto-avance e impresos de la fase. Cerradas con **Daniel**
+(dueño / experto del negocio), relayed por Gabriel, 2026-06-22, ANTES de arrancar la fase (preguntas
+de fase juntas, regla CLAUDE.md §6). Detalle operativo en la ficha `docs/hoja-de-ruta/F5-etapas.md`.
+Profundizan D10 (RC como workflow configurable) y D11 (modelo analítico).
+
+> **Principio rector que ató varias respuestas (Daniel):** la RC **refleja la realidad física de
+> producción**, así que **el dato automático (evento de producción) manda** sobre la captura a mano.
+> De ahí salen (e) y (f).
+
+#### (a) — Calendario laboral configurable: L–V + festivos MX + fechas propias de FR (E2)
+- **Decisión:** la planta trabaja **lunes a viernes** (sin sábados ni domingos). El calendario laboral
+  es **configurable por empresa** e incluye los **festivos oficiales de México** + un conjunto de
+  **fechas propias de FR Moda** como días no hábiles. El CPM (E4) solo cuenta días hábiles contra este
+  calendario (reemplaza el `L–V` hardcodeado y `CuantosSabYDom` del viejo).
+- **Pendiente operativo:** Gabriel consigue con Daniel la **lista de fechas propias de FR** para
+  cargarlas al construir el calendario en E2 (no bloquea E1).
+- **Aplica en:** F5-E2 (`CalendarioLaboral`), consumido por el CPM en F5-E4.
+
+#### (b) — Los factores SÍ afectan las duraciones: cantidad + tipo de producto + tipo de tela (E2/E3)
+- **Decisión:** las duraciones de los procesos **deben variar** por **cantidad**, **tipo de producto**
+  y **tipo de tela**. Esto **revierte el default** que se había propuesto (conservar el comportamiento
+  viejo de NO aplicar ciertos multiplicadores): se **prenden** los factores que el sistema viejo tenía
+  guardados pero **nunca aplicaba** (`FactorTela` 0.07–2.30, `FactCantAp`), además de lo que ya hacía
+  (factor por rango de cantidad `CP_Cant`, días por tipo de tela `TelasDias`, y plantilla propia por
+  artículo/familia = el "tipo de producto").
+- **Cómo se valida:** el equipo define la fórmula exacta en E2/E3 y la **valida con Daniel mostrándole
+  números concretos** ("esta tela + esta cantidad + este producto = N días") — NO se valida en
+  abstracto. La ADR de E3 que iba a documentar el **descarte** de `FactorTela`/`FactCantAp` cambia de
+  sentido: ahora documenta **cómo se aplican** los tres ejes.
+- **Aplica en:** F5-E2 (reglas de duración) y F5-E3 (`calcularDuracion` + ADR).
+
+#### (c) — La RC nunca modifica la fecha de entrega de la orden; el cierre se guarda aparte (E3/E4)
+- **Decisión:** la fecha de entrega comprometida de la orden **no se modifica nunca** (a diferencia del
+  viejo, donde completar el proceso 'C' la sobre-escribía en silencio). La RC **calcula y muestra** su
+  fecha de término, pero no la pisa. Cuando la orden/RC **se cierra**, se registra **en otro lado** una
+  marca de **"terminada el [fecha]"** (solo para saber que ya acabó) — derivada del cierre de la RC
+  (`rcViva=false` + `fechaReal` del último proceso), sin tocar `fechaEntrega`.
+- **Aplica en:** F5-E3/E4 (la RC expone su fecha; campo/indicador de terminación real separado de la
+  fecha de entrega).
+
+#### (d) — Auto-avance de recibos parciales: el proceso se completa hasta la cantidad COMPLETA (E6)
+- **Decisión:** cuando un proceso se auto-completa por un evento que llega en **varias remesas**
+  (recibo de maquila, recepción de tela, etc.), el proceso se marca **completo solo al llegar la
+  cantidad completa**; desde el **primer recibo** lleva una **marca visible de "parcial en curso"**
+  (sobre cantidades color×talla, D4).
+- **Aplica en:** F5-E6.
+
+#### (e) — Evento automático vs captura manual: gana el automático (E6)
+- **Decisión:** si un proceso ya tenía fecha **capturada a mano** y luego **llega el evento**
+  automático, **el evento PISA** la fecha manual; la `Bitacora` guarda que alguien la había puesto a
+  mano (no se pierde el rastro, A7). *(Esto invierte el default propuesto de "el evento no pisa lo
+  manual".)* Motivo: principio rector — el evento refleja lo que pasó físicamente.
+- **Aplica en:** F5-E6.
+
+#### (f) — Cancelación del movimiento origen: el proceso SÍ se des-completa (E6)
+- **Decisión:** si se **cancela** el corte/recibo que auto-completó un proceso, el proceso **se
+  des-completa automáticamente** y queda registro en `Bitacora`; después alguien puede volver a ponerlo
+  **a mano** si corresponde. *(Esto invierte el default propuesto de "no se des-completa solo".)*
+- **Implicación técnica (no es decisión de Daniel):** des-completar obliga a **recalcular el CPM** y a
+  revisar los **sucesores ya activados** de ese proceso. Contemplado en el alcance de E6.
+- **Aplica en:** F5-E6.
+
+#### (g) — Impreso PDF del "Plan de la RC por orden": SÍ, pero lo principal es en línea (E5)
+- **Decisión:** **sí** se construye el impreso PDF del plan por orden (R9), pero el uso principal es
+  **consultar y actualizar en línea** (la pantalla RC por orden con timeline planeado-vs-real). El PDF
+  es complemento para piso, no el flujo central.
+- **Aplica en:** F5-E5.
+
+#### (h) — Exportación a Excel del concentrado planeado-vs-real: SÍ (E7)
+- **Decisión:** **sí** al export a Excel del concentrado (exceljs, mismo resultado que el tablero).
+  Daniel anota que **las vistas/reportes de análisis se trabajan a fondo más adelante** (eso es F7 —
+  tableros/KPIs sobre el modelo `RutaOrden`, D11); en F5 va el concentrado + su export como base.
+- **Aplica en:** F5-E7.
+
+#### Decisiones TÉCNICAS de la fase (en ADR, sin Daniel)
+- **CPM v2** = backward pass limpio en días hábiles (en vez del bucle iterativo `OtraVez` del viejo);
+  con N antecesores `fechaInicio = MAX(fin de antecesores)`. ADR en E4.
+- **Motor de jobs** = pg-boss 12 como motor común, **serializado por orden** (singleton key) para que
+  dos recálculos de la misma orden no se pisen. Introducido en E3.
+- **Modelo analítico (D11):** se congela el **plan original** (`fechaPlaneadaOriginal`) aparte del
+  vigente y del real, con `capturadoPor`/`capturadoEn` y `origenCaptura` (manual|evento) — base de los
+  KPIs de F7.
+
+- **Fecha (a–h):** 2026-06-22. Cerradas con Daniel; relayed por Gabriel.

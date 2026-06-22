@@ -50,6 +50,8 @@ import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { DependenciasPagina } from '@/modulos/ruta-critica/DependenciasPagina';
+import { ProcesosPagina } from '@/modulos/ruta-critica/ProcesosPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
@@ -145,6 +147,9 @@ const router = createBrowserRouter([
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
           { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
+          // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.
+          { path: 'ruta-critica/procesos', element: <ProcesosPagina /> },
+          { path: 'ruta-critica/dependencias', element: <DependenciasPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

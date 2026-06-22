@@ -19,6 +19,8 @@ import { hashPassword } from 'better-auth/crypto';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { sembrarRutaCritica } from './seed-ruta-critica.js';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Empresa FR Moda + configuración (ex-`Propiedades`, ahora POR empresa — plan §4)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -639,6 +641,9 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarTiposMovimiento(prisma);
   await sembrarAlmacenesPt(prisma);
   await sembrarAdmin(prisma);
+  // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
+  // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").
+  await sembrarRutaCritica(prisma);
 }
 
 // Punto de entrada al ejecutarse como script (`prisma db seed` → `tsx prisma/seed.ts`).
