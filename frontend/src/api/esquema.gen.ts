@@ -114,6 +114,8 @@ export interface paths {
                 | 'rc.ver-botones'
                 | 'rc.fechas-retraso'
                 | 'rc.fecha-libre-cumplimiento'
+                | 'rc.catalogo-ver'
+                | 'rc.catalogo-administrar'
                 | 'calidad.generar-auditorias'
                 | 'calidad.modificar-auditorias'
                 | 'calidad.actualizar-auditorias'
@@ -31728,6 +31730,1637 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/procesos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar procesos de la Ruta Crítica */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Texto a buscar en el código o nombre (insensible a mayúsculas). */
+          busqueda?: string;
+          /** @description Incluye los desactivados ("true"/"false"). */
+          incluirInactivos?: string;
+          /** @description Columna de ordenamiento. */
+          ordenarPor?: 'codigo' | 'nombre' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de procesos de la RC. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Procesos de la página. */
+              datos: {
+                /** @description Id del proceso. */
+                id: number;
+                /** @description Clave estable kebab-case (ej. "corte"). */
+                codigo: string;
+                /** @description Nombre para mostrar. */
+                nombre: string;
+                /** @description ¿Es un proceso crítico de la ruta? */
+                critico: boolean;
+                /** @description ¿Es el último proceso (checkpoint final)? */
+                ultimoProceso: boolean;
+                /** @description ¿Aplica también en órdenes de resurtido? */
+                esResurtido: boolean;
+                /**
+                 * @description Condición de aplicabilidad a una orden.
+                 * @enum {string}
+                 */
+                condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Evento de negocio que representa.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /**
+                 * @description Cómo se estima su duración.
+                 * @enum {string}
+                 */
+                tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+                /** @description Falso si está desactivado (borrado suave). */
+                activo: boolean;
+                /** @description Roles responsables (N:M). */
+                roles: {
+                  /** @description Id del rol responsable. */
+                  idRol: number;
+                  /** @description Nombre del rol responsable. */
+                  nombre: string;
+                }[];
+                /** @description Procesos antecesores (DAG). */
+                antecesores: {
+                  /** @description Id del proceso antecesor. */
+                  idProceso: number;
+                  /** @description Código del proceso antecesor. */
+                  codigo: string;
+                  /** @description Nombre del proceso antecesor. */
+                  nombre: string;
+                }[];
+                /** @description Ítems activos del checklist. */
+                checklist: {
+                  /** @description Id del ítem. */
+                  id: number;
+                  /** @description Texto del ítem a verificar. */
+                  descripcion: string;
+                  /** @description Orden de despliegue dentro del checklist. */
+                  orden: number;
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+              /** @description Total que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Crear un proceso de la Ruta Crítica */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            codigo: string;
+            nombre: string;
+            critico?: boolean;
+            ultimoProceso?: boolean;
+            esResurtido?: boolean;
+            /** @enum {string} */
+            condicionAplicabilidad?: 'ninguna' | 'soloSiLlevaAplicacion';
+            /** @enum {string} */
+            tipoEvento?:
+              | 'recepcionTela'
+              | 'corte'
+              | 'envioCostura'
+              | 'reciboCostura'
+              | 'envioEstampado'
+              | 'reciboEstampado'
+              | 'auditoria'
+              | 'autorizacionArte'
+              | 'entregaCliente'
+              | 'manual';
+            /** @enum {string} */
+            tipoDuracion?: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+          };
+        };
+      };
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/procesos/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener un proceso de la Ruta Crítica */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proceso de la Ruta Crítica. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Desactivar un proceso de la Ruta Crítica (borrado suave) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proceso de la Ruta Crítica. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Actualizar un proceso de la Ruta Crítica */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proceso de la Ruta Crítica. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            codigo?: string;
+            nombre?: string;
+            critico?: boolean;
+            ultimoProceso?: boolean;
+            esResurtido?: boolean;
+            /** @enum {string} */
+            condicionAplicabilidad?: 'ninguna' | 'soloSiLlevaAplicacion';
+            /** @enum {string} */
+            tipoEvento?:
+              | 'recepcionTela'
+              | 'corte'
+              | 'envioCostura'
+              | 'reciboCostura'
+              | 'envioEstampado'
+              | 'reciboEstampado'
+              | 'auditoria'
+              | 'autorizacionArte'
+              | 'entregaCliente'
+              | 'manual';
+            /** @enum {string} */
+            tipoDuracion?: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/ruta-critica/procesos/{id}/roles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Fijar los roles responsables de un proceso (set completo) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proceso de la Ruta Crítica. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Ids de los roles RESPONSABLES del proceso (set completo; reemplaza el actual). */
+            idsRoles: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/procesos/{id}/dependencias': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Fijar los antecesores de un proceso (DAG; rechaza ciclos) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proceso de la Ruta Crítica. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Ids de los procesos ANTECESORES (set completo; el dominio rechaza ciclos). */
+            idsAntecesores: number[];
+          };
+        };
+      };
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/procesos/{id}/checklist': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Fijar el checklist de un proceso (set completo) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proceso de la Ruta Crítica. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Ítems del checklist EN ORDEN (set completo; los quitados se desactivan). */
+            items: {
+              id?: number;
+              descripcion: string;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Proceso de la Ruta Crítica (catálogo configurable global). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del proceso. */
+              id: number;
+              /** @description Clave estable kebab-case (ej. "corte"). */
+              codigo: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description ¿Es un proceso crítico de la ruta? */
+              critico: boolean;
+              /** @description ¿Es el último proceso (checkpoint final)? */
+              ultimoProceso: boolean;
+              /** @description ¿Aplica también en órdenes de resurtido? */
+              esResurtido: boolean;
+              /**
+               * @description Condición de aplicabilidad a una orden.
+               * @enum {string}
+               */
+              condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+              /**
+               * @description Evento de negocio que representa.
+               * @enum {string}
+               */
+              tipoEvento:
+                | 'recepcionTela'
+                | 'corte'
+                | 'envioCostura'
+                | 'reciboCostura'
+                | 'envioEstampado'
+                | 'reciboEstampado'
+                | 'auditoria'
+                | 'autorizacionArte'
+                | 'entregaCliente'
+                | 'manual';
+              /**
+               * @description Cómo se estima su duración.
+               * @enum {string}
+               */
+              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              /** @description Falso si está desactivado (borrado suave). */
+              activo: boolean;
+              /** @description Roles responsables (N:M). */
+              roles: {
+                /** @description Id del rol responsable. */
+                idRol: number;
+                /** @description Nombre del rol responsable. */
+                nombre: string;
+              }[];
+              /** @description Procesos antecesores (DAG). */
+              antecesores: {
+                /** @description Id del proceso antecesor. */
+                idProceso: number;
+                /** @description Código del proceso antecesor. */
+                codigo: string;
+                /** @description Nombre del proceso antecesor. */
+                nombre: string;
+              }[];
+              /** @description Ítems activos del checklist. */
+              checklist: {
+                /** @description Id del ítem. */
+                id: number;
+                /** @description Texto del ítem a verificar. */
+                descripcion: string;
+                /** @description Orden de despliegue dentro del checklist. */
+                orden: number;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

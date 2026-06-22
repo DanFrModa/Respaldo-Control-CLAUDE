@@ -241,6 +241,12 @@ model Rol {
   permisos RolPermiso[]
   usuarios UsuarioRol[]
 
+  /// Procesos de la Ruta Crítica de los que este rol es RESPONSABLE (F5-E1, D10/A4). Puente
+  /// N:M sobre el RBAC único: NO hay catálogo de roles paralelo (los `RC_TipoUsuarios` del
+  /// viejo se absorben como roles funcionales del seed). Restrict: un rol asignado a un proceso
+  /// no se borra físico.
+  procesos ProcesoDefRol[]
+
   @@map("roles")
 }
 
@@ -3025,4 +3031,170 @@ model NotaSalidaLinea {
   @@index([idMovimientoSalidaTela])
   @@index([idMovimientoAvio])
   @@map("nota_salida_linea")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUTA CRÍTICA — catálogo configurable de procesos (Módulo 8, F5-E1; doc
+// 08-Ruta-Critica.md; D10/D11). El "corazón configurable" del motor de workflow:
+// el catálogo de procesos como DATOS (`ProcesoDef`), sus roles responsables N:M
+// sobre el RBAC único (`ProcesoDefRol`, A4 — sin catálogo de roles paralelo), el
+// grafo (DAG) de dependencias genéricas (`ProcesoDep`, con rechazo de ciclos en
+// el dominio) y los checklists configurables (`ProcesoChecklist`). El MOTOR (las
+// instancias por orden con fechas/semáforos) y las plantillas llegan en E2+.
+//
+// Origen v1: `CP_Procesos` (26 procesos), `RC_TipoUsuarios` (roles funcionales) y
+// `RC_ProcUsua` (asignaciones proceso×rol). El ETL formal con cuadre es E7; aquí
+// el seed de desarrollo siembra los 26 procesos reales (datos bakeados, sin
+// depender del CSV en runtime de deploy).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// ¿Bajo qué condición APLICA un proceso a una orden? (F5-E1). TIPADO SIMPLE (no es
+/// un motor de expresiones): `ninguna` = siempre aplica; `soloSiLlevaAplicacion` =
+/// solo si la orden lleva estampado/aplicación (ex `CP_Procesos.NoLlevaProceso`, que
+/// marcaba los procesos saltables cuando no hay arte/aplicación). El motor de E2+
+/// evaluará esta bandera al instanciar la RC de cada orden.
+enum CondicionAplicabilidad {
+  ninguna
+  soloSiLlevaAplicacion
+
+  @@map("condicion_aplicabilidad")
+}
+
+/// Tipo de EVENTO de negocio que un proceso de la RC representa (F5-E1). Liga el
+/// proceso configurable con los hechos reales de v2 (recepción de tela, corte,
+/// envío/recibo de costura/estampado, auditoría, autorización de arte, entrega a
+/// cliente). El motor de E2+ podrá auto-completar el cumplimiento de un proceso a
+/// partir del evento de dominio correspondiente (gancho RC, F3-E1). `manual` = el
+/// proceso no tiene evento del sistema y se cumple a mano.
+enum TipoEventoProceso {
+  recepcionTela
+  corte
+  envioCostura
+  reciboCostura
+  envioEstampado
+  reciboEstampado
+  auditoria
+  autorizacionArte
+  entregaCliente
+  manual
+
+  @@map("tipo_evento_proceso")
+}
+
+/// Cómo se calcula la DURACIÓN estimada de un proceso (F5-E1). TIPADO SIMPLE: `fija`
+/// (días fijos), `porCantidad` (escala con las piezas — ex `CP_Procesos.Variable`),
+/// `porTipoTela` o `porAplicacion`. El cálculo concreto (la fórmula y los parámetros
+/// por proceso) lo definirá el motor de E2+; aquí solo se clasifica.
+enum TipoDuracionProceso {
+  fija
+  porCantidad
+  porTipoTela
+  porAplicacion
+
+  @@map("tipo_duracion_proceso")
+}
+
+/// Definición de un PROCESO de la Ruta Crítica (catálogo configurable y GLOBAL — sin
+/// idEmpresa, como TipoProceso/ADR-0007). Es la pieza-DATO del CPM hecho a mano del
+/// viejo (doc 08): cada proceso tiene su criticidad, condición de aplicabilidad,
+/// tipo de evento y de duración, sus roles responsables (N:M) y sus antecesores
+/// (DAG). Borrado SUAVE (`activo`). Auditoría uniforme (A7).
+model ProcesoDef {
+  id     Int    @id @default(autoincrement())
+  /// Clave estable kebab-case (p. ej. "corte", "recepcion-tela"). Única global.
+  codigo String @unique
+  nombre String
+
+  /// ¿Es un proceso CRÍTICO de la ruta? (ex `CP_Procesos.Critico`). Marca los procesos
+  /// que entran al cálculo de la ruta crítica / KPIs (doc 08).
+  critico       Boolean @default(false)
+  /// ¿Es el ÚLTIMO proceso (checkpoint final de la orden)? (ex `CP_Procesos.UltimoProceso`).
+  /// El motor de E2+ lo usa para cerrar la RC de la orden.
+  ultimoProceso Boolean @default(false) @map("ultimo_proceso")
+  /// ¿Aplica también en órdenes de RESURTIDO? (ex `CP_Procesos.EsResurtido`).
+  esResurtido   Boolean @default(false) @map("es_resurtido")
+
+  /// Condición de aplicabilidad del proceso a una orden (TIPADO, no motor de expresiones).
+  condicionAplicabilidad CondicionAplicabilidad @default(ninguna) @map("condicion_aplicabilidad")
+  /// Evento de negocio que el proceso representa (gancho con los hechos reales de v2).
+  tipoEvento             TipoEventoProceso      @default(manual) @map("tipo_evento")
+  /// Cómo se estima la duración del proceso (TIPADO; la fórmula la pone el motor de E2+).
+  tipoDuracion           TipoDuracionProceso    @default(fija) @map("tipo_duracion")
+
+  /// Borrado SUAVE (plan §4): un proceso en uso por la RC nunca se borra físico → se desactiva.
+  activo Boolean @default(true)
+
+  /// Roles RESPONSABLES del proceso (N:M sobre el RBAC único, A4).
+  roles       ProcesoDefRol[]
+  /// Dependencias en las que ESTE proceso es el sucesor (sus antecesores).
+  antecesores ProcesoDep[]       @relation("ProcesoComoSucesor")
+  /// Dependencias en las que ESTE proceso es el antecesor (sus sucesores).
+  sucesores   ProcesoDep[]       @relation("ProcesoComoAntecesor")
+  /// Ítems de checklist configurable del proceso.
+  checklist   ProcesoChecklist[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("proceso_def")
+}
+
+/// Puente N:M `ProcesoDef` × `Rol` — el/los rol(es) RESPONSABLE(s) de un proceso de la RC
+/// (F5-E1, A4: sobre el RBAC único, sin catálogo de roles paralelo). PK compuesta; solo
+/// auditoría de creación (las puentes no se "modifican": se crean/borran al re-set de roles).
+model ProcesoDefRol {
+  idProcesoDef Int        @map("id_proceso_def")
+  procesoDef   ProcesoDef @relation(fields: [idProcesoDef], references: [id], onDelete: Cascade)
+  idRol        Int        @map("id_rol")
+  rol          Rol        @relation(fields: [idRol], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idProcesoDef, idRol])
+  @@index([idRol])
+  @@map("proceso_def_rol")
+}
+
+/// Arista del DAG de dependencias genéricas entre procesos de la RC (F5-E1): `idAntecesor`
+/// DEBE ocurrir antes que `idProceso`. Self-relation con dos nombres de relación distintos.
+/// El RECHAZO DE CICLOS vive en el dominio (`definirDependencias`): el grafo siempre acíclico.
+/// PK compuesta `[idProceso, idAntecesor]`; Restrict (un proceso con dependencias no se borra
+/// físico). Solo auditoría de creación (las aristas se crean/borran al re-set de dependencias).
+model ProcesoDep {
+  idProceso   Int        @map("id_proceso")
+  proceso     ProcesoDef @relation("ProcesoComoSucesor", fields: [idProceso], references: [id], onDelete: Restrict)
+  idAntecesor Int        @map("id_antecesor")
+  antecesor   ProcesoDef @relation("ProcesoComoAntecesor", fields: [idAntecesor], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idProceso, idAntecesor])
+  @@index([idAntecesor])
+  @@map("proceso_dep")
+}
+
+/// Ítem de CHECKLIST configurable de un proceso de la RC (F5-E1). Lista ordenada de puntos a
+/// verificar por proceso (doc 08: la RC del viejo llevaba comprobaciones manuales). Borrado
+/// SUAVE (`activo`): al re-set del checklist, los ítems quitados se desactivan (no se borran).
+model ProcesoChecklist {
+  id           Int        @id @default(autoincrement())
+  idProcesoDef Int        @map("id_proceso_def")
+  procesoDef   ProcesoDef @relation(fields: [idProcesoDef], references: [id], onDelete: Cascade)
+  descripcion  String
+  /// Orden de despliegue del ítem dentro del checklist (lo gestiona el dominio).
+  orden        Int        @default(0)
+  /// Borrado suave: un ítem quitado del checklist se desactiva (conserva historial).
+  activo       Boolean    @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idProcesoDef])
+  @@map("proceso_checklist")
 }

@@ -104,6 +104,10 @@ describe('catálogo de permisos', () => {
       'produccion.wip-ver',
       'proveedores.administrar',
       'proveedores.ver',
+      // Catálogo configurable de la Ruta Crítica (Módulo 8, F5-E1): ver/administrar (nuevos de v2;
+      // los `rc.*` LEGADO del MOTOR tienen origen).
+      'rc.catalogo-administrar',
+      'rc.catalogo-ver',
       'roles.administrar',
       'tallas.administrar',
       'tallas.ver',

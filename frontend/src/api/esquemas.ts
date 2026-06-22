@@ -615,3 +615,91 @@ export const esquemaTipoProcesoFormulario = z.object({
 
 /** Datos del formulario de tipo de proceso. */
 export type DatosTipoProcesoFormulario = z.infer<typeof esquemaTipoProcesoFormulario>;
+
+// ── Ruta Crítica: procesos (espejo de `esquemaProcesoCrear`/`Editar` del backend, F5-E1) ──
+
+/** Condiciones de aplicabilidad (espejo del backend). */
+export const CONDICIONES_APLICABILIDAD = ['ninguna', 'soloSiLlevaAplicacion'] as const;
+/** Clave de condición de aplicabilidad. */
+export type CondicionAplicabilidadClave = (typeof CONDICIONES_APLICABILIDAD)[number];
+/** Etiquetas para UI de cada condición. */
+export const ETIQUETAS_CONDICION_APLICABILIDAD: Record<CondicionAplicabilidadClave, string> = {
+  ninguna: 'Siempre aplica',
+  soloSiLlevaAplicacion: 'Solo si la orden lleva aplicación/estampado',
+};
+
+/** Tipos de evento de proceso (espejo del backend). */
+export const TIPOS_EVENTO_PROCESO = [
+  'recepcionTela',
+  'corte',
+  'envioCostura',
+  'reciboCostura',
+  'envioEstampado',
+  'reciboEstampado',
+  'auditoria',
+  'autorizacionArte',
+  'entregaCliente',
+  'manual',
+] as const;
+/** Clave de tipo de evento. */
+export type TipoEventoProcesoClave = (typeof TIPOS_EVENTO_PROCESO)[number];
+/** Etiquetas para UI de cada tipo de evento. */
+export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, string> = {
+  recepcionTela: 'Recepción de tela',
+  corte: 'Corte',
+  envioCostura: 'Envío a costura',
+  reciboCostura: 'Recibo de costura',
+  envioEstampado: 'Envío a estampado',
+  reciboEstampado: 'Recibo de estampado',
+  auditoria: 'Auditoría de calidad',
+  autorizacionArte: 'Autorización de arte',
+  entregaCliente: 'Entrega a cliente',
+  manual: 'Manual (sin evento del sistema)',
+};
+
+/** Tipos de duración de proceso (espejo del backend). */
+export const TIPOS_DURACION_PROCESO = [
+  'fija',
+  'porCantidad',
+  'porTipoTela',
+  'porAplicacion',
+] as const;
+/** Clave de tipo de duración. */
+export type TipoDuracionProcesoClave = (typeof TIPOS_DURACION_PROCESO)[number];
+/** Etiquetas para UI de cada tipo de duración. */
+export const ETIQUETAS_TIPO_DURACION_PROCESO: Record<TipoDuracionProcesoClave, string> = {
+  fija: 'Duración fija (días)',
+  porCantidad: 'Escala con la cantidad de piezas',
+  porTipoTela: 'Según el tipo de tela',
+  porAplicacion: 'Según la aplicación',
+};
+
+/**
+ * Captura del formulario de proceso de la RC (alta y edición comparten forma). Roles, dependencias
+ * y checklist se gestionan por sus propios sub-recursos (no van en este schema de texto/banderas).
+ * Validación SOLO de UX: el backend re-valida y es la autoridad (A1).
+ */
+export const esquemaProcesoRcFormulario = z.object({
+  codigo: z
+    .string({ error: 'El código es obligatorio' })
+    .trim()
+    .min(1, { error: 'El código es obligatorio' })
+    .max(50, { error: 'El código no puede tener más de 50 caracteres' })
+    .regex(/^[a-z][a-z0-9-]*$/, {
+      error: 'Usa minúsculas, dígitos y guiones (ej. "corte")',
+    }),
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
+  critico: z.boolean(),
+  ultimoProceso: z.boolean(),
+  esResurtido: z.boolean(),
+  condicionAplicabilidad: z.enum(CONDICIONES_APLICABILIDAD),
+  tipoEvento: z.enum(TIPOS_EVENTO_PROCESO),
+  tipoDuracion: z.enum(TIPOS_DURACION_PROCESO),
+});
+
+/** Datos del formulario de proceso de la RC. */
+export type DatosProcesoRcFormulario = z.infer<typeof esquemaProcesoRcFormulario>;

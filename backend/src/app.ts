@@ -30,6 +30,7 @@ import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
+import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
@@ -190,6 +191,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
   // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.
   await app.register(rutasCargosEsMa, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
+  // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
+  // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias
+  // por orden, fechas/semáforos) y las plantillas llegan en E2+.
+  await app.register(rutasProcesosRc, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

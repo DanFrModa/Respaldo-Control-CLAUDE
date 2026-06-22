@@ -717,6 +717,45 @@ export {
   type ExistenciaMaquileroLista,
 } from './esquemas/wip.js';
 
+// ── Ruta Crítica: catálogo configurable de procesos (Módulo 8, F5-E1; doc 08-Ruta-Critica) ──
+export {
+  CONDICIONES_APLICABILIDAD,
+  ETIQUETAS_CONDICION_APLICABILIDAD,
+  TIPOS_EVENTO_PROCESO,
+  ETIQUETAS_TIPO_EVENTO_PROCESO,
+  TIPOS_DURACION_PROCESO,
+  ETIQUETAS_TIPO_DURACION_PROCESO,
+  esquemaProcesoCrear,
+  esquemaProcesoEditar,
+  esquemaProcesoPatchCuerpo,
+  esquemaProcesoRolesCuerpo,
+  esquemaProcesoDependenciasCuerpo,
+  esquemaChecklistItemEntrada,
+  esquemaProcesoChecklistCuerpo,
+  esquemaProcesoRolSalida,
+  esquemaProcesoAntecesorSalida,
+  esquemaChecklistItemSalida,
+  esquemaProcesoSalida,
+  esquemaProcesosQuery,
+  esquemaProcesosPagina,
+  type CondicionAplicabilidadClave,
+  type TipoEventoProcesoClave,
+  type TipoDuracionProcesoClave,
+  type DatosProcesoCrear,
+  type DatosProcesoEditar,
+  type DatosProcesoPatchCuerpo,
+  type DatosProcesoRoles,
+  type DatosProcesoDependencias,
+  type DatosChecklistItemEntrada,
+  type DatosProcesoChecklist,
+  type ProcesoRolSalida,
+  type ProcesoAntecesorSalida,
+  type ChecklistItemSalida,
+  type ProcesoSalida,
+  type ProcesosQuery,
+  type ProcesosPagina,
+} from './esquemas/ruta-critica.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

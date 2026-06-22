@@ -511,6 +511,27 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: 'autenticado',
     destacado: true,
   },
+  // Sub-vistas de Ruta Crítica (F5-E1): el CATÁLOGO CONFIGURABLE (procesos + roles + checklist) y el
+  // editor de DEPENDENCIAS (DAG). Cuelgan del módulo Ruta Crítica; los gobierna `rc.catalogo-ver`.
+  // El MOTOR (instancias por orden, fechas/semáforos) y la bandeja de tareas llegan en E2+.
+  {
+    clave: 'rc-procesos',
+    titulo: 'Procesos (catálogo)',
+    descripcion: 'Catálogo configurable de procesos: banderas, roles responsables y checklists',
+    ruta: '/ruta-critica/procesos',
+    icono: 'lista-tareas',
+    permisos: ['rc.catalogo-ver'],
+    subVista: true,
+  },
+  {
+    clave: 'rc-dependencias',
+    titulo: 'Dependencias',
+    descripcion: 'Editor del grafo de dependencias entre procesos (sin ciclos)',
+    ruta: '/ruta-critica/dependencias',
+    icono: 'ruta',
+    permisos: ['rc.catalogo-ver'],
+    subVista: true,
+  },
   {
     clave: 'calidad',
     titulo: 'Calidad',
