@@ -1,0 +1,6 @@
+IdEntradas,Fecha,Factura,Referencia,IdTela
+1,15/03/2021 00:00:00,Nota,"Compra inicial
+felpa",10
+2,16/03/2021 00:00:00,Remision,,10
+3,17/03/2021 00:00:00,Nota,,20
+4,18/03/2021 00:00:00,Transferencia,2.Naucalpan,20

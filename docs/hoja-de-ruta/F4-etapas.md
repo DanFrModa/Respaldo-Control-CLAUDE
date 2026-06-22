@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Explosión R3, OC desde explosión, recepción R7 con estatus por orden, inventarios de telas (D5) y avíos (R4), notas de salida estructuradas.
 > **Criterio de salida:** El tablero "qué tengo / qué falta" reemplaza el drive manual.
-> **Estado:** 🚧 en curso (E1–E5 ✅, 5/6) — E1 (kardex telas/avíos), E2 (órdenes de compra), E3 (recepción), E4 (explosión MRP + tablero) y E5 (notas de salida) cerradas; sigue E6 (ETL + cuadre de existencias + cierre de fase).
+> **Estado:** ✅ **COMPLETA (6/6, 22-jun-2026)** — E1 (kardex telas/avíos), E2 (órdenes de compra), E3 (recepción), E4 (explosión MRP + tablero), E5 (notas de salida) y E6 (ETL del histórico + cuadre + docs + cierre) cerradas. Pendiente: verificación de Gabriel en `prueba` y merge `prueba`→`main`.
 
 ## F4-E1 · Kardex de telas y avíos (lotes D5) + pantallas de inventario — ✅ (20-jun-2026)
 
@@ -290,7 +290,17 @@
 
 ---
 
-## F4-E6 · ETL + cuadre de existencias, documentación de módulos y cierre de fase — ⬜ pendiente
+## F4-E6 · ETL + cuadre de existencias, documentación de módulos y cierre de fase — ✅ (22-jun-2026)
+
+> **Cierre (22-jun-2026) — reviewer independiente APROBADO (10/10 criterios verificados; 2 🟢 nits no bloqueantes; pendiente verificación de Gabriel en `prueba`).** 2 coders en paralelo (piezas disjuntas) + 1 reviewer. **Pieza A — compras + notas (legacy):** `dominio/compras/migracion.ts` (`crearOCMigrada`) y `dominio/notas/migracion.ts` (`crearNotaMigrada`) en modo migración (folio explícito, líneas legacy SOLO texto libre, **SIN kardex ni RecepcionCompra**; notas `confirmada` histórica sin descontar avíos); loaders `ordenes-compra.ts` (OrdCompra+OrdCompraDet+OrdCom-Ord → OrdenCompra/Linea/N:N) y `notas-salida.ts` (Notas+NotasDet → NotaSalida/Linea); orquestador `etl-compras-notas.ts`. **Pieza B — telas:** `dominio/inventarios/migracion.ts` extendido (`crearMovimientoTelaMigrado`/`crearTraspasoTelaMigrado`/`asegurarLoteLegacyTela`); `comun/pares-traspaso-tela.ts` (detector PURO determinista de pares de traspaso); `loaders/entradas-salidas-telas.ts` (clasificación a/b/c/d); orquestador `etl-telas.ts`; **`cuadre-f4.ts`** (TelasColAlm v1 vs Σ movimientos v2, descuadres LISTADOS no corregidos D3). **Clasificación de telas** (verificada contra el VBA `ITelas_TransferAlmSub.txt`): (a) pares de traspaso `Factura='Transferencia'`↔salida sin orden → `traspaso` pareado (359/368 parean limpio en datos reales; 9 de cardinalidad desigual reportadas); (b) entradas de compra → `entrada-recepcion` directa con `costoUnit=TelasColores.Precio`, **SIN RecepcionCompra**; (c) salidas con orden → `salida-a-orden`; (d) salidas restantes → `ajuste-salida` LISTADO. **Lotes legacy:** refinamiento de la decisión (f) → sintetizados **POR COLOR** (`LEGACY-TELA-<id>`), no por entrada/factura (las salidas legacy no referencian lote; v2 unificó Telas+TelasDis ADR-0009) → existencia v2 cuadra 1:1 con TelasColAlm; registrado en `DECISIONES.md §"ETL F4-E6" (E6.1)` para ratificar con Daniel. **Empresas viejas (1-6) OMITIDAS y listadas** (solo migran 7=Marilyn Fitness / 8=FR Moda); ventana temporal configurable `ETL_VENTANA_ANIOS` default 0. **Idempotencia** vía `MapeoMigracion` (claves nuevas `OrdenCompra`/`NotaSalida`/`movEntradaTela`/`movSalidaTela`/`movTraspasoTelaSalida`/`movTraspasoTelaEntrada`/`loteLegacyTela`) + uniques; **escritura por lotes** (`enLotes`/`CONCURRENCIA_ETL`+`conReintentoTransitorio`); cada documento/par en transacción (A2). **Reconciliación con go-live (decisión (c) de Daniel):** E6 preserva el histórico de consumos y el cuadre; el **saldo de existencia de telas al go-live = 0** es de F9. **Docs de módulo:** `docs/modulos/compras-mrp.md` + `docs/modulos/inventario-telas-avios.md`. **SIN migración Prisma, SIN permisos nuevos, SIN seed** (usa modelos de E1-E5; único colateral = almacén/lote sentinela creado por el propio ETL) → el deploy a `prueba` NO requiere `SEED_ON_START` para E6; el ETL se corre a mano post-deploy. CI: tsc limpio, **141 unit de migración verdes**, integración con testcontainers en CI (clasificación, lote 2-componentes con suma+costo, salida-a-orden, traspaso pareado, cuadre con descuadre listado, **corrida doble = idempotencia**, sin-kardex, CP850 con salto de línea embebido). 2 🟢 nits no bloqueantes (transferencia sin par → entrada de compra reportada; mapeo doc-level en fallo parcial cubierto por el guard fino origenId).
+
+**Comandos del ETL** (desde `backend/`, en este orden):
+```bash
+npx tsx --env-file=.env migracion/etl-compras-notas.ts   # OC + notas legacy
+npx tsx --env-file=.env migracion/etl-telas.ts            # entradas/salidas/traspasos + lotes legacy
+npx tsx --env-file=.env migracion/cuadre-f4.ts            # cuadre TelasColAlm v1 vs Σ movimientos v2
+# verificación rápida (local, gitignored): npx tsx --env-file=.env migracion/_progreso.ts
+```
 
 **Objetivo:** Migrar el histórico de la fase (OC, notas, entradas/salidas de telas con lotes legacy sintetizados y traspasos detectados), cuadrar existencias v1 vs v2 listando diferencias para decisión, documentar los módulos en docs/modulos/ y verificar el criterio de salida completo en el ambiente de prueba. Es la última etapa por regla 6.
 
