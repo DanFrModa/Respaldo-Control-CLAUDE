@@ -161,6 +161,17 @@ async function existenciaColor(idTelasColores: string, idAlmacen: number): Promi
   return Number(filas[0]?.existencia ?? '0');
 }
 
+/** idLote nuevo del lote legacy sintetizado por color (mapeo loteLegacyTela). */
+async function idLoteColor(idTelasColores: string): Promise<number> {
+  const m = await cliente.mapeoMigracion.findUniqueOrThrow({
+    where: {
+      entidad_claveVieja: { entidad: ENTIDAD_MAPEO.loteLegacyTela, claveVieja: idTelasColores },
+    },
+    select: { idNuevo: true },
+  });
+  return Number(m.idNuevo);
+}
+
 describe('ETL de inventario de TELAS (kardex histórico) F4-E6 Pieza B (integración, fixtures)', () => {
   it('CLASIFICA, migra con conteos EXACTOS y es IDEMPOTENTE; existencias = Σ movimientos (D3)', async () => {
     await ejecutarEtlTelas(cliente);
@@ -192,17 +203,22 @@ describe('ETL de inventario de TELAS (kardex histórico) F4-E6 Pieza B (integrac
 
   it('LOTE de 2 componentes: la cantidad del kardex suma TelaEnt1+TelaEnt2', async () => {
     await ejecutarEtlTelas(cliente);
-    // Entrada 1 de la tela 10 (2 componentes) a (100,A): TelaEnt1=130 + TelaEnt2=15 = 145.
+    // En almA hay DOS entradas de la tela 10: color Marino (100) con TelaEnt1=130+TelaEnt2=15=145 y
+    // color Blanco (101) con 25. Filtramos por el LOTE del Marino para apuntar de forma determinista a
+    // la entrada del lote de 2 componentes (sin esto, findFirst devolvía cualquiera de las dos → flaky).
+    const idLoteMarino = await idLoteColor('100');
     const entrada = await cliente.movimiento.findFirstOrThrow({
       where: {
         origenTipo: ORIGEN.migracion,
         tipoMov: { direccion: DireccionMovimiento.entrada },
         idAlmacen: idAlmA,
-        detallesTela: { some: { idTela: idTela10 } },
+        detallesTela: { some: { idTela: idTela10, idLote: idLoteMarino } },
       },
       include: { detallesTela: true },
     });
-    const det = entrada.detallesTela.find((d) => d.idTela === idTela10);
+    const det = entrada.detallesTela.find(
+      (d) => d.idTela === idTela10 && d.idLote === idLoteMarino,
+    );
     expect(det).toBeDefined();
     expect(Number(det?.cantidad)).toBeCloseTo(145, 4);
     // El costoUnit de la entrada de compra viene de TelasColores.Precio (Marino=57).
