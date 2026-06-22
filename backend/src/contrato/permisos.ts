@@ -474,6 +474,22 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar procesos, roles responsables, dependencias y checklists de la Ruta Crítica',
   },
+  // Motor de la RUTA VIVA por orden (Módulo 8, F5-E3, A4) — permisos NUEVOS de v2. Gobiernan la
+  // programación (generar/re-generar/ajustar la ruta de una orden) y su consulta. Son OPERATIVOS
+  // (producción/IP los usa día a día): cascadean a los roles como los `produccion.*`, no se restan a
+  // los bajos. Distintos del catálogo configurable (`rc.catalogo-*`, que define las plantillas).
+  {
+    clave: 'rc.programar',
+    modulo: 'rc',
+    descripcion:
+      'Programar (generar/re-generar) y ajustar la Ruta Crítica de una orden de producción (F5-E3)',
+  },
+  {
+    clave: 'rc.ruta-ver',
+    modulo: 'rc',
+    descripcion:
+      'Consultar la Ruta Crítica viva de una orden (procesos, duraciones, fechas) (F5-E3)',
+  },
 
   // ── Control de calidad ───────────────────────────────────────────────────────
   {

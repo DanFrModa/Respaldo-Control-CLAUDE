@@ -1858,6 +1858,28 @@ model Orden {
   /// viejo: `RC_Viva`. Dato RC (F5).
   rcViva           Boolean?  @map("rc_viva")
 
+  // ── Programación de la Ruta Crítica (F5-E3, motor pt1) — campos NUEVOS de v2 ──────────────
+  //    Los escalares legacy de arriba (idTipoArticuloRC/idRcAplicaciones/idRcTipoTelas/…) se
+  //    conservan SIN tocar (datos ETL de v1); la programación de v2 usa estos campos aditivos,
+  //    con FK a los catálogos de E2. Todos nullable: prueba ya tiene órdenes ETL sin RC.
+  /// ¿La RC de la orden está GENERADA y vigente? (v2, F5-E3). Distinto de `rcViva` (dato legado de v1).
+  rcActiva             Boolean?               @map("rc_activa")
+  /// Cuándo se PROGRAMÓ la RC de esta orden (v2; sello al generar). Paralelo al legado `fechaProg`.
+  fechaProgramada      DateTime?              @map("fecha_programada")
+  /// ¿La orden se programó como RESURTIDO? (v2). Los procesos `esResurtido` quedan en duración 0.
+  esResurtidoRC        Boolean?               @map("es_resurtido_rc")
+  /// Artículo RC elegido para la programación de v2 (FK al catálogo de E2). Restrict, nullable.
+  idArticuloRcProg     Int?                   @map("id_articulo_rc_prog")
+  articuloRcProg       ArticuloRC?            @relation(fields: [idArticuloRcProg], references: [id], onDelete: Restrict)
+  /// Tipo de tela elegido para la programación de v2 (FK a DuracionPorTipoTela). Restrict, nullable.
+  idDuracionTela       Int?                   @map("id_duracion_tela")
+  duracionTela         DuracionPorTipoTela?   @relation(fields: [idDuracionTela], references: [id], onDelete: Restrict)
+  /// Aplicación elegida para la programación de v2 (FK a DuracionPorAplicacion). Restrict, nullable.
+  idDuracionAplicacion Int?                   @map("id_duracion_aplicacion")
+  duracionAplicacion   DuracionPorAplicacion? @relation(fields: [idDuracionAplicacion], references: [id], onDelete: Restrict)
+  /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
+  rutaProcesos         RutaOrden[]
+
   lineas            OrdenLinea[]
   referencias       OrdenReferencia[]
   comentarios       OrdenComentario[]
@@ -3138,6 +3160,8 @@ model ProcesoDef {
   checklist    ProcesoChecklist[]
   /// Renglones de plantilla de ruta que usan este proceso (F5-E2). Restrict.
   enPlantillas PlantillaRutaProceso[]
+  /// Renglones de ruta viva (por orden) que usan este proceso (F5-E3). Restrict.
+  enRutas      RutaOrden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3242,6 +3266,8 @@ model ArticuloRC {
 
   /// Plantillas de ruta que aplican específicamente a este artículo (Restrict).
   plantillas PlantillaRuta[]
+  /// Órdenes programadas con este artículo RC (F5-E3). Restrict.
+  ordenes    Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3367,6 +3393,9 @@ model DuracionPorTipoTela {
   factorTela Decimal @map("factor_tela") @db.Decimal(10, 4)
   activo     Boolean @default(true)
 
+  /// Órdenes programadas con este tipo de tela (F5-E3). Restrict.
+  ordenes Orden[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -3389,6 +3418,9 @@ model DuracionPorAplicacion {
   /// Factor (no existe en el origen; opcional para el motor de E4, decisión (b)).
   factor Decimal? @db.Decimal(10, 4)
   activo Boolean  @default(true)
+
+  /// Órdenes programadas con esta aplicación (F5-E3). Restrict.
+  ordenes Orden[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3440,4 +3472,142 @@ model DiaFestivo {
   @@unique([idEmpresa, fecha])
   @@index([idEmpresa])
   @@map("dia_festivo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUTA CRÍTICA · F5-E3 — Ruta viva por orden (motor pt1: generación + duraciones)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estado de un proceso dentro de la RUTA VIVA de una orden (F5-E3). El SEMÁFORO de
+/// cumplimiento (a tiempo / en riesgo / atrasado) es de E4 y NO se modela aquí: aquí solo el
+/// avance simple del proceso. `pendiente` (sin capturar), `activo` (en curso), `completado`
+/// (cumplido — su `fechaReal` ya se capturó o se auto-completó por duración 0).
+enum EstadoProcesoRuta {
+  pendiente
+  activo
+  completado
+
+  @@map("estado_proceso_ruta")
+}
+
+/// CÓMO se capturó el cumplimiento de un proceso de la ruta viva (F5-E3). `manual` (un usuario
+/// lo marcó), `evento` (lo auto-completó el sistema: un evento de dominio o la duración 0 al
+/// generar). Nullable: queda en null mientras el proceso no se ha completado.
+enum OrigenCaptura {
+  manual
+  evento
+
+  @@map("origen_captura")
+}
+
+/// RENGLÓN de la RUTA VIVA de UNA orden (F5-E3): un proceso de la ruta de esa orden, con su
+/// duración estimada, sus fechas (planeadas/reales) y su estado. Pensado para explotación
+/// analítica (D11): una fila por proceso×orden. Se GENERA desde la plantilla aplicable
+/// (`generarRutaOrden`); el snapshot de banderas (`critico`, `ultimoProceso`, `esResurtido`,
+/// `condicionAplicabilidad`) congela cómo estaba el proceso AL GENERAR (la plantilla puede cambiar
+/// luego sin alterar rutas ya generadas). Las dependencias propias de la orden viven en
+/// `RutaOrdenDep` (editables sin tocar la plantilla, D10). Las fechas planeadas las calcula el CPM
+/// de E4 (aquí quedan en null salvo los procesos de duración 0 auto-completados). Auditoría A7.
+model RutaOrden {
+  id           Int        @id @default(autoincrement())
+  idOrden      Int        @map("id_orden")
+  orden        Orden      @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+  idProcesoDef Int        @map("id_proceso_def")
+  procesoDef   ProcesoDef @relation(fields: [idProcesoDef], references: [id], onDelete: Restrict)
+
+  /// Posición del proceso en la ruta de la orden (lo gestiona el dominio al generar).
+  secuencia Int @default(0)
+
+  // ── Snapshot de las banderas del proceso AL GENERAR (no se re-leen del catálogo) ──
+  /// ¿Era CRÍTICO al generar? (snapshot de `ProcesoDef.critico`).
+  critico                Boolean                @default(false)
+  /// ¿Era el ÚLTIMO proceso al generar? (snapshot de `ProcesoDef.ultimoProceso`).
+  ultimoProceso          Boolean                @default(false) @map("ultimo_proceso")
+  /// ¿Aplicaba en resurtido al generar? (snapshot de `ProcesoDef.esResurtido`).
+  esResurtido            Boolean                @default(false) @map("es_resurtido")
+  /// Condición de aplicabilidad al generar (snapshot de `ProcesoDef.condicionAplicabilidad`).
+  condicionAplicabilidad CondicionAplicabilidad @default(ninguna) @map("condicion_aplicabilidad")
+
+  /// Duración estimada del proceso en DÍAS (la calcula `calcularDuracion` al generar, F5-E3).
+  duracionDias  Int  @map("duracion_dias")
+  /// Días acumulados hasta este proceso (lo llena el CPM de E4; null en E3).
+  acumuladoDias Int? @map("acumulado_dias")
+
+  /// Fecha planeada ORIGINAL (primer cálculo del CPM, E4). Null en E3 (pendiente de cálculo).
+  fechaPlaneadaOriginal DateTime? @map("fecha_planeada_original")
+  /// Fecha planeada VIGENTE (se recalcula al ajustar la ruta, E4). Null en E3.
+  fechaPlaneadaVigente  DateTime? @map("fecha_planeada_vigente")
+  /// Fecha REAL de cumplimiento del proceso (capturada o auto-completada por duración 0).
+  fechaReal             DateTime? @map("fecha_real")
+
+  /// Estado del proceso en la ruta (avance simple; el semáforo es E4).
+  estado EstadoProcesoRuta @default(pendiente)
+
+  /// Quién capturó el cumplimiento (null mientras no se complete).
+  capturadoPorId String?        @map("capturado_por_id")
+  /// Cuándo se capturó el cumplimiento (null mientras no se complete).
+  capturadoEn    DateTime?      @map("capturado_en")
+  /// Cómo se capturó (manual / evento del sistema). Null mientras no se complete.
+  origenCaptura  OrigenCaptura? @map("origen_captura")
+
+  /// Dependencias de la ruta de ESTA orden en las que este renglón es el sucesor (sus antecesores).
+  antecesores RutaOrdenDep[]       @relation("RutaProcesoComoSucesor")
+  /// Dependencias de la ruta de ESTA orden en las que este renglón es el antecesor (sus sucesores).
+  sucesores   RutaOrdenDep[]       @relation("RutaProcesoComoAntecesor")
+  /// Ítems de checklist (snapshot del proceso al generar) de este renglón.
+  checklist   RutaOrdenChecklist[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idProcesoDef])
+  @@index([idOrden])
+  @@index([idProcesoDef])
+  @@map("ruta_orden")
+}
+
+/// Arista del DAG de dependencias de la RUTA VIVA de UNA orden (F5-E3): `idAntecesor` debe ocurrir
+/// antes que `idRutaOrden`, AMBOS renglones de la MISMA orden. Es un SNAPSHOT editable sin tocar la
+/// plantilla (D10: `ajustarRutaOrden` cambia estas aristas, no `PlantillaRutaDep`). Se valida
+/// acíclico en el dominio (reusa `grafo.ts`). Ambos extremos Cascade desde sus renglones.
+model RutaOrdenDep {
+  idRutaOrden Int       @map("id_ruta_orden")
+  rutaOrden   RutaOrden @relation("RutaProcesoComoSucesor", fields: [idRutaOrden], references: [id], onDelete: Cascade)
+  idAntecesor Int       @map("id_antecesor")
+  antecesor   RutaOrden @relation("RutaProcesoComoAntecesor", fields: [idAntecesor], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idRutaOrden, idAntecesor])
+  @@index([idAntecesor])
+  @@map("ruta_orden_dep")
+}
+
+/// Ítem de CHECKLIST de un proceso de la ruta viva de una orden (F5-E3). Snapshot de
+/// `ProcesoChecklist` al generar la ruta; se marca `hecho` por orden (no toca el catálogo).
+/// Cascade desde su renglón de ruta. Auditoría A7.
+model RutaOrdenChecklist {
+  id          Int       @id @default(autoincrement())
+  idRutaOrden Int       @map("id_ruta_orden")
+  rutaOrden   RutaOrden @relation(fields: [idRutaOrden], references: [id], onDelete: Cascade)
+  descripcion String
+  /// Posición del ítem dentro del checklist (snapshot del orden del catálogo).
+  orden       Int       @default(0)
+  /// ¿Ya se verificó este punto en esta orden?
+  hecho       Boolean   @default(false)
+  /// Cuándo se marcó como hecho (null si no se ha hecho).
+  fechaHecho  DateTime? @map("fecha_hecho")
+  /// Quién lo marcó (null si no se ha hecho).
+  hechoPorId  String?   @map("hecho_por_id")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idRutaOrden])
+  @@map("ruta_orden_checklist")
 }

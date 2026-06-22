@@ -815,6 +815,21 @@ export {
   type FestivoSalida,
 } from './esquemas/ruta-critica-plantillas.js';
 
+// ── Ruta Crítica: motor de la ruta viva por orden (Módulo 8, F5-E3) ──
+export {
+  esquemaParamOrdenRc,
+  esquemaProgramarRc,
+  esquemaAjusteAgregar,
+  esquemaAjusteDependencia,
+  esquemaAjustarRuta,
+  esquemaRutaChecklistSalida,
+  esquemaRutaProcesoSalida,
+  esquemaRutaOrdenSalida,
+  type DatosProgramarRc,
+  type DatosAjustarRuta as DatosAjustarRutaContrato,
+  type RutaOrdenSalida,
+} from './esquemas/ruta-critica-programacion.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

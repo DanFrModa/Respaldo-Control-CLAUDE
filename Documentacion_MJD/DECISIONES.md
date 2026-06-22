@@ -306,6 +306,25 @@ Profundizan D10 (RC como workflow configurable) y D11 (modelo analítico).
   sentido: ahora documenta **cómo se aplican** los tres ejes.
 - **Aplica en:** F5-E2 (reglas de duración) y F5-E3 (`calcularDuracion` + ADR).
 
+##### (b.E3) — Fórmula exacta de duración cerrada con Daniel (22-jun-2026, F5-E3, ADR-0012)
+- **Contexto:** al implementar `calcularDuracion` (E3) se cerró con Daniel CÓMO se aplican los ejes,
+  evitando doble-conteo. Refina la (b): no TODOS los multiplicadores guardados se "prenden".
+- **Decisión:** cada proceso tiene UN `tipoDuracion` y se calcula por esa regla (los ejes no se
+  combinan en una sola multiplicación):
+  - `fija` → `tiempoEstandar` de la plantilla (el "tipo de producto" ya está en la plantilla por
+    artículo/familia).
+  - `porCantidad` → `max(1, round(tiempoEstandar × factorCantidad(cant) + colchonCostura))`.
+  - `porTipoTela` → los **`dias`** del catálogo de la tela, **DIRECTOS**. **NO se multiplica por
+    `factorTela`** (los `dias` ya son el tiempo absoluto de espera de esa tela; multiplicar por su
+    propio factor doble-contaría). `factorTela` se **conserva como referencia** en el catálogo.
+  - `porAplicacion` → `max(0, round(diasAplicacion × factorCantidad(cant)))`. **SÍ se PRENDE el factor
+    de cantidad** (corrige el ex-bug `FactCantAp`, que lo ignoraba). La columna
+    `DuracionPorAplicacion.factor` **NO se usa** (referencia, como `factorTela`).
+- **Por qué:** el eje que escala con el volumen es el **factor de cantidad** (más piezas = más tiempo);
+  `factorTela` y el `factor` de aplicación se dejan en el catálogo para que nadie los "corrija" en
+  silencio, pero aplicarlos sería doble-conteo sin sentido de negocio.
+- **Aplica en:** F5-E3 (`backend/src/dominio/ruta-critica/calcularDuracion.ts`, ADR-0012).
+
 #### (c) — La RC nunca modifica la fecha de entrega de la orden; el cierre se guarda aparte (E3/E4)
 - **Decisión:** la fecha de entrega comprometida de la orden **no se modifica nunca** (a diferencia del
   viejo, donde completar el proceso 'C' la sobre-escribía en silencio). La RC **calcula y muestra** su

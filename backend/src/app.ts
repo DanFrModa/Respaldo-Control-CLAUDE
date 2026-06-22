@@ -32,6 +32,7 @@ import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
 import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
 import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
+import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
@@ -201,6 +202,12 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // propio DAG), reglas de duración (cantidad/tela/aplicación), familias/artículos y calendario
   // laboral por empresa (días hábiles + festivos). RBAC reusa rc.catalogo-ver / rc.catalogo-administrar.
   await app.register(rutasPlantillasRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E3) — MOTOR de la ruta viva por orden (pt1): programar (generar/
+  // re-generar la ruta desde la plantilla aplicable, omitiendo condicionales y reconectando
+  // transitivamente; duración por las reglas de E2), ajustar la ruta de esa orden (sin tocar la
+  // plantilla, D10) y consultarla. Encola el recálculo del CPM (pg-boss); las FECHAS las calcula
+  // E4. RBAC por ruta (rc.programar muta, rc.ruta-ver consulta).
+  await app.register(rutasProgramacionRc, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

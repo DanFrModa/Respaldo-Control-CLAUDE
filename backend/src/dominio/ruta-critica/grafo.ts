@@ -124,3 +124,58 @@ export function validarDependencias(
   }
   return { ok: true };
 }
+
+/** Una redefinición del set COMPLETO de antecesores de un proceso (en términos de id de proceso). */
+export interface RedefinicionAntecesores {
+  idProceso: number;
+  idsAntecesores: readonly number[];
+}
+
+/** Resultado de validar un lote de redefiniciones (un solo request de ajuste). */
+export interface ResultadoValidacionLote {
+  ok: boolean;
+  /** Si NO es ok, la redefinición que cerró el ciclo + el conflicto concreto. */
+  conflicto?: { idProceso: number; idAntecesor: number; razon: 'auto' | 'ciclo' };
+}
+
+/**
+ * Valida un LOTE de redefiniciones de antecesores (las de UN SOLO request de ajuste) de forma
+ * ACUMULATIVA, para que el grafo FINAL propuesto sea acíclico — no solo cada redefinición contra el
+ * grafo base. Sin esto, un request con `[{A→[B]}, {B→[A]}]` colaría: cada una es válida contra el
+ * grafo base (donde A y B son independientes), pero JUNTAS cierran A↔B. Aquí, tras validar cada
+ * redefinición, se ACTUALIZA el acumulador (se quitan las aristas viejas de ese proceso y se agregan
+ * las propuestas), de modo que la siguiente ya "ve" a la anterior y el ciclo cruzado se rechaza.
+ *
+ * Es PURO (sin Prisma): lo consume `ajustarRutaOrden` tras traducir su request a ids de proceso, y se
+ * prueba directo en unit tests.
+ *
+ * @param aristasBase    aristas vivas de partida `{ idProceso, idAntecesor }` (todas, sin filtrar).
+ * @param redefiniciones redefiniciones del request, EN ORDEN (cada una reemplaza los antecesores de su
+ *                       proceso).
+ */
+export function validarRedefinicionesAcumulado(
+  aristasBase: readonly { idProceso: number; idAntecesor: number }[],
+  redefiniciones: readonly RedefinicionAntecesores[],
+): ResultadoValidacionLote {
+  let acumulado: { idProceso: number; idAntecesor: number }[] = [...aristasBase];
+  for (const { idProceso, idsAntecesores } of redefiniciones) {
+    const res = validarDependencias(idProceso, idsAntecesores, acumulado);
+    if (!res.ok && res.conflicto) {
+      return {
+        ok: false,
+        conflicto: {
+          idProceso,
+          idAntecesor: res.conflicto.idAntecesor,
+          razon: res.conflicto.razon,
+        },
+      };
+    }
+    // Acumula: quita las aristas viejas de este proceso y agrega las nuevas propuestas, para que la
+    // siguiente redefinición valide contra el grafo con ESTA ya aplicada.
+    acumulado = [
+      ...acumulado.filter((a) => a.idProceso !== idProceso),
+      ...idsAntecesores.map((idAntecesor) => ({ idProceso, idAntecesor })),
+    ];
+  }
+  return { ok: true };
+}
