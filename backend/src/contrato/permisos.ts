@@ -490,6 +490,17 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Consultar la Ruta Crítica viva de una orden (procesos, duraciones, fechas) (F5-E3)',
   },
+  // Captura de avance de la RUTA VIVA por orden (Módulo 8, F5-E4, A4) — permiso NUEVO de v2. Gobierna
+  // marcar/revertir la fecha REAL de cumplimiento de un proceso y los ítems de su checklist. Es
+  // OPERATIVO (producción/IP lo usa día a día); cascadea a los roles como `rc.programar`/`produccion.*`.
+  // Además, el dominio exige que ALGUNO de los roles del usuario sea responsable del proceso
+  // (`ProcesoDefRol`, N:M); el admin (`roles.administrar`) captura cualquier proceso.
+  {
+    clave: 'rc.capturar',
+    modulo: 'rc',
+    descripcion:
+      'Capturar (o revertir) el cumplimiento de los procesos de la Ruta Crítica de una orden y su checklist (F5-E4)',
+  },
 
   // ── Control de calidad ───────────────────────────────────────────────────────
   {

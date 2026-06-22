@@ -314,6 +314,19 @@ export async function cargarCalendarioLaboral(
   bd?: ContextoBd,
 ): Promise<CalendarioLaboral> {
   verificarPermiso(sesion, 'rc.catalogo-ver');
+  return cargarCalendarioLaboralSinSesion(idEmpresa, bd);
+}
+
+/**
+ * Igual que {@link cargarCalendarioLaboral} pero SIN sesión ni verificación de permiso: para los
+ * PROCESOS DE SISTEMA (el handler del CPM en segundo plano, F5-E4) que no tienen una `SesionUsuario`.
+ * NUNCA se expone por una ruta REST; solo lo invoca el motor de jobs (el RBAC ya se aplicó cuando un
+ * usuario disparó la programación). Lectura pura (no muta).
+ */
+export async function cargarCalendarioLaboralSinSesion(
+  idEmpresa: number,
+  bd?: ContextoBd,
+): Promise<CalendarioLaboral> {
   const cliente = clienteLectura(bd);
   const [cal, festivos] = await Promise.all([
     cliente.calendarioEmpresa.findUnique({ where: { idEmpresa } }),

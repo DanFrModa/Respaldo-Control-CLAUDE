@@ -106,6 +106,8 @@ describe('catálogo de permisos', () => {
       'proveedores.ver',
       // Catálogo configurable de la Ruta Crítica (Módulo 8, F5-E1): ver/administrar (nuevos de v2;
       // los `rc.*` LEGADO del MOTOR tienen origen). Motor de la ruta viva (F5-E3): programar/ruta-ver.
+      // Captura del cumplimiento (F5-E4): rc.capturar.
+      'rc.capturar',
       'rc.catalogo-administrar',
       'rc.catalogo-ver',
       'rc.programar',
