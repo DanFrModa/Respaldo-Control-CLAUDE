@@ -33,6 +33,9 @@ import { EstatusMaterialesPagina } from '@/modulos/ordenes-compra/EstatusMateria
 import { ExplosionMaterialesPagina } from '@/modulos/ordenes-compra/ExplosionMaterialesPagina';
 import { OrdenesCompraPagina } from '@/modulos/ordenes-compra/OrdenesCompraPagina';
 import { RecepcionComprasPagina } from '@/modulos/ordenes-compra/RecepcionComprasPagina';
+import { ConsultaNotasPagina } from '@/modulos/notas-salida/ConsultaNotasPagina';
+import { NotasPorOrdenPagina } from '@/modulos/notas-salida/NotasPorOrdenPagina';
+import { NotasSalidaPagina } from '@/modulos/notas-salida/NotasSalidaPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
@@ -125,6 +128,10 @@ const router = createBrowserRouter([
           { path: 'compras/estatus-materiales', element: <EstatusMaterialesPagina /> },
           // Recepción de compras (Módulo 3 · Compras, F4-E3).
           { path: 'compras/recepcion', element: <RecepcionComprasPagina /> },
+          // Notas de salida a maquilero (Módulo 5 · Producción, F4-E5).
+          { path: 'produccion/notas-salida', element: <NotasSalidaPagina /> },
+          { path: 'produccion/notas-salida/consulta', element: <ConsultaNotasPagina /> },
+          { path: 'produccion/notas-salida/por-orden', element: <NotasPorOrdenPagina /> },
           { path: 'inventarios', element: <InventariosPagina /> },
           { path: 'inventarios/movimientos', element: <MovimientosPtPagina /> },
           { path: 'inventarios/traspasos', element: <TraspasosPtPagina /> },

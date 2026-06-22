@@ -296,6 +296,37 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['produccion.wip-ver'],
     subVista: true,
   },
+  // Sub-vistas de Producción (F4-E5): notas de salida a maquilero (captura/confirmación), su consulta
+  // (solo lectura + PDF) y las notas por orden de producción. Cuelgan del módulo Producción con los
+  // permisos de notas (`notas.ver` para consultar; `notas.administrar` para capturar/confirmar).
+  {
+    clave: 'notas-salida',
+    titulo: 'Notas de salida',
+    descripcion:
+      'Envío de telas y avíos a maquileros contra una orden (descuenta avíos al confirmar)',
+    ruta: '/produccion/notas-salida',
+    icono: 'camion',
+    permisos: ['notas.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'notas-salida-consulta',
+    titulo: 'Consulta de notas',
+    descripcion: 'Notas de salida con su encabezado, renglones y estatus (solo lectura, con PDF)',
+    ruta: '/produccion/notas-salida/consulta',
+    icono: 'archivo',
+    permisos: ['notas.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'notas-salida-por-orden',
+    titulo: 'Notas por orden',
+    descripcion: 'Notas de salida que envían material a una orden de producción',
+    ruta: '/produccion/notas-salida/por-orden',
+    icono: 'fabrica',
+    permisos: ['notas.ver'],
+    subVista: true,
+  },
   {
     clave: 'compras',
     titulo: 'Compras y Materiales',

@@ -188,7 +188,10 @@ function tablaEstatus(datos: DatosImpresoEstatus): ReactElement {
       h(
         Text,
         { style: [estilos.celda, estilos.celdaEstatus] },
-        etiquetaEstatus(l.estatus, l.estatus === 'no-identificado-en-oc' ? 'no-identificado' : 'mat'),
+        etiquetaEstatus(
+          l.estatus,
+          l.estatus === 'no-identificado-en-oc' ? 'no-identificado' : 'mat',
+        ),
       ),
     ),
   );
@@ -205,7 +208,11 @@ function paginaEstatus(datos: DatosImpresoEstatus): ReactElement {
         View,
         {},
         h(Text, { style: estilos.empresa }, datos.empresa),
-        h(Text, { style: estilos.subtitulo }, 'Estatus de materiales (qué tengo / qué falta) — CONTROL v2'),
+        h(
+          Text,
+          { style: estilos.subtitulo },
+          'Estatus de materiales (qué tengo / qué falta) — CONTROL v2',
+        ),
       ),
       h(
         View,
@@ -230,7 +237,11 @@ function paginaEstatus(datos: DatosImpresoEstatus): ReactElement {
       `CONTROL v2 · ${datos.empresa} · Estatus de materiales de la orden ${datos.folioOrden}`,
     ),
   ];
-  return h(Page, { key: 'pagina-0', size: 'A4', style: estilos.pagina }, ...hijos.filter((x) => x !== null));
+  return h(
+    Page,
+    { key: 'pagina-0', size: 'A4', style: estilos.pagina },
+    ...hijos.filter((x) => x !== null),
+  );
 }
 
 /** Documento de UN estatus. */

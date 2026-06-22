@@ -480,6 +480,26 @@ export {
   type RecepcionesLista,
 } from './esquemas/recepcion.js';
 
+// ── Notas de salida estructuradas (Módulo 5, F4-E5; doc 03-Produccion §Notas de Salida; R4/R9) ──
+export {
+  esquemaNotaSalidaLineaEntrada,
+  esquemaNotaSalidaCrear,
+  esquemaNotaSalidaEditarCuerpo,
+  esquemaNotaSalidaCancelarCuerpo,
+  esquemaNotaSalidaLineaSalida,
+  esquemaNotaSalidaSalida,
+  esquemaNotasSalidaQuery,
+  esquemaNotasSalidaPagina,
+  type DatosNotaSalidaLineaEntrada,
+  type DatosNotaSalidaCrear,
+  type DatosNotaSalidaEditar,
+  type DatosNotaSalidaCancelar,
+  type NotaSalidaLineaSalida,
+  type NotaSalidaSalida,
+  type NotasSalidaQuery,
+  type NotasSalidaPagina,
+} from './esquemas/nota-salida.js';
+
 // ── Explosión MRP / requerimiento de materiales por orden (Módulo 3, F4-E4; R3/R7) ──
 export {
   esquemaEstadoGenerico,

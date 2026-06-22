@@ -25,7 +25,9 @@ test.describe('Explosión MRP y estatus de materiales (F4-E4)', () => {
     await expect(page.getByTestId('exp-buscar-orden')).toBeVisible();
   });
 
-  test('la pantalla "qué tengo / qué falta" carga y wirea su selector de orden', async ({ page }) => {
+  test('la pantalla "qué tengo / qué falta" carga y wirea su selector de orden', async ({
+    page,
+  }) => {
     await entrarComoAdmin(page);
 
     await page.goto('/compras/estatus-materiales');

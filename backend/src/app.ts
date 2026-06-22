@@ -20,6 +20,7 @@ import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.j
 import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
 import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
 import { rutasMrp } from './api/compras/mrp.rutas.js';
+import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
@@ -147,6 +148,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // proveedor en un clic, y el tablero "qué tengo / qué falta" (cruce requerido/en-oc/recibido).
   // NO crea permisos nuevos (usa los compras.* de E2).
   await app.register(rutasMrp, { prefix: '/api' });
+  // NOTAS DE SALIDA estructuradas (Módulo 5, F4-E5, R4/R9): documento de envío de materiales a un
+  // maquilero contra una orden. Renglones de AVÍO descuentan el kardex al CONFIRMAR (`salida-por-nota`);
+  // los de TELA REFERENCIAN su salida-a-orden de E1 SIN segundo movimiento (anti-doble-descuento,
+  // decisión (e)). Folio por empresa (A3/A9); cancelación suave con reverso de avíos (D3).
+  await app.register(rutasNotasSalida, { prefix: '/api' });
   // Producción / WIP + kardex (Módulo 4/6, F3-E1): CRUD de tipos de proceso (con la bandera
   // generaEntradaPt editable solo por admin) y GET solo-lectura de tipos de movimiento de
   // inventario. El motor (kardex/eventos) vive en comun/; los flujos (corte/recibo/entrega)

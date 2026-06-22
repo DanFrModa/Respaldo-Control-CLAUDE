@@ -30,11 +30,7 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ajustarInventarioAvio } from '../inventarios/avios.js';
 import { autorizarOC } from './ordenes-compra.js';
 import { recibirCompra } from './recepciones.js';
-import {
-  estatusMaterialesOrden,
-  explosionarOrden,
-  generarOCDesdeExplosion,
-} from './mrp.js';
+import { estatusMaterialesOrden, explosionarOrden, generarOCDesdeExplosion } from './mrp.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -217,9 +213,11 @@ describe('Explosión — neteo de genéricos contra el kardex (decisión d, D3)'
       {
         idAlmacen: almacen.id,
         fecha: '2026-06-21',
-        idTipoMov: (await cliente.tipoMovimientoInventario.findUniqueOrThrow({
-          where: { codigo: 'ajuste-entrada' },
-        })).id,
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
         lineas: [{ idAvio: avioHilo.id, cantidad: 100 }],
         motivo: 'conteo inicial',
       },
@@ -239,9 +237,11 @@ describe('Explosión — neteo de genéricos contra el kardex (decisión d, D3)'
       {
         idAlmacen: almacen.id,
         fecha: '2026-06-21',
-        idTipoMov: (await cliente.tipoMovimientoInventario.findUniqueOrThrow({
-          where: { codigo: 'ajuste-entrada' },
-        })).id,
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
         lineas: [{ idAvio: avioHilo.id, cantidad: 25 }],
         motivo: 'conteo inicial',
       },
@@ -287,7 +287,12 @@ describe('Explosión — snapshot regenerable + diff', () => {
 describe('Generar OC desde la explosión (R3) — una OC por proveedor', () => {
   it('genera una OC por proveedor con líneas ligadas a la orden', async () => {
     await explosionarOrden(sesion(), idOrden, bd());
-    const resultado = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
+    const resultado = await generarOCDesdeExplosion(
+      sesion(),
+      idOrden,
+      { idsRequerimiento: [] },
+      bd(),
+    );
 
     // Solo el botón tiene proveedor sugerido (la felpa es null, el hilo también sin proveedor).
     expect(resultado.ordenesCompra).toHaveLength(1);

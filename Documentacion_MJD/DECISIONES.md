@@ -198,7 +198,13 @@ Reglas de Órdenes de Compra, recepción, explosión MRP, notas de salida y migr
 - **Decisión:** al migrar el histórico de telas, los **lotes legacy se sintetizan por entrada/factura** (cada entrada física = un lote; sus componentes `ExTela1`/`ExTela2` → `LoteComponente`, D5). El precio viejo (`TelasColores.Precio`) se carga como **`costoUnit` del movimiento de entrada legacy** (D1); no se crea tabla de precios editable.
 - **Aplica en:** F4-E6.
 
-- **Fecha:** 2026-06-20. Cerradas con Daniel; relayed por Gabriel.
+#### (g) — Almacén origen de la nota de salida: en el ENCABEZADO (un almacén por nota) (E5)
+- **Contexto:** al confirmar una nota de salida, los **avíos** se descuentan del kardex (R4) y hay que saber de qué almacén salen (el inventario de avíos es multi-almacén). Pregunta llevada a Daniel durante la construcción de E5.
+- **Decisión:** el **almacén origen va en el ENCABEZADO de la nota** (un solo almacén por nota), capturado al crear — espejo de la **recepción de compra**, que lleva su almacén destino en el encabezado. Toda la nota sale del mismo almacén; **no** se maneja almacén por renglón. La tela no descuenta (decisión (e)), así que el almacén aplica a los **avíos**.
+- **Aplica en:** F4-E5 (`NotaSalida.idAlmacen`, validado existe/activo/global-o-de-la-empresa A9; `confirmarNotaSalida` lo lee del encabezado, ya no como parámetro).
+- **Fecha:** 2026-06-21. Cerrada con Daniel; relayed por Gabriel.
+
+- **Fecha (a–f):** 2026-06-20. Cerradas con Daniel; relayed por Gabriel.
 
 ---
 
