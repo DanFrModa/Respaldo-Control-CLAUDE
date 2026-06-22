@@ -20,6 +20,7 @@ import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/con
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
 import { sembrarRutaCritica } from './seed-ruta-critica.js';
+import { sembrarRutaCriticaPlantillas } from './seed-ruta-critica-plantillas.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Empresa FR Moda + configuración (ex-`Propiedades`, ahora POR empresa — plan §4)
@@ -644,6 +645,10 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").
   await sembrarRutaCritica(prisma);
+  // Ruta Crítica (F5-E2): familias/artículos + reglas de duración (cantidad/tela/aplicación) +
+  // 2 plantillas reales (1/6 y 6/6) con su encadenamiento propio + calendario L–V y festivos MX
+  // de la empresa favorita. Después de F5-E1 (necesita los procesos) y de la empresa favorita.
+  await sembrarRutaCriticaPlantillas(prisma);
 }
 
 // Punto de entrada al ejecutarse como script (`prisma db seed` → `tsx prisma/seed.ts`).

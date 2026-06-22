@@ -24,14 +24,15 @@ describe('catalogo de modulos del menu', () => {
     // 13 módulos del plan + 29 sub-vistas (recepción de compras, F4-E3) + 2 sub-vistas de F4-E4
     // (explosión de materiales y "qué tengo / qué falta") + 3 sub-vistas de F4-E5 (notas de salida:
     // captura, consulta de notas y notas por orden) + 2 sub-vistas de F5-E1 (Ruta Crítica: procesos
-    // y dependencias) = 36 sub-vistas.
+    // y dependencias) + 3 sub-vistas de F5-E2 (plantillas de ruta, reglas de duración y
+    // configuración de RC por empresa) = 39 sub-vistas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(49);
+    expect(MODULOS_MENU).toHaveLength(52);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(49);
+    expect(new Set(claves).size).toBe(52);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(49);
+    expect(new Set(rutas).size).toBe(52);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -116,9 +117,10 @@ describe('catalogo de modulos del menu', () => {
       'esma.cargo-validar',
     );
     // 13 módulos del plan + 25 sub-vistas (las 19 previas + las 6 de inventario de telas/avíos de
-    // F4-E1: existencias de telas, existencias de avíos, kardex de materiales, salida de tela a
-    // orden, traspaso de materiales y ajuste de materiales) = 38.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(38);
+    // F4-E1) + la Configuración de RC por empresa (F5-E2, gobernada por `empresas.administrar`,
+    // que sí está en este set) = 39. Las sub-vistas de RC `rc.catalogo-ver` (procesos/dependencias
+    // de F5-E1 y plantillas/reglas de F5-E2) NO entran: ese permiso no está en este set.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(39);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {
