@@ -58,7 +58,13 @@ export function MovimientosPtPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const colores = useColores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre', direccion: 'asc' });
+  const colores = useColores({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+    incluirInactivos: 'false',
+  });
   const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
 
   const crear = useCrearMovimientoPt();

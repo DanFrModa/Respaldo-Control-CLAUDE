@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del módulo ÓRDENES de producción (F2-E3) contra el stack real, en la estructura LISTA +
@@ -24,6 +24,8 @@ test.describe('Órdenes de producción (F2-E3)', () => {
     const valorReferencia = `OC-${sufijo}`;
 
     await entrarComoAdmin(page);
+    // La matriz color×talla necesita ≥1 color y ≥1 talla en catálogo (no sembrados): se crean al vuelo.
+    await crearColorYTalla(page);
 
     // ── Prepara un cliente CON un campo de referencia activo (D7) ───────────────
     await page.goto('/catalogos/clientes');

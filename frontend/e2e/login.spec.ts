@@ -43,20 +43,28 @@ test.describe('Inicio de sesión', () => {
     await expect(page.getByText('La contraseña es obligatoria')).toBeVisible();
   });
 
-  test('el admin entra y ve el layout con los 18 módulos', async ({ page }) => {
+  test('el admin entra y ve el layout con todos sus módulos', async ({ page }) => {
     await entrarComoAdmin(page);
 
     // Entró a la app (inicio).
     await expect(page).toHaveURL(/\/$|\/$/);
     await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
 
-    // El admin (todos los permisos) ve los 18 links en la navegación lateral:
-    // 13 módulos del plan §5 + 5 sub-vistas (galería de Modelos, F1-E5;
-    // órdenes de Producción, F2-E3; consulta + incompletas + pedidos por mes, F2-E4).
+    // El admin (todos los permisos) ve el menú completo. NO se fija un número exacto de links: cada
+    // fase suma módulos/sub-vistas y un `toHaveCount` exacto se rompería en cada etapa. Se valida un
+    // PISO razonable y la presencia de módulos representativos de varias áreas.
     const navegacion = page.getByRole('navigation', { name: 'Módulos' }).first();
-    await expect(navegacion.getByRole('link')).toHaveCount(18);
-    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica' })).toBeVisible();
-    await expect(navegacion.getByRole('link', { name: 'Administración' })).toBeVisible();
+    const links = navegacion.getByRole('link');
+    expect(await links.count()).toBeGreaterThanOrEqual(18);
+    for (const modulo of [
+      'Catálogos',
+      'Producción',
+      'Inventarios',
+      'Ruta Crítica',
+      'Administración',
+    ]) {
+      await expect(links.filter({ hasText: modulo }).first()).toBeVisible();
+    }
     // La empresa activa aparece en el encabezado.
     await expect(page.getByTestId('empresa-activa')).toHaveText(CREDENCIALES_ADMIN.empresa);
   });
