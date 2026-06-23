@@ -117,39 +117,49 @@ export async function publicarPendientes(
     return; // cola inactiva o no arrancada: las filas esperan en el outbox.
   }
   const instancia = boss;
-  const pendientes = await prisma.eventoOutbox.findMany({
-    where: { publicadoEn: null },
-    orderBy: { id: 'asc' },
-    take: LOTE_PUBLICACION,
-  });
-  for (const fila of pendientes) {
-    try {
-      await instancia.send(COLA_EVENTOS_DOMINIO, {
-        id: fila.id,
-        tipo: fila.tipo,
-        version: fila.version,
-        idEmpresa: fila.idEmpresa,
-        payload: fila.payload,
-      });
-      await prisma.eventoOutbox.update({
-        where: { id: fila.id },
-        data: { publicadoEn: new Date() },
-      });
-    } catch (error) {
-      // No bloquea las demás: incrementa el contador y guarda el error; el barrido reintenta.
-      await prisma.eventoOutbox
-        .update({
-          where: { id: fila.id },
-          data: { intentos: { increment: 1 }, error: String(error) },
-        })
-        .catch(() => {
-          /* si ni el update del error pega, lo deja para el siguiente barrido */
+  // Toda la función va dentro de try/catch porque se la llama fire-and-forget (`void
+  // publicarPendientes()` desde el barrido y desde `dispararPublicacion`): si la BD parpadea, el
+  // propio `findMany` rechazaría y, sin handler, sería un unhandledRejection que tumba el proceso.
+  // Aquí NUNCA debe propagar un rechazo: cualquier error (incl. el `findMany`) se loguea y se sale
+  // limpio; las filas quedan en el outbox para el próximo barrido.
+  try {
+    const pendientes = await prisma.eventoOutbox.findMany({
+      where: { publicadoEn: null },
+      orderBy: { id: 'asc' },
+      take: LOTE_PUBLICACION,
+    });
+    for (const fila of pendientes) {
+      try {
+        await instancia.send(COLA_EVENTOS_DOMINIO, {
+          id: fila.id,
+          tipo: fila.tipo,
+          version: fila.version,
+          idEmpresa: fila.idEmpresa,
+          payload: fila.payload,
         });
-      registrarError(
-        `Cola de eventos: no se pudo publicar la fila outbox ${String(fila.id)}.`,
-        error,
-      );
+        await prisma.eventoOutbox.update({
+          where: { id: fila.id },
+          data: { publicadoEn: new Date() },
+        });
+      } catch (error) {
+        // No bloquea las demás: incrementa el contador y guarda el error; el barrido reintenta.
+        await prisma.eventoOutbox
+          .update({
+            where: { id: fila.id },
+            data: { intentos: { increment: 1 }, error: String(error) },
+          })
+          .catch(() => {
+            /* si ni el update del error pega, lo deja para el siguiente barrido */
+          });
+        registrarError(
+          `Cola de eventos: no se pudo publicar la fila outbox ${String(fila.id)}.`,
+          error,
+        );
+      }
     }
+  } catch (error) {
+    // Falla al leer el outbox (típicamente BD inalcanzable): se loguea y se sale sin lanzar.
+    registrarError('Cola de eventos: no se pudieron leer las filas pendientes del outbox.', error);
   }
 }
 
