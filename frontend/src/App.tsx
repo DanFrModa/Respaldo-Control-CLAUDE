@@ -57,6 +57,7 @@ import { PlantillasPagina } from '@/modulos/ruta-critica/PlantillasPagina';
 import { ProcesosPagina } from '@/modulos/ruta-critica/ProcesosPagina';
 import { ProgramarRcPagina } from '@/modulos/ruta-critica/ProgramarRcPagina';
 import { ReglasDuracionPagina } from '@/modulos/ruta-critica/ReglasDuracionPagina';
+import { RutaCriticaPagina } from '@/modulos/ruta-critica/RutaCriticaPagina';
 import { RutaPorOrdenPagina } from '@/modulos/ruta-critica/RutaPorOrdenPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -153,6 +154,8 @@ const router = createBrowserRouter([
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
           { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
+          // Ruta Crítica (Módulo 8) — portada-hub de las sub-vistas (antes caía en ":modulo").
+          { path: 'ruta-critica', element: <RutaCriticaPagina /> },
           // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.
           { path: 'ruta-critica/procesos', element: <ProcesosPagina /> },
           { path: 'ruta-critica/dependencias', element: <DependenciasPagina /> },
