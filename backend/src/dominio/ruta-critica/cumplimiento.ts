@@ -289,6 +289,39 @@ async function estadoSegunAntecesores(
 }
 
 /**
+ * Activa TODOS los procesos LISTOS de una orden: cada `RutaOrden` en `'pendiente'` cuyos antecesores
+ * estén TODOS `'completado'` (vacuamente cierto si NO tiene antecesores: proceso raíz) pasa a
+ * `'activo'`. Reusa el MISMO predicado que `estadoSegunAntecesores`/`activarSucesoresListos`.
+ *
+ * Es el "arranque" que faltaba: tras GENERAR (o re-ajustar) la ruta nadie había puesto en `'activo'`
+ * los procesos raíz (o los que quedaron listos porque su antecesor se auto-completó por duración 0),
+ * así que la bandeja (`estado='activo'`) nunca se poblaba. Al COMPLETAR un proceso ya lo cubría
+ * `activarSucesoresListos`; esta es la versión que recorre la orden completa, para usarse al generar/
+ * ajustar.
+ *
+ * UNA sola pasada basta: activar NUNCA completa nada (solo `'pendiente'→'activo'`), así que no se
+ * abre la posibilidad de que activar un proceso vuelva listo a otro en la misma corrida (no hay efecto
+ * dominó). NUNCA toca `'completado'` ni `'activo'` (idempotente y seguro respecto a fechas reales /
+ * capturas ya existentes). PURO sobre `tx`. Devuelve los ids que activó.
+ */
+export async function activarProcesosListos(tx: Tx, idOrden: number): Promise<number[]> {
+  const filas = await tx.rutaOrden.findMany({
+    where: { idOrden, estado: 'pendiente' },
+    select: { id: true, antecesores: { select: { antecesor: { select: { estado: true } } } } },
+  });
+  const aActivar = filas
+    .filter((f) => f.antecesores.every((a) => a.antecesor.estado === 'completado'))
+    .map((f) => f.id);
+  if (aActivar.length > 0) {
+    await tx.rutaOrden.updateMany({
+      where: { id: { in: aActivar } },
+      data: { estado: 'activo' },
+    });
+  }
+  return aActivar;
+}
+
+/**
  * Marca o desmarca un ÍTEM de checklist de un proceso de la ruta. Si al marcarlo quedan TODOS los
  * ítems hechos, AUTO-COMPLETA el proceso padre con `origenCaptura='evento'` (lo completó el sistema,
  * no una captura manual de fecha — igual que la duración-0 de E3). Si al desmarcar un ítem el proceso

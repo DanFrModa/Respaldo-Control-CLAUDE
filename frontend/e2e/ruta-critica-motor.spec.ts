@@ -5,17 +5,18 @@ import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 /**
  * E2E del MOTOR de la Ruta Crítica por orden (F5-E5) contra el stack real, en el estándar teal. El
  * primer test arma el ciclo COMPLETO de extremo a extremo:
- *   catálogo RC (familia/artículo/tela/aplicación vía API) + plantilla con 2 procesos encadenados →
- *   cliente + modelo + pedido + orden con matriz (UI) → PROGRAMAR RC desde el detalle de la orden →
- *   la tarea aparece en la Bandeja → capturar con "Hoy" → la pelota pasa al siguiente proceso →
- *   capturar el último → la RC queda al día (la bandeja se vacía de esa orden).
+ *   catálogo RC (familia/artículo/tela/aplicación vía API) + plantilla con 2 procesos (cada uno con
+ *   duración > 0, sin encadenamiento entre sí) → cliente + modelo + pedido + orden con matriz (UI) →
+ *   PROGRAMAR RC desde el detalle de la orden → ambos procesos quedan ACTIVOS en la Bandeja →
+ *   capturar uno con "Hoy" lo saca de la bandeja → capturar el otro la vacía de esa orden.
+ * (El encadenamiento real "la pelota pasa al siguiente" lo cubre un test de integración del backend.)
  * El segundo test verifica la Bandeja en viewport MÓVIL (cards con botones grandes).
  *
  * El catálogo RC (familia/artículo/tela/aplicación) NO tiene UI de alta en esta etapa: se siembra por
  * API reutilizando la cookie de sesión del admin (`page.request`). Sufijos únicos por corrida.
  */
 test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
-  test('programar una orden → bandeja → capturar "Hoy" → la pelota avanza → cierra la RC', async ({
+  test('programar una orden → ambos procesos activos en la bandeja → capturar uno y luego el otro la vacía', async ({
     page,
   }) => {
     const sufijo = Date.now().toString().slice(-6);
@@ -70,6 +71,11 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     const editorProcesos = page.getByTestId('editor-procesos-plantilla');
     await editorProcesos.getByText(proc1Nombre, { exact: true }).click();
     await editorProcesos.getByText(proc2Nombre, { exact: true }).click();
+    // Sin tiempo, cada proceso queda en duración 0 y el motor lo AUTO-COMPLETA (no entra a la
+    // bandeja). Cada proceso incluido muestra su input "Días" (spinbutton); les damos duración > 0.
+    const tiempos = editorProcesos.getByRole('spinbutton');
+    await tiempos.nth(0).fill('3');
+    await tiempos.nth(1).fill('2');
     await page.getByTestId('guardar-plantilla').click();
     await expect(page.getByText('Plantilla creada.')).toBeVisible();
 
@@ -136,17 +142,17 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await expect(page.getByRole('heading', { name: 'Ruta Crítica de la orden' })).toBeVisible();
     await expect(page.getByTestId('imprimir-plan-rc')).toBeVisible();
 
-    // ── 6) La tarea aparece en la Bandeja ───────────────────────────────────────
+    // ── 6) Ambos procesos (raíces independientes, duración > 0) aparecen ACTIVOS en la Bandeja ──
     await page.goto('/ruta-critica/bandeja');
     await expect(page.getByRole('heading', { name: 'Bandeja de tareas' })).toBeVisible();
     await page.getByTestId('bandeja-buscar-cliente').fill(cliente);
     const tarea1 = page.getByTestId('bandeja-tarea').filter({ hasText: proc1Nombre });
     await expect(tarea1).toBeVisible();
 
-    // ── 7) Capturar con "Hoy": la pelota pasa al siguiente proceso ──────────────
+    // ── 7) Capturar uno con "Hoy" lo saca de la bandeja; el otro (ya activo) sigue ahí ──────────
     await tarea1.getByTestId('bandeja-completar-hoy').click();
     await expect(page.getByText(/completado\./)).toBeVisible();
-    // El proceso 1 desaparece de la bandeja; el 2 (sucesor) se activa y aparece.
+    // El proceso 1 desaparece de la bandeja; el 2 (raíz independiente, ya estaba activo) sigue.
     await expect(page.getByTestId('bandeja-tarea').filter({ hasText: proc1Nombre })).toHaveCount(0);
     const tarea2 = page.getByTestId('bandeja-tarea').filter({ hasText: proc2Nombre });
     await expect(tarea2).toBeVisible();

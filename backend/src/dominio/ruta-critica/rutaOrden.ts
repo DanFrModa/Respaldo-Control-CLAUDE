@@ -36,6 +36,7 @@ import {
 } from '../../comun/transaccion.js';
 
 import { calcularDuracion, type RangoFactorCantidad } from './calcularDuracion.js';
+import { activarProcesosListos } from './cumplimiento.js';
 import { validarRedefinicionesAcumulado, type RedefinicionAntecesores } from './grafo.js';
 import {
   estadoSemaforoOrden,
@@ -436,6 +437,11 @@ export async function generarRutaOrden(
       await tx.rutaOrdenChecklist.createMany({ data: itemsChecklist });
     }
 
+    // ARRANQUE de la ruta: activa los procesos LISTOS (raíz, o cuyos antecesores ya quedaron
+    // completados — p. ej. un antecesor auto-completado por duración 0). Sin esto la bandeja
+    // (`estado='activo'`) nunca se poblaría tras generar. Se hace TRAS crear filas + aristas.
+    await activarProcesosListos(tx, datos.idOrden);
+
     // 9) Marca la orden como programada (NUNCA toca `fechaEntrega` comprometida — decisión (c)).
     await tx.orden.update({
       where: { id: datos.idOrden },
@@ -662,6 +668,11 @@ export async function ajustarRutaOrden(
         }
       }
     }
+
+    // Tras recomponer filas/aristas el conjunto LISTO pudo cambiar (un proceso quedó sin antecesores,
+    // o todos sus antecesores ya completados): re-activa los listos. Solo promueve 'pendiente'→'activo'
+    // (NUNCA toca 'completado'/'activo'), así que no afecta fechas reales ni capturas conservadas.
+    await activarProcesosListos(tx, datos.idOrden);
 
     await registrarBitacora(tx, sesion, {
       entidad: 'Orden',
