@@ -23,6 +23,19 @@ const HOST = '::';
 
 const app = await construirApp({ logBonito: process.env.NODE_ENV !== 'production' });
 
+// RED DE SEGURIDAD GLOBAL (defensa en profundidad, coherente con el "best-effort, la app sigue"
+// del resto del archivo). Las tareas de fondo (relay del outbox, motor de jobs) corren
+// fire-and-forget; si un parpadeo TRANSITORIO de la BD escapara su try/catch, un rechazo sin
+// atrapar (o una excepción no capturada) tumbaría el proceso. Aquí solo LO LOGUEAMOS y dejamos el
+// proceso vivo: preferimos seguir sirviendo a reiniciar por un error transitorio de fondo. (El
+// blindaje principal es el try/catch de `publicarPendientes`; esto es el cinturón de seguridad.)
+process.on('unhandledRejection', (error) => {
+  app.log.error({ err: error }, 'unhandledRejection no atrapado (la app sigue viva).');
+});
+process.on('uncaughtException', (error) => {
+  app.log.error({ err: error }, 'uncaughtException no atrapada (la app sigue viva).');
+});
+
 // Arranque de la cola de eventos (best-effort: si pg-boss no levanta, la app sigue y el outbox
 // no se pierde — el barrido reintentará). NO-OP en tests/CI (EVENTOS_COLA_ACTIVA=false).
 await iniciarColaEventos((mensaje, error) => {
