@@ -82,10 +82,16 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const colores = useColores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre', direccion: 'asc' });
+  const colores = useColores({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+    incluirInactivos: 'false',
+  });
   const proveedores = useProveedores({
     pagina: 1,
-    porPagina: 200,
+    porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
   });

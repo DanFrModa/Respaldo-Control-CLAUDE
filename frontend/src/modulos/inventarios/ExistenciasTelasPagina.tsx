@@ -39,7 +39,13 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
   const [incluirCeros, setIncluirCeros] = useState(false);
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
 
-  const colores = useColores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre', direccion: 'asc' });
+  const colores = useColores({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+    incluirInactivos: 'false',
+  });
   const almacenes = useAlmacenes({
     pagina: 1,
     porPagina: 100,

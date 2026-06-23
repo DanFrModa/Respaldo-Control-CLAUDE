@@ -65,11 +65,11 @@ export function DialogoEditarNota({
   const esEdicion = nota !== undefined;
 
   // ── Catálogos para los selectores. ───────────────────────────────────────────
-  const proveedores = useProveedores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre' });
+  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
   const almacenes = useAlmacenes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
-  const avios = useAvios({ pagina: 1, porPagina: 500 });
-  const telas = useTelas({ pagina: 1, porPagina: 500, ordenarPor: 'nombre' });
-  const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 200, incluirCanceladas: 'false' });
+  const avios = useAvios({ pagina: 1, porPagina: 100 });
+  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
+  const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idMaquilero, setIdMaquilero] = useState<number | null>(null);

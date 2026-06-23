@@ -33,7 +33,7 @@ export function ConsultaNotasPagina(): React.JSX.Element {
   const [estatus, setEstatus] = useState<EstatusNotaSalida | ''>('');
   const [pagina, setPagina] = useState(1);
 
-  const proveedores = useProveedores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre' });
+  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const query: NotasSalidaQuery = {
     pagina,
