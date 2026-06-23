@@ -35,6 +35,7 @@ import {
   marcarChecklistItem,
   revertirProceso,
 } from '../../dominio/ruta-critica/cumplimiento.js';
+import { impresoPlanRc } from '../../dominio/ruta-critica/impresos/impreso-plan-rc.js';
 
 /** Proyecta el DTO de dominio (fechas Date) al JSON del contrato (fechas ISO). */
 function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
@@ -68,6 +69,7 @@ function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
       fechaReal: iso(p.fechaReal),
       estado: p.estado,
       capturadoPorId: p.capturadoPorId,
+      capturadoPorNombre: p.capturadoPorNombre,
       capturadoEn: iso(p.capturadoEn),
       origenCaptura: p.origenCaptura,
       semaforo: p.semaforo,
@@ -176,6 +178,31 @@ export const rutasProgramacionRc: FastifyPluginCallbackZod = (app, _opciones, do
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return aRutaSalida(await obtenerRutaOrden(sesion, request.params.id));
+    },
+  });
+
+  // ── Plan de la RC por orden (impreso PDF, F5-E5, R9) ─────────────────────────
+  // Binario `application/pdf` (no entra al cliente tipado: solo se documentan los errores). Mismo
+  // patrón que los demás impresos (entrega/recibo/OC). 400 si la orden no tiene RC generada.
+  app.route({
+    method: 'GET',
+    url: '/ruta-critica/ordenes/:id/plan-impreso',
+    preHandler: app.conPermiso('rc.ruta-ver'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary:
+        'Plan de la Ruta Crítica de una orden (PDF): procesos, fechas, duración, responsables',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrdenRc,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folioOrden } = await impresoPlanRc(sesion, request.params.id);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="plan-rc-orden-${folioOrden}.pdf"`);
+      return reply.send(buffer as unknown as never);
     },
   });
 

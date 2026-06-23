@@ -360,7 +360,15 @@ Profundizan D10 (RC como workflow configurable) y D11 (modelo analítico).
 - **Decisión:** **sí** se construye el impreso PDF del plan por orden (R9), pero el uso principal es
   **consultar y actualizar en línea** (la pantalla RC por orden con timeline planeado-vs-real). El PDF
   es complemento para piso, no el flujo central.
-- **Aplica en:** F5-E5.
+- **Aplica en:** F5-E5 (CONSTRUIDO).
+- **Cierre (Gabriel, 2026-06-22):** se construyó en E5, fiel a lo que decidió Daniel. Es un impreso
+  **server-side** (`@react-pdf/renderer`, mismo patrón que orden/OC/nota/entrega): ruta binaria
+  `GET /api/ruta-critica/ordenes/:id/plan-impreso` (permiso `rc.ruta-ver`, scope de empresa A9) con
+  encabezado de la orden + tabla de procesos (fecha planeada, duración, responsables, estado, fecha
+  real) y botón **"Imprimir plan"** en la pantalla *RC por orden*. (Inicialmente lo propuse mover a E7
+  para agruparlo con el Excel del concentrado; Gabriel pidió hacerlo en E5 porque Daniel ya lo había
+  aprobado para esta etapa. **Recordatorio de proceso:** revisar SIEMPRE las decisiones ya cerradas de
+  Daniel antes de proponer o diferir algo.)
 
 #### (h) — Exportación a Excel del concentrado planeado-vs-real: SÍ (E7)
 - **Decisión:** **sí** al export a Excel del concentrado (exceljs, mismo resultado que el tablero).

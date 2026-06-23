@@ -608,6 +608,51 @@ export type FestivoRcCrear =
 export type FestivoRcEditar =
   paths['/api/ruta-critica/calendario/festivos/{id}']['patch']['requestBody']['content']['application/json'];
 
+// ── Ruta Crítica: motor por orden, bandeja de tareas y alertas (Módulo 8, F5-E3/E4/E5) ──
+
+/** Tri-estado del semáforo de cumplimiento de la RC (derivado por el backend). */
+export type SemaforoRc =
+  paths['/api/ruta-critica/ordenes/{id}/ruta']['get']['responses']['200']['content']['application/json']['semaforo'];
+
+/** Ruta Crítica VIVA de una orden (encabezado + procesos con sus fechas/semáforos). */
+export type RutaOrden =
+  paths['/api/ruta-critica/ordenes/{id}/ruta']['get']['responses']['200']['content']['application/json'];
+/** Un proceso de la ruta viva (con plan vs real, captura y semáforo). */
+export type RutaOrdenProceso = RutaOrden['procesos'][number];
+/** Estado del cálculo de fechas de la ruta (calculado / recalculando / sin-ruta). */
+export type EstadoRecalculoRc = RutaOrden['estadoRecalculo'];
+/** Estado de un proceso de la ruta (pendiente / activo / completado). */
+export type EstadoProcesoRc = RutaOrdenProceso['estado'];
+
+/** Cuerpo para programar (generar/re-generar) la RC de una orden. */
+export type ProgramarRcCuerpo =
+  paths['/api/ruta-critica/ordenes/{id}/programar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo para ajustar la ruta de una orden (agregar/quitar procesos, dependencias). */
+export type AjustarRutaCuerpo =
+  paths['/api/ruta-critica/ordenes/{id}/ruta']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de captura/reversión del cumplimiento de un proceso. */
+export type CumplimientoRcCuerpo =
+  paths['/api/ruta-critica/procesos/{idRuta}/cumplimiento']['put']['requestBody']['content']['application/json'];
+/** Cuerpo de marcar/desmarcar un ítem de checklist de la ruta viva. */
+export type ChecklistRcCuerpo =
+  paths['/api/ruta-critica/checklist/{idItem}']['put']['requestBody']['content']['application/json'];
+
+/** Página de la bandeja "mis tareas" de la RC (`GET /api/ruta-critica/bandeja`). */
+export type BandejaRcPagina =
+  paths['/api/ruta-critica/bandeja']['get']['responses']['200']['content']['application/json'];
+/** Una tarea activa de la bandeja (proceso×orden a capturar). */
+export type TareaRc = BandejaRcPagina['datos'][number];
+/** Un ítem de checklist de una tarea de la bandeja. */
+export type TareaRcChecklistItem = TareaRc['checklist'][number];
+/** Parámetros de consulta de la bandeja (querystring). */
+export type BandejaRcQuery = NonNullable<
+  paths['/api/ruta-critica/bandeja']['get']['parameters']['query']
+>;
+
+/** Conteo de alertas (atrasados / en riesgo) para el badge del header. */
+export type AlertasRcConteo =
+  paths['/api/ruta-critica/alertas/conteo']['get']['responses']['200']['content']['application/json'];
+
 // ── Tipos de movimiento de inventario (Módulo 6, F3-E1; solo lectura) ────────
 
 /** Lista de tipos de movimiento de inventario (`GET /api/tipos-movimiento`). */

@@ -37873,6 +37873,8 @@ export interface paths {
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
+                /** @description Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+                capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
                 /**
@@ -38055,6 +38057,8 @@ export interface paths {
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
+                /** @description Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+                capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
                 /**
@@ -38256,6 +38260,8 @@ export interface paths {
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
+                /** @description Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+                capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
                 /**
@@ -38361,6 +38367,116 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/ruta-critica/ordenes/{id}/plan-impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Plan de la Ruta Crítica de una orden (PDF): procesos, fechas, duración, responsables */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ruta-critica/procesos/{idRuta}/cumplimiento': {
     parameters: {
       query?: never;
@@ -38448,6 +38564,8 @@ export interface paths {
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
+                /** @description Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+                capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
                 /**
@@ -38640,6 +38758,8 @@ export interface paths {
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
+                /** @description Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+                capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
                 /**
@@ -38743,6 +38863,278 @@ export interface paths {
         };
       };
     };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/bandeja': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Bandeja "mis tareas": procesos activos a capturar de la Ruta Crítica (por urgencia) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (tope 100). */
+          porPagina?: number;
+          /** @description Filtra por un tipo de proceso (ProcesoDef). */
+          idProcesoDef?: number;
+          /** @description Filtra por una orden. */
+          idOrden?: number;
+          /** @description Texto a buscar en el nombre del cliente. */
+          busquedaCliente?: string;
+          /** @description Supervisión: si true (y con permiso), muestra TODAS las tareas activas de la empresa, no solo las de los roles del usuario. */
+          todas?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de la bandeja "mis tareas" de la Ruta Crítica. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Tareas activas de la página. */
+              datos: {
+                /** @description Id del renglón de ruta (proceso×orden) a capturar. */
+                idRutaOrden: number;
+                /** @description Id de la orden. */
+                idOrden: number;
+                /** @description Folio consecutivo de la orden (por empresa). */
+                folioOrden: number;
+                /** @description Nombre del cliente de la orden. */
+                cliente: string;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Tipo de proceso (ProcesoDef). */
+                idProcesoDef: number;
+                /** @description Código del proceso (kebab-case). */
+                codigoProceso: string;
+                /** @description Nombre del proceso (para la UI). */
+                nombreProceso: string;
+                /** @description ¿Es un proceso crítico de la ruta? */
+                critico: boolean;
+                /** @description Fecha planeada vigente del proceso (CPM, E4), o null si aún no se ha fechado. */
+                fechaPlaneadaVigente: string | null;
+                /** @description Días NATURALES vencidos respecto a la planeada vigente (>0 si vencida; 0 si no). */
+                diasAtraso: number;
+                /**
+                 * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente).
+                 * @enum {string}
+                 */
+                semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                /** @description Ítems de checklist del proceso (snapshot por orden). */
+                checklist: {
+                  /** @description Id del ítem de checklist. */
+                  id: number;
+                  /** @description Texto del punto a verificar. */
+                  descripcion: string;
+                  /** @description Posición del ítem en el checklist. */
+                  orden: number;
+                  /** @description ¿Ya se verificó este punto en esta orden? */
+                  hecho: boolean;
+                }[];
+              }[];
+              /** @description Total de tareas que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/alertas/conteo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Conteo de mis tareas activas atrasadas / en riesgo de la Ruta Crítica */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Conteo de mis tareas activas atrasadas / en riesgo (badge del header). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Mis tareas activas atrasadas (HOY > planeada vigente). */
+              atrasados: number;
+              /** @description Mis tareas activas en riesgo (planeada vigente dentro del umbral). */
+              enRiesgo: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;

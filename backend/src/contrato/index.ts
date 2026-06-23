@@ -837,6 +837,19 @@ export {
   type RutaOrdenSalida,
 } from './esquemas/ruta-critica-programacion.js';
 
+// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5) ──
+export {
+  esquemaBandejaRcQuery,
+  esquemaBandejaChecklistSalida,
+  esquemaBandejaTareaSalida,
+  esquemaBandejaRcPagina,
+  esquemaAlertasRcConteo,
+  type BandejaRcQuery,
+  type BandejaTareaSalida,
+  type BandejaRcPagina,
+  type AlertasRcConteo,
+} from './esquemas/ruta-critica-bandeja.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

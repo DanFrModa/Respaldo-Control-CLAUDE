@@ -81,6 +81,8 @@ export interface RutaOrdenProcesoDto {
   fechaReal: Date | null;
   estado: 'pendiente' | 'activo' | 'completado';
   capturadoPorId: string | null;
+  /** Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+  capturadoPorNombre: string | null;
   capturadoEn: Date | null;
   origenCaptura: 'manual' | 'evento' | null;
   /** Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4). */
@@ -155,7 +157,8 @@ export async function obtenerRutaOrden(
     include: INCLUDE_RUTA,
     orderBy: { secuencia: 'asc' },
   });
-  return armarDto(orden, filas);
+  const nombres = await nombresCapturadores(cliente, filas);
+  return armarDto(orden, filas, nombres);
 }
 
 // ── Generación ──────────────────────────────────────────────────────────────────
@@ -483,7 +486,8 @@ export async function generarRutaOrden(
       include: INCLUDE_RUTA,
       orderBy: { secuencia: 'asc' },
     });
-    const dto = armarDto(orden2, filas);
+    const nombres = await nombresCapturadores(tx, filas);
+    const dto = armarDto(orden2, filas, nombres);
     dto.advertencias = advertencias;
     return { dto, idEmpresa: orden.idEmpresa };
   }, bd);
@@ -690,7 +694,8 @@ export async function ajustarRutaOrden(
       include: INCLUDE_RUTA,
       orderBy: { secuencia: 'asc' },
     });
-    return { dto: armarDto(orden2, filas), idEmpresa: orden.idEmpresa };
+    const nombres = await nombresCapturadores(tx, filas);
+    return { dto: armarDto(orden2, filas, nombres), idEmpresa: orden.idEmpresa };
   }, bd);
 
   // ⚠️ ASUME TRANSACCIÓN PROPIA (ver la misma nota en `generarRutaOrden`): si se compone bajo una
@@ -842,7 +847,26 @@ async function cargarAristasRuta(
   return aristas;
 }
 
-/** Proyecta orden + renglones al DTO de dominio. */
+/**
+ * Resuelve el nombre de cada `capturadoPorId` presente en los renglones, en UN solo viaje a la BD.
+ * Devuelve el mapa `idUsuario -> nombre` (las ids sin usuario quedan fuera → se proyectan a null).
+ */
+async function nombresCapturadores(
+  cliente: ReturnType<typeof clienteLectura>,
+  filas: RutaConRelaciones[],
+): Promise<Map<string, string>> {
+  const ids = [
+    ...new Set(filas.map((f) => f.capturadoPorId).filter((x): x is string => x !== null)),
+  ];
+  if (ids.length === 0) return new Map();
+  const usuarios = await cliente.usuario.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, nombre: true },
+  });
+  return new Map(usuarios.map((u) => [u.id, u.nombre]));
+}
+
+/** Proyecta orden + renglones al DTO de dominio. `nombresPorId` resuelve `capturadoPorNombre` (F5-E5). */
 function armarDto(
   orden: {
     id: number;
@@ -856,6 +880,7 @@ function armarDto(
     idDuracionAplicacion: number | null;
   },
   filas: RutaConRelaciones[],
+  nombresPorId: ReadonlyMap<string, string> = new Map(),
 ): RutaOrdenDto {
   // idProcesoDef por id de RutaOrden, para traducir las aristas a idProcesoDef.
   const procesoPorIdRuta = new Map(filas.map((f) => [f.id, f.idProcesoDef]));
@@ -900,6 +925,8 @@ function armarDto(
       fechaReal: f.fechaReal,
       estado: f.estado,
       capturadoPorId: f.capturadoPorId,
+      capturadoPorNombre:
+        f.capturadoPorId === null ? null : (nombresPorId.get(f.capturadoPorId) ?? null),
       capturadoEn: f.capturadoEn,
       origenCaptura: f.origenCaptura,
       semaforo: estadoSemaforoProceso(
