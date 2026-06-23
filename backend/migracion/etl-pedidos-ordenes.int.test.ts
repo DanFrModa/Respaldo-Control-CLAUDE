@@ -261,11 +261,16 @@ describe('ETL de pedidos y órdenes F2-E5 (integración, fixtures committeados)'
     await ejecutarEtlPedidosOrdenes(cliente);
     const orden1 = await cliente.orden.findFirstOrThrow({
       where: { idEmpresa: idEmpresaFR, folio: 9001n },
-      include: { comentarios: { orderBy: { id: 'asc' } } },
+      include: { comentarios: true },
     });
     expect(orden1.comentarios).toHaveLength(2);
-    expect(orden1.comentarios[0]?.idUsuario).toBe('usr-daniel');
-    expect(orden1.comentarios[0]?.fecha.toISOString()).toBe('2005-01-11T09:30:00.000Z');
+    // El loader carga los comentarios EN CONCURRENCIA (`enLotes`), así que el `id` autoincremental NO
+    // refleja el orden de origen: ordenar/posicionar por `id` flaquea (a veces el id menor es el de
+    // gabriel). Se valida POR AUTOR — cada comentario conservó su `idUsuario` y su `fecha` ORIGINAL —
+    // sin depender de ningún orden, que es justo lo que la prueba quiere demostrar.
+    const porUsuario = new Map(orden1.comentarios.map((c) => [c.idUsuario, c]));
+    expect(porUsuario.get('usr-daniel')?.fecha.toISOString()).toBe('2005-01-11T09:30:00.000Z');
+    expect(porUsuario.get('usr-gabriel')?.fecha.toISOString()).toBe('2005-01-12T10:00:00.000Z');
   });
 
   it('SIEMBRA DE SECUENCIAS: un pedido y una orden NUEVOS salen con folio > máximo migrado', async () => {
