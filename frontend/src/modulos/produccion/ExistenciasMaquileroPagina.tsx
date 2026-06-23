@@ -38,7 +38,7 @@ export function ExistenciasMaquileroPagina(): React.JSX.Element {
   // Maquileros: cualquier proveedor (un maquilero puede tener cualquier rol de maquila).
   const maquileros = useProveedores({
     pagina: 1,
-    porPagina: 200,
+    porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
   });

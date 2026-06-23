@@ -38,7 +38,13 @@ export function ExistenciasPtPagina(): React.JSX.Element {
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [incluirCeros, setIncluirCeros] = useState(false);
 
-  const colores = useColores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre', direccion: 'asc' });
+  const colores = useColores({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+    incluirInactivos: 'false',
+  });
   const tallasCat = useTallas({ pagina: 1, porPagina: 100, ordenarPor: 'orden', direccion: 'asc' });
   const almacenes = useAlmacenes({
     pagina: 1,

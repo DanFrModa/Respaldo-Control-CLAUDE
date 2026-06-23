@@ -36,7 +36,7 @@ export function RecibosSemanalesPagina(): React.JSX.Element {
   // Maquileros: todos los proveedores (un maquilero puede tener cualquier rol de maquila).
   const maquileros = useProveedores({
     pagina: 1,
-    porPagina: 200,
+    porPagina: 100,
     ordenarPor: 'nombre',
     direccion: 'asc',
   });

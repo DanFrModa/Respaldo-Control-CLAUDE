@@ -55,13 +55,18 @@ export function DialogoEditarOc({
   const esEdicion = oc !== undefined;
 
   // ── Catálogos para los selectores (solo activos). ────────────────────────────
-  const proveedores = useProveedores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre' });
-  const telas = useTelas({ pagina: 1, porPagina: 500, ordenarPor: 'nombre' });
-  const avios = useAvios({ pagina: 1, porPagina: 500 });
-  const colores = useColores({ pagina: 1, porPagina: 500, ordenarPor: 'nombre' });
+  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
+  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
+  const avios = useAvios({ pagina: 1, porPagina: 100 });
+  const colores = useColores({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    incluirInactivos: 'false',
+  });
   const tallas = useTallasActivas();
   // Órdenes de producción no canceladas para ligar por línea (R7).
-  const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 200, incluirCanceladas: 'false' });
+  const ordenes = useConsultaOrdenes({ pagina: 1, porPagina: 100, incluirCanceladas: 'false' });
 
   // ── Estado del encabezado. ───────────────────────────────────────────────────
   const [idProveedor, setIdProveedor] = useState<number | null>(null);

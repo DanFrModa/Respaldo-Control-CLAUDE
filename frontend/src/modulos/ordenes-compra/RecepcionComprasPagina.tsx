@@ -97,10 +97,16 @@ export function RecepcionComprasPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
-  const colores = useColores({ pagina: 1, porPagina: 500, ordenarPor: 'nombre', direccion: 'asc' });
+  const colores = useColores({
+    pagina: 1,
+    porPagina: 100,
+    ordenarPor: 'nombre',
+    direccion: 'asc',
+    incluirInactivos: 'false',
+  });
   // Catálogo de telas para elegir los componentes ACOMPAÑANTES del lote (D5, M1): cualquier tela,
   // no solo la comprada en la línea.
-  const telas = useTelas({ pagina: 1, porPagina: 500, ordenarPor: 'nombre', direccion: 'asc' });
+  const telas = useTelas({ pagina: 1, porPagina: 100, ordenarPor: 'nombre', direccion: 'asc' });
   const recepciones = useRecepcionesDeOc(ocSeleccionada?.id);
   const recibir = useRecibir();
   const reversar = useReversarRecepcion();

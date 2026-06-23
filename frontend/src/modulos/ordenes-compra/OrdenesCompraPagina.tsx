@@ -74,7 +74,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   const [fechaHasta, setFechaHasta] = useState('');
   const [pagina, setPagina] = useState(1);
 
-  const proveedores = useProveedores({ pagina: 1, porPagina: 200, ordenarPor: 'nombre' });
+  const proveedores = useProveedores({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
   const query: OrdenesCompraQuery = {
     pagina,
