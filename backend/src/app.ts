@@ -30,6 +30,7 @@ import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
+import { rutasBandejaRc } from './api/ruta-critica/bandeja.rutas.js';
 import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
 import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
 import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
@@ -208,6 +209,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // plantilla, D10) y consultarla. Encola el recálculo del CPM (pg-boss); las FECHAS las calcula
   // E4. RBAC por ruta (rc.programar muta, rc.ruta-ver consulta).
   await app.register(rutasProgramacionRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E5) — BANDEJA "mis tareas" (procesos activos a capturar, por urgencia,
+  // de los que el usuario es responsable; o todas con supervisión) + CONTEO de alertas (atrasados/
+  // enRiesgo) para el badge del header. Solo lectura; RBAC rc.ruta-ver; semáforo/atraso DERIVADOS.
+  await app.register(rutasBandejaRc, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

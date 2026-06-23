@@ -25,14 +25,14 @@ describe('catalogo de modulos del menu', () => {
     // (explosión de materiales y "qué tengo / qué falta") + 3 sub-vistas de F4-E5 (notas de salida:
     // captura, consulta de notas y notas por orden) + 2 sub-vistas de F5-E1 (Ruta Crítica: procesos
     // y dependencias) + 3 sub-vistas de F5-E2 (plantillas de ruta, reglas de duración y
-    // configuración de RC por empresa) = 39 sub-vistas.
+    // configuración de RC por empresa) + 1 sub-vista de F5-E5 (bandeja de tareas) = 40 sub-vistas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(52);
+    expect(MODULOS_MENU).toHaveLength(53);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(52);
+    expect(new Set(claves).size).toBe(53);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(52);
+    expect(new Set(rutas).size).toBe(53);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

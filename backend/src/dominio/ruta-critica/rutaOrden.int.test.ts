@@ -341,10 +341,58 @@ describe('generarRutaOrden (F5-E3)', () => {
     expect(fichaR.estado).toBe('completado');
     expect(fichaR.origenCaptura).toBe('evento');
     expect(fichaR.fechaReal).not.toBeNull();
-    // El que NO es de resurtido conserva su duración y queda pendiente.
+    // El que NO es de resurtido conserva su duración. Su ÚNICO antecesor (ficha) quedó completado
+    // (auto-completado por duración 0), así que el ARRANQUE de la ruta lo deja 'activo' — listo para
+    // capturar (es el caso que reproduce el bug del e2e: sin el arranque se quedaba 'pendiente' para
+    // siempre y la bandeja nunca se poblaba).
     const corteR = ruta.procesos.find((p) => p.codigoProceso === 'corte')!;
     expect(corteR.duracionDias).toBe(3);
-    expect(corteR.estado).toBe('pendiente');
+    expect(corteR.estado).toBe('activo');
+  });
+
+  it('ARRANQUE: al generar activa los procesos LISTOS (raíz / antecesor completado)', async () => {
+    // Regresión del bug del e2e: tras generar, nadie ponía 'activo' a los procesos raíz ni a los que
+    // quedaban listos por un antecesor auto-completado (duración 0). La bandeja (estado='activo') no se
+    // poblaba → la RC no se podía operar. Tres formas en un solo árbol:
+    //   raizCero (duración 0 → completado) → hijo (dur>0, su único antecesor completado → ACTIVO)
+    //   raiz (dur>0, sin antecesores → ACTIVO) → cola (dur>0, antecesor 'activo' no completado → pendiente)
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idSinAplic } = await crearReglas();
+    // raizCero: porAplicacion + Sin Aplicación → duración 0 → auto-completado.
+    const raizCero = await crearProceso('raiz-cero', { tipoDuracion: 'porAplicacion' });
+    const hijo = await crearProceso('hijo', { tipoDuracion: 'fija' });
+    const raiz = await crearProceso('raiz', { tipoDuracion: 'fija' });
+    const cola = await crearProceso('cola', { tipoDuracion: 'fija' });
+    await crearPlantilla({ idArticulo }, [
+      { idProcesoDef: raizCero, tiempoEstandar: 0 },
+      { idProcesoDef: hijo, tiempoEstandar: 3, antecesores: [raizCero] },
+      { idProcesoDef: raiz, tiempoEstandar: 2 },
+      { idProcesoDef: cola, tiempoEstandar: 2, antecesores: [raiz] },
+    ]);
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      {
+        idOrden,
+        idArticuloRC: idArticulo,
+        fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+        idTipoTela: idTela,
+        idAplicacion: idSinAplic, // 0 días → raizCero auto-completado
+        fechaInicioRC: new Date('2026-06-22T00:00:00Z'),
+      },
+      bd(),
+    );
+    const porCodigo = new Map(ruta.procesos.map((p) => [p.codigoProceso, p]));
+    // Raíz duración 0 → completado (auto).
+    expect(porCodigo.get('raiz-cero')!.estado).toBe('completado');
+    // Sucesor de la raíz-cero: su único antecesor está completado → ACTIVO (el caso del bug).
+    expect(porCodigo.get('hijo')!.duracionDias).toBe(3);
+    expect(porCodigo.get('hijo')!.estado).toBe('activo');
+    // Raíz suelta duración>0, sin antecesores → ACTIVO.
+    expect(porCodigo.get('raiz')!.duracionDias).toBeGreaterThan(0);
+    expect(porCodigo.get('raiz')!.estado).toBe('activo');
+    // Su sucesor: el antecesor está 'activo' (no completado) → sigue PENDIENTE.
+    expect(porCodigo.get('cola')!.estado).toBe('pendiente');
   });
 
   it('duración 0 (Sin Aplicación) auto-completa el proceso porAplicacion', async () => {
@@ -496,6 +544,16 @@ describe('ajustarRutaOrden (F5-E3, sin tocar la plantilla)', () => {
     const { idOrden, b } = await programarBasica();
     const ruta = await ajustarRutaOrden(sesionProg(), { idOrden, quitar: [b] }, bd());
     expect(ruta.procesos.map((p) => p.codigoProceso)).toEqual(['a']);
+  });
+
+  it('ARRANQUE en ajuste: quitar el antecesor activa al sucesor que queda raíz', async () => {
+    // programarBasica deja a→b: a (raíz) 'activo', b (depende de a) 'pendiente'. Al QUITAR a, b queda
+    // sin antecesores → el re-arranque del ajuste lo promueve a 'activo'.
+    const { idOrden, a } = await programarBasica();
+    const ruta = await ajustarRutaOrden(sesionProg(), { idOrden, quitar: [a] }, bd());
+    const b2 = ruta.procesos.find((p) => p.codigoProceso === 'b')!;
+    expect(ruta.procesos.map((p) => p.codigoProceso)).toEqual(['b']);
+    expect(b2.estado).toBe('activo');
   });
 
   it('rechaza un ajuste que formaría un ciclo', async () => {

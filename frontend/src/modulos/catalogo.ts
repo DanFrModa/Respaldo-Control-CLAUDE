@@ -511,6 +511,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: 'autenticado',
     destacado: true,
   },
+  // Sub-vista de Ruta Crítica (F5-E5): la BANDEJA de "mis tareas" — el operador captura su avance de
+  // la ruta por orden (Hoy/Ayer + checklist). Cuelga del módulo Ruta Crítica; la gobierna
+  // `rc.ruta-ver` (capturar exige además `rc.capturar`, que el backend re-verifica, A1).
+  {
+    clave: 'rc-bandeja',
+    titulo: 'Bandeja de tareas',
+    descripcion: 'Mis procesos pendientes de la Ruta Crítica, ordenados por urgencia',
+    ruta: '/ruta-critica/bandeja',
+    icono: 'lista-tareas',
+    permisos: ['rc.ruta-ver'],
+    subVista: true,
+  },
   // Sub-vistas de Ruta Crítica (F5-E1): el CATÁLOGO CONFIGURABLE (procesos + roles + checklist) y el
   // editor de DEPENDENCIAS (DAG). Cuelgan del módulo Ruta Crítica; los gobierna `rc.catalogo-ver`.
   // El MOTOR (instancias por orden, fechas/semáforos) y la bandeja de tareas llegan en E2+.

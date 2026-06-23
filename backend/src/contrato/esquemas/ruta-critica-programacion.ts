@@ -169,6 +169,10 @@ export const esquemaRutaProcesoSalida = z
     fechaReal: z.iso.datetime().nullable().describe('Fecha real de cumplimiento, o null.'),
     estado: z.enum(['pendiente', 'activo', 'completado']),
     capturadoPorId: z.string().nullable(),
+    capturadoPorNombre: z
+      .string()
+      .nullable()
+      .describe('Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5).'),
     capturadoEn: z.iso.datetime().nullable(),
     origenCaptura: z.enum(['manual', 'evento']).nullable(),
     semaforo: esquemaEstadoSemaforo.describe(

@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { filtrarModulosVisibles } from '@/modulos/catalogo';
 import { NavegacionModulos } from '@/modulos/NavegacionModulos';
 import { BuscadorGlobal } from '@/modulos/ordenes-consulta/BuscadorGlobal';
+import { BadgeAlertasRc } from '@/modulos/ruta-critica/BadgeAlertasRc';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
@@ -176,6 +177,7 @@ export function CascaronSistema(): React.JSX.Element {
                 <Building2 className="size-3.5" aria-hidden />
                 {sesion.empresaActiva.nombre}
               </Badge>
+              <BadgeAlertasRc />
               <AlternadorTema />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

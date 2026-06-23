@@ -50,11 +50,14 @@ import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { BandejaTareasPagina } from '@/modulos/ruta-critica/BandejaTareasPagina';
 import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
 import { DependenciasPagina } from '@/modulos/ruta-critica/DependenciasPagina';
 import { PlantillasPagina } from '@/modulos/ruta-critica/PlantillasPagina';
 import { ProcesosPagina } from '@/modulos/ruta-critica/ProcesosPagina';
+import { ProgramarRcPagina } from '@/modulos/ruta-critica/ProgramarRcPagina';
 import { ReglasDuracionPagina } from '@/modulos/ruta-critica/ReglasDuracionPagina';
+import { RutaPorOrdenPagina } from '@/modulos/ruta-critica/RutaPorOrdenPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
@@ -156,6 +159,10 @@ const router = createBrowserRouter([
           // Ruta Crítica (Módulo 8, F5-E2) — plantillas de ruta y reglas de duración.
           { path: 'ruta-critica/plantillas', element: <PlantillasPagina /> },
           { path: 'ruta-critica/reglas-duracion', element: <ReglasDuracionPagina /> },
+          // Ruta Crítica (Módulo 8, F5-E5) — motor por orden: bandeja, programar y RC por orden.
+          { path: 'ruta-critica/bandeja', element: <BandejaTareasPagina /> },
+          { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },
+          { path: 'ruta-critica/ordenes/:idOrden/programar', element: <ProgramarRcPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
