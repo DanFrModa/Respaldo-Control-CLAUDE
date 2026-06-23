@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del ciclo de ENTREGA a cliente + TABLERO WIP (F3-E5) contra el stack real. El flujo
@@ -34,6 +34,8 @@ test.describe('Entrega a cliente y tablero WIP (F3-E5)', () => {
     const RESTANTE = STOCK - ENTREGA;
 
     await entrarComoAdmin(page);
+    // La matriz color×talla necesita ≥1 color y ≥1 talla en catálogo (no sembrados): se crean al vuelo.
+    await crearColorYTalla(page);
 
     // ── Prepara un cliente ──────────────────────────────────────────────────────
     await page.goto('/catalogos/clientes');

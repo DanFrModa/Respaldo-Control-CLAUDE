@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del INVENTARIO de PRODUCTO TERMINADO (F3-E3) contra el stack real. Cubre el flujo de la ficha:
@@ -16,6 +16,8 @@ test.describe('Inventario PT operable (F3-E3)', () => {
     const codigoModelo = `IPT-${sufijo}`;
 
     await entrarComoAdmin(page);
+    // La matriz color×talla necesita ≥1 color y ≥1 talla en catálogo (no sembrados): se crean al vuelo.
+    await crearColorYTalla(page);
 
     // ── Prepara un modelo ───────────────────────────────────────────────────────
     await page.goto('/modelos');
