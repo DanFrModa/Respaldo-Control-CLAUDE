@@ -45,7 +45,14 @@ import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_ETAPA_RC,
+  registrarEventoOutbox,
+  type EventoEtapaRc,
+} from '../../comun/eventos-dominio.js';
 import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
@@ -393,6 +400,20 @@ async function emitirRecibo(evento: NombreEvento, etapa: EtapaMovimiento): Promi
   });
 }
 
+/**
+ * Escribe en el OUTBOX DURABLE el evento de etapa que consume el auto-avance de la RC (F5-E6), en la
+ * MISMA transacción del recibo (atómico). Es el gancho REAL de F5 para el recibo de maquila — el
+ * punto de integración central (PLANMAESTRO §5): WIP + IPT + EsMa + RC en UNA transacción. El
+ * consumidor relee las cantidades; aquí solo viaja a qué orden/proceso apunta.
+ */
+async function registrarEventoEtapaRc(
+  tx: Tx,
+  evento: (typeof EVENTOS_OUTBOX)[keyof typeof EVENTOS_OUTBOX],
+  datos: EventoEtapaRc,
+): Promise<void> {
+  await registrarEventoOutbox(tx, evento, VERSION_EVENTO_ETAPA_RC, datos.idEmpresa, datos);
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────────────────
 
 /** Alta de recibo: campos del esquema compartido. */
@@ -624,11 +645,22 @@ export async function registrarReciboMaquila(
       },
     });
 
+    // OUTBOX (F5-E6): el gancho durable del auto-avance — escrito en la MISMA tx que WIP + IPT + EsMa
+    // (punto de integración central, PLANMAESTRO §5). La RC re-evalúa `reciboCostura`/`reciboEstampado`.
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.reciboMaquilaRegistrado, {
+      idEmpresa: orden.idEmpresa,
+      idOrden: datos.idOrden,
+      idEtapaMovimiento: recibo.id,
+      tipoEtapa: TipoEtapaMovimiento.recibo_maquila,
+      idTipoProceso: datos.idTipoProceso,
+    });
+
     return recibo.id;
   }, bd);
 
   const salida = await obtenerRecibo(sesion, idRecibo, bd);
   await emitirReciboPorId(idRecibo, EVENTOS_PRODUCCION.reciboRegistrado, bd);
+  dispararPublicacion();
   return salida;
 }
 
@@ -680,7 +712,14 @@ export async function cancelarReciboMaquila(
   await enTransaccion(async (tx) => {
     const recibo = await tx.etapaMovimiento.findFirst({
       where: { id: idRecibo, idEmpresa: sesion.idEmpresaActiva },
-      select: { id: true, tipo: true, idOrden: true, canceladoEn: true, folio: true },
+      select: {
+        id: true,
+        tipo: true,
+        idOrden: true,
+        idTipoProceso: true,
+        canceladoEn: true,
+        folio: true,
+      },
     });
     if (recibo === null) {
       throw new ErrorNoEncontrado('EtapaMovimiento', idRecibo);
@@ -757,8 +796,19 @@ export async function cancelarReciboMaquila(
         movimientosRevertidos: movimientos.length,
       },
     });
+
+    // OUTBOX (F5-E6, decisión (f)): la cancelación re-evalúa el proceso de recibo de la RC; si ya no
+    // está cubierto, lo des-completa y recalcula el CPM.
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.reciboMaquilaCancelado, {
+      idEmpresa: sesion.idEmpresaActiva,
+      idOrden: recibo.idOrden,
+      idEtapaMovimiento: recibo.id,
+      tipoEtapa: TipoEtapaMovimiento.recibo_maquila,
+      idTipoProceso: recibo.idTipoProceso,
+    });
   }, bd);
 
+  dispararPublicacion();
   return obtenerRecibo(sesion, idRecibo, bd);
 }
 

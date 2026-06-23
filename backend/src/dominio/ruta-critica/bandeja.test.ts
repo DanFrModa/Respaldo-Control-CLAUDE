@@ -61,6 +61,7 @@ describe('ordenarTareasPorUrgencia', () => {
       fechaPlaneadaVigente,
       diasAtraso,
       semaforo,
+      parcialEnCurso: false,
       checklist: [],
     };
   }

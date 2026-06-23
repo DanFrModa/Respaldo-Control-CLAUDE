@@ -171,3 +171,53 @@ export async function publicarPendientes(
 export function dispararPublicacion(): void {
   void publicarPendientes();
 }
+
+/**
+ * Forma del MENSAJE que el relay publica a {@link COLA_EVENTOS_DOMINIO} (una fila del outbox). El
+ * consumidor de negocio (el auto-avance de la RC, F5-E6) recibe esto: `tipo`/`version` para despachar
+ * y `idEmpresa`/`payload` para reaccionar. `payload` es JSON opaco (cada handler lo tipa por `tipo`).
+ */
+export interface MensajeEventoDominio {
+  /** Id de la fila `EventoOutbox` que originó el mensaje (traza). */
+  id: number;
+  /** Nombre del evento (contrato versionado, p. ej. "recibo-maquila-registrado"). */
+  tipo: string;
+  /** Versión del contrato del payload. */
+  version: number;
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Carga del evento (JSON; el handler la tipa según `tipo`). */
+  payload: unknown;
+}
+
+/**
+ * Registra un CONSUMIDOR de la cola de eventos de dominio (F5-E6): un worker pg-boss sobre la MISMA
+ * instancia privada `boss` que usa el relay. Procesa los mensajes UNO A LA VEZ (`localConcurrency: 1`
+ * + `batchSize: 1`): el auto-avance re-evalúa el estado de una orden y debe ser ordenado/idempotente.
+ *
+ * NO-OP si la cola está inactiva o aún no arrancó (tests/CI: `EVENTOS_COLA_ACTIVA=false`): la lógica
+ * del auto-avance se prueba invocando el handler directo (sin pg-boss), igual que el CPM de E4. Debe
+ * llamarse DESPUÉS de `iniciarColaEventos` (que crea la cola y fija `boss`).
+ *
+ * El handler NO debe propagar al final: pg-boss reintenta si lanza, y como el auto-avance es
+ * idempotente (re-evaluación pura), reintentar es seguro. Aun así, conviene que el handler atrape y
+ * loguee para no acumular reintentos por un error de datos.
+ *
+ * @param manejar  función que procesa un mensaje de evento (su forma es {@link MensajeEventoDominio}).
+ */
+export async function registrarConsumidorEventos(
+  manejar: (mensaje: MensajeEventoDominio) => Promise<void>,
+): Promise<void> {
+  if (boss === null) {
+    return; // cola inactiva o sin arrancar: nada que consumir (la lógica se prueba sin pg-boss).
+  }
+  await boss.work<MensajeEventoDominio>(
+    COLA_EVENTOS_DOMINIO,
+    { localConcurrency: 1, batchSize: 1 },
+    async (jobs) => {
+      for (const job of jobs) {
+        await manejar(job.data);
+      }
+    },
+  );
+}

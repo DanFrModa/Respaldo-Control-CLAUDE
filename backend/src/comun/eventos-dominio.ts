@@ -20,6 +20,22 @@ import type { Tx } from './transaccion.js';
 export const EVENTOS_OUTBOX = {
   /** Material (tela/avío) recibido contra una OC: dispara MRP/RC en F5 (ADR-0011). */
   materialRecibido: 'material-recibido',
+  /** El material de una recepción se REVERSÓ: la RC re-evalúa `recepcionTela` (F5-E6, decisión (f)). */
+  materialRecibidoCancelado: 'material-recibido-cancelado',
+  /** Corte registrado en una orden: la RC re-evalúa el proceso `corte` (F5-E6, decisión (d)/(e)). */
+  corteRegistrado: 'corte-registrado',
+  /** Envío a maquila registrado: la RC re-evalúa `envioCostura`/`envioEstampado` según el proceso. */
+  envioMaquilaRegistrado: 'envio-maquila-registrado',
+  /** Recibo de maquila registrado: la RC re-evalúa `reciboCostura`/`reciboEstampado`. */
+  reciboMaquilaRegistrado: 'recibo-maquila-registrado',
+  /** Entrega a cliente registrada: la RC re-evalúa `entregaCliente`. */
+  entregaClienteRegistrada: 'entrega-cliente-registrada',
+  /** Una etapa de corte/envío se CANCELÓ: la RC re-evalúa el proceso (decisión (f), des-completa). */
+  etapaCancelada: 'etapa-cancelada',
+  /** Un recibo de maquila se CANCELÓ: la RC re-evalúa el proceso de recibo (decisión (f)). */
+  reciboMaquilaCancelado: 'recibo-maquila-cancelado',
+  /** Una entrega a cliente se CANCELÓ: la RC re-evalúa `entregaCliente` (decisión (f)). */
+  entregaClienteCancelada: 'entrega-cliente-cancelada',
 } as const;
 
 /** Nombre válido de evento de outbox. */
@@ -27,6 +43,13 @@ export type NombreEventoOutbox = (typeof EVENTOS_OUTBOX)[keyof typeof EVENTOS_OU
 
 /** Versión actual del contrato del evento `material-recibido`. */
 export const VERSION_MATERIAL_RECIBIDO = 1;
+
+/**
+ * Versión actual del contrato de los eventos de ETAPA de producción (corte/envío/recibo/entrega y
+ * sus cancelaciones) que consume el auto-avance de la RC (F5-E6). Comparten forma (ver
+ * {@link EventoEtapaRc}); por eso una sola constante.
+ */
+export const VERSION_EVENTO_ETAPA_RC = 1;
 
 /**
  * Un material recibido en un renglón de recepción. `tipo`: `'tela'` (con `idLote` del lote creado),
@@ -70,6 +93,45 @@ export type EventoMaterialRecibido = {
   idAlmacen: number;
   /** Fecha de la recepción (YYYY-MM-DD). */
   fecha: string;
+};
+
+/**
+ * Carga COMÚN de los eventos de ETAPA de producción y de su cancelación que consume el auto-avance
+ * de la RC (F5-E6). Lleva lo MÍNIMO para que el consumidor reaccione: contra qué orden ocurrió la
+ * etapa y, en envío/recibo de maquila, el `idTipoProceso` (define si el proceso RC es de costura o
+ * estampado). El consumidor RELEE de la BD las cantidades color×talla (no viajan en el evento): así
+ * la re-evaluación es siempre sobre el estado físico ACTUAL y el handler es idempotente.
+ *
+ * `tipoEtapa` traza qué hecho lo originó (corte/envío/recibo/entrega); en las CANCELACIONES, es el
+ * tipo de la etapa cancelada (para que el consumidor sepa qué proceso RC des-completar).
+ */
+export type EventoEtapaRc = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden de producción a la que pertenece la etapa. */
+  idOrden: number;
+  /** Id de la `EtapaMovimiento` que originó (o se canceló en) este evento. */
+  idEtapaMovimiento: number;
+  /** Tipo de la etapa (`corte`/`envio_maquila`/`recibo_maquila`/`entrega_cliente`). */
+  tipoEtapa: string;
+  /** Tipo de proceso de maquila (solo envío/recibo; null en corte/entrega). */
+  idTipoProceso: number | null;
+};
+
+/**
+ * Carga del evento de CANCELACIÓN de una recepción de compra (F5-E6, decisión (f)). El consumidor
+ * re-evalúa `recepcionTela` de las órdenes ligadas a la OC. Lleva las ÓRDENES afectadas (de las
+ * líneas de la OC) ya resueltas por el emisor, para que el consumidor no tenga que recorrer la OC.
+ */
+export type EventoMaterialRecibidoCancelado = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden de COMPRA cuya recepción se reversó. */
+  idOrdenCompra: number;
+  /** Recepción reversada. */
+  idRecepcion: number;
+  /** Órdenes de PRODUCCIÓN ligadas a la OC (de sus líneas con `idOrden`), sin repetir. */
+  idsOrden: number[];
 };
 
 /**

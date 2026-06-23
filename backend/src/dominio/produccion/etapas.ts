@@ -51,7 +51,14 @@ import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../da
 import type { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_ETAPA_RC,
+  registrarEventoOutbox,
+  type EventoEtapaRc,
+} from '../../comun/eventos-dominio.js';
 import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
@@ -380,6 +387,21 @@ async function emitirEtapa(evento: NombreEvento, etapa: EtapaMovimiento): Promis
   });
 }
 
+/**
+ * Escribe en el OUTBOX DURABLE el evento de etapa que consume el auto-avance de la RC (F5-E6), en la
+ * MISMA transacción del hecho (atómico: si el corte/envío hace rollback, el evento no existe). Es el
+ * gancho REAL de F5: el `emitir(...)` in-process de arriba se conserva (inofensivo, nadie escucha en
+ * prod) pero quien dispara el auto-avance es esta fila del outbox. La RELEE el consumidor (no manda
+ * cantidades): la completitud se re-evalúa sobre el estado físico actual.
+ */
+async function registrarEventoEtapaRc(
+  tx: Tx,
+  evento: (typeof EVENTOS_OUTBOX)[keyof typeof EVENTOS_OUTBOX],
+  datos: EventoEtapaRc,
+): Promise<void> {
+  await registrarEventoOutbox(tx, evento, VERSION_EVENTO_ETAPA_RC, datos.idEmpresa, datos);
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────────────────
 
 /** Alta de corte: campos del esquema compartido. */
@@ -446,11 +468,21 @@ export async function registrarCorte(
       },
     });
 
+    // OUTBOX (F5-E6): el gancho durable que dispara el auto-avance de la RC (proceso `corte`).
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.corteRegistrado, {
+      idEmpresa: orden.idEmpresa,
+      idOrden: datos.idOrden,
+      idEtapaMovimiento: etapa.id,
+      tipoEtapa: TipoEtapaMovimiento.corte,
+      idTipoProceso: null,
+    });
+
     return etapa.id;
   }, bd);
 
   const salida = await obtenerEtapa(sesion, idEtapa, bd);
   await emitirEtapaPorId(sesion, idEtapa, EVENTOS_PRODUCCION.corteRegistrado, bd);
+  dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
   return salida;
 }
 
@@ -563,11 +595,22 @@ export async function registrarEnvioMaquila(
       },
     });
 
+    // OUTBOX (F5-E6): dispara el auto-avance de la RC (`envioCostura`/`envioEstampado` según el
+    // proceso; el consumidor resuelve costura vs estampado por `generaEntradaPt`).
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.envioMaquilaRegistrado, {
+      idEmpresa: orden.idEmpresa,
+      idOrden: datos.idOrden,
+      idEtapaMovimiento: etapa.id,
+      tipoEtapa: TipoEtapaMovimiento.envio_maquila,
+      idTipoProceso: datos.idTipoProceso,
+    });
+
     return etapa.id;
   }, bd);
 
   const salida = await obtenerEtapa(sesion, idEtapa, bd);
   await emitirEtapaPorId(sesion, idEtapa, EVENTOS_PRODUCCION.envioRegistrado, bd);
+  dispararPublicacion();
   return salida;
 }
 
@@ -593,7 +636,14 @@ export async function cancelarEtapaMovimiento(
   await enTransaccion(async (tx) => {
     const etapa = await tx.etapaMovimiento.findFirst({
       where: { id: idEtapa, idEmpresa: sesion.idEmpresaActiva },
-      select: { id: true, tipo: true, idOrden: true, canceladoEn: true, folio: true },
+      select: {
+        id: true,
+        tipo: true,
+        idOrden: true,
+        idTipoProceso: true,
+        canceladoEn: true,
+        folio: true,
+      },
     });
     if (etapa === null) {
       throw new ErrorNoEncontrado('EtapaMovimiento', idEtapa);
@@ -645,8 +695,20 @@ export async function cancelarEtapaMovimiento(
       accion: 'CANCELAR',
       datos: { tipo: etapa.tipo, folio: Number(etapa.folio), motivo: datos.motivo },
     });
+
+    // OUTBOX (F5-E6, decisión (f)): la cancelación re-evalúa el proceso de la RC; si ya no está
+    // cubierto, se des-completa y se recalcula el CPM. El consumidor sabe qué proceso por `tipoEtapa`
+    // (+ `idTipoProceso` para envío costura/estampado).
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.etapaCancelada, {
+      idEmpresa: sesion.idEmpresaActiva,
+      idOrden: etapa.idOrden,
+      idEtapaMovimiento: etapa.id,
+      tipoEtapa: etapa.tipo,
+      idTipoProceso: etapa.idTipoProceso,
+    });
   }, bd);
 
+  dispararPublicacion();
   return obtenerEtapa(sesion, idEtapa, bd);
 }
 

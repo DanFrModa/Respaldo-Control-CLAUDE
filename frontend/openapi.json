@@ -89110,6 +89110,10 @@
                               }
                             ]
                           },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa."
+                          },
                           "semaforo": {
                             "type": "string",
                             "enum": [
@@ -89180,6 +89184,7 @@
                           "capturadoPorNombre",
                           "capturadoEn",
                           "origenCaptura",
+                          "parcialEnCurso",
                           "semaforo",
                           "idsAntecesores",
                           "checklist"
@@ -89745,6 +89750,10 @@
                               }
                             ]
                           },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa."
+                          },
                           "semaforo": {
                             "type": "string",
                             "enum": [
@@ -89815,6 +89824,7 @@
                           "capturadoPorNombre",
                           "capturadoEn",
                           "origenCaptura",
+                          "parcialEnCurso",
                           "semaforo",
                           "idsAntecesores",
                           "checklist"
@@ -90289,6 +90299,10 @@
                               }
                             ]
                           },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa."
+                          },
                           "semaforo": {
                             "type": "string",
                             "enum": [
@@ -90359,6 +90373,7 @@
                           "capturadoPorNombre",
                           "capturadoEn",
                           "origenCaptura",
+                          "parcialEnCurso",
                           "semaforo",
                           "idsAntecesores",
                           "checklist"
@@ -91035,6 +91050,10 @@
                               }
                             ]
                           },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa."
+                          },
                           "semaforo": {
                             "type": "string",
                             "enum": [
@@ -91105,6 +91124,7 @@
                           "capturadoPorNombre",
                           "capturadoEn",
                           "origenCaptura",
+                          "parcialEnCurso",
                           "semaforo",
                           "idsAntecesores",
                           "checklist"
@@ -91602,6 +91622,10 @@
                               }
                             ]
                           },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa."
+                          },
                           "semaforo": {
                             "type": "string",
                             "enum": [
@@ -91672,6 +91696,7 @@
                           "capturadoPorNombre",
                           "capturadoEn",
                           "origenCaptura",
+                          "parcialEnCurso",
                           "semaforo",
                           "idsAntecesores",
                           "checklist"
@@ -92037,6 +92062,10 @@
                             ],
                             "description": "Semáforo de cumplimiento del proceso (HOY vs planeada vigente)."
                           },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? La tarea sigue activa."
+                          },
                           "checklist": {
                             "type": "array",
                             "items": {
@@ -92089,6 +92118,7 @@
                           "fechaPlaneadaVigente",
                           "diasAtraso",
                           "semaforo",
+                          "parcialEnCurso",
                           "checklist"
                         ],
                         "additionalProperties": false,

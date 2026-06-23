@@ -44,6 +44,7 @@ function tarea(id: number, extra: Partial<TareaRc> = {}): TareaRc {
     fechaPlaneadaVigente: '2026-06-20T00:00:00.000Z',
     diasAtraso: 0,
     semaforo: 'aTiempo',
+    parcialEnCurso: false,
     checklist: [],
     ...extra,
   };

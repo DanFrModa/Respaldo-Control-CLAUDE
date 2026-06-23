@@ -2,6 +2,7 @@ import { construirApp } from './app.js';
 import { detenerColaEventos, iniciarColaEventos } from './comun/cola-eventos.js';
 import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
 import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
+import { registrarAutoAvanceRc } from './dominio/ruta-critica/autoAvance.js';
 import { registrarBarridoRiesgoRc } from './comun/jobs/riesgo-rc.js';
 
 /**
@@ -55,6 +56,17 @@ await iniciarMotorJobs((mensaje, error) => {
 // inactivo (tests/CI). Best-effort: si fallan, la app sigue (el job se puede re-disparar).
 await registrarHandlerCpm();
 await registrarBarridoRiesgoRc((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra el CONSUMIDOR del AUTO-AVANCE de la Ruta Crítica (F5-E6): escucha la cola de eventos de
+// dominio (corte, envío, recibo, entrega, recepción de tela y sus cancelaciones) y auto-completa /
+// des-completa el proceso correspondiente de la RC, encolando el recálculo del CPM. Va AL FINAL —
+// DESPUÉS de `iniciarMotorJobs` y sus handlers — a propósito: el consumidor llama `encolarJob` para
+// el recálculo del CPM sobre la instancia del MOTOR DE JOBS (otra instancia pg-boss). Si se
+// registrara antes de iniciar el motor, un evento que llegara en esa ventana encolaría sobre un
+// motor aún nulo (no-op) y se perdería ese recálculo. NO-OP en tests/CI (EVENTOS_COLA_ACTIVA=false).
+await registrarAutoAvanceRc((mensaje, error) => {
   app.log.error({ error }, mensaje);
 });
 

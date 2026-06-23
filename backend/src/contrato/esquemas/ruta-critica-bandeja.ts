@@ -102,6 +102,9 @@ export const esquemaBandejaTareaSalida = z
     semaforo: esquemaEstadoSemaforo.describe(
       'Semáforo de cumplimiento del proceso (HOY vs planeada vigente).',
     ),
+    parcialEnCurso: z
+      .boolean()
+      .describe('¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? La tarea sigue activa.'),
     checklist: z
       .array(esquemaBandejaChecklistSalida)
       .describe('Ítems de checklist del proceso (snapshot por orden).'),

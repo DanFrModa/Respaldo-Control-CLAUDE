@@ -44,6 +44,7 @@ function proceso(extra: Partial<RutaOrdenProceso> = {}): RutaOrdenProceso {
     capturadoPorNombre: 'Juana Pérez',
     capturadoEn: '2026-06-11T15:00:00.000Z',
     origenCaptura: 'manual',
+    parcialEnCurso: false,
     semaforo: 'aTiempo',
     idsAntecesores: [],
     checklist: [],
@@ -99,6 +100,28 @@ describe('<RutaPorOrdenPagina>', () => {
     expect(captura).toHaveTextContent('Juana Pérez');
     // Plan vs real legibles.
     expect(screen.getByText(/12.*jun.*2026/i)).toBeInTheDocument();
+  });
+
+  it('marca "Parcial en curso" cuando el proceso lo tiene encendido (F5-E6)', () => {
+    render({
+      data: ruta({ procesos: [proceso({ estado: 'activo', parcialEnCurso: true })] }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+
+    expect(screen.getByTestId('rc-proceso-parcial')).toHaveTextContent(/parcial en curso/i);
+  });
+
+  it('NO marca "Parcial en curso" cuando está apagado', () => {
+    render({
+      data: ruta({ procesos: [proceso({ parcialEnCurso: false })] }),
+      isPending: false,
+      isError: false,
+      error: null,
+    });
+
+    expect(screen.queryByTestId('rc-proceso-parcial')).not.toBeInTheDocument();
   });
 
   it('avisa cuando la orden no tiene ruta programada', () => {
