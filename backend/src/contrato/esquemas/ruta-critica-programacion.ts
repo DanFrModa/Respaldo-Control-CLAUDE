@@ -175,6 +175,11 @@ export const esquemaRutaProcesoSalida = z
       .describe('Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5).'),
     capturadoEn: z.iso.datetime().nullable(),
     origenCaptura: z.enum(['manual', 'evento']).nullable(),
+    parcialEnCurso: z
+      .boolean()
+      .describe(
+        '¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa.',
+      ),
     semaforo: esquemaEstadoSemaforo.describe(
       'Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).',
     ),

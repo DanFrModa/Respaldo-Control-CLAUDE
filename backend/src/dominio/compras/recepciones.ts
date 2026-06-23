@@ -52,9 +52,11 @@ import { convertirLineaCompra } from '../../comun/conversion.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import {
   EVENTOS_OUTBOX,
+  VERSION_EVENTO_ETAPA_RC,
   VERSION_MATERIAL_RECIBIDO,
   registrarEventoOutbox,
   type EventoMaterialRecibido,
+  type EventoMaterialRecibidoCancelado,
 } from '../../comun/eventos-dominio.js';
 import {
   cancelarMovimientoMaterial,
@@ -816,15 +818,43 @@ export async function reversarRecepcion(
     // ya quedó marcada reversada arriba → su material deja de contar. Bajo el lock (B2).
     const oc = await tx.ordenCompra.findUniqueOrThrow({
       where: { id: recepcion.idOrdenCompra },
-      select: { id: true, estatus: true, lineas: { select: { id: true, cantidad: true } } },
+      select: {
+        id: true,
+        estatus: true,
+        lineas: { select: { id: true, cantidad: true, idOrden: true } },
+      },
     });
     await recalcularEstatusOC(tx, sesion, {
       id: oc.id,
       estatus: oc.estatus,
       lineas: oc.lineas.map((l) => ({ id: l.id, pedido: Number(l.cantidad) })),
     });
+
+    // OUTBOX (F5-E6, decisión (f)): el reverso re-evalúa `recepcionTela` de las órdenes ligadas a la
+    // OC; si ya no hay tela completa, ese proceso de la RC se des-completa y recalcula su CPM. Las
+    // órdenes salen de los `idOrden` de las líneas de la OC (sin repetir). Si la OC no liga ninguna
+    // orden de producción, no hay nada que re-evaluar (el evento igual se escribe; el consumidor lo
+    // ignora con `idsOrden` vacío).
+    const idsOrden = [
+      ...new Set(oc.lineas.map((l) => l.idOrden).filter((x): x is number => x !== null)),
+    ];
+    const eventoCancel: EventoMaterialRecibidoCancelado = {
+      idEmpresa,
+      idOrdenCompra: oc.id,
+      idRecepcion,
+      idsOrden,
+    };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.materialRecibidoCancelado,
+      VERSION_EVENTO_ETAPA_RC,
+      idEmpresa,
+      eventoCancel,
+    );
   }, bd);
 
+  // Tras el commit: dispara la publicación (best-effort; el barrido recupera si falla).
+  dispararPublicacion();
   return obtenerRecepcion(idRecepcion, idEmpresa, bd);
 }
 

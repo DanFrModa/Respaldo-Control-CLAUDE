@@ -236,6 +236,15 @@ function TareaCard({
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <span className="font-medium">{tarea.nombreProceso}</span>
+        {tarea.parcialEnCurso ? (
+          <Badge
+            variant="outline"
+            className="border-amber-400 text-amber-700 dark:border-amber-600 dark:text-amber-300"
+            data-testid="bandeja-parcial"
+          >
+            Parcial en curso
+          </Badge>
+        ) : null}
         <span className="text-muted-foreground">Plan: {fechaRc(tarea.fechaPlaneadaVigente)}</span>
         {tarea.diasAtraso > 0 ? (
           <span className="font-medium text-red-600" data-testid="bandeja-atraso">

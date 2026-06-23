@@ -190,6 +190,15 @@ function ProcesoRenglon({ proceso }: { proceso: RutaOrdenProceso }): React.JSX.E
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          {proceso.parcialEnCurso ? (
+            <Badge
+              variant="outline"
+              className="border-amber-400 text-amber-700 dark:border-amber-600 dark:text-amber-300"
+              data-testid="rc-proceso-parcial"
+            >
+              Parcial en curso
+            </Badge>
+          ) : null}
           <Badge variant={VARIANTE_ESTADO[proceso.estado]}>{ETIQUETA_ESTADO[proceso.estado]}</Badge>
           <Semaforo semaforo={proceso.semaforo} />
         </div>

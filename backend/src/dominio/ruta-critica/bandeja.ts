@@ -139,6 +139,7 @@ function aTareaSalida(fila: TareaConRelaciones, hoy: Date): BandejaTareaSalida {
       fila.fechaPlaneadaVigente === null ? null : fila.fechaPlaneadaVigente.toISOString(),
     diasAtraso: diasAtrasoProceso(fila.fechaPlaneadaVigente, hoy),
     semaforo,
+    parcialEnCurso: fila.parcialEnCurso,
     checklist: fila.checklist.map((c) => ({
       id: c.id,
       descripcion: c.descripcion,

@@ -3543,6 +3543,13 @@ model RutaOrden {
   /// Estado del proceso en la ruta (avance simple; el semáforo es E4).
   estado EstadoProcesoRuta @default(pendiente)
 
+  /// ¿Hay una entrada PARCIAL en curso para este proceso? (F5-E6, decisión (d)). El auto-avance la
+  /// enciende cuando un evento (recibo de maquila, recepción de tela, entrega…) cubre SOLO una parte
+  /// de la cantidad pedida color×talla, y la apaga cuando se completa (proceso `completado`) o se
+  /// des-completa por una cancelación (decisión (f)). Es una MARCA visible "parcial en curso"; el
+  /// proceso solo se marca `completado` cuando llega la cantidad COMPLETA.
+  parcialEnCurso Boolean @default(false) @map("parcial_en_curso")
+
   /// Quién capturó el cumplimiento (null mientras no se complete).
   capturadoPorId String?        @map("capturado_por_id")
   /// Cuándo se capturó el cumplimiento (null mientras no se complete).

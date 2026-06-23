@@ -86,6 +86,8 @@ export interface RutaOrdenProcesoDto {
   capturadoPorNombre: string | null;
   capturadoEn: Date | null;
   origenCaptura: 'manual' | 'evento' | null;
+  /** ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no está completo. */
+  parcialEnCurso: boolean;
   /** Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4). */
   semaforo: EstadoSemaforo;
   idsAntecesores: number[];
@@ -940,6 +942,7 @@ function armarDto(
         f.capturadoPorId === null ? null : (nombresPorId.get(f.capturadoPorId) ?? null),
       capturadoEn: f.capturadoEn,
       origenCaptura: f.origenCaptura,
+      parcialEnCurso: f.parcialEnCurso,
       semaforo: estadoSemaforoProceso(
         { fechaPlaneadaVigente: f.fechaPlaneadaVigente, fechaReal: f.fechaReal },
         hoy,

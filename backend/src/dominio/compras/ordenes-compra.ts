@@ -628,6 +628,11 @@ export async function autorizarOC(
       accion: 'OTRO',
       datos: { autorizada: true, numCompra: Number(actual.numCompra) },
     });
+    // F5-E6: NO se emite evento de auto-avance al autorizar una OC. El catálogo de procesos de la RC
+    // no tiene un `tipoEvento` para "autorización de OC": el único `autorizacionArte` es de ARTE, no
+    // de OC (ver seed-ruta-critica). El gancho de compras con la RC es `recepcionTela` (al RECIBIR el
+    // material, en recepciones.ts), no al autorizar la compra. Si algún día existe un proceso RC
+    // ligado a la autorización de OC, se añade aquí el `registrarEventoOutbox` correspondiente.
   }, bd);
 
   return obtenerOC(sesion, id, bd);

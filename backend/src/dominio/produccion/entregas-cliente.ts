@@ -51,7 +51,14 @@ import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  EVENTOS_OUTBOX,
+  VERSION_EVENTO_ETAPA_RC,
+  registrarEventoOutbox,
+  type EventoEtapaRc,
+} from '../../comun/eventos-dominio.js';
 import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
   bloquearArticuloPt,
@@ -347,6 +354,19 @@ async function emitirEntrega(evento: NombreEvento, etapa: EtapaMovimiento): Prom
   });
 }
 
+/**
+ * Escribe en el OUTBOX DURABLE el evento de entrega que consume el auto-avance de la RC (F5-E6), en
+ * la MISMA transacción del hecho (atómico). Gancho REAL de F5: la RC re-evalúa `entregaCliente`
+ * (parcial mientras falte por entregar; completa cuando se entrega todo lo pedido).
+ */
+async function registrarEventoEtapaRc(
+  tx: Tx,
+  evento: (typeof EVENTOS_OUTBOX)[keyof typeof EVENTOS_OUTBOX],
+  datos: EventoEtapaRc,
+): Promise<void> {
+  await registrarEventoOutbox(tx, evento, VERSION_EVENTO_ETAPA_RC, datos.idEmpresa, datos);
+}
+
 // ── Operaciones ───────────────────────────────────────────────────────────────────────────────
 
 /** Alta de entrega: campos del esquema compartido. */
@@ -436,11 +456,21 @@ export async function registrarEntregaCliente(
       },
     });
 
+    // OUTBOX (F5-E6): dispara el auto-avance de la RC (`entregaCliente`).
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.entregaClienteRegistrada, {
+      idEmpresa: orden.idEmpresa,
+      idOrden: datos.idOrden,
+      idEtapaMovimiento: entrega.id,
+      tipoEtapa: TipoEtapaMovimiento.entrega_cliente,
+      idTipoProceso: null,
+    });
+
     return entrega.id;
   }, bd);
 
   const salida = await obtenerEntrega(sesion, idEntrega, bd);
   await emitirEntregaPorId(idEntrega, EVENTOS_PRODUCCION.entregaRegistrado, bd);
+  dispararPublicacion();
   return salida;
 }
 
@@ -514,8 +544,19 @@ export async function cancelarEntregaCliente(
         movimientosRevertidos: movimientos.length,
       },
     });
+
+    // OUTBOX (F5-E6, decisión (f)): la cancelación re-evalúa `entregaCliente`; si ya no está cubierto,
+    // lo des-completa y recalcula el CPM.
+    await registrarEventoEtapaRc(tx, EVENTOS_OUTBOX.entregaClienteCancelada, {
+      idEmpresa: sesion.idEmpresaActiva,
+      idOrden: entrega.idOrden,
+      idEtapaMovimiento: entrega.id,
+      tipoEtapa: TipoEtapaMovimiento.entrega_cliente,
+      idTipoProceso: null,
+    });
   }, bd);
 
+  dispararPublicacion();
   return obtenerEntrega(sesion, idEntrega, bd);
 }
 

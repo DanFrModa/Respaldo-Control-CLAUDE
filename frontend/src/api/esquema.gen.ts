@@ -37877,6 +37877,8 @@ export interface paths {
                 capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa. */
+                parcialEnCurso: boolean;
                 /**
                  * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).
                  * @enum {string}
@@ -38061,6 +38063,8 @@ export interface paths {
                 capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa. */
+                parcialEnCurso: boolean;
                 /**
                  * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).
                  * @enum {string}
@@ -38264,6 +38268,8 @@ export interface paths {
                 capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa. */
+                parcialEnCurso: boolean;
                 /**
                  * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).
                  * @enum {string}
@@ -38568,6 +38574,8 @@ export interface paths {
                 capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa. */
+                parcialEnCurso: boolean;
                 /**
                  * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).
                  * @enum {string}
@@ -38762,6 +38770,8 @@ export interface paths {
                 capturadoPorNombre: string | null;
                 capturadoEn: string | null;
                 origenCaptura: ('manual' | 'evento') | null;
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa. */
+                parcialEnCurso: boolean;
                 /**
                  * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).
                  * @enum {string}
@@ -38940,6 +38950,8 @@ export interface paths {
                  * @enum {string}
                  */
                 semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? La tarea sigue activa. */
+                parcialEnCurso: boolean;
                 /** @description Ítems de checklist del proceso (snapshot por orden). */
                 checklist: {
                   /** @description Id del ítem de checklist. */

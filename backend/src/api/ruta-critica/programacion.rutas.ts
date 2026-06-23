@@ -72,6 +72,7 @@ function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
       capturadoPorNombre: p.capturadoPorNombre,
       capturadoEn: iso(p.capturadoEn),
       origenCaptura: p.origenCaptura,
+      parcialEnCurso: p.parcialEnCurso,
       semaforo: p.semaforo,
       idsAntecesores: p.idsAntecesores,
       checklist: p.checklist,
