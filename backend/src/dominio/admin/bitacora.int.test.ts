@@ -67,7 +67,6 @@ describe('Bitácora — lectura del log A7 (F6-E1)', () => {
 
   it('filtra por acción y por usuario, y resuelve el nombre del usuario', async () => {
     // Un usuario real cuyo nombre la bitácora debe resolver.
-    const empresa = await cliente.empresa.findFirstOrThrow();
     const usuario = await cliente.usuario.create({
       data: {
         id: 'usuario-prueba',
@@ -81,7 +80,6 @@ describe('Bitácora — lectura del log A7 (F6-E1)', () => {
     });
     const catalogo = sesionDePrueba({
       id: usuario.id,
-      idEmpresaActiva: empresa.id,
       permisos: ['calidad.ver', 'calidad.administrar-catalogo'],
     });
     const tipo = await crearTipoProducto(catalogo, { nombre: 'Sudadera' }, bd());
