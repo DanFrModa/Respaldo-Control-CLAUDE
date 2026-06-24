@@ -386,3 +386,93 @@ Profundizan D10 (RC como workflow configurable) y D11 (modelo analítico).
   KPIs de F7.
 
 - **Fecha (a–h):** 2026-06-22. Cerradas con Daniel; relayed por Gabriel.
+
+---
+
+### Decisiones de negocio de F6 (Calidad + EsMa) — 2026-06-24
+
+Respuestas de **Daniel** (dueño / experto del negocio), relayed por Gabriel, **2026-06-24**, ANTES de
+arrancar la fase (preguntas de fase juntas, regla CLAUDE.md §6). Detalle operativo en la ficha
+`docs/hoja-de-ruta/F6-etapas.md`. Varias **revierten** el default que la ficha había propuesto — marcadas
+abajo. La ubicación final del módulo de Calidad (D8) sigue por definir.
+
+#### (a) — Resultado de la auditoría: MANUAL con comentarios, NO cálculo automático AQL (E2)
+- **Decisión:** el auditor **marca los defectos** (captura fallas) pero **decide a mano** si la auditoría
+  se aprueba o reprueba, **con comentarios/observaciones**. *(Esto REVIERTE el default de la ficha, que
+  calculaba el veredicto automáticamente por nivel AQL.)*
+- **Cómo queda:** el cálculo por nivel AQL se conserva como **sugerencia informativa** en pantalla (y
+  como metadato para los KPIs de F7), **sin ser vinculante**. El campo `resultado` lo fija el usuario; el
+  override deja de ser excepción y pasa a ser el flujo normal, todo con `Bitacora` (A7).
+- **Consecuencia:** la **severidad** de los 40 defectos (crítico/mayor/menor) ya **no entra** en ningún
+  veredicto — es pura categorización para KPIs; el arranque automático (inferida del AQL, "por revisar")
+  es suficiente y Daniel la ajusta en pantalla.
+- **Aplica en:** F6-E1 (catálogo/severidad) y F6-E2 (`capturarResultado`).
+
+#### (b) — Tamaño de muestra automático con default; cambiarlo requiere autorización (E1/E2)
+- **Decisión:** el **tamaño de muestra** se determina **automático según la cantidad de la orden**, con
+  un **default** (tabla ISO 2859 nivel II, AQL 1.0/2.5/10 como datos). **Modificar** la muestra propuesta
+  **requiere autorización** (permiso).
+- **Cómo queda:** la tabla AQL sirve para **calcular la muestra**, no para el veredicto (ver (a)). El
+  override de la muestra se gobierna con un permiso server-side (A4).
+- **Aplica en:** F6-E1 (`servicioPlanesAQL` / tabla de muestreo) y F6-E2 (alta con muestra propuesta).
+
+#### (c) — Misma exigencia para todos: un solo plan, sin asignación por cliente/producto (E1)
+- **Decisión:** la **misma exigencia** aplica a **todos los clientes y todos los productos** → **un solo
+  plan default** del sistema. *(REVIERTE/simplifica el default de la ficha, que preveía asignar el plan
+  por cliente y/o tipo de producto con un resolver en cascada.)*
+- **Cómo queda:** se **cae** la tabla de asignación de planes y el resolver cliente→tipo→default; queda
+  el plan único. Esto cierra el supuesto (7) de la ficha **para la tabla de muestreo** (el "tipo de
+  producto" sigue vivo, pero por (d), para filtrar defectos, no para el plan).
+- **Aplica en:** F6-E1.
+
+#### (d) — Defectos por tipo de producto: catálogo nuevo, etiquetado, tipo heredado del modelo (E1/E2)
+- **Decisión:** los defectos **se cargan**, pero **cada tipo de producto puede tener defectos distintos**.
+  Solución acordada (propuesta del equipo + confirmación de Gabriel relayando a Daniel):
+  - Catálogo nuevo **"Tipo de producto"**, **corto y editable** (arranca con una lista chica y se agranda
+    sobre la marcha).
+  - Cada **defecto se etiqueta** por tipo de producto donde aplica, más una marca **"general"** para los
+    que aplican a cualquier producto.
+  - El tipo de producto **viene del modelo por default** (se define una vez y se hereda a sus órdenes),
+    con **override en la auditoría** como red de seguridad; el alta pre-carga los defectos del tipo + los
+    generales y el auditor siempre puede agregar cualquier defecto a mano.
+- **Pendiente operativo (no bloquea):** Daniel entrega la **lista inicial** de tipos de producto; mientras
+  tanto se siembra una corta y editable.
+- **Aplica en:** F6-E1 (catálogo `TipoProducto` + etiqueta en `DefectoCatalogo` + campo en `Modelo`) y
+  F6-E2 (pre-carga por tipo).
+
+#### (e) — Cargo de estampado a su propio precio (corrige bug v1) (E4)
+- **Decisión:** el cargo de **estampado** se valúa con **su propio precio** (`AplicacionOrd`), **determinado
+  en cada orden de producción** y que **puede variar de orden a orden** aun con el mismo estampado.
+  Confirma el **fix del bug v1** (`EsMaRecibosSemEstCon` calculaba el importe con `MaquilaOrd`, el precio
+  de costura). Cierra la consulta (a) de las notas de la ficha.
+- **Aplica en:** F6-E4 (`servicioCargos.validar`).
+
+#### (f) — Orden "pagada" derivada + forzar estatus + segundas sin costo (E4)
+- **Decisión:** una orden se marca **pagada en automático** cuando **todos sus cargos** están pagados
+  (derivada, D3), **pero**:
+  - se admite una **casilla para forzar el estatus** en **excepciones** (override manual auditado);
+  - las **"segundas"** (prendas reclasificadas como defectuosas) **a veces no se pagan** al maquilero →
+    se debe poder **meterlas sin costo** (cargo en cero / excluidas del pago).
+- **Cómo queda:** ajusta el supuesto (5) de la ficha (era "derivada, sin marca manual"). Liga
+  **Calidad↔EsMa**: lo reclasificado a 2ª en una auditoría (E2) alimenta el "sin costo" del cargo.
+- **Aplica en:** F6-E4 (`Orden.pagada` derivada + override; cargo con segundas sin costo).
+
+#### (g) — Pagos duplicados: BLOQUEAR vía "prendas por pagar", no solo avisar (E4)
+- **Decisión:** los pagos se ligan al **sistema de recibos**: al pagar se **descuentan las prendas
+  pagadas** (quedan visibles como ya pagadas) y si se intenta **re-pagar lo mismo, arroja error**. El
+  modelo es de **"prendas por pagar"**: cada cargo/prenda tiene saldo por pagar, pagar lo consume, y
+  pagar de nuevo lo ya pagado se bloquea. *(REFUERZA el default de la ficha, que solo "advertía" por
+  mismo maquilero+monto en ventana corta — ahora es bloqueo estructural, pagos aplicados contra cargos.)*
+- **Aplica en:** F6-E4 (`servicioPagos`: pago ligado a cargos; antidoble-pago duro).
+
+#### (h) — Recibo: pagador FR Moda; con/sin factura por proveedor; "ambos" → dos estados de cuenta (E4/E5)
+- **Decisión:** el pagador del recibo es **FR Moda siempre** (desde la **config de empresa**, A9 — no el
+  "SR. DANIEL MASRI" hardcodeado del reporte viejo). La modalidad **con factura / sin factura** se
+  **determina por proveedor**; un proveedor puede operar **de las dos maneras** y en ese caso debe tener
+  **dos estados de cuenta** (uno facturado, uno no facturado).
+- **Cómo queda:** flag **`conFactura`** en cada movimiento de EsMa + atributo de **modalidad de
+  facturación** en el **proveedor** (R15/F1: solo-con / solo-sin / ambos); el estado de cuenta de E5 se
+  **segmenta** por factura (para "ambos", dos saldos corrientes separados).
+- **Aplica en:** F6-E4 (modelo + recibo R9) y F6-E5 (estado de cuenta segmentado).
+
+- **Fecha (a–h):** 2026-06-24. Cerradas con Daniel; relayed por Gabriel.

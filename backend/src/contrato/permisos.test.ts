@@ -44,6 +44,8 @@ describe('catálogo de permisos', () => {
   it('incluye los permisos nuevos de administración y de catálogos de v2', () => {
     const nuevos = catalogo.filter((p) => p.origen === undefined).map((p) => p.clave);
     expect(nuevos.sort()).toEqual([
+      // Consulta de la bitácora del sistema (F6-E1, transversal): lectura del motor A7.
+      'admin.ver-bitacora',
       'almacenes.administrar',
       'almacenes.ver',
       // Catálogos de materiales (F1-E3): avíos (R1) + proveedores.
@@ -52,6 +54,11 @@ describe('catálogo de permisos', () => {
       // Catálogos de materiales (F1-E3): bordados/estampados (R2) + foto.
       'bordados.administrar',
       'bordados.ver',
+      // Calidad — base configurable (Módulo 8, F6-E1): ver + administrar el catálogo de
+      // defectos/tipos de producto/planes AQL (nuevos de v2; los `calidad.*-auditorias` LEGADO
+      // del núcleo de auditorías tienen origen).
+      'calidad.administrar-catalogo',
+      'calidad.ver',
       // Catálogos estructurados (F1-E2): clientes (D7) + tallas/curvas (D4).
       // NOTA (fusión de terceros, D12/R15): maquileros/cortadores se fusionaron en proveedores.
       'clientes.administrar',

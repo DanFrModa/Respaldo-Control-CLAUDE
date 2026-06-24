@@ -49,11 +49,12 @@ export type EntradaCrearModelo = z.input<typeof esquemaModeloCrear>;
 /** Edición: `id` + cambios parciales (incluye `activo` para descontinuar/reactivar). */
 export type EntradaActualizarModelo = z.input<typeof esquemaModeloEditar>;
 
-/** Modelo con su temporada/curva/género y el conteo de fotos (forma del listado). */
+/** Modelo con su temporada/curva/género/tipo de producto y el conteo de fotos (forma del listado). */
 export type ModeloConRelaciones = Modelo & {
   temporada: { nombre: string } | null;
   curvaTalla: { nombre: string } | null;
   genero: { nombre: string } | null;
+  tipoProducto: { nombre: string } | null;
   _count: { fotos: number };
   /**
    * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
@@ -68,6 +69,7 @@ export const incluirRelacionesModelo = {
   temporada: { select: { nombre: true } },
   curvaTalla: { select: { nombre: true } },
   genero: { select: { nombre: true } },
+  tipoProducto: { select: { nombre: true } },
   _count: { select: { fotos: true } },
 } satisfies Prisma.ModeloInclude;
 
@@ -166,6 +168,22 @@ async function exigirGeneroValido(tx: Tx, idGenero: number): Promise<void> {
   }
 }
 
+/** Valida que un tipo de producto (si viene) exista y esté ACTIVO (F6-E1). */
+async function exigirTipoProductoValido(tx: Tx, idTipoProducto: number): Promise<void> {
+  const tipo = await tx.tipoProducto.findUnique({
+    where: { id: idTipoProducto },
+    select: { nombre: true, activo: true },
+  });
+  if (tipo === null) {
+    throw new ErrorValidacion('El tipo de producto seleccionado no existe.');
+  }
+  if (!tipo.activo) {
+    throw new ErrorValidacion(
+      `El tipo de producto "${tipo.nombre}" está desactivado y no se puede asignar.`,
+    );
+  }
+}
+
 /** Construye el `data` de los campos opcionales presentes en el alta (solo los definidos). */
 function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUncheckedCreateInput> {
   const data: Partial<Prisma.ModeloUncheckedCreateInput> = {};
@@ -174,6 +192,7 @@ function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUnc
   if (datos.idTemporada !== undefined) data.idTemporada = datos.idTemporada;
   if (datos.idCurvaTalla !== undefined) data.idCurvaTalla = datos.idCurvaTalla;
   if (datos.idGenero !== undefined) data.idGenero = datos.idGenero;
+  if (datos.idTipoProducto !== undefined) data.idTipoProducto = datos.idTipoProducto;
   return data;
 }
 
@@ -235,6 +254,10 @@ function aplicarOpcionalesEditar(
     cambios.idGenero = datos.idGenero;
     detalle.idGenero = { de: actual.idGenero, a: datos.idGenero };
   }
+  if (datos.idTipoProducto !== undefined && datos.idTipoProducto !== actual.idTipoProducto) {
+    cambios.idTipoProducto = datos.idTipoProducto;
+    detalle.idTipoProducto = { de: actual.idTipoProducto, a: datos.idTipoProducto };
+  }
 
   return detalle;
 }
@@ -264,6 +287,8 @@ export async function crearModelo(
       if (datos.idTemporada !== undefined) await exigirTemporadaValida(tx, datos.idTemporada);
       if (datos.idCurvaTalla !== undefined) await exigirCurvaValida(tx, datos.idCurvaTalla);
       if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
+      if (datos.idTipoProducto !== undefined)
+        await exigirTipoProductoValido(tx, datos.idTipoProducto);
 
       const modelo = await tx.modelo.create({
         data: {
@@ -353,6 +378,13 @@ export async function actualizarModelo(
         datos.idGenero !== actual.idGenero
       ) {
         await exigirGeneroValido(tx, datos.idGenero);
+      }
+      if (
+        datos.idTipoProducto !== undefined &&
+        datos.idTipoProducto !== null &&
+        datos.idTipoProducto !== actual.idTipoProducto
+      ) {
+        await exigirTipoProductoValido(tx, datos.idTipoProducto);
       }
 
       const huboCambio =

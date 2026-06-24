@@ -55,7 +55,7 @@ test.describe('Inicio de sesión', () => {
     // PISO razonable y la presencia de módulos representativos de varias áreas.
     const navegacion = page.getByRole('navigation', { name: 'Módulos' }).first();
     const links = navegacion.getByRole('link');
-    expect(await links.count()).toBeGreaterThanOrEqual(18);
+    expect(await links.count()).toBeGreaterThanOrEqual(20);
     for (const modulo of [
       'Catálogos',
       'Producción',
@@ -63,6 +63,8 @@ test.describe('Inicio de sesión', () => {
       'Ruta Crítica',
       // Sub-vista del concentrado (F5-E7): aparece como enlace del menú con su permiso.
       'Concentrado planeado vs real',
+      // Calidad (F6-E1): módulo + sub-vista de defectos.
+      'Calidad',
       'Administración',
     ]) {
       await expect(links.filter({ hasText: modulo }).first()).toBeVisible();

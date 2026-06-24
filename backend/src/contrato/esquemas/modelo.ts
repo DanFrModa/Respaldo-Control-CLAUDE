@@ -173,6 +173,12 @@ export const esquemaModeloCrear = z.object({
     .int({ error: 'El id del género debe ser entero' })
     .positive({ error: 'El id del género debe ser positivo' })
     .optional(),
+  /** Tipo de producto para Calidad (opcional, F6-E1, decisión (d)). Si viene, debe existir/estar activo. */
+  idTipoProducto: z
+    .number({ error: 'El id del tipo de producto debe ser un número' })
+    .int({ error: 'El id del tipo de producto debe ser entero' })
+    .positive({ error: 'El id del tipo de producto debe ser positivo' })
+    .optional(),
   ...camposOpcionalesModelo,
 });
 
@@ -218,6 +224,13 @@ export const esquemaModeloEditar = z
       .number({ error: 'El id del género debe ser un número' })
       .int({ error: 'El id del género debe ser entero' })
       .positive({ error: 'El id del género debe ser positivo' })
+      .nullable()
+      .optional(),
+    /** `null` quita el tipo de producto; un id lo fija; omitir = no tocar (F6-E1). */
+    idTipoProducto: z
+      .number({ error: 'El id del tipo de producto debe ser un número' })
+      .int({ error: 'El id del tipo de producto debe ser entero' })
+      .positive({ error: 'El id del tipo de producto debe ser positivo' })
       .nullable()
       .optional(),
     descripcion: camposOpcionalesModelo.descripcion.nullable(),
@@ -296,6 +309,12 @@ export const esquemaModeloSalida = z
     curvaTalla: z.string().nullable().describe('Nombre de la curva de tallas, o null.'),
     idGenero: z.number().int().nullable().describe('Id del género, o null.'),
     genero: z.string().nullable().describe('Nombre del género, o null.'),
+    idTipoProducto: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Id del tipo de producto, o null (F6-E1).'),
+    tipoProducto: z.string().nullable().describe('Nombre del tipo de producto, o null.'),
     cantidadFotos: z.number().int().describe('Cantidad de fotos del modelo.'),
     /**
      * URL GET prefirmada de la FOTO PRINCIPAL del modelo (la primera por orden, luego id), o

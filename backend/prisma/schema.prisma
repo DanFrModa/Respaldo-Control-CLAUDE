@@ -1343,6 +1343,11 @@ model Modelo {
   /// Género (opcional; se poblará en el ETL E7). Restrict (igual que temporada).
   idGenero     Int?        @map("id_genero")
   genero       Genero?     @relation(fields: [idGenero], references: [id], onDelete: Restrict)
+  /// Tipo de producto para Calidad (F6-E1, decisión (d)): la auditoría hereda este tipo del
+  /// modelo para filtrar los defectos aplicables. NULLABLE y sin default (no rompe los modelos
+  /// existentes; se asigna desde la pantalla de Modelos). Restrict (igual que temporada/género).
+  idTipoProducto Int?          @map("id_tipo_producto")
+  tipoProducto   TipoProducto? @relation(fields: [idTipoProducto], references: [id], onDelete: Restrict)
 
   /// Borrado suave = descontinuar (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
@@ -3617,4 +3622,178 @@ model RutaOrdenChecklist {
 
   @@index([idRutaOrden])
   @@map("ruta_orden_checklist")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CALIDAD (F6-E1) — Control de calidad: catálogo de defectos enriquecido + tipos de
+// producto + motor de planes de muestreo AQL como DATOS (no código). doc funcional
+// `09-Control-de-Calidad.md` §2/§5; MEJORAS 09; DECISIONES.md §F6 (a)–(d). El núcleo
+// transaccional de auditorías llega en F6-E2 (este E1 es solo la base configurable).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Severidad del defecto (doc 09 §5.4: categorías/severidad para el catálogo). Es METADATO
+/// INFORMATIVO (categorización + KPIs de F7): NO entra en ningún veredicto de auditoría
+/// (decisión (a) — el resultado lo decide el auditor a mano en E2). Por eso vive como enum
+/// libre, sin pesos ni números de aceptación.
+enum SeveridadDefecto {
+  critico
+  mayor
+  menor
+
+  @@map("severidad_defecto")
+}
+
+/// Tipo de producto (F6-E1, decisión (d) — DECISIONES.md §F6). Catálogo CORTO y editable que
+/// clasifica los modelos (playera, pantalón, sudadera…) para FILTRAR qué defectos aplican a una
+/// auditoría (NO para el plan AQL: hay un solo plan para todos, decisión (c)). El tipo se hereda
+/// del modelo (`Modelo.tipoProductoId`) y en el alta de auditoría se puede sobre-escribir (E2).
+/// GLOBAL como los catálogos de F1 (sin idEmpresa); borrado suave + auditoría A7.
+model TipoProducto {
+  id     Int     @id @default(autoincrement())
+  /// Nombre del tipo (único global, insensible a mayúsculas lo valida el dominio).
+  nombre String  @unique
+  activo Boolean @default(true)
+
+  /// Modelos clasificados con este tipo (F1, Restrict: un tipo en uso por un modelo no se borra
+  /// físico → se desactiva).
+  modelos         Modelo[]
+  /// Defectos etiquetados con este tipo (M:N por `DefectoTipoProducto`). Cascade desde el puente.
+  defectosLigados DefectoTipoProducto[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("tipos_producto")
+}
+
+/// Defecto del catálogo de calidad (F6-E1 — ex `CC_Catalogo`, doc 09 §2). `nivelAQL` numérico
+/// (1.0 / 2.5 / 10 — el AQL al que pertenece el defecto, doc 09 §2: la columna AQL del viejo trae
+/// '1'/'2.5'/'10' limpios). `favorito` = se pre-carga en toda auditoría nueva (ex `Favorito`,
+/// E2). `severidad` es METADATO (no veredicto, decisión (a)). `aplicaGeneral=true` → el defecto
+/// aplica a TODOS los tipos de producto sin importar las ligas de `DefectoTipoProducto` (decisión
+/// (d)). GLOBAL (sin idEmpresa — catálogo maestro como F1); borrado suave (un defecto con
+/// auditorías históricas NO se borra físico, solo se inactiva); auditoría A7.
+model DefectoCatalogo {
+  id          Int     @id @default(autoincrement())
+  /// Clave de negocio del defecto (ex `CC_Catalogo.Clave`). Única global.
+  clave       String  @unique
+  descripcion String
+  /// Página/referencia del manual de calidad donde se ilustra (ex `Pag`). Opcional.
+  pag         String?
+  /// Nivel AQL al que pertenece el defecto (1.0 / 2.5 / 10). Numérico para agrupar por nivel en E2.
+  nivelAQL    Decimal @map("nivel_aql") @db.Decimal(4, 2)
+  /// Se pre-carga en toda auditoría nueva (ex `CC_Catalogo.Favorito` — hoy 33 favoritos).
+  favorito    Boolean @default(false)
+  /// Categoría libre para agrupar defectos (doc 09 §5.4). Opcional.
+  categoria   String?
+  /// Severidad informativa (NO entra en el veredicto, decisión (a)).
+  severidad   SeveridadDefecto @default(menor)
+  /// ¿Aplica a TODOS los tipos de producto? (decisión (d)). Si es `true`, las ligas de
+  /// `DefectoTipoProducto` se ignoran (el defecto es universal).
+  aplicaGeneral Boolean @default(false) @map("aplica_general")
+  activo        Boolean @default(true)
+
+  /// Tipos de producto a los que aplica este defecto (M:N por `DefectoTipoProducto`). Cuando
+  /// `aplicaGeneral=true` estas ligas no importan (aplica a todos).
+  tiposLigados DefectoTipoProducto[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("defectos_catalogo")
+}
+
+/// Puente M:N defecto ↔ tipo de producto (F6-E1, decisión (d)). Un defecto aplica a los tipos
+/// ligados aquí (salvo que `DefectoCatalogo.aplicaGeneral=true`, que lo hace universal). PK
+/// compuesta: una liga única por par. Cascade desde ambos extremos (reescribir las ligas de un
+/// defecto en la tx; quitar un tipo arrastra sus ligas).
+model DefectoTipoProducto {
+  idDefecto      Int @map("id_defecto")
+  idTipoProducto Int @map("id_tipo_producto")
+
+  defecto      DefectoCatalogo @relation(fields: [idDefecto], references: [id], onDelete: Cascade)
+  tipoProducto TipoProducto    @relation(fields: [idTipoProducto], references: [id], onDelete: Cascade)
+
+  @@id([idDefecto, idTipoProducto])
+  @@index([idTipoProducto])
+  @@map("defecto_tipo_producto")
+}
+
+/// Plan de muestreo AQL (F6-E1 — doc 09 §5.2; ISO 2859 nivel general II, AQL 1.0/2.5/10). Es la
+/// tabla de muestreo COMO DATOS (no motor estadístico — "no sobre-diseñar"). Decisión (c): hay UN
+/// solo plan default activo para todos (sin asignación por cliente ni tipo de producto). El plan
+/// sirve para la MUESTRA (decisión (b)); el límite acepta/rechaza queda como referencia (el
+/// veredicto lo decide el auditor a mano en E2, decisión (a)). GLOBAL; auditoría A7.
+model PlanMuestreoAQL {
+  id     Int     @id @default(autoincrement())
+  /// Nombre del plan (único global). Ej. "ISO 2859 — Nivel general II".
+  nombre String  @unique
+  /// Solo un plan default es el activo que el resolver usa (decisión (c)). Borrado suave.
+  activo Boolean @default(true)
+
+  /// Renglones por rango de tamaño de lote (Cascade: reescribir el plan en la tx A2).
+  renglones PlanMuestreoRenglon[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("planes_muestreo_aql")
+}
+
+/// Renglón del plan AQL por RANGO de tamaño de lote → tamaño de muestra (F6-E1, doc 09 §5.2). El
+/// resolver elige el renglón cuyo [loteMin, loteMax] contiene el tamaño del lote y devuelve
+/// `tamanoMuestra` (decisión (b): la muestra es lo vinculante). `loteMax` null = "en adelante"
+/// (último rango abierto). Cascade desde el plan.
+model PlanMuestreoRenglon {
+  id            Int             @id @default(autoincrement())
+  idPlan        Int             @map("id_plan")
+  plan          PlanMuestreoAQL @relation(fields: [idPlan], references: [id], onDelete: Cascade)
+  /// Tamaño de lote mínimo del rango (inclusivo).
+  loteMin       Int             @map("lote_min")
+  /// Tamaño de lote máximo del rango (inclusivo); null = sin tope (último rango abierto).
+  loteMax       Int?            @map("lote_max")
+  /// Tamaño de muestra para este rango (cuántas piezas se inspeccionan).
+  tamanoMuestra Int             @map("tamano_muestra")
+
+  /// Límites acepta/rechaza por nivel AQL de este renglón (Cascade).
+  limites PlanMuestreoLimite[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idPlan])
+  @@map("plan_muestreo_renglon")
+}
+
+/// Límite acepta/rechaza de un renglón del plan POR NIVEL AQL (F6-E1, doc 09 §2: en ISO 2859 cada
+/// nivel AQL tiene su PROPIO número de aceptación/rechazo). El resolver, dado (lote, nivel),
+/// localiza el renglón por lote y este límite por `nivelAQL`. `aceptar` = máximo de defectos para
+/// APROBAR; `rechazar` = mínimo para RECHAZAR (normalmente aceptar+1). Es REFERENCIA (el veredicto
+/// es manual en E2, decisión (a)). Un nivel único por renglón.
+model PlanMuestreoLimite {
+  id        Int                 @id @default(autoincrement())
+  idRenglon Int                 @map("id_renglon")
+  renglon   PlanMuestreoRenglon @relation(fields: [idRenglon], references: [id], onDelete: Cascade)
+  /// Nivel AQL al que aplica el límite (1.0 / 2.5 / 10).
+  nivelAQL  Decimal             @map("nivel_aql") @db.Decimal(4, 2)
+  /// Número de aceptación (Ac): hasta este número de defectos, se ACEPTA.
+  aceptar   Int
+  /// Número de rechazo (Re): a partir de este número de defectos, se RECHAZA.
+  rechazar  Int
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idRenglon, nivelAQL])
+  @@map("plan_muestreo_limite")
 }

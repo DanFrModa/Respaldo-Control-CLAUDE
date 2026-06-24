@@ -78,6 +78,12 @@ vi.mock('@/api/avios', () => ({ useAvios: () => ({ data: { datos: [] }, isPendin
 vi.mock('@/api/bordados', () => ({
   useBordados: () => ({ data: { datos: [] }, isPending: false }),
 }));
+vi.mock('@/api/calidad', () => ({
+  useTiposProductoActivos: () => ({
+    data: { datos: [], total: 0, pagina: 1, totalPaginas: 0, porPagina: 100 },
+    isPending: false,
+  }),
+}));
 
 /** Modelo de ejemplo (listado). */
 function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo> = {}): Modelo {
@@ -94,6 +100,8 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     genero: null,
     cantidadFotos: 0,
     urlFotoPrincipal: null,
+    idTipoProducto: null,
+    tipoProducto: null,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,

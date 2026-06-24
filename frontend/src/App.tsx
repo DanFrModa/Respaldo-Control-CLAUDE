@@ -50,6 +50,11 @@ import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
+import { CalidadPagina } from '@/modulos/calidad/CalidadPagina';
+import { DefectosPagina } from '@/modulos/calidad/DefectosPagina';
+import { PlanesAqlPagina } from '@/modulos/calidad/PlanesAqlPagina';
+import { TiposProductoPagina } from '@/modulos/calidad/TiposProductoPagina';
 import { BandejaTareasPagina } from '@/modulos/ruta-critica/BandejaTareasPagina';
 import { ConcentradoPagina } from '@/modulos/ruta-critica/ConcentradoPagina';
 import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
@@ -169,11 +174,18 @@ const router = createBrowserRouter([
           { path: 'ruta-critica/concentrado', element: <ConcentradoPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden/programar', element: <ProgramarRcPagina /> },
+          // Calidad (Módulo 9, F6-E1) — catálogos base: defectos, tipos de producto, planes AQL.
+          { path: 'calidad', element: <CalidadPagina /> },
+          { path: 'calidad/defectos', element: <DefectosPagina /> },
+          { path: 'calidad/tipos-producto', element: <TiposProductoPagina /> },
+          { path: 'calidad/planes-aql', element: <PlanesAqlPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
           // Configuración de la RC por empresa (colchón + calendario + festivos).
           { path: 'administracion/ruta-critica', element: <ConfiguracionRcPagina /> },
+          // Bitácora de auditoría (A7, F6-E1).
+          { path: 'administracion/bitacora', element: <BitacoraPagina /> },
           { path: ':modulo', element: <Proximamente /> },
           { path: '*', element: <NoEncontrado /> },
         ],

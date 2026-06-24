@@ -1,4 +1,4 @@
-import { Building2, Users, type LucideIcon } from 'lucide-react';
+import { Building2, ClipboardList, Users, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
@@ -55,16 +55,20 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     tono: 'avios',
     permiso: 'empresas.administrar',
   },
+  {
+    clave: 'bitacora',
+    titulo: 'Bitácora',
+    descripcion: 'Auditoría de cambios del sistema: quién, qué, cuándo y sobre qué registro.',
+    ruta: '/administracion/bitacora',
+    icono: ClipboardList,
+    tono: 'servicios',
+    permiso: 'admin.ver-bitacora',
+  },
 ];
 
 /** Secciones aun por construir (se muestran como "Próximamente"). */
 const SECCIONES_PENDIENTES: readonly SeccionPendiente[] = [
   { clave: 'roles', titulo: 'Roles y permisos', descripcion: 'Roles del sistema y sus permisos.' },
-  {
-    clave: 'bitacora',
-    titulo: 'Bitácora',
-    descripcion: 'Auditoría de cambios y accesos del sistema.',
-  },
 ];
 
 export function AdministracionPagina(): React.JSX.Element {

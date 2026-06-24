@@ -4,6 +4,7 @@ import {
   CalendarRange,
   Calculator,
   ChartLine,
+  ClipboardList,
   Factory,
   Files,
   Images,
@@ -54,7 +55,8 @@ export type IconoModulo =
   | 'calculadora'
   | 'grafica'
   | 'archivo'
-  | 'engrane';
+  | 'engrane'
+  | 'portapapeles';
 
 /**
  * Mapa nombre estable -> componente Lucide. Vive aqui (modulo de datos, no
@@ -81,6 +83,7 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
   grafica: ChartLine,
   archivo: Files,
   engrane: Settings,
+  portapapeles: ClipboardList,
 };
 
 export interface ModuloMenu {
@@ -584,7 +587,37 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Auditorías AQL y catálogo de defectos',
     ruta: '/calidad',
     icono: 'medalla',
-    permisos: 'autenticado',
+    permisos: ['calidad.ver'],
+  },
+  // Sub-vistas de Calidad (F6-E1): catálogos base del sistema AQL. Cuelgan del módulo Calidad y
+  // las gobierna `calidad.ver` (consulta) / `calidad.administrar-catalogo` (escritura; el backend
+  // re-verifica, A1).
+  {
+    clave: 'calidad-defectos',
+    titulo: 'Catálogo de defectos',
+    descripcion: 'Defectos del sistema AQL con severidad, nivel y tipos de producto aplicables',
+    ruta: '/calidad/defectos',
+    icono: 'portapapeles',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'calidad-tipos-producto',
+    titulo: 'Tipos de producto',
+    descripcion: 'Segmentación de producto para acotar qué defectos aplican a cada familia',
+    ruta: '/calidad/tipos-producto',
+    icono: 'medalla',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'calidad-planes-aql',
+    titulo: 'Planes AQL',
+    descripcion: 'Tablas de muestreo AQL: tamaño de muestra y límites de aceptación/rechazo',
+    ruta: '/calidad/planes-aql',
+    icono: 'medalla',
+    permisos: ['calidad.ver'],
+    subVista: true,
   },
   {
     clave: 'esma',
@@ -651,6 +684,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/administracion/ruta-critica',
     icono: 'calendario',
     permisos: ['empresas.administrar'],
+    subVista: true,
+  },
+  // Sub-vista de Administración (F6-E1): bitácora de auditoría (A7) — registro inmutable de
+  // todas las acciones del sistema (quién, qué, cuándo, sobre qué). Solo lectura.
+  // La gobierna `admin.ver-bitacora`.
+  {
+    clave: 'bitacora',
+    titulo: 'Bitácora',
+    descripcion: 'Auditoría de cambios del sistema: quién, qué, cuándo y sobre qué registro',
+    ruta: '/administracion/bitacora',
+    icono: 'portapapeles',
+    permisos: ['admin.ver-bitacora'],
     subVista: true,
   },
 ] as const;
