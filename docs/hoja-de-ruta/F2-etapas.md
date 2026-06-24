@@ -5,7 +5,7 @@
 >
 > **Entrega de la fase (plan §6):** Módulo 3 (pedido interno + pedido real) y órdenes de producción con matriz color×talla ilimitada (D4) y referencias del cliente buscables (D7).
 > **Criterio de salida:** Un pedido fluye hasta su orden; impreso de orden.
-> **Estado:** 🔄 EN CURSO — `F2-E1` ✅ (en `prueba`, PR #46) · `F2-E2` ✅ (en `prueba`, PR #48, verificado por Gabriel, 16-jun-2026) · `F2-E3` ✅ (en `prueba`, PR #50, verificado por Gabriel, 16-jun-2026); siguen E4–E5.
+> **Estado:** ✅ **FASE F2 COMPLETA (5/5)** — `F2-E1` ✅ (en `prueba`, PR #46) · `F2-E2` ✅ (en `prueba`, PR #48) · `F2-E3` ✅ (en `prueba`, PR #50) · `F2-E4` ✅ (en `prueba`, PR #52) · `F2-E5` ✅ (17-jun-2026, verificada por Gabriel; reviewer independiente APROBADO). Pendiente operativo de Gabriel: commit → PR a `prueba` → corrida del ETL en Railway.
 
 ## F2-E1 · Pedidos internos + Pedidos Reales (vertical completo) — ✅ 16-jun-2026 (en `prueba`, PR #46)
 
@@ -177,7 +177,9 @@
 
 ---
 
-## F2-E4 · Consultas, tableros, búsqueda global e impreso de orden (R9) — ⬜ pendiente
+## F2-E4 · Consultas, tableros, búsqueda global e impreso de orden (R9) — ✅ 16-jun-2026 (en `prueba`, PR #52)
+
+> **Cierre F2-E4 (16-jun-2026).** Cerrada la operación diaria de Órdenes. **Impreso de orden (R9)** en PDF **server-side** con `@react-pdf/renderer` (PRIMER PDF de servidor del repo; el de barras de F1-E5 era de cliente): `GET /api/ordenes/:id/impreso` (individual) y `POST /api/ordenes/impresos` (lote → **un solo PDF consolidado**, una orden por página). El PDF lleva encabezado (folio, fechas, cliente, etiqueta, maquilero, modelo+descripción+composición, observaciones), **hasta 3 fotos** del modelo desde R2 (best-effort: foto faltante NO truena), la **matriz color×talla** con totales por fila/columna/orden (cuadran con `totalPiezas`) y secciones **TELAS** (`paraProduccion`), **BORDADOS** (sin precio) y **HABILITACIÓN** = avíos del BOM (`paraProduccion`), todo de la receta del modelo de F1. **Decisiones del dueño (Gabriel, 16-jun):** la hoja es de PISO de producción → **SIN precios/costos** (ni precio de bordados, ni `maquilaOrd`/`aplicacionOrd`/`maquilaBase`) y **SIN UPC/código de barra** (en retiro); lote = un PDF consolidado. El impreso se genera con solo `ordenes.ver` (review detectó y se corrigió que NO dependiera de `modelos.ver`: se extrajo `leerFotosModelo` de bajo nivel). **Consultas (proyecciones LIGERAS, NO reusan el listado pesado de E2):** `GET /api/ordenes/consulta` (filtros cliente/año/modelo/estado/canceladas/búsqueda + paginación de servidor; `totalPiezas` por agregado SQL, sin traer la matriz), `GET /api/ordenes/incompletas` (estado='capturada' = sin matriz; **semáforo derivado en backend**: verde ≤3d / amarillo 4–7d / urgente >7d desde `creadoEn`, paridad `EsUrgente`), `GET /api/ordenes/tablero/pedidos-por-mes` (agregado por mes, forma EXTENSIBLE para columnas de avance de F3 sin rehacerlo; banderas entregadosTienda/noProducir aceptadas sin efecto en F2 y documentadas), `GET /api/ordenes/buscar` (**buscador global** ligero: folio/modelo/valor de OrdenReferencia D7, tope 20, excluye canceladas; reusa `armarBusqueda` de E2). **Frontend (PC + móvil):** vista de consulta con filtros + selección múltiple → imprimir (lote por fetch→blob, individual por window.open; los binarios PDF van fuera del cliente tipado), pantalla de incompletas con semáforo, tablero pedidos-por-mes con saltos a la consulta filtrada/pedidos reales, **buscador global en el header** (`CascaronSistema`), y los botones a proceso/OC/notas/costos como **stubs deshabilitados** (F3/F4/F7). 3 entradas de menú nuevas gated `ordenes.ver` (conteos 16→19 en `catalogo.test.ts` y `login.spec.ts`). **Sin permisos nuevos** (todo `ordenes.ver`) → **sin re-seed**; **sin migración** (E4 es solo lectura + PDF). **Construido por 2 coders en PARALELO con límites de archivos declarados** (pieza A = `dominio/produccion/impresos/**` + `impresos.rutas.ts`; pieza B = consultas + todo el frontend + integración), único punto de contacto el contrato del impreso; **reviewer independiente APROBADO** (0 bloqueantes; 1 menor [dependencia oculta de `modelos.ver` en el impreso] + 3 nits, todos cerrados). **CI local en verde:** backend 333 unit + typecheck/lint/build; frontend 40 (módulos E4 + adyacentes) + typecheck/lint/build. El demo `npm run demo:ordenes` siembra DEMO-D (orden con `creadoEn` −10 días) para ver el semáforo URGENTE. **Verificado por Gabriel en `prueba`, 16-jun-2026.** **Sigue: F2-E5** (ETL de pedidos y órdenes + cierre de fase F2).
 
 **Objetivo:** Cerrar la operación diaria de F2: consulta/lista unificada de órdenes con impresión individual y por lote (R9), órdenes incompletas con semáforo, búsqueda global por referencia D7 en el layout, y tablero 'Pedidos por mes'. El impreso va aquí (no al final) porque pertenece a este grupo funcional (forms viejos ListaOrdenes/ImprimirOrdenes/OrdImp*), cumpliendo la regla 5.
 
@@ -228,11 +230,66 @@
 - Decisiones: D7 (búsqueda global), R9, A1/A4 (permisos también en endpoints de consulta e impresión)
 - Forms viejos de referencia (latin-1): Respaldo CLAUDE/Respaldo CLAUDEFormularios/OrdImp.txt + OrdImpDet/OrdImpTela/OrdImpHab/OrdImpBor, ImprimirOrdenes.txt, ListaOrdenes.txt, OrdenVer.txt/OrdenVerSub, OrdsIncompletas.txt (función EsUrgente), PedidosPorMes.txt y consulta PedidosPorMesCon
 - PLANMAESTRO.md §1 (impresos con @react-pdf/renderer en el backend) y §5 (impresos dentro de la fase de su módulo)
-- BLOQUEANTE antes de arrancar: confirmar con Daniel qué imprime la sección HABILITACIÓN en F2 (supuesto: BOM del modelo; la habilitación por orden es de F4)
+- BLOQUEANTE RESUELTO (Gabriel, 16-jun-2026): la sección HABILITACIÓN imprime los **avíos del modelo** del BOM marcados `paraProduccion` (la habilitación POR ORDEN con cantidades es de F4, R3). Decisiones adicionales del dueño: el impreso es de PISO de producción → SIN precios/costos y SIN código de barra; la impresión por lote es UN PDF consolidado (una orden por página)
 
 ---
 
-## F2-E5 · ETL de pedidos y órdenes + documentación + cierre de fase — ⬜ pendiente
+## F2-E5 · ETL de pedidos y órdenes + documentación + cierre de fase — ✅ 17-jun-2026 (verificada por Gabriel) · CIERRE DE FASE F2
+
+> **CIERRE F2-E5 (17-jun-2026, verificada por Gabriel; reviewer independiente APROBADO con 0 bloqueantes + 3 menores corregidos).** ÚLTIMA etapa de F2 → **cierra la fase**. Migra el histórico real de
+> pedidos y órdenes vía un **MODO MIGRACIÓN dedicado en la capa de dominio** (A1): funciones
+> `crearPedidoMigrado`/`crearPedidoRealMigrado` (`src/dominio/pedidos/migracion.ts`) y
+> `crearOrdenMigrada`/`agregarReferenciasOrdenMigrada`/`crearComentarioOrdenMigrado`
+> (`src/dominio/produccion/migracion.ts`). Esas funciones NO se exponen en NINGUNA ruta REST →
+> **E1–E4 y el API quedan INTACTOS**. Relajan SOLO las excepciones históricas documentadas (folio
+> explícito, sin validar activos, idPedidoLinea NULL, estado/fecha desde el viejo, snapshots V1) y
+> siguen siendo **transaccionales (A2)** y **auditadas (A7)** con la auditoría ORIGINAL del viejo
+> donde el CSV la trae.
+>
+> **Orquestador:** `npm run etl:pedidos-ordenes` (`migracion/etl-pedidos-ordenes.ts`). Loaders en
+> `migracion/loaders/{pedidos,pedidos-reales,ordenes,comentarios-orden}.ts`. Cadena de carga:
+> Pedidos→PedidoLinea (mapea `IdPedidosDet`, **crítico**) → PedidosReales → Ordenes (despivote +
+> Monarch) → ComentaOrd → **siembra de secuencias** `pedido`/`orden` por empresa al máximo migrado.
+>
+> **Reportes:** cuadre en DOS niveles (`npm run etl:cuadre-f2`): (1) filas/sumas + la suma de
+> cantidades de matriz v1 (Σ T1..T8) vs v2 (Σ OrdenLineaTalla); (2) checklist columna-v1 → destino-v2
+> con no-vacíos por columna para las 7 tablas. Las inconsistencias (colores/tallas creados al vuelo,
+> Monarch descartados, órdenes sin pedido, cadenas ambiguas) se LISTAN en el `Reporte` del
+> orquestador. **Análisis de tallas** (`npm run etl:analisis-tallas`): catálogo completo de las
+> **183 cadenas distintas** de `Ordenes.Tallas` con frecuencia (committeado como fixture
+> `__fixtures__/catalogo-tallas-real.json` para los tests, CI-safe).
+>
+> **Tests:** unitarios (110 en `migracion/`, verdes en local) — parsing posicional contra el
+> catálogo COMPLETO de 183 cadenas, doble curva, despivote con cuadre de sumas, normalización de
+> color CP850, reglas puras (IdPedidosDet 0/vacío→NULL, Monarch==código→descartado, estado
+> histórico), fechas. Integración (`etl-pedidos-ordenes.int.test.ts`, **corre en CI**, no local —
+> testcontainers prohibido en la máquina de Gabriel): conteos exactos de fixtures, idempotencia,
+> modo migración (folio explícito, idPedidoLinea NULL, estado/fechaCompletada desde el viejo),
+> siembra de secuencias post-máximo.
+>
+> **DESVIACIONES de la ficha original (registradas):**
+> - **Encoding = CP850, NO latin-1.** La ficha decía latin-1; el lector real (`comun/csv.ts`, F1-E6)
+>   decodifica **CP850** (corregido desde F1). El ETL de F2 reusa ese lector.
+> - **UPC EXCLUIDO por decisión (Gabriel, 16-jun-2026).** La ficha pedía normalizar el espacio del
+>   `UPC` y re-validar el verificador; **se ANULÓ**: los códigos de barra están en retiro y NO se
+>   conserva historial. El ETL **NO migra** `Ordenes.UPC` (`Orden.upc` queda null). En el cuadre de
+>   columnas aparece como **EXCLUIDA POR DECISIÓN** (exclusión justificada y registrada, §7), no como
+>   columna tirada en silencio. El algoritmo de re-validación NO se usa. **Además, en este mismo
+>   cambio se hizo el RETIRO TOTAL de los códigos de barra** (decisión de Gabriel, 16-jun-2026): se
+>   ELIMINARON las columnas `Orden.upc` y `Empresa.upc` (migración `20260616140000_retiro_codigos_barra`),
+>   el generador de códigos de barra de F1-E5 con su impreso y UI, y el permiso `modelos.codigos-barra`.
+> - **Tallas: 183 cadenas distintas** (la ficha estimaba ~184). 8 ambiguas + 17 con doble curva.
+> - **Token de talla sin match** (p. ej. `GE` de `"CHM GEX"`, padding perdido): se CREA la talla y se
+>   LISTA para Daniel (preserva la cantidad; no se autocorrige la etiqueta). Igual para colores.
+> - **Verificada por Gabriel (17-jun-2026).** El ETL es **re-ejecutable**: su corrida sobre los datos reales y el cuadre vs CSV se hacen al desplegar a `prueba` (y de nuevo en F9, al corte). Pendiente operativo: commit → PR a `prueba` → `npm run etl:pedidos-ordenes` en Railway.
+>
+> **HALLAZGOS para Daniel (al reporte, no autocorregidos):** **26 órdenes sin pedido**
+> (`IdPedidosDet` 0/vacío → idPedidoLinea NULL); **~1,415 piezas** en columnas `Tn` con cantidad pero
+> SIN etiqueta de talla en `Ordenes.Tallas` (1,307 en 3 órdenes con `Tallas` vacía; 103 con una talla
+> de más sobre `"CHM G EX"`; 5 sobre una curva de 7); **8 cadenas ambiguas** + **17 con doble curva**;
+> Monarch == código del modelo (~3,212 esperados) descartados como default automático.
+>
+> **CORRIDA REAL del ETL (17-jun-2026, contra `prueba`):** cargó 1,084 pedidos / 3,923 órdenes / 6,818 renglones-color / 29,258 celdas de talla / 1,920 referencias Monarch / 505 comentarios. **DECISIÓN de Gabriel (17-jun): la historia de las 6 empresas viejas INACTIVAS NO se migra por ahora** — eso dejó fuera 444 pedidos y ~1,528 órdenes (`IdEmpresas` ∈ {1..6}: MJD/Zipora/Skintex/Free Ride/Corporativo/Marilyn), **casi todo de 2005–2012** (historia antigua de empresas extintas; el negocio reciente 2012→2026 sí migró bajo Marilyn Fitness + FR Moda). Pendiente: revisar con Daniel **antes de F9** si se rescata (MJD/Corporativo/Marilyn = linaje de FR Moda; Zipora/Skintex/Free Ride eran aparte). Anotado en `HOJA-DE-RUTA.md` §6.
 
 **Objetivo:** Migrar los datos reales de pedidos y órdenes (idempotente, cargando a través de los servicios de dominio), sembrar las secuencias después del histórico, documentar los módulos y verificar el criterio de salida de F2 completo (un pedido fluye hasta su orden; impreso de orden).
 

@@ -1,7 +1,8 @@
 /**
  * Loader de EMPRESAS (F1-E6). `Empresas.csv` (8, solo 2 activas) → upsert SOLO de las
  * ACTIVAS que falten. FR Moda (Activa=1) ya existe (seed F0); FALTA **Marilyn Fitness**
- * (Activa=1, UPC 7500092). Las 6 inactivas NO migran (se registran en el reporte).
+ * (Activa=1). Las 6 inactivas NO migran (se registran en el reporte). La columna `UPCEmp`
+ * NO se migra: códigos de barra en retiro y `Empresa.upc` fue eliminada (Gabriel 16-jun-2026).
  *
  * Carga VÍA el dominio (A1): `crearEmpresa`. Idempotente por nombre. Persiste el mapeo
  * `IdEmpresas → idEmpresa`. Devuelve el id de FR Moda (la empresa de los almacenes).
@@ -90,14 +91,8 @@ export async function cargarEmpresas(
       parsearTexto(fila.Identificador),
       LIMITES.empresa.identificador,
     );
-    const upc = truncarYReportar(
-      reporte,
-      'Empresa',
-      idViejo,
-      'upc',
-      parsearTexto(fila.UPCEmp),
-      LIMITES.empresa.upc,
-    );
+    // Empresas.UPCEmp → EXCLUIDA POR DECISIÓN (Gabriel, 16-jun-2026): los códigos de barra están
+    // en retiro y la columna destino `Empresa.upc` fue eliminada del modelo. No se lee ni se migra.
 
     let idNuevo = await idPorNombre(cliente, nombre);
     if (idNuevo === null) {
@@ -108,7 +103,6 @@ export async function cargarEmpresas(
             nombre,
             razonSocial: razonSocial ?? undefined,
             identificador: identificador ?? undefined,
-            upc: upc ?? undefined,
             // La favorita ya es FR Moda (seed F0): NO la cambiamos aquí.
             favorita: false,
             paraIpt: parsearBandera(fila.ParaIPT),

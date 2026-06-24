@@ -68,6 +68,17 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
         name: 'ordenes',
         description: 'Órdenes de producción: alta desde pedido, matriz colores × tallas, cancelar.',
       },
+      // Inventario de materiales por kardex (F4-E1).
+      {
+        name: 'inventario-telas',
+        description:
+          'Inventario de telas por kardex (tela×lote, D5): ajuste, salida a orden, traspaso, existencias y kardex.',
+      },
+      {
+        name: 'inventario-avios',
+        description:
+          'Inventario de avíos por kardex (multi-almacén, R4): ajuste, traspaso, existencias y kardex.',
+      },
     ],
     components: {
       securitySchemes: {

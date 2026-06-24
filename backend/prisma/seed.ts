@@ -19,6 +19,9 @@ import { hashPassword } from 'better-auth/crypto';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { sembrarRutaCritica } from './seed-ruta-critica.js';
+import { sembrarRutaCriticaPlantillas } from './seed-ruta-critica-plantillas.js';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Empresa FR Moda + configuración (ex-`Propiedades`, ahora POR empresa — plan §4)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +36,6 @@ async function sembrarEmpresa(prisma: PrismaClient): Promise<number> {
       nombre: 'FR Moda',
       razonSocial: 'FR Moda, S.A. De C.V.',
       identificador: 'FR',
-      upc: '7500092',
       favorita: true,
       paraIpt: true,
       paraEdr: true,
@@ -145,6 +147,10 @@ function definirRoles(): {
     // F1-E4 — modelos (Módulo 2): administrar el catálogo + BOM + fotos solo para
     // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos).
     'modelos.administrar',
+    // F3-E1 — tipos de proceso (Módulo 4, catálogo): administrar solo Administrador y
+    // AdministracionDireccion (mismo reparto que el resto de catálogos). El `ver` y los
+    // permisos operativos de producción/inventario cascadean (siguen en el conjunto).
+    'tipos-proceso.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
@@ -324,21 +330,29 @@ async function sembrarRolesProveedor(prisma: PrismaClient): Promise<void> {
  * partida. Se siembran por `codigo` (clave natural estable), sin pisar el `nombre`
  * si ya existe (pudo editarse). NO se borran los que no estén aquí (podrían estar en uso).
  */
-const TIPOS_PROCESO_BASE: { codigo: string; nombre: string }[] = [
-  { codigo: 'costura', nombre: 'Costura' },
-  { codigo: 'estampado', nombre: 'Estampado' },
-  { codigo: 'bordado', nombre: 'Bordado' },
-  { codigo: 'lavado', nombre: 'Lavado' },
-  { codigo: 'aplicacion', nombre: 'Aplicación' },
+// F3-E1: cada tipo nace con su bandera `generaEntradaPt` (decisión (e), DECISIONES.md / ADR-0010):
+// SOLO costura deja prenda terminada → su recibo mete a inventario PT; estampado/aplicación,
+// bordado y lavado = false. Es el DEFAULT inicial; cambiarlo luego es dato (UI de admin), no
+// migración. `update` NO pisa la bandera si el tipo ya existe (pudo ajustarse en producción).
+const TIPOS_PROCESO_BASE: { codigo: string; nombre: string; generaEntradaPt: boolean }[] = [
+  { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
+  { codigo: 'estampado', nombre: 'Estampado', generaEntradaPt: false },
+  { codigo: 'bordado', nombre: 'Bordado', generaEntradaPt: false },
+  { codigo: 'lavado', nombre: 'Lavado', generaEntradaPt: false },
+  { codigo: 'aplicacion', nombre: 'Aplicación', generaEntradaPt: false },
 ];
 
 async function sembrarTiposProceso(prisma: PrismaClient): Promise<void> {
   for (const tipo of TIPOS_PROCESO_BASE) {
     await prisma.tipoProceso.upsert({
       where: { codigo: tipo.codigo },
-      // No se pisa el nombre/activo si ya existe (pudo editarse en producción).
+      // No se pisa nombre/activo/generaEntradaPt si ya existe (pudo editarse en producción).
       update: {},
-      create: { codigo: tipo.codigo, nombre: tipo.nombre },
+      create: {
+        codigo: tipo.codigo,
+        nombre: tipo.nombre,
+        generaEntradaPt: tipo.generaEntradaPt,
+      },
     });
   }
 }
@@ -373,6 +387,195 @@ async function sembrarGeneros(prisma: PrismaClient): Promise<void> {
       update: {},
       create: { nombre },
     });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3e. Tipos de movimiento de inventario (F3-E1) — ex `IPT_TiposMov`, idempotente
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los 19 tipos de movimiento de inventario del sistema viejo (`IPT_TiposMov.csv`,
+ * doc 04-Inventarios §A.2) con su DIRECCIÓN (ex `TipoEnSa`: 1=entrada, 2=salida, 3=traspaso),
+ * que el kardex usa para el signo de la existencia (D3, ADR-0010). Cada uno con un `codigo`
+ * estable kebab-case para referenciarlo en código sin atarlo al texto.
+ *
+ * Es la lista CANÓNICA (fuente de verdad del seed), transcrita de `IPT_TiposMov.csv`. El CSV se
+ * lee en CP850 (CLAUDE.md §4 / `migracion/comun/csv.ts`) SOLO para VERIFICAR esta lista contra el
+ * dump cuando el archivo está disponible (local/CI) — `verificarTiposMovimientoContraCsv`; en el
+ * deploy (donde el CSV no viaja en la imagen del backend) la verificación se omite sin fallar.
+ *
+ * Se siembran por `codigo`; `update` NO pisa nombre/activo/dirección si ya existen (idempotente).
+ */
+const TIPOS_MOVIMIENTO_BASE: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  { codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
+  { codigo: 'entrada-maquila', nombre: 'Entrada de Maquila', direccion: 'entrada' },
+  { codigo: 'entrada-aplicacion', nombre: 'Entrada de Aplicación', direccion: 'entrada' },
+  {
+    codigo: 'devolucion-nota-credito',
+    nombre: 'Devolución / Notas de Crédito',
+    direccion: 'entrada',
+  },
+  { codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+  { codigo: 'salida-aplicacion', nombre: 'Salida a Aplicación', direccion: 'salida' },
+  { codigo: 'muestrario-ventas', nombre: 'Muestrario Ventas', direccion: 'salida' },
+  { codigo: 'salida-maquilero', nombre: 'Salida a Maquilero', direccion: 'salida' },
+  {
+    codigo: 'transferencia-almacenes',
+    nombre: 'Transferencia entre almacenes',
+    direccion: 'traspaso',
+  },
+  { codigo: 'recibo-muestrario', nombre: 'Recibo de Muestrario', direccion: 'entrada' },
+  { codigo: 'error-entrada', nombre: 'Error de Entrada', direccion: 'salida' },
+  { codigo: 'error-salida', nombre: 'Error de Salida', direccion: 'entrada' },
+  { codigo: 'venta-mostrador', nombre: 'Venta de Mostrador', direccion: 'salida' },
+  { codigo: 'ajuste-entrada', nombre: 'Ajuste de Inventario (Entrada)', direccion: 'entrada' },
+  { codigo: 'ajuste-salida', nombre: 'Ajuste de Inventario (Salida)', direccion: 'salida' },
+  { codigo: 'salida-laboratorio', nombre: 'Salida a Laboratorio', direccion: 'salida' },
+  { codigo: 'salida-composturas', nombre: 'Salida a Composturas', direccion: 'salida' },
+  { codigo: 'otras-salidas', nombre: 'Otras Salidas', direccion: 'salida' },
+  { codigo: 'otras-entradas', nombre: 'Otras Entradas', direccion: 'entrada' },
+];
+
+/** `IPT_TiposMov.TipoEnSa` → dirección de v2 (1=entrada, 2=salida, 3=traspaso). */
+function direccionDesdeTipoEnSa(valor: string): 'entrada' | 'salida' | 'traspaso' | null {
+  if (valor === '1') return 'entrada';
+  if (valor === '2') return 'salida';
+  if (valor === '3') return 'traspaso';
+  return null;
+}
+
+/**
+ * VERIFICA que {@link TIPOS_MOVIMIENTO_BASE} tenga las 19 entradas del dump viejo con su dirección
+ * (nit #5: el CSV se lee en CP850). Best-effort: si el CSV no está disponible (deploy), avisa y
+ * sigue. Si está pero NO cuadra (conteo o dirección por TipoEnSa), LANZA — el seed canónico no
+ * debe divergir del viejo en silencio.
+ */
+async function verificarTiposMovimientoContraCsv(): Promise<void> {
+  let leerCsv: (nombre: string) => Record<string, string>[];
+  try {
+    ({ leerCsv } = await import('../migracion/comun/csv.js'));
+  } catch {
+    return; // el ETL/csv no está disponible en este contexto: se omite la verificación
+  }
+  let filas: Record<string, string>[];
+  try {
+    filas = leerCsv('IPT_TiposMov.csv');
+  } catch {
+    console.warn(
+      '⚠ IPT_TiposMov.csv no disponible: se omite la verificación (seed canónico igual se aplica).',
+    );
+    return;
+  }
+  if (filas.length !== TIPOS_MOVIMIENTO_BASE.length) {
+    throw new Error(
+      `IPT_TiposMov.csv trae ${String(filas.length)} tipos; el seed canónico tiene ${String(TIPOS_MOVIMIENTO_BASE.length)}.`,
+    );
+  }
+  // El orden del CSV coincide 1:1 con el de la lista canónica (IdIPT_TiposMov 1..19).
+  filas.forEach((fila, i) => {
+    const esperada = TIPOS_MOVIMIENTO_BASE[i];
+    const direccionCsv = direccionDesdeTipoEnSa(String(fila.TipoEnSa ?? '').trim());
+    if (esperada === undefined || direccionCsv !== esperada.direccion) {
+      throw new Error(
+        `IPT_TiposMov.csv fila ${String(i + 1)} ("${String(fila.TipoMov)}") tiene dirección ${String(direccionCsv)}, ` +
+          `pero el seed espera ${esperada?.direccion ?? '(ninguna)'} para "${esperada?.nombre ?? ''}".`,
+      );
+    }
+  });
+}
+
+/**
+ * Tipos de movimiento NUEVOS de v2 que NO vienen del CSV viejo (F3-E3). El viejo modelaba la
+ * "Transferencia entre almacenes" con UN tipo de dirección `traspaso`; v2 la materializa como DOS
+ * patas (salida del origen + entrada al destino) para que la vista `existencia_pt` sume +1/−1 por
+ * almacén (ADR-0010 §1/§5). El traspaso de dominio resuelve estas patas POR `codigo`. NO entran en
+ * {@link TIPOS_MOVIMIENTO_BASE} (esa es la lista canónica verificada 1:1 contra el CSV de 19); el
+ * tipo viejo `transferencia-almacenes` (dirección `traspaso`) se conserva y NO se usa como pata.
+ */
+const TIPOS_MOVIMIENTO_V2: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  {
+    codigo: 'transferencia-salida',
+    nombre: 'Transferencia entre Almacenes (Salida)',
+    direccion: 'salida',
+  },
+  {
+    codigo: 'transferencia-entrada',
+    nombre: 'Transferencia entre Almacenes (Entrada)',
+    direccion: 'entrada',
+  },
+];
+
+/**
+ * Tipos de movimiento NUEVOS de F4-E1 (kardex de telas y avíos). El viejo registraba las entradas
+ * de tela con factura, las salidas ligadas a la orden (`Salidas.IdOrdenes`) y los consumos por nota
+ * en tablas SEPARADAS sin un tipo de movimiento explícito; v2 los modela como tipos de kardex con su
+ * dirección (D3, ADR-0010). El traspaso reusa `transferencia-salida`/`-entrada` (ya sembrados en
+ * F3-E3) y el ajuste reusa `ajuste-entrada`/`-salida` (de los 19 canónicos): NO se duplican aquí.
+ *  • `entrada-recepcion` — entrada de tela/avío por recepción de compra (E3, con factor de
+ *    conversión y costo por unidad de consumo). Dirección entrada.
+ *  • `salida-a-orden` — salida de TELA hacia una orden de producción (`Salidas.IdOrdenes`, E1). Es
+ *    LA única vía que descuenta tela hacia una orden; la nota (E5) la referencia sin segundo
+ *    movimiento. Dirección salida.
+ *  • `salida-por-nota` — salida de AVÍO por una nota de salida a maquilero (E5: el consumo de avíos
+ *    va ligado a las notas, R4). Dirección salida.
+ */
+const TIPOS_MOVIMIENTO_F4: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  { codigo: 'entrada-recepcion', nombre: 'Entrada por Recepción de Compra', direccion: 'entrada' },
+  { codigo: 'salida-a-orden', nombre: 'Salida de Tela a Orden', direccion: 'salida' },
+  { codigo: 'salida-por-nota', nombre: 'Salida de Avío por Nota', direccion: 'salida' },
+];
+
+async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
+  await verificarTiposMovimientoContraCsv();
+  // Los 19 canónicos del CSV + los 2 nuevos de F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex
+  // de telas y avíos). Idempotente: el `update: {}` no pisa nombre/dirección/activo si ya existen
+  // (pudieron editarse en producción).
+  for (const tipo of [...TIPOS_MOVIMIENTO_BASE, ...TIPOS_MOVIMIENTO_V2, ...TIPOS_MOVIMIENTO_F4]) {
+    await prisma.tipoMovimientoInventario.upsert({
+      where: { codigo: tipo.codigo },
+      update: {},
+      create: { codigo: tipo.codigo, nombre: tipo.nombre, direccion: tipo.direccion },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3f. Almacenes de PT (F3-E1) — ex `IPT_Almacenes` (Primeras/Segundas/Tránsito)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los 3 almacenes de PT del sistema viejo (`IPT_Almacenes.csv`: Primeras/Segundas/Tránsito). Son
+ * GLOBALES (`idEmpresa = null`, como crea el dominio de almacenes para los compartidos). Se
+ * siembran de forma idempotente: si ya existe un almacén PT con ese nombre (global), NO se
+ * duplica. El kardex de PT (E3) y el recibo de costura (E4) los usan como destino.
+ */
+const ALMACENES_PT_BASE: string[] = ['Primeras', 'Segundas', 'Tránsito'];
+
+async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
+  for (const nombre of ALMACENES_PT_BASE) {
+    // Idempotente por (nombre, tipo PT, global): si ya existe NO se crea otro (el @@unique de
+    // almacenes es (idEmpresa, nombre), pero los globales tienen idEmpresa null, que Postgres
+    // trata como distinto en el unique → se verifica a mano antes de crear).
+    const existente = await prisma.almacen.findFirst({
+      where: { nombre, tipo: 'PT', idEmpresa: null },
+      select: { id: true },
+    });
+    if (existente === null) {
+      await prisma.almacen.create({ data: { nombre, tipo: 'PT', idEmpresa: null } });
+    }
   }
 }
 
@@ -436,7 +639,16 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarRolesProveedor(prisma);
   await sembrarTiposProceso(prisma);
   await sembrarGeneros(prisma);
+  await sembrarTiposMovimiento(prisma);
+  await sembrarAlmacenesPt(prisma);
   await sembrarAdmin(prisma);
+  // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
+  // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").
+  await sembrarRutaCritica(prisma);
+  // Ruta Crítica (F5-E2): familias/artículos + reglas de duración (cantidad/tela/aplicación) +
+  // 2 plantillas reales (1/6 y 6/6) con su encadenamiento propio + calendario L–V y festivos MX
+  // de la empresa favorita. Después de F5-E1 (necesita los procesos) y de la empresa favorita.
+  await sembrarRutaCriticaPlantillas(prisma);
 }
 
 // Punto de entrada al ejecutarse como script (`prisma db seed` → `tsx prisma/seed.ts`).

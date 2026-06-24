@@ -5,6 +5,8 @@ import {
   parsearBandera,
   parsearDinero,
   parsearEntero,
+  parsearFecha,
+  parsearFechaSoloDia,
   parsearTexto,
 } from './valores.js';
 
@@ -58,6 +60,31 @@ describe('migración · valores (conversores puros)', () => {
       expect(parsearEntero('12.9')).toBe(12);
       expect(parsearEntero('')).toBeNull();
       expect(parsearEntero('abc')).toBeNull();
+    });
+  });
+
+  describe('parsearFecha (F2 — formato Access DD/MM/YYYY HH:MM:SS)', () => {
+    it('parsea fecha con y sin hora (UTC), día/mes en ese orden', () => {
+      expect(parsearFecha('04/01/2005 00:00:00')?.toISOString()).toBe('2005-01-04T00:00:00.000Z');
+      // 25 > 12 ⇒ confirma que el primer campo es DÍA, no mes.
+      expect(parsearFecha('25/12/2010 13:30:00')?.toISOString()).toBe('2010-12-25T13:30:00.000Z');
+      expect(parsearFecha('15/06/2008')?.toISOString()).toBe('2008-06-15T00:00:00.000Z');
+    });
+    it('vacío / no parseable / fecha desbordada → null', () => {
+      expect(parsearFecha('')).toBeNull();
+      expect(parsearFecha(null)).toBeNull();
+      expect(parsearFecha('no es fecha')).toBeNull();
+      expect(parsearFecha('31/02/2005')).toBeNull(); // 31 de feb no existe → no se inventa
+      expect(parsearFecha('00/01/2005')).toBeNull();
+    });
+  });
+
+  describe('parsearFechaSoloDia (columnas @db.Date)', () => {
+    it('descarta la hora y deja medianoche UTC', () => {
+      expect(parsearFechaSoloDia('25/12/2010 13:30:00')?.toISOString()).toBe(
+        '2010-12-25T00:00:00.000Z',
+      );
+      expect(parsearFechaSoloDia('')).toBeNull();
     });
   });
 

@@ -143,16 +143,16 @@ export async function solicitarSubidaFoto(
 }
 
 /**
- * Lista las fotos de un modelo, cada una con su URL GET prefirmada para verla, ordenadas por
- * `orden` (luego por id). Requiere `modelos.ver`. Exige que el modelo exista.
+ * Lectura de BAJO NIVEL de las fotos de un modelo (findMany + URLs GET prefirmadas), ordenadas por
+ * `orden` (luego por id). NO verifica permiso ni sesión: el llamador es responsable de autorizar.
+ * Exige que el modelo exista. La usan `listarFotos` (tras `modelos.ver`) y el IMPRESO de la orden
+ * (autorizado por `ordenes.ver`, ver `dominio/produccion/impresos/impreso-orden.ts`).
  */
-export async function listarFotos(
-  sesion: SesionUsuario,
+export async function leerFotosModelo(
   idModelo: number,
   bd?: ContextoBd,
   archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<FotoModeloConUrl[]> {
-  verificarPermiso(sesion, 'modelos.ver');
   const cliente = clienteLectura(bd);
   const modelo = await cliente.modelo.findUnique({ where: { id: idModelo }, select: { id: true } });
   if (modelo === null) {
@@ -181,6 +181,20 @@ export async function listarFotos(
       urlDescarga: await archivos.urlDescarga(foto.archivo.key),
     })),
   );
+}
+
+/**
+ * Lista las fotos de un modelo, cada una con su URL GET prefirmada para verla, ordenadas por
+ * `orden` (luego por id). Requiere `modelos.ver`. Exige que el modelo exista.
+ */
+export async function listarFotos(
+  sesion: SesionUsuario,
+  idModelo: number,
+  bd?: ContextoBd,
+  archivos: ServicioArchivos = servicioArchivos(),
+): Promise<FotoModeloConUrl[]> {
+  verificarPermiso(sesion, 'modelos.ver');
+  return leerFotosModelo(idModelo, bd, archivos);
 }
 
 /**

@@ -1,0 +1,7 @@
+IdUsuarios,Usuario,Clave,Nombre,Apellidos,Nivel,CantBloq,DesdeQueAno,EstaLogiado,Activo,IdRC_TipoUsuarios,EmpresaFav,EsAuditor
+1,dmasri,x,Daniel,Masri,1,0,2000,0,1,1,1,0
+2,blanca,x,Blanca,Lopez,5,0,2005,0,0,7,1,0
+3,lina,x,Lina,Perez,5,0,2008,0,1,3,1,0
+4,juan,x,Juan,Ramos,50,0,2010,0,1,0,1,0
+5,viejo,x,Viejo,User,100,0,2001,0,0,0,1,0
+6,jose,x,Jos‚,N£¤ez,50,0,2009,0,1,9,1,0

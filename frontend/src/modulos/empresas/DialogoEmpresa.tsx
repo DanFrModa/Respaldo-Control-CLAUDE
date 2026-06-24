@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Valores por defecto de un alta (texto vacio; banderas en estado aparte). */
@@ -24,7 +24,6 @@ const VALORES_INICIALES: DatosEmpresaFormulario = {
   nombre: '',
   razonSocial: '',
   identificador: '',
-  upc: '',
 };
 
 /** Banderas booleanas de la empresa (se capturan como checkbox, fuera del schema de texto). */
@@ -43,7 +42,7 @@ function texto(valor: string | null): string {
 
 /**
  * Dialogo de alta y edicion de empresa (react-hook-form + Zod). Captura nombre,
- * razon social, identificador (RFC), **UPC** (clave: lo usara E5) y las banderas
+ * razon social, identificador (RFC) y las banderas
  * favorita/IPT/EDR. Si recibe una `empresa` edita (PATCH); si no, da de alta
  * (POST). La validacion de captura es solo UX: el backend re-valida y es la
  * autoridad (A1).
@@ -80,7 +79,6 @@ export function DialogoEmpresa({
         nombre: empresa.nombre,
         razonSocial: texto(empresa.razonSocial),
         identificador: texto(empresa.identificador),
-        upc: texto(empresa.upc),
       });
       setBanderas({
         favorita: empresa.favorita,
@@ -105,9 +103,6 @@ export function DialogoEmpresa({
     }
     if (datos.identificador.length > 0) {
       cuerpo.identificador = datos.identificador;
-    }
-    if (datos.upc.length > 0) {
-      cuerpo.upc = datos.upc;
     }
     return cuerpo;
   }
@@ -188,21 +183,6 @@ export function DialogoEmpresa({
                 {...formulario.register('identificador')}
               />
               <FieldError errors={[errors.identificador]} />
-            </Field>
-
-            <Field data-invalid={Boolean(errors.upc)}>
-              <FieldLabel htmlFor="empresa-upc">UPC</FieldLabel>
-              <Input
-                id="empresa-upc"
-                aria-invalid={Boolean(errors.upc)}
-                disabled={guardando}
-                {...formulario.register('upc')}
-              />
-              <FieldDescription>
-                Prefijo de código de barras de la empresa (se usará al generar los UPC de los
-                modelos).
-              </FieldDescription>
-              <FieldError errors={[errors.upc]} />
             </Field>
 
             {/* Banderas */}

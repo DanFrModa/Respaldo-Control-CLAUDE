@@ -26,8 +26,8 @@
  * `Ordenes.FechaDet = Now()` al insertar el primer renglón del detalle) — ahí se sella
  * `fechaCompletada` y NO se re-sella después; `cancelada` por `cancelarOrden`.
  *
- * UPC: NO se construye `generarUPC` (decisión Gabriel 16-jun-2026). Los códigos de barra de orden
- * ya no se usan; `upc` es solo un dato histórico de lectura (sin endpoint de escritura/generación).
+ * UPC: ELIMINADO. Los códigos de barra de orden ya no se usan y la columna `Orden.upc` fue
+ * borrada del modelo (decisión Gabriel 16-jun-2026): no hay dato, endpoint ni generación.
  *
  * ─────────────────────────────────────────────────────────────────────────────────────────────
  * MAPEO DE COLUMNAS v1→v2 (contrato del ETL futuro). Verificado contra el encabezado REAL de
@@ -57,7 +57,7 @@
  *  | OrdCancelada       | estado=cancelada    | + motivoCancelada                                  |
  *  | MotivoCancelada    | motivoCancelada     | String?                                            |
  *  | IdEmpresas         | idEmpresa           | FK Empresa (A9)                                    |
- *  | UPC                | upc (String?)       | dato histórico, sin generación                     |
+ *  | UPC                | — (EXCLUIDA)        | códigos de barra en retiro: columna eliminada      |
  *  | IdCP_Articulos     | idTipoArticuloRC    | Int? SIN FK (F5)                                   |
  *  | IdRC_Aplicaciones  | idRcAplicaciones    | Int? SIN FK (F5)                                   |
  *  | IdRC_TipoTelas     | idRcTipoTelas       | Int? SIN FK (F5)                                   |
@@ -483,7 +483,6 @@ function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
     fechaCompletada: orden.fechaCompletada === null ? null : orden.fechaCompletada.toISOString(),
     motivoCancelada: orden.motivoCancelada,
     tallasV1: orden.tallasV1,
-    upc: orden.upc,
     maquilaOrd: orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
     aplicacionOrd: orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
     pagada: orden.pagada,
@@ -1014,8 +1013,12 @@ export const buscarOrdenes = listarOrdenes;
 /**
  * Arma el `OR` de búsqueda combinada: folio (si la búsqueda es entero), código de modelo, nombre
  * de cliente y valor de referencia (D7, vía el índice de `OrdenReferencia.valor`). Vacío → sin OR.
+ *
+ * Exportado para reusarse en las CONSULTAS ligeras (F2-E4, `consultas.ts`): la consulta y el
+ * buscador global comparten EXACTAMENTE esta lógica de búsqueda combinada (folio + modelo + cliente
+ * + valor de referencia), con su proyección ligera propia.
  */
-function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereInput {
+export function armarBusqueda(busqueda: string | undefined): Prisma.OrdenWhereInput {
   if (busqueda === undefined || busqueda === '') {
     return {};
   }
@@ -1043,8 +1046,11 @@ function aFolioBusqueda(busqueda: string): bigint | null {
   }
 }
 
-/** Rango `@db.Date` para filtrar por año natural (de enero 1 a enero 1 del siguiente, exclusivo). */
-function rangoAnio(anio: number): Prisma.DateTimeNullableFilter {
+/**
+ * Rango `@db.Date` para filtrar por año natural (de enero 1 a enero 1 del siguiente, exclusivo).
+ * Exportado para reusarse en las CONSULTAS/tablero (F2-E4): el filtro por año es idéntico.
+ */
+export function rangoAnio(anio: number): Prisma.DateTimeNullableFilter {
   return {
     gte: new Date(`${anio}-01-01T00:00:00.000Z`),
     lt: new Date(`${anio + 1}-01-01T00:00:00.000Z`),

@@ -163,7 +163,10 @@ test.describe('Galería de bordados', () => {
     await page.getByTestId('guardar-bordado').click();
     await expect(page.getByText(`Bordado "${nombre}" creado.`)).toBeVisible();
 
-    // Navega a la galeria (descubrible por clic).
+    // Navega a la galería desde el PORTAL de Catálogos: la tarjeta vive en `/catalogos`, no en la
+    // pantalla de bordados donde quedamos tras crear el bordado.
+    await page.goto('/catalogos');
+    await expect(page.getByRole('heading', { name: 'Catálogos' })).toBeVisible();
     await page.getByTestId('catalogo-galeria-bordados').click();
     await expect(page.getByRole('heading', { name: 'Galería de bordados' })).toBeVisible();
 

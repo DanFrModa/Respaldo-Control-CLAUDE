@@ -1,0 +1,5 @@
+"IdOrdCompra","IdProveedor","Fecha","NumCompra","EntregaEn","Parcial","FechaEntrega","IdUsuarios","IdUsuAutorizado","Autorizado","FechaAutorizado","Cancelado","CanceladoMotivo","IdUsuCancelado","FacturasAmparadas","Totales","Observaciones","CorrespondeA","Estatus","FechaRecibido","IdEmpresas"
+2,1,30/06/2005 17:44:34,1,"Aculco",1,20/07/2005 00:00:00,2,7,1,30/06/2005 17:44:51,0,,0,"F-123 F-124",100000,"Telas para pedido 931","Pedido 931",3,,8
+3,1,15/03/2008 10:00:00,2,"Bodega",1,,2,7,1,15/03/2008 10:05:00,0,,0,,5000,"OC de empresa vieja",,3,,1
+4,1,10/01/2009 09:00:00,3,,1,,2,0,0,,1,"Ya no se necesita",2,,0,"OC cancelada",,1,,8
+5,99,12/02/2010 09:00:00,4,,1,,2,7,1,,0,,0,,0,"Proveedor sin mapeo",,3,,8

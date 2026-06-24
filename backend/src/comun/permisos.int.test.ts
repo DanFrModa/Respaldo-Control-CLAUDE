@@ -62,7 +62,9 @@ describe('dominio sobre el seed real de fundación (backend/prisma/seed)', () =>
     const roles = await listarRoles(sesion, { cliente });
 
     expect(roles.length).toBeGreaterThanOrEqual(9); // los 9 niveles absorbidos como roles
-    expect(roles.every((rol) => rol.esSistema)).toBe(true);
+    // F5-E1 agregó roles funcionales de la RC con esSistema=false; los de sistema (niveles
+    // viejos) siguen marcados, así que ya no TODOS son de sistema, pero sí al menos los 9.
+    expect(roles.filter((rol) => rol.esSistema).length).toBeGreaterThanOrEqual(9);
     const administrador = roles.find((rol) => rol.nombre === 'Administrador');
     expect(administrador).toBeDefined();
     expect(administrador?.clavesPermisos.length).toBeGreaterThan(0);

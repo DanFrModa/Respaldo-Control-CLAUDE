@@ -59,14 +59,33 @@ describe('catálogo de permisos', () => {
       // Catálogos maestros globales (F1-E1, ADR-0007): ver + administrar por catálogo.
       'colores.administrar',
       'colores.ver',
+      // Órdenes de compra (Módulo 3, F4-E2/E3): ver/administrar/cancelar/recibir (nuevos de v2;
+      // la autorización tiene su permiso LEGADO `compras.autorizar`, con origen).
+      'compras.administrar',
+      'compras.cancelar',
+      'compras.recibir',
+      'compras.ver',
       'empresas.administrar',
+      // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
+      'esma.cargo-validar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Inventario de avíos por kardex (Módulo 4, F4-E1, R4): ver/mover (nuevos de v2).
+      'inventario-avios.mover',
+      'inventario-avios.ver',
+      // Inventario PT por kardex (Módulo 6, F3-E3): ver/mover (nuevos de v2).
+      'inventario-pt.mover',
+      'inventario-pt.ver',
+      // Inventario de telas por kardex (Módulo 4, F4-E1, D5): ver/mover (nuevos de v2).
+      'inventario-telas.mover',
+      'inventario-telas.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
-      // Generador de códigos de barra (F1-E5): EAN-13 + DUN-14 (sucesor del form `Codigo`).
-      'modelos.codigos-barra',
       'modelos.ver',
+      // Notas de salida (Módulo 5, F4-E5, R4/R9): ver/administrar/cancelar (nuevos de v2).
+      'notas.administrar',
+      'notas.cancelar',
+      'notas.ver',
       // Órdenes de producción (Módulo ÓRDENES, F2-E2): ver/administrar/cancelar (nuevos de v2).
       'ordenes.administrar',
       'ordenes.cancelar',
@@ -76,8 +95,23 @@ describe('catálogo de permisos', () => {
       'pedidos.administrar',
       'pedidos.importes',
       'pedidos.ver',
+      // Producción / WIP (Módulo 4, F3): corte/envío/recibo/entrega/wip-ver/cancelar (nuevos de v2).
+      'produccion.cancelar',
+      'produccion.corte',
+      'produccion.entrega',
+      'produccion.envio',
+      'produccion.recibo',
+      'produccion.wip-ver',
       'proveedores.administrar',
       'proveedores.ver',
+      // Catálogo configurable de la Ruta Crítica (Módulo 8, F5-E1): ver/administrar (nuevos de v2;
+      // los `rc.*` LEGADO del MOTOR tienen origen). Motor de la ruta viva (F5-E3): programar/ruta-ver.
+      // Captura del cumplimiento (F5-E4): rc.capturar.
+      'rc.capturar',
+      'rc.catalogo-administrar',
+      'rc.catalogo-ver',
+      'rc.programar',
+      'rc.ruta-ver',
       'roles.administrar',
       'tallas.administrar',
       'tallas.ver',
@@ -86,6 +120,9 @@ describe('catálogo de permisos', () => {
       'telas.ver',
       'temporadas.administrar',
       'temporadas.ver',
+      // Tipos de proceso de maquila (Módulo 4, F3-E1): catálogo CRUD (nuevos de v2).
+      'tipos-proceso.administrar',
+      'tipos-proceso.ver',
       'usuarios.administrar',
     ]);
   });

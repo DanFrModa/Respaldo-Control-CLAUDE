@@ -22,6 +22,8 @@ import { useColapsoSidebar } from '@/lib/useColapsoSidebar';
 import { cn } from '@/lib/utils';
 import { filtrarModulosVisibles } from '@/modulos/catalogo';
 import { NavegacionModulos } from '@/modulos/NavegacionModulos';
+import { BuscadorGlobal } from '@/modulos/ordenes-consulta/BuscadorGlobal';
+import { BadgeAlertasRc } from '@/modulos/ruta-critica/BadgeAlertasRc';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
@@ -163,6 +165,9 @@ export function CascaronSistema(): React.JSX.Element {
               <Marca tamano="sm" conSubtitulo={false} />
             </div>
 
+            {/* Buscador global de ordenes (F2-E4): solo visible con `ordenes.ver`. */}
+            <BuscadorGlobal />
+
             <div className="ml-auto flex items-center gap-2 sm:gap-3">
               <Badge
                 variant="secondary"
@@ -172,6 +177,7 @@ export function CascaronSistema(): React.JSX.Element {
                 <Building2 className="size-3.5" aria-hidden />
                 {sesion.empresaActiva.nombre}
               </Badge>
+              <BadgeAlertasRc />
               <AlternadorTema />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

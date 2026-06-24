@@ -104,7 +104,6 @@ function orden(
     fechaCompletada: null,
     motivoCancelada: opciones.estado === 'cancelada' ? 'Cliente canceló' : null,
     tallasV1: null,
-    upc: null,
     maquilaOrd: null,
     aplicacionOrd: null,
     pagada: null,

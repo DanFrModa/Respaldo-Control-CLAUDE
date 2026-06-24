@@ -13,7 +13,28 @@ import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
+import { rutasInventarioAvios } from './api/inventarios/avios.rutas.js';
+import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
+import { rutasInventarioTelas } from './api/inventarios/telas.rutas.js';
+import { rutasTiposMovimiento } from './api/inventarios/tipos-movimiento.rutas.js';
+import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
+import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
+import { rutasMrp } from './api/compras/mrp.rutas.js';
+import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
+import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
+import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
+import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
+import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
+import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
+import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
+import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
+import { rutasWip } from './api/produccion/wip.rutas.js';
+import { rutasBandejaRc } from './api/ruta-critica/bandeja.rutas.js';
+import { rutasConcentradoRc } from './api/ruta-critica/concentrado.rutas.js';
+import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
+import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
+import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
@@ -111,6 +132,93 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.
   await app.register(rutasOrdenes, { prefix: '/api' });
+  // Órdenes — CONSULTAS/TABLEROS/BÚSQUEDA (F2-E4 PIEZA B): consulta ligera, incompletas con
+  // semáforo, tablero "pedidos por mes" y buscador global. Solo lectura (`ordenes.ver`). Sus paths
+  // estáticos se registran ANTES de nada que choque con `/ordenes/:id` (Fastify los prioriza).
+  await app.register(rutasConsultasOrden, { prefix: '/api' });
+  // Órdenes — IMPRESOS (F2-E4 PIEZA A): PDF individual (`/ordenes/:id/impreso`) y lote consolidado
+  // (`POST /ordenes/impresos`). Binarios `application/pdf`. Solo lectura (`ordenes.ver`).
+  await app.register(rutasImpresosOrden, { prefix: '/api' });
+  // Órdenes de COMPRA (Módulo 3, F4-E2): CRUD del documento de compra de material a un proveedor
+  // (encabezado + líneas tela/avío/libre + matriz talla×color opcional + órdenes ligadas R7),
+  // autorización, cancelación suave y duplicado. Folio por empresa (A3/A9). NO mueve kardex (E3).
+  await app.register(rutasOrdenesCompra, { prefix: '/api' });
+  // RECEPCIÓN de compras (Módulo 3, F4-E3): el hecho que conecta la OC con el kardex de
+  // materiales — recibir (parcial/total) crea el lote de tela (D5) y mueve el kardex de
+  // telas/avíos con cantidad/costo ya convertidos a unidad de consumo (R1); reverso suave (D3).
+  // Solo se recibe contra una OC autorizada/recibida_parcial (decisión b, server-side).
+  await app.register(rutasRecepcionesCompra, { prefix: '/api' });
+  // EXPLOSIÓN MRP (Módulo 3, F4-E4, R3/R7): explosiona el BOM del modelo contra la matriz de la
+  // orden → qué/cuánto comprar (netea genéricos contra el kardex, decisión d), genera OC por
+  // proveedor en un clic, y el tablero "qué tengo / qué falta" (cruce requerido/en-oc/recibido).
+  // NO crea permisos nuevos (usa los compras.* de E2).
+  await app.register(rutasMrp, { prefix: '/api' });
+  // NOTAS DE SALIDA estructuradas (Módulo 5, F4-E5, R4/R9): documento de envío de materiales a un
+  // maquilero contra una orden. Renglones de AVÍO descuentan el kardex al CONFIRMAR (`salida-por-nota`);
+  // los de TELA REFERENCIAN su salida-a-orden de E1 SIN segundo movimiento (anti-doble-descuento,
+  // decisión (e)). Folio por empresa (A3/A9); cancelación suave con reverso de avíos (D3).
+  await app.register(rutasNotasSalida, { prefix: '/api' });
+  // Producción / WIP + kardex (Módulo 4/6, F3-E1): CRUD de tipos de proceso (con la bandera
+  // generaEntradaPt editable solo por admin) y GET solo-lectura de tipos de movimiento de
+  // inventario. El motor (kardex/eventos) vive en comun/; los flujos (corte/recibo/entrega)
+  // llegan en E2–E5.
+  await app.register(rutasTiposProceso, { prefix: '/api' });
+  await app.register(rutasTiposMovimiento, { prefix: '/api' });
+  // Inventario PT operable (Módulo 6, F3-E3): movimientos manuales (entrada/salida/ajuste),
+  // traspasos entre almacenes (dos patas), cancelación por inverso auditado (D3), existencias
+  // (vista) y kardex (por modelo con saldo corrido + por folio). RBAC inventario-pt.ver/.mover.
+  await app.register(rutasMovimientosPt, { prefix: '/api' });
+  // Inventario de TELAS y AVÍOS por kardex (Módulo 4, F4-E1, D5/R4): ajustes (telas con lote
+  // multi-componente), salida de tela a orden (traza Salidas.IdOrdenes), traspasos, cancelación por
+  // inverso (D3), existencias (vistas) y kardex. Importes de telas ocultos sin telas.ver-totales
+  // (ex-acceso #7). RBAC inventario-telas/.avios ver/.mover.
+  await app.register(rutasInventarioTelas, { prefix: '/api' });
+  await app.register(rutasInventarioAvios, { prefix: '/api' });
+  // Producción / WIP — ETAPAS (F3-E2): corte + envío a maquila unificado (M/A por TipoProceso, D8),
+  // cancelación suave, pendientes derivados por orden, corte semanal por cortador y los 2 PDFs
+  // (documento de envío + ficha de estampado). RBAC por ruta (produccion.corte/.envio/.cancelar/
+  // .wip-ver). El corte/envío NO tocan el kardex PT (eso entra en E4 recibo / E5 entrega).
+  await app.register(rutasEtapasProduccion, { prefix: '/api' });
+  // Producción / WIP — RECIBO de maquila (F3-E4, etapa ⭐ central): de UNA captura se derivan WIP +
+  // entrada a PT (solo costura, generaEntradaPt) + cargo EsMa propuesto. Cancelación con inverso de
+  // kardex; pendientes por recibir; recibos semanales por maquilero; PDF de recibo. RBAC por ruta
+  // (produccion.recibo/.cancelar/.wip-ver).
+  await app.register(rutasRecibosProduccion, { prefix: '/api' });
+  // Producción / WIP — ENTREGA a cliente (F3-E5): cierre del ciclo de la orden. Salida de PT
+  // (kardex) no-negativa bajo lock, seguimiento del pedido DERIVADO (pedido − entregado),
+  // cancelación con inverso de kardex y comprobante PDF. RBAC produccion.entrega/.cancelar/.wip-ver.
+  await app.register(rutasEntregasCliente, { prefix: '/api' });
+  // Producción / WIP — TABLERO de avance + existencias en poder del maquilero (F3-E5): el WIP de las
+  // órdenes (derivado por suma) y lo enviado − recibido a cada maquilero. Solo lectura
+  // (produccion.wip-ver).
+  await app.register(rutasWip, { prefix: '/api' });
+  // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
+  // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.
+  await app.register(rutasCargosEsMa, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
+  // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
+  // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias
+  // por orden, fechas/semáforos) y las plantillas llegan en E2+.
+  await app.register(rutasProcesosRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E2) — plantillas de ruta (procesos + tiempo estándar + encadenamiento
+  // propio DAG), reglas de duración (cantidad/tela/aplicación), familias/artículos y calendario
+  // laboral por empresa (días hábiles + festivos). RBAC reusa rc.catalogo-ver / rc.catalogo-administrar.
+  await app.register(rutasPlantillasRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E3) — MOTOR de la ruta viva por orden (pt1): programar (generar/
+  // re-generar la ruta desde la plantilla aplicable, omitiendo condicionales y reconectando
+  // transitivamente; duración por las reglas de E2), ajustar la ruta de esa orden (sin tocar la
+  // plantilla, D10) y consultarla. Encola el recálculo del CPM (pg-boss); las FECHAS las calcula
+  // E4. RBAC por ruta (rc.programar muta, rc.ruta-ver consulta).
+  await app.register(rutasProgramacionRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E5) — BANDEJA "mis tareas" (procesos activos a capturar, por urgencia,
+  // de los que el usuario es responsable; o todas con supervisión) + CONTEO de alertas (atrasados/
+  // enRiesgo) para el badge del header. Solo lectura; RBAC rc.ruta-ver; semáforo/atraso DERIVADOS.
+  await app.register(rutasBandejaRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, F5-E7) — CONCENTRADO "planeado vs real" (reemplaza RC_ConcentradoDif):
+  // todas las órdenes con RC viva × sus procesos, con semáforo/atraso, AGREGADO en el servidor (SQL
+  // crudo, sin pivoteo en el cliente), paginado/filtrable/ordenable, + export a Excel del mismo
+  // resultado. Solo lectura; RBAC rc.ruta-ver (reusado); A9 por empresa activa.
+  await app.register(rutasConcentradoRc, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

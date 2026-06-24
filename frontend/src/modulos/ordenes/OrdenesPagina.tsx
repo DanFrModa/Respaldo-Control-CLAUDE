@@ -4,11 +4,13 @@ import {
   Factory,
   Grid3x3,
   MessageSquare,
+  Route,
   Tags,
   UserRound,
   XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useOrdenes } from '@/api/ordenes';
 import type { EstadoOrden, Orden, OrdenesQuery } from '@/api/tipos';
@@ -82,8 +84,11 @@ function EstadoOrdenBadge({ estado }: { estado: EstadoOrden }): React.JSX.Elemen
  */
 export function OrdenesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
+  const navigate = useNavigate();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
   const puedeCancelar = tienePermiso('ordenes.cancelar');
+  const puedeRutaVer = tienePermiso('rc.ruta-ver');
+  const puedeProgramar = tienePermiso('rc.programar');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -198,7 +203,11 @@ export function OrdenesPagina(): React.JSX.Element {
           <DetalleOrden
             orden={o}
             puedeAdministrar={puedeAdministrar}
+            puedeRutaVer={puedeRutaVer}
+            puedeProgramar={puedeProgramar}
             alCopiarMatriz={() => setACopiarMatriz(o)}
+            alVerRuta={() => void navigate(`/ruta-critica/ordenes/${o.id}`)}
+            alProgramarRuta={() => void navigate(`/ruta-critica/ordenes/${o.id}/programar`)}
           />
         )}
       />
@@ -236,11 +245,19 @@ export function OrdenesPagina(): React.JSX.Element {
 function DetalleOrden({
   orden,
   puedeAdministrar,
+  puedeRutaVer,
+  puedeProgramar,
   alCopiarMatriz,
+  alVerRuta,
+  alProgramarRuta,
 }: {
   orden: Orden;
   puedeAdministrar: boolean;
+  puedeRutaVer: boolean;
+  puedeProgramar: boolean;
   alCopiarMatriz: () => void;
+  alVerRuta: () => void;
+  alProgramarRuta: () => void;
 }): React.JSX.Element {
   return (
     <>
@@ -271,8 +288,23 @@ function DetalleOrden({
 
         <FotosModeloOrden idModelo={orden.idModelo} codigoModelo={orden.codigoModelo} />
 
-        {orden.upc ? (
-          <p className="text-xs text-muted-foreground">Código histórico (UPC): {orden.upc}</p>
+        {/* Ruta Crítica (F5-E5): consultar / programar la ruta de ESTA orden. La acción real la
+            re-verifica el backend (A1); aquí solo se muestran los accesos según permiso. */}
+        {(puedeRutaVer || puedeProgramar) && orden.estado !== 'cancelada' ? (
+          <div className="flex flex-wrap gap-2" data-testid="acciones-rc-orden">
+            {puedeRutaVer ? (
+              <Button variant="outline" size="sm" onClick={alVerRuta} data-testid="orden-ver-ruta">
+                <Route aria-hidden />
+                Ver Ruta Crítica
+              </Button>
+            ) : null}
+            {puedeProgramar ? (
+              <Button size="sm" onClick={alProgramarRuta} data-testid="orden-programar-rc">
+                <Route aria-hidden />
+                Programar RC
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </SeccionDetalle>
 

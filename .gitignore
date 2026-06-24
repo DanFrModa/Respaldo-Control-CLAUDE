@@ -47,3 +47,5 @@ Respaldo CLAUDE/
 
 # Reportes generados por el ETL de migración (artefactos de cada corrida, no se versionan)
 backend/reporte-etl-*.txt
+backend/migracion/_progreso.ts
+backend/analisis-tallas-*.txt

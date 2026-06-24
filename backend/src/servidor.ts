@@ -1,4 +1,9 @@
 import { construirApp } from './app.js';
+import { detenerColaEventos, iniciarColaEventos } from './comun/cola-eventos.js';
+import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
+import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
+import { registrarAutoAvanceRc } from './dominio/ruta-critica/autoAvance.js';
+import { registrarBarridoRiesgoRc } from './comun/jobs/riesgo-rc.js';
 
 /**
  * Punto de entrada del servicio de API.
@@ -7,6 +12,11 @@ import { construirApp } from './app.js';
  * red privada de Railway (PLANMAESTRO §2.2), y en el puerto `PORT` (3000 por
  * defecto). Maneja un apagado limpio ante SIGINT/SIGTERM para que Docker y
  * Railway puedan reiniciar/parar el contenedor sin dejar conexiones colgadas.
+ *
+ * También arranca/cierra la COLA de eventos (pg-boss sobre el MISMO Postgres,
+ * F4-E3 / ADR-0011): el relay del outbox publica los eventos de dominio. Vive en
+ * el entry point (no en `app.ts`) para que los tests, que construyen la app con
+ * `inject()`, NO requieran un pg-boss vivo. Se guarda además por `EVENTOS_COLA_ACTIVA`.
  */
 
 const PUERTO = Number(process.env.PORT ?? 3000);
@@ -14,10 +24,58 @@ const HOST = '::';
 
 const app = await construirApp({ logBonito: process.env.NODE_ENV !== 'production' });
 
+// RED DE SEGURIDAD GLOBAL (defensa en profundidad, coherente con el "best-effort, la app sigue"
+// del resto del archivo). Las tareas de fondo (relay del outbox, motor de jobs) corren
+// fire-and-forget; si un parpadeo TRANSITORIO de la BD escapara su try/catch, un rechazo sin
+// atrapar (o una excepción no capturada) tumbaría el proceso. Aquí solo LO LOGUEAMOS y dejamos el
+// proceso vivo: preferimos seguir sirviendo a reiniciar por un error transitorio de fondo. (El
+// blindaje principal es el try/catch de `publicarPendientes`; esto es el cinturón de seguridad.)
+process.on('unhandledRejection', (error) => {
+  app.log.error({ err: error }, 'unhandledRejection no atrapado (la app sigue viva).');
+});
+process.on('uncaughtException', (error) => {
+  app.log.error({ err: error }, 'uncaughtException no atrapada (la app sigue viva).');
+});
+
+// Arranque de la cola de eventos (best-effort: si pg-boss no levanta, la app sigue y el outbox
+// no se pierde — el barrido reintentará). NO-OP en tests/CI (EVENTOS_COLA_ACTIVA=false).
+await iniciarColaEventos((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Arranque del MOTOR DE JOBS (pg-boss sobre el mismo Postgres, F5-E3 / ADR-0012): tareas durables
+// en segundo plano (CPM de la RC, E4; auto-avance, E6). Best-effort; NO-OP en tests/CI
+// (JOBS_ACTIVOS=false). En E3 solo se ENCOLA el recálculo; el worker del CPM lo monta E4.
+await iniciarMotorJobs((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra los HANDLERS de jobs de la Ruta Crítica (F5-E4): el CPM (recálculo de fechas de la ruta
+// viva, serializado por orden) y el BARRIDO RECURRENTE de riesgo (recalcula el semáforo de las
+// órdenes con RC activa, incl. la regla "EnRiesgo antes de programar"). NO-OP si el motor está
+// inactivo (tests/CI). Best-effort: si fallan, la app sigue (el job se puede re-disparar).
+await registrarHandlerCpm();
+await registrarBarridoRiesgoRc((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra el CONSUMIDOR del AUTO-AVANCE de la Ruta Crítica (F5-E6): escucha la cola de eventos de
+// dominio (corte, envío, recibo, entrega, recepción de tela y sus cancelaciones) y auto-completa /
+// des-completa el proceso correspondiente de la RC, encolando el recálculo del CPM. Va AL FINAL —
+// DESPUÉS de `iniciarMotorJobs` y sus handlers — a propósito: el consumidor llama `encolarJob` para
+// el recálculo del CPM sobre la instancia del MOTOR DE JOBS (otra instancia pg-boss). Si se
+// registrara antes de iniciar el motor, un evento que llegara en esa ventana encolaría sobre un
+// motor aún nulo (no-op) y se perdería ese recálculo. NO-OP en tests/CI (EVENTOS_COLA_ACTIVA=false).
+await registrarAutoAvanceRc((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
 /** Cierra la app de forma ordenada y termina el proceso. */
 async function apagar(senal: NodeJS.Signals): Promise<void> {
   app.log.info({ senal }, 'Apagando el servidor...');
   try {
+    await detenerColaEventos();
+    await detenerMotorJobs();
     await app.close();
     app.log.info('Servidor apagado correctamente.');
     process.exit(0);

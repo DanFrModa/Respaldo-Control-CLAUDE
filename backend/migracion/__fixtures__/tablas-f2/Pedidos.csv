@@ -1,0 +1,4 @@
+"IdPedidos","IdClientes","NumeroPed","FechaPedido","FechaDe","FechaHasta","EntregadoTienda","FechaTela","IdOrdCompra","PedCancelado","NoProducir","FechaElaboracion","IdEmpresas"
+"10","1","5001","04/01/2005 00:00:00","10/01/2005 00:00:00","20/01/2005 00:00:00","0","","777","0","0","","8"
+"11","2","5002","15/03/2006 00:00:00","","","1","","","1","0","","8"
+"12","1","5003","20/06/2007 00:00:00","","","0","","","0","1","","8"

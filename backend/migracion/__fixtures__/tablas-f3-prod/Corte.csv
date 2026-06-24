@@ -1,0 +1,4 @@
+"IdCorte","IdOrdenes","IdCortadores","Fecha","Cantidad","Observaciones"
+1,100,5,01/08/2020 00:00:00,150,"Corte orden 100"
+2,101,5,02/08/2020 00:00:00,20,"Corte orden 101"
+3,999,5,03/08/2020 00:00:00,120,"Corte de orden no migrada"

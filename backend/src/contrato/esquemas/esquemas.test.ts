@@ -127,14 +127,14 @@ describe('esquemas de edición: omitir un campo con default NO lo rellena (Zod .
   });
 
   it('esquemaEmpresaEditar: omitir las banderas las deja undefined (no rellena false)', () => {
-    const datos = esquemaEmpresaEditar.parse({ upc: '750' });
+    const datos = esquemaEmpresaEditar.parse({ identificador: 'FRM-01' });
     expect('favorita' in datos).toBe(false);
     expect('paraIpt' in datos).toBe(false);
     expect('paraEdr' in datos).toBe(false);
     expect(datos.favorita).toBeUndefined();
     expect(datos.paraIpt).toBeUndefined();
     expect(datos.paraEdr).toBeUndefined();
-    expect(datos).toEqual({ upc: '750' });
+    expect(datos).toEqual({ identificador: 'FRM-01' });
     // si se mandan, se respetan
     expect(esquemaEmpresaEditar.parse({ favorita: true }).favorita).toBe(true);
   });

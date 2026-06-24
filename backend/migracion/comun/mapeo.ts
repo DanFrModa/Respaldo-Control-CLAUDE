@@ -39,6 +39,46 @@ export const ENTIDAD_MAPEO = {
   almacenTela: 'Almacen:Tela',
   /** E7: IdModelos viejo → id nuevo (lo usan el BOM y las fotos). */
   modelo: 'Modelo',
+  /** F2-E5: IdPedidos viejo → Pedido.id nuevo. */
+  pedido: 'Pedido',
+  /** F2-E5: IdPedidosDet viejo → PedidoLinea.id nuevo (CRÍTICO: lo usan las órdenes y los reales). */
+  pedidoLinea: 'PedidoLinea',
+  /** F2-E5: IdPedidosReales viejo → PedidoReal.id nuevo. */
+  pedidoReal: 'PedidoReal',
+  /** F2-E5: IdPedidosRealesDet viejo → PedidoRealLinea.id nuevo. */
+  pedidoRealLinea: 'PedidoRealLinea',
+  /** F2-E5: IdOrdenes viejo → Orden.id nuevo. */
+  orden: 'Orden',
+  /** F2-E5: IdOrdenesDet viejo → OrdenLinea.id nuevo. */
+  ordenLinea: 'OrdenLinea',
+  /** F2-E5: IdComentaOrd viejo → OrdenComentario.id nuevo. */
+  ordenComentario: 'OrdenComentario',
+  /** F3-E6: IdCorte viejo → EtapaMovimiento(corte).id nuevo. */
+  etapaCorte: 'EtapaCorte',
+  /** F3-E6: Consecutivo de Entregas (costura) viejo → EtapaMovimiento(envio_maquila costura).id. */
+  etapaEnvioCostura: 'EtapaEnvioCostura',
+  /** F3-E6: Consecutivo de EntregasEst (estampado) viejo → EtapaMovimiento(envio_maquila estampado).id. */
+  etapaEnvioEstampado: 'EtapaEnvioEstampado',
+  /** F3-E6: IdRecibos (costura) viejo → EtapaMovimiento(recibo_maquila costura).id. */
+  etapaReciboCostura: 'EtapaReciboCostura',
+  /** F3-E6: IdRecibosEst (estampado) viejo → EtapaMovimiento(recibo_maquila estampado).id. */
+  etapaReciboEstampado: 'EtapaReciboEstampado',
+  /** F3-E6: IdEsMa_Recibos viejo → EsMaCargo.id nuevo. */
+  cargoEsMa: 'CargoEsMa',
+  /** F4-E6: IdOrdCompra viejo → OrdenCompra.id nuevo. */
+  ordenCompra: 'OrdenCompra',
+  /** F4-E6: IdNotas viejo → NotaSalida.id nuevo. */
+  notaSalida: 'NotaSalida',
+  /** F4-E6 (telas): IdEntradasDet (entrada de compra legacy) → Movimiento(entrada de tela).id. */
+  movEntradaTela: 'MovEntradaTela',
+  /** F4-E6 (telas): IdSalidasDet (salida a orden legacy) → Movimiento(salida de tela a orden).id. */
+  movSalidaTela: 'MovSalidaTela',
+  /** F4-E6 (telas): clave del par de traspaso de tela legacy (pata SALIDA) → Movimiento.id. */
+  movTraspasoTelaSalida: 'MovTraspasoTelaSalida',
+  /** F4-E6 (telas): clave del par de traspaso de tela legacy (pata ENTRADA) → Movimiento.id. */
+  movTraspasoTelaEntrada: 'MovTraspasoTelaEntrada',
+  /** F4-E6 (telas): IdTelasColores legacy → Lote sintetizado (lote-por-color, decisión f). */
+  loteLegacyTela: 'LoteLegacyTela',
 } as const;
 
 /** Una clave de entidad de mapeo. */

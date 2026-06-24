@@ -66,3 +66,7 @@ Reglas:
 | [ADR-0006](ADR-0006-openapi-desde-zod.md)          | El contrato OpenAPI se genera desde los esquemas Zod del backend  | Aceptado |
 | [ADR-0007](ADR-0007-catalogos-globales-vs-por-empresa.md) | Catálogos maestros globales; `idEmpresa` solo en lo operativo (A9) | Aceptado |
 | [ADR-0008](ADR-0008-schema-prisma-archivo-unico.md) | `schema.prisma` archivo único (no `prismaSchemaFolder`) en F1     | Aceptado |
+| [ADR-0009](ADR-0009-materiales-f1e3.md)            | Catálogos de materiales F1-E3: telas unificadas, avíos NULLABLE, fallback de precio | Aceptado |
+| [ADR-0010](ADR-0010-motor-kardex-produccion.md)    | Motor de kardex genérico y modelo de datos de Producción (F3-E1)  | Aceptado |
+| [ADR-0011](ADR-0011-eventos-outbox-pgboss.md)      | Eventos de dominio con OUTBOX transaccional + pg-boss (F4-E3)     | Aceptado |
+| [ADR-0012](ADR-0012-motor-rc-duracion-y-jobs.md)   | Motor de la RC (pt1): fórmula de duración + jobs pg-boss con serialización por orden (F5-E3) | Aceptado |

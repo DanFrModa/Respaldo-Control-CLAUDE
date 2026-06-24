@@ -50,8 +50,6 @@ model Empresa {
   razonSocial   String? @map("razon_social")
   /// Identificador corto usado en folios e impresos (viejo: `Identificador`).
   identificador String?
-  /// Prefijo UPC de la empresa (viejo: `UPCEmp`).
-  upc           String?
   /// Empresa propuesta por defecto al iniciar sesión (viejo: `Importancia = 1`).
   favorita      Boolean @default(false)
   /// Participa en el inventario de producto terminado (viejo: `ParaIPT`).
@@ -66,13 +64,31 @@ model Empresa {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  configuracion ConfiguracionEmpresa?
-  almacenes     Almacen[]
-  secuencias    Secuencia[]
+  configuracion     ConfiguracionEmpresa?
+  almacenes         Almacen[]
+  secuencias        Secuencia[]
   /// Pedidos internos de esta empresa (F2-E1, A9 — folio por empresa). Restrict.
-  pedidos       Pedido[]
+  pedidos           Pedido[]
   /// Órdenes de producción de esta empresa (F2-E2, A9 — folio por empresa). Restrict.
-  ordenes       Orden[]
+  ordenes           Orden[]
+  /// Etapas de producción (corte/envío/recibo/entrega) de esta empresa (F3-E1, A9). Restrict.
+  etapasMovimiento  EtapaMovimiento[]
+  /// Movimientos de kardex de esta empresa (F3-E1, A9 — folio por empresa). Restrict.
+  movimientos       Movimiento[]
+  /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
+  cargosEsMa        EsMaCargo[]
+  /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
+  ordenesCompra     OrdenCompra[]
+  /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
+  recepcionesCompra RecepcionCompra[]
+  /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
+  eventosOutbox     EventoOutbox[]
+  /// Notas de salida de materiales a maquileros de esta empresa (F4-E5, A9 — folio por empresa). Restrict.
+  notasSalida       NotaSalida[]
+  /// Calendario laboral de la RC de esta empresa (F5-E2, 1:1). Restrict.
+  calendario        CalendarioEmpresa?
+  /// Días festivos de la RC de esta empresa (F5-E2). Restrict.
+  diasFestivos      DiaFestivo[]
 
   @@map("empresas")
 }
@@ -229,6 +245,12 @@ model Rol {
   permisos RolPermiso[]
   usuarios UsuarioRol[]
 
+  /// Procesos de la Ruta Crítica de los que este rol es RESPONSABLE (F5-E1, D10/A4). Puente
+  /// N:M sobre el RBAC único: NO hay catálogo de roles paralelo (los `RC_TipoUsuarios` del
+  /// viejo se absorben como roles funcionales del seed). Restrict: un rol asignado a un proceso
+  /// no se borra físico.
+  procesos ProcesoDefRol[]
+
   @@map("roles")
 }
 
@@ -313,6 +335,21 @@ model Almacen {
   modificadoPorId String?  @map("modificado_por_id")
 
   configuracionesPtDefault ConfiguracionEmpresa[] @relation("ConfiguracionAlmacenPtDefault")
+
+  /// Movimientos de kardex en este almacén (F3-E1, D3). Restrict: un almacén con
+  /// movimientos no se borra físico → se desactiva.
+  movimientos Movimiento[]
+
+  /// Recibos de maquila que mandan sus PRIMERAS a este almacén (F3-E4). Restrict.
+  recibosAlmacenPrimeras EtapaMovimiento[] @relation("ReciboAlmacenPrimeras")
+  /// Recibos de maquila que mandan sus SEGUNDAS a este almacén (F3-E4). Restrict.
+  recibosAlmacenSegundas EtapaMovimiento[] @relation("ReciboAlmacenSegundas")
+
+  /// Recepciones de compra cuyo material entra a este almacén destino (F4-E3). Restrict.
+  recepcionesCompra RecepcionCompra[]
+
+  /// Notas de salida cuyos avíos salen de este almacén origen (F4-E5, decisión (g)). Restrict.
+  notasSalida NotaSalida[]
 
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
@@ -508,13 +545,26 @@ model Proveedor {
   activo Boolean @default(true)
 
   /// Roles/servicios multi-valor del proveedor (F1-E1B, N:N vía `ProveedorRol`).
-  roles    ProveedorRol[]
+  roles                   ProveedorRol[]
   /// Adjuntos del proveedor en R2 (F1-E1B: constancia, contrato…).
-  archivos ProveedorArchivo[]
+  archivos                ProveedorArchivo[]
   /// Avíos que surte este proveedor (F1-E3, R1, N:N vía `AvioProveedor`).
-  avios    AvioProveedor[]
+  avios                   AvioProveedor[]
   /// Órdenes de producción donde está asignado como maquilero (F2-E2, Restrict).
-  ordenes  Orden[]
+  ordenes                 Orden[]
+  /// Etapas de producción donde es el TERCERO (cortador/maquilero/estampador) (F3-E1,
+  /// fusión de terceros D12/R15: el tercero es un Proveedor con su rol de servicio). Restrict.
+  etapasMovimiento        EtapaMovimiento[]
+  /// Cargos a su cuenta de maquila (EsMa) como maquilero (F3-E1). Restrict.
+  cargosEsMa              EsMaCargo[]
+  /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
+  lotes                   Lote[]
+  /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
+  ordenesCompra           OrdenCompra[]
+  /// Requerimientos de explosión MRP donde es el proveedor SUGERIDO (F4-E4, R1/R3). Restrict.
+  requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
+  /// Notas de salida donde este proveedor es el MAQUILERO destino del envío (F4-E5). Restrict.
+  notasSalida             NotaSalida[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -663,9 +713,17 @@ model Color {
   activo Boolean @default(true)
 
   /// Telas que tienen este color con su precio (F1-E3, N:N vía `TelaColor`).
-  telas       TelaColor[]
+  telas                  TelaColor[]
   /// Renglones de matriz de órdenes en este color (F2-E2, Restrict).
-  ordenLineas OrdenLinea[]
+  ordenLineas            OrdenLinea[]
+  /// Renglones de etapas de producción (corte/envío/recibo/entrega) en este color (F3-E1, D4). Restrict.
+  etapasMovimientoDet    EtapaMovimientoDet[]
+  /// Renglones de kardex PT en este color (F3-E1, D4). Restrict.
+  movimientosDetPt       MovimientoDetPt[]
+  /// Lotes de tela teñidos en este color (F4-E1, D5: el lote define el teñido). Restrict.
+  lotes                  Lote[]
+  /// Cantidades de la matriz talla×color de renglones de OC en este color (F4-E2). Restrict.
+  ordenCompraLineasTalla OrdenCompraLineaTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -704,6 +762,24 @@ model TipoProceso {
   nombre String
   activo Boolean @default(true)
 
+  /// ¿El RECIBO de este proceso deja PRENDA TERMINADA y por tanto genera ENTRADA al
+  /// inventario PT? (F3-E1, decisión (e) — DECISIONES.md). Por DATO, no por código:
+  /// el recibo de maquila (F3-E4) consulta esta bandera para decidir si crea un
+  /// `Movimiento` de entrada al kardex PT. SOLO costura = `true`; estampado/aplicación,
+  /// bordado y lavado = `false` (evidencia v1: `Recibos.Inventariado` existe solo en
+  /// costura; `RecibosEst` NO la trae; `IPT_Movs` tiene 2,468 entradas tipo 2 'Entrada
+  /// de Maquila' contra 3 del tipo 3 'Entrada de Aplicación'). Default `false` (lo
+  /// SEGURO: un proceso nuevo no mete a PT salvo que se marque). El seed de F3-E1 pone
+  /// `true` solo en costura. Cambiar el valor luego es DATO (UI de admin, F3-E1 Fase 2),
+  /// NO migración. Editable solo por admin (A4).
+  generaEntradaPt Boolean @default(false) @map("genera_entrada_pt")
+
+  /// Etapas de envío/recibo de maquila de este proceso (F3, Restrict): un tipo de
+  /// proceso en uso por una etapa no se borra físico → se desactiva.
+  etapas     EtapaMovimiento[]
+  /// Cargos a maquileros (EsMa) de este proceso (F3, Restrict).
+  cargosEsMa EsMaCargo[]
+
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
   modificadoEn    DateTime @updatedAt @map("modificado_en")
@@ -727,9 +803,15 @@ model Talla {
   orden    Int     @default(0)
   activo   Boolean @default(true)
 
-  curvas           CurvaTallaItem[]
+  curvas                 CurvaTallaItem[]
   /// Cantidades de matriz de órdenes en esta talla (F2-E2, Restrict).
-  ordenLineasTalla OrdenLineaTalla[]
+  ordenLineasTalla       OrdenLineaTalla[]
+  /// Renglones de etapas de producción en esta talla (F3-E1, D4). Restrict.
+  etapasMovimientoDet    EtapaMovimientoDet[]
+  /// Renglones de kardex PT en esta talla (F3-E1, D4). Restrict.
+  movimientosDetPt       MovimientoDetPt[]
+  /// Cantidades de la matriz talla×color de renglones de OC en esta talla (F4-E2). Restrict.
+  ordenCompraLineasTalla OrdenCompraLineaTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -932,11 +1014,23 @@ model Tela {
   activo         Boolean            @default(true)
 
   /// Colores disponibles de esta tela con su precio (N:N a Color).
-  colores TelaColor[]
+  colores            TelaColor[]
   /// Renglones del BOM de modelos que usan esta tela (F1-E4, Restrict hacia la tela).
-  modelos ModeloTela[]
+  modelos            ModeloTela[]
   /// Órdenes de producción que disponen de esta tela (F2-E2, Restrict).
-  ordenes Orden[]
+  ordenes            Orden[]
+  /// Renglones de kardex de TELA de esta tela (dimensión tela×lote, D5). Las filas las
+  /// ejercita F4 (el inventario de telas); la tabla nace en F3-E1 para fijar el motor
+  /// genérico. Restrict.
+  movimientosDetTela MovimientoDetTela[]
+  /// Componentes de lote que usan esta tela (F4-E1, D5: un lote trae N telas). Restrict.
+  loteComponentes    LoteComponente[]
+  /// Renglones de orden de compra que piden esta tela (F4-E2). Restrict.
+  ordenCompraLineas  OrdenCompraLinea[]
+  /// Renglones de explosión MRP que requieren esta tela (F4-E4, R3). Restrict.
+  requerimientos     RequerimientoOrden[]
+  /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
+  notaSalidaLineas   NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -973,6 +1067,81 @@ model TelaColor {
   @@map("telas_colores")
 }
 
+/// LOTE de tela (F4-E1, D5 — doc 04-Inventarios §B.1/§B.3). Un lote es una compra/teñido
+/// concreto que ENTRA al inventario: define el COLOR (el teñido) y trae 1..N telas
+/// acompañantes (cuerpo + cardigan + …) del MISMO lote y color, para que casen los colores
+/// (D5 elimina el límite viejo de 2 componentes `ExTela1/ExTela2`). El lote es la dimensión de
+/// trazabilidad del kardex de telas: la existencia es por tela × lote × almacén (Σ de
+/// movimientos, D3). `proveedor`/`factura`/`fecha` son los datos de la entrada (el viejo los
+/// llevaba en `Entradas`); en v2 la entrada-recepción (E3) crea el lote en la MISMA transacción
+/// que el movimiento de kardex. GLOBAL (sin idEmpresa — catálogo de materiales, ADR-0007: el
+/// inventario por empresa lo da `Movimiento.idEmpresa`). Auditoría A7.
+model Lote {
+  id            Int        @id @default(autoincrement())
+  /// Clave de negocio del lote (estable, p. ej. número de lote/teñido del proveedor). Única
+  /// global. Para el ETL de lotes legacy sintetizados (E6) se genera una clave determinista.
+  clave         String     @unique
+  /// Color (teñido) del lote: TODOS sus componentes comparten este color (D5). Restrict.
+  idColor       Int        @map("id_color")
+  color         Color      @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  /// Proveedor que surtió el lote (opcional: el histórico legacy puede no mapearlo). Restrict.
+  idProveedor   Int?       @map("id_proveedor")
+  proveedor     Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Factura de la entrada del lote (texto del proveedor; opcional para el legacy).
+  factura       String?
+  /// Fecha de la entrada/teñido del lote (solo fecha).
+  fecha         DateTime?  @db.Date
+  observaciones String?    @db.Text
+
+  /// Componentes (telas) que llegaron en este lote (1..N, mismo color — D5).
+  componentes        LoteComponente[]
+  /// Renglones de kardex de TELA ligados a este lote (existencia por tela×lote×almacén, D3).
+  movimientosDetTela MovimientoDetTela[]
+  /// Renglones de kardex de AVÍO ligados a este lote (opcional, R4 — pocos avíos por lote).
+  movimientosDetAvio MovimientoDetAvio[]
+  /// Renglones de recepción de compra que crearon/usaron este lote (F4-E3, D5). Restrict.
+  recepcionLineas    RecepcionCompraLinea[]
+  /// Renglones de nota de salida que envían tela de este lote a maquila (F4-E5, D5). Restrict.
+  notaSalidaLineas   NotaSalidaLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idColor])
+  @@index([idProveedor])
+  @@map("lotes")
+}
+
+/// COMPONENTE de un lote (F4-E1, D5): una tela concreta dentro del lote, con la cantidad y el
+/// peso que llegaron. Reemplaza el par fijo `ExTela1/ExTela2` del viejo por N renglones (un
+/// lote puede traer cuerpo + cardigan + más). PK compuesta (idLote, idTela): una tela aparece
+/// UNA vez por lote. `onDelete`: Cascade hacia `Lote` (los componentes son parte del lote; se
+/// reescriben en la transacción A2 de la recepción); Restrict hacia `Tela` (una tela en uso no
+/// se borra físico). La EXISTENCIA NO vive aquí (sería un saldo editable, prohibido por D3):
+/// `cantidad` es la cantidad ORIGINAL que entró (dato de la entrada); el saldo real es Σ de
+/// `MovimientoDetTela` por tela×lote×almacén. Auditoría A7.
+model LoteComponente {
+  idLote   Int      @map("id_lote")
+  lote     Lote     @relation(fields: [idLote], references: [id], onDelete: Cascade)
+  idTela   Int      @map("id_tela")
+  tela     Tela     @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Cantidad de esta tela que ENTRÓ en el lote (dato de la entrada; NO es la existencia — D3).
+  cantidad Decimal  @db.Decimal(14, 4)
+  /// Peso de esta tela en el lote (kg), informativo (ex `Entradas...Peso`). Opcional.
+  peso     Decimal? @db.Decimal(14, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idLote, idTela])
+  @@index([idTela])
+  @@map("lote_componentes")
+}
+
 /// Avío / habilitación (catálogo global, F1-E3, R1). Equivale a `Habilitacion` del viejo
 /// (doc 01-Modelos §2, con Favorito/CantFav). `unidad` y `presentacion` son campos NUEVOS
 /// que el viejo no tiene: NULLABLE en BD a propósito (obligatorios SOLO en altas nuevas por
@@ -996,13 +1165,31 @@ model Avio {
   esGenerico       Boolean  @default(false) @map("es_generico")
   /// Precio de referencia (fallback de precio sin proveedor mapeable — ADR-0009).
   precioReferencia Decimal? @map("precio_referencia") @db.Decimal(12, 2)
+  /// FACTOR de conversión por DEFECTO presentación→unidad de consumo (F4-E1, R1): cuántas
+  /// `unidad` (m, pza…) trae una `presentacion` (rollo, caja…). Es el fallback cuando el
+  /// `AvioProveedor` del precio no define su propio factor (un proveedor puede vender el mismo
+  /// avío en presentaciones distintas — por eso el factor "fino" vive en `AvioProveedor`). Lo
+  /// usa el motor de conversión (`comun/conversion.ts`) para convertir CANTIDADES y PRECIOS
+  /// (E3: costo por unidad = precio por presentación ÷ factor). NULL = sin conversión (1:1).
+  /// Debe ser > 0 si viene (lo valida el dominio/Zod). NO se compra para stock con mínimos (R4).
+  factorConversion Decimal? @map("factor_conversion") @db.Decimal(14, 6)
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo           Boolean  @default(true)
 
   /// Proveedores que surten este avío con su precio (N:N a Proveedor).
-  proveedores AvioProveedor[]
+  proveedores        AvioProveedor[]
   /// Renglones del BOM de modelos que usan este avío (F1-E4, Restrict hacia el avío).
-  modelos     ModeloAvio[]
+  modelos            ModeloAvio[]
+  /// Renglones de kardex de AVÍO de este avío (dimensión avío×lote opcional + esGenerico,
+  /// R4). Las filas las ejercita F4 (el inventario de avíos); la tabla nace en F3-E1 para
+  /// fijar el motor genérico. Restrict.
+  movimientosDetAvio MovimientoDetAvio[]
+  /// Renglones de orden de compra que piden este avío (F4-E2). Restrict.
+  ordenCompraLineas  OrdenCompraLinea[]
+  /// Renglones de explosión MRP que requieren este avío (F4-E4, R3). Restrict.
+  requerimientos     RequerimientoOrden[]
+  /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.
+  notaSalidaLineas   NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1021,12 +1208,21 @@ model Avio {
 ///    desactiva), para no dejar el par colgando.
 /// Auditoría COMPLETA: `precio`/`condiciones` son editables (A7).
 model AvioProveedor {
-  idAvio      Int      @map("id_avio")
-  idProveedor Int      @map("id_proveedor")
-  /// Precio al que ESTE proveedor surte el avío.
-  precio      Decimal? @db.Decimal(12, 2)
+  idAvio           Int      @map("id_avio")
+  idProveedor      Int      @map("id_proveedor")
+  /// Precio al que ESTE proveedor surte el avío (por PRESENTACIÓN de compra — p. ej. por rollo).
+  precio           Decimal? @db.Decimal(12, 2)
+  /// FACTOR de conversión presentación→unidad de consumo PARA ESTE PROVEEDOR (F4-E1, R1):
+  /// cuántas unidades del BOM (m, pza…) trae UNA presentación de compra de este proveedor
+  /// (p. ej. 50 = un rollo de 50 m). Vive aquí porque el mismo avío se compra a varios
+  /// proveedores en presentaciones distintas (R1, insight del dueño). Si es NULL, el motor de
+  /// conversión cae al `Avio.factorConversion` por defecto, y si ese también es NULL, asume 1:1.
+  /// El motor lo usa para convertir CANTIDADES y PRECIOS: la recepción (E3) calcula el costo por
+  /// unidad de consumo = `precio` ÷ factor (precio por rollo ÷ m por rollo = costo por metro).
+  /// Debe ser > 0 si viene (lo valida el dominio/Zod).
+  factorConversion Decimal? @map("factor_conversion") @db.Decimal(14, 6)
   /// Condiciones comerciales de este proveedor para este avío (texto libre).
-  condiciones String?
+  condiciones      String?
 
   avio      Avio      @relation(fields: [idAvio], references: [id], onDelete: Cascade)
   proveedor Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
@@ -1152,17 +1348,19 @@ model Modelo {
   activo Boolean @default(true)
 
   /// Fotos del modelo en R2 (N por modelo).
-  fotos        ModeloFoto[]
+  fotos            ModeloFoto[]
   /// BOM — telas del modelo (N:N a Tela con consumo + banderas).
-  telas        ModeloTela[]
+  telas            ModeloTela[]
   /// BOM — avíos del modelo (N:N a Avio con consumo + banderas).
-  avios        ModeloAvio[]
+  avios            ModeloAvio[]
   /// BOM — bordados/estampados del modelo (N:N a Bordado con precio).
-  bordados     ModeloBordado[]
+  bordados         ModeloBordado[]
   /// Renglones de pedidos internos que piden este modelo (F2-E1, Restrict hacia el modelo).
-  pedidoLineas PedidoLinea[]
+  pedidoLineas     PedidoLinea[]
   /// Órdenes de producción de este modelo (F2-E2, Restrict hacia el modelo).
-  ordenes      Orden[]
+  ordenes          Orden[]
+  /// Renglones de kardex PT de este modelo (F3-E1, D4 — dimensión PT: modelo×color×talla). Restrict.
+  movimientosDetPt MovimientoDetPt[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1542,8 +1740,9 @@ model PedidoRealLinea {
 //    la secuencia atómica "orden". Reemplaza el `AumentarNumOrd`/Max()+1 del viejo.
 //  • Snapshots/datos conservados de v1 SIN motor (catálogos RC/finanzas aún no existen): columnas
 //    escalares nullable SIN FK (idTipoArticuloRC, idRcAplicaciones, idRcTipoTelas, fechas RC,
-//    enRiesgo, siRC, rcViva = F5; maquilaOrd, aplicacionOrd, pagada = F3/F6; upc = histórico sin
-//    generación; tallasV1 = cadena cruda de trazabilidad). Mismo espíritu que `idOrdCompraV1`.
+//    enRiesgo, siRC, rcViva = F5; maquilaOrd, aplicacionOrd, pagada = F3/F6; tallasV1 = cadena
+//    cruda de trazabilidad). Mismo espíritu que `idOrdCompraV1`. El `upc` (códigos de barra) fue
+//    ELIMINADO (decisión Gabriel 16-jun-2026).
 //  • Orden sin pedido = SOLO HISTÓRICO: `idPedidoLinea` es NULLABLE (el ETL migra ~26 casos
 //    huérfanos del viejo), pero el servicio `crearOrden` EXIGE un renglón de pedido válido y
 //    rechaza la captura nueva sin pedido.
@@ -1635,10 +1834,8 @@ model Orden {
   /// Motivo de la cancelación suave (viejo: `MotivoCancelada`; `OrdCancelada` → estado=cancelada).
   motivoCancelada String?     @map("motivo_cancelada") @db.Text
 
-  /// Código de barra de la orden (viejo: `UPC`). DATO HISTÓRICO de SOLO LECTURA: los códigos de
-  /// barra de orden ya no se usan (decisión Gabriel 16-jun-2026). Sin endpoint de escritura ni de
-  /// generación; el ETL lo pobla para no tirar el dato.
-  upc String? @map("upc")
+  // El código de barra de la orden (viejo: `UPC`) fue ELIMINADO (decisión Gabriel 16-jun-2026):
+  // los códigos de barra están en retiro; la columna no se conserva ni se migra.
 
   // ── Datos de Ruta Crítica (F5) — conservados de v1 SIN FK ni motor (los catálogos RC aún no
   //    existen). Columnas escalares nullable; su lógica/relaciones llegan en F5.
@@ -1661,9 +1858,44 @@ model Orden {
   /// viejo: `RC_Viva`. Dato RC (F5).
   rcViva           Boolean?  @map("rc_viva")
 
-  lineas      OrdenLinea[]
-  referencias OrdenReferencia[]
-  comentarios OrdenComentario[]
+  // ── Programación de la Ruta Crítica (F5-E3, motor pt1) — campos NUEVOS de v2 ──────────────
+  //    Los escalares legacy de arriba (idTipoArticuloRC/idRcAplicaciones/idRcTipoTelas/…) se
+  //    conservan SIN tocar (datos ETL de v1); la programación de v2 usa estos campos aditivos,
+  //    con FK a los catálogos de E2. Todos nullable: prueba ya tiene órdenes ETL sin RC.
+  /// ¿La RC de la orden está GENERADA y vigente? (v2, F5-E3). Distinto de `rcViva` (dato legado de v1).
+  rcActiva             Boolean?               @map("rc_activa")
+  /// Cuándo se PROGRAMÓ la RC de esta orden (v2; sello al generar). Paralelo al legado `fechaProg`.
+  fechaProgramada      DateTime?              @map("fecha_programada")
+  /// ¿La orden se programó como RESURTIDO? (v2). Los procesos `esResurtido` quedan en duración 0.
+  esResurtidoRC        Boolean?               @map("es_resurtido_rc")
+  /// Artículo RC elegido para la programación de v2 (FK al catálogo de E2). Restrict, nullable.
+  idArticuloRcProg     Int?                   @map("id_articulo_rc_prog")
+  articuloRcProg       ArticuloRC?            @relation(fields: [idArticuloRcProg], references: [id], onDelete: Restrict)
+  /// Tipo de tela elegido para la programación de v2 (FK a DuracionPorTipoTela). Restrict, nullable.
+  idDuracionTela       Int?                   @map("id_duracion_tela")
+  duracionTela         DuracionPorTipoTela?   @relation(fields: [idDuracionTela], references: [id], onDelete: Restrict)
+  /// Aplicación elegida para la programación de v2 (FK a DuracionPorAplicacion). Restrict, nullable.
+  idDuracionAplicacion Int?                   @map("id_duracion_aplicacion")
+  duracionAplicacion   DuracionPorAplicacion? @relation(fields: [idDuracionAplicacion], references: [id], onDelete: Restrict)
+  /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
+  rutaProcesos         RutaOrden[]
+
+  lineas            OrdenLinea[]
+  referencias       OrdenReferencia[]
+  comentarios       OrdenComentario[]
+  /// Etapas de producción de esta orden (corte/envío/recibo/entrega) (F3-E1, D4). Restrict.
+  etapasMovimiento  EtapaMovimiento[]
+  /// Cargos a maquileros (EsMa) derivados de los recibos de esta orden (F3-E1). Restrict.
+  cargosEsMa        EsMaCargo[]
+  /// Renglones de orden de compra ligados a esta orden de producción (F4-E2, R7: la
+  /// liga es POR LÍNEA para cruzar gasto↔producción sin prorrateos). Restrict.
+  ordenCompraLineas OrdenCompraLinea[]
+  /// Ligas N:N (a nivel encabezado) entre esta orden de producción y sus OC (F4-E2). Restrict.
+  ordenesCompra     OrdenCompraOrden[]
+  /// Snapshot de explosión MRP de esta orden (F4-E4, R3). Se reemplaza al regenerar. Cascade.
+  requerimientos    RequerimientoOrden[]
+  /// Renglones de nota de salida (avíos/telas enviados a maquila) ligados a esta orden (F4-E5). Restrict.
+  notaSalidaLineas  NotaSalidaLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1772,4 +2004,1617 @@ model OrdenComentario {
 
   @@index([idOrden])
   @@map("orden_comentario")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PRODUCCIÓN / WIP + MOTOR KARDEX (F3-E1) — modelo de datos de TODA F3 en una
+// migración. Diseño en docs/arquitectura/ADR-0010-motor-kardex-produccion.md.
+//
+// Dos planos que NO se mezclan (ADR-0010):
+//  • PLANO WIP (avance de la orden): `EtapaMovimiento` + `EtapaMovimientoDet`. Captura
+//    corte/envío/recibo/entrega por color×talla (D4). Los pendientes del WIP (por cortar,
+//    cortado por enviar, por recibir…) son DERIVADOS de estas filas — sin acumuladores.
+//  • PLANO INVENTARIO (kardex genérico, D3): `Movimiento` (encabezado) + un detalle POR
+//    TIPO de artículo (`MovimientoDetPt`/`MovimientoDetTela`/`MovimientoDetAvio`). La
+//    existencia es SIEMPRE Σ del detalle — NUNCA una columna/tabla editable (D3).
+//
+// MECANISMO DE EXTENSIBILIDAD (ADR-0010 §2): un detalle por tipo de artículo (NO columnas
+// nullable+CHECKs en una tabla gorda). En F3 solo se ejercita la dimensión PT; las tablas
+// de tela y avío nacen aquí VACÍAS para que F4 las ejercite SIN migrar filas existentes ni
+// tocar el núcleo de `kardex.ts` (que opera sobre el encabezado `Movimiento` y delega el
+// detalle por tipo). La única ALTER que F4 hará es agregar la FK `id_lote → Lote` (modelo
+// que nace en F4): es aditiva y segura, no migra filas. Criterio verificable contra D5/R4.
+//
+// costoUnit: NULLABLE y SIEMPRE NULL en F3 (D1/D2 — la valuación a costo actual llega en
+// F7). Política fijada en ADR-0010 §4, con test en Fase 2.
+//
+// Auditoría A7 + idEmpresa A9 + folio por secuencia atómica A3 ("etapa-mov", "movimiento")
+// + borrado/cancelación SUAVE (canceladoEn/canceladoPor/motivoCancelacion). FKs Restrict
+// hacia catálogos en uso; Cascade hacia el encabezado en los detalles (reescribir el set
+// en la tx A2). El despachador de eventos de dominio vive en src/comun/eventos.ts (Fase 2,
+// solo el gancho — ADR-0010 §6).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Tipo de etapa del WIP de una orden (D4 — PLANMAESTRO §4). La maquila es UNIFICADA: el
+/// envío/recibo NO distinguen costura vs estampado en el enum, lo distingue `idTipoProceso`
+/// (D8 — "maquila unificada parametrizada por TipoProceso"). El `corte` y la `entrega_cliente`
+/// no llevan proceso. El estampado pre/post-costura se modela como envío/recibo de su
+/// TipoProceso (WIP+cargo) y, para su va-y-ven de inventario, con los tipos 6/3 del kardex (E3).
+enum TipoEtapaMovimiento {
+  corte
+  envio_maquila
+  recibo_maquila
+  entrega_cliente
+
+  @@map("tipo_etapa_movimiento")
+}
+
+/// Dirección de un tipo de movimiento de inventario (ex `IPT_TiposMov.TipoEnSa`: 1/2/3).
+/// `entrada` suma (+1), `salida` resta (−1). El detalle guarda `cantidad` SIEMPRE positiva; el
+/// SIGNO de la existencia lo deriva el kardex de esta dirección.
+///
+/// `traspaso` es una ETIQUETA DE CATÁLOGO (el tipo viejo 9 'Transferencia entre almacenes',
+/// `TipoEnSa=3`): NO es una dirección que la vista de existencia interprete con un signo plano.
+/// Resolución del nit #1 del reviewer (ADR-0010 §1/§5): un traspaso se MATERIALIZA como DOS
+/// `Movimiento` —salida del almacén origen + entrada del almacén destino, cada uno con un
+/// `TipoMovimientoInventario` de dirección EFECTIVA `salida`/`entrada`— en UNA transacción (A2).
+/// Así la vista `existencia_pt` solo ve patas `entrada`/`salida` y la existencia TOTAL no cambia
+/// (la cantidad pasa de origen a destino). La vista mapea `entrada→+1`, `salida→−1` y cualquier
+/// otra (incluido `traspaso`, que NO debería aparecer en el detalle) a `0` (defensivo): un
+/// encabezado con dirección `traspaso` jamás lleva detalle de existencia, no la infla.
+enum DireccionMovimiento {
+  entrada
+  salida
+  traspaso
+
+  @@map("direccion_movimiento")
+}
+
+/// Estado del cargo a un maquilero (EsMa). Nace `propuesto` al registrar el recibo (F3-E4);
+/// el admin lo `validado` (ajusta cantidad/precio real, doc 07-EsMa §2 — punto de control
+/// humano CONSERVADO sin recapturar); `cancelado` si el recibo se cancela antes de validar.
+enum EstadoCargoEsMa {
+  propuesto
+  validado
+  cancelado
+
+  @@map("estado_cargo_esma")
+}
+
+/// Etapa del WIP de una orden (F3-E1 — PLANO WIP; D4 §PLANMAESTRO §4, doc 03-Produccion).
+/// Es el encabezado de cada CAPTURA de corte/envío/recibo/entrega; el detalle color×talla
+/// cuelga en `EtapaMovimientoDet`. NO es el kardex: el kardex PT (entrada/salida real de
+/// existencia) lo genera SOLO el recibo de costura (`TipoProceso.generaEntradaPt`) y la
+/// entrega, vía un `Movimiento` aparte (F3-E4/E5). Aquí los pendientes del WIP se DERIVAN
+/// por suma (sin acumuladores). Folio por secuencia atómica (A3, clave "etapa-mov") POR
+/// EMPRESA (A9). Cancelación SUAVE + motivo + Bitácora (A7). Liga recibo↔envío AGREGADA por
+/// orden+proceso, con `idEtapaEnvio` OPCIONAL (decisión (d), ADR-0010 §7: reversible).
+model EtapaMovimiento {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "etapa-mov"; en el ETL conserva el
+  /// `Consecutivo` histórico de v1).
+  folio     BigInt
+  /// Empresa dueña de la etapa y de su numeración (A9).
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Orden a la que pertenece la etapa (doc 03-Produccion). Restrict.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Qué etapa es (corte/envío/recibo/entrega). Ver enum `TipoEtapaMovimiento`.
+  tipo TipoEtapaMovimiento
+
+  /// Tipo de proceso de maquila (costura/estampado/bordado/lavado). OBLIGATORIO en
+  /// envío/recibo de maquila, NULL en corte y entrega a cliente (lo valida el dominio —
+  /// el esquema lo deja nullable porque no todas las etapas lo llevan). Restrict.
+  idTipoProceso Int?         @map("id_tipo_proceso")
+  tipoProceso   TipoProceso? @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  /// Tercero de la etapa: cortador (corte) o maquilero/estampador (envío/recibo). Es un
+  /// `Proveedor` con su rol de servicio (fusión de terceros D12/R15). NULL en entrega a
+  /// cliente y en datos viejos sin asignar. Restrict.
+  idTercero Int?       @map("id_tercero")
+  tercero   Proveedor? @relation(fields: [idTercero], references: [id], onDelete: Restrict)
+
+  /// Fecha de la etapa (captura o compromiso, según el tipo — el dominio lo precisa).
+  fecha           DateTime  @db.Date
+  /// Fecha compromiso del maquilero en los envíos (doc 03-Produccion Paso 4). Nullable.
+  fechaCompromiso DateTime? @map("fecha_compromiso") @db.Date
+  /// Precio pactado de maquila para envíos (doc 03 — `PrecioPactado`); base del cargo EsMa
+  /// del recibo. Nullable: 1,309 envíos viejos no lo traen (por eso la validación del cargo
+  /// en F3-E4 es obligatoria). Decimal.
+  precioPactado   Decimal?  @map("precio_pactado") @db.Decimal(12, 2)
+  observaciones   String?   @db.Text
+
+  /// LIGA recibo↔envío (decisión (d), ADR-0010 §7): en un recibo apunta OPCIONALMENTE al
+  /// envío que se está recibiendo. Hoy el WIP cuadra por AGREGADO orden+proceso (la liga
+  /// puede quedar NULL); se deja para que, si Daniel pide amarre estricto por envío, sea
+  /// dato y no migración. Autorreferencia Restrict (no borrar un envío con recibos ligados).
+  idEtapaEnvio Int?              @map("id_etapa_envio")
+  etapaEnvio   EtapaMovimiento?  @relation("ReciboDeEnvio", fields: [idEtapaEnvio], references: [id], onDelete: Restrict)
+  recibos      EtapaMovimiento[] @relation("ReciboDeEnvio")
+
+  /// Almacén destino de las PRIMERAS de un RECIBO de costura (F3-E4). Solo se usa cuando el
+  /// recibo genera entrada a PT (`TipoProceso.generaEntradaPt`); NULL en corte/envío y en los
+  /// recibos de procesos que NO meten a PT (estampado/bordado/lavado). La CALIDAD (primeras/
+  /// segundas) se captura SEPARADA del almacén destino (decisión Gabriel F3-E4): lo bueno va a
+  /// "Primeras", lo defectuoso a "Segundas". Restrict.
+  idAlmacenPrimeras Int?     @map("id_almacen_primeras")
+  almacenPrimeras   Almacen? @relation("ReciboAlmacenPrimeras", fields: [idAlmacenPrimeras], references: [id], onDelete: Restrict)
+  /// Almacén destino de las SEGUNDAS de un RECIBO de costura (F3-E4). NULL si el recibo no
+  /// reportó segundas o no genera entrada a PT. Restrict.
+  idAlmacenSegundas Int?     @map("id_almacen_segundas")
+  almacenSegundas   Almacen? @relation("ReciboAlmacenSegundas", fields: [idAlmacenSegundas], references: [id], onDelete: Restrict)
+
+  /// Cancelación SUAVE (plan §4): la etapa nunca se borra ni se edita; se cancela con motivo
+  /// y queda en el historial (A7). El kardex/efectos se revierten con movimiento inverso (E4/E5).
+  canceladoEn       DateTime? @map("cancelado_en")
+  /// Usuario que canceló (sin FK físico, mismo criterio que la auditoría — ADR-0005).
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// Detalle color×talla de la etapa (SIEMPRE, D4). Cascade (reescribir el set en la tx A2).
+  detalles   EtapaMovimientoDet[]
+  /// Cargo(s) EsMa derivados de esta etapa cuando es un recibo (F3-E4). Restrict.
+  cargosEsMa EsMaCargo[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idOrden])
+  @@index([idOrden, tipo, idTipoProceso])
+  @@index([idTipoProceso])
+  @@index([idTercero])
+  @@index([idEtapaEnvio])
+  @@index([idAlmacenPrimeras])
+  @@index([idAlmacenSegundas])
+  @@map("etapa_movimiento")
+}
+
+/// Renglón color×talla de una etapa del WIP (F3-E1, D4 — despivota T1..T8/TC1..TC8 del viejo
+/// a FILAS, MEJORAS A6). Una talla aparece UNA vez por color por etapa (@@unique). `cantidad`
+/// entera ≥0; NUNCA hay un `total` persistido (se deriva por suma, D4 + espíritu D3). Cascade
+/// hacia la etapa (reescribir el set en la tx); Restrict hacia Color/Talla (en uso ⇒ se desactiva).
+/// NO lleva `idEmpresa`: la empresa SE DERIVA del encabezado `EtapaMovimiento.idEmpresa` (A9 —
+/// el detalle nunca se consulta ni escribe fuera de su encabezado).
+model EtapaMovimientoDet {
+  id         Int             @id @default(autoincrement())
+  idEtapaMov Int             @map("id_etapa_mov")
+  etapaMov   EtapaMovimiento @relation(fields: [idEtapaMov], references: [id], onDelete: Cascade)
+  idColor    Int             @map("id_color")
+  color      Color           @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla    Int             @map("id_talla")
+  talla      Talla           @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// Cantidad de prendas de esta talla en este color para la etapa. Entera ≥0. En un RECIBO
+  /// de maquila es el TOTAL recibido (= primeras + segundas); en corte/envío es la cantidad
+  /// cortada/enviada (sin desglose de calidad).
+  cantidad Int
+
+  /// CALIDAD del recibo (F3-E4, decisión Gabriel): cuántas de las `cantidad` recibidas son
+  /// PRIMERAS (buenas) y cuántas SEGUNDAS (defectuosas). Solo se llenan en recibos; NULL en
+  /// corte/envío. Cuando ambas vienen, `cantidadPrimeras + cantidadSegundas = cantidad` (lo
+  /// valida el dominio). La calidad es DATO del WIP, SEPARADA del almacén destino (que vive en
+  /// el encabezado). El kardex de costura mete las primeras al almacén de primeras y las
+  /// segundas al de segundas (F3-E4).
+  cantidadPrimeras Int? @map("cantidad_primeras")
+  cantidadSegundas Int? @map("cantidad_segundas")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEtapaMov, idColor, idTalla])
+  @@index([idEtapaMov])
+  @@index([idColor])
+  @@index([idTalla])
+  @@map("etapa_movimiento_det")
+}
+
+/// Catálogo de tipos de movimiento de inventario (F3-E1 — ex `IPT_TiposMov`, doc 04-Inventarios
+/// §A.2). 19 tipos en el seed (Fase 2): Inventario Inicial, Entrada de Maquila, Entrega a
+/// Cliente, Transferencia, Ajustes… Cada tipo lleva su `direccion` (entrada/salida/traspaso, ex
+/// `TipoEnSa` 1/2/3) que el kardex usa para el signo. GLOBAL (catálogo, sin idEmpresa — ADR-0007).
+/// `codigo` estable kebab-case para referenciarlo en código/seed sin atarlo al texto. Borrado
+/// suave (los tipos en desuso se desactivan, no se borran). Solo lectura por API en F3-E1.
+model TipoMovimientoInventario {
+  id        Int                 @id @default(autoincrement())
+  /// Clave estable kebab-case (p. ej. "entrada-maquila", "entrega-cliente"). Única global.
+  codigo    String              @unique
+  /// Nombre para mostrar (ex `IPT_TiposMov.TipoMov`).
+  nombre    String
+  /// Dirección del movimiento (ex `TipoEnSa`): entrada suma, salida resta, traspaso mueve.
+  direccion DireccionMovimiento
+  activo    Boolean             @default(true)
+
+  /// Movimientos de kardex de este tipo (F3). Restrict: un tipo en uso no se borra físico.
+  movimientos Movimiento[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("tipos_movimiento_inventario")
+}
+
+/// Encabezado de un movimiento del KARDEX único (F3-E1 — PLANO INVENTARIO; D3, PLANMAESTRO §4).
+/// GENÉRICO para PT/tela/avío: el encabezado es el mismo; el detalle es POR TIPO de artículo
+/// (`detallesPt`/`detallesTela`/`detallesAvio` — ADR-0010 §2). En F3 SOLO se ejercita PT. La
+/// existencia es SIEMPRE Σ del detalle (D3) — NO hay columna/tabla de existencia editable; la
+/// vista `ExistenciaPt` (CREATE VIEW en la migración) es solo para CONSULTA. Las validaciones
+/// transaccionales (no entregar lo que no existe) suman el detalle DIRECTO bajo bloqueo, NUNCA
+/// la vista (ADR-0010 §3). Referencia polimórfica al ORIGEN (`origenTipo`+`origenId`, ADR-0010
+/// §1): qué hecho generó el movimiento (recibo, entrega, movimiento manual, traspaso…). Folio
+/// por secuencia atómica (A3, "movimiento") POR EMPRESA (A9). Cancelación = movimiento INVERSO
+/// auditado, NUNCA edición/borrado (D3/A7) — `idMovimientoInverso` enlaza el par.
+model Movimiento {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "movimiento").
+  folio     BigInt
+  /// Empresa dueña del movimiento y de su numeración (A9).
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Tipo de movimiento (entrada/salida/traspaso vía su `direccion`). Restrict.
+  idTipoMov Int                      @map("id_tipo_mov")
+  tipoMov   TipoMovimientoInventario @relation(fields: [idTipoMov], references: [id], onDelete: Restrict)
+
+  /// Almacén afectado (D4: existencia por …×almacén). En un traspaso, cada pata del par
+  /// (salida-origen / entrada-destino) es un `Movimiento` con su propio almacén. Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  fecha DateTime @db.Date
+
+  /// REFERENCIA POLIMÓRFICA al origen (ADR-0010 §1): `origenTipo` discrimina (p. ej.
+  /// "recibo-maquila", "entrega-cliente", "movimiento-manual", "traspaso", "ajuste") y
+  /// `origenId` es el id de esa fila (texto, para cubrir PKs Int/String). SIN FK física (el
+  /// origen es de varias tablas; el dominio garantiza la consistencia, mismo criterio que la
+  /// Bitácora — ADR-0005). Permite trazar el movimiento a su hecho sin acoplar el kardex a
+  /// cada tabla de origen.
+  origenTipo String? @map("origen_tipo")
+  origenId   String? @map("origen_id")
+
+  /// Usuario que registró el movimiento (sin FK física — ADR-0005, log de inventario).
+  idUsuario String? @map("id_usuario")
+
+  /// Movimiento que ANULA a otro (cancelación = inverso auditado, NUNCA borrado — D3/A7).
+  /// En el inverso apunta al original; el original referencia al inverso por la relación
+  /// inversa `anuladoPor`. Autorreferencia Restrict.
+  idMovimientoInverso Int?         @map("id_movimiento_inverso")
+  movimientoOriginal  Movimiento?  @relation("MovimientoInverso", fields: [idMovimientoInverso], references: [id], onDelete: Restrict)
+  anuladoPor          Movimiento[] @relation("MovimientoInverso")
+
+  observaciones String? @db.Text
+
+  /// Detalle por TIPO de artículo (ADR-0010 §2). En F3 solo se llena `detallesPt`; tela/avío
+  /// nacen vacías para F4 (sin migrar filas ni tocar el núcleo). Cascade (reescribir set en tx).
+  detallesPt   MovimientoDetPt[]
+  detallesTela MovimientoDetTela[]
+  detallesAvio MovimientoDetAvio[]
+
+  /// Renglones de recepción de compra que GENERARON este movimiento de entrada (F4-E3): traza
+  /// del movimiento de kardex a su renglón de recepción. SetNull al borrar el movimiento (que
+  /// nunca pasa — D3: los movimientos no se borran). Relación inversa informativa.
+  recepcionLineas RecepcionCompraLinea[]
+
+  /// Renglones de nota de salida de TELA que REFERENCIAN este movimiento `salida-tela-orden` como
+  /// documento de envío (F4-E5, decisión (e): la nota no descuenta tela, la referencia). Inversa.
+  notaLineasSalidaTela NotaSalidaLinea[] @relation("NotaLineaSalidaTela")
+  /// Renglones de nota de salida de AVÍO cuyo descuento (`salida-por-nota`) GENERÓ este movimiento
+  /// al confirmar la nota (F4-E5, R4). Inversa informativa.
+  notaLineasAvio       NotaSalidaLinea[] @relation("NotaLineaAvio")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idTipoMov])
+  @@index([idAlmacen])
+  @@index([origenTipo, origenId])
+  @@index([idMovimientoInverso])
+  @@map("movimientos")
+}
+
+/// Detalle de kardex para PRODUCTO TERMINADO (F3-E1, D4 — dimensión PT: modelo×color×talla).
+/// La existencia PT es Σ(cantidad·signo) por modelo×color×talla×almacén (D3). `cantidad`
+/// SIEMPRE positiva (el signo lo da `Movimiento.tipoMov.direccion`); el dominio lo valida.
+/// `costoUnit` NULLABLE y SIEMPRE NULL en F3 (D1/D2 — valuación en F7; ADR-0010 §4). Cascade
+/// hacia `Movimiento`; Restrict hacia Modelo/Color/Talla. La empresa y el almacén SE DERIVAN
+/// del encabezado `Movimiento` (A9 — el detalle no se consulta fuera de él). NO hay @@unique:
+/// un movimiento PUEDE repetir el mismo artículo en líneas distintas (nit #3 del reviewer — la
+/// vista suma todas las líneas; la unicidad operativa, si aplica, la cuida el dominio).
+model MovimientoDetPt {
+  id           Int        @id @default(autoincrement())
+  idMovimiento Int        @map("id_movimiento")
+  movimiento   Movimiento @relation(fields: [idMovimiento], references: [id], onDelete: Cascade)
+  idModelo     Int        @map("id_modelo")
+  modelo       Modelo     @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  idColor      Int        @map("id_color")
+  color        Color      @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla      Int        @map("id_talla")
+  talla        Talla      @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// Cantidad de prendas (positiva; el signo lo da la dirección del tipo de movimiento).
+  cantidad  Int
+  /// Costo unitario al momento del movimiento. NULLABLE y NULL en toda F3 (D1/D2 — ADR-0010 §4).
+  costoUnit Decimal? @map("costo_unit") @db.Decimal(12, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idMovimiento])
+  @@index([idModelo, idColor, idTalla])
+  @@map("movimiento_det_pt")
+}
+
+/// Detalle de kardex para TELA (dimensión tela×lote, D5). NACE VACÍA en F3-E1 para fijar el
+/// motor genérico (ADR-0010 §2); las filas las ejercita F4 (inventario de telas). `idLote` es
+/// ESCALAR NULLABLE SIN FK en F3: el modelo `Lote` nace en F4 y entonces se agrega la FK
+/// `id_lote → Lote` con un ALTER aditivo y seguro (no migra filas ni toca el núcleo de
+/// kardex.ts). `cantidad` Decimal (telas se miden en kg/m). `costoUnit` NULL en F3 (D1/D2).
+/// Cascade hacia `Movimiento`; Restrict hacia `Tela`. La empresa y el almacén SE DERIVAN del
+/// encabezado `Movimiento` (A9 — el detalle no se consulta fuera de él).
+model MovimientoDetTela {
+  id           Int        @id @default(autoincrement())
+  idMovimiento Int        @map("id_movimiento")
+  movimiento   Movimiento @relation(fields: [idMovimiento], references: [id], onDelete: Cascade)
+  idTela       Int        @map("id_tela")
+  tela         Tela       @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Lote de la tela (D5). En F4-E1 se agrega la FK `→ Lote` (ALTER aditivo): el lote es la
+  /// dimensión de trazabilidad de la existencia (tela×lote×almacén). NULLABLE: un ajuste
+  /// inicial sin lote conocido puede no traerlo (el dominio decide). Restrict.
+  idLote       Int?       @map("id_lote")
+  lote         Lote?      @relation(fields: [idLote], references: [id], onDelete: Restrict)
+
+  /// Cantidad de tela (positiva; el signo lo da la dirección del tipo de movimiento). Decimal.
+  cantidad  Decimal  @db.Decimal(14, 4)
+  /// Costo unitario. NULLABLE y NULL en F3 (D1/D2 — ADR-0010 §4).
+  costoUnit Decimal? @map("costo_unit") @db.Decimal(12, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idMovimiento])
+  @@index([idTela, idLote])
+  @@map("movimiento_det_tela")
+}
+
+/// Detalle de kardex para AVÍO (dimensión avío×lote opcional, R4). NACE VACÍA en F3-E1 para
+/// fijar el motor genérico (ADR-0010 §2); las filas las ejercita F4 (inventario de avíos).
+/// `esGenerico` se DERIVA del catálogo `Avio.esGenerico` (R4 — pocos avíos de stock); se copia
+/// aquí para consultas de kardex sin join. `idLote` ESCALAR NULLABLE SIN FK en F3 (igual que
+/// tela: la FK `→ Lote` la agrega F4). `cantidad` Decimal. `costoUnit` NULL en F3 (D1/D2).
+/// Cascade hacia `Movimiento`; Restrict hacia `Avio`. La empresa y el almacén SE DERIVAN del
+/// encabezado `Movimiento` (A9 — el detalle no se consulta fuera de él).
+model MovimientoDetAvio {
+  id           Int        @id @default(autoincrement())
+  idMovimiento Int        @map("id_movimiento")
+  movimiento   Movimiento @relation(fields: [idMovimiento], references: [id], onDelete: Cascade)
+  idAvio       Int        @map("id_avio")
+  avio         Avio       @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+  /// Lote del avío (opcional, R4 — pocos avíos se manejan por lote). En F4-E1 se agrega la FK
+  /// `→ Lote` (ALTER aditivo). NULLABLE: el inventario de avíos suele ser por avío×almacén sin
+  /// lote (la vista `ExistenciaAvio` agrega por avío×almacén). Restrict.
+  idLote       Int?       @map("id_lote")
+  lote         Lote?      @relation(fields: [idLote], references: [id], onDelete: Restrict)
+  /// Avío genérico de stock (R4 — copiado de `Avio.esGenerico` para consultas sin join).
+  esGenerico   Boolean    @default(false) @map("es_generico")
+
+  /// Cantidad de avío (positiva; el signo lo da la dirección del tipo de movimiento). Decimal.
+  cantidad  Decimal  @db.Decimal(14, 4)
+  /// Costo unitario. NULLABLE y NULL en F3 (D1/D2 — ADR-0010 §4).
+  costoUnit Decimal? @map("costo_unit") @db.Decimal(12, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idMovimiento])
+  @@index([idAvio, idLote])
+  @@map("movimiento_det_avio")
+}
+
+/// Cargo a la cuenta corriente de un maquilero (EsMa) — F3-E1 SOLO el esquema; el flujo
+/// (propuesto→validado) llega en F3-E4 (doc 07-EsMa). Nace al registrar un recibo de maquila
+/// para TODO proceso (costura Y estampado — `EsMa_Recibos.EsEstampado` lo confirma), con
+/// cantidad×precio del envío. `idEtapaRecibo` NULLABLE: la captura nueva la liga al recibo,
+/// pero el ETL (F3-E6) migra 7,401 cargos históricos SIN FK formal al recibo (la liga nace en
+/// v2). `estado` propuesto/validado/cancelado (el admin valida ajustando cantidad/precio real,
+/// punto de control humano CONSERVADO). `cantidadReal`/`precioReal` los fija la validación
+/// (nullables hasta entonces). Auditoría A7 + idEmpresa A9. EsMa es la semilla de la cuenta
+/// corriente de terceros que F8 generaliza (R10/D12).
+model EsMaCargo {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del cargo (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Recibo de maquila que originó el cargo (F3-E4). NULLABLE para el histórico migrado
+  /// (F3-E6: cargos viejos sin liga formal). Restrict.
+  idEtapaRecibo Int?             @map("id_etapa_recibo")
+  etapaRecibo   EtapaMovimiento? @relation(fields: [idEtapaRecibo], references: [id], onDelete: Restrict)
+
+  /// Maquilero al que se le carga (Proveedor con rol de maquila — fusión D12/R15). Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Orden a la que pertenece el cargo (para el estado de cuenta por orden). Restrict.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Proceso de maquila del cargo (costura/estampado…). Restrict.
+  idTipoProceso Int         @map("id_tipo_proceso")
+  tipoProceso   TipoProceso @relation(fields: [idTipoProceso], references: [id], onDelete: Restrict)
+
+  /// Cantidad real validada por el admin (F3-E4). NULL mientras esté `propuesto`. Decimal.
+  cantidadReal Decimal? @map("cantidad_real") @db.Decimal(14, 2)
+  /// Precio real validado por el admin (F3-E4). NULL mientras esté `propuesto`. Decimal.
+  precioReal   Decimal? @map("precio_real") @db.Decimal(12, 2)
+
+  /// Estado del cargo (propuesto/validado/cancelado). Ver enum `EstadoCargoEsMa`.
+  estado        EstadoCargoEsMa @default(propuesto)
+  observaciones String?         @db.Text
+
+  /// Validación: quién y cuándo (sin FK física — ADR-0005).
+  validadoEn    DateTime? @map("validado_en")
+  validadoPorId String?   @map("validado_por_id")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idEtapaRecibo])
+  @@index([idMaquilero])
+  @@index([idOrden])
+  @@index([idTipoProceso])
+  @@index([estado])
+  @@map("esma_cargo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Órdenes de COMPRA (Módulo 3, F4-E2 — doc `Documentacion_MJD/03-Produccion.md` §OC).
+// El documento con el que se COMPRA material (telas/avíos) a un proveedor. Folio
+// consecutivo POR EMPRESA (A3/A9). Documento por empresa (A9), catálogos globales.
+// E2 captura/autoriza/cancela/duplica la OC; E3 conectará la RECEPCIÓN al kardex de
+// telas/avíos (aquí NO se mueve inventario todavía, D3). Decisiones cerradas con el
+// dueño (DECISIONES.md §"Decisiones de diseño F4"):
+//  • (a) Una OC AUTORIZADA queda bloqueada para el usuario normal (el admin sí la edita,
+//    cada cambio a Bitácora). "Duplicar a nueva OC" (todos) copia a un `borrador` nuevo.
+//  • (c) Se ELIMINA el Excel: el renglón que lo requiera lleva matriz talla×color NATIVA
+//    (análoga a OrdenLineaTalla de F2); la suma de la matriz = cantidad del renglón.
+//    Renglones que no la necesiten = cantidad simple.
+// Totales NO se persisten: se derivan por suma (Σ cantidad×precio) al proyectar (D3).
+// onDelete: Restrict hacia empresa/proveedor/tela/avío/orden y los catálogos en uso
+// (Color/Talla en la matriz). Cascade del detalle (líneas, matriz, ligas N:N) hacia su
+// OC padre (permite reescribir el set completo en la transacción A2, igual que F2).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estatus de la orden de compra (F4-E2). `borrador` recién capturada (editable);
+/// `pendiente_autorizacion` lista para revisión; `autorizada` aprobada y bloqueada para
+/// el usuario normal (decisión (a)); `recibida_parcial`/`recibida_total` los pondrá la
+/// RECEPCIÓN de E3 (aquí solo se declaran); `cancelada` = cancelación suave con motivo.
+enum EstatusOrdenCompra {
+  borrador
+  pendiente_autorizacion
+  autorizada
+  recibida_parcial
+  recibida_total
+  cancelada
+
+  @@map("estatus_orden_compra")
+}
+
+/// Orden de compra (F4-E2 — ex `OrdCompra`, doc 03-Produccion §OC). Encabezado del
+/// documento de compra de material a un proveedor. Folio `numCompra` consecutivo POR
+/// EMPRESA (A3/A9, secuencia "orden-compra"). El TOTAL no se almacena: se deriva de las
+/// líneas (Σ cantidad×precio). El ETL de E6 llenará `facturasAmparadasLegacy` (solo
+/// lectura; en v2 lo supera la factura por recepción).
+model OrdenCompra {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — viejo: `OrdCompra.NumCompra`).
+  numCompra BigInt  @map("num_compra")
+  /// Empresa dueña de la OC y de su numeración (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Proveedor al que se le compra. Restrict.
+  idProveedor Int       @map("id_proveedor")
+  proveedor   Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+
+  /// Fecha de emisión de la OC.
+  fecha        DateTime? @db.Date
+  /// Fecha de entrega esperada del material.
+  fechaEntrega DateTime? @map("fecha_entrega") @db.Date
+  /// Dónde se entrega el material (texto libre).
+  entregaEn    String?   @map("entrega_en")
+
+  /// Estatus del documento (ver enum). DERIVADO/controlado por los servicios; default borrador.
+  estatus EstatusOrdenCompra @default(borrador)
+
+  /// Autorización (decisión (a)): quién y cuándo autorizó. NULL mientras no se autorice.
+  /// SIN FK física al usuario (mismo criterio que EsMaCargo.validadoPorId — ADR-0005).
+  idUsuAutorizado String?   @map("id_usu_autorizado")
+  fechaAutorizado DateTime? @map("fecha_autorizado")
+
+  /// Cancelación suave: cuándo, quién y por qué. NULL si no está cancelada. Motivo obligatorio
+  /// al cancelar (lo exige el dominio). SIN FK física al usuario (ADR-0005).
+  canceladaEn       DateTime? @map("cancelada_en")
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  observaciones           String? @db.Text
+  /// A qué corresponde la compra (texto libre; viejo: `OrdCompra.CorrespondeA`).
+  correspondeA            String? @map("corresponde_a")
+  /// Facturas que amparaba la OC en v1 (viejo: texto). SOLO LECTURA, lo llena el ETL de E6;
+  /// en v2 lo supera la factura por recepción (E3+). No se captura por UI.
+  facturasAmparadasLegacy String? @map("facturas_amparadas_legacy") @db.Text
+
+  lineas         OrdenCompraLinea[]
+  /// Ligas N:N (a nivel encabezado) a las órdenes de producción de la OC (F4-E2). Cascade.
+  ordenesLigadas OrdenCompraOrden[]
+  /// Recepciones de material contra esta OC (F4-E3, R7). Restrict: una OC con recepciones
+  /// no se borra; la cancelación de la OC se bloquea si hay recepciones activas (decisión b).
+  recepciones    RecepcionCompra[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, numCompra])
+  @@index([idProveedor])
+  @@index([estatus])
+  @@index([fecha])
+  @@map("ordenes_compra")
+}
+
+/// Renglón de una orden de compra (F4-E2 — ex `OrdCompraDet`). Un material a comprar:
+/// de catálogo (`idTela` XOR `idAvio`) o LIBRE (`descripcionLibre`, fallback para
+/// servicios/no-catalogados — esas líneas NO cruzan en R7). EXACTAMENTE una de las tres
+/// (lo valida el dominio). El `precio` es el unitario de la línea (D1: precio actual);
+/// `idAvioProveedor` se conserva para trazar el origen del precio R1 (es el idAvio del
+/// `AvioProveedor` cuyo proveedor = el de la OC). La liga `idOrden` (orden de PRODUCCIÓN)
+/// es POR LÍNEA para que R7 cruce gasto↔producción sin prorrateos. Cascade hacia la OC;
+/// Restrict hacia tela/avío/orden.
+model OrdenCompraLinea {
+  id            Int         @id @default(autoincrement())
+  idOrdenCompra Int         @map("id_orden_compra")
+  ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Cascade)
+
+  /// Tela pedida (catálogo). XOR con `idAvio`/`descripcionLibre`. Restrict.
+  idTela          Int?  @map("id_tela")
+  tela            Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Avío pedido (catálogo). XOR con `idTela`/`descripcionLibre`. Restrict.
+  idAvio          Int?  @map("id_avio")
+  avio            Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+  /// Avío del `AvioProveedor` que da el precio R1 (traza el origen del precio). Solo se
+  /// guarda cuando la línea es de avío; el proveedor es el de la OC. SIN FK (el par vive
+  /// en `AvioProveedor` con PK compuesta; aquí basta el idAvio para reconstruir el par).
+  idAvioProveedor Int?  @map("id_avio_proveedor")
+
+  /// Cantidad a comprar (en `unidad`). Decimal. Si la línea usa matriz, = Σ de la matriz.
+  cantidad Decimal @db.Decimal(14, 2)
+  /// Unidad/presentación de compra (texto: rollo, m, pza…).
+  unidad   String?
+  /// Precio unitario de la línea (D1: precio actual). Decimal.
+  precio   Decimal @db.Decimal(12, 2)
+
+  /// Orden de PRODUCCIÓN a la que se liga este renglón (R7, liga por línea). NULLABLE
+  /// (compras genéricas/stock no ligan). Restrict.
+  idOrden Int?   @map("id_orden")
+  orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Descripción libre (SOLO si la línea NO es de catálogo: servicios/no-catalogados).
+  /// Cuando viene, `idTela`/`idAvio` van NULL (XOR validado en dominio). No cruza en R7.
+  descripcionLibre String? @map("descripcion_libre")
+
+  /// Matriz talla×color OPCIONAL del renglón (decisión (c)). Cuando se usa, `cantidad` = Σ.
+  tallas          OrdenCompraLineaTalla[]
+  /// Renglones de recepción que recibieron (parcial o total) contra este renglón de OC
+  /// (F4-E3, R7). Restrict hacia la línea de OC. La suma de lo recibido por esta línea define
+  /// el estatus de la OC (parcial/total).
+  recepcionLineas RecepcionCompraLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idOrdenCompra])
+  @@index([idTela])
+  @@index([idAvio])
+  @@index([idOrden])
+  @@map("orden_compra_linea")
+}
+
+/// Cantidad de una talla×color dentro de un renglón de OC (F4-E2, decisión (c) —
+/// análoga a `OrdenLineaTalla` de F2 pero con color EN la misma fila, porque el renglón
+/// de OC ya es de un material, no de un color). El par (color, talla) aparece UNA vez
+/// por renglón (@@unique). `cantidad` entera ≥0. Cascade hacia el renglón; Restrict hacia
+/// Color/Talla. La suma de la matriz = `cantidad` del renglón (lo valida el dominio).
+model OrdenCompraLineaTalla {
+  id                 Int              @id @default(autoincrement())
+  idOrdenCompraLinea Int              @map("id_orden_compra_linea")
+  ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Cascade)
+  idColor            Int              @map("id_color")
+  color              Color            @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla            Int              @map("id_talla")
+  talla              Talla            @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+
+  /// Cantidad de esta talla×color. Entera ≥0.
+  cantidad Int
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrdenCompraLinea, idColor, idTalla])
+  @@index([idOrdenCompraLinea])
+  @@index([idColor])
+  @@index([idTalla])
+  @@map("orden_compra_linea_talla")
+}
+
+/// Liga N:N (a nivel ENCABEZADO) entre una orden de compra y una orden de producción
+/// (F4-E2 — ex `OrdCom-Ord`). Informativo/derivado: se deriva de los `idOrden` de las
+/// líneas pero se persiste a nivel encabezado (la ficha lo pide). Una orden de producción
+/// aparece UNA vez por OC (@@unique). Cascade hacia la OC; Restrict hacia la orden.
+model OrdenCompraOrden {
+  id            Int         @id @default(autoincrement())
+  idOrdenCompra Int         @map("id_orden_compra")
+  ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Cascade)
+  idOrden       Int         @map("id_orden")
+  orden         Orden       @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrdenCompra, idOrden])
+  @@index([idOrdenCompra])
+  @@index([idOrden])
+  @@map("orden_compra_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RECEPCIÓN de compras (Módulo 3, F4-E3 — doc `Documentacion_MJD/03-Produccion.md` §OC;
+// R7 — REQUISITOS-NUEVOS.md). La recepción es el HECHO que conecta la OC con el kardex de
+// materiales: recibe (parcial o total) el material de una OC AUTORIZADA, crea el lote de la
+// tela (D5), registra la ENTRADA al kardex (`entrada-recepcion`) con cantidad y costo YA
+// convertidos a unidad de consumo (R1: factor presentación→consumo, costo ÷ factor, D1), y
+// recalcula el estatus de la OC (parcial/total, R7). Decisión (b) cerrada con Daniel: SOLO se
+// recibe contra una OC `autorizada`/`recibida_parcial` (server-side, A4). Reverso SUAVE: nada
+// se borra (D3) — la reversión genera el movimiento INVERSO de kardex y marca la recepción
+// como reversada (A7). Folio por empresa (A3/A9, secuencia "recepcion-compra").
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Recepción de material contra una orden de compra (F4-E3, R7). Encabezado del documento de
+/// entrada: factura del proveedor, fecha, almacén DESTINO y empresa (A9). Folio `folio`
+/// consecutivo POR EMPRESA (A3/A9). SIEMPRE ligada a una OC (`idOrdenCompra` obligatorio: las
+/// recepciones de v2 nacen de una OC, no hay entrada "suelta"). Reverso suave (`reversadaEn`):
+/// la recepción reversada sigue consultable; sus movimientos de kardex se neutralizan con su
+/// inverso (D3). Auditoría A7.
+model RecepcionCompra {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — secuencia "recepcion-compra").
+  folio     BigInt
+  /// Empresa dueña de la recepción y de su numeración (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Orden de compra que se recibe (OBLIGATORIO — recepciones v2 siempre ligadas a OC). Restrict.
+  idOrdenCompra Int         @map("id_orden_compra")
+  ordenCompra   OrdenCompra @relation(fields: [idOrdenCompra], references: [id], onDelete: Restrict)
+
+  /// Almacén DESTINO al que entra el material recibido (D4: existencia por …×almacén). Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  /// Factura del proveedor de esta recepción (texto; opcional). El lote de tela también la guarda.
+  factura String?
+  /// Fecha de la recepción (solo fecha).
+  fecha   DateTime @db.Date
+
+  observaciones String? @db.Text
+
+  /// Reverso SUAVE (D3): cuándo, quién y por qué se reversó. NULL si está activa. Al reversar se
+  /// genera el movimiento INVERSO de kardex (la recepción NO se borra). SIN FK física al usuario
+  /// (mismo criterio que OrdenCompra.canceladaPorId — ADR-0005).
+  reversadaEn    DateTime? @map("reversada_en")
+  reversadaPorId String?   @map("reversada_por_id")
+  motivoReverso  String?   @map("motivo_reverso") @db.Text
+
+  /// Renglones recibidos (uno por renglón de OC recibido, parcial o total).
+  lineas RecepcionCompraLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idOrdenCompra])
+  @@index([idAlmacen])
+  @@index([reversadaEn])
+  @@map("recepciones_compra")
+}
+
+/// Renglón de una recepción (F4-E3): cuánto se recibió contra un renglón de OC. `cantidadRecibida`
+/// está en UNIDAD DE CONSUMO ya convertida (R1: cantidad × factor) — es la que cuenta para el
+/// estatus de la OC y la que entró al kardex. `idLote` (telas) = el lote creado en esta recepción;
+/// `idMovimiento` = el movimiento de kardex de ENTRADA que generó (traza). Las líneas LIBRES de la
+/// OC (sin tela/avío) se registran con cantidad pero SIN lote ni movimiento (no inventarían).
+/// Cascade hacia la recepción; Restrict hacia la línea de OC/lote; SetNull hacia el movimiento (que
+/// nunca se borra — D3). `costoUnit` = costo por unidad de consumo (precio ÷ factor, D1).
+model RecepcionCompraLinea {
+  id                Int             @id @default(autoincrement())
+  idRecepcionCompra Int             @map("id_recepcion_compra")
+  recepcionCompra   RecepcionCompra @relation(fields: [idRecepcionCompra], references: [id], onDelete: Cascade)
+
+  /// Renglón de la OC que se recibe (R7). Restrict.
+  idOrdenCompraLinea Int              @map("id_orden_compra_linea")
+  ordenCompraLinea   OrdenCompraLinea @relation(fields: [idOrdenCompraLinea], references: [id], onDelete: Restrict)
+
+  /// Cantidad recibida en UNIDAD DE CONSUMO (ya convertida: cantidadPresentación × factor, R1).
+  /// Para líneas de catálogo es lo que entró al kardex; para líneas libres es informativa.
+  cantidadRecibida Decimal  @map("cantidad_recibida") @db.Decimal(14, 4)
+  /// Costo por unidad de consumo (precioPresentación ÷ factor, D1). NULL en líneas libres.
+  costoUnit        Decimal? @map("costo_unit") @db.Decimal(12, 4)
+
+  /// Lote creado/usado para esta línea de TELA (D5). NULL en avío/libre. Restrict.
+  idLote Int?  @map("id_lote")
+  lote   Lote? @relation(fields: [idLote], references: [id], onDelete: Restrict)
+
+  /// Movimiento de kardex de ENTRADA que generó esta línea (tela/avío). NULL en líneas libres y
+  /// tras un reverso conceptual (el movimiento sigue existiendo; aquí se conserva la traza).
+  /// SetNull: los movimientos nunca se borran (D3), pero el FK es defensivo.
+  idMovimiento Int?        @map("id_movimiento")
+  movimiento   Movimiento? @relation(fields: [idMovimiento], references: [id], onDelete: SetNull)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idRecepcionCompra])
+  @@index([idOrdenCompraLinea])
+  @@index([idLote])
+  @@index([idMovimiento])
+  @@map("recepcion_compra_linea")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OUTBOX de eventos de dominio (F4-E3 — ADR-0011: patrón outbox transaccional + pg-boss).
+// La fila se inserta DENTRO de la transacción de negocio (atómica con la recepción): el evento
+// NUNCA se pierde aunque el proceso muera tras el commit. Un relay (`comun/cola-eventos.ts`)
+// publica las filas pendientes a pg-boss (sobre el MISMO Postgres) y marca `publicadoEn`; un
+// barrido periódico reintenta las no publicadas (durabilidad). El consumidor de negocio es de
+// F5 (RC/MRP) — aquí SOLO se publica.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Evento de dominio pendiente de publicar (F4-E3, ADR-0011 — patrón OUTBOX). Se escribe en la
+/// MISMA transacción que el hecho de negocio (atómico); el relay lo publica a la cola pg-boss y
+/// marca `publicadoEn`. `tipo` = nombre del evento (p. ej. "material-recibido"); `version` =
+/// versión del contrato del payload; `payload` = la carga JSON versionada. `intentos`/`error`
+/// registran los reintentos del relay. GLOBAL por empresa (A9: `idEmpresa` para trazar/segmentar).
+model EventoOutbox {
+  id          Int       @id @default(autoincrement())
+  /// Nombre del evento (contrato versionado, p. ej. "material-recibido"). Ver ADR-0011.
+  tipo        String
+  /// Versión del contrato del payload (para evolucionar el evento sin romper consumidores).
+  version     Int       @default(1)
+  /// Empresa dueña del hecho (A9). Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Carga del evento (JSON). Lo MÍNIMO para que el consumidor reaccione (ids + material).
+  payload     Json
+  /// Cuándo se publicó a la cola (NULL = pendiente). El relay lo sella tras encolar.
+  publicadoEn DateTime? @map("publicado_en")
+  /// Número de intentos de publicación (el barrido lo incrementa al reintentar).
+  intentos    Int       @default(0)
+  /// Último error de publicación (texto), si lo hubo. NULL si nunca falló.
+  error       String?   @db.Text
+
+  creadoEn DateTime @default(now()) @map("creado_en")
+
+  @@index([publicadoEn])
+  @@index([idEmpresa])
+  @@map("eventos_outbox")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPLOSIÓN MRP / requerimiento de materiales por orden (F4-E4 — REQUISITOS-NUEVOS.md
+// §R3/R7 + principio Make-to-Order; doc `Documentacion_MJD/01-Modelos.md §2`). La explosión
+// cruza el BOM del modelo (telas+avíos `paraProduccion`) contra las cantidades color×talla de
+// la orden para obtener QUÉ y CUÁNTO material hace falta comprar. El resultado se PERSISTE como
+// un SNAPSHOT regenerable: congela lo requerido aunque el BOM cambie después (R3 — el cálculo
+// que originó la compra queda trazable). Regenerar = borrar el snapshot anterior de la orden y
+// reescribirlo en una transacción (D3: nada se edita en sitio). El cruce con OC/recepciones (R7)
+// es on-demand (no se materializa aquí).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Renglón del SNAPSHOT de explosión de una orden (F4-E4, R3). Un material (tela XOR avío) con la
+/// cantidad requerida YA en unidad de consumo del BOM (consumoPorPrenda × Σ piezas color×talla de
+/// la orden). `idProveedorSugerido` viene del `AvioProveedor` más barato para avíos (R1); para
+/// telas es NULL (no hay liga directa tela→proveedor en v2 — el proveedor se decide al comprar el
+/// lote, D5). `esGenerico`/`cubiertoPorStock`/`cantidadAComprar` registran el NETEO contra el
+/// kardex de avíos genéricos (decisión (d) de Daniel): un genérico solo manda a compra el faltante.
+/// El snapshot se REEMPLAZA al regenerar (se borra y reescribe en la misma tx, A2/D3). Auditoría A7.
+model RequerimientoOrden {
+  id      Int   @id @default(autoincrement())
+  /// Orden de producción a la que pertenece este requerimiento (R3). Cascade: el snapshot es
+  /// configuración derivada de la orden; al borrar la orden se va con ella.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Tela requerida (catálogo). XOR con `idAvio`. Restrict. NULL si el renglón es de avío.
+  idTela Int?  @map("id_tela")
+  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Avío requerido (catálogo). XOR con `idTela`. Restrict. NULL si el renglón es de tela.
+  idAvio Int?  @map("id_avio")
+  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Cantidad requerida en UNIDAD DE CONSUMO del BOM (consumoPorPrenda × piezas de la orden, R3).
+  cantidadRequerida Decimal @map("cantidad_requerida") @db.Decimal(14, 4)
+  /// Unidad de consumo del material (m, kg, pza…), copiada del catálogo para mostrar sin join.
+  unidad            String?
+
+  /// ¿El avío es genérico (de stock, R4)? Copiado de `Avio.esGenerico`. FALSE para telas.
+  esGenerico       Boolean @default(false) @map("es_generico")
+  /// Existencia REAL del kardex de avíos (Σ de movimientos, D3) al momento del snapshot — solo se
+  /// llena para genéricos (decisión (d)); 0 para el resto. Informativa (el neteo ya se aplicó).
+  existenciaStock  Decimal @default(0) @map("existencia_stock") @db.Decimal(14, 4)
+  /// Cantidad que realmente va a COMPRA = requerida − existencia (solo genéricos netean; el resto
+  /// va completo). NUNCA negativa. Es la base de la generación de OC y del cruce R7.
+  cantidadAComprar Decimal @map("cantidad_a_comprar") @db.Decimal(14, 4)
+
+  /// Proveedor SUGERIDO para comprar este material (avíos: el `AvioProveedor` más barato, R1).
+  /// NULL para telas (sin liga directa tela→proveedor) o si el avío no tiene proveedor mapeado.
+  /// SIN FK de relación inversa nombrada al revés: Restrict para no perder la sugerencia.
+  idProveedorSugerido Int?       @map("id_proveedor_sugerido")
+  proveedorSugerido   Proveedor? @relation("RequerimientoProveedorSugerido", fields: [idProveedorSugerido], references: [id], onDelete: Restrict)
+
+  /// Precio unitario sugerido (por unidad de consumo) del proveedor sugerido (R1: precio ÷ factor),
+  /// para pre-llenar la OC. NULL si no hay proveedor/precio mapeado.
+  precioSugerido Decimal? @map("precio_sugerido") @db.Decimal(12, 4)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idOrden])
+  @@index([idTela])
+  @@index([idAvio])
+  @@index([idProveedorSugerido])
+  @@map("requerimiento_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NOTAS DE SALIDA estructuradas (Módulo 5, F4-E5 — doc `Documentacion_MJD/03-Produccion.md`
+// §"Submódulo — Notas de Salida (Menú 3.4)"; 04-Inventarios.md §"Cómo conecta"; MEJORAS §03;
+// R4/R9). Una nota de salida documenta el ENVÍO de materiales a un maquilero contra una orden de
+// producción. Sustituye las notas de TEXTO LIBRE del viejo (`Notas`/`NotasDet`, 11,459 renglones)
+// por renglones ESTRUCTURADOS contra catálogo, ligados a la orden. Dos tipos de renglón:
+//  • AVÍO: al CONFIRMAR la nota descuenta el kardex de avíos con un movimiento `salida-por-nota`
+//    (R4 — el consumo de avíos va ligado a las notas).
+//  • TELA: la tela YA se descontó UNA sola vez con `registrarSalidaTelaAOrden` (E1, traza
+//    `origenTipo=salida-tela-orden`, `origenId=idOrden`). La nota solo REFERENCIA ese movimiento
+//    como documento de envío y NO genera segundo movimiento de kardex (DECISIÓN (e) de Daniel).
+// Folio `NumNota` por secuencia atómica por empresa (A3/A9, clave "nota-salida"). Cancelación
+// suave (D3): reversa SOLO los movimientos de avíos que la nota generó; la tela no se toca.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estatus de una nota de salida. Nace `borrador` (capturable/editable); al CONFIRMAR pasa a
+/// `confirmada` y se descuentan los avíos del kardex (A2). `cancelada` = cancelación suave
+/// (reverso auditado de los avíos, D3). Mismo patrón de enum que `EstatusOrdenCompra`.
+enum EstatusNotaSalida {
+  borrador
+  confirmada
+  cancelada
+
+  @@map("estatus_nota_salida")
+}
+
+/// Nota de salida de materiales a un maquilero (F4-E5, R4/R9). Encabezado del documento de envío:
+/// el maquilero (un Proveedor/tercero — fusión D12/R15), fechas de elaboración y envío, empresa
+/// (A9) y folio `numNota` consecutivo POR EMPRESA (A3/A9, secuencia "nota-salida"). El consumo
+/// real (descuento de avíos) sucede al CONFIRMAR (`estatus=confirmada`); la cancelación es SUAVE
+/// (`canceladaEn` + reverso auditado de los avíos, D3 — nada se borra). Auditoría A7.
+model NotaSalida {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3/A9 — viejo: `Notas.NumNota`). Secuencia "nota-salida".
+  numNota   BigInt  @map("num_nota")
+  /// Empresa dueña de la nota y de su numeración (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Maquilero al que se le envían los materiales (un Proveedor/tercero — fusión D12/R15). Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Almacén ORIGEN del que salen los avíos al CONFIRMAR la nota (un almacén por nota, en el
+  /// ENCABEZADO — decisión (g) de Daniel, espejo de la recepción de compra; la tela no descuenta,
+  /// decisión (e)). El inventario de avíos es multi-almacén (R4). Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  /// Fecha de elaboración de la nota (solo fecha).
+  fechaElaboracion DateTime  @map("fecha_elaboracion") @db.Date
+  /// Fecha de envío real de los materiales (solo fecha; opcional hasta que salga el envío).
+  fechaEnvio       DateTime? @map("fecha_envio") @db.Date
+
+  /// Estatus del documento (ver enum). Controlado por el dominio; default borrador.
+  estatus EstatusNotaSalida @default(borrador)
+
+  observaciones String? @db.Text
+
+  /// Confirmación: cuándo se confirmó (se descontaron los avíos). NULL mientras esté en borrador.
+  /// SIN FK física al usuario (mismo criterio que OrdenCompra.idUsuAutorizado — ADR-0005).
+  confirmadaEn    DateTime? @map("confirmada_en")
+  confirmadaPorId String?   @map("confirmada_por_id")
+
+  /// Cancelación SUAVE (D3): cuándo, quién y por qué. NULL si no está cancelada. Motivo obligatorio
+  /// al cancelar (lo exige el dominio). SIN FK física al usuario (ADR-0005). Al cancelar una nota
+  /// confirmada se generan los movimientos INVERSOS de los avíos (la tela NO se toca).
+  canceladaEn       DateTime? @map("cancelada_en")
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// Renglones de la nota (avío que descuenta O tela que referencia su salida-a-orden).
+  lineas NotaSalidaLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, numNota])
+  @@index([idMaquilero])
+  @@index([idAlmacen])
+  @@index([estatus])
+  @@index([fechaElaboracion])
+  @@map("notas_salida")
+}
+
+/// Renglón de una nota de salida (F4-E5). XOR de material: AVÍO (`idAvio`, del catálogo) o TELA
+/// (`idTela` + `idLote` + `idMovimientoSalidaTela` → liga al movimiento `salida-tela-orden` de E1).
+/// SIEMPRE ligado a una `idOrden` de producción destino (R7/04-Inventarios §"Cómo conecta").
+///  • AVÍO: al confirmar la nota, el dominio crea el movimiento `salida-por-nota` y lo guarda en
+///    `idMovimientoAvio` (traza del descuento; NULL en borrador y para renglones de tela).
+///  • TELA: `idMovimientoSalidaTela` apunta al movimiento de salida-a-orden YA registrado (E1) —
+///    la base del ANTI-DOBLE-DESCUENTO (la nota REFERENCIA, no descuenta otra vez; decisión (e)).
+/// `descripcionLegacy` es SOLO para el texto libre que migrará E6 (la captura nueva no la usa).
+/// Cascade hacia la nota; Restrict hacia avío/tela/lote/orden; SetNull hacia los movimientos (que
+/// nunca se borran — D3). Auditoría A7.
+model NotaSalidaLinea {
+  id           Int        @id @default(autoincrement())
+  idNotaSalida Int        @map("id_nota_salida")
+  notaSalida   NotaSalida @relation(fields: [idNotaSalida], references: [id], onDelete: Cascade)
+
+  /// Orden de PRODUCCIÓN destino del envío (R7). Restrict.
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Avío enviado (catálogo). XOR con `idTela`. Restrict. NULL si el renglón es de tela.
+  idAvio Int?  @map("id_avio")
+  avio   Avio? @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+
+  /// Tela enviada (catálogo). XOR con `idAvio`. Restrict. NULL si el renglón es de avío.
+  idTela Int?  @map("id_tela")
+  tela   Tela? @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  /// Lote de la tela enviada (D5). Obligatorio (dominio) en renglones de tela; NULL en avío. Restrict.
+  idLote Int?  @map("id_lote")
+  lote   Lote? @relation(fields: [idLote], references: [id], onDelete: Restrict)
+
+  /// Movimiento `salida-tela-orden` de E1 que esta línea de TELA referencia (decisión (e): la nota
+  /// NO descuenta tela; documenta el envío de una salida YA registrada). NULL en renglones de avío.
+  /// SetNull: el movimiento nunca se borra (D3); el FK es defensivo.
+  idMovimientoSalidaTela Int?        @map("id_movimiento_salida_tela")
+  movimientoSalidaTela   Movimiento? @relation("NotaLineaSalidaTela", fields: [idMovimientoSalidaTela], references: [id], onDelete: SetNull)
+
+  /// Movimiento `salida-por-nota` que el descuento de AVÍO de esta línea generó al CONFIRMAR la
+  /// nota (R4). NULL en borrador y en renglones de tela. SetNull (el movimiento no se borra — D3).
+  idMovimientoAvio Int?        @map("id_movimiento_avio")
+  movimientoAvio   Movimiento? @relation("NotaLineaAvio", fields: [idMovimientoAvio], references: [id], onDelete: SetNull)
+
+  /// Cantidad enviada (en `unidad`). Decimal (avíos en pza; telas en kg/m).
+  cantidad Decimal @db.Decimal(14, 4)
+  /// Unidad de medida del renglón (texto: pza, m, kg…), copiada del catálogo para mostrar sin join.
+  unidad   String?
+
+  /// Texto libre del renglón en v1 — SOLO para lo que migrará E6 (la captura nueva NO la usa).
+  descripcionLegacy String? @map("descripcion_legacy") @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idNotaSalida])
+  @@index([idOrden])
+  @@index([idAvio])
+  @@index([idTela])
+  @@index([idLote])
+  @@index([idMovimientoSalidaTela])
+  @@index([idMovimientoAvio])
+  @@map("nota_salida_linea")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUTA CRÍTICA — catálogo configurable de procesos (Módulo 8, F5-E1; doc
+// 08-Ruta-Critica.md; D10/D11). El "corazón configurable" del motor de workflow:
+// el catálogo de procesos como DATOS (`ProcesoDef`), sus roles responsables N:M
+// sobre el RBAC único (`ProcesoDefRol`, A4 — sin catálogo de roles paralelo), el
+// grafo (DAG) de dependencias genéricas (`ProcesoDep`, con rechazo de ciclos en
+// el dominio) y los checklists configurables (`ProcesoChecklist`). El MOTOR (las
+// instancias por orden con fechas/semáforos) y las plantillas llegan en E2+.
+//
+// Origen v1: `CP_Procesos` (26 procesos), `RC_TipoUsuarios` (roles funcionales) y
+// `RC_ProcUsua` (asignaciones proceso×rol). El ETL formal con cuadre es E7; aquí
+// el seed de desarrollo siembra los 26 procesos reales (datos bakeados, sin
+// depender del CSV en runtime de deploy).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// ¿Bajo qué condición APLICA un proceso a una orden? (F5-E1). TIPADO SIMPLE (no es
+/// un motor de expresiones): `ninguna` = siempre aplica; `soloSiLlevaAplicacion` =
+/// solo si la orden lleva estampado/aplicación (ex `CP_Procesos.NoLlevaProceso`, que
+/// marcaba los procesos saltables cuando no hay arte/aplicación). El motor de E2+
+/// evaluará esta bandera al instanciar la RC de cada orden.
+enum CondicionAplicabilidad {
+  ninguna
+  soloSiLlevaAplicacion
+
+  @@map("condicion_aplicabilidad")
+}
+
+/// Tipo de EVENTO de negocio que un proceso de la RC representa (F5-E1). Liga el
+/// proceso configurable con los hechos reales de v2 (recepción de tela, corte,
+/// envío/recibo de costura/estampado, auditoría, autorización de arte, entrega a
+/// cliente). El motor de E2+ podrá auto-completar el cumplimiento de un proceso a
+/// partir del evento de dominio correspondiente (gancho RC, F3-E1). `manual` = el
+/// proceso no tiene evento del sistema y se cumple a mano.
+enum TipoEventoProceso {
+  recepcionTela
+  corte
+  envioCostura
+  reciboCostura
+  envioEstampado
+  reciboEstampado
+  auditoria
+  autorizacionArte
+  entregaCliente
+  manual
+
+  @@map("tipo_evento_proceso")
+}
+
+/// Cómo se calcula la DURACIÓN estimada de un proceso (F5-E1). TIPADO SIMPLE: `fija`
+/// (días fijos), `porCantidad` (escala con las piezas — ex `CP_Procesos.Variable`),
+/// `porTipoTela` o `porAplicacion`. El cálculo concreto (la fórmula y los parámetros
+/// por proceso) lo definirá el motor de E2+; aquí solo se clasifica.
+enum TipoDuracionProceso {
+  fija
+  porCantidad
+  porTipoTela
+  porAplicacion
+
+  @@map("tipo_duracion_proceso")
+}
+
+/// Definición de un PROCESO de la Ruta Crítica (catálogo configurable y GLOBAL — sin
+/// idEmpresa, como TipoProceso/ADR-0007). Es la pieza-DATO del CPM hecho a mano del
+/// viejo (doc 08): cada proceso tiene su criticidad, condición de aplicabilidad,
+/// tipo de evento y de duración, sus roles responsables (N:M) y sus antecesores
+/// (DAG). Borrado SUAVE (`activo`). Auditoría uniforme (A7).
+model ProcesoDef {
+  id     Int    @id @default(autoincrement())
+  /// Clave estable kebab-case (p. ej. "corte", "recepcion-tela"). Única global.
+  codigo String @unique
+  nombre String
+
+  /// ¿Es un proceso CRÍTICO de la ruta? (ex `CP_Procesos.Critico`). Marca los procesos
+  /// que entran al cálculo de la ruta crítica / KPIs (doc 08).
+  critico       Boolean @default(false)
+  /// ¿Es el ÚLTIMO proceso (checkpoint final de la orden)? (ex `CP_Procesos.UltimoProceso`).
+  /// El motor de E2+ lo usa para cerrar la RC de la orden.
+  ultimoProceso Boolean @default(false) @map("ultimo_proceso")
+  /// ¿Aplica también en órdenes de RESURTIDO? (ex `CP_Procesos.EsResurtido`).
+  esResurtido   Boolean @default(false) @map("es_resurtido")
+
+  /// Condición de aplicabilidad del proceso a una orden (TIPADO, no motor de expresiones).
+  condicionAplicabilidad CondicionAplicabilidad @default(ninguna) @map("condicion_aplicabilidad")
+  /// Evento de negocio que el proceso representa (gancho con los hechos reales de v2).
+  tipoEvento             TipoEventoProceso      @default(manual) @map("tipo_evento")
+  /// Cómo se estima la duración del proceso (TIPADO; la fórmula la pone el motor de E2+).
+  tipoDuracion           TipoDuracionProceso    @default(fija) @map("tipo_duracion")
+
+  /// Borrado SUAVE (plan §4): un proceso en uso por la RC nunca se borra físico → se desactiva.
+  activo Boolean @default(true)
+
+  /// Roles RESPONSABLES del proceso (N:M sobre el RBAC único, A4).
+  roles        ProcesoDefRol[]
+  /// Dependencias en las que ESTE proceso es el sucesor (sus antecesores).
+  antecesores  ProcesoDep[]           @relation("ProcesoComoSucesor")
+  /// Dependencias en las que ESTE proceso es el antecesor (sus sucesores).
+  sucesores    ProcesoDep[]           @relation("ProcesoComoAntecesor")
+  /// Ítems de checklist configurable del proceso.
+  checklist    ProcesoChecklist[]
+  /// Renglones de plantilla de ruta que usan este proceso (F5-E2). Restrict.
+  enPlantillas PlantillaRutaProceso[]
+  /// Renglones de ruta viva (por orden) que usan este proceso (F5-E3). Restrict.
+  enRutas      RutaOrden[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("proceso_def")
+}
+
+/// Puente N:M `ProcesoDef` × `Rol` — el/los rol(es) RESPONSABLE(s) de un proceso de la RC
+/// (F5-E1, A4: sobre el RBAC único, sin catálogo de roles paralelo). PK compuesta; solo
+/// auditoría de creación (las puentes no se "modifican": se crean/borran al re-set de roles).
+model ProcesoDefRol {
+  idProcesoDef Int        @map("id_proceso_def")
+  procesoDef   ProcesoDef @relation(fields: [idProcesoDef], references: [id], onDelete: Cascade)
+  idRol        Int        @map("id_rol")
+  rol          Rol        @relation(fields: [idRol], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idProcesoDef, idRol])
+  @@index([idRol])
+  @@map("proceso_def_rol")
+}
+
+/// Arista del DAG de dependencias genéricas entre procesos de la RC (F5-E1): `idAntecesor`
+/// DEBE ocurrir antes que `idProceso`. Self-relation con dos nombres de relación distintos.
+/// El RECHAZO DE CICLOS vive en el dominio (`definirDependencias`): el grafo siempre acíclico.
+/// PK compuesta `[idProceso, idAntecesor]`; Restrict (un proceso con dependencias no se borra
+/// físico). Solo auditoría de creación (las aristas se crean/borran al re-set de dependencias).
+model ProcesoDep {
+  idProceso   Int        @map("id_proceso")
+  proceso     ProcesoDef @relation("ProcesoComoSucesor", fields: [idProceso], references: [id], onDelete: Restrict)
+  idAntecesor Int        @map("id_antecesor")
+  antecesor   ProcesoDef @relation("ProcesoComoAntecesor", fields: [idAntecesor], references: [id], onDelete: Restrict)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idProceso, idAntecesor])
+  @@index([idAntecesor])
+  @@map("proceso_dep")
+}
+
+/// Ítem de CHECKLIST configurable de un proceso de la RC (F5-E1). Lista ordenada de puntos a
+/// verificar por proceso (doc 08: la RC del viejo llevaba comprobaciones manuales). Borrado
+/// SUAVE (`activo`): al re-set del checklist, los ítems quitados se desactivan (no se borran).
+model ProcesoChecklist {
+  id           Int        @id @default(autoincrement())
+  idProcesoDef Int        @map("id_proceso_def")
+  procesoDef   ProcesoDef @relation(fields: [idProcesoDef], references: [id], onDelete: Cascade)
+  descripcion  String
+  /// Orden de despliegue del ítem dentro del checklist (lo gestiona el dominio).
+  orden        Int        @default(0)
+  /// Borrado suave: un ítem quitado del checklist se desactiva (conserva historial).
+  activo       Boolean    @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idProcesoDef])
+  @@map("proceso_checklist")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUTA CRÍTICA · F5-E2 — Plantillas de ruta, reglas de duración y calendario
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Familia de artículos de la Ruta Crítica (ex `CP_Familia`). Agrupa los `ArticuloRC`
+/// (tipos de artículo del CPM). Catálogo GLOBAL, borrado SUAVE (`activo`), auditoría A7.
+model FamiliaArticulo {
+  id     Int     @id @default(autoincrement())
+  nombre String  @unique
+  activo Boolean @default(true)
+
+  /// Artículos RC de esta familia (Restrict: una familia con artículos no se borra física).
+  articulos ArticuloRC[]
+
+  creadoEn        DateTime        @default(now()) @map("creado_en")
+  creadoPorId     String?         @map("creado_por_id")
+  modificadoEn    DateTime        @updatedAt @map("modificado_en")
+  modificadoPorId String?         @map("modificado_por_id")
+  plantillaRutas  PlantillaRuta[]
+
+  @@map("familia_articulo")
+}
+
+/// Tipo de artículo de la Ruta Crítica (ex `CP_Articulos`, viejo `IdCP_Articulos`). Es la
+/// dimensión por la que el CPM viejo variaba sus tiempos (p. ej. "SENCILLO 1/6", "DIFICIL 6/6").
+/// Pertenece a una `FamiliaArticulo`. NO se conecta por FK desde `Orden` en esta etapa: la orden
+/// guarda `idTipoArticuloRC` como escalar nullable sin FK (prueba ya tiene órdenes ETL con valores
+/// ahí; el enganche formal llega cuando el motor lo necesite). Catálogo GLOBAL, borrado SUAVE.
+model ArticuloRC {
+  id                Int             @id @default(autoincrement())
+  nombre            String
+  idFamiliaArticulo Int             @map("id_familia_articulo")
+  familia           FamiliaArticulo @relation(fields: [idFamiliaArticulo], references: [id], onDelete: Restrict)
+  activo            Boolean         @default(true)
+
+  /// Plantillas de ruta que aplican específicamente a este artículo (Restrict).
+  plantillas PlantillaRuta[]
+  /// Órdenes programadas con este artículo RC (F5-E3). Restrict.
+  ordenes    Orden[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idFamiliaArticulo])
+  @@map("articulo_rc")
+}
+
+/// PLANTILLA de ruta: qué procesos lleva un artículo/familia, con qué tiempo estándar y con qué
+/// ENCADENAMIENTO PROPIO (puede diferir del DAG genérico de `ProcesoDep`, porque el viejo
+/// `CP_Tiempos.Antecesor` se capturaba por artículo). Identifica a qué aplica por familia y/o
+/// artículo (ambos opcionales: una plantilla puede ser de toda una familia o de un artículo
+/// concreto). Catálogo GLOBAL, borrado SUAVE, auditoría A7.
+model PlantillaRuta {
+  id     Int    @id @default(autoincrement())
+  nombre String
+
+  /// Familia a la que aplica (opcional). Restrict.
+  idFamiliaArticulo Int?             @map("id_familia_articulo")
+  familia           FamiliaArticulo? @relation(fields: [idFamiliaArticulo], references: [id], onDelete: Restrict)
+  /// Artículo concreto al que aplica (opcional). Restrict.
+  idArticuloRC      Int?             @map("id_articulo_rc")
+  articulo          ArticuloRC?      @relation(fields: [idArticuloRC], references: [id], onDelete: Restrict)
+
+  activo Boolean @default(true)
+
+  /// Procesos de la plantilla (su tiempo estándar + posición). Cascade: al borrar la plantilla.
+  procesos PlantillaRutaProceso[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idFamiliaArticulo])
+  @@index([idArticuloRC])
+  @@map("plantilla_ruta")
+}
+
+/// Renglón de una `PlantillaRuta`: un proceso del catálogo con su TIEMPO ESTÁNDAR (días) y su
+/// posición (`orden`) dentro de la plantilla (ex `CP_Tiempos`). El encadenamiento PROPIO de la
+/// plantilla se modela aparte en `PlantillaRutaDep` (un renglón puede tener antecesores distintos
+/// a los del DAG genérico). Cascade desde la plantilla; Restrict hacia el `ProcesoDef`.
+model PlantillaRutaProceso {
+  id              Int           @id @default(autoincrement())
+  idPlantillaRuta Int           @map("id_plantilla_ruta")
+  plantilla       PlantillaRuta @relation(fields: [idPlantillaRuta], references: [id], onDelete: Cascade)
+  idProcesoDef    Int           @map("id_proceso_def")
+  procesoDef      ProcesoDef    @relation(fields: [idProcesoDef], references: [id], onDelete: Restrict)
+
+  /// Tiempo estándar del proceso en esta plantilla, en días (ex `CP_Tiempos.Tiempo`).
+  tiempoEstandar Int @map("tiempo_estandar")
+  /// Posición del renglón dentro de la plantilla (lo gestiona el dominio).
+  orden          Int @default(0)
+
+  /// Dependencias en las que ESTE renglón es el sucesor (sus antecesores en la plantilla).
+  antecesores PlantillaRutaDep[] @relation("PlantillaProcesoComoSucesor")
+  /// Dependencias en las que ESTE renglón es el antecesor (sus sucesores en la plantilla).
+  sucesores   PlantillaRutaDep[] @relation("PlantillaProcesoComoAntecesor")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idPlantillaRuta, idProcesoDef])
+  @@index([idProcesoDef])
+  @@map("plantilla_ruta_proceso")
+}
+
+/// Arista del DAG de encadenamiento PROPIO de una plantilla: `idAntecesor` (renglón de la plantilla)
+/// debe ocurrir antes que `idPlantillaRutaProceso` (otro renglón de la MISMA plantilla). Se valida
+/// acíclico en el dominio (reusa `grafo.ts`). Ambos extremos Cascade desde sus renglones (al borrar
+/// la plantilla caen sus renglones y con ellos sus aristas). Solo auditoría de creación.
+model PlantillaRutaDep {
+  idPlantillaRutaProceso Int                  @map("id_plantilla_ruta_proceso")
+  proceso                PlantillaRutaProceso @relation("PlantillaProcesoComoSucesor", fields: [idPlantillaRutaProceso], references: [id], onDelete: Cascade)
+  idAntecesor            Int                  @map("id_antecesor")
+  antecesor              PlantillaRutaProceso @relation("PlantillaProcesoComoAntecesor", fields: [idAntecesor], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idPlantillaRutaProceso, idAntecesor])
+  @@index([idAntecesor])
+  @@map("plantilla_ruta_dep")
+}
+
+/// Factor de duración POR CANTIDAD de piezas (ex `CP_Cant`, 11 rangos). El motor de E4 multiplica
+/// el tiempo base por el `factor` del rango `[deCant, aCant]` en el que cae la cantidad de la orden.
+/// Catálogo GLOBAL, borrado SUAVE, auditoría A7.
+model FactorCantidad {
+  id     Int     @id @default(autoincrement())
+  /// Límite inferior del rango (inclusive) (ex `CP_Cant.DeCant`).
+  deCant Int     @map("de_cant")
+  /// Límite superior del rango (inclusive) (ex `CP_Cant.ACant`).
+  aCant  Int     @map("a_cant")
+  /// Factor multiplicador para ese rango (ex `CP_Cant.FactorCant`).
+  factor Decimal @db.Decimal(10, 4)
+  activo Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([deCant, aCant])
+  @@map("factor_cantidad")
+}
+
+/// Duración (días de espera) POR TIPO DE TELA (ex `RC_TipoTelas`, 7). El `factorTela` se guarda
+/// aunque el viejo NO lo aplicaba (decisión (b)): queda disponible para el motor de E4. Catálogo
+/// GLOBAL, borrado SUAVE, auditoría A7.
+model DuracionPorTipoTela {
+  id         Int     @id @default(autoincrement())
+  /// Nombre del tipo de tela (ex `RC_TipoTelas.TipoTela`). Único.
+  nombre     String  @unique
+  /// Días de espera que suma este tipo de tela (ex `RC_TipoTelas.Dias`).
+  dias       Int
+  /// Factor de la tela (ex `RC_TipoTelas.FactorTela`). Se conserva aunque el viejo no lo aplicara.
+  factorTela Decimal @map("factor_tela") @db.Decimal(10, 4)
+  activo     Boolean @default(true)
+
+  /// Órdenes programadas con este tipo de tela (F5-E3). Restrict.
+  ordenes Orden[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("duracion_tipo_tela")
+}
+
+/// Duración (días de espera) POR APLICACIÓN/estampado (ex `RC_Aplicaciones`, 9). El origen NO trae
+/// factor (solo `Dias`): `factor` queda OPCIONAL (decisión (b)) para el motor de E4. Catálogo
+/// GLOBAL, borrado SUAVE, auditoría A7.
+model DuracionPorAplicacion {
+  id     Int      @id @default(autoincrement())
+  /// Nombre de la aplicación (ex `RC_Aplicaciones.TipoAplicacion`). Único.
+  nombre String   @unique
+  /// Clave corta de la aplicación (ex `RC_Aplicaciones.ClaveAplicacion`, p. ej. "A1").
+  clave  String?
+  /// Días de espera que suma esta aplicación (ex `RC_Aplicaciones.Dias`).
+  dias   Int
+  /// Factor (no existe en el origen; opcional para el motor de E4, decisión (b)).
+  factor Decimal? @db.Decimal(10, 4)
+  activo Boolean  @default(true)
+
+  /// Órdenes programadas con esta aplicación (F5-E3). Restrict.
+  ordenes Orden[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("duracion_aplicacion")
+}
+
+/// CALENDARIO LABORAL por empresa (decisión (a)): qué días de la semana son hábiles. Un registro
+/// por empresa (1:1). Los 7 booleanos default L–V hábiles, sáb/dom no. Las funciones puras de
+/// `díasHábiles` lo consultan junto con los `DiaFestivo`. Auditoría A7.
+model CalendarioEmpresa {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @unique @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  lunes     Boolean @default(true)
+  martes    Boolean @default(true)
+  miercoles Boolean @default(true)
+  jueves    Boolean @default(true)
+  viernes   Boolean @default(true)
+  sabado    Boolean @default(false)
+  domingo   Boolean @default(false)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("calendario_empresa")
+}
+
+/// DÍA FESTIVO (no laborable) de una empresa (decisión (a)). Fecha + descripción. El motor de E4 lo
+/// salta al contar días hábiles. Único por empresa+fecha. Borrado SUAVE, auditoría A7.
+model DiaFestivo {
+  id          Int      @id @default(autoincrement())
+  idEmpresa   Int      @map("id_empresa")
+  empresa     Empresa  @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  fecha       DateTime @db.Date
+  descripcion String
+  activo      Boolean  @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, fecha])
+  @@index([idEmpresa])
+  @@map("dia_festivo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RUTA CRÍTICA · F5-E3 — Ruta viva por orden (motor pt1: generación + duraciones)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Estado de un proceso dentro de la RUTA VIVA de una orden (F5-E3). El SEMÁFORO de
+/// cumplimiento (a tiempo / en riesgo / atrasado) es de E4 y NO se modela aquí: aquí solo el
+/// avance simple del proceso. `pendiente` (sin capturar), `activo` (en curso), `completado`
+/// (cumplido — su `fechaReal` ya se capturó o se auto-completó por duración 0).
+enum EstadoProcesoRuta {
+  pendiente
+  activo
+  completado
+
+  @@map("estado_proceso_ruta")
+}
+
+/// CÓMO se capturó el cumplimiento de un proceso de la ruta viva (F5-E3). `manual` (un usuario
+/// lo marcó), `evento` (lo auto-completó el sistema: un evento de dominio o la duración 0 al
+/// generar). Nullable: queda en null mientras el proceso no se ha completado.
+enum OrigenCaptura {
+  manual
+  evento
+
+  @@map("origen_captura")
+}
+
+/// RENGLÓN de la RUTA VIVA de UNA orden (F5-E3): un proceso de la ruta de esa orden, con su
+/// duración estimada, sus fechas (planeadas/reales) y su estado. Pensado para explotación
+/// analítica (D11): una fila por proceso×orden. Se GENERA desde la plantilla aplicable
+/// (`generarRutaOrden`); el snapshot de banderas (`critico`, `ultimoProceso`, `esResurtido`,
+/// `condicionAplicabilidad`) congela cómo estaba el proceso AL GENERAR (la plantilla puede cambiar
+/// luego sin alterar rutas ya generadas). Las dependencias propias de la orden viven en
+/// `RutaOrdenDep` (editables sin tocar la plantilla, D10). Las fechas planeadas las calcula el CPM
+/// de E4 (aquí quedan en null salvo los procesos de duración 0 auto-completados). Auditoría A7.
+model RutaOrden {
+  id           Int        @id @default(autoincrement())
+  idOrden      Int        @map("id_orden")
+  orden        Orden      @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+  idProcesoDef Int        @map("id_proceso_def")
+  procesoDef   ProcesoDef @relation(fields: [idProcesoDef], references: [id], onDelete: Restrict)
+
+  /// Posición del proceso en la ruta de la orden (lo gestiona el dominio al generar).
+  secuencia Int @default(0)
+
+  // ── Snapshot de las banderas del proceso AL GENERAR (no se re-leen del catálogo) ──
+  /// ¿Era CRÍTICO al generar? (snapshot de `ProcesoDef.critico`).
+  critico                Boolean                @default(false)
+  /// ¿Era el ÚLTIMO proceso al generar? (snapshot de `ProcesoDef.ultimoProceso`).
+  ultimoProceso          Boolean                @default(false) @map("ultimo_proceso")
+  /// ¿Aplicaba en resurtido al generar? (snapshot de `ProcesoDef.esResurtido`).
+  esResurtido            Boolean                @default(false) @map("es_resurtido")
+  /// Condición de aplicabilidad al generar (snapshot de `ProcesoDef.condicionAplicabilidad`).
+  condicionAplicabilidad CondicionAplicabilidad @default(ninguna) @map("condicion_aplicabilidad")
+
+  /// Duración estimada del proceso en DÍAS (la calcula `calcularDuracion` al generar, F5-E3).
+  duracionDias  Int  @map("duracion_dias")
+  /// Días acumulados hasta este proceso (lo llena el CPM de E4; null en E3).
+  acumuladoDias Int? @map("acumulado_dias")
+
+  /// Fecha planeada ORIGINAL (primer cálculo del CPM, E4). Null en E3 (pendiente de cálculo).
+  fechaPlaneadaOriginal DateTime? @map("fecha_planeada_original")
+  /// Fecha planeada VIGENTE (se recalcula al ajustar la ruta, E4). Null en E3.
+  fechaPlaneadaVigente  DateTime? @map("fecha_planeada_vigente")
+  /// Fecha REAL de cumplimiento del proceso (capturada o auto-completada por duración 0).
+  fechaReal             DateTime? @map("fecha_real")
+
+  /// Estado del proceso en la ruta (avance simple; el semáforo es E4).
+  estado EstadoProcesoRuta @default(pendiente)
+
+  /// ¿Hay una entrada PARCIAL en curso para este proceso? (F5-E6, decisión (d)). El auto-avance la
+  /// enciende cuando un evento (recibo de maquila, recepción de tela, entrega…) cubre SOLO una parte
+  /// de la cantidad pedida color×talla, y la apaga cuando se completa (proceso `completado`) o se
+  /// des-completa por una cancelación (decisión (f)). Es una MARCA visible "parcial en curso"; el
+  /// proceso solo se marca `completado` cuando llega la cantidad COMPLETA.
+  parcialEnCurso Boolean @default(false) @map("parcial_en_curso")
+
+  /// Quién capturó el cumplimiento (null mientras no se complete).
+  capturadoPorId String?        @map("capturado_por_id")
+  /// Cuándo se capturó el cumplimiento (null mientras no se complete).
+  capturadoEn    DateTime?      @map("capturado_en")
+  /// Cómo se capturó (manual / evento del sistema). Null mientras no se complete.
+  origenCaptura  OrigenCaptura? @map("origen_captura")
+
+  /// Dependencias de la ruta de ESTA orden en las que este renglón es el sucesor (sus antecesores).
+  antecesores RutaOrdenDep[]       @relation("RutaProcesoComoSucesor")
+  /// Dependencias de la ruta de ESTA orden en las que este renglón es el antecesor (sus sucesores).
+  sucesores   RutaOrdenDep[]       @relation("RutaProcesoComoAntecesor")
+  /// Ítems de checklist (snapshot del proceso al generar) de este renglón.
+  checklist   RutaOrdenChecklist[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idProcesoDef])
+  @@index([idOrden])
+  @@index([idProcesoDef])
+  @@map("ruta_orden")
+}
+
+/// Arista del DAG de dependencias de la RUTA VIVA de UNA orden (F5-E3): `idAntecesor` debe ocurrir
+/// antes que `idRutaOrden`, AMBOS renglones de la MISMA orden. Es un SNAPSHOT editable sin tocar la
+/// plantilla (D10: `ajustarRutaOrden` cambia estas aristas, no `PlantillaRutaDep`). Se valida
+/// acíclico en el dominio (reusa `grafo.ts`). Ambos extremos Cascade desde sus renglones.
+model RutaOrdenDep {
+  idRutaOrden Int       @map("id_ruta_orden")
+  rutaOrden   RutaOrden @relation("RutaProcesoComoSucesor", fields: [idRutaOrden], references: [id], onDelete: Cascade)
+  idAntecesor Int       @map("id_antecesor")
+  antecesor   RutaOrden @relation("RutaProcesoComoAntecesor", fields: [idAntecesor], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@id([idRutaOrden, idAntecesor])
+  @@index([idAntecesor])
+  @@map("ruta_orden_dep")
+}
+
+/// Ítem de CHECKLIST de un proceso de la ruta viva de una orden (F5-E3). Snapshot de
+/// `ProcesoChecklist` al generar la ruta; se marca `hecho` por orden (no toca el catálogo).
+/// Cascade desde su renglón de ruta. Auditoría A7.
+model RutaOrdenChecklist {
+  id          Int       @id @default(autoincrement())
+  idRutaOrden Int       @map("id_ruta_orden")
+  rutaOrden   RutaOrden @relation(fields: [idRutaOrden], references: [id], onDelete: Cascade)
+  descripcion String
+  /// Posición del ítem dentro del checklist (snapshot del orden del catálogo).
+  orden       Int       @default(0)
+  /// ¿Ya se verificó este punto en esta orden?
+  hecho       Boolean   @default(false)
+  /// Cuándo se marcó como hecho (null si no se ha hecho).
+  fechaHecho  DateTime? @map("fecha_hecho")
+  /// Quién lo marcó (null si no se ha hecho).
+  hechoPorId  String?   @map("hecho_por_id")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idRutaOrden])
+  @@map("ruta_orden_checklist")
 }

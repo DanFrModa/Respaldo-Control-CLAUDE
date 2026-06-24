@@ -60,6 +60,22 @@ export const MODULOS_PERMISO = {
   bordados: 'Bordados y estampados',
   // ── Modelos (Módulo 2, F1-E4) ──────────────────────────────────────────────
   modelos: 'Modelos',
+  // ── Producción / WIP (Módulo 4, F3) ────────────────────────────────────────
+  // Catálogo de tipos de proceso de maquila (F3-E1): hasta F3 solo se sembraba; E1 le da CRUD.
+  // Su consumidor real (la RC) llega en F5; aquí es un catálogo administrable más.
+  'tipos-proceso': 'Tipos de proceso',
+  // Inventario de PRODUCTO TERMINADO operable por kardex (F3-E3). `ipt` (arriba) son los accesos
+  // granulares LEGADO del viejo; `inventario-pt` es el módulo NUEVO del kardex de v2 (D3).
+  'inventario-pt': 'Inventario de producto terminado (kardex)',
+  // ── Inventario de TELAS y AVÍOS operable por kardex (Módulo 4, F4-E1, D5/R4) ──
+  // `telas` (arriba) son los accesos granulares LEGADO del viejo (incl. el ex-acceso #7
+  // `telas.ver-totales`, que oculta importes); `inventario-telas`/`inventario-avios` son los
+  // módulos NUEVOS del kardex de materiales de v2 (D3). Mismo esquema ver/mover que `inventario-pt`.
+  'inventario-telas': 'Inventario de telas (kardex)',
+  'inventario-avios': 'Inventario de avíos (kardex)',
+  // ── Notas de salida estructuradas (Módulo 5, F4-E5, R4/R9) ──
+  // El documento de envío de materiales a un maquilero contra una orden de producción.
+  notas: 'Notas de salida',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -276,6 +292,35 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Poder autorizar Ordenes de Compra',
     },
   },
+  // Permisos NUEVOS de v2 (F4-E2, A4): el CRUD de la orden de compra. `ver` (consulta),
+  // `administrar` (alta/edición/duplicado) y `cancelar` (cancelación suave con motivo). La
+  // autorización tiene su permiso propio LEGADO (`compras.autorizar`, arriba). La edición de una
+  // OC YA autorizada queda reservada al admin (decisión (a)): el dominio usa `roles.administrar`
+  // como marcador de admin (mismo criterio que `generaEntradaPt` de tipos-proceso, F3-E1).
+  {
+    clave: 'compras.ver',
+    modulo: 'compras',
+    descripcion: 'Consultar órdenes de compra',
+  },
+  {
+    clave: 'compras.administrar',
+    modulo: 'compras',
+    descripcion: 'Crear y editar órdenes de compra (y duplicarlas a un borrador nuevo)',
+  },
+  {
+    clave: 'compras.cancelar',
+    modulo: 'compras',
+    descripcion: 'Cancelar (suave, con motivo) órdenes de compra',
+  },
+  // Permiso NUEVO de v2 (F4-E3, A4): RECIBIR material contra una OC autorizada (recepción que
+  // crea el lote de tela y mueve el kardex de telas/avíos) y REVERSAR una recepción (inverso
+  // auditado, D3). Se da a quien administra compras (mismo reparto que `compras.administrar`).
+  {
+    clave: 'compras.recibir',
+    modulo: 'compras',
+    descripcion:
+      'Recibir material contra una OC autorizada (recepción + entrada al kardex) y reversar recepciones (F4-E3)',
+  },
 
   // ── Producción (corte y maquila) ─────────────────────────────────────────────
   {
@@ -411,6 +456,50 @@ export const CATALOGO_PERMISOS = [
       formulario: 'RC_MeterDatosDet',
       descripcion: 'Poder meter la fecha que sea en el cumplimiento',
     },
+  },
+  // Catálogo configurable de la Ruta Crítica (Módulo 8, F5-E1, A4) — permisos NUEVOS de v2.
+  // Gobiernan el "corazón configurable": el catálogo de procesos, sus roles responsables (N:M),
+  // las dependencias (DAG) y los checklists. Mismo reparto que un catálogo maestro: `ver`
+  // (consulta) y `administrar` (alta/edición/des-reactivación + roles + dependencias + checklist).
+  // Los `rc.*` LEGADO de arriba (ver-botones/fechas-retraso/fecha-libre-cumplimiento) son del
+  // MOTOR de la RC (instancias por orden, E2+); NO se reutilizan para el catálogo configurable.
+  {
+    clave: 'rc.catalogo-ver',
+    modulo: 'rc',
+    descripcion: 'Consultar el catálogo de procesos, dependencias y checklists de la Ruta Crítica',
+  },
+  {
+    clave: 'rc.catalogo-administrar',
+    modulo: 'rc',
+    descripcion:
+      'Administrar procesos, roles responsables, dependencias y checklists de la Ruta Crítica',
+  },
+  // Motor de la RUTA VIVA por orden (Módulo 8, F5-E3, A4) — permisos NUEVOS de v2. Gobiernan la
+  // programación (generar/re-generar/ajustar la ruta de una orden) y su consulta. Son OPERATIVOS
+  // (producción/IP los usa día a día): cascadean a los roles como los `produccion.*`, no se restan a
+  // los bajos. Distintos del catálogo configurable (`rc.catalogo-*`, que define las plantillas).
+  {
+    clave: 'rc.programar',
+    modulo: 'rc',
+    descripcion:
+      'Programar (generar/re-generar) y ajustar la Ruta Crítica de una orden de producción (F5-E3)',
+  },
+  {
+    clave: 'rc.ruta-ver',
+    modulo: 'rc',
+    descripcion:
+      'Consultar la Ruta Crítica viva de una orden (procesos, duraciones, fechas) (F5-E3)',
+  },
+  // Captura de avance de la RUTA VIVA por orden (Módulo 8, F5-E4, A4) — permiso NUEVO de v2. Gobierna
+  // marcar/revertir la fecha REAL de cumplimiento de un proceso y los ítems de su checklist. Es
+  // OPERATIVO (producción/IP lo usa día a día); cascadea a los roles como `rc.programar`/`produccion.*`.
+  // Además, el dominio exige que ALGUNO de los roles del usuario sea responsable del proceso
+  // (`ProcesoDefRol`, N:M); el admin (`roles.administrar`) captura cualquier proceso.
+  {
+    clave: 'rc.capturar',
+    modulo: 'rc',
+    descripcion:
+      'Capturar (o revertir) el cumplimiento de los procesos de la Ruta Crítica de una orden y su checklist (F5-E4)',
   },
 
   // ── Control de calidad ───────────────────────────────────────────────────────
@@ -696,15 +785,121 @@ export const CATALOGO_PERMISOS = [
     descripcion:
       'Administrar el catálogo de modelos: ficha, BOM (telas/avíos/bordados) y fotos (alta, edición, desactivación)',
   },
-  // ── Generador de códigos de barra (F1-E5, Módulo 1 del viejo → form `Codigo`) ─
-  // Permiso de SOLO LECTURA: generar/ver/imprimir el EAN-13 y DUN-14 de un modelo para la
-  // empresa activa (prefijo de `Empresa.upc`). Es una sub-función del módulo Modelos
-  // (misma fila que `modelos.ver`); no muta datos. Como es de lectura, los roles que ven
-  // modelos lo heredan (el seed lo incluye salvo donde se restrinja explícitamente).
+
+  // ── Producción / WIP (Módulo 4, F3 — doc 03-Produccion) ──────────────────────
+  // Permisos NUEVOS de v2 (A4). El esquema y motor nacen en F3-E1; los flujos que cada permiso
+  // gobierna se construyen en E2 (corte/envío), E4 (recibo/cargo) y E5 (entrega/WIP). El catálogo
+  // de tipos de proceso (F3-E1) tiene su `ver`/`administrar` como cualquier catálogo; la bandera
+  // `generaEntradaPt` es EDITABLE solo por admin (se exige `roles.administrar`, ver dominio).
   {
-    clave: 'modelos.codigos-barra',
-    modulo: 'modelos',
-    descripcion: 'Generar y descargar los códigos de barra (EAN-13 / DUN-14) de un modelo',
+    clave: 'tipos-proceso.ver',
+    modulo: 'tipos-proceso',
+    descripcion: 'Consultar el catálogo de tipos de proceso de maquila',
+  },
+  {
+    clave: 'tipos-proceso.administrar',
+    modulo: 'tipos-proceso',
+    descripcion:
+      'Administrar el catálogo de tipos de proceso (alta, edición, desactivación). La bandera "genera entrada a PT" solo la edita un administrador',
+  },
+  {
+    clave: 'produccion.corte',
+    modulo: 'produccion',
+    descripcion: 'Capturar el corte de una orden de producción (F3-E2)',
+  },
+  {
+    clave: 'produccion.envio',
+    modulo: 'produccion',
+    descripcion: 'Capturar envíos de maquila (costura/estampado/…) de una orden (F3-E2)',
+  },
+  {
+    clave: 'produccion.recibo',
+    modulo: 'produccion',
+    descripcion:
+      'Capturar recibos de maquila (WIP + entrada a PT + cargo EsMa según proceso) (F3-E4)',
+  },
+  {
+    clave: 'produccion.entrega',
+    modulo: 'produccion',
+    descripcion: 'Capturar entregas a cliente (salida de PT) (F3-E5)',
+  },
+  {
+    clave: 'produccion.wip-ver',
+    modulo: 'produccion',
+    descripcion: 'Consultar el avance (WIP) y los pendientes por etapa de las órdenes (F3-E5)',
+  },
+  {
+    clave: 'produccion.cancelar',
+    modulo: 'produccion',
+    descripcion: 'Cancelar (suave, con inverso auditado) corte, envíos, recibos o entregas (F3)',
+  },
+
+  // ── Inventario de producto terminado por kardex (Módulo 6, F3-E3 — doc 04-Inventarios) ──
+  {
+    clave: 'inventario-pt.ver',
+    modulo: 'inventario-pt',
+    descripcion: 'Consultar existencias y kardex de producto terminado (F3-E3)',
+  },
+  {
+    clave: 'inventario-pt.mover',
+    modulo: 'inventario-pt',
+    descripcion: 'Capturar movimientos manuales y traspasos de producto terminado (F3-E3)',
+  },
+
+  // ── Inventario de TELAS y AVÍOS por kardex (Módulo 4, F4-E1 — doc 04-Inventarios §B; D5/R4) ──
+  // Mismo esquema ver/mover que inventario-pt. El ex-acceso #7 (telas.ver-totales) es APARTE: sobre
+  // estos permisos, controla si las consultas de TELAS muestran o no los importes/costos en dinero
+  // (las cantidades sí se ven con `inventario-telas.ver`).
+  {
+    clave: 'inventario-telas.ver',
+    modulo: 'inventario-telas',
+    descripcion: 'Consultar existencias y kardex de telas por lote (F4-E1, D5)',
+  },
+  {
+    clave: 'inventario-telas.mover',
+    modulo: 'inventario-telas',
+    descripcion: 'Capturar ajustes, traspasos y salidas a orden de telas (F4-E1)',
+  },
+  {
+    clave: 'inventario-avios.ver',
+    modulo: 'inventario-avios',
+    descripcion: 'Consultar existencias y kardex de avíos multi-almacén (F4-E1, R4)',
+  },
+  {
+    clave: 'inventario-avios.mover',
+    modulo: 'inventario-avios',
+    descripcion: 'Capturar ajustes y traspasos de avíos (F4-E1, R4)',
+  },
+
+  // ── Estados de cuenta de maquileros (EsMa, F3-E4) — permiso NUEVO de v2 ──────
+  {
+    clave: 'esma.cargo-validar',
+    modulo: 'esma',
+    descripcion:
+      'Validar (o ajustar/cancelar) los cargos propuestos de EsMa desde los recibos (F3-E4)',
+  },
+
+  // ── Notas de salida estructuradas (Módulo 5, F4-E5 — doc 03-Produccion §Notas de Salida; R4/R9) ──
+  // Permisos NUEVOS de v2 (A4). `ver` (consulta), `administrar` (alta/edición/confirmar la nota — el
+  // confirmar descuenta los avíos del kardex; la tela solo se referencia, decisión (e)) y `cancelar`
+  // (cancelación suave con motivo + reverso auditado de los avíos, D3). Mismo reparto que compras:
+  // ver es lectura, administrar muta/confirma, cancelar es su propio permiso (acción que revierte
+  // movimientos de kardex). Operativos (no se restan a los roles bajos, como `compras.recibir`).
+  {
+    clave: 'notas.ver',
+    modulo: 'notas',
+    descripcion: 'Consultar notas de salida y sus renglones',
+  },
+  {
+    clave: 'notas.administrar',
+    modulo: 'notas',
+    descripcion:
+      'Crear, editar y CONFIRMAR notas de salida (confirmar descuenta los avíos del kardex, R4)',
+  },
+  {
+    clave: 'notas.cancelar',
+    modulo: 'notas',
+    descripcion: 'Cancelar (suave, con motivo) notas de salida; reversa los avíos descontados (D3)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 
