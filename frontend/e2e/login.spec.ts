@@ -61,6 +61,8 @@ test.describe('Inicio de sesión', () => {
       'Producción',
       'Inventarios',
       'Ruta Crítica',
+      // Sub-vista del concentrado (F5-E7): aparece como enlace del menú con su permiso.
+      'Concentrado planeado vs real',
       'Administración',
     ]) {
       await expect(links.filter({ hasText: modulo }).first()).toBeVisible();

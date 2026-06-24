@@ -51,6 +51,7 @@ import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPag
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { BandejaTareasPagina } from '@/modulos/ruta-critica/BandejaTareasPagina';
+import { ConcentradoPagina } from '@/modulos/ruta-critica/ConcentradoPagina';
 import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
 import { DependenciasPagina } from '@/modulos/ruta-critica/DependenciasPagina';
 import { PlantillasPagina } from '@/modulos/ruta-critica/PlantillasPagina';
@@ -164,6 +165,8 @@ const router = createBrowserRouter([
           { path: 'ruta-critica/reglas-duracion', element: <ReglasDuracionPagina /> },
           // Ruta Crítica (Módulo 8, F5-E5) — motor por orden: bandeja, programar y RC por orden.
           { path: 'ruta-critica/bandeja', element: <BandejaTareasPagina /> },
+          // Ruta Crítica (Módulo 8, F5-E7) — concentrado "planeado vs real" (tablero gerencial).
+          { path: 'ruta-critica/concentrado', element: <ConcentradoPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden/programar', element: <ProgramarRcPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },

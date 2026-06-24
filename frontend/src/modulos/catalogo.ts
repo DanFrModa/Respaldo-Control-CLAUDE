@@ -523,6 +523,20 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['rc.ruta-ver'],
     subVista: true,
   },
+  // Sub-vista de Ruta Crítica (F5-E7): el CONCENTRADO "planeado vs real" — el tablero gerencial que
+  // reemplaza la vista más pesada del viejo (RC_ConcentradoDif). Todas las órdenes con RC viva ×
+  // sus procesos, con semáforo y atraso; export a Excel. Cuelga del módulo Ruta Crítica; la gobierna
+  // `rc.ruta-ver` (la misma que la bandeja; el backend re-verifica, A1).
+  {
+    clave: 'rc-concentrado',
+    titulo: 'Concentrado planeado vs real',
+    descripcion:
+      'Todas las órdenes con Ruta Crítica viva: semáforo y atraso por proceso, con Excel',
+    ruta: '/ruta-critica/concentrado',
+    icono: 'grafica',
+    permisos: ['rc.ruta-ver'],
+    subVista: true,
+  },
   // Sub-vistas de Ruta Crítica (F5-E1): el CATÁLOGO CONFIGURABLE (procesos + roles + checklist) y el
   // editor de DEPENDENCIAS (DAG). Cuelgan del módulo Ruta Crítica; los gobierna `rc.catalogo-ver`.
   // El MOTOR (instancias por orden, fechas/semáforos) y la bandeja de tareas llegan en E2+.
