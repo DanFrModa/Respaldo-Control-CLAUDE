@@ -39154,6 +39154,304 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ruta-critica/concentrado': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Concentrado "planeado vs real" de la Ruta Crítica: órdenes con RC viva, semáforo y atraso */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Órdenes por página (tope 100). */
+          porPagina?: number;
+          /** @description Texto a buscar en el nombre del cliente. */
+          busquedaCliente?: string;
+          /** @description Solo órdenes que tienen ese tipo de proceso (ProcesoDef) en su ruta. */
+          idProcesoDef?: number;
+          /** @description Solo órdenes con algún proceso cuyo rol responsable es ese (Rol). */
+          idRolResponsable?: number;
+          /** @description Criterio de orden: por retraso (peor proceso), por cliente o por fecha de entrega. */
+          orden?: 'retraso' | 'cliente' | 'fecha';
+          /** @description Invierte el sentido del orden (por defecto: más urgente / más reciente primero). */
+          descendente?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página del concentrado "planeado vs real" de la Ruta Crítica. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes de la página. */
+              datos: {
+                /** @description Id de la orden. */
+                idOrden: number;
+                /** @description Folio consecutivo de la orden (por empresa). */
+                folioOrden: number;
+                /** @description Nombre del cliente de la orden. */
+                cliente: string;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Fecha de entrega comprometida de la RC, o null. */
+                fechaEntregaRC: string | null;
+                /** @description Fecha de inicio de la RC, o null. */
+                fechaInicioRC: string | null;
+                /** @description ¿La orden se programó como resurtido? */
+                esResurtido: boolean;
+                /**
+                 * @description Semáforo de la orden (el PEOR de sus procesos sin cumplir).
+                 * @enum {string}
+                 */
+                semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                /** @description Mayor atraso (en días) entre los procesos pendientes de la orden (0 si ninguno). */
+                maxDiasAtraso: number;
+                /** @description Cuántos procesos de la orden siguen sin cumplir. */
+                procesosPendientes: number;
+                /** @description Procesos de la ruta de la orden (en orden de secuencia). */
+                procesos: {
+                  /** @description Tipo de proceso (ProcesoDef). */
+                  idProcesoDef: number;
+                  /** @description Código del proceso (kebab-case). */
+                  codigoProceso: string;
+                  /** @description Nombre del proceso (para la UI). */
+                  nombreProceso: string;
+                  /** @description Posición del proceso en la ruta de la orden. */
+                  secuencia: number;
+                  /** @description ¿Es un proceso crítico de la ruta? */
+                  critico: boolean;
+                  /** @description Fecha planeada vigente del proceso (CPM), o null si aún no se ha fechado. */
+                  fechaPlaneadaVigente: string | null;
+                  /** @description Fecha real de cumplimiento, o null. */
+                  fechaReal: string | null;
+                  /**
+                   * @description Estado del proceso en la ruta (avance simple).
+                   * @enum {string}
+                   */
+                  estado: 'pendiente' | 'activo' | 'completado';
+                  /** @description Días NATURALES vencidos respecto a la planeada vigente (>0 si vencida; 0 si no). */
+                  diasAtraso: number;
+                  /**
+                   * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente).
+                   * @enum {string}
+                   */
+                  semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                }[];
+              }[];
+              /** @description Total de órdenes que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Órdenes por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+              /** @description Conteo de órdenes por semáforo SOBRE TODO el filtro (no solo la página). */
+              resumen: {
+                /** @description Órdenes (del filtro) cuyo semáforo es atrasado. */
+                atrasadas: number;
+                /** @description Órdenes (del filtro) cuyo semáforo es en riesgo. */
+                enRiesgo: number;
+                /** @description Órdenes (del filtro) cuyo semáforo es a tiempo. */
+                aTiempo: number;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/concentrado/excel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Concentrado de la Ruta Crítica en Excel (.xlsx): mismo resultado que el tablero */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Órdenes por página (tope 100). */
+          porPagina?: number;
+          /** @description Texto a buscar en el nombre del cliente. */
+          busquedaCliente?: string;
+          /** @description Solo órdenes que tienen ese tipo de proceso (ProcesoDef) en su ruta. */
+          idProcesoDef?: number;
+          /** @description Solo órdenes con algún proceso cuyo rol responsable es ese (Rol). */
+          idRolResponsable?: number;
+          /** @description Criterio de orden: por retraso (peor proceso), por cliente o por fecha de entrega. */
+          orden?: 'retraso' | 'cliente' | 'fecha';
+          /** @description Invierte el sentido del orden (por defecto: más urgente / más reciente primero). */
+          descendente?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/usuarios': {
     parameters: {
       query?: never;

@@ -14,6 +14,8 @@ import type {
   AlertasRcConteo,
   BandejaRcPagina,
   BandejaRcQuery,
+  ConcentradoRcPagina,
+  ConcentradoRcQuery,
   ProgramarRcCuerpo,
   RutaOrden,
 } from './tipos';
@@ -31,6 +33,8 @@ import type {
 export const CLAVE_RC_RUTA = ['ruta-critica', 'ruta'] as const;
 /** Clave raíz de la caché de la bandeja de tareas. */
 export const CLAVE_RC_BANDEJA = ['ruta-critica', 'bandeja'] as const;
+/** Clave raíz de la caché del concentrado "planeado vs real". */
+export const CLAVE_RC_CONCENTRADO = ['ruta-critica', 'concentrado'] as const;
 /** Clave raíz de la caché del conteo de alertas (badge del header). */
 export const CLAVE_RC_ALERTAS = ['ruta-critica', 'alertas'] as const;
 
@@ -156,6 +160,45 @@ export function useConteoAlertasRc(
     enabled: habilitado,
     refetchInterval: intervaloMs,
   });
+}
+
+// ── Concentrado "planeado vs real" (tablero gerencial + export Excel) ─────────
+
+async function listarConcentrado(query: ConcentradoRcQuery): Promise<ConcentradoRcPagina> {
+  const { data, error } = await api.GET('/api/ruta-critica/concentrado', { params: { query } });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/**
+ * Concentrado "planeado vs real" de la RC (todas las órdenes con RC viva × sus procesos, con
+ * semáforo/atraso), paginado/filtrable/ordenable por el backend (la agregación es del servidor, A1).
+ * Sin parpadeo al paginar/filtrar.
+ */
+export function useConcentradoRc(
+  query: ConcentradoRcQuery,
+): UseQueryResult<ConcentradoRcPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_RC_CONCENTRADO, query],
+    queryFn: () => listarConcentrado(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * URL del export a Excel del concentrado (`GET /api/ruta-critica/concentrado/excel`), con los MISMOS
+ * filtros del tablero en la querystring. Binario server-side (igual que los impresos PDF): la auth
+ * viaja por la cookie de sesión (mismo origen), así que basta abrirla con `window.open`.
+ */
+export function urlConcentradoExcel(query: ConcentradoRcQuery): string {
+  const qs = new URLSearchParams();
+  for (const [clave, valor] of Object.entries(query)) {
+    if (valor !== undefined && valor !== '') {
+      qs.set(clave, String(valor));
+    }
+  }
+  const cadena = qs.toString();
+  return `/api/ruta-critica/concentrado/excel${cadena === '' ? '' : `?${cadena}`}`;
 }
 
 // ── Captura de cumplimiento + checklist ──────────────────────────────────────

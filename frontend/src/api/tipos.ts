@@ -653,6 +653,22 @@ export type BandejaRcQuery = NonNullable<
 export type AlertasRcConteo =
   paths['/api/ruta-critica/alertas/conteo']['get']['responses']['200']['content']['application/json'];
 
+// ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ────────────
+
+/** Página del concentrado de la RC (`GET /api/ruta-critica/concentrado`). */
+export type ConcentradoRcPagina =
+  paths['/api/ruta-critica/concentrado']['get']['responses']['200']['content']['application/json'];
+/** Una orden (fila) del concentrado, con su semáforo, atraso y sus procesos. */
+export type ConcentradoRcFila = ConcentradoRcPagina['datos'][number];
+/** Un proceso (celda) de la ruta de una orden en el concentrado. */
+export type ConcentradoRcProceso = ConcentradoRcFila['procesos'][number];
+/** Resumen por semáforo del concentrado (sobre todo el filtro). */
+export type ConcentradoRcResumen = ConcentradoRcPagina['resumen'];
+/** Parámetros de consulta del concentrado (querystring). */
+export type ConcentradoRcQuery = NonNullable<
+  paths['/api/ruta-critica/concentrado']['get']['parameters']['query']
+>;
+
 // ── Tipos de movimiento de inventario (Módulo 6, F3-E1; solo lectura) ────────
 
 /** Lista de tipos de movimiento de inventario (`GET /api/tipos-movimiento`). */

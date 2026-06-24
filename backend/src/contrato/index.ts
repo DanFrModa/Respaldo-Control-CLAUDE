@@ -850,6 +850,20 @@ export {
   type AlertasRcConteo,
 } from './esquemas/ruta-critica-bandeja.js';
 
+// ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ──
+export {
+  ORDENES_CONCENTRADO,
+  esquemaConcentradoQuery,
+  esquemaConcentradoProceso,
+  esquemaConcentradoFila,
+  esquemaConcentradoPagina,
+  type OrdenConcentradoClave,
+  type ConcentradoQuery,
+  type ConcentradoProceso,
+  type ConcentradoFila,
+  type ConcentradoPagina,
+} from './esquemas/ruta-critica-concentrado.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

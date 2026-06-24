@@ -354,7 +354,36 @@
 
 ---
 
-## F5-E7 · Concentrado planeado vs real + exportación + ETL del módulo + documentación y cierre de fase — ⬜ pendiente
+## F5-E7 · Concentrado planeado vs real + exportación + ETL del módulo + documentación y cierre de fase — ✅ (23-jun-2026)
+
+> **Nota de cierre (23-jun-2026; reviewer independiente APROBADO; pend. verif. Gabriel en `prueba`).**
+> Dos coders en paralelo (piezas sin solape) + 1 reviewer; la doc del módulo la integró el lead.
+> **Pieza A — Concentrado:** `dominio/ruta-critica/concentrado.ts` (agregación **SQL crudo
+> parametrizado, sin vista → SIN migración**; pivote en SQL, **nunca en el cliente**; paginada,
+> filtrable por cliente/proceso/responsable, ordenable por retraso/cliente/fecha; semáforo/atraso
+> reusando la lógica pura de E4, ADR-0013) + endpoints `GET /concentrado` y `/concentrado/excel`
+> (**reusan `rc.ruta-ver` → deploy SIN `SEED_ON_START`**) + export Excel (`exceljs`, decisión (h)) +
+> `ConcentradoPagina.tsx` (teal responsive, reusa `Semaforo`) + test de **volumen** (200 órd × 26
+> procesos paginado <4s). **Pieza B — ETL del módulo** (`migracion/ruta-critica/` + orquestador
+> `etl-ruta-critica.ts` + `cuadre-f5.ts`, idempotente/por-lotes/CP850/vía dominio modo-migración
+> `dominio/ruta-critica/migracion.ts`): catálogos (verifica los 26 procesos de E1, crea
+> familias/artículos/factores/telas/aplicaciones faltantes), **materializa las 54 `ProcesoDefRol`
+> vigentes** (14 huérfanas LISTADAS), plantillas (156 tiempos), `UsuarioRol` (23 con tipo), ruta
+> histórica (181 `RC` con `capturadoPor`/`capturadoEn` para el KPI D11) + checklist IP3/IP4, estado RC
+> de órdenes y `ColchonCostura`. **SIN migración / SIN permisos / SIN seed nuevos** (carga en tablas de
+> E1–E6; el ETL se corre a mano post-deploy: `npx tsx --env-file=.env migracion/etl-ruta-critica.ts`).
+> **Hallazgos del reviewer:** 1 BLOQUEANTE — el SQL crudo del concentrado usaba nombres de tabla en
+> singular (`"orden"`/`"cliente"`/`"modelo"`) en vez de los plurales reales (`@@map` →
+> `"ordenes"`/`"clientes"`/`"modelos"`); habría tronado contra la BD real (lo tapaba que vive en un
+> `*.int.test.ts`, solo CI). **Corregido y re-verificado**; el reviewer aprobó el resto. **Ajustes a la
+> ficha (realidad de los CSV):** el checklist histórico son **9 ítems** (IP3 6 + IP4 3 columnas
+> reales), no 12. **Dependencia cruzada con F9:** los 137 usuarios del viejo no están migrados a v2
+> todavía (eso es F9); el ETL no crea usuarios — casa por login contra usuarios v2 existentes y **lista
+> los pendientes "hasta F9"** (idempotente → re-correr tras F9 los materializa). **Deja abierto:** D8
+> (auditoría como proceso de la RC → F6; los procesos #16/#20/#23 quedan con `tipoEvento='auditoria'`),
+> D11 (tableros KPI → F7 sobre `RutaOrden`) y notificaciones push/correo → F7 (el badge de E5 es el
+> mínimo viable). Pendiente operativo: fechas propias de FR para el calendario (decisión (a), no
+> bloquea). Módulo documentado en `docs/modulos/ruta-critica.md`. **F5 cerrada (7/7).**
 
 **Objetivo:** La vista gerencial que hoy es la pantalla más pesada del sistema viejo (RC_ConcentradoDif), rediseñada con agregación en servidor; la exportación a Excel; el ETL completo e idempotente de los catálogos, las asignaciones usuario↔rol funcional y el histórico RC; la doc del módulo; y la verificación funcional de TODA la fase contra el criterio de salida en el ambiente de prueba.
 

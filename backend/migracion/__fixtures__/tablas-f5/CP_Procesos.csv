@@ -1,0 +1,27 @@
+"IdCP_Procesos","NumProceso","AntecesorRef","Proceso","TipoProceso","Critico","UltimoProceso","Variable","NoLlevaProceso","EsResurtido"
+1,1,0,"REVISI‡N ORDEN DE PRODUCCI‡N ",,0,0,0,0,0
+2,2,1,"Ficha de desarrollo",,0,0,0,0,1
+3,3,2,"Programaci¢n ",,0,0,0,0,0
+4,4,1,"Autorizaci¢n de fit",,0,0,0,0,1
+5,5,1,"Autorizaci¢n de Arte (Artes Autorizados, Ficha Tecnica y Posicion)","AP",0,0,0,1,1
+6,6,2,"Orden de compra tela",,0,0,0,0,0
+7,7,2,"Autorizaci¢n tono de tela",,0,0,0,0,0
+8,8,2,"Autorizaci¢n de av°os ",,0,0,0,0,1
+9,9,1,"Ficha tÇcnica (Incluye incformaci¢n de av°os)","M",0,0,0,0,1
+10,10,4,"Contra muestra  autorizada de maquila (Maquilero)","F",0,0,0,0,0
+11,11,8,"‡rden de compra de habiltaciones e informaci¢n de av°os a Control",,0,0,0,0,0
+12,12,11,"Surtido de av°os",,0,0,0,0,0
+13,13,6,"Recepci¢n de tela","T",0,0,0,0,0
+14,14,13,"Autorizaci¢n de muestras a laboratorio",,0,0,0,0,1
+15,15,13,"Entrega de moldes auditados a corte",,0,0,0,0,1
+16,16,15,"Auditor°a de Corte",,0,0,0,0,0
+17,17,16,"Corte","CO",0,0,0,0,0
+18,18,17,"Env°o a procesos ","EP",0,0,0,1,0
+19,19,18,"Recepci¢n  Procesos","RP",0,0,0,1,0
+20,20,18,"Auditoria de Calidad Inicio Proceso o estampado","CP",0,0,0,1,0
+21,21,17,"Env°o a confecci¢n (1500 prendas) por maquilero","EC",0,0,0,0,0
+22,22,21,"Recepci¢n de confecci¢n (1500 prendas) por maquilero","C",0,0,0,0,0
+23,23,22,"Auditoria de Calidad Interna",,0,0,0,0,0
+24,24,23,"Empaque ",,0,0,0,0,0
+25,25,24,"Entrega en CDIS",,0,0,0,0,0
+26,26,25,"Aceptaci¢n de Cliente",,0,1,0,0,0
