@@ -22,7 +22,7 @@ test.describe('CRUD de Defectos (Calidad, F6-E1)', () => {
       .first()
       .getByRole('link', { name: 'Calidad' })
       .click();
-    await page.getByRole('link', { name: /Catálogo de defectos/i }).click();
+    await page.getByTestId('calidad-defectos').click();
     await expect(page.getByRole('heading', { name: 'Catálogo de defectos' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-defecto');
