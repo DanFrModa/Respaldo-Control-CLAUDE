@@ -30,6 +30,10 @@ import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
+import { rutasBitacora } from './api/admin/bitacora.rutas.js';
+import { rutasDefectos } from './api/calidad/defectos.rutas.js';
+import { rutasPlanesAql } from './api/calidad/planes-aql.rutas.js';
+import { rutasTiposProducto } from './api/calidad/tipos-producto.rutas.js';
 import { rutasBandejaRc } from './api/ruta-critica/bandeja.rutas.js';
 import { rutasConcentradoRc } from './api/ruta-critica/concentrado.rutas.js';
 import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
@@ -219,10 +223,19 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // crudo, sin pivoteo en el cliente), paginado/filtrable/ordenable, + export a Excel del mismo
   // resultado. Solo lectura; RBAC rc.ruta-ver (reusado); A9 por empresa activa.
   await app.register(rutasConcentradoRc, { prefix: '/api' });
+  // CALIDAD (Módulo 8, F6-E1) — base configurable: catálogo de defectos enriquecido (severidad/
+  // categoría/etiqueta por tipo), tipos de producto (clasificación de modelos) y el motor de planes
+  // de muestreo AQL como DATOS (CRUD + resolución lote+nivel → muestra/límites). RBAC por ruta
+  // (calidad.ver consulta / calidad.administrar-catalogo muta).
+  await app.register(rutasDefectos, { prefix: '/api' });
+  await app.register(rutasTiposProducto, { prefix: '/api' });
+  await app.register(rutasPlanesAql, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });
   await app.register(rutasRoles, { prefix: '/api' });
+  // Consulta de BITÁCORA (F6-E1, transversal) — lectura del log de auditoría A7 (admin.ver-bitacora).
+  await app.register(rutasBitacora, { prefix: '/api' });
 
   return app;
 }

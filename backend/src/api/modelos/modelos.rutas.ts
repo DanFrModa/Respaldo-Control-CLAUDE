@@ -91,6 +91,8 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     curvaTalla: modelo.curvaTalla?.nombre ?? null,
     idGenero: modelo.idGenero,
     genero: modelo.genero?.nombre ?? null,
+    idTipoProducto: modelo.idTipoProducto,
+    tipoProducto: modelo.tipoProducto?.nombre ?? null,
     cantidadFotos: modelo._count.fotos,
     // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
     urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,

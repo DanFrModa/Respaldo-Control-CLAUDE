@@ -63,6 +63,8 @@ function modelo(id: number, codigo: string, urlFoto: string | null = null): Mode
     genero: null,
     cantidadFotos: urlFoto === null ? 0 : 1,
     urlFotoPrincipal: urlFoto,
+    idTipoProducto: null,
+    tipoProducto: null,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,

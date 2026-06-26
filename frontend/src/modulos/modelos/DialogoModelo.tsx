@@ -12,6 +12,7 @@ import {
   type ModeloCrear,
   type ModeloEditar,
 } from '@/api/modelos';
+import { useTiposProductoActivos } from '@/api/calidad';
 import { useCurvas } from '@/api/tallas';
 import { useTemporadas } from '@/api/temporadas';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,7 @@ const VALORES_INICIALES: DatosModeloFormulario = {
   idTemporada: '',
   idCurvaTalla: '',
   idGenero: '',
+  idTipoProducto: '',
 };
 
 /** Lee un id de FK del modelo como texto para el `<select>` (`null` -> ''). */
@@ -83,6 +85,10 @@ function aCuerpoCrear(datos: DatosModeloFormulario): ModeloCrear {
   if (idGenero !== null) {
     cuerpo.idGenero = idGenero;
   }
+  const idTipoProducto = idSelectorACuerpo(datos.idTipoProducto);
+  if (idTipoProducto !== null) {
+    cuerpo.idTipoProducto = idTipoProducto;
+  }
   return cuerpo;
 }
 
@@ -99,6 +105,7 @@ function aCuerpoEditar(datos: DatosModeloFormulario): ModeloEditar {
     idTemporada: idSelectorACuerpo(datos.idTemporada),
     idCurvaTalla: idSelectorACuerpo(datos.idCurvaTalla),
     idGenero: idSelectorACuerpo(datos.idGenero),
+    idTipoProducto: idSelectorACuerpo(datos.idTipoProducto),
   };
 }
 
@@ -126,6 +133,7 @@ export function DialogoModelo({
   const temporadas = useTemporadas(QUERY_SELECTOR);
   const curvas = useCurvas(QUERY_SELECTOR);
   const generos = useGeneros();
+  const tiposProducto = useTiposProductoActivos();
 
   const formulario = useForm<DatosModeloFormulario>({
     resolver: zodResolver(esquemaModeloFormulario),
@@ -143,6 +151,7 @@ export function DialogoModelo({
               idTemporada: idTexto(modelo.idTemporada),
               idCurvaTalla: idTexto(modelo.idCurvaTalla),
               idGenero: idTexto(modelo.idGenero),
+              idTipoProducto: idTexto(modelo.idTipoProducto),
             }
           : VALORES_INICIALES,
       );
@@ -266,6 +275,22 @@ export function DialogoModelo({
                   {(generos.data ?? []).map((g) => (
                     <option key={g.id} value={String(g.id)}>
                       {g.nombre}
+                    </option>
+                  ))}
+                </SelectNativo>
+              </Field>
+
+              <Field>
+                <FieldLabel htmlFor="modelo-tipo-producto">Tipo de producto</FieldLabel>
+                <SelectNativo
+                  id="modelo-tipo-producto"
+                  disabled={guardando}
+                  {...registrar('idTipoProducto')}
+                >
+                  <option value="">Sin tipo de producto</option>
+                  {(tiposProducto.data?.datos ?? []).map((t) => (
+                    <option key={t.id} value={String(t.id)}>
+                      {t.nombre}
                     </option>
                   ))}
                 </SelectNativo>

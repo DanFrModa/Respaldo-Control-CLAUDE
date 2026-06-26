@@ -703,3 +703,147 @@ export const esquemaProcesoRcFormulario = z.object({
 
 /** Datos del formulario de proceso de la RC. */
 export type DatosProcesoRcFormulario = z.infer<typeof esquemaProcesoRcFormulario>;
+
+// ── Calidad: defectos, tipos de producto y planes AQL (F6-E1) ─────────────────
+
+/** Severidades de defecto (espejo del backend). */
+export const SEVERIDADES_DEFECTO = ['critico', 'mayor', 'menor'] as const;
+/** Clave de severidad de defecto. */
+export type SeveridadDefectoClave = (typeof SEVERIDADES_DEFECTO)[number];
+/** Etiquetas para UI de cada severidad. */
+export const ETIQUETAS_SEVERIDAD_DEFECTO: Record<SeveridadDefectoClave, string> = {
+  critico: 'Crítico',
+  mayor: 'Mayor',
+  menor: 'Menor',
+};
+
+/** Niveles AQL disponibles (espejo del backend). */
+export const NIVELES_AQL = [1, 2.5, 10] as const;
+/** Clave de nivel AQL. */
+export type NivelAqlClave = (typeof NIVELES_AQL)[number];
+
+/** Etiquetas de la accion de bitacora (espejo del backend, A7). */
+export const ETIQUETAS_ACCION_BITACORA: Record<string, string> = {
+  CREAR: 'Creó',
+  MODIFICAR: 'Modificó',
+  DESACTIVAR: 'Desactivó',
+  CANCELAR: 'Canceló',
+  OTRO: 'Otro',
+};
+
+/**
+ * Captura del formulario de defecto (alta y edicion comparten forma). Los campos
+ * obligatorios son `clave`, `descripcion`, `nivelAQL`, `severidad` y `aplicaGeneral`;
+ * el resto son opcionales. Los `tiposProducto` (ids) se capturan como array de
+ * numeros aparte (el backend los requiere cuando `aplicaGeneral` es `false`).
+ * Validacion solo de UX: el servidor re-valida y es la autoridad (A1).
+ */
+export const esquemaDefectoFormulario = z.object({
+  clave: z
+    .string({ error: 'La clave es obligatoria' })
+    .trim()
+    .min(1, { error: 'La clave es obligatoria' })
+    .max(50, { error: 'La clave no puede tener más de 50 caracteres' }),
+  descripcion: z
+    .string({ error: 'La descripción es obligatoria' })
+    .trim()
+    .min(1, { error: 'La descripción es obligatoria' })
+    .max(500, { error: 'La descripción no puede tener más de 500 caracteres' }),
+  pag: z
+    .string()
+    .trim()
+    .max(50, { error: 'La página/referencia no puede tener más de 50 caracteres' }),
+  nivelAQL: z.enum(['1', '2.5', '10'], {
+    error: 'El nivel AQL debe ser 1, 2.5 o 10',
+  }),
+  favorito: z.boolean(),
+  categoria: z
+    .string()
+    .trim()
+    .max(100, { error: 'La categoría no puede tener más de 100 caracteres' }),
+  severidad: z.enum(SEVERIDADES_DEFECTO, {
+    error: 'La severidad debe ser crítico, mayor o menor',
+  }),
+  aplicaGeneral: z.boolean(),
+  tiposProducto: z.array(z.number()),
+});
+
+/** Datos del formulario de defecto. */
+export type DatosDefectoFormulario = z.infer<typeof esquemaDefectoFormulario>;
+
+/**
+ * Captura del formulario de tipo de producto (solo el nombre). Simple CRUD.
+ * Validacion solo de UX: el backend re-valida y es la autoridad (A1).
+ */
+export const esquemaTipoProductoFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(100, { error: 'El nombre no puede tener más de 100 caracteres' }),
+});
+
+/** Datos del formulario de tipo de producto. */
+export type DatosTipoProductoFormulario = z.infer<typeof esquemaTipoProductoFormulario>;
+
+/**
+ * Captura de un limite de un renglon de plan AQL (nivel AQL + Ac + Re).
+ * Cada renglon puede tener 1-N limites (uno por nivel AQL).
+ */
+export const esquemaLimiteAqlFormulario = z.object({
+  nivelAQL: z.enum(['1', '2.5', '10'], { error: 'El nivel AQL debe ser 1, 2.5 o 10' }),
+  aceptar: z
+    .string({ error: 'El número de aceptación es obligatorio' })
+    .refine((v) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 0, {
+      error: 'El Ac debe ser un entero ≥ 0',
+    }),
+  rechazar: z
+    .string({ error: 'El número de rechazo es obligatorio' })
+    .refine((v) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 1, {
+      error: 'El Re debe ser un entero ≥ 1',
+    }),
+});
+
+/** Datos de un limite de renglon AQL en el formulario. */
+export type DatosLimiteAqlFormulario = z.infer<typeof esquemaLimiteAqlFormulario>;
+
+/**
+ * Captura de un renglon del plan AQL (rango de lote + tamano de muestra + limites).
+ * `loteMin` es obligatorio; `loteMax` es opcional (nulo = sin tope, el ultimo renglon).
+ * Los limites son un array con al menos un elemento (uno por nivel AQL).
+ * Validacion solo de UX (A1).
+ */
+export const esquemaRenglonAqlFormulario = z.object({
+  loteMin: z
+    .string({ error: 'El lote mínimo es obligatorio' })
+    .refine((v) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 1, {
+      error: 'El lote mínimo debe ser un entero ≥ 1',
+    }),
+  loteMax: z.string(),
+  tamanoMuestra: z
+    .string({ error: 'El tamaño de muestra es obligatorio' })
+    .refine((v) => v.trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= 1, {
+      error: 'El tamaño de muestra debe ser un entero ≥ 1',
+    }),
+  limites: z.array(esquemaLimiteAqlFormulario),
+});
+
+/** Datos de un renglon del plan AQL en el formulario. */
+export type DatosRenglonAqlFormulario = z.infer<typeof esquemaRenglonAqlFormulario>;
+
+/**
+ * Captura del formulario de plan AQL (alta y edicion comparten forma). Solo el
+ * `nombre` va en el schema de texto; los `renglones` se gestionan con
+ * `useFieldArray` y tienen su propio schema. Validacion solo de UX (A1).
+ */
+export const esquemaPlanAqlFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(200, { error: 'El nombre no puede tener más de 200 caracteres' }),
+  renglones: z.array(esquemaRenglonAqlFormulario),
+});
+
+/** Datos del formulario de plan AQL. */
+export type DatosPlanAqlFormulario = z.infer<typeof esquemaPlanAqlFormulario>;

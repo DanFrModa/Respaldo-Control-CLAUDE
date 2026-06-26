@@ -864,6 +864,67 @@ export {
   type ConcentradoPagina,
 } from './esquemas/ruta-critica-concentrado.js';
 
+// ── Calidad: base configurable — defectos, tipos de producto y planes AQL (Módulo 8, F6-E1) ──
+export {
+  SEVERIDADES_DEFECTO,
+  ETIQUETAS_SEVERIDAD_DEFECTO,
+  NIVELES_AQL,
+  esquemaTipoProductoCrear,
+  esquemaTipoProductoEditar,
+  esquemaTipoProductoSalida,
+  esquemaTiposProductoQuery,
+  esquemaTiposProductoPagina,
+  esquemaDefectoCrear,
+  esquemaDefectoEditar,
+  esquemaDefectoTipoSalida,
+  esquemaDefectoSalida,
+  esquemaDefectosQuery,
+  esquemaDefectosPagina,
+  esquemaPlanLimiteEntrada,
+  esquemaPlanRenglonEntrada,
+  esquemaPlanAqlCrear,
+  esquemaPlanAqlEditar,
+  esquemaPlanLimiteSalida,
+  esquemaPlanRenglonSalida,
+  esquemaPlanAqlSalida,
+  esquemaPlanesAqlQuery,
+  esquemaPlanesAqlPagina,
+  esquemaResolverPlanQuery,
+  esquemaResolverPlanSalida,
+  type SeveridadDefectoClave,
+  type NivelAqlClave,
+  type DatosTipoProductoCrear,
+  type DatosTipoProductoEditar,
+  type TipoProductoSalida,
+  type TiposProductoQuery,
+  type TiposProductoPagina,
+  type DatosDefectoCrear,
+  type DatosDefectoEditar,
+  type DefectoSalida,
+  type DefectosQuery,
+  type DefectosPagina,
+  type DatosPlanAqlCrear,
+  type DatosPlanAqlEditar,
+  type PlanAqlSalida,
+  type PlanesAqlQuery,
+  type PlanesAqlPagina,
+  type ResolverPlanQuery,
+  type ResolverPlanSalida,
+} from './esquemas/calidad.js';
+
+// ── Bitácora: consulta del log de auditoría A7 (transversal, F6-E1) ──
+export {
+  ACCIONES_BITACORA,
+  ETIQUETAS_ACCION_BITACORA,
+  esquemaBitacoraSalida,
+  esquemaBitacoraQuery,
+  esquemaBitacoraPagina,
+  type AccionBitacoraClave,
+  type BitacoraSalida,
+  type BitacoraQuery,
+  type BitacoraPagina,
+} from './esquemas/bitacora.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

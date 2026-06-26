@@ -903,3 +903,74 @@ export type ExistenciaMaquileroFila = ExistenciaMaquilero['filas'][number];
 export type ExistenciaMaquileroQuery = NonNullable<
   paths['/api/produccion/existencias-maquilero']['get']['parameters']['query']
 >;
+
+// ── Calidad (F6-E1): defectos, tipos de producto, planes AQL y bitácora ──────
+
+/** Página de defectos (`GET /api/calidad/defectos`). */
+export type DefectosPagina =
+  paths['/api/calidad/defectos']['get']['responses']['200']['content']['application/json'];
+/** Un defecto tal como lo devuelve el API (con sus tipos de producto ligados). */
+export type Defecto = DefectosPagina['datos'][number];
+/** Severidad informativa de un defecto. */
+export type SeveridadDefecto = Defecto['severidad'];
+/** Parámetros de consulta del listado de defectos (querystring). */
+export type DefectosQuery = NonNullable<
+  paths['/api/calidad/defectos']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de defecto (`POST /api/calidad/defectos`). */
+export type DefectoCrear =
+  paths['/api/calidad/defectos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de defecto (`PATCH /api/calidad/defectos/{id}`). */
+export type DefectoEditar =
+  paths['/api/calidad/defectos/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Página de tipos de producto (`GET /api/calidad/tipos-producto`). */
+export type TiposProductoPagina =
+  paths['/api/calidad/tipos-producto']['get']['responses']['200']['content']['application/json'];
+/** Un tipo de producto tal como lo devuelve el API. */
+export type TipoProducto = TiposProductoPagina['datos'][number];
+/** Parámetros de consulta del listado de tipos de producto (querystring). */
+export type TiposProductoQuery = NonNullable<
+  paths['/api/calidad/tipos-producto']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de tipo de producto (`POST /api/calidad/tipos-producto`). */
+export type TipoProductoCrear =
+  paths['/api/calidad/tipos-producto']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de tipo de producto (`PATCH /api/calidad/tipos-producto/{id}`). */
+export type TipoProductoEditar =
+  paths['/api/calidad/tipos-producto/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Página de planes AQL (`GET /api/calidad/planes-aql`). */
+export type PlanesAqlPagina =
+  paths['/api/calidad/planes-aql']['get']['responses']['200']['content']['application/json'];
+/** Un plan AQL tal como lo devuelve el API (con sus renglones y límites). */
+export type PlanAql = PlanesAqlPagina['datos'][number];
+/** Un renglón del plan AQL (rango de lote → muestra + límites). */
+export type PlanAqlRenglon = PlanAql['renglones'][number];
+/** Parámetros de consulta del listado de planes AQL (querystring). */
+export type PlanesAqlQuery = NonNullable<
+  paths['/api/calidad/planes-aql']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de plan AQL (`POST /api/calidad/planes-aql`). */
+export type PlanAqlCrear =
+  paths['/api/calidad/planes-aql']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de plan AQL (`PATCH /api/calidad/planes-aql/{id}`). */
+export type PlanAqlEditar =
+  paths['/api/calidad/planes-aql/{id}']['patch']['requestBody']['content']['application/json'];
+/** Resultado de la resolución del plan (`GET /api/calidad/planes-aql/resolver`). */
+export type ResolverPlan =
+  paths['/api/calidad/planes-aql/resolver']['get']['responses']['200']['content']['application/json'];
+/** Parámetros de la resolución del plan (querystring). */
+export type ResolverPlanQuery = NonNullable<
+  paths['/api/calidad/planes-aql/resolver']['get']['parameters']['query']
+>;
+
+/** Página de bitácora (`GET /api/admin/bitacora`). */
+export type BitacoraPagina =
+  paths['/api/admin/bitacora']['get']['responses']['200']['content']['application/json'];
+/** Un registro de bitácora tal como lo devuelve el API. */
+export type RegistroBitacora = BitacoraPagina['datos'][number];
+/** Acción registrada en la bitácora. */
+export type AccionBitacora = RegistroBitacora['accion'];
+/** Parámetros de consulta del listado de bitácora (querystring). */
+export type BitacoraQuery = NonNullable<paths['/api/admin/bitacora']['get']['parameters']['query']>;

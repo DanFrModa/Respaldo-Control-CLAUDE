@@ -19,6 +19,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { sembrarCalidad } from './seed-calidad.js';
 import { sembrarRutaCritica } from './seed-ruta-critica.js';
 import { sembrarRutaCriticaPlantillas } from './seed-ruta-critica-plantillas.js';
 
@@ -151,6 +152,10 @@ function definirRoles(): {
     // AdministracionDireccion (mismo reparto que el resto de catálogos). El `ver` y los
     // permisos operativos de producción/inventario cascadean (siguen en el conjunto).
     'tipos-proceso.administrar',
+    // F6-E1 — catálogo de Calidad (defectos/tipos de producto/planes AQL): administrar solo
+    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos). El
+    // `calidad.ver` y la consulta de bitácora cascadean (siguen en el conjunto del directivo).
+    'calidad.administrar-catalogo',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
@@ -649,6 +654,10 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // 2 plantillas reales (1/6 y 6/6) con su encadenamiento propio + calendario L–V y festivos MX
   // de la empresa favorita. Después de F5-E1 (necesita los procesos) y de la empresa favorita.
   await sembrarRutaCriticaPlantillas(prisma);
+  // Calidad (F6-E1): tipos de producto base (lista corta editable, decisión (d)) + UN plan de
+  // muestreo AQL default (ISO 2859 nivel general II, AQL 1.0/2.5/10) como DATOS. Idempotente; no
+  // siembra defectos (los carga el ETL de F6-E6).
+  await sembrarCalidad(prisma);
 }
 
 // Punto de entrada al ejecutarse como script (`prisma db seed` → `tsx prisma/seed.ts`).
