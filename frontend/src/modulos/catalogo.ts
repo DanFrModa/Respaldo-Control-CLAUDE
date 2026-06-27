@@ -589,6 +589,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     icono: 'medalla',
     permisos: ['calidad.ver'],
   },
+  // Sub-vista de Calidad (F6-E2): ALTA de auditoría (la operación de piso). Cuelga del módulo
+  // Calidad; la gobierna `calidad.generar-auditorias` (la captura de resultados se llega desde el
+  // alta y exige `calidad.actualizar-auditorias`, que el backend re-verifica, A1).
+  {
+    clave: 'calidad-auditorias',
+    titulo: 'Auditorías de calidad',
+    descripcion: 'Inspecciona una muestra de una orden, captura fallas y resuelve aprobar/reprobar',
+    ruta: '/calidad/auditorias/nueva',
+    icono: 'portapapeles',
+    permisos: ['calidad.generar-auditorias'],
+    subVista: true,
+  },
   // Sub-vistas de Calidad (F6-E1): catálogos base del sistema AQL. Cuelgan del módulo Calidad y
   // las gobierna `calidad.ver` (consulta) / `calidad.administrar-catalogo` (escritura; el backend
   // re-verifica, A1).

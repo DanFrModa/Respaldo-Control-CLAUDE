@@ -89,6 +89,8 @@ model Empresa {
   calendario        CalendarioEmpresa?
   /// Días festivos de la RC de esta empresa (F5-E2). Restrict.
   diasFestivos      DiaFestivo[]
+  /// Auditorías de calidad de esta empresa (F6-E2, A9 — folio por empresa). Restrict.
+  auditorias        Auditoria[]
 
   @@map("empresas")
 }
@@ -565,6 +567,8 @@ model Proveedor {
   requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
   /// Notas de salida donde este proveedor es el MAQUILERO destino del envío (F4-E5). Restrict.
   notasSalida             NotaSalida[]
+  /// Auditorías de calidad donde este proveedor es el MAQUILERO auditado (F6-E2). Restrict.
+  auditorias              Auditoria[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1335,14 +1339,14 @@ model Modelo {
   maquilaBase Decimal? @map("maquila_base") @db.Decimal(12, 2)
 
   /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
-  idTemporada  Int?        @map("id_temporada")
-  temporada    Temporada?  @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+  idTemporada    Int?          @map("id_temporada")
+  temporada      Temporada?    @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
   /// Curva de tallas del modelo (D4, opcional). Restrict (igual que temporada).
-  idCurvaTalla Int?        @map("id_curva_talla")
-  curvaTalla   CurvaTalla? @relation(fields: [idCurvaTalla], references: [id], onDelete: Restrict)
+  idCurvaTalla   Int?          @map("id_curva_talla")
+  curvaTalla     CurvaTalla?   @relation(fields: [idCurvaTalla], references: [id], onDelete: Restrict)
   /// Género (opcional; se poblará en el ETL E7). Restrict (igual que temporada).
-  idGenero     Int?        @map("id_genero")
-  genero       Genero?     @relation(fields: [idGenero], references: [id], onDelete: Restrict)
+  idGenero       Int?          @map("id_genero")
+  genero         Genero?       @relation(fields: [idGenero], references: [id], onDelete: Restrict)
   /// Tipo de producto para Calidad (F6-E1, decisión (d)): la auditoría hereda este tipo del
   /// modelo para filtrar los defectos aplicables. NULLABLE y sin default (no rompe los modelos
   /// existentes; se asigna desde la pantalla de Modelos). Restrict (igual que temporada/género).
@@ -1901,6 +1905,8 @@ model Orden {
   requerimientos    RequerimientoOrden[]
   /// Renglones de nota de salida (avíos/telas enviados a maquila) ligados a esta orden (F4-E5). Restrict.
   notaSalidaLineas  NotaSalidaLinea[]
+  /// Auditorías de calidad de esta orden (F6-E2). Restrict (una orden con auditorías no se borra).
+  auditorias        Auditoria[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3676,28 +3682,30 @@ model TipoProducto {
 /// (d)). GLOBAL (sin idEmpresa — catálogo maestro como F1); borrado suave (un defecto con
 /// auditorías históricas NO se borra físico, solo se inactiva); auditoría A7.
 model DefectoCatalogo {
-  id          Int     @id @default(autoincrement())
+  id            Int              @id @default(autoincrement())
   /// Clave de negocio del defecto (ex `CC_Catalogo.Clave`). Única global.
-  clave       String  @unique
-  descripcion String
+  clave         String           @unique
+  descripcion   String
   /// Página/referencia del manual de calidad donde se ilustra (ex `Pag`). Opcional.
-  pag         String?
+  pag           String?
   /// Nivel AQL al que pertenece el defecto (1.0 / 2.5 / 10). Numérico para agrupar por nivel en E2.
-  nivelAQL    Decimal @map("nivel_aql") @db.Decimal(4, 2)
+  nivelAQL      Decimal          @map("nivel_aql") @db.Decimal(4, 2)
   /// Se pre-carga en toda auditoría nueva (ex `CC_Catalogo.Favorito` — hoy 33 favoritos).
-  favorito    Boolean @default(false)
+  favorito      Boolean          @default(false)
   /// Categoría libre para agrupar defectos (doc 09 §5.4). Opcional.
-  categoria   String?
+  categoria     String?
   /// Severidad informativa (NO entra en el veredicto, decisión (a)).
-  severidad   SeveridadDefecto @default(menor)
+  severidad     SeveridadDefecto @default(menor)
   /// ¿Aplica a TODOS los tipos de producto? (decisión (d)). Si es `true`, las ligas de
   /// `DefectoTipoProducto` se ignoran (el defecto es universal).
-  aplicaGeneral Boolean @default(false) @map("aplica_general")
-  activo        Boolean @default(true)
+  aplicaGeneral Boolean          @default(false) @map("aplica_general")
+  activo        Boolean          @default(true)
 
   /// Tipos de producto a los que aplica este defecto (M:N por `DefectoTipoProducto`). Cuando
   /// `aplicaGeneral=true` estas ligas no importan (aplica a todos).
-  tiposLigados DefectoTipoProducto[]
+  tiposLigados      DefectoTipoProducto[]
+  /// Renglones de auditoría que cuentan fallas de este defecto (F6-E2). Restrict (en uso ⇒ se desactiva).
+  auditoriaDefectos AuditoriaDefecto[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3796,4 +3804,138 @@ model PlanMuestreoLimite {
 
   @@unique([idRenglon, nivelAQL])
   @@map("plan_muestreo_limite")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AUDITORÍAS DE CALIDAD (F6-E2) — núcleo transaccional del Control de calidad. doc
+// funcional `09-Control-de-Calidad.md` §1/§2/§4; DECISIONES.md §F6 (a)/(b). Una
+// auditoría inspecciona una MUESTRA de prendas de una orden (recibidas de un
+// maquilero), cuenta las fallas por defecto y deja un RESULTADO que el auditor
+// decide A MANO (decisión (a) — el cálculo por nivel AQL es solo sugerencia
+// informativa, NO vinculante; la severidad del defecto NO entra en el veredicto).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Resultado de una auditoría de calidad (doc 09 §2). Lo decide el auditor A MANO
+/// (decisión (a)); el cálculo por nivel AQL del plan es solo SUGERENCIA. `no_calificado`
+/// es el estado inicial (capturada sin veredicto). Una auditoría FINAL `aprobado`
+/// auto-completa el proceso de RC "auditoría" de la orden (F5/F6 integración).
+enum ResultadoAuditoria {
+  aprobado
+  reprobado
+  no_calificado
+
+  @@map("resultado_auditoria")
+}
+
+/// Tipo de auditoría (doc 09 §1: en piso durante la producción, o final al recibir).
+/// `no_definida` para los casos viejos/sin clasificar. Solo una auditoría `final`
+/// `aprobado` gatilla el auto-avance de la RC (la de piso es un control intermedio).
+enum TipoAuditoria {
+  en_piso
+  final
+  no_definida
+
+  @@map("tipo_auditoria")
+}
+
+/// Auditoría de calidad de una orden (F6-E2 — ex `CC_Auditorias`, doc 09 §2). Folio
+/// `numAuditoria` por SECUENCIA ATÓMICA por empresa (A3 — reemplaza el `Max()+1` del
+/// viejo `AumentarNumAudit`). `idMaquilero` es el `Proveedor` con rol de maquila al que
+/// se le audita la prenda (NO existe tabla Maquilero — fusión de terceros D12/R15); se
+/// PROPONE desde las entregas reales de la orden y se puede ELEGIR. Doble responsable:
+/// `elaboroPorId` (quien la dio de alta) + `auditorPorId` (quien la auditó) — referencias
+/// de usuario SIN FK físico, mismo criterio que la Bitácora (ADR-0005). `tamanoMuestra`
+/// se propone del plan AQL default según la cantidad de la orden (decisión (b), vinculante)
+/// y solo se cambia a mano con permiso (`muestraManual`). `resultado` se persiste MANUAL
+/// (decisión (a)). Cancelación = borrado SUAVE (la auditoría nunca se borra; A7). A9.
+model Auditoria {
+  id           Int        @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "auditoria"; viejo: `CC_Auditorias.NumAudit`).
+  numAuditoria BigInt     @map("num_auditoria")
+  /// Empresa dueña de la auditoría y de su numeración (A9).
+  idEmpresa    Int        @map("id_empresa")
+  empresa      Empresa    @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Orden auditada (doc 09 §2 — `CC_Auditorias.IdOrdenes`). Restrict.
+  idOrden      Int        @map("id_orden")
+  orden        Orden      @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+  /// Maquilero auditado (Proveedor con rol maquila; D12/R15). Propuesto de las entregas
+  /// reales de la orden. Nullable (puede no haberse asignado). Restrict.
+  idMaquilero  Int?       @map("id_maquilero")
+  maquilero    Proveedor? @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Fecha en que se ELABORÓ la auditoría (alta). `@db.Date`.
+  fechaElaboracion DateTime @map("fecha_elaboracion") @db.Date
+  /// Fecha en que se AUDITÓ físicamente la prenda. `@db.Date`. Es la fecha que se escribe
+  /// como `fechaReal` del proceso de RC si la auditoría final aprobada lo auto-completa.
+  fechaAuditoria   DateTime @map("fecha_auditoria") @db.Date
+
+  /// Quién dio de alta la auditoría (usuario de sesión). Sin FK físico (ADR-0005).
+  elaboroPorId String? @map("elaboro_por_id")
+  /// Quién auditó (responsable de calidad). Sin FK físico (ADR-0005).
+  auditorPorId String? @map("auditor_por_id")
+
+  /// Tamaño de muestra inspeccionado. Se PROPONE del plan AQL default por la cantidad de la
+  /// orden (decisión (b)); cambiarlo a mano exige permiso y enciende `muestraManual`.
+  tamanoMuestra Int     @map("tamano_muestra")
+  /// `true` si el `tamanoMuestra` se sobre-escribió a mano (decisión (b) — gate por permiso).
+  muestraManual Boolean @default(false) @map("muestra_manual")
+
+  /// Veredicto MANUAL del auditor (decisión (a)). `no_calificado` mientras no se captura.
+  resultado       ResultadoAuditoria @default(no_calificado)
+  /// Siempre `true` en v2: el resultado lo decide el humano (la sugerencia AQL NO es vinculante).
+  /// Se conserva como bandera para el ETL del histórico y para KPIs de F7.
+  resultadoManual Boolean            @default(true) @map("resultado_manual")
+  /// Tipo de auditoría (en piso / final / no definida). Solo `final` + `aprobado` gatilla la RC.
+  tipoAuditoria   TipoAuditoria      @default(no_definida) @map("tipo_auditoria")
+
+  /// Observaciones del auditor (justifica el veredicto manual). Nullable.
+  observaciones String? @db.Text
+
+  /// Cancelación SUAVE (borrado lógico, A7): la auditoría nunca se borra ni se edita destructivo.
+  /// La MODIFICACIÓN/cancelación es F6-E3; aquí solo el esquema. NULL = viva.
+  cancelada         Boolean   @default(false)
+  canceladaEn       DateTime? @map("cancelada_en")
+  /// Usuario que canceló (sin FK físico, ADR-0005).
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// Renglones defecto → nº de fallas (todos los favoritos se pre-cargan al alta). Cascade.
+  defectos AuditoriaDefecto[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, numAuditoria])
+  @@index([idEmpresa])
+  @@index([idOrden])
+  @@index([idMaquilero])
+  @@map("auditorias")
+}
+
+/// Renglón defecto → nº de fallas de una auditoría (F6-E2 — ex `CC_AuditoriasDet`, doc 09 §2).
+/// Al dar de alta una auditoría se PRE-CARGAN todos los defectos favoritos activos con
+/// `numFallas = 0` (ex `InsertarFav`); el auditor captura cuántas fallas vio de cada uno. Un
+/// defecto aparece UNA vez por auditoría (@@unique). El nivel AQL para la sugerencia se lee del
+/// `DefectoCatalogo` (NO se snapshotea). Cascade desde la auditoría; Restrict hacia el defecto
+/// (un defecto con auditorías históricas no se borra físico — se desactiva).
+model AuditoriaDefecto {
+  id          Int             @id @default(autoincrement())
+  idAuditoria Int             @map("id_auditoria")
+  auditoria   Auditoria       @relation(fields: [idAuditoria], references: [id], onDelete: Cascade)
+  idDefecto   Int             @map("id_defecto")
+  defecto     DefectoCatalogo @relation(fields: [idDefecto], references: [id], onDelete: Restrict)
+
+  /// Número de prendas con este defecto en la muestra. Entero ≥ 0.
+  numFallas Int @default(0) @map("num_fallas")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idAuditoria, idDefecto])
+  @@index([idDefecto])
+  @@map("auditoria_defecto")
 }

@@ -912,6 +912,36 @@ export {
   type ResolverPlanSalida,
 } from './esquemas/calidad.js';
 
+// ── Calidad — núcleo de auditorías (F6-E2) ──
+export {
+  RESULTADOS_AUDITORIA,
+  ETIQUETAS_RESULTADO_AUDITORIA,
+  TIPOS_AUDITORIA,
+  ETIQUETAS_TIPO_AUDITORIA,
+  SUGERENCIAS_AQL,
+  esquemaAuditoriaCrear,
+  esquemaAuditoriaDefectoEntrada,
+  esquemaAuditoriaResultadoCuerpo,
+  esquemaReclasificacionCuerpo,
+  esquemaSugerenciaNivel,
+  esquemaSugerenciaAql,
+  esquemaAuditoriaDefectoSalida,
+  esquemaAuditoriaSalida,
+  esquemaMaquileroPropuesto,
+  esquemaMuestraNivel,
+  esquemaMuestraPropuesta,
+  esquemaAuditoriaContexto,
+  type ResultadoAuditoriaClave,
+  type TipoAuditoriaClave,
+  type SugerenciaAqlClave,
+  type DatosAuditoriaCrear,
+  type DatosAuditoriaResultado,
+  type DatosReclasificacion,
+  type SugerenciaAqlSalida,
+  type AuditoriaSalida,
+  type AuditoriaContextoSalida,
+} from './esquemas/auditorias.js';
+
 // ── Bitácora: consulta del log de auditoría A7 (transversal, F6-E1) ──
 export {
   ACCIONES_BITACORA,

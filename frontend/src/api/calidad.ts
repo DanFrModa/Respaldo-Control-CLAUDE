@@ -10,6 +10,11 @@ import {
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
+  Auditoria,
+  AuditoriaContexto,
+  AuditoriaCrear,
+  AuditoriaReclasificacion,
+  AuditoriaResultado,
   Defecto,
   DefectoCrear,
   DefectoEditar,
@@ -41,6 +46,7 @@ import type {
 export const CLAVE_DEFECTOS = ['calidad', 'defectos'] as const;
 export const CLAVE_TIPOS_PRODUCTO = ['calidad', 'tipos-producto'] as const;
 export const CLAVE_PLANES_AQL = ['calidad', 'planes-aql'] as const;
+export const CLAVE_AUDITORIAS = ['calidad', 'auditorias'] as const;
 
 // ── Defectos ─────────────────────────────────────────────────────────────────
 
@@ -383,6 +389,122 @@ export function useReactivarPlanAql(): UseMutationResult<PlanAql, ErrorDeApi, nu
   return useMutation({
     mutationFn: reactivarPlanAql,
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_PLANES_AQL }),
+  });
+}
+
+// ── Auditorías (F6-E2) ─────────────────────────────────────────────────────────
+
+async function obtenerContextoOrden(idOrden: number): Promise<AuditoriaContexto> {
+  const { data, error } = await api.GET('/api/calidad/auditorias/orden/{idOrden}/contexto', {
+    params: { path: { idOrden } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerAuditoria(id: number): Promise<Auditoria> {
+  const { data, error } = await api.GET('/api/calidad/auditorias/{id}', {
+    params: { path: { id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function crearAuditoria(cuerpo: AuditoriaCrear): Promise<Auditoria> {
+  const { data, error } = await api.POST('/api/calidad/auditorias', { body: cuerpo });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function capturarResultado(id: number, cuerpo: AuditoriaResultado): Promise<Auditoria> {
+  const { data, error } = await api.PATCH('/api/calidad/auditorias/{id}/resultado', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function reclasificar(id: number, cuerpo: AuditoriaReclasificacion): Promise<Auditoria> {
+  const { data, error } = await api.POST('/api/calidad/auditorias/{id}/reclasificacion', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/**
+ * Contexto de una orden para dar de alta su auditoría (cantidad, maquileros, muestra). Solo se
+ * ejecuta cuando hay una orden elegida (`enabled`).
+ */
+export function useContextoOrden(
+  idOrden: number | undefined,
+): UseQueryResult<AuditoriaContexto, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AUDITORIAS, 'contexto', idOrden],
+    queryFn: () => obtenerContextoOrden(idOrden as number),
+    enabled: idOrden !== undefined,
+  });
+}
+
+/** Detalle de una auditoría (con sus renglones y la sugerencia AQL). */
+export function useAuditoria(id: number | undefined): UseQueryResult<Auditoria, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AUDITORIAS, 'detalle', id],
+    queryFn: () => obtenerAuditoria(id as number),
+    enabled: id !== undefined,
+  });
+}
+
+export function useCrearAuditoria(): UseMutationResult<Auditoria, ErrorDeApi, AuditoriaCrear> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: crearAuditoria,
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_AUDITORIAS }),
+  });
+}
+
+export interface ArgsCapturarResultado {
+  id: number;
+  cuerpo: AuditoriaResultado;
+}
+
+export function useCapturarResultado(): UseMutationResult<
+  Auditoria,
+  ErrorDeApi,
+  ArgsCapturarResultado
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCapturarResultado) => capturarResultado(id, cuerpo),
+    onSuccess: (auditoria) => {
+      void qc.invalidateQueries({ queryKey: CLAVE_AUDITORIAS });
+      qc.setQueryData([...CLAVE_AUDITORIAS, 'detalle', auditoria.id], auditoria);
+    },
+  });
+}
+
+export interface ArgsReclasificar {
+  id: number;
+  cuerpo: AuditoriaReclasificacion;
+}
+
+export function useReclasificar(): UseMutationResult<Auditoria, ErrorDeApi, ArgsReclasificar> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsReclasificar) => reclasificar(id, cuerpo),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_AUDITORIAS }),
   });
 }
 

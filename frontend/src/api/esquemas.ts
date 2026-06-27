@@ -722,6 +722,30 @@ export const NIVELES_AQL = [1, 2.5, 10] as const;
 /** Clave de nivel AQL. */
 export type NivelAqlClave = (typeof NIVELES_AQL)[number];
 
+// ── Calidad: auditorías (F6-E2, espejo del backend) ───────────────────────────
+
+/** Resultados de una auditoría (el veredicto lo decide el auditor a mano). */
+export const RESULTADOS_AUDITORIA = ['aprobado', 'reprobado', 'no_calificado'] as const;
+/** Clave de resultado de auditoría. */
+export type ResultadoAuditoriaClave = (typeof RESULTADOS_AUDITORIA)[number];
+/** Etiquetas para UI de cada resultado. */
+export const ETIQUETAS_RESULTADO_AUDITORIA: Record<ResultadoAuditoriaClave, string> = {
+  aprobado: 'Aprobada',
+  reprobado: 'Reprobada',
+  no_calificado: 'Sin calificar',
+};
+
+/** Tipos de auditoría (en piso / final / sin definir). */
+export const TIPOS_AUDITORIA = ['en_piso', 'final', 'no_definida'] as const;
+/** Clave de tipo de auditoría. */
+export type TipoAuditoriaClave = (typeof TIPOS_AUDITORIA)[number];
+/** Etiquetas para UI de cada tipo. */
+export const ETIQUETAS_TIPO_AUDITORIA: Record<TipoAuditoriaClave, string> = {
+  en_piso: 'En piso',
+  final: 'Final',
+  no_definida: 'Sin definir',
+};
+
 /** Etiquetas de la accion de bitacora (espejo del backend, A7). */
 export const ETIQUETAS_ACCION_BITACORA: Record<string, string> = {
   CREAR: 'Creó',

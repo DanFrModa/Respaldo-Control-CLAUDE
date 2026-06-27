@@ -31,6 +31,7 @@ import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
 import { rutasBitacora } from './api/admin/bitacora.rutas.js';
+import { rutasAuditorias } from './api/calidad/auditorias.rutas.js';
 import { rutasDefectos } from './api/calidad/defectos.rutas.js';
 import { rutasPlanesAql } from './api/calidad/planes-aql.rutas.js';
 import { rutasTiposProducto } from './api/calidad/tipos-producto.rutas.js';
@@ -230,6 +231,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasDefectos, { prefix: '/api' });
   await app.register(rutasTiposProducto, { prefix: '/api' });
   await app.register(rutasPlanesAql, { prefix: '/api' });
+  // Calidad — núcleo de auditorías (F6-E2): alta + captura de resultados + reclasificación + GETs de
+  // apoyo. RBAC por ruta (calidad.generar-auditorias el alta; calidad.actualizar-auditorias la captura
+  // y reclasificación; calidad.ver el detalle).
+  await app.register(rutasAuditorias, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

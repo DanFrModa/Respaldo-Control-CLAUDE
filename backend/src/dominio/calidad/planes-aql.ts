@@ -407,3 +407,77 @@ export async function resolverPlan(
     rechazar: limite.rechazar,
   };
 }
+
+/** Un límite Ac/Re de un nivel AQL en un renglón resuelto. */
+export interface LimiteNivelResuelto {
+  nivelAQL: number;
+  aceptar: number;
+  rechazar: number;
+}
+
+/** Renglón del plan default resuelto para un lote: muestra + TODOS los niveles con su Ac/Re. */
+export interface RenglonPlanResuelto {
+  idPlan: number;
+  nombrePlan: string;
+  tamanoLote: number;
+  tamanoMuestra: number;
+  niveles: LimiteNivelResuelto[];
+}
+
+/**
+ * Resuelve el plan default activo para un tamaño de lote, devolviendo el `tamanoMuestra` del renglón
+ * que lo cubre y TODOS sus niveles (Ac/Re). A diferencia de {@link resolverPlan} (un solo nivel), esta
+ * sirve a la auditoría (F6-E2): la MUESTRA es independiente del nivel (decisión (b)) y la SUGERENCIA
+ * necesita los límites de los tres niveles (decisión (a)). Devuelve `null` (no lanza) si no hay plan
+ * default activo o ningún renglón cubre el lote: la captura es posible igual (el veredicto es manual),
+ * solo no hay sugerencia. CLAMP: un lote por DEBAJO del primer rango usa el primer renglón (un lote de
+ * 1 prenda es válido para inspeccionar; la tabla AQL arranca en 2).
+ *
+ * NO verifica permiso: es un BLOQUE INTERNO (no se expone por ruta) que llaman los servicios de
+ * auditoría YA autorizados (alta/captura/contexto). Así `crearAuditoria` (permiso `generar`) no exige
+ * además `calidad.ver`.
+ */
+export async function resolverPlanPorLote(
+  tamanoLote: number,
+  bd?: ContextoBd,
+): Promise<RenglonPlanResuelto | null> {
+  if (!Number.isInteger(tamanoLote) || tamanoLote < 1) {
+    return null;
+  }
+  const cliente = clienteLectura(bd);
+  const plan = await cliente.planMuestreoAQL.findFirst({
+    where: { activo: true },
+    orderBy: { creadoEn: 'desc' },
+    include: INCLUIR_RENGLONES,
+  });
+  if (plan === null || plan.renglones.length === 0) {
+    return null;
+  }
+
+  // Renglón cuyo rango cubre el lote; si el lote cae por debajo del primer rango, usa el primero.
+  let renglon = plan.renglones.find(
+    (r) => tamanoLote >= r.loteMin && (r.loteMax === null || tamanoLote <= r.loteMax),
+  );
+  if (renglon === undefined) {
+    const ordenados = [...plan.renglones].sort((a, b) => a.loteMin - b.loteMin);
+    const primero = ordenados[0];
+    if (primero !== undefined && tamanoLote < primero.loteMin) {
+      renglon = primero;
+    }
+  }
+  if (renglon === undefined) {
+    return null;
+  }
+
+  return {
+    idPlan: plan.id,
+    nombrePlan: plan.nombre,
+    tamanoLote,
+    tamanoMuestra: renglon.tamanoMuestra,
+    niveles: renglon.limites.map((l) => ({
+      nivelAQL: l.nivelAQL.toNumber(),
+      aceptar: l.aceptar,
+      rechazar: l.rechazar,
+    })),
+  };
+}

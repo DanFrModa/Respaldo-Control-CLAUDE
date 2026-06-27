@@ -1,0 +1,218 @@
+/**
+ * Pruebas de integración de las rutas REST de AUDITORÍAS de calidad (F6-E2). Levantan la app Fastify
+ * REAL apuntada al Postgres efímero (testcontainers), reusando el seed real (admin `Control.2026!`, FR
+ * Moda, el plan AQL default). Cubren:
+ *  - deny-by-default: un usuario sin permisos (Basico) recibe 403 al dar de alta y al capturar;
+ *  - alta + captura end-to-end por HTTP (el resultado MANUAL se persiste);
+ *  - el permiso de CAPTURA (`calidad.actualizar-auditorias`) gobierna la captura/override de muestra:
+ *    un usuario con SOLO `calidad.generar-auditorias` da de alta (201) pero NO captura (403).
+ */
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { FastifyInstance } from 'fastify';
+
+import { construirApp } from '../app.js';
+import type { PrismaClient } from '../datos/index.js';
+import { clientePruebas, limpiarBaseDatos } from '../pruebas/contexto.js';
+import { sembrar } from '../../prisma/seed.js';
+
+let cliente: PrismaClient;
+let app: FastifyInstance;
+let idOrden: number;
+
+const PASSWORD_ADMIN = 'Control.2026!';
+
+interface ResultadoLogin {
+  status: number;
+  cookies: string[];
+}
+
+async function login(username: string, password: string): Promise<ResultadoLogin> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/api/auth/sign-in/username',
+    payload: { username, password },
+  });
+  const set = res.headers['set-cookie'];
+  const cookies = set === undefined ? [] : Array.isArray(set) ? set : [set];
+  return { status: res.statusCode, cookies };
+}
+
+function comoHeaderCookie(cookies: string[]): string {
+  return cookies.map((c) => c.split(';')[0]).join('; ');
+}
+
+async function cookieAdmin(): Promise<string> {
+  const sesion = await login('admin', PASSWORD_ADMIN);
+  expect(sesion.status).toBe(200);
+  return comoHeaderCookie(sesion.cookies);
+}
+
+async function idRol(nombre: string): Promise<number> {
+  const rol = await cliente.rol.findUniqueOrThrow({ where: { nombre }, select: { id: true } });
+  return rol.id;
+}
+
+/** Crea una orden COMPLETA con matriz (30 pzas) en la empresa del seed. Devuelve su id. */
+async function crearOrden(): Promise<number> {
+  const empresa = await cliente.empresa.findFirstOrThrow({ select: { id: true } });
+  const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
+  const modelo = await cliente.modelo.create({ data: { codigo: 'A-100', descripcion: 'Playera' } });
+  const color = await cliente.color.create({ data: { nombre: 'Rojo' } });
+  const talla = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
+  const pedido = await cliente.pedido.create({
+    data: { folio: 1n, idEmpresa: empresa.id, idCliente: clienteNegocio.id },
+  });
+  const linea = await cliente.pedidoLinea.create({
+    data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 30, precio: 10 },
+  });
+  const orden = await cliente.orden.create({
+    data: {
+      folio: 1n,
+      idEmpresa: empresa.id,
+      idPedidoLinea: linea.id,
+      idModelo: modelo.id,
+      idCliente: clienteNegocio.id,
+      estado: 'completa',
+      fechaCompletada: new Date(),
+      lineas: {
+        create: [{ idColor: color.id, tallas: { create: [{ idTalla: talla.id, cantidad: 30 }] } }],
+      },
+    },
+  });
+  return orden.id;
+}
+
+/** Crea un rol con permisos exactos y un usuario con ese rol; devuelve su cookie de sesión. */
+async function usuarioConPermisos(
+  cookieAdmin: string,
+  username: string,
+  permisos: string[],
+): Promise<string> {
+  const perms = await cliente.permiso.findMany({
+    where: { clave: { in: permisos } },
+    select: { id: true },
+  });
+  const rol = await cliente.rol.create({
+    data: {
+      nombre: `rol-${username}`,
+      descripcion: 'rol de prueba',
+      permisos: { create: perms.map((p) => ({ idPermiso: p.id })) },
+    },
+  });
+  const creado = await app.inject({
+    method: 'POST',
+    url: '/api/usuarios',
+    headers: { cookie: cookieAdmin },
+    payload: { username, nombre: username, password: 'Clave.1234!', idsRoles: [rol.id] },
+  });
+  expect(creado.statusCode).toBe(201);
+  return comoHeaderCookie((await login(username, 'Clave.1234!')).cookies);
+}
+
+beforeAll(async () => {
+  cliente = clientePruebas();
+  app = await construirApp();
+  await app.ready();
+});
+
+afterAll(async () => {
+  await app.close();
+  await cliente.$disconnect();
+});
+
+beforeEach(async () => {
+  await limpiarBaseDatos(cliente);
+  await sembrar(cliente);
+  idOrden = await crearOrden();
+});
+
+describe('API de Auditorías (F6-E2)', () => {
+  it('deny-by-default: Basico (sin permisos) recibe 403 al dar de alta y al capturar', async () => {
+    const cookieAdminVal = await cookieAdmin();
+    const creado = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      headers: { cookie: cookieAdminVal },
+      payload: {
+        username: 'sinpermiso',
+        nombre: 'Sin Permiso',
+        password: 'Clave.1234!',
+        idsRoles: [await idRol('Basico')],
+      },
+    });
+    expect(creado.statusCode).toBe(201);
+    const cookieBasico = comoHeaderCookie((await login('sinpermiso', 'Clave.1234!')).cookies);
+
+    const alta = await app.inject({
+      method: 'POST',
+      url: '/api/calidad/auditorias',
+      headers: { cookie: cookieBasico },
+      payload: { idOrden },
+    });
+    expect(alta.statusCode).toBe(403);
+
+    const captura = await app.inject({
+      method: 'PATCH',
+      url: '/api/calidad/auditorias/1/resultado',
+      headers: { cookie: cookieBasico },
+      payload: { resultado: 'aprobado', defectos: [] },
+    });
+    expect(captura.statusCode).toBe(403);
+  });
+
+  it('alta + captura por HTTP: el resultado MANUAL se persiste', async () => {
+    const cookie = await cookieAdmin();
+
+    const alta = await app.inject({
+      method: 'POST',
+      url: '/api/calidad/auditorias',
+      headers: { cookie },
+      payload: { idOrden, tipoAuditoria: 'final' },
+    });
+    expect(alta.statusCode).toBe(201);
+    const auditoria = alta.json<{ id: number; numAuditoria: number; tamanoMuestra: number }>();
+    expect(auditoria.numAuditoria).toBe(1);
+    expect(auditoria.tamanoMuestra).toBeGreaterThan(0); // muestra del plan default del seed.
+
+    const detalle = await app.inject({
+      method: 'GET',
+      url: `/api/calidad/auditorias/${String(auditoria.id)}`,
+      headers: { cookie },
+    });
+    expect(detalle.statusCode).toBe(200);
+
+    const captura = await app.inject({
+      method: 'PATCH',
+      url: `/api/calidad/auditorias/${String(auditoria.id)}/resultado`,
+      headers: { cookie },
+      payload: { resultado: 'aprobado', observaciones: 'OK', defectos: [] },
+    });
+    expect(captura.statusCode).toBe(200);
+    expect(captura.json<{ resultado: string }>().resultado).toBe('aprobado');
+  });
+
+  it('SOLO generar-auditorias: da de alta (201) pero NO captura (403 — la captura exige actualizar)', async () => {
+    const cookieAdminVal = await cookieAdmin();
+    const cookie = await usuarioConPermisos(cookieAdminVal, 'generador', [
+      'calidad.ver',
+      'calidad.generar-auditorias',
+    ]);
+
+    const alta = await app.inject({
+      method: 'POST',
+      url: '/api/calidad/auditorias',
+      headers: { cookie },
+      payload: { idOrden },
+    });
+    expect(alta.statusCode).toBe(201);
+    const id = alta.json<{ id: number }>().id;
+
+    const captura = await app.inject({
+      method: 'PATCH',
+      url: `/api/calidad/auditorias/${String(id)}/resultado`,
+      headers: { cookie },
+      payload: { resultado: 'aprobado', defectos: [] },
+    });
+    expect(captura.statusCode).toBe(403);
+  });
+});

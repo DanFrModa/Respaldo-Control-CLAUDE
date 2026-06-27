@@ -36,6 +36,13 @@ export const EVENTOS_OUTBOX = {
   reciboMaquilaCancelado: 'recibo-maquila-cancelado',
   /** Una entrega a cliente se CANCELÓ: la RC re-evalúa `entregaCliente` (decisión (f)). */
   entregaClienteCancelada: 'entrega-cliente-cancelada',
+  /**
+   * Una auditoría de calidad se CAPTURÓ/CAMBIÓ de resultado (F6-E2): la RC re-evalúa el proceso
+   * `auditoria` de la orden. Idempotente: el consumidor relee el estado físico (¿hay auditoría FINAL
+   * aprobada viva?) y auto-completa o des-completa el proceso. Se publica en TODA captura (aprobar,
+   * reprobar o limpiar), no solo al aprobar, para que des-completar también funcione (decisión (f)).
+   */
+  auditoriaCalidadResuelta: 'auditoria-calidad-resuelta',
 } as const;
 
 /** Nombre válido de evento de outbox. */
@@ -43,6 +50,21 @@ export type NombreEventoOutbox = (typeof EVENTOS_OUTBOX)[keyof typeof EVENTOS_OU
 
 /** Versión actual del contrato del evento `material-recibido`. */
 export const VERSION_MATERIAL_RECIBIDO = 1;
+
+/** Versión actual del contrato del evento `auditoria-calidad-resuelta` (F6-E2). */
+export const VERSION_AUDITORIA_CALIDAD = 1;
+
+/**
+ * Carga del evento `auditoria-calidad-resuelta` (F6-E2). Lo MÍNIMO para que el auto-avance de la RC
+ * re-evalúe el proceso `auditoria` de la orden: a qué orden apunta. El consumidor relee de la BD si
+ * la orden tiene una auditoría FINAL aprobada VIVA (idempotente: no confía en el evento como delta).
+ */
+export type EventoAuditoriaCalidad = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden de producción cuya auditoría se capturó/cambió. */
+  idOrden: number;
+};
 
 /**
  * Versión actual del contrato de los eventos de ETAPA de producción (corte/envío/recibo/entrega y
