@@ -40,16 +40,18 @@ WHERE d."id_movimiento" = m."id"
 --     `origen_id` al movimiento ORIGINAL; se copia el `id_orden` del renglón homólogo (mismo
 --     modelo×color×talla) ya backfilleado en (a). Debe correr DESPUÉS de (a). Así el inverso
 --     neutraliza el MISMO bucket de orden que el original (no descuadra la existencia por orden).
+-- NOTA (Postgres): en `UPDATE ... AS inv FROM ...`, la tabla objetivo `inv` NO puede
+-- referenciarse en las condiciones `JOIN ON` del FROM (solo en el WHERE de nivel superior).
+-- Por eso las correlaciones orig↔inv (mismo modelo×color×talla) van en el WHERE, no en el JOIN.
 UPDATE "movimiento_det_pt" AS inv
 SET "id_orden" = orig."id_orden"
 FROM "movimientos" AS m_inv
 JOIN "movimientos" AS m_orig ON m_orig."id"::text = m_inv."origen_id"
-JOIN "movimiento_det_pt" AS orig
-  ON orig."id_movimiento" = m_orig."id"
+JOIN "movimiento_det_pt" AS orig ON orig."id_movimiento" = m_orig."id"
+WHERE inv."id_movimiento" = m_inv."id"
   AND orig."id_modelo" = inv."id_modelo"
   AND orig."id_color" = inv."id_color"
   AND orig."id_talla" = inv."id_talla"
-WHERE inv."id_movimiento" = m_inv."id"
   AND m_inv."origen_tipo" = 'cancelacion'
   AND inv."id_orden" IS NULL
   AND orig."id_orden" IS NOT NULL;

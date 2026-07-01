@@ -631,12 +631,11 @@ const SQL_BACKFILL_CANCELACION = `
   SET "id_orden" = orig."id_orden"
   FROM "movimientos" AS m_inv
   JOIN "movimientos" AS m_orig ON m_orig."id"::text = m_inv."origen_id"
-  JOIN "movimiento_det_pt" AS orig
-    ON orig."id_movimiento" = m_orig."id"
+  JOIN "movimiento_det_pt" AS orig ON orig."id_movimiento" = m_orig."id"
+  WHERE inv."id_movimiento" = m_inv."id"
     AND orig."id_modelo" = inv."id_modelo"
     AND orig."id_color" = inv."id_color"
     AND orig."id_talla" = inv."id_talla"
-  WHERE inv."id_movimiento" = m_inv."id"
     AND m_inv."origen_tipo" = 'cancelacion'
     AND inv."id_orden" IS NULL
     AND orig."id_orden" IS NOT NULL
