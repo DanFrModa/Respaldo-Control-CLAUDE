@@ -23,6 +23,11 @@ import { SelectorModelo } from './SelectorModelo';
 /** Valor del filtro que significa "todos". */
 const TODOS = 'TODOS';
 
+/** Etiqueta de la orden de un renglón de existencia (F6-E2: PT por orden). null = bucket sin orden. */
+function etiquetaOrden(folioOrden: number | null): string {
+  return folioOrden === null ? 'Sin orden (hist./ajuste)' : `Orden #${String(folioOrden)}`;
+}
+
 /**
  * EXISTENCIAS de producto terminado (F3-E3, doc 04-Inventarios — IPT). Tabla con la existencia por
  * modelo×color×talla×almacén (Σ de movimientos, D3) con filtros por modelo, color, talla y almacén.
@@ -191,7 +196,9 @@ export function ExistenciasPtPagina(): React.JSX.Element {
               {/* Móvil: tarjetas apiladas. */}
               <div className="space-y-3 md:hidden" data-testid="exist-tarjetas">
                 {filas.map((f) => (
-                  <Card key={`${f.idModelo}-${f.idColor}-${f.idTalla}-${f.idAlmacen}`}>
+                  <Card
+                    key={`${f.idModelo}-${f.idColor}-${f.idTalla}-${f.idAlmacen}-${f.idOrden ?? 'sin'}`}
+                  >
                     <CardContent className="flex items-center justify-between gap-3 p-4">
                       <div>
                         <p className="font-medium">
@@ -200,6 +207,9 @@ export function ExistenciasPtPagina(): React.JSX.Element {
                         <p className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Warehouse className="size-3.5" aria-hidden />
                           {f.almacen}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {etiquetaOrden(f.folioOrden)}
                         </p>
                       </div>
                       <span className="text-lg font-semibold tabular-nums">
@@ -222,16 +232,22 @@ export function ExistenciasPtPagina(): React.JSX.Element {
                       <TableHead>Color</TableHead>
                       <TableHead>Talla</TableHead>
                       <TableHead>Almacén</TableHead>
+                      <TableHead>Orden</TableHead>
                       <TableHead className="text-right">Existencia</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filas.map((f) => (
-                      <TableRow key={`${f.idModelo}-${f.idColor}-${f.idTalla}-${f.idAlmacen}`}>
+                      <TableRow
+                        key={`${f.idModelo}-${f.idColor}-${f.idTalla}-${f.idAlmacen}-${f.idOrden ?? 'sin'}`}
+                      >
                         <TableCell className="font-medium">{f.modelo}</TableCell>
                         <TableCell>{f.color}</TableCell>
                         <TableCell>{f.etiquetaTalla}</TableCell>
                         <TableCell>{f.almacen}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {etiquetaOrden(f.folioOrden)}
+                        </TableCell>
                         <TableCell className="text-right font-semibold tabular-nums">
                           {f.existencia.toLocaleString('es-MX')}
                         </TableCell>

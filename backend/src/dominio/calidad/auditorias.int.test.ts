@@ -235,7 +235,8 @@ async function crearProcesoAuditoriaRC(): Promise<number> {
   return r.id;
 }
 
-/** Mete existencia a Primeras (Rojo CH 10, M 20) por el motor de kardex. */
+/** Mete existencia a Primeras (Rojo CH 10, M 20) por el motor de kardex, ETIQUETADA con la orden
+ * auditada (F6-E2 "PT por orden": la reclasificación valida/mueve contra el bucket de ESA orden). */
 async function sembrarExistenciaPrimeras(): Promise<void> {
   const tipo = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
     where: { codigo: 'inventario-inicial' },
@@ -250,8 +251,8 @@ async function sembrarExistenciaPrimeras(): Promise<void> {
       fecha: new Date('2026-06-20T00:00:00Z'),
       origenTipo: ORIGEN.movimientoManual,
       lineas: [
-        { idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaCH.id, cantidad: 10 },
-        { idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaM.id, cantidad: 20 },
+        { idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaCH.id, idOrden, cantidad: 10 },
+        { idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaM.id, idOrden, cantidad: 20 },
       ],
     },
     bd(),
@@ -270,6 +271,45 @@ async function existenciaEnAlmacen(idAlmacen: number, idTalla: number): Promise<
       AND e."id_almacen" = ${idAlmacen}
   `;
   return Number(filas[0]?.existencia ?? 0n);
+}
+
+/** Existencia de un artículo en un almacén DENTRO de un bucket de orden (NULL = bucket sin orden). */
+async function existenciaBucket(
+  idAlmacen: number,
+  idTalla: number,
+  idOrdenBucket: number | null,
+): Promise<number> {
+  const filas = await cliente.$queryRaw<{ existencia: bigint | null }[]>`
+    SELECT COALESCE(SUM(e."existencia"), 0)::bigint AS existencia
+    FROM "existencia_pt" e
+    WHERE e."id_empresa" = ${empresa.id}
+      AND e."id_modelo" = ${modelo.id}
+      AND e."id_color" = ${colorRojo.id}
+      AND e."id_talla" = ${idTalla}
+      AND e."id_almacen" = ${idAlmacen}
+      AND e."id_orden" IS NOT DISTINCT FROM ${idOrdenBucket}
+  `;
+  return Number(filas[0]?.existencia ?? 0n);
+}
+
+/** Mete `cantidad` piezas de Rojo/CH a Primeras en el bucket SIN ORDEN (movimiento manual). */
+async function sembrarSinOrdenPrimeras(cantidad: number): Promise<void> {
+  const tipo = await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+    where: { codigo: 'inventario-inicial' },
+    select: { id: true },
+  });
+  await registrarMovimientoPtMotor(
+    sesion(),
+    {
+      idEmpresa: empresa.id,
+      idTipoMov: tipo.id,
+      idAlmacen: almPrimeras.id,
+      fecha: new Date('2026-06-20T00:00:00Z'),
+      origenTipo: ORIGEN.movimientoManual,
+      lineas: [{ idModelo: modelo.id, idColor: colorRojo.id, idTalla: tallaCH.id, cantidad }],
+    },
+    bd(),
+  );
 }
 
 /** Drena la ÚLTIMA fila del outbox de un tipo y la pasa al auto-avance (cola inactiva en tests). */
@@ -469,5 +509,44 @@ describe('Auditorías — reclasificación Primeras↔Segundas (kardex, D3)', ()
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('PT por orden: reclasifica SOLO lo de la orden auditada; el stock SIN orden no se toca ni cuenta', async () => {
+    await sembrarExistenciaPrimeras(); // bucket de `idOrden`: Primeras CH 10.
+    await sembrarSinOrdenPrimeras(5); // bucket SIN orden: Primeras CH 5 (mismo artículo, otra "bolsa").
+    // Primeras CH total = 15, pero solo 10 pertenecen a la orden auditada.
+    expect(await existenciaEnAlmacen(almPrimeras.id, tallaCH.id)).toBe(15);
+
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+
+    // No puede mover 11 (> 10 de la orden) aunque el almacén tenga 15 en total: valida por orden.
+    await expect(
+      reclasificar(
+        sesion(),
+        a.id,
+        {
+          sentido: 'a-segundas',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 11 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // Mueve 4 de la orden auditada: salen del bucket de la orden, no del bucket sin orden.
+    await reclasificar(
+      sesion(),
+      a.id,
+      {
+        sentido: 'a-segundas',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 4 }] }],
+      },
+      bd(),
+    );
+
+    // Bucket de la orden: Primeras 6, Segundas 4. Bucket SIN orden: Primeras 5 INTACTO.
+    expect(await existenciaBucket(almPrimeras.id, tallaCH.id, idOrden)).toBe(6);
+    expect(await existenciaBucket(almSegundas.id, tallaCH.id, idOrden)).toBe(4);
+    expect(await existenciaBucket(almPrimeras.id, tallaCH.id, null)).toBe(5);
+    expect(await existenciaBucket(almSegundas.id, tallaCH.id, null)).toBe(0);
   });
 });

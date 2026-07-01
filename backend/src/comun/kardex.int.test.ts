@@ -46,10 +46,11 @@ let almTransito: Almacen;
 const sesion = () => sesionDePrueba({ idEmpresaActiva: empresa.id });
 const bd = () => ({ cliente });
 
-/** Suma directa de la vista existencia_pt para un artículo×almacén (lo que ve el reporte). */
+/** Suma de la vista existencia_pt para un artículo×almacén (TOTAL sobre todos los buckets de orden,
+ * F6-E2: la vista ahora agrega por …×ORDEN×almacén, así que se SUMA sobre las órdenes). */
 async function existenciaVista(idAlmacen: number): Promise<number> {
   const filas = await cliente.$queryRaw<{ existencia: bigint | null }[]>`
-    SELECT existencia FROM existencia_pt
+    SELECT COALESCE(SUM(existencia), 0)::bigint AS existencia FROM existencia_pt
     WHERE id_modelo = ${modelo.id} AND id_color = ${colorRojo.id}
       AND id_talla = ${tallaM.id} AND id_almacen = ${idAlmacen}
   `;
@@ -449,6 +450,7 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
           modelo.id,
           colorRojo.id,
           tallaM.id,
+          null,
         );
         return existenciaPtBloqueada(
           tx,
@@ -457,6 +459,7 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
           modelo.id,
           colorRojo.id,
           tallaM.id,
+          null,
         );
       }, bd());
       expect(directo).toBe(9);
@@ -487,6 +490,7 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
           modelo.id,
           colorRojo.id,
           tallaM.id,
+          null,
         );
         return existenciaPtBloqueada(
           tx,
@@ -495,6 +499,7 @@ describe('Motor de kardex PT (F3-E1, D3/ADR-0010)', () => {
           modelo.id,
           colorRojo.id,
           tallaM.id,
+          null,
         );
       }, bd());
       // La ruta bloqueada (la que usarán E4/E5 para validar) ve el neto en 0, no solo la vista.

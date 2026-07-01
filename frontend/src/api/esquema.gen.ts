@@ -25021,6 +25021,8 @@ export interface paths {
           idTalla?: number;
           /** @description Filtra por un almacén. */
           idAlmacen?: number;
+          /** @description Filtra por una orden de producción (F6-E2: existencia por orden). */
+          idOrden?: number;
           /** @description Incluye filas con existencia 0 ("true"/"false"). Por defecto se omiten. */
           incluirCeros?: string;
         };
@@ -25057,6 +25059,10 @@ export interface paths {
                 idAlmacen: number;
                 /** @description Nombre del almacén. */
                 almacen: string;
+                /** @description Orden de producción de las prendas, o null (bucket sin orden: histórico/manual/ajuste). */
+                idOrden: number | null;
+                /** @description Folio de la orden, o null si es del bucket sin orden. */
+                folioOrden: number | null;
                 /** @description Existencia actual (Σ de movimientos, D3). */
                 existencia: number;
               }[];
@@ -25174,6 +25180,8 @@ export interface paths {
           idTalla?: number;
           /** @description Filtra por un almacén. */
           idAlmacen?: number;
+          /** @description Filtra por una orden de producción (F6-E2). */
+          idOrden?: number;
         };
         header?: never;
         path?: never;
@@ -25221,6 +25229,10 @@ export interface paths {
                 idTalla: number;
                 /** @description Etiqueta de la talla. */
                 etiquetaTalla: string;
+                /** @description Orden de producción del renglón, o null (bucket sin orden). */
+                idOrden: number | null;
+                /** @description Folio de la orden, o null. */
+                folioOrden: number | null;
                 /** @description Piezas que entran en este renglón (0 si es salida). */
                 entrada: number;
                 /** @description Piezas que salen en este renglón (0 si es entrada). */

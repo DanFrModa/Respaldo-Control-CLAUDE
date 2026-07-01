@@ -132,6 +132,7 @@ function KardexPorModelo(): React.JSX.Element {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Movimiento</TableHead>
                     <TableHead>Almacén</TableHead>
+                    <TableHead>Orden</TableHead>
                     <TableHead>Color</TableHead>
                     <TableHead>Talla</TableHead>
                     <TableHead className="text-right">Entrada</TableHead>
@@ -152,6 +153,9 @@ function KardexPorModelo(): React.JSX.Element {
                         {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
                       </TableCell>
                       <TableCell>{r.almacen}</TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {r.folioOrden === null ? 'Sin orden' : `#${String(r.folioOrden)}`}
+                      </TableCell>
                       <TableCell>{r.color}</TableCell>
                       <TableCell>{r.etiquetaTalla}</TableCell>
                       <TableCell className="text-right tabular-nums">

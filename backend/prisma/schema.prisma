@@ -1907,6 +1907,8 @@ model Orden {
   notaSalidaLineas  NotaSalidaLinea[]
   /// Auditorías de calidad de esta orden (F6-E2). Restrict (una orden con auditorías no se borra).
   auditorias        Auditoria[]
+  /// Renglones de kardex PT que PERTENECEN a esta orden (F6-E2 "PT por orden"). Restrict.
+  movimientosDetPt  MovimientoDetPt[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2354,6 +2356,15 @@ model MovimientoDetPt {
   idTalla      Int        @map("id_talla")
   talla        Talla      @relation(fields: [idTalla], references: [id], onDelete: Restrict)
 
+  /// ORDEN de producción a la que PERTENECEN estas prendas (F6-E2 "PT por orden" — restaura el
+  /// `IPT_Modelos.IdOrdenes` de v1; ver ADR-0014, enmienda de ADR-0010). NULLABLE: el histórico
+  /// migrado (`origenTipo='migracion'`) y los movimientos manuales/traspasos NO la traen (bucket
+  /// "sin orden"). Con esta columna la existencia PT pasa a ser por modelo×color×talla×ORDEN×almacén;
+  /// la suma directa y el advisory lock casan el NULL con `IS NOT DISTINCT FROM`. Restrict (una
+  /// orden con PT en el kardex no se borra físico).
+  idOrden Int?   @map("id_orden")
+  orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
   /// Cantidad de prendas (positiva; el signo lo da la dirección del tipo de movimiento).
   cantidad  Int
   /// Costo unitario al momento del movimiento. NULLABLE y NULL en toda F3 (D1/D2 — ADR-0010 §4).
@@ -2366,6 +2377,8 @@ model MovimientoDetPt {
 
   @@index([idMovimiento])
   @@index([idModelo, idColor, idTalla])
+  @@index([idOrden])
+  @@index([idOrden, idModelo, idColor, idTalla])
   @@map("movimiento_det_pt")
 }
 

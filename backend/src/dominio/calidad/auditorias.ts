@@ -566,16 +566,25 @@ async function almacenPtPorNombre(tx: Tx, nombre: string, idEmpresa: number): Pr
   return almacen.id;
 }
 
-/** Aplana la matriz de reclasificación a celdas con cantidad > 0 (D4). Exige al menos una. */
+/** Aplana la matriz de reclasificación a celdas con cantidad > 0 (D4). Exige al menos una. Las
+ * celdas quedan etiquetadas con la ORDEN auditada (F6-E2 "PT por orden"): la reclasificación mueve
+ * SOLO las prendas de esa orden entre Primeras/Segundas, no el modelo entero. */
 function aplanarReclasif(
   lineas: EntradaReclasificacion['lineas'],
   idModelo: number,
+  idOrden: number,
 ): LineaMovimientoPt[] {
   const celdas: LineaMovimientoPt[] = [];
   for (const linea of lineas) {
     for (const t of linea.tallas) {
       if (t.cantidad > 0) {
-        celdas.push({ idModelo, idColor: linea.idColor, idTalla: t.idTalla, cantidad: t.cantidad });
+        celdas.push({
+          idModelo,
+          idColor: linea.idColor,
+          idTalla: t.idTalla,
+          idOrden,
+          cantidad: t.cantidad,
+        });
       }
     }
   }
@@ -596,7 +605,9 @@ async function validarNoNegativo(
 ): Promise<void> {
   const ordenadas = [...celdas].sort((a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla);
   for (const c of ordenadas) {
-    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, c.idModelo, c.idColor, c.idTalla);
+    // PT por orden (F6-E2): valida contra el saldo de la ORDEN auditada en el almacén origen.
+    const idOrden = c.idOrden ?? null;
+    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, c.idModelo, c.idColor, c.idTalla, idOrden);
     const existencia = await existenciaPtBloqueada(
       tx,
       idEmpresa,
@@ -604,11 +615,12 @@ async function validarNoNegativo(
       c.idModelo,
       c.idColor,
       c.idTalla,
+      idOrden,
     );
     if (existencia - c.cantidad < 0) {
       throw new ErrorConflicto(
         `No hay existencia suficiente para reclasificar: se intentan mover ${String(c.cantidad)} pza(s) ` +
-          `de un artículo con ${String(existencia)} en el almacén origen (no se permite negativo).`,
+          `de un artículo de esta orden con ${String(existencia)} en el almacén origen (no se permite negativo).`,
       );
     }
   }
@@ -639,6 +651,7 @@ export async function reclasificar(
         id: true,
         numAuditoria: true,
         cancelada: true,
+        idOrden: true,
         orden: { select: { idModelo: true } },
       },
     });
@@ -650,7 +663,7 @@ export async function reclasificar(
     }
 
     const idModelo = auditoria.orden.idModelo;
-    const celdas = aplanarReclasif(datos.lineas, idModelo);
+    const celdas = aplanarReclasif(datos.lineas, idModelo, auditoria.idOrden);
 
     const idPrimeras = await almacenPtPorNombre(tx, ALMACEN_PRIMERAS, idEmpresa);
     const idSegundas = await almacenPtPorNombre(tx, ALMACEN_SEGUNDAS, idEmpresa);

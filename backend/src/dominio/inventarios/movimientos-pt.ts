@@ -167,9 +167,11 @@ async function validarNoNegativo(
   // Toma los locks en un orden DETERMINISTA (por color, luego talla) para que dos operaciones que
   // compitan por los mismos artículos los adquieran SIEMPRE en el mismo orden: elimina el riesgo
   // teórico de deadlock entre dos traspasos cruzados. No copia/ordena `celdas` (caller la usa luego).
+  // Los movimientos manuales / traspasos NO tienen orden (F6-E2 "PT por orden"): validan contra el
+  // bucket "sin orden" (`idOrden = null`), igual que el histórico.
   const ordenadas = [...celdas].sort((a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla);
   for (const c of ordenadas) {
-    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla);
+    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, null);
     const existencia = await existenciaPtBloqueada(
       tx,
       idEmpresa,
@@ -177,6 +179,7 @@ async function validarNoNegativo(
       idModelo,
       c.idColor,
       c.idTalla,
+      null,
     );
     if (existencia - c.cantidad < 0) {
       throw new ErrorConflicto(
@@ -484,6 +487,7 @@ const esquemaConsultaExistenciasPt = z.object({
   idColor: z.number().int().positive().optional(),
   idTalla: z.number().int().positive().optional(),
   idAlmacen: z.number().int().positive().optional(),
+  idOrden: z.number().int().positive().optional(),
   incluirCeros: z.boolean().default(false),
 });
 
@@ -493,6 +497,7 @@ const esquemaConsultaKardexPt = z.object({
   idColor: z.number().int().positive().optional(),
   idTalla: z.number().int().positive().optional(),
   idAlmacen: z.number().int().positive().optional(),
+  idOrden: z.number().int().positive().optional(),
 });
 
 /** Parámetros de la consulta de existencias (forma de dominio). */
@@ -525,10 +530,14 @@ export async function consultarExistenciasPt(
     condiciones.push(Prisma.sql`e."id_talla" = ${filtros.idTalla}`);
   if (filtros.idAlmacen !== undefined)
     condiciones.push(Prisma.sql`e."id_almacen" = ${filtros.idAlmacen}`);
+  if (filtros.idOrden !== undefined)
+    condiciones.push(Prisma.sql`e."id_orden" = ${filtros.idOrden}`);
   if (!filtros.incluirCeros) condiciones.push(Prisma.sql`e."existencia" <> 0`);
 
   const where = Prisma.join(condiciones, ' AND ');
 
+  // PT por orden (F6-E2): la vista `existencia_pt` ya agrega por …×ORDEN×almacén; aquí se trae el
+  // folio de la orden (LEFT JOIN: el bucket "sin orden" tiene `id_orden` NULL → folio NULL).
   const filas = await cliente.$queryRaw<
     {
       idModelo: number;
@@ -540,6 +549,8 @@ export async function consultarExistenciasPt(
       ordenTalla: number;
       idAlmacen: number;
       almacen: string;
+      idOrden: number | null;
+      folioOrden: bigint | null;
       existencia: bigint;
     }[]
   >(Prisma.sql`
@@ -553,14 +564,17 @@ export async function consultarExistenciasPt(
       t."orden"       AS "ordenTalla",
       e."id_almacen"  AS "idAlmacen",
       a."nombre"      AS "almacen",
+      e."id_orden"    AS "idOrden",
+      o."folio"       AS "folioOrden",
       e."existencia"  AS "existencia"
     FROM "existencia_pt" e
     JOIN "modelos"   mo ON mo."id" = e."id_modelo"
     JOIN "colores"   c  ON c."id"  = e."id_color"
     JOIN "tallas"    t  ON t."id"  = e."id_talla"
     JOIN "almacenes" a  ON a."id"  = e."id_almacen"
+    LEFT JOIN "ordenes" o ON o."id" = e."id_orden"
     WHERE ${where}
-    ORDER BY mo."codigo" ASC, c."nombre" ASC, t."orden" ASC, a."nombre" ASC
+    ORDER BY mo."codigo" ASC, c."nombre" ASC, t."orden" ASC, a."nombre" ASC, o."folio" ASC NULLS FIRST
   `);
 
   let totalExistencia = 0;
@@ -577,6 +591,8 @@ export async function consultarExistenciasPt(
       ordenTalla: f.ordenTalla,
       idAlmacen: f.idAlmacen,
       almacen: f.almacen,
+      idOrden: f.idOrden,
+      folioOrden: f.folioOrden === null ? null : Number(f.folioOrden),
       existencia,
     };
   });
@@ -620,6 +636,7 @@ export async function kardexPt(
       idModelo: filtros.idModelo,
       ...(filtros.idColor === undefined ? {} : { idColor: filtros.idColor }),
       ...(filtros.idTalla === undefined ? {} : { idTalla: filtros.idTalla }),
+      ...(filtros.idOrden === undefined ? {} : { idOrden: filtros.idOrden }),
       movimiento: {
         idEmpresa,
         ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),
@@ -628,9 +645,11 @@ export async function kardexPt(
     select: {
       idColor: true,
       idTalla: true,
+      idOrden: true,
       cantidad: true,
       color: { select: { nombre: true } },
       talla: { select: { etiqueta: true } },
+      orden: { select: { folio: true } },
       movimiento: {
         select: {
           id: true,
@@ -659,7 +678,9 @@ export async function kardexPt(
     const entrada = esEntrada ? d.cantidad : 0;
     const salida = esSalida ? d.cantidad : 0;
 
-    const claveArt = `${d.idColor}:${d.idTalla}:${m.idAlmacen}`;
+    // PT por orden (F6-E2): el saldo corrido es por artículo×ALMACÉN×ORDEN (el bucket "sin orden"
+    // —`id_orden` NULL— lleva su propio saldo, separado de las prendas con orden).
+    const claveArt = `${d.idColor}:${d.idTalla}:${m.idAlmacen}:${d.idOrden ?? 'sin'}`;
     const saldoPrevio = saldoPorArticulo.get(claveArt) ?? 0;
     const saldo = saldoPrevio + entrada - salida;
     saldoPorArticulo.set(claveArt, saldo);
@@ -677,6 +698,8 @@ export async function kardexPt(
       color: d.color.nombre,
       idTalla: d.idTalla,
       etiquetaTalla: d.talla.etiqueta,
+      idOrden: d.idOrden,
+      folioOrden: d.orden === null ? null : Number(d.orden.folio),
       entrada,
       salida,
       saldo,

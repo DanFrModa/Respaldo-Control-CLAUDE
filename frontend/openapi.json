@@ -60289,6 +60289,17 @@
           },
           {
             "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idOrden",
+            "required": false,
+            "description": "Filtra por una orden de producción (F6-E2: existencia por orden)."
+          },
+          {
+            "schema": {
               "type": "string"
             },
             "in": "query",
@@ -60361,6 +60372,32 @@
                             "type": "string",
                             "description": "Nombre del almacén."
                           },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden de producción de las prendas, o null (bucket sin orden: histórico/manual/ajuste)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden, o null si es del bucket sin orden."
+                          },
                           "existencia": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -60378,6 +60415,8 @@
                           "ordenTalla",
                           "idAlmacen",
                           "almacen",
+                          "idOrden",
+                          "folioOrden",
                           "existencia"
                         ],
                         "additionalProperties": false
@@ -60599,6 +60638,17 @@
             "name": "idAlmacen",
             "required": false,
             "description": "Filtra por un almacén."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idOrden",
+            "required": false,
+            "description": "Filtra por una orden de producción (F6-E2)."
           }
         ],
         "security": [
@@ -60694,6 +60744,32 @@
                             "type": "string",
                             "description": "Etiqueta de la talla."
                           },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden de producción del renglón, o null (bucket sin orden)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden, o null."
+                          },
                           "entrada": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -60741,6 +60817,8 @@
                           "color",
                           "idTalla",
                           "etiquetaTalla",
+                          "idOrden",
+                          "folioOrden",
                           "entrada",
                           "salida",
                           "saldo",

@@ -25,7 +25,7 @@ test.describe('Auditorías de calidad (F6-E2)', () => {
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Calidad' })
+      .getByRole('link', { name: 'Calidad', exact: true })
       .click();
     await page.getByTestId('calidad-auditorias').click();
 

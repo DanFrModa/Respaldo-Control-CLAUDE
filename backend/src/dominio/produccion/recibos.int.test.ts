@@ -34,7 +34,7 @@ import {
   registrarReciboMaquila,
 } from './recibos.js';
 import { registrarCorte, registrarEnvioMaquila } from './etapas.js';
-import { consultarExistenciasPt } from '../inventarios/movimientos-pt.js';
+import { consultarExistenciasPt, registrarMovimientoPt } from '../inventarios/movimientos-pt.js';
 import { listarCargosEsMa, validarCargoEsMa } from '../esma/cargos.js';
 
 let cliente: PrismaClient;
@@ -230,6 +230,15 @@ describe('Recibo de COSTURA (F3-E4)', () => {
     expect(existencias.totalExistencia).toBe(10);
     const fila = existencias.filas.find((f) => f.idAlmacen === almPrimeras.id);
     expect(fila?.existencia).toBe(10);
+
+    // (2b) PT por orden (F6-E2): la entrada quedó ETIQUETADA con la orden del recibo (detalle y vista).
+    expect(fila?.idOrden).toBe(idOrden);
+    const detsPt = await cliente.movimientoDetPt.findMany({
+      where: { movimiento: { origenTipo: 'recibo-maquila' } },
+      select: { idOrden: true },
+    });
+    expect(detsPt.length).toBeGreaterThan(0);
+    expect(detsPt.every((d) => d.idOrden === idOrden)).toBe(true);
 
     // (3) Cargo EsMa propuesto: cantidad propuesta = 10, precio = 8.
     const cola = await listarCargosEsMa(sesion(), { estado: 'propuesto' }, bd());
@@ -600,5 +609,149 @@ describe('Cola de validación EsMa y recibos semanales (F3-E4)', () => {
     expect(semanal.filas[0]?.totalPrimeras).toBe(8);
     expect(semanal.filas[0]?.totalSegundas).toBe(2);
     expect(semanal.filas[0]?.numRecibos).toBe(1);
+  });
+});
+
+// El BACKFILL de la migración `20260627120000_f6_e2_pt_por_orden` (copiado AQUÍ verbatim) repuebla el
+// `id_orden` de los movimientos de PT que ya estaban en `prueba` antes de la columna. Se prueba
+// simulando el estado pre-migración (poner `id_orden = NULL` en lo que el dominio ya etiquetó) y
+// corriendo los dos UPDATE; deben re-derivar la orden del recibo/entrega y de su cancelación.
+const SQL_BACKFILL_RECIBO_ENTREGA = `
+  UPDATE "movimiento_det_pt" AS d
+  SET "id_orden" = em."id_orden"
+  FROM "movimientos" AS m
+  JOIN "etapa_movimiento" AS em ON em."id"::text = m."origen_id"
+  WHERE d."id_movimiento" = m."id"
+    AND m."origen_tipo" IN ('recibo-maquila', 'entrega-cliente')
+    AND m."origen_id" IS NOT NULL
+    AND d."id_orden" IS NULL
+`;
+const SQL_BACKFILL_CANCELACION = `
+  UPDATE "movimiento_det_pt" AS inv
+  SET "id_orden" = orig."id_orden"
+  FROM "movimientos" AS m_inv
+  JOIN "movimientos" AS m_orig ON m_orig."id"::text = m_inv."origen_id"
+  JOIN "movimiento_det_pt" AS orig
+    ON orig."id_movimiento" = m_orig."id"
+    AND orig."id_modelo" = inv."id_modelo"
+    AND orig."id_color" = inv."id_color"
+    AND orig."id_talla" = inv."id_talla"
+  WHERE inv."id_movimiento" = m_inv."id"
+    AND m_inv."origen_tipo" = 'cancelacion'
+    AND inv."id_orden" IS NULL
+    AND orig."id_orden" IS NOT NULL
+`;
+
+describe('Backfill PT por orden (migración F6-E2)', () => {
+  it('repuebla id_orden de un recibo a partir de su etapa (origen → orden)', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    // Simula el estado PRE-migración: borra el id_orden que el dominio ya puso.
+    await cliente.movimientoDetPt.updateMany({ data: { idOrden: null } });
+    expect(await cliente.movimientoDetPt.count({ where: { idOrden: { not: null } } })).toBe(0);
+
+    await cliente.$executeRawUnsafe(SQL_BACKFILL_RECIBO_ENTREGA);
+
+    const dets = await cliente.movimientoDetPt.findMany({ select: { idOrden: true } });
+    expect(dets.length).toBeGreaterThan(0);
+    expect(dets.every((d) => d.idOrden === idOrden)).toBe(true);
+  });
+
+  it('la cancelación de un recibo hereda el id_orden del original (backfill en 2 pasos)', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'prueba backfill' }, bd());
+
+    // Estado pre-migración: original (recibo) + inverso (cancelación), ambos sin id_orden.
+    await cliente.movimientoDetPt.updateMany({ data: { idOrden: null } });
+    await cliente.$executeRawUnsafe(SQL_BACKFILL_RECIBO_ENTREGA); // (a) primero el original
+    await cliente.$executeRawUnsafe(SQL_BACKFILL_CANCELACION); // (b) luego el inverso
+
+    const dets = await cliente.movimientoDetPt.findMany({ select: { idOrden: true } });
+    expect(dets.length).toBeGreaterThan(0);
+    // TODO renglón (original e inverso) quedó etiquetado con la orden → la existencia por orden cuadra.
+    expect(dets.every((d) => d.idOrden === idOrden)).toBe(true);
+  });
+
+  it('NO toca un movimiento MANUAL de PT: su id_orden sigue NULL tras el backfill', async () => {
+    await cortarBase();
+    await enviar(procesoCostura, maquileroCostura, 10);
+    // Recibo de costura: su entrada a PT nace ETIQUETADA con la orden (el dominio pone id_orden).
+    await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        idAlmacenPrimeras: almPrimeras.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    // Movimiento MANUAL de PT (entrada suelta, SIN orden): su detalle nace con id_orden NULL.
+    const tipoEntrada = await cliente.tipoMovimientoInventario.findFirstOrThrow({
+      where: { codigo: 'entrada-maquila' },
+    });
+    await registrarMovimientoPt(
+      sesion(['inventario-pt.mover']),
+      {
+        idTipoMov: tipoEntrada.id,
+        idAlmacen: almPrimeras.id,
+        idModelo: modelo.id,
+        fecha: '2026-06-21',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+
+    // Estado PRE-migración: anula el id_orden que el dominio ya puso (el manual ya era NULL).
+    await cliente.movimientoDetPt.updateMany({ data: { idOrden: null } });
+    await cliente.$executeRawUnsafe(SQL_BACKFILL_RECIBO_ENTREGA);
+    await cliente.$executeRawUnsafe(SQL_BACKFILL_CANCELACION);
+
+    // El recibo SÍ recuperó su orden…
+    const detsRecibo = await cliente.movimientoDetPt.findMany({
+      where: { movimiento: { origenTipo: 'recibo-maquila' } },
+      select: { idOrden: true },
+    });
+    expect(detsRecibo.length).toBeGreaterThan(0);
+    expect(detsRecibo.every((d) => d.idOrden === idOrden)).toBe(true);
+
+    // …pero el MANUAL sigue SIN orden: el backfill solo toca recibo/entrega y su cancelación.
+    const detsManual = await cliente.movimientoDetPt.findMany({
+      where: { movimiento: { origenTipo: 'movimiento-manual' } },
+      select: { idOrden: true },
+    });
+    expect(detsManual.length).toBeGreaterThan(0);
+    expect(detsManual.every((d) => d.idOrden === null)).toBe(true);
   });
 });
