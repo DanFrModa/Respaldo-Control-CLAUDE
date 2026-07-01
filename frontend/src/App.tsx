@@ -51,7 +51,9 @@ import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPag
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
+import { AltaAuditoriaPagina } from '@/modulos/calidad/AltaAuditoriaPagina';
 import { CalidadPagina } from '@/modulos/calidad/CalidadPagina';
+import { CapturaAuditoriaPagina } from '@/modulos/calidad/CapturaAuditoriaPagina';
 import { DefectosPagina } from '@/modulos/calidad/DefectosPagina';
 import { PlanesAqlPagina } from '@/modulos/calidad/PlanesAqlPagina';
 import { TiposProductoPagina } from '@/modulos/calidad/TiposProductoPagina';
@@ -179,6 +181,9 @@ const router = createBrowserRouter([
           { path: 'calidad/defectos', element: <DefectosPagina /> },
           { path: 'calidad/tipos-producto', element: <TiposProductoPagina /> },
           { path: 'calidad/planes-aql', element: <PlanesAqlPagina /> },
+          // Auditorías de calidad (F6-E2): alta + captura de resultados.
+          { path: 'calidad/auditorias/nueva', element: <AltaAuditoriaPagina /> },
+          { path: 'calidad/auditorias/:id', element: <CapturaAuditoriaPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

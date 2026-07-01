@@ -70,3 +70,5 @@ Reglas:
 | [ADR-0010](ADR-0010-motor-kardex-produccion.md)    | Motor de kardex genérico y modelo de datos de Producción (F3-E1)  | Aceptado |
 | [ADR-0011](ADR-0011-eventos-outbox-pgboss.md)      | Eventos de dominio con OUTBOX transaccional + pg-boss (F4-E3)     | Aceptado |
 | [ADR-0012](ADR-0012-motor-rc-duracion-y-jobs.md)   | Motor de la RC (pt1): fórmula de duración + jobs pg-boss con serialización por orden (F5-E3) | Aceptado |
+| [ADR-0013](ADR-0013-cpm-backward-pass-y-semaforo.md) | Motor de la RC (pt2): CPM backward-pass + semáforo (F5-E4)        | Aceptado |
+| [ADR-0014](ADR-0014-pt-por-orden.md)               | Existencia de PT por ORDEN de producción (enmienda de ADR-0010, F6-E2) | Aceptado |

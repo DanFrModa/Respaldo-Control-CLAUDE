@@ -1,6 +1,7 @@
 # ADR-0010 — Motor de kardex genérico y modelo de datos de Producción (F3-E1)
 
-- **Estado:** Aceptado
+- **Estado:** Aceptado (enmendado por [ADR-0014](ADR-0014-pt-por-orden.md): la existencia de PT
+  agrega la dimensión ORDEN, `MovimientoDetPt.idOrden` NULLABLE — F6-E2).
 - **Fecha:** 2026-06-17
 - **Decisores:** Gabriel (dueño de la ejecución; firma el diseño del esquema/ADR ANTES de codificar
   el motor — `docs/hoja-de-ruta/F3-etapas.md` §F3-E1, regla de los 2 reviewers de PLANMAESTRO §9.1).

@@ -561,12 +561,14 @@ export async function registrarReciboMaquila(
     // segundas → almacén segundas. El motor abre el movimiento dentro de ESTA transacción ({ tx }).
     if (meteAPt) {
       const idModelo = await modeloDeLaOrden(tx, datos.idOrden);
+      // PT por orden (F6-E2): la entrada de PT queda etiquetada con la orden del recibo.
       const lineasPrimeras = celdas
         .filter((c) => c.primeras > 0)
         .map<LineaMovimientoPt>((c) => ({
           idModelo,
           idColor: c.idColor,
           idTalla: c.idTalla,
+          idOrden: datos.idOrden,
           cantidad: c.primeras,
         }));
       const lineasSegundas = celdas
@@ -575,6 +577,7 @@ export async function registrarReciboMaquila(
           idModelo,
           idColor: c.idColor,
           idTalla: c.idTalla,
+          idOrden: datos.idOrden,
           cantidad: c.segundas,
         }));
       const tipoEntrada = await tipoPorCodigo(tx, COD_ENTRADA_MAQUILA);

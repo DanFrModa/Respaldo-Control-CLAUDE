@@ -1,14 +1,17 @@
-import { CheckCircle, ClipboardList, Medal, type LucideIcon } from 'lucide-react';
+import { CheckCircle, ClipboardCheck, ClipboardList, Medal, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import type { ClavePermiso } from '@/api/tipos';
 import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
  * Portada del modulo Calidad (patron portada-hub, calca CatalogosPagina.tsx):
- * tarjetas con los sub-catalogos del modulo. Solo muestra los que el usuario
- * puede ver (`calidad.ver`). La decision real de acceso la toma el backend (A1).
+ * tarjetas con los sub-catalogos del modulo. Cada tarjeta se filtra por SU
+ * propio permiso (los catalogos por `calidad.ver`, las auditorias por
+ * `calidad.generar-auditorias`), igual que el menu de catalogo.ts. La decision
+ * real de acceso la toma el backend (A1).
  */
 
 interface SubvistaCalidad {
@@ -18,9 +21,20 @@ interface SubvistaCalidad {
   ruta: string;
   icono: LucideIcon;
   tono: Tono;
+  permiso: ClavePermiso;
 }
 
 const SUB_VISTAS: readonly SubvistaCalidad[] = [
+  {
+    clave: 'auditorias',
+    titulo: 'Auditorías de calidad',
+    descripcion:
+      'Inspecciona una muestra de una orden, captura fallas y resuelve aprobar/reprobar.',
+    ruta: '/calidad/auditorias/nueva',
+    icono: ClipboardCheck,
+    tono: 'pt',
+    permiso: 'calidad.generar-auditorias',
+  },
   {
     clave: 'defectos',
     titulo: 'Catálogo de defectos',
@@ -28,6 +42,7 @@ const SUB_VISTAS: readonly SubvistaCalidad[] = [
     ruta: '/calidad/defectos',
     icono: ClipboardList,
     tono: 'servicios',
+    permiso: 'calidad.ver',
   },
   {
     clave: 'tipos-producto',
@@ -36,6 +51,7 @@ const SUB_VISTAS: readonly SubvistaCalidad[] = [
     ruta: '/calidad/tipos-producto',
     icono: CheckCircle,
     tono: 'avios',
+    permiso: 'calidad.ver',
   },
   {
     clave: 'planes-aql',
@@ -44,12 +60,13 @@ const SUB_VISTAS: readonly SubvistaCalidad[] = [
     ruta: '/calidad/planes-aql',
     icono: Medal,
     tono: 'telas',
+    permiso: 'calidad.ver',
   },
 ];
 
 export function CalidadPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
-  const visibles = SUB_VISTAS.filter(() => tienePermiso('calidad.ver'));
+  const visibles = SUB_VISTAS.filter((sub) => tienePermiso(sub.permiso));
 
   return (
     <div className="h-full overflow-y-auto">

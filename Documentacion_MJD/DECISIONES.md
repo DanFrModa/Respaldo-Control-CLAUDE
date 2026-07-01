@@ -476,3 +476,17 @@ abajo. La ubicación final del módulo de Calidad (D8) sigue por definir.
 - **Aplica en:** F6-E4 (modelo + recibo R9) y F6-E5 (estado de cuenta segmentado).
 
 - **Fecha (a–h):** 2026-06-24. Cerradas con Daniel; relayed por Gabriel.
+
+#### (i) PT ligado a la ORDEN de producción en el inventario
+
+- **Contexto:** al construir la reclasificación Primeras↔Segundas de la auditoría (E2), esta operaba sobre el stock del **modelo** (el kardex PT era por modelo×color×talla×almacén, sin orden). Daniel: *"es importante que la mercancía esté ligada a la orden de producción en el inventario."*
+- **Decisión:** el inventario de Producto Terminado lleva la **orden como dimensión**. Técnicamente: `movimiento_det_pt.idOrden` (NULLABLE) + la vista `existencia_pt` agrupa por orden; los flujos que conocen la orden la pueblan (recibo de maquila, entrega a cliente, reclasificación de auditoría); los que no (movimientos/traspasos manuales, ETL histórico) quedan en el **bucket `idOrden IS NULL`**. La **reclasificación de la auditoría opera solo sobre las prendas de la orden auditada**, no del modelo entero. Esto **restaura** el comportamiento de v1 (`IPT_Modelos.IdOrdenes`), que se había perdido al aplanar el ETL de F3-E6 por `NumMod`.
+- **Consecuencia intencional:** una entrega ahora se valida contra el stock **de esa orden**; el PT histórico/manual (bucket sin orden) no se entrega "por orden" (habría que ligarlo antes). Enriquecer el **histórico** por orden (re-ETL desde `IPT_Modelos.IdOrdenes`) queda **pendiente para F9** (no bloquea).
+- **Aplica en:** F6-E2 (reclasificación por orden) + F3 (motor kardex, recibo, entrega, existencias/pantallas) — cambio "PT por orden", documentado en **ADR-0014** (enmienda ADR-0010).
+
+#### (j) Reclasificar Primeras/Segundas es INDEPENDIENTE del veredicto de la auditoría
+
+- **Decisión:** reclasificar prendas a Segundas **no** exige que la auditoría esté reprobada. Daniel: *"siempre van a haber prendas de segunda; siempre que se reciben las prendas deben venir clasificadas primeras/segundas, aunque la auditoría esté aprobada."* La clasificación primaria ocurre al **recibir** (recibo de maquila, F3); la reclasificación de la auditoría es un ajuste que puede hacerse con cualquier estado del veredicto. **Confirma** el comportamiento ya construido en E2.
+- **Aplica en:** F6-E2 (reclasificación).
+
+- **Fecha (i–j):** 2026-06-27, respondidas por Daniel (relayed por Gabriel); (i) implementada como el cambio "PT por orden" el 2026-07-01.

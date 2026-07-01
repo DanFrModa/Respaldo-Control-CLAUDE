@@ -18,6 +18,8 @@ const existencias: ExistenciasPt = {
       ordenTalla: 1,
       idAlmacen: 3,
       almacen: 'Primeras',
+      idOrden: 9,
+      folioOrden: 42,
       existencia: 30,
     },
   ],
@@ -49,5 +51,7 @@ describe('ExistenciasPtPagina (F3-E3)', () => {
     expect(screen.getAllByText('A-100').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Primeras').length).toBeGreaterThan(0);
     expect(screen.getAllByText('30').length).toBeGreaterThan(0);
+    // PT por orden (F6-E2): la fila muestra a qué orden pertenecen las prendas.
+    expect(screen.getAllByText('Orden #42').length).toBeGreaterThan(0);
   });
 });

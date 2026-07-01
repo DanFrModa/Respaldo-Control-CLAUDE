@@ -965,6 +965,32 @@ export type ResolverPlanQuery = NonNullable<
   paths['/api/calidad/planes-aql/resolver']['get']['parameters']['query']
 >;
 
+/** Una auditoría de calidad con su detalle y sugerencia (`GET /api/calidad/auditorias/{id}`). */
+export type Auditoria =
+  paths['/api/calidad/auditorias/{id}']['get']['responses']['200']['content']['application/json'];
+/** Un renglón defecto → fallas de una auditoría. */
+export type AuditoriaDefecto = Auditoria['defectos'][number];
+/** Veredicto de una auditoría (aprobado/reprobado/no_calificado). */
+export type ResultadoAuditoria = Auditoria['resultado'];
+/** Tipo de auditoría (en piso / final / sin definir). */
+export type TipoAuditoria = Auditoria['tipoAuditoria'];
+/** Sugerencia AQL informativa de una auditoría. */
+export type SugerenciaAql = Auditoria['sugerencia'];
+/** Cuerpo de alta de auditoría (`POST /api/calidad/auditorias`). */
+export type AuditoriaCrear =
+  paths['/api/calidad/auditorias']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de captura de resultado (`PATCH /api/calidad/auditorias/{id}/resultado`). */
+export type AuditoriaResultado =
+  paths['/api/calidad/auditorias/{id}/resultado']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de reclasificación (`POST /api/calidad/auditorias/{id}/reclasificacion`). */
+export type AuditoriaReclasificacion =
+  paths['/api/calidad/auditorias/{id}/reclasificacion']['post']['requestBody']['content']['application/json'];
+/** Contexto de una orden para el alta (`GET /api/calidad/auditorias/orden/{idOrden}/contexto`). */
+export type AuditoriaContexto =
+  paths['/api/calidad/auditorias/orden/{idOrden}/contexto']['get']['responses']['200']['content']['application/json'];
+/** Un maquilero propuesto en el contexto de la orden. */
+export type MaquileroPropuesto = AuditoriaContexto['maquileros'][number];
+
 /** Página de bitácora (`GET /api/admin/bitacora`). */
 export type BitacoraPagina =
   paths['/api/admin/bitacora']['get']['responses']['200']['content']['application/json'];

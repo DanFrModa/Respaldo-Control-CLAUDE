@@ -77,17 +77,17 @@ async function crearProveedorConRol(nombre: string, codigoRol: string): Promise<
   });
 }
 
-/** Crea una orden con matriz: Rojo (CH 10, M 20). Devuelve su id. */
-async function crearOrdenConMatriz(): Promise<number> {
+/** Crea una orden con matriz: Rojo (CH 10, M 20). Devuelve su id. `folio` distingue varias órdenes. */
+async function crearOrdenConMatriz(folio = 1n): Promise<number> {
   const pedido = await cliente.pedido.create({
-    data: { folio: 1n, idEmpresa: empresa.id, idCliente: clienteNegocioId },
+    data: { folio, idEmpresa: empresa.id, idCliente: clienteNegocioId },
   });
   const linea = await cliente.pedidoLinea.create({
     data: { idPedido: pedido.id, idModelo: modelo.id, cantidadPedida: 30, precio: 10 },
   });
   const orden = await cliente.orden.create({
     data: {
-      folio: 1n,
+      folio,
       idEmpresa: empresa.id,
       idPedidoLinea: linea.id,
       idModelo: modelo.id,
@@ -266,6 +266,44 @@ describe('Entrega a cliente — salida de PT (F3-E5)', () => {
     const e1 = await entregar(3);
     const e2 = await entregar(2);
     expect(e2.folio).toBe(e1.folio + 1);
+  });
+
+  it('(g) PT por orden: la entrega valida contra la ORDEN, no contra el total del modelo', async () => {
+    // 10 piezas de Rojo/CH entran a PT en el bucket de `idOrden` (vía su recibo de costura).
+    await meterAInventario(10);
+
+    // Una SEGUNDA orden del MISMO modelo, sin stock propio en PT.
+    const idOrden2 = await crearOrdenConMatriz(2n);
+
+    // Entregar desde la 2ª orden DEBE fallar: su bucket de existencia está en 0, aunque el modelo
+    // tenga 10 en el almacén (pertenecen a la 1ª orden). Esto es el objetivo de "PT por orden".
+    await expect(
+      registrarEntregaCliente(
+        sesion(),
+        {
+          idOrden: idOrden2,
+          idAlmacen: almacen.id,
+          fecha: '2026-06-21',
+          lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 1 }] }],
+        },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // El stock de la 1ª orden sigue intacto y la existencia trae la orden + su folio desglosados.
+    const existencias = await consultarExistenciasPt(sesion(), { idModelo: modelo.id }, bd());
+    expect(existencias.totalExistencia).toBe(10);
+    const fila = existencias.filas.find((f) => f.idTalla === tallaCH.id);
+    expect(fila?.idOrden).toBe(idOrden);
+    expect(fila?.folioOrden).toBe(1);
+
+    // Filtrar la consulta por la 2ª orden devuelve 0 filas (no tiene existencia).
+    const dosVacia = await consultarExistenciasPt(
+      sesion(),
+      { idModelo: modelo.id, idOrden: idOrden2 },
+      bd(),
+    );
+    expect(dosVacia.totalExistencia).toBe(0);
   });
 });
 
