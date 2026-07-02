@@ -52,9 +52,15 @@ let clienteNegocioId: number;
 let idOrden: number;
 
 const PERM_TODOS: ClavePermiso[] = [
+  // Permisos de los PASOS DE ARRANGE (corte/envío/recibo mueven WIP + kardex PT): mismos que
+  // `recibos.int.test.ts` (que sí pasa) — incluye `produccion.wip-ver` (obtenerRecibo lo exige) y
+  // `inventario-pt.ver`.
   'produccion.corte',
   'produccion.envio',
   'produccion.recibo',
+  'produccion.cancelar',
+  'produccion.wip-ver',
+  'inventario-pt.ver',
   'esma.cargo-validar',
   'esma.modificar',
   'esma.ver-pagos',

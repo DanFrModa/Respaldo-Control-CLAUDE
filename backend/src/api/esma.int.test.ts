@@ -80,9 +80,8 @@ async function sembrarCargoValidado(): Promise<void> {
   const modelo = await cliente.modelo.create({ data: { codigo: 'A-100', descripcion: 'Playera' } });
   const color = await cliente.color.create({ data: { nombre: 'Rojo' } });
   const talla = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
-  const proceso = await cliente.tipoProceso.create({
-    data: { codigo: 'costura', nombre: 'Costura', generaEntradaPt: true },
-  });
+  // El TipoProceso 'costura' YA lo siembra el seed (F3-E1): se REUSA (crearlo choca con su @unique).
+  const proceso = await cliente.tipoProceso.findFirstOrThrow({ where: { codigo: 'costura' } });
   const maquilero = await cliente.proveedor.create({ data: { nombre: 'Maquila Costura SA' } });
   idMaquilero = maquilero.id;
   const pedido = await cliente.pedido.create({
