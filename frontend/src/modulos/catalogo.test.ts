@@ -31,14 +31,15 @@ describe('catalogo de modulos del menu', () => {
     // Administración (bitácora) = 45 sub-vistas → 58 entradas. F6-E2: +1 sub-vista de Calidad
     // (auditorías de calidad, `calidad.generar-auditorias`) = 46 sub-vistas → 59 entradas. F6-E3:
     // +2 sub-vistas de Calidad (consulta de auditorías e historial por maquilero, `calidad.ver`) =
-    // 48 sub-vistas → 61 entradas en total.
+    // 48 sub-vistas → 61 entradas. F6-E4: +4 sub-vistas de EsMa (conciliación y pagos con
+    // `esma.ver-pagos`; abonos y descuentos con `esma.modificar`) = 52 sub-vistas → 65 entradas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(61);
+    expect(MODULOS_MENU).toHaveLength(65);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(61);
+    expect(new Set(claves).size).toBe(65);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(61);
+    expect(new Set(rutas).size).toBe(65);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

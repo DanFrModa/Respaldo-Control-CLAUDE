@@ -1,12 +1,22 @@
 /**
- * CARGOS EsMa — cola de validación derivada de los recibos (F3-E4; doc 07-EsMa §2). Toda la lógica
- * de negocio vive AQUÍ (A1); las rutas REST solo validan permiso + Zod y delegan.
+ * CARGOS EsMa — cola de validación derivada de los recibos (F3-E4) + su cierre contable (F6-E4;
+ * doc 07-EsMa §2/§6, DECISIONES.md §F6 (e)/(f)/(h)). Toda la lógica de negocio vive AQUÍ (A1);
+ * las rutas REST solo validan permiso + Zod y delegan.
  *
  * Un recibo de maquila crea un `EsMaCargo` en estado `propuesto` (F3-E4 `registrarReciboMaquila`):
- * la CANTIDAD propuesta se DERIVA del recibo (piezas recibidas) y el PRECIO propuesto del envío (que
- * puede ser NULL). El admin VALIDA el cargo fijando la cantidad y el precio REALES (punto de control
- * humano conservado de v1). El estado de cuenta completo (abonos, saldos) es de F6: aquí solo la
- * cola de validación.
+ * la CANTIDAD propuesta se DERIVA del recibo (piezas recibidas). El admin VALIDA el cargo fijando la
+ * cantidad y el precio REALES (punto de control humano conservado de v1).
+ *
+ * Reglas de F6-E4:
+ *  • PRECIO PROPUESTO de referencia (decisión (e)): el cargo se valúa con el precio de la ORDEN por
+ *    tipo de proceso — `maquilaOrd` para COSTURA, `aplicacionOrd` para ESTAMPADO/APLICACIÓN (y demás
+ *    procesos que no son costura). Corrige el bug v1 (`EsMaRecibosSemEstCon` usaba `MaquilaOrd` para el
+ *    estampado). Si la orden no trae ese precio, cae al `precioPactado` del recibo como referencia.
+ *  • Al VALIDAR se fija `conFactura` según la modalidad del proveedor (decisión (h)) y se admite
+ *    marcar el cargo `sinCosto` (segundas no pagadas, decisión (f)): un cargo sin costo se EXCLUYE del
+ *    saldo y del pago.
+ *  • Los estados de conciliación "capturado/revisado/pagado" se PROYECTAN (no se persisten aparte):
+ *    propuesto=capturado, validado=revisado, validado+totalmente-pagado=pagado, cancelado=cancelado.
  *
  * Innegociables: A1 (lógica aquí), A2 (la validación es una transacción), A4 (`esma.cargo-validar`),
  * A7 (bitácora), A9 (empresa activa). NO toca kardex (D3 no aplica: el cargo es CxP de maquila).
@@ -26,11 +36,13 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-/** `include` para proyectar un cargo con sus nombres legibles y la cantidad recibida (propuesta). */
+import { resolverConFactura } from './facturacion.js';
+
+/** `include` para proyectar un cargo con sus nombres legibles, la cantidad recibida y los precios. */
 const incluirCargo = {
   maquilero: { select: { nombre: true } },
-  orden: { select: { folio: true } },
-  tipoProceso: { select: { nombre: true } },
+  orden: { select: { folio: true, maquilaOrd: true, aplicacionOrd: true } },
+  tipoProceso: { select: { nombre: true, codigo: true } },
   etapaRecibo: {
     select: {
       folio: true,
@@ -43,20 +55,50 @@ const incluirCargo = {
 type CargoConDetalle = Prisma.EsMaCargoGetPayload<{ include: typeof incluirCargo }>;
 
 /**
- * Proyecta un cargo a la forma JSON del contrato. La cantidad/precio PROPUESTOS se DERIVAN del
- * recibo (cantidad = Σ del detalle del recibo; precio = precioPactado del recibo) — el cargo solo
- * persiste lo REAL que el admin validó (NULL mientras esté propuesto). El importe propuesto es null
- * si el recibo no traía precio.
+ * Proyecta un cargo a la forma JSON del contrato. La cantidad PROPUESTA se DERIVA del recibo; el
+ * PRECIO propuesto de referencia sale de la orden por tipo de proceso (decisión (e)) con fallback al
+ * `precioPactado` del recibo. El cargo persiste lo REAL (NULL mientras esté propuesto).
  */
 function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
   const cantidadPropuesta = (c.etapaRecibo?.detalles ?? []).reduce((s, d) => s + d.cantidad, 0);
+
+  // (e) Precio de referencia por proceso: costura → maquilaOrd; estampado/aplicación/otros → aplicacionOrd.
+  const esCostura = c.tipoProceso.codigo === 'costura';
+  const precioOrden = esCostura ? c.orden.maquilaOrd : c.orden.aplicacionOrd;
   const precioPropuesto =
-    c.etapaRecibo?.precioPactado == null ? null : c.etapaRecibo.precioPactado.toNumber();
+    precioOrden != null
+      ? precioOrden.toNumber()
+      : c.etapaRecibo?.precioPactado == null
+        ? null
+        : c.etapaRecibo.precioPactado.toNumber();
   const importePropuesto = precioPropuesto === null ? null : cantidadPropuesta * precioPropuesto;
+
   const cantidadReal = c.cantidadReal === null ? null : c.cantidadReal.toNumber();
   const precioReal = c.precioReal === null ? null : c.precioReal.toNumber();
   const importeReal =
     cantidadReal === null || precioReal === null ? null : cantidadReal * precioReal;
+
+  const cantidadPagada = c.cantidadPagada.toNumber();
+  const esValidado = c.estado === 'validado';
+  const porPagar =
+    esValidado && !c.sinCosto && cantidadReal !== null
+      ? Math.max(0, cantidadReal - cantidadPagada)
+      : 0;
+  const pagado =
+    esValidado &&
+    !c.sinCosto &&
+    cantidadReal !== null &&
+    cantidadReal > 0 &&
+    cantidadPagada >= cantidadReal;
+
+  const estadoConciliacion =
+    c.estado === 'cancelado'
+      ? ('cancelado' as const)
+      : c.estado === 'propuesto'
+        ? ('capturado' as const)
+        : pagado
+          ? ('pagado' as const)
+          : ('revisado' as const);
 
   return {
     id: c.id,
@@ -75,7 +117,13 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
     cantidadReal,
     precioReal,
     importeReal,
+    sinCosto: c.sinCosto,
+    conFactura: c.conFactura,
+    cantidadPagada,
+    porPagar,
+    pagado,
     estado: c.estado,
+    estadoConciliacion,
     observaciones: c.observaciones,
     validadoEn: c.validadoEn === null ? null : c.validadoEn.toISOString(),
     validadoPorId: c.validadoPorId,
@@ -85,7 +133,8 @@ function aCargoSalida(c: CargoConDetalle): CargoEsMaSalida {
 
 /**
  * Lista la COLA de cargos EsMa de la empresa activa (A9), por estado (default `propuesto`) y opcional
- * por maquilero. Permiso `esma.cargo-validar` (A4): la cola es la herramienta de quien valida.
+ * por maquilero. Permiso `esma.cargo-validar` (A4): la cola es la herramienta de quien valida y por
+ * tanto SÍ ve los precios (no se ocultan aquí: no se puede validar un precio que no se ve).
  * Devuelve las filas + la suma de los importes propuestos (los que tienen precio).
  */
 export async function listarCargosEsMa(
@@ -130,10 +179,11 @@ export async function obtenerCargoEsMa(
 }
 
 /**
- * VALIDA un cargo `propuesto` → `validado`, fijando la cantidad y el precio REALES (el admin
- * confirma o ajusta los propuestos). En UNA transacción (A2): actualiza el cargo + bitácora (A7).
- * Solo cargos `propuesto` de la empresa activa (A9). Permiso `esma.cargo-validar` (A4). El estado de
- * cuenta (abonos/saldos) es de F6 — aquí solo se cierra el punto de control humano.
+ * VALIDA un cargo `propuesto` → `validado`, fijando la cantidad y el precio REALES (el admin confirma
+ * o ajusta los propuestos). Además (F6-E4): fija `conFactura` según la modalidad del proveedor
+ * (decisión (h)) y admite marcar el cargo `sinCosto` (decisión (f)). En UNA transacción (A2):
+ * actualiza el cargo + bitácora (A7). Solo cargos `propuesto` de la empresa activa (A9). Permiso
+ * `esma.cargo-validar` (A4).
  */
 export async function validarCargoEsMa(
   sesion: SesionUsuario,
@@ -147,7 +197,11 @@ export async function validarCargoEsMa(
   await enTransaccion(async (tx) => {
     const cargo = await tx.esMaCargo.findFirst({
       where: { id: idCargo, idEmpresa: sesion.idEmpresaActiva },
-      select: { id: true, estado: true },
+      select: {
+        id: true,
+        estado: true,
+        maquilero: { select: { modalidadFacturacion: true } },
+      },
     });
     if (cargo === null) {
       throw new ErrorNoEncontrado('EsMaCargo', idCargo);
@@ -159,11 +213,15 @@ export async function validarCargoEsMa(
       throw new ErrorConflicto('Ese cargo ya fue validado.');
     }
 
+    const conFactura = resolverConFactura(cargo.maquilero.modalidadFacturacion, datos.conFactura);
+
     await tx.esMaCargo.update({
       where: { id: idCargo },
       data: {
         cantidadReal: datos.cantidadReal,
         precioReal: datos.precioReal,
+        sinCosto: datos.sinCosto ?? false,
+        conFactura,
         estado: 'validado',
         validadoEn: new Date(),
         validadoPorId: sesion.id,
@@ -180,6 +238,8 @@ export async function validarCargoEsMa(
         accion: 'validar',
         cantidadReal: datos.cantidadReal,
         precioReal: datos.precioReal,
+        sinCosto: datos.sinCosto ?? false,
+        conFactura,
       },
     });
   }, bd);

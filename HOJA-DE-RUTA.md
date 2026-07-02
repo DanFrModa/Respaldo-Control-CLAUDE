@@ -32,7 +32,7 @@ Construir (F0–F9)     : █████░░░░░  F5 de 10 ✅ · F6 a F
 | **F3 · Producción / WIP** | 6 | ✅ **hecha** (6 etapas, 20-jun-2026) |
 | **F4 · Compras / MRP** | 6 | ✅ COMPLETA (6/6, 22-jun-2026) |
 | **F5 · Ruta Crítica ⭐** | 7 | ✅ COMPLETA (7/7, 23-jun-2026) |
-| **F6 · Calidad + EsMa** | 6 | 🔧 EN CURSO (2/6 — E1 ✅ · E2 ✅ 27-jun-2026) |
+| **F6 · Calidad + EsMa** | 6 | 🔧 EN CURSO (4/6 — E1–E4 ✅, 1-jul-2026) |
 | **F7 · Costos / EDR + Indicadores** | 6 | ⬜ |
 | **F8 · Finanzas (CxC/CxP + CFDI)** | 6 | ⬜ |
 | **F9 · Migración + Go-live** | 7 | ⬜ |
@@ -138,7 +138,7 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **F5-E6** | Auto-avance: eventos de dominio en F3/F4 y suscriptor de la RC | 1 coder + 1 reviewer | ✅ **23-jun-2026** (reviewer APROBADO; pend. verif. Gabriel) |
 | **F5-E7** | Concentrado planeado vs real + exportación + ETL + docs + cierre de fase | 2 coders en paralelo + 1 reviewer | ✅ **23-jun-2026** (reviewer APROBADO, 1 bloqueante corregido; pend. verif. Gabriel) · **cierre de fase F5** |
 
-### F6 · Calidad + EsMa — 🔧 EN CURSO (3/6)
+### F6 · Calidad + EsMa — 🔧 EN CURSO (4/6)
 
 **Salida:** EsMa cuadra contra los recibos del periodo. · **Ficha completa:** [`docs/hoja-de-ruta/F6-etapas.md`](docs/hoja-de-ruta/F6-etapas.md)
 
@@ -146,8 +146,8 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 |---|---|---|---|
 | **F6-E1** | Calidad: catálogo de defectos + motor de planes AQL + consulta de bitácora | 1 coder + 1 reviewer (Calidad y EsMa pueden correr en paralelo) | ✅ **24-jun-2026 (en prueba, PR #80)** |
 | **F6-E2** | Calidad: auditorías con folio atómico + **resultado MANUAL** + integración RC + reclasificación (+ **PT-por-orden**, ADR-0014) | 1 coder + 1 reviewer | ✅ **1-jul-2026 (en prueba, PR #81)** |
-| **F6-E3** | Calidad: consulta e impresión (R9), historial por maquilero, modificar/cancelar | 1 coder + 1 reviewer | ✅ **1-jul-2026 (reviewer APROBÓ; pend. verif. Gabriel)** |
-| **F6-E4** | EsMa: movimientos, validación de cargos, saldos, conciliación, recibo de pago | 1 coder + 1 reviewer | ⬜ |
+| **F6-E3** | Calidad: consulta e impresión (R9), historial por maquilero, modificar/cancelar | 1 coder + 1 reviewer | ✅ **1-jul-2026 (en prueba, PR #82)** |
+| **F6-E4** | EsMa: movimientos, validación de cargos, saldos (derivados D3), conciliación, prendas-por-pagar (g), recibo de pago R9 | 1 coder + 1 reviewer | ✅ **1-jul-2026 (2 reviewers APROBARON; pend. verif. Gabriel)** |
 | **F6-E5** | EsMa: estado de cuenta, consultas semanales, impreso + vista móvil | 1 coder + 1 reviewer | ⬜ |
 | **F6-E6** | ETL Calidad + EsMa, reporte de cuadre v1 vs v2, docs y cierre de fase | 2 coders en paralelo + 1 reviewer | ⬜ |
 

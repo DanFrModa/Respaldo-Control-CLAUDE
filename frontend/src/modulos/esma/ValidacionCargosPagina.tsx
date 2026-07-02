@@ -28,16 +28,10 @@ import {
 } from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
+import { moneda } from './comun';
+
 /** Estados posibles de un cargo, para el filtro. */
 type EstadoCargo = NonNullable<CargosEsMaQuery['estado']>;
-
-/** Formatea un importe en pesos (o "—" si no hay precio). */
-function moneda(monto: number | null): string {
-  if (monto === null) {
-    return '—';
-  }
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(monto);
-}
 
 const BADGE_ESTADO: Record<EstadoCargo, { texto: string; variant: 'secondary' | 'default' }> = {
   propuesto: { texto: 'Propuesto', variant: 'secondary' },
@@ -239,17 +233,23 @@ function DialogoValidarCargo({
   const [cantidadReal, setCantidadReal] = useState('');
   const [precioReal, setPrecioReal] = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [sinCosto, setSinCosto] = useState(false);
+  // Tri-estado: '' = según la modalidad del proveedor (el backend decide); 'con'/'sin' fuerza.
+  const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>('');
 
   useEffect(() => {
     if (cargo !== null) {
       setCantidadReal(String(cargo.cantidadPropuesta));
       setPrecioReal(cargo.precioPropuesto !== null ? String(cargo.precioPropuesto) : '');
       setObservaciones('');
+      setSinCosto(cargo.sinCosto);
+      setConFactura(cargo.conFactura === null ? '' : cargo.conFactura ? 'con' : 'sin');
     }
   }, [cargo]);
 
   const cantInvalida = cantidadReal.trim() === '' || Number(cantidadReal) < 0;
-  const precioInvalido = precioReal.trim() === '' || Number(precioReal) < 0;
+  // Sin costo → importe 0: el precio deja de exigirse (el backend lo excluye del saldo).
+  const precioInvalido = !sinCosto && (precioReal.trim() === '' || Number(precioReal) < 0);
 
   function confirmar(): void {
     if (cargo === null || cantInvalida || precioInvalido) {
@@ -260,7 +260,9 @@ function DialogoValidarCargo({
         id: cargo.id,
         cuerpo: {
           cantidadReal: Number(cantidadReal),
-          precioReal: Number(precioReal),
+          precioReal: sinCosto && precioReal.trim() === '' ? 0 : Number(precioReal),
+          sinCosto,
+          ...(conFactura !== '' ? { conFactura: conFactura === 'con' } : {}),
           ...(observaciones.trim().length > 0 ? { observaciones: observaciones.trim() } : {}),
         },
       },
@@ -307,9 +309,37 @@ function DialogoValidarCargo({
               step="0.01"
               value={precioReal}
               onChange={(e) => setPrecioReal(e.target.value)}
+              disabled={sinCosto}
               data-testid="cargo-precio-real"
             />
           </Field>
+          <Field>
+            <FieldLabel htmlFor="cargo-con-factura">Facturación</FieldLabel>
+            <SelectNativo
+              id="cargo-con-factura"
+              value={conFactura}
+              onChange={(e) => setConFactura(e.target.value as '' | 'con' | 'sin')}
+              data-testid="cargo-con-factura"
+            >
+              <option value="">Según proveedor</option>
+              <option value="con">Con factura</option>
+              <option value="sin">Sin factura</option>
+            </SelectNativo>
+          </Field>
+          <label
+            className="flex items-center gap-2 self-end pb-2 text-sm"
+            htmlFor="cargo-sin-costo"
+          >
+            <input
+              id="cargo-sin-costo"
+              type="checkbox"
+              className="size-4"
+              checked={sinCosto}
+              onChange={(e) => setSinCosto(e.target.checked)}
+              data-testid="cargo-sin-costo"
+            />
+            Sin costo (segundas no pagadas)
+          </label>
           <Field className="sm:col-span-2">
             <FieldLabel htmlFor="cargo-obs">Observaciones</FieldLabel>
             <Input
