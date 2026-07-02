@@ -12,6 +12,10 @@ import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
+import { CapturaMovimientoPagina } from '@/modulos/esma/CapturaMovimientoPagina';
+import { CapturaPagosPagina } from '@/modulos/esma/CapturaPagosPagina';
+import { ConciliacionCargosPagina } from '@/modulos/esma/ConciliacionCargosPagina';
+import { EsMaPagina } from '@/modulos/esma/EsMaPagina';
 import { ValidacionCargosPagina } from '@/modulos/esma/ValidacionCargosPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
@@ -163,7 +167,13 @@ const router = createBrowserRouter([
           { path: 'inventarios/telas/salida-orden', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
+          // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4) y corazón contable (F6-E4).
+          { path: 'esma', element: <EsMaPagina /> },
           { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
+          { path: 'esma/conciliacion', element: <ConciliacionCargosPagina /> },
+          { path: 'esma/abonos', element: <CapturaMovimientoPagina concepto="abonos" /> },
+          { path: 'esma/descuentos', element: <CapturaMovimientoPagina concepto="descuentos" /> },
+          { path: 'esma/pagos', element: <CapturaPagosPagina /> },
           // Ruta Crítica (Módulo 8) — portada-hub de las sub-vistas (antes caía en ":modulo").
           { path: 'ruta-critica', element: <RutaCriticaPagina /> },
           // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.

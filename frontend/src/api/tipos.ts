@@ -850,6 +850,52 @@ export type CargosEsMaQuery = NonNullable<paths['/api/esma/cargos']['get']['para
 export type CargoEsMaValidar =
   paths['/api/esma/cargos/{id}/validar']['post']['requestBody']['content']['application/json'];
 
+// ── EsMa corazón contable: abonos/descuentos/pagos, saldo y conciliación (F6-E4) ──
+
+/** Cuerpo de captura de un abono o descuento (`POST /api/esma/{abonos,descuentos}`). */
+export type EsMaMovimientoCrear =
+  paths['/api/esma/abonos']['post']['requestBody']['content']['application/json'];
+/** Un movimiento plano de EsMa (abono/descuento) tal como lo devuelve el API. */
+export type EsMaMovimiento =
+  paths['/api/esma/abonos']['post']['responses']['201']['content']['application/json'];
+/** Lista de abonos/descuentos de un maquilero (`GET /api/esma/maquileros/{id}/{abonos,descuentos}`). */
+export type EsMaMovimientosLista =
+  paths['/api/esma/maquileros/{id}/abonos']['get']['responses']['200']['content']['application/json'];
+
+/** Cuerpo de captura de un pago ligado a cargos (`POST /api/esma/pagos`). */
+export type EsMaPagoCrear =
+  paths['/api/esma/pagos']['post']['requestBody']['content']['application/json'];
+/** Un renglón de aplicación del pago a un cargo (parte del cuerpo). */
+export type EsMaPagoAplicacionEntrada = EsMaPagoCrear['aplicaciones'][number];
+/** Un pago a un maquilero (con sus aplicaciones a cargos) tal como lo devuelve el API. */
+export type EsMaPago =
+  paths['/api/esma/pagos']['post']['responses']['201']['content']['application/json'];
+/** Una aplicación (cargo cubierto) de un pago. */
+export type EsMaPagoAplicacion = EsMaPago['aplicaciones'][number];
+/** Lista de pagos de un maquilero (`GET /api/esma/maquileros/{id}/pagos`). */
+export type EsMaPagosLista =
+  paths['/api/esma/maquileros/{id}/pagos']['get']['responses']['200']['content']['application/json'];
+
+/** Saldo derivado de un maquilero (`GET /api/esma/maquileros/{id}/saldo`). */
+export type EsMaSaldo =
+  paths['/api/esma/maquileros/{id}/saldo']['get']['responses']['200']['content']['application/json'];
+/** Parámetros del saldo (segmento con/sin factura). */
+export type EsMaSaldoQuery = NonNullable<
+  paths['/api/esma/maquileros/{id}/saldo']['get']['parameters']['query']
+>;
+
+/** Conciliación EsMa vs recibos del periodo (`GET /api/esma/conciliacion`). */
+export type EsMaConciliacion =
+  paths['/api/esma/conciliacion']['get']['responses']['200']['content']['application/json'];
+/** Una fila del cuadre (orden + maquilero + proceso). */
+export type EsMaConciliacionFila = EsMaConciliacion['filas'][number];
+/** Un cargo sin recibo ligado (parte de la conciliación). */
+export type EsMaCargoSinRecibo = EsMaConciliacion['cargosSinRecibo'][number];
+/** Parámetros de la conciliación (querystring). */
+export type EsMaConciliacionQuery = NonNullable<
+  paths['/api/esma/conciliacion']['get']['parameters']['query']
+>;
+
 // ── Entrega a cliente (F3-E5) — cierre del ciclo de la orden ──────────────────
 
 /** Una entrega a cliente tal como la devuelve el API (con su matriz color×talla). */

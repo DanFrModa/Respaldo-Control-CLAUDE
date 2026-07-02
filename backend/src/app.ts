@@ -22,6 +22,9 @@ import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
 import { rutasMrp } from './api/compras/mrp.rutas.js';
 import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
+import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
+import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
+import { rutasCuentaEsMa } from './api/esma/cuenta.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
@@ -200,6 +203,12 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
   // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.
   await app.register(rutasCargosEsMa, { prefix: '/api' });
+  // EsMa (F6-E4) — corazón contable: abonos/descuentos (esma.modificar), pagos ligados a cargos con
+  // anti-doble-pago (esma.ver-pagos) + recibo de pago PDF, saldo derivado (D3), conciliación vs recibos
+  // y estatus "orden pagada" derivado + override. Importes ocultos sin consultas.ver-importes.
+  await app.register(rutasMovimientosEsMa, { prefix: '/api' });
+  await app.register(rutasPagosEsMa, { prefix: '/api' });
+  await app.register(rutasCuentaEsMa, { prefix: '/api' });
   // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
   // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
   // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias

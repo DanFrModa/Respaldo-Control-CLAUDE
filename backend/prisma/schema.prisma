@@ -77,6 +77,12 @@ model Empresa {
   movimientos       Movimiento[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
   cargosEsMa        EsMaCargo[]
+  /// Abonos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
+  abonosMaquilero   AbonoMaquilero[]
+  /// Descuentos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
+  descuentosMaquilero DescuentoMaquilero[]
+  /// Pagos a maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
+  pagosMaquilero    PagoMaquilero[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
   ordenesCompra     OrdenCompra[]
   /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
@@ -543,6 +549,13 @@ model Proveedor {
   /// Observaciones específicas de pago (ex `Maquilero.obsPago`).
   obsPago   String?  @map("obs_pago")
 
+  /// Modalidad de facturación del maquilero para su cuenta EsMa (F6-E4, decisión (h)):
+  /// `solo_con` factura siempre, `solo_sin` nunca, `ambos` opera de las dos formas (y en
+  /// ese caso su estado de cuenta se segmenta en dos, E5). NULLABLE: los proveedores ya
+  /// migrados no lo traen (default sensato en el dominio: se deriva de `factura` en la UI;
+  /// null se trata como "no definido" y exige elegir con-factura por movimiento). Ver enum.
+  modalidadFacturacion ModalidadFacturacion? @map("modalidad_facturacion")
+
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
@@ -559,6 +572,12 @@ model Proveedor {
   etapasMovimiento        EtapaMovimiento[]
   /// Cargos a su cuenta de maquila (EsMa) como maquilero (F3-E1). Restrict.
   cargosEsMa              EsMaCargo[]
+  /// Abonos a su cuenta de maquila (EsMa, F6-E4). Restrict.
+  abonosMaquilero         AbonoMaquilero[]
+  /// Descuentos a su cuenta de maquila (EsMa, F6-E4). Restrict.
+  descuentosMaquilero     DescuentoMaquilero[]
+  /// Pagos recibidos como maquilero (EsMa, F6-E4). Restrict.
+  pagosMaquilero          PagoMaquilero[]
   /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
   lotes                   Lote[]
   /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
@@ -1831,8 +1850,13 @@ model Orden {
   compForzada   Boolean  @default(false) @map("comp_forzada")
   /// Observaciones de maquila (viejo: `ObsMaquila`).
   obsMaquila    String?  @map("obs_maquila") @db.Text
-  /// Maquila ya pagada (viejo: `Pagada`). DATO conservado; su motor (EsMa/finanzas) llega en F6.
+  /// Maquila ya pagada (viejo: `Pagada`). En F6-E4 es un estado DERIVADO (D3): la orden queda
+  /// pagada cuando TODOS sus cargos EsMa pagables (validados, no sin-costo) están pagados. NO se
+  /// edita a mano salvo el override `pagadaForzada`; lo recalcula el dominio al aplicar un pago.
   pagada        Boolean? @map("pagada")
+  /// Override MANUAL AUDITADO de `pagada` (F6-E4, decisión (f)): si viene (true/false) fuerza el
+  /// estatus y la derivación deja de pisarlo; null = derivación automática. Se registra en bitácora.
+  pagadaForzada Boolean? @map("pagada_forzada")
 
   /// Estado DERIVADO (no editable): capturada/completa/cancelada (ver enum `EstadoOrden`).
   estado          EstadoOrden @default(capturada)
@@ -2489,7 +2513,21 @@ model EsMaCargo {
   /// Precio real validado por el admin (F3-E4). NULL mientras esté `propuesto`. Decimal.
   precioReal   Decimal? @map("precio_real") @db.Decimal(12, 2)
 
-  /// Estado del cargo (propuesto/validado/cancelado). Ver enum `EstadoCargoEsMa`.
+  /// Prendas de este cargo YA PAGADAS (F6-E4, decisión (g) — "prendas por pagar"). Suma de las
+  /// `PagoAplicacion.cantidad` que consumió este cargo; se actualiza bajo lock por maquilero al
+  /// aplicar un pago. El "pagado" se DERIVA (cantidadPagada ≥ cantidadReal): no hay bandera editable.
+  cantidadPagada Decimal @default(0) @map("cantidad_pagada") @db.Decimal(14, 2)
+  /// Segundas SIN COSTO (F6-E4, decisión (f)): prenda reclasificada a 2ª que NO se le paga al
+  /// maquilero. Un cargo `sinCosto` se EXCLUYE del saldo y del pago (importe 0). Default false.
+  sinCosto       Boolean @default(false) @map("sin_costo")
+  /// Modalidad de facturación de ESTE movimiento (F6-E4, decisión (h)): true con factura, false sin
+  /// factura, null sin definir. Se fija al VALIDAR según la `modalidadFacturacion` del proveedor.
+  conFactura     Boolean? @map("con_factura")
+
+  /// Estado del cargo (propuesto/validado/cancelado). Ver enum `EstadoCargoEsMa`. NOTA (F6-E4): los
+  /// 3 estados de conciliación "capturado/revisado/pagado" NO se persisten aparte — se PROYECTAN de
+  /// `estado` (propuesto=capturado, validado=revisado) + `cantidadPagada` (pagado). No hay columna
+  /// redundante `estadoConciliacion` (D3: un solo dato de verdad).
   estado        EstadoCargoEsMa @default(propuesto)
   observaciones String?         @db.Text
 
@@ -2502,6 +2540,10 @@ model EsMaCargo {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  /// Pagos aplicados a este cargo (F6-E4, puente N:N; decisión (g)). Restrict (no borrar un cargo
+  /// con pagos aplicados).
+  aplicacionesPago PagoAplicacion[]
+
   @@index([idEmpresa])
   @@index([idEtapaRecibo])
   @@index([idMaquilero])
@@ -2509,6 +2551,146 @@ model EsMaCargo {
   @@index([idTipoProceso])
   @@index([estado])
   @@map("esma_cargo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EsMa — MOVIMIENTOS de la cuenta corriente de maquileros (F6-E4, doc
+// `Documentacion_MJD/07-EsMa-Estados-de-Cuenta-Maquileros.md`; DECISIONES.md §F6 (e)–(h)).
+// Corazón contable: los 3 conceptos PLANOS que completan el ciclo junto al cargo (nacido en
+// F3). "Planos" = sin encabezado EsMa; el maquilero + la fecha + las observaciones viven en
+// CADA movimiento (mejora sobre el viejo, que llevaba un encabezado por maquilero). Todos con
+// `idEmpresa` (A9, Restrict), `idMaquilero`→Proveedor (Restrict), `monto` Decimal(14,2), `fecha`,
+// `conFactura` (decisión h), `estadoRevision` (asteriscos Rev del viejo → E5) y auditoría A7.
+// El SALDO NUNCA se persiste: es la suma derivada (D3) `Σcargos + Σabonos − Σpagos − Σdescuentos`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Modalidad de facturación de un maquilero/movimiento EsMa (F6-E4, decisión (h), R15). `ambos`
+/// obliga a elegir con/sin factura por movimiento (y su estado de cuenta se segmenta en dos, E5).
+enum ModalidadFacturacion {
+  solo_con
+  solo_sin
+  ambos
+
+  @@map("modalidad_facturacion")
+}
+
+/// Estado de revisión de un movimiento EsMa (F6-E4; ex asteriscos `Rev` del `EsMa_EdoCta` viejo).
+/// `capturado` recién metido; `revisado` confirmado por quien supervisa (la transición fina la
+/// opera E5). Default `capturado`.
+enum EstadoRevisionEsMa {
+  capturado
+  revisado
+
+  @@map("estado_revision_esma")
+}
+
+/// ABONO a la cuenta de un maquilero (F6-E4; ex `EsMaAbonos`). Movimiento plano.
+model AbonoMaquilero {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del movimiento (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Maquilero (Proveedor) al que se le abona. Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Importe del abono (positivo). Decimal.
+  monto          Decimal            @db.Decimal(14, 2)
+  /// Fecha del movimiento (date-only).
+  fecha          DateTime           @db.Date
+  /// Con/sin factura (decisión h). Null = sin definir. Se resuelve del proveedor al capturar.
+  conFactura     Boolean?           @map("con_factura")
+  observaciones  String?            @db.Text
+  estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idMaquilero])
+  @@map("abono_maquilero")
+}
+
+/// DESCUENTO a la cuenta de un maquilero (F6-E4; ex `EsMaDescuentos`). Movimiento plano.
+model DescuentoMaquilero {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del movimiento (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Maquilero (Proveedor) al que se le descuenta. Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Importe del descuento (positivo). Decimal.
+  monto          Decimal            @db.Decimal(14, 2)
+  /// Fecha del movimiento (date-only).
+  fecha          DateTime           @db.Date
+  conFactura     Boolean?           @map("con_factura")
+  observaciones  String?            @db.Text
+  estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idMaquilero])
+  @@map("descuento_maquilero")
+}
+
+/// PAGO a un maquilero (F6-E4; ex `EsMaPagos`). Movimiento plano LIGADO a cargos (decisión (g)):
+/// el pago se aplica a uno o más cargos consumiendo sus "prendas por pagar". `monto` = Σ importes
+/// aplicados (se sella al capturar). El recibo de pago (R9) se imprime de este registro.
+model PagoMaquilero {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del movimiento (A9). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Maquilero (Proveedor) al que se le paga. Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Importe total del pago (= Σ `aplicaciones.importe`). Decimal.
+  monto          Decimal            @db.Decimal(14, 2)
+  /// Fecha del pago (date-only).
+  fecha          DateTime           @db.Date
+  conFactura     Boolean?           @map("con_factura")
+  observaciones  String?            @db.Text
+  estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
+
+  /// Aplicaciones del pago a cargos concretos (decisión (g)). Cascade (el detalle vive con el pago).
+  aplicaciones PagoAplicacion[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idMaquilero])
+  @@map("pago_maquilero")
+}
+
+/// Aplicación de un PAGO a un CARGO (F6-E4, puente decisión (g)): cuántas prendas de ese cargo se
+/// pagaron y por qué importe. El saldo "por pagar" de un cargo = `cantidadReal − Σ cantidad` de sus
+/// aplicaciones; pagar de más se BLOQUEA en el dominio (anti-doble-pago duro). PK (idPago, idCargo).
+model PagoAplicacion {
+  idPago Int           @map("id_pago")
+  pago   PagoMaquilero @relation(fields: [idPago], references: [id], onDelete: Cascade)
+  idCargo Int       @map("id_cargo")
+  cargo   EsMaCargo @relation(fields: [idCargo], references: [id], onDelete: Restrict)
+
+  /// Prendas de este cargo cubiertas por el pago (>0, ≤ prendas por pagar del cargo). Decimal.
+  cantidad Decimal @db.Decimal(14, 2)
+  /// Importe aplicado (= cantidad × precioReal del cargo). Decimal.
+  importe  Decimal @db.Decimal(14, 2)
+
+  @@id([idPago, idCargo])
+  @@index([idCargo])
+  @@map("pago_aplicacion")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
