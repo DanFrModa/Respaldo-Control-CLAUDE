@@ -29,14 +29,16 @@ describe('catalogo de modulos del menu', () => {
     // F5-E7 (concentrado planeado vs real) = 41 sub-vistas.
     // F6-E1: +3 sub-vistas de Calidad (defectos, tipos de producto, planes AQL) + 1 sub-vista de
     // Administración (bitácora) = 45 sub-vistas → 58 entradas. F6-E2: +1 sub-vista de Calidad
-    // (auditorías de calidad, `calidad.generar-auditorias`) = 46 sub-vistas → 59 entradas en total.
+    // (auditorías de calidad, `calidad.generar-auditorias`) = 46 sub-vistas → 59 entradas. F6-E3:
+    // +2 sub-vistas de Calidad (consulta de auditorías e historial por maquilero, `calidad.ver`) =
+    // 48 sub-vistas → 61 entradas en total.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(59);
+    expect(MODULOS_MENU).toHaveLength(61);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(59);
+    expect(new Set(claves).size).toBe(61);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(59);
+    expect(new Set(rutas).size).toBe(61);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

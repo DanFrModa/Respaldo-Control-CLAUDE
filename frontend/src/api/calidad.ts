@@ -11,10 +11,16 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
   Auditoria,
+  AuditoriaCancelar,
   AuditoriaContexto,
   AuditoriaCrear,
+  AuditoriaModificar,
   AuditoriaReclasificacion,
   AuditoriaResultado,
+  AuditoriasPagina,
+  AuditoriasQuery,
+  HistorialMaquilero,
+  HistorialMaquileroQuery,
   Defecto,
   DefectoCrear,
   DefectoEditar,
@@ -506,6 +512,123 @@ export function useReclasificar(): UseMutationResult<Auditoria, ErrorDeApi, Args
     mutationFn: ({ id, cuerpo }: ArgsReclasificar) => reclasificar(id, cuerpo),
     onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_AUDITORIAS }),
   });
+}
+
+// ── Consulta de auditorías / historial / modificar / cancelar (F6-E3) ───────────
+
+async function listarAuditorias(query: AuditoriasQuery): Promise<AuditoriasPagina> {
+  const { data, error } = await api.GET('/api/calidad/auditorias', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerHistorialMaquilero(
+  idMaquilero: number,
+  query: HistorialMaquileroQuery,
+): Promise<HistorialMaquilero> {
+  const { data, error } = await api.GET('/api/calidad/auditorias/maquilero/{idMaquilero}', {
+    params: { path: { idMaquilero }, query },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function modificarAuditoria(id: number, cuerpo: AuditoriaModificar): Promise<Auditoria> {
+  const { data, error } = await api.PATCH('/api/calidad/auditorias/{id}', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function cancelarAuditoria(id: number, cuerpo: AuditoriaCancelar): Promise<Auditoria> {
+  const { data, error } = await api.POST('/api/calidad/auditorias/{id}/cancelacion', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Lista paginada de auditorías con filtros de servidor. */
+export function useAuditorias(
+  query: AuditoriasQuery,
+): UseQueryResult<AuditoriasPagina, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AUDITORIAS, 'lista', query],
+    queryFn: () => listarAuditorias(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Historial de auditorías de un maquilero (+ % de aprobación). Solo si hay maquilero (`enabled`). */
+export function useHistorialMaquilero(
+  idMaquilero: number | undefined,
+  query: HistorialMaquileroQuery = {},
+): UseQueryResult<HistorialMaquilero, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AUDITORIAS, 'historial-maquilero', idMaquilero, query],
+    queryFn: () => obtenerHistorialMaquilero(idMaquilero as number, query),
+    enabled: idMaquilero !== undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+export interface ArgsModificarAuditoria {
+  id: number;
+  cuerpo: AuditoriaModificar;
+}
+
+/** Modifica el encabezado de una auditoría e invalida la caché de auditorías. */
+export function useModificarAuditoria(): UseMutationResult<
+  Auditoria,
+  ErrorDeApi,
+  ArgsModificarAuditoria
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsModificarAuditoria) => modificarAuditoria(id, cuerpo),
+    onSuccess: (auditoria) => {
+      void qc.invalidateQueries({ queryKey: CLAVE_AUDITORIAS });
+      qc.setQueryData([...CLAVE_AUDITORIAS, 'detalle', auditoria.id], auditoria);
+    },
+  });
+}
+
+export interface ArgsCancelarAuditoria {
+  id: number;
+  cuerpo: AuditoriaCancelar;
+}
+
+/** Cancela (borrado suave) una auditoría e invalida la caché de auditorías. */
+export function useCancelarAuditoria(): UseMutationResult<
+  Auditoria,
+  ErrorDeApi,
+  ArgsCancelarAuditoria
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCancelarAuditoria) => cancelarAuditoria(id, cuerpo),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_AUDITORIAS }),
+  });
+}
+
+/**
+ * Abre el PDF de UNA auditoría en una pestaña nueva (`GET /api/calidad/auditorias/{id}/impreso`). El
+ * impreso es SERVER-SIDE (igual que el resto de impresos del proyecto): la auth viaja por la cookie de
+ * sesión (mismo origen), así que basta `window.open`.
+ */
+export function imprimirAuditoria(id: number): void {
+  window.open(`/api/calidad/auditorias/${String(id)}/impreso`, '_blank', 'noopener');
 }
 
 /**

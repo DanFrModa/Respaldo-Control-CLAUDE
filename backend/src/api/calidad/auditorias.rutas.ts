@@ -10,21 +10,32 @@ import { z } from 'zod';
 import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
+  esquemaAuditoriaCancelarCuerpo,
   esquemaAuditoriaContexto,
   esquemaAuditoriaCrear,
+  esquemaAuditoriaModificarCuerpo,
   esquemaAuditoriaResultadoCuerpo,
   esquemaAuditoriaSalida,
+  esquemaAuditoriasPagina,
+  esquemaAuditoriasQuery,
   esquemaErrorApi,
+  esquemaHistorialMaquileroQuery,
+  esquemaHistorialMaquileroSalida,
   esquemaReclasificacionCuerpo,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import {
+  cancelarAuditoria,
   capturarResultado,
   crearAuditoria,
+  historialPorMaquilero,
+  listarAuditorias,
+  modificarAuditoria,
   obtenerAuditoria,
   obtenerContextoOrden,
   reclasificar,
 } from '../../dominio/calidad/auditorias.js';
+import { impresoAuditoria } from '../../dominio/calidad/impresos/impreso-auditoria.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 
 const esquemaParamId = z.object({
@@ -41,6 +52,14 @@ const esquemaParamIdOrden = z.object({
     .int({ error: 'El id debe ser entero' })
     .positive({ error: 'El id debe ser positivo' })
     .describe('Id de la orden.'),
+});
+
+const esquemaParamIdMaquilero = z.object({
+  idMaquilero: z.coerce
+    .number({ error: 'El id del maquilero debe ser un número' })
+    .int({ error: 'El id debe ser entero' })
+    .positive({ error: 'El id debe ser positivo' })
+    .describe('Id del maquilero.'),
 });
 
 const respuestasError = {
@@ -78,6 +97,46 @@ export const rutasAuditorias: FastifyPluginCallbackZod = (app, _opciones, done) 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return obtenerContextoOrden(sesion, request.params.idOrden);
+    },
+  });
+
+  // ── Listado paginado + filtros (consulta, F6-E3) ─────────────────────────────────────────────────
+  app.route({
+    method: 'GET',
+    url: '/calidad/auditorias',
+    preHandler: app.conPermiso('calidad.ver'),
+    schema: {
+      tags: ['calidad'],
+      summary: 'Listar auditorías (paginado + filtros por orden/maquilero/resultado/tipo/fechas)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaAuditoriasQuery,
+      response: { 200: esquemaAuditoriasPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarAuditorias(sesion, request.query);
+    },
+  });
+
+  // ── Historial por maquilero (+ % de aprobación operativo, F6-E3) ─────────────────────────────────
+  app.route({
+    method: 'GET',
+    url: '/calidad/auditorias/maquilero/:idMaquilero',
+    preHandler: app.conPermiso('calidad.ver'),
+    schema: {
+      tags: ['calidad'],
+      summary: 'Historial de auditorías de un maquilero con su % de aprobación operativo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamIdMaquilero,
+      querystring: esquemaHistorialMaquileroQuery,
+      response: { 200: esquemaHistorialMaquileroSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return historialPorMaquilero(sesion, {
+        idMaquilero: request.params.idMaquilero,
+        ...request.query,
+      });
     },
   });
 
@@ -153,6 +212,66 @@ export const rutasAuditorias: FastifyPluginCallbackZod = (app, _opciones, done) 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return reclasificar(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Modificar datos de ENCABEZADO (F6-E3) ────────────────────────────────────────────────────────
+  app.route({
+    method: 'PATCH',
+    url: '/calidad/auditorias/:id',
+    preHandler: app.conPermiso('calidad.modificar-auditorias'),
+    schema: {
+      tags: ['calidad'],
+      summary: 'Modificar los datos de encabezado de una auditoría (no toca las fallas)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAuditoriaModificarCuerpo,
+      response: { 200: esquemaAuditoriaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return modificarAuditoria(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Cancelación (borrado suave + motivo, F6-E3) ──────────────────────────────────────────────────
+  app.route({
+    method: 'POST',
+    url: '/calidad/auditorias/:id/cancelacion',
+    preHandler: app.conPermiso('calidad.modificar-auditorias'),
+    schema: {
+      tags: ['calidad'],
+      summary: 'Cancelar una auditoría (borrado suave con motivo; des-completa la RC)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaAuditoriaCancelarCuerpo,
+      response: { 200: esquemaAuditoriaSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cancelarAuditoria(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Impreso (binario application/pdf; solo se documentan los errores) ─────────────────────────────
+  app.route({
+    method: 'GET',
+    url: '/calidad/auditorias/:id/impreso',
+    preHandler: app.conPermiso('calidad.ver'),
+    schema: {
+      tags: ['calidad'],
+      summary: 'Impreso de una auditoría de calidad (PDF)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const { buffer, folio } = await impresoAuditoria(sesion, request.params.id);
+      reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="auditoria-${String(folio)}.pdf"`);
+      return reply.send(buffer as unknown as never);
     },
   });
 

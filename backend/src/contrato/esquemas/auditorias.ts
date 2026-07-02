@@ -333,3 +333,203 @@ export const esquemaAuditoriaContexto = z
 
 /** Forma del contexto de orden. */
 export type AuditoriaContextoSalida = z.infer<typeof esquemaAuditoriaContexto>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consulta de auditorías (F6-E3): listado LIGERO paginado + filtros en servidor
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * RESUMEN de una auditoría para el LISTADO (F6-E3). Proyección LIGERA: NO trae los renglones de
+ * defecto ni la sugerencia AQL (eso vive en el detalle `esquemaAuditoriaSalida`); solo lo que pinta
+ * una fila de la consulta y su historial. `totalFallas` es Σ de las fallas de sus defectos (derivado).
+ */
+export const esquemaAuditoriaResumen = z
+  .object({
+    id: z.number().int().describe('Id de la auditoría.'),
+    numAuditoria: z.number().int().describe('Folio consecutivo por empresa.'),
+    folioOrden: z.number().int().nullable().describe('Folio de la orden auditada (legible).'),
+    codigoModelo: z.string().nullable().describe('Código del modelo de la orden (legible).'),
+    idMaquilero: z.number().int().nullable().describe('Maquilero auditado, o null.'),
+    maquilero: z.string().nullable().describe('Nombre del maquilero, o null.'),
+    fechaAuditoria: z.iso.date().describe('Fecha en que se auditó (YYYY-MM-DD).'),
+    tipoAuditoria: z.enum(TIPOS_AUDITORIA).describe('Tipo de auditoría.'),
+    resultado: z.enum(RESULTADOS_AUDITORIA).describe('Veredicto manual del auditor.'),
+    tamanoMuestra: z.number().int().describe('Tamaño de muestra inspeccionado.'),
+    totalFallas: z.number().int().describe('Σ de fallas de todos los defectos (derivado).'),
+    cancelada: z.boolean().describe('Si la auditoría está cancelada (borrado suave).'),
+  })
+  .describe('Resumen de una auditoría para el listado.');
+
+/** Forma del resumen de una auditoría en la API. */
+export type AuditoriaResumenSalida = z.infer<typeof esquemaAuditoriaResumen>;
+
+/** Filtros, orden y paginación del listado de auditorías (querystring). */
+export const esquemaAuditoriasQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página.'),
+    folioOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra por folio de la orden auditada.'),
+    idMaquilero: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra por maquilero auditado.'),
+    resultado: z.enum(RESULTADOS_AUDITORIA).optional().describe('Filtra por resultado.'),
+    tipoAuditoria: z.enum(TIPOS_AUDITORIA).optional().describe('Filtra por tipo de auditoría.'),
+    desde: z.iso
+      .date({ error: 'La fecha "desde" debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha de auditoría mínima (YYYY-MM-DD, inclusive).'),
+    hasta: z.iso
+      .date({ error: 'La fecha "hasta" debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha de auditoría máxima (YYYY-MM-DD, inclusive).'),
+    incluirCanceladas: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye las canceladas ("true"/"false").'),
+    ordenarPor: z
+      .enum(['numAuditoria', 'fechaAuditoria'])
+      .default('numAuditoria')
+      .describe('Columna de ordenamiento.'),
+    direccion: z.enum(['asc', 'desc']).default('desc').describe('Dirección del orden.'),
+  })
+  .describe('Filtros, orden y paginación del listado de auditorías.');
+
+/** Parámetros de listado de auditorías ya coaccionados desde la URL. */
+export type AuditoriasQuery = z.infer<typeof esquemaAuditoriasQuery>;
+
+/** Respuesta paginada del listado de auditorías. */
+export const esquemaAuditoriasPagina = z
+  .object({
+    datos: z.array(esquemaAuditoriaResumen).describe('Auditorías de la página.'),
+    total: z.number().int().describe('Total que cumplen el filtro.'),
+    pagina: z.number().int().describe('Página devuelta.'),
+    porPagina: z.number().int().describe('Renglones por página.'),
+    totalPaginas: z.number().int().describe('Total de páginas.'),
+  })
+  .describe('Página de auditorías.');
+
+/** Forma de la respuesta paginada de auditorías. */
+export type AuditoriasPagina = z.infer<typeof esquemaAuditoriasPagina>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Modificar encabezado / cancelar (F6-E3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Modificación de los datos de ENCABEZADO de una auditoría (F6-E3 — ex `CC_ModificarDatos`). NO edita
+ * las fallas (eso es la captura). Todos los campos son opcionales (edición parcial); el maquilero, si
+ * se cambia, debe seguir siendo uno de los propuestos de la orden (lo valida el dominio).
+ */
+export const esquemaAuditoriaModificarCuerpo = z
+  .object({
+    idMaquilero: z
+      .number()
+      .int({ error: 'El id del maquilero debe ser entero' })
+      .positive({ error: 'El id del maquilero debe ser positivo' })
+      .nullable()
+      .optional()
+      .describe('Maquilero auditado (de los propuestos de la orden), o null para quitarlo.'),
+    fechaElaboracion: z.iso
+      .date({ error: 'La fecha de elaboración debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha de elaboración (YYYY-MM-DD).'),
+    fechaAuditoria: z.iso
+      .date({ error: 'La fecha de auditoría debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha en que se auditó (YYYY-MM-DD).'),
+    tipoAuditoria: z
+      .enum(TIPOS_AUDITORIA)
+      .optional()
+      .describe('Tipo de auditoría (en piso / final / sin definir).'),
+    observaciones: z
+      .string()
+      .trim()
+      .max(1000, { error: 'Las observaciones no pueden tener más de 1000 caracteres' })
+      .nullable()
+      .optional()
+      .describe('Observaciones (texto libre), o null.'),
+  })
+  .describe('Modificación del encabezado de una auditoría (no toca las fallas).');
+
+/** Datos validados de modificación de encabezado. */
+export type DatosAuditoriaModificar = z.infer<typeof esquemaAuditoriaModificarCuerpo>;
+
+/**
+ * Cancelación de una auditoría (F6-E3): borrado SUAVE con motivo obligatorio. El motivo queda en la
+ * bitácora (A7) y anexado a las observaciones (sin migración). Cancelar publica el evento de calidad
+ * para que la Ruta Crítica des-complete el proceso `auditoria` (una auditoría cancelada ya no es viva).
+ */
+export const esquemaAuditoriaCancelarCuerpo = z
+  .object({
+    motivo: z
+      .string({ error: 'El motivo de cancelación es obligatorio' })
+      .trim()
+      .min(1, { error: 'El motivo de cancelación es obligatorio' })
+      .max(500, { error: 'El motivo no puede tener más de 500 caracteres' })
+      .describe('Motivo de la cancelación (obligatorio).'),
+  })
+  .describe('Cancelación (borrado suave) de una auditoría con motivo.');
+
+/** Datos validados de cancelación. */
+export type DatosAuditoriaCancelar = z.infer<typeof esquemaAuditoriaCancelarCuerpo>;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Historial por maquilero (F6-E3): % de aprobación operativo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Filtros (rango de fechas de auditoría) del historial por maquilero (querystring). */
+export const esquemaHistorialMaquileroQuery = z
+  .object({
+    desde: z.iso
+      .date({ error: 'La fecha "desde" debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha de auditoría mínima (YYYY-MM-DD, inclusive).'),
+    hasta: z.iso
+      .date({ error: 'La fecha "hasta" debe ser YYYY-MM-DD' })
+      .optional()
+      .describe('Fecha de auditoría máxima (YYYY-MM-DD, inclusive).'),
+  })
+  .describe('Filtros del historial por maquilero.');
+
+/** Parámetros del historial ya coaccionados desde la URL. */
+export type HistorialMaquileroQuery = z.infer<typeof esquemaHistorialMaquileroQuery>;
+
+/**
+ * Historial de auditorías (no canceladas) de un maquilero con sus agregados (F6-E3). El
+ * `porcentajeAprobacion` es operativo: aprobadas / (aprobadas + reprobadas), SOLO sobre las
+ * CALIFICADAS (las `no_calificado` no cuentan); `null` si no hay ninguna calificada.
+ */
+export const esquemaHistorialMaquileroSalida = z
+  .object({
+    idMaquilero: z.number().int().describe('Maquilero consultado.'),
+    maquilero: z.string().describe('Nombre del maquilero.'),
+    total: z.number().int().describe('Total de auditorías vivas del maquilero en el rango.'),
+    aprobadas: z.number().int().describe('Auditorías con resultado aprobado.'),
+    reprobadas: z.number().int().describe('Auditorías con resultado reprobado.'),
+    noCalificadas: z.number().int().describe('Auditorías sin calificar (no_calificado).'),
+    porcentajeAprobacion: z
+      .number()
+      .nullable()
+      .describe('Aprobadas / (aprobadas + reprobadas), 0–100; null si no hay calificadas.'),
+    auditorias: z
+      .array(esquemaAuditoriaResumen)
+      .describe('Auditorías vivas del maquilero (resumen).'),
+  })
+  .describe('Historial de auditorías de un maquilero con % de aprobación operativo.');
+
+/** Forma del historial por maquilero. */
+export type HistorialMaquileroSalida = z.infer<typeof esquemaHistorialMaquileroSalida>;

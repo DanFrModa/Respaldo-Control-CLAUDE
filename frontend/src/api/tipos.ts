@@ -991,6 +991,29 @@ export type AuditoriaContexto =
 /** Un maquilero propuesto en el contexto de la orden. */
 export type MaquileroPropuesto = AuditoriaContexto['maquileros'][number];
 
+/** Página de auditorías (consulta, `GET /api/calidad/auditorias`). */
+export type AuditoriasPagina =
+  paths['/api/calidad/auditorias']['get']['responses']['200']['content']['application/json'];
+/** Resumen ligero de una auditoría (una fila del listado). */
+export type AuditoriaResumen = AuditoriasPagina['datos'][number];
+/** Parámetros de consulta del listado de auditorías (querystring). */
+export type AuditoriasQuery = NonNullable<
+  paths['/api/calidad/auditorias']['get']['parameters']['query']
+>;
+/** Cuerpo de modificación de encabezado (`PATCH /api/calidad/auditorias/{id}`). */
+export type AuditoriaModificar =
+  paths['/api/calidad/auditorias/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación (`POST /api/calidad/auditorias/{id}/cancelacion`). */
+export type AuditoriaCancelar =
+  paths['/api/calidad/auditorias/{id}/cancelacion']['post']['requestBody']['content']['application/json'];
+/** Historial de auditorías de un maquilero (`GET /api/calidad/auditorias/maquilero/{idMaquilero}`). */
+export type HistorialMaquilero =
+  paths['/api/calidad/auditorias/maquilero/{idMaquilero}']['get']['responses']['200']['content']['application/json'];
+/** Parámetros del historial por maquilero (querystring). */
+export type HistorialMaquileroQuery = NonNullable<
+  paths['/api/calidad/auditorias/maquilero/{idMaquilero}']['get']['parameters']['query']
+>;
+
 /** Página de bitácora (`GET /api/admin/bitacora`). */
 export type BitacoraPagina =
   paths['/api/admin/bitacora']['get']['responses']['200']['content']['application/json'];

@@ -52,8 +52,10 @@ import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
 import { AltaAuditoriaPagina } from '@/modulos/calidad/AltaAuditoriaPagina';
+import { AuditoriasPorMaquileroPagina } from '@/modulos/calidad/AuditoriasPorMaquileroPagina';
 import { CalidadPagina } from '@/modulos/calidad/CalidadPagina';
 import { CapturaAuditoriaPagina } from '@/modulos/calidad/CapturaAuditoriaPagina';
+import { ConsultaAuditoriasPagina } from '@/modulos/calidad/ConsultaAuditoriasPagina';
 import { DefectosPagina } from '@/modulos/calidad/DefectosPagina';
 import { PlanesAqlPagina } from '@/modulos/calidad/PlanesAqlPagina';
 import { TiposProductoPagina } from '@/modulos/calidad/TiposProductoPagina';
@@ -183,6 +185,9 @@ const router = createBrowserRouter([
           { path: 'calidad/planes-aql', element: <PlanesAqlPagina /> },
           // Auditorías de calidad (F6-E2): alta + captura de resultados.
           { path: 'calidad/auditorias/nueva', element: <AltaAuditoriaPagina /> },
+          // Consulta + historial por maquilero (F6-E3). Rutas estáticas antes de `:id`.
+          { path: 'calidad/auditorias', element: <ConsultaAuditoriasPagina /> },
+          { path: 'calidad/auditorias/maquilero', element: <AuditoriasPorMaquileroPagina /> },
           { path: 'calidad/auditorias/:id', element: <CapturaAuditoriaPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },

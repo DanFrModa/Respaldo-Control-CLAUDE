@@ -216,3 +216,136 @@ describe('API de Auditorías (F6-E2)', () => {
     expect(captura.statusCode).toBe(403);
   });
 });
+
+describe('API de Auditorías — consulta/impreso/modificar/cancelar (F6-E3)', () => {
+  /** Da de alta una auditoría por HTTP con el admin y devuelve su id. */
+  async function altaAuditoria(cookie: string): Promise<number> {
+    const alta = await app.inject({
+      method: 'POST',
+      url: '/api/calidad/auditorias',
+      headers: { cookie },
+      payload: { idOrden, tipoAuditoria: 'final' },
+    });
+    expect(alta.statusCode).toBe(201);
+    return alta.json<{ id: number }>().id;
+  }
+
+  it('lista paginada y filtra por resultado (calidad.ver)', async () => {
+    const cookie = await cookieAdmin();
+    const id = await altaAuditoria(cookie);
+    await app.inject({
+      method: 'PATCH',
+      url: `/api/calidad/auditorias/${String(id)}/resultado`,
+      headers: { cookie },
+      payload: { resultado: 'aprobado', defectos: [] },
+    });
+
+    const lista = await app.inject({
+      method: 'GET',
+      url: '/api/calidad/auditorias?resultado=aprobado',
+      headers: { cookie },
+    });
+    expect(lista.statusCode).toBe(200);
+    const pagina = lista.json<{ total: number; datos: { id: number; resultado: string }[] }>();
+    expect(pagina.total).toBe(1);
+    expect(pagina.datos[0]?.resultado).toBe('aprobado');
+  });
+
+  it('el impreso responde 200 application/pdf', async () => {
+    const cookie = await cookieAdmin();
+    const id = await altaAuditoria(cookie);
+    const pdf = await app.inject({
+      method: 'GET',
+      url: `/api/calidad/auditorias/${String(id)}/impreso`,
+      headers: { cookie },
+    });
+    expect(pdf.statusCode).toBe(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    expect(pdf.rawPayload.subarray(0, 4).toString('latin1')).toBe('%PDF');
+  });
+
+  it('modificar y cancelar por HTTP (con calidad.modificar-auditorias)', async () => {
+    const cookieAdminVal = await cookieAdmin();
+    const id = await altaAuditoria(cookieAdminVal);
+    const cookie = await usuarioConPermisos(cookieAdminVal, 'modificador', [
+      'calidad.ver',
+      'calidad.modificar-auditorias',
+    ]);
+
+    const mod = await app.inject({
+      method: 'PATCH',
+      url: `/api/calidad/auditorias/${String(id)}`,
+      headers: { cookie },
+      payload: { observaciones: 'revisada por HTTP' },
+    });
+    expect(mod.statusCode).toBe(200);
+    expect(mod.json<{ observaciones: string }>().observaciones).toBe('revisada por HTTP');
+
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/calidad/auditorias/${String(id)}/cancelacion`,
+      headers: { cookie },
+      payload: { motivo: 'duplicada' },
+    });
+    expect(cancel.statusCode).toBe(200);
+    expect(cancel.json<{ cancelada: boolean }>().cancelada).toBe(true);
+  });
+
+  it('deny-by-default: solo generar/actualizar NO basta para modificar ni cancelar (403)', async () => {
+    const cookieAdminVal = await cookieAdmin();
+    const id = await altaAuditoria(cookieAdminVal);
+    const cookie = await usuarioConPermisos(cookieAdminVal, 'capturador', [
+      'calidad.ver',
+      'calidad.generar-auditorias',
+      'calidad.actualizar-auditorias',
+    ]);
+
+    const mod = await app.inject({
+      method: 'PATCH',
+      url: `/api/calidad/auditorias/${String(id)}`,
+      headers: { cookie },
+      payload: { observaciones: 'no debería' },
+    });
+    expect(mod.statusCode).toBe(403);
+
+    const cancel = await app.inject({
+      method: 'POST',
+      url: `/api/calidad/auditorias/${String(id)}/cancelacion`,
+      headers: { cookie },
+      payload: { motivo: 'no debería' },
+    });
+    expect(cancel.statusCode).toBe(403);
+  });
+
+  it('deny-by-default: sin calidad.ver no lista ni imprime (403)', async () => {
+    const cookieAdminVal = await cookieAdmin();
+    const id = await altaAuditoria(cookieAdminVal);
+    const creado = await app.inject({
+      method: 'POST',
+      url: '/api/usuarios',
+      headers: { cookie: cookieAdminVal },
+      payload: {
+        username: 'sinver',
+        nombre: 'Sin Ver',
+        password: 'Clave.1234!',
+        idsRoles: [await idRol('Basico')],
+      },
+    });
+    expect(creado.statusCode).toBe(201);
+    const cookie = comoHeaderCookie((await login('sinver', 'Clave.1234!')).cookies);
+
+    const lista = await app.inject({
+      method: 'GET',
+      url: '/api/calidad/auditorias',
+      headers: { cookie },
+    });
+    expect(lista.statusCode).toBe(403);
+
+    const pdf = await app.inject({
+      method: 'GET',
+      url: `/api/calidad/auditorias/${String(id)}/impreso`,
+      headers: { cookie },
+    });
+    expect(pdf.statusCode).toBe(403);
+  });
+});

@@ -931,6 +931,13 @@ export {
   esquemaMuestraNivel,
   esquemaMuestraPropuesta,
   esquemaAuditoriaContexto,
+  esquemaAuditoriaResumen,
+  esquemaAuditoriasQuery,
+  esquemaAuditoriasPagina,
+  esquemaAuditoriaModificarCuerpo,
+  esquemaAuditoriaCancelarCuerpo,
+  esquemaHistorialMaquileroQuery,
+  esquemaHistorialMaquileroSalida,
   type ResultadoAuditoriaClave,
   type TipoAuditoriaClave,
   type SugerenciaAqlClave,
@@ -940,6 +947,13 @@ export {
   type SugerenciaAqlSalida,
   type AuditoriaSalida,
   type AuditoriaContextoSalida,
+  type AuditoriaResumenSalida,
+  type AuditoriasQuery,
+  type AuditoriasPagina,
+  type DatosAuditoriaModificar,
+  type DatosAuditoriaCancelar,
+  type HistorialMaquileroQuery,
+  type HistorialMaquileroSalida,
 } from './esquemas/auditorias.js';
 
 // ── Bitácora: consulta del log de auditoría A7 (transversal, F6-E1) ──
