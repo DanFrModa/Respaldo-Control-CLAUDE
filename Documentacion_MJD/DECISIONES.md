@@ -490,3 +490,34 @@ abajo. La ubicación final del módulo de Calidad (D8) sigue por definir.
 - **Aplica en:** F6-E2 (reclasificación).
 
 - **Fecha (i–j):** 2026-06-27, respondidas por Daniel (relayed por Gabriel); (i) implementada como el cambio "PT por orden" el 2026-07-01.
+
+---
+
+### Hallazgos y decisiones del ETL de F6-E6 (cierre de fase) — 2026-07-02
+
+Tomadas por el equipo al construir el ETL del histórico de Calidad y EsMa + el reporte de cuadre. Las marcadas **(a ratificar con Daniel)** son defaults seguros o refinamientos; no bloquean el cierre de F6 pero conviene confirmarlas antes de F9 (corte de go-live).
+
+#### (E6.1) — El gap de estampadores de F3-E6 era un BUG del loader, NO proveedores faltantes — RESUELTO
+- **Contexto:** la decisión `§F3-E6 (a)` dejó pendiente incluir ~1,251 cargos EsMa de estampadores cuyo `IdMaquileros` "no mapeaba a un `Proveedor` de v2", sospechando que faltaba migrar un catálogo de proveedores.
+- **Causa raíz (verificada con los CSV reales):** de 1,252 cargos `EsMa_Recibos.EsEstampado=1`, **1,251 apuntan a maquileros con `Proceso=1`** (maquileros de costura que TAMBIÉN hacen estampado) que **SÍ existen** en `Maquileros.csv`; 0 apuntan al catálogo aparte de 44 `Estampadores`. El loader `esma-cargos.ts` buscaba el `IdMaquileros` de la cabecera EsMa en el mapa de **Estampadores** cuando `EsEstampado=1` → no resolvía. Era un **bug de mapeo**, no datos faltantes.
+- **Decisión/fix:** para `EsEstampado=1` se resuelve por `Proveedor:IdMaquileros` (fallback a estampadores). Recupera 1,251 cargos; **1 huérfano real** (`IdEsMa_Recibos=5811`, sin `IdMaquileros`) se LISTA. **NO se extendió la migración de proveedores** (la deuda de `§F3-E6 (a)` queda cerrada por esta vía). El `idTipoProceso` del cargo sigue siendo estampado.
+- **Refinamiento (a ratificar con Daniel, no bloquea):** un maquilero `Proceso=1` puede quedar en v2 solo con rol `maquila-costura` (sin `estampado`) → afecta el filtro de la UI de EsMa por tipo costura/estampado, no la validez del cargo. Si Daniel quiere que aparezcan al filtrar "estampado", se añade el rol `estampado` a los `Proceso=1` en un re-ETL de proveedores (F9).
+- **Aplica en:** F6-E6 (ETL EsMa) y un posible refinamiento de roles de proveedor en F9.
+
+#### (E6.2) — Modo migración SIN efectos derivados (auditorías y pagos)
+- **Decisión:** el histórico se carga por un modo-migración de dominio que NO dispara efectos derivados (consistente con F3-E6/F5-E7): `crearAuditoriaMigrada` **no publica el evento de RC** (evita 488 auto-avances) y **preserva el folio `numAuditoria`** recalibrando la secuencia A3 al final; los **5,935 pagos históricos se migran LIBRES** (sin aplicaciones a cargos, sin `pg_advisory_xact_lock`, sin recomputar `Orden.pagada`) — el esquema de E4 dejó los pagos sin aplicaciones permitidos a propósito para esto.
+- **Aplica en:** F6-E6 (dominio `calidad/auditorias.ts` y `esma/migracion.ts`).
+
+#### (E6.3) — Mapeos y defaults del histórico (a ratificar con Daniel)
+- **Severidad de defectos:** v1 no la tiene → INFERIDA del AQL (1→crítico, 2.5→mayor, 10→menor), marcada "para revisión". Es metadato, NO veredicto (decisión (a)). `aplicaGeneral=true` para los 40 (v1 no tiene tipo de producto; se etiquetan a mano después, decisión (d)).
+- **Usuarios elaboró/auditor** de las auditorías: se preservan como TEXTO del id viejo (sin FK, ADR-0005); remapeables cuando F9 migre usuarios.
+- **`estadoRevision`** de movimientos EsMa: abonos/descuentos → `revisado` (histórico ya conciliado, v1 no traía bandera); pagos por `RevisionPendienteP`. **`conFactura=null`** en todo el histórico (v1 no tiene el flag de facturación).
+- **Empresa** de los movimientos planos (abono/desc/pago, que no cuelgan de orden): se toma la del histórico EsMa (una sola empresa activa, consistente con "empresas viejas no migradas").
+- **Pares `(auditoría,defecto)` duplicados** del viejo → fusionados sumando fallas (defensa del `@@unique`).
+- **Aplica en:** F6-E6.
+
+#### (E6.4) — Cuadre de saldos: v1 comparable vs v2, diferencias LISTADAS nunca corregidas
+- **Decisión:** el reporte de cuadre (`cuadre-f6.ts`) calcula el saldo por maquilero con la MISMA fórmula derivada del dominio (`saldoDeMaquilero`, D3: Σcargos validado no-sinCosto + Σabonos − Σpagos − Σdescuentos, ceronulo) y compara contra un v1 comparable; las diferencias sistemáticas (cargos de órdenes no migradas, refs de maquilero de empresas viejas, cargos con `IdEsMa=0`) se **LISTAN como inconsistencias de origen**, nunca se corrigen (plan §7). El criterio de salida "EsMa cuadra contra los recibos del periodo" se valida con la conciliación recibido-vs-cargado sobre un periodo histórico, EN VIVO en `prueba`.
+- **Aplica en:** F6-E6 (criterio de salida de la fase).
+
+- **Fecha (E6.1–E6.4):** 2026-07-02.

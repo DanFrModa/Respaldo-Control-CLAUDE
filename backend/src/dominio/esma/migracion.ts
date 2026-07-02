@@ -17,7 +17,7 @@
  * la orden por el loader). NO toca kardex (D3 no aplica: el cargo es CxP de maquila). Idempotencia:
  * el loader resuelve "ya existe" por el `MapeoMigracion` de `IdEsMa_Recibos` ANTES de llamar.
  */
-import type { EstadoCargoEsMa } from '../../datos/index.js';
+import type { EstadoCargoEsMa, EstadoRevisionEsMa } from '../../datos/index.js';
 
 import { registrarBitacora } from '../../comun/auditoria.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
@@ -90,5 +90,149 @@ export async function crearCargoEsMaMigrado(
     });
 
     return { idCargo: cargo.id };
+  }, bd);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODO MIGRACIÓN de los MOVIMIENTOS planos de EsMa (F6-E6): ABONO / DESCUENTO / PAGO histórico.
+//
+// El viejo llevaba estos tres conceptos en tablas hijas de la cabecera `EsMa` (`EsMa_Abonos`,
+// `EsMa_Desc`, `EsMa_Pagos`), sin encabezado propio: el maquilero + la fecha viven en la cabecera.
+// v2 los volvió PLANOS (F6-E4): cada movimiento trae su maquilero/fecha. El histórico se inserta
+// aquí, SIN pasar por los servicios normales (`movimientos.ts`/`pagos.ts`) porque:
+//   • los servicios normales validan con Zod (rechazarían montos negativos, que el viejo SÍ tiene:
+//     los "saldo anterior" negativos) y resuelven `conFactura` de la modalidad del proveedor — el
+//     viejo NUNCA tuvo el flag de factura, así que `conFactura = null` (sin definir);
+//   • ⭐ los PAGOS: `pagos.ts::crearPagoMaquilero` EXIGE `aplicaciones`, toma un
+//     `pg_advisory_xact_lock` por maquilero y recalcula `Orden.pagada`. Los 5,935 pagos históricos
+//     son LIBRES (el viejo nunca ligó pago↔cargo), así que se insertan SIN aplicaciones, SIN lock y
+//     SIN recomputar `Orden.pagada` (el esquema permite un pago sin aplicaciones — E4 lo dejó a
+//     propósito para este ETL). Ninguno dispara efectos derivados.
+//
+// Preservan la FECHA histórica (`EsMa.FechaEsMa`), el `estadoRevision` (asteriscos `Rev` del viejo:
+// para pagos, `RevisionPendienteP`; abonos/descuentos no lo traían → `revisado`, ya conciliados) y
+// `conFactura = null`. Siguen A2 (transacción) + A7 (bitácora, `operacion: 'migracion'`).
+// Idempotencia: el loader resuelve "ya existe" por su `MapeoMigracion` ANTES de llamar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Un movimiento plano EsMa histórico (abono/descuento/pago) a migrar. */
+export interface MovimientoEsMaMigrado {
+  idEmpresa: number;
+  idMaquilero: number;
+  /** Importe del viejo (`AbonoEsMa`/`DescuentoEsMa`/`PagoEsMa`); nulos→0. Puede ser NEGATIVO (abonos
+   * y descuentos de "saldo anterior"): se preserva tal cual para no alterar el saldo derivado. */
+  monto: number;
+  /** Fecha original del movimiento (`EsMa.FechaEsMa`). Obligatoria (la columna es `@db.Date`). */
+  fecha: Date;
+  /** Estado de revisión histórico (asteriscos `Rev` del viejo). */
+  estadoRevision: EstadoRevisionEsMa;
+  observaciones?: string | null;
+}
+
+/** Resultado de migrar un movimiento plano EsMa. */
+export interface ResultadoMovimientoEsMaMigrado {
+  id: number;
+}
+
+/** Datos comunes de un movimiento plano migrado (mismo shape para abono/descuento/pago). */
+function datosMovimientoMigrado(
+  sesion: SesionUsuario,
+  entrada: MovimientoEsMaMigrado,
+): {
+  idEmpresa: number;
+  idMaquilero: number;
+  monto: number;
+  fecha: Date;
+  conFactura: null;
+  estadoRevision: EstadoRevisionEsMa;
+  observaciones: string | null;
+  creadoPorId: string;
+  modificadoPorId: string;
+} {
+  return {
+    idEmpresa: entrada.idEmpresa,
+    idMaquilero: entrada.idMaquilero,
+    monto: entrada.monto,
+    fecha: entrada.fecha,
+    // El viejo no tenía el flag de facturación: el movimiento migrado nace SIN definir (decisión h).
+    conFactura: null,
+    estadoRevision: entrada.estadoRevision,
+    observaciones: entrada.observaciones ?? null,
+    creadoPorId: sesion.id,
+    modificadoPorId: sesion.id,
+  };
+}
+
+/** Crea un ABONO histórico (A2/A7), sin efectos derivados. */
+export async function crearAbonoMigrado(
+  sesion: SesionUsuario,
+  entrada: MovimientoEsMaMigrado,
+  bd?: ContextoBd,
+): Promise<ResultadoMovimientoEsMaMigrado> {
+  return enTransaccion(async (tx) => {
+    const abono = await tx.abonoMaquilero.create({ data: datosMovimientoMigrado(sesion, entrada) });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'AbonoMaquilero',
+      idEntidad: abono.id,
+      accion: 'CREAR',
+      datos: {
+        operacion: 'migracion',
+        idEmpresa: entrada.idEmpresa,
+        idMaquilero: entrada.idMaquilero,
+        monto: entrada.monto,
+      },
+    });
+    return { id: abono.id };
+  }, bd);
+}
+
+/** Crea un DESCUENTO histórico (A2/A7), sin efectos derivados. */
+export async function crearDescuentoMigrado(
+  sesion: SesionUsuario,
+  entrada: MovimientoEsMaMigrado,
+  bd?: ContextoBd,
+): Promise<ResultadoMovimientoEsMaMigrado> {
+  return enTransaccion(async (tx) => {
+    const desc = await tx.descuentoMaquilero.create({
+      data: datosMovimientoMigrado(sesion, entrada),
+    });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'DescuentoMaquilero',
+      idEntidad: desc.id,
+      accion: 'CREAR',
+      datos: {
+        operacion: 'migracion',
+        idEmpresa: entrada.idEmpresa,
+        idMaquilero: entrada.idMaquilero,
+        monto: entrada.monto,
+      },
+    });
+    return { id: desc.id };
+  }, bd);
+}
+
+/**
+ * Crea un PAGO histórico LIBRE (A2/A7): SIN `aplicaciones`, SIN lock por maquilero y SIN recomputar
+ * `Orden.pagada` (el viejo nunca ligó pago↔cargo — ver TSDoc del bloque). No usar el servicio normal.
+ */
+export async function crearPagoMigrado(
+  sesion: SesionUsuario,
+  entrada: MovimientoEsMaMigrado,
+  bd?: ContextoBd,
+): Promise<ResultadoMovimientoEsMaMigrado> {
+  return enTransaccion(async (tx) => {
+    const pago = await tx.pagoMaquilero.create({ data: datosMovimientoMigrado(sesion, entrada) });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'PagoMaquilero',
+      idEntidad: pago.id,
+      accion: 'CREAR',
+      datos: {
+        operacion: 'migracion',
+        idEmpresa: entrada.idEmpresa,
+        idMaquilero: entrada.idMaquilero,
+        monto: entrada.monto,
+      },
+    });
+    return { id: pago.id };
   }, bd);
 }

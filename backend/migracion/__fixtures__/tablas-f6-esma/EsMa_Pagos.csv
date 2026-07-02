@@ -1,0 +1,4 @@
+"IdEsMa_Pagos","IdEsMa","PagoEsMa","ObsPagos","RevisionPendienteP"
+1,1,"$300.00","Pago revisado",0
+2,2,"$50.00","Pago por revisar",1
+3,0,"$70.00","Pago sin cabecera EsMa (OMITIDO)",0

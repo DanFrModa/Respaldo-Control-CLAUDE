@@ -1,0 +1,6 @@
+IdCC_Auditorias,NumAuditoria,IdOrdenes,FechaElaboracion,FechaAuditoria,IdMaquilero,IdUsuariosElaboro,IdUsuariosAuditor,TamanoMuestra,Resultado,TipoAuditoria,Observaciones,Cancelada
+10,10,100,03/06/2008 11:05:24,28/05/2008 00:00:00,7,31,31,32,1,2,"Todo bien en la revision.
+Segunda linea de observaciones.",0
+11,11,101,11/06/2008 10:22:46,,0,31,0,0,2,1,,0
+12,12,100,16/06/2008 13:12:19,30/05/2008 00:00:00,999,2,31,20,0,0,Auditoria cancelada,1
+13,13,999,01/07/2008 00:00:00,01/07/2008 00:00:00,7,31,31,10,1,2,Orden sin mapeo,0
