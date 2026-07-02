@@ -38,6 +38,9 @@ function datos(): EsMaConciliacion {
         recibido: 50,
         cargado: 30,
         faltantePorCargar: 20,
+        cortado: 60,
+        entregado: 25,
+        pagada: false,
       },
       {
         idOrden: 2,
@@ -49,6 +52,9 @@ function datos(): EsMaConciliacion {
         recibido: 40,
         cargado: 40,
         faltantePorCargar: 0,
+        cortado: 40,
+        entregado: 40,
+        pagada: true,
       },
     ],
     cargosSinRecibo: [

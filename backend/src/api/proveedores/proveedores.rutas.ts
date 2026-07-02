@@ -79,6 +79,7 @@ function aProveedorSalida(proveedor: ProveedorConRoles): z.infer<typeof esquemaP
     corto: proveedor.corto,
     asegurado: proveedor.asegurado,
     obsPago: proveedor.obsPago,
+    modalidadFacturacion: proveedor.modalidadFacturacion,
     roles: proveedor.roles.map((r) => ({
       id: r.rol.id,
       codigo: r.rol.codigo,

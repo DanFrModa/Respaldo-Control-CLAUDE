@@ -130,7 +130,38 @@ export async function conciliarEsMa(
     }
   }
 
-  const filas = [...grupos.values()]
+  // (2b) CONTEXTO de la orden para el add-on de E5: cortado + entregado (F3/wip) y estatus "pagada".
+  //      Son datos POR ORDEN (se repiten en cada fila de la misma orden). Solo lectura, en cantidades.
+  const cortadoPorOrden = new Map<number, number>();
+  const entregadoPorOrden = new Map<number, number>();
+  const pagadaPorOrden = new Map<number, boolean>();
+  if (idsOrden.size > 0) {
+    const [etapas, ordenes] = await Promise.all([
+      cliente.etapaMovimiento.findMany({
+        where: {
+          idEmpresa,
+          canceladoEn: null,
+          idOrden: { in: [...idsOrden] },
+          tipo: { in: [TipoEtapaMovimiento.corte, TipoEtapaMovimiento.entrega_cliente] },
+        },
+        select: { idOrden: true, tipo: true, detalles: { select: { cantidad: true } } },
+      }),
+      cliente.orden.findMany({
+        where: { id: { in: [...idsOrden] } },
+        select: { id: true, pagada: true },
+      }),
+    ]);
+    for (const e of etapas) {
+      const suma = e.detalles.reduce((s, d) => s + d.cantidad, 0);
+      const destino = e.tipo === TipoEtapaMovimiento.corte ? cortadoPorOrden : entregadoPorOrden;
+      destino.set(e.idOrden, (destino.get(e.idOrden) ?? 0) + suma);
+    }
+    for (const o of ordenes) {
+      pagadaPorOrden.set(o.id, o.pagada ?? false);
+    }
+  }
+
+  const filasBase = [...grupos.values()]
     .map((g) => ({
       idOrden: g.idOrden,
       folioOrden: g.folioOrden,
@@ -141,8 +172,19 @@ export async function conciliarEsMa(
       recibido: g.recibido,
       cargado: g.cargado,
       faltantePorCargar: g.recibido - g.cargado,
+      cortado: cortadoPorOrden.get(g.idOrden) ?? 0,
+      entregado: entregadoPorOrden.get(g.idOrden) ?? 0,
+      pagada: pagadaPorOrden.get(g.idOrden) ?? false,
     }))
     .sort((a, b) => a.folioOrden - b.folioOrden || a.maquilero.localeCompare(b.maquilero, 'es'));
+
+  // Filtro por estatus de pago (E5 add-on): "pagadas" / "no-pagadas" / "todas" (default).
+  const filas =
+    filtros.pagadas === 'pagadas'
+      ? filasBase.filter((f) => f.pagada)
+      : filtros.pagadas === 'no-pagadas'
+        ? filasBase.filter((f) => !f.pagada)
+        : filasBase;
 
   // (3) CARGOS SIN RECIBO ligado (histórico/manual). Filtra por creadoEn en el periodo si se dio.
   const rangoCreado =

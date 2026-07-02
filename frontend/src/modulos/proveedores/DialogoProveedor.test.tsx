@@ -64,6 +64,7 @@ function proveedorEjemplo(sobre: Partial<Proveedor> = {}): Proveedor {
     corto: null,
     asegurado: null,
     obsPago: null,
+    modalidadFacturacion: null,
     roles: [],
     cantidadAdjuntos: 0,
     activo: true,

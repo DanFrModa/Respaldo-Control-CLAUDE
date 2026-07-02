@@ -25,6 +25,7 @@ import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
 import { rutasCuentaEsMa } from './api/esma/cuenta.rutas.js';
+import { rutasEstadoCuentaEsMa } from './api/esma/estado-cuenta.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
@@ -209,6 +210,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasMovimientosEsMa, { prefix: '/api' });
   await app.register(rutasPagosEsMa, { prefix: '/api' });
   await app.register(rutasCuentaEsMa, { prefix: '/api' });
+  // EsMa (F6-E5) — experiencia de usuario: estado de cuenta unificado + desglosado (+ PDF R9 + Excel),
+  // saldos de todos, pagos/recibos semanales, selector de maquileros y revisión de partidas. Consulta
+  // con esma.ver-pagos; revisar con esma.modificar. Importes ocultos sin consultas.ver-importes.
+  await app.register(rutasEstadoCuentaEsMa, { prefix: '/api' });
   // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
   // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
   // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias

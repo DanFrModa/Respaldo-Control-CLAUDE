@@ -15,7 +15,12 @@ import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
 import { CapturaMovimientoPagina } from '@/modulos/esma/CapturaMovimientoPagina';
 import { CapturaPagosPagina } from '@/modulos/esma/CapturaPagosPagina';
 import { ConciliacionCargosPagina } from '@/modulos/esma/ConciliacionCargosPagina';
+import { DesglosadoPagina } from '@/modulos/esma/DesglosadoPagina';
 import { EsMaPagina } from '@/modulos/esma/EsMaPagina';
+import { EstadoCuentaPagina } from '@/modulos/esma/EstadoCuentaPagina';
+import { PagosSemanalesPagina } from '@/modulos/esma/PagosSemanalesPagina';
+import { RecibosSemanalesEsMaPagina } from '@/modulos/esma/RecibosSemanalesEsMaPagina';
+import { SaldosMaquilerosPagina } from '@/modulos/esma/SaldosMaquilerosPagina';
 import { ValidacionCargosPagina } from '@/modulos/esma/ValidacionCargosPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
@@ -167,8 +172,14 @@ const router = createBrowserRouter([
           { path: 'inventarios/telas/salida-orden', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
-          // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4) y corazón contable (F6-E4).
+          // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la
+          // experiencia de usuario del estado de cuenta (F6-E5). Rutas estáticas antes de cualquier :param.
           { path: 'esma', element: <EsMaPagina /> },
+          { path: 'esma/estado-cuenta', element: <EstadoCuentaPagina /> },
+          { path: 'esma/saldos', element: <SaldosMaquilerosPagina /> },
+          { path: 'esma/desglosado', element: <DesglosadoPagina /> },
+          { path: 'esma/pagos-semanales', element: <PagosSemanalesPagina /> },
+          { path: 'esma/recibos-semanales', element: <RecibosSemanalesEsMaPagina /> },
           { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
           { path: 'esma/conciliacion', element: <ConciliacionCargosPagina /> },
           { path: 'esma/abonos', element: <CapturaMovimientoPagina concepto="abonos" /> },

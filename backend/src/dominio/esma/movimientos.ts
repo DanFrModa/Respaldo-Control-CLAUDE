@@ -14,11 +14,12 @@ import {
   type MovimientoEsMaSalida,
   type MovimientosEsMaLista,
   type ConceptoMovimientoEsMaClave,
+  type RevisionSalida,
 } from '../../contrato/index.js';
 import { type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
-import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
+import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import {
@@ -202,4 +203,74 @@ export async function listarDescuentosMaquilero(
   });
   const total = puedeVerImportes ? filas.reduce((s, f) => s + f.monto.toNumber(), 0) : null;
   return { filas: filas.map((f) => aMovimientoSalida(f, 'descuento', puedeVerImportes)), total };
+}
+
+// ── Revisión / autorización de una partida (F6-E5) ──────────────────────────────────────────────
+
+/**
+ * REVISA (autoriza) una partida `capturado` → `revisado` (F6-E5; ex asteriscos `Rev`/`RevRec` del
+ * `EsMa_EdoCta` viejo). Aplica a abonos, descuentos y pagos. En UNA transacción (A2) con bitácora
+ * (A7). Idempotencia dura: si ya estaba `revisado`, lanza `ErrorConflicto` (409). Permiso
+ * `esma.modificar` (A4); solo la empresa activa (A9). Es el "punto de control del admin" del viejo,
+ * operable también desde el celular (E5 vista móvil).
+ */
+export async function revisarMovimiento(
+  sesion: SesionUsuario,
+  concepto: ConceptoMovimientoEsMaClave,
+  id: number,
+  bd?: ContextoBd,
+): Promise<RevisionSalida> {
+  verificarPermiso(sesion, 'esma.modificar');
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  const entidadBitacora =
+    concepto === 'abono'
+      ? 'AbonoMaquilero'
+      : concepto === 'descuento'
+        ? 'DescuentoMaquilero'
+        : 'PagoMaquilero';
+
+  await enTransaccion(async (tx) => {
+    // Lee el estado actual del movimiento del concepto (siempre acotado a la empresa activa, A9).
+    const actual =
+      concepto === 'abono'
+        ? await tx.abonoMaquilero.findFirst({
+            where: { id, idEmpresa },
+            select: { estadoRevision: true },
+          })
+        : concepto === 'descuento'
+          ? await tx.descuentoMaquilero.findFirst({
+              where: { id, idEmpresa },
+              select: { estadoRevision: true },
+            })
+          : await tx.pagoMaquilero.findFirst({
+              where: { id, idEmpresa },
+              select: { estadoRevision: true },
+            });
+
+    if (actual === null) {
+      throw new ErrorNoEncontrado(entidadBitacora, id);
+    }
+    if (actual.estadoRevision === 'revisado') {
+      throw new ErrorConflicto('Esa partida ya está revisada.');
+    }
+
+    const datos = { estadoRevision: 'revisado' as const, ...datosModificacion(sesion) };
+    if (concepto === 'abono') {
+      await tx.abonoMaquilero.update({ where: { id }, data: datos });
+    } else if (concepto === 'descuento') {
+      await tx.descuentoMaquilero.update({ where: { id }, data: datos });
+    } else {
+      await tx.pagoMaquilero.update({ where: { id }, data: datos });
+    }
+
+    await registrarBitacora(tx, sesion, {
+      entidad: entidadBitacora,
+      idEntidad: id,
+      accion: 'MODIFICAR',
+      datos: { accion: 'revisar', estadoRevision: 'revisado' },
+    });
+  }, bd);
+
+  return { concepto, id, estadoRevision: 'revisado' };
 }

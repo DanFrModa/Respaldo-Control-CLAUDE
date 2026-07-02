@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { MODALIDADES_FACTURACION } from './esma.js';
 import { esClabeValida, esRfcValido, METODOS_PAGO, MONEDAS } from './fiscal.js';
 
 /**
@@ -145,6 +146,12 @@ const camposEnriquecidos = {
     .trim()
     .max(2000, { error: 'Las observaciones de pago no pueden tener más de 2000 caracteres' })
     .optional(),
+
+  // ── Facturación EsMa (F6-E4/E5, decisión (h)) ────────────────────────────────
+  /** Modalidad de facturación de su cuenta de maquila (solo_con/solo_sin/ambos). */
+  modalidadFacturacion: z
+    .enum(MODALIDADES_FACTURACION, { error: 'La modalidad de facturación no es válida' })
+    .optional(),
 } as const;
 
 /**
@@ -177,6 +184,8 @@ const camposEnriquecidosEditar = {
   // es bandera (omitir = no tocar), no se hace nullable (igual que `factura`).
   corto: camposEnriquecidos.corto.nullable(),
   obsPago: camposEnriquecidos.obsPago.nullable(),
+  // Modalidad de facturación EsMa (enum): se puede VACIAR (null = "no definido").
+  modalidadFacturacion: camposEnriquecidos.modalidadFacturacion.nullable(),
 } as const;
 
 /**
@@ -385,6 +394,10 @@ export const esquemaProveedorSalida = z
     corto: z.string().nullable().describe('Código corto del taller (ex maquilero), o null.'),
     asegurado: z.boolean().nullable().describe('¿Está asegurado? (talleres), o null.'),
     obsPago: z.string().nullable().describe('Observaciones de pago (talleres), o null.'),
+    modalidadFacturacion: z
+      .enum(MODALIDADES_FACTURACION)
+      .nullable()
+      .describe('Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir).'),
     // ── Relaciones (E1B) ────────────────────────────────────────────────────────
     roles: z.array(esquemaRolProveedorEnProveedor).describe('Roles/servicios del proveedor.'),
     cantidadAdjuntos: z.number().int().describe('Cantidad de adjuntos del proveedor.'),

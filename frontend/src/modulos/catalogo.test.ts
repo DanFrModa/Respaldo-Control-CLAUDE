@@ -33,13 +33,15 @@ describe('catalogo de modulos del menu', () => {
     // +2 sub-vistas de Calidad (consulta de auditorías e historial por maquilero, `calidad.ver`) =
     // 48 sub-vistas → 61 entradas. F6-E4: +4 sub-vistas de EsMa (conciliación y pagos con
     // `esma.ver-pagos`; abonos y descuentos con `esma.modificar`) = 52 sub-vistas → 65 entradas.
+    // F6-E5: +5 sub-vistas de EsMa (estado de cuenta, saldos, desglosado, pagos y recibos semanales,
+    // todas con `esma.ver-pagos`) = 57 sub-vistas → 70 entradas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(65);
+    expect(MODULOS_MENU).toHaveLength(70);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(65);
+    expect(new Set(claves).size).toBe(70);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(65);
+    expect(new Set(rutas).size).toBe(70);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

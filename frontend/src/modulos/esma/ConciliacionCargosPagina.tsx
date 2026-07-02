@@ -40,6 +40,7 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [soloFaltantes, setSoloFaltantes] = useState(false);
+  const [pagadas, setPagadas] = useState<'todas' | 'pagadas' | 'no-pagadas'>('todas');
 
   const maquileros = useProveedores({
     pagina: 1,
@@ -52,6 +53,7 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
     ...(desde !== '' ? { desde } : {}),
     ...(hasta !== '' ? { hasta } : {}),
     ...(idMaquilero !== TODOS ? { idMaquilero: Number(idMaquilero) } : {}),
+    ...(pagadas !== 'todas' ? { pagadas } : {}),
   };
   const consulta = useConciliacionEsMa(query);
   const datos = consulta.data;
@@ -79,7 +81,7 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
           <CardDescription>Acota por rango de fechas y maquilero.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field>
               <FieldLabel htmlFor="conc-maquilero">Maquilero</FieldLabel>
               <SelectNativo
@@ -115,6 +117,19 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                 onChange={(e) => setHasta(e.target.value)}
                 data-testid="conc-hasta"
               />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="conc-pagadas">Pago de la orden</FieldLabel>
+              <SelectNativo
+                id="conc-pagadas"
+                value={pagadas}
+                onChange={(e) => setPagadas(e.target.value as 'todas' | 'pagadas' | 'no-pagadas')}
+                data-testid="conc-pagadas"
+              >
+                <option value="todas">Todas</option>
+                <option value="pagadas">Solo pagadas</option>
+                <option value="no-pagadas">Solo no pagadas</option>
+              </SelectNativo>
             </Field>
           </div>
           <label className="mt-4 flex items-center gap-2 text-sm" htmlFor="conc-solo-faltantes">
@@ -189,9 +204,12 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                       <TableHead>Orden</TableHead>
                       <TableHead>Maquilero</TableHead>
                       <TableHead>Proceso</TableHead>
+                      <TableHead className="text-right">Cortado</TableHead>
                       <TableHead className="text-right">Recibido</TableHead>
+                      <TableHead className="text-right">Entregado</TableHead>
                       <TableHead className="text-right">Ya cargado</TableHead>
                       <TableHead className="text-right">Falta por cargar</TableHead>
+                      <TableHead>Pago</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -202,7 +220,11 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                         <TableCell>#{f.folioOrden}</TableCell>
                         <TableCell className="font-medium">{f.maquilero}</TableCell>
                         <TableCell>{f.tipoProceso}</TableCell>
+                        <TableCell className="text-right tabular-nums">{fmt(f.cortado)}</TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(f.recibido)}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {fmt(f.entregado)}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">{fmt(f.cargado)}</TableCell>
                         <TableCell className="text-right tabular-nums">
                           {f.faltantePorCargar > 0 ? (
@@ -211,6 +233,13 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                             </span>
                           ) : (
                             fmt(f.faltantePorCargar)
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {f.pagada ? (
+                            <Badge variant="secondary">Pagada</Badge>
+                          ) : (
+                            <Badge variant="outline">Pendiente</Badge>
                           )}
                         </TableCell>
                       </TableRow>

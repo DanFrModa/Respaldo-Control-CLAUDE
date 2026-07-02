@@ -59,9 +59,12 @@ vi.mock('@/api/esma', () => ({
     error: null,
   }),
   useSaldoMaquilero: () => saldo,
-}));
-vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Maquila SA' }] } }),
+  // F6-E5: el selector de maquilero usa el nuevo endpoint (activos + rol de maquila).
+  useMaquilerosEsMa: () => ({
+    data: { filas: [{ id: 5, nombre: 'Maquila SA', corto: null }] },
+    isPending: false,
+    isError: false,
+  }),
 }));
 
 describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
@@ -107,5 +110,19 @@ describe('CapturaMovimientoPagina (F6-E4, abonos)', () => {
     // La fila del histórico muestra "—" en el importe (monto null) y el saldo también.
     expect(screen.getByTestId('mov-fila')).toHaveTextContent('—');
     expect(screen.getByTestId('saldo-saldo')).toHaveTextContent('—');
+  });
+
+  it('"Duplicar partida": pre-llena el formulario con los valores iniciales del router state', () => {
+    renderConProveedores(<CapturaMovimientoPagina concepto="abonos" />, {
+      sesion: estadoSesionDePrueba(['esma.modificar']),
+      rutaInicial: {
+        pathname: '/esma/abonos',
+        state: { idMaquilero: 5, monto: '750', observaciones: 'Copia de anticipo' },
+      },
+    });
+    // Maquilero, importe y observaciones llegan pre-llenados de la partida origen.
+    expect(screen.getByTestId('mov-maquilero')).toHaveValue('5');
+    expect(screen.getByTestId('mov-monto')).toHaveValue(750);
+    expect(screen.getByDisplayValue('Copia de anticipo')).toBeInTheDocument();
   });
 });

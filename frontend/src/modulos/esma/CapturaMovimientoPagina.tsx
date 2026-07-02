@@ -1,9 +1,14 @@
 import { Loader2Icon, MinusCircle, PlusCircle } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { useAbonosMaquilero, useCrearMovimientoEsMa, useDescuentosMaquilero } from '@/api/esma';
-import { useProveedores } from '@/api/proveedores';
+import {
+  useAbonosMaquilero,
+  useCrearMovimientoEsMa,
+  useDescuentosMaquilero,
+  useMaquilerosEsMa,
+} from '@/api/esma';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -20,12 +25,7 @@ import {
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
-import { moneda } from './comun';
-
-/** Fecha de hoy en formato YYYY-MM-DD (para el default del campo fecha). */
-function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoyISO, moneda, type PartidaInicial } from './comun';
 
 /**
  * CAPTURA de un ABONO o un DESCUENTO a la cuenta de un maquilero (F6-E4). Formulario simple:
@@ -42,6 +42,7 @@ export function CapturaMovimientoPagina({
   concepto: 'abonos' | 'descuentos';
 }): React.JSX.Element {
   const { tienePermiso } = useSesion();
+  const location = useLocation();
   const puedeModificar = tienePermiso('esma.modificar');
   const verPagos = tienePermiso('esma.ver-pagos');
 
@@ -49,18 +50,17 @@ export function CapturaMovimientoPagina({
   const etiqueta = esAbono ? 'abono' : 'descuento';
   const Icono = esAbono ? PlusCircle : MinusCircle;
 
-  const [idMaquilero, setIdMaquilero] = useState<string>('');
-  const [monto, setMonto] = useState('');
+  // "Duplicar partida" (F6-E5): valores iniciales por router state (pre-llenan el formulario).
+  const inicial = (location.state ?? null) as PartidaInicial | null;
+  const [idMaquilero, setIdMaquilero] = useState<string>(
+    inicial?.idMaquilero !== undefined ? String(inicial.idMaquilero) : '',
+  );
+  const [monto, setMonto] = useState(inicial?.monto ?? '');
   const [fecha, setFecha] = useState(hoyISO());
-  const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>('');
-  const [observaciones, setObservaciones] = useState('');
+  const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>(inicial?.conFactura ?? '');
+  const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? '');
 
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-  });
+  const maquileros = useMaquilerosEsMa({});
 
   const idNum = idMaquilero === '' ? undefined : Number(idMaquilero);
   // Las listas de cuenta solo se piden si el usuario puede leerlas (`esma.ver-pagos`).
@@ -131,9 +131,9 @@ export function CapturaMovimientoPagina({
                 data-testid="mov-maquilero"
               >
                 <option value="">Elige un maquilero…</option>
-                {(maquileros.data?.datos ?? []).map((m) => (
+                {(maquileros.data?.filas ?? []).map((m) => (
                   <option key={m.id} value={String(m.id)}>
-                    {m.nombre}
+                    {m.corto ? `${m.nombre} (${m.corto})` : m.nombre}
                   </option>
                 ))}
               </SelectNativo>

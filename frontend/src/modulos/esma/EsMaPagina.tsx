@@ -1,9 +1,13 @@
 import {
   BadgeCheck,
   Banknote,
+  CalendarClock,
+  FileText,
   MinusCircle,
+  PackageCheck,
   PlusCircle,
   Scale,
+  Users,
   Wallet,
   type LucideIcon,
 } from 'lucide-react';
@@ -32,6 +36,52 @@ interface SubvistaEsMa {
 }
 
 const SUB_VISTAS: readonly SubvistaEsMa[] = [
+  {
+    clave: 'estado-cuenta',
+    titulo: 'Estado de cuenta',
+    descripcion:
+      'La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha.',
+    ruta: '/esma/estado-cuenta',
+    icono: Wallet,
+    tono: 'pt',
+    permiso: 'esma.ver-pagos',
+  },
+  {
+    clave: 'saldos',
+    titulo: 'Saldos de maquileros',
+    descripcion: 'Los maquileros activos con saldo distinto de cero (con drill-down).',
+    ruta: '/esma/saldos',
+    icono: Users,
+    tono: 'servicios',
+    permiso: 'esma.ver-pagos',
+  },
+  {
+    clave: 'desglosado',
+    titulo: 'Desglosado',
+    descripcion: 'El detalle por orden/modelo, exportable a Excel y como PDF del estado de cuenta.',
+    ruta: '/esma/desglosado',
+    icono: FileText,
+    tono: 'avios',
+    permiso: 'esma.ver-pagos',
+  },
+  {
+    clave: 'pagos-semanales',
+    titulo: 'Pagos semanales',
+    descripcion: 'Los pagos a maquileros de la semana, con su total.',
+    ruta: '/esma/pagos-semanales',
+    icono: CalendarClock,
+    tono: 'neutro',
+    permiso: 'esma.ver-pagos',
+  },
+  {
+    clave: 'recibos-semanales',
+    titulo: 'Recibos semanales',
+    descripcion: 'Los recibos de maquila del periodo por maquilero y modelo (con importes).',
+    ruta: '/esma/recibos-semanales',
+    icono: PackageCheck,
+    tono: 'telas',
+    permiso: 'esma.ver-pagos',
+  },
   {
     clave: 'validacion-cargos',
     titulo: 'Validación de cargos',

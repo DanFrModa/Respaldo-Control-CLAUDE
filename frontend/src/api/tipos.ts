@@ -896,6 +896,71 @@ export type EsMaConciliacionQuery = NonNullable<
   paths['/api/esma/conciliacion']['get']['parameters']['query']
 >;
 
+// ── EsMa experiencia de usuario: estado de cuenta, semanales, saldos, selector (F6-E5) ──
+
+/** Estado de cuenta unificado de un maquilero (`GET /api/esma/maquileros/{id}/estado-cuenta`). */
+export type EsMaEstadoCuenta =
+  paths['/api/esma/maquileros/{id}/estado-cuenta']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del estado de cuenta unificado. */
+export type EsMaEstadoCuentaMovimiento = EsMaEstadoCuenta['movimientos'][number];
+/** Parámetros del estado de cuenta (querystring). */
+export type EsMaEstadoCuentaQuery = NonNullable<
+  paths['/api/esma/maquileros/{id}/estado-cuenta']['get']['parameters']['query']
+>;
+
+/** Estado de cuenta desglosado de un maquilero (`GET /api/esma/maquileros/{id}/desglosado`). */
+export type EsMaDesglosado =
+  paths['/api/esma/maquileros/{id}/desglosado']['get']['responses']['200']['content']['application/json'];
+/** Un cargo desglosado (detalle por orden/modelo). */
+export type EsMaDesglosadoCargo = EsMaDesglosado['cargos'][number];
+
+/** Saldos de todos los maquileros (`GET /api/esma/saldos`). */
+export type EsMaSaldosTodos =
+  paths['/api/esma/saldos']['get']['responses']['200']['content']['application/json'];
+/** Una fila del tablero de saldos. */
+export type EsMaSaldoTodosFila = EsMaSaldosTodos['filas'][number];
+/** Parámetros del tablero de saldos (querystring). */
+export type EsMaSaldosTodosQuery = NonNullable<
+  paths['/api/esma/saldos']['get']['parameters']['query']
+>;
+
+/** Pagos semanales (`GET /api/esma/pagos-semanales`). */
+export type EsMaPagosSemanales =
+  paths['/api/esma/pagos-semanales']['get']['responses']['200']['content']['application/json'];
+/** Un pago en la consulta semanal. */
+export type EsMaPagoSemanalFila = EsMaPagosSemanales['filas'][number];
+/** Parámetros de pagos semanales (querystring). */
+export type EsMaPagosSemanalesQuery = NonNullable<
+  paths['/api/esma/pagos-semanales']['get']['parameters']['query']
+>;
+
+/** Recibos semanales de maquila EsMa (`GET /api/esma/recibos-semanales`). */
+export type EsMaRecibosSemanales =
+  paths['/api/esma/recibos-semanales']['get']['responses']['200']['content']['application/json'];
+/** Un recibo de maquila del periodo. */
+export type EsMaReciboSemanalFila = EsMaRecibosSemanales['filas'][number];
+/** Parámetros de recibos semanales EsMa (querystring). */
+export type EsMaRecibosSemanalesQuery = NonNullable<
+  paths['/api/esma/recibos-semanales']['get']['parameters']['query']
+>;
+
+/** Selector de maquileros de EsMa (`GET /api/esma/maquileros`). */
+export type EsMaMaquileros =
+  paths['/api/esma/maquileros']['get']['responses']['200']['content']['application/json'];
+/** Un maquilero del selector. */
+export type EsMaMaquileroFila = EsMaMaquileros['filas'][number];
+/** Parámetros del selector de maquileros (querystring). */
+export type EsMaMaquilerosQuery = NonNullable<
+  paths['/api/esma/maquileros']['get']['parameters']['query']
+>;
+
+/** Resultado de revisar una partida (`POST /api/esma/movimientos/{concepto}/{id}/revisar`). */
+export type EsMaRevision =
+  paths['/api/esma/movimientos/{concepto}/{id}/revisar']['post']['responses']['200']['content']['application/json'];
+/** Concepto de una partida revisable (abono/descuento/pago). */
+export type EsMaConceptoRevisable =
+  paths['/api/esma/movimientos/{concepto}/{id}/revisar']['post']['parameters']['path']['concepto'];
+
 // ── Entrega a cliente (F3-E5) — cierre del ciclo de la orden ──────────────────
 
 /** Una entrega a cliente tal como la devuelve el API (con su matriz color×talla). */

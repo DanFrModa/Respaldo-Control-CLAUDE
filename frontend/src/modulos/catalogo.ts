@@ -660,6 +660,55 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     icono: 'billete',
     permisos: 'autenticado',
   },
+  // Sub-vistas de EsMa (F6-E5, experiencia de usuario): estado de cuenta, saldos, desglosado y las
+  // consultas semanales. Todas de LECTURA DE CUENTA (`esma.ver-pagos`); el backend re-verifica (A1).
+  {
+    clave: 'esma-estado-cuenta',
+    titulo: 'Estado de cuenta',
+    descripcion:
+      'La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha',
+    ruta: '/esma/estado-cuenta',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-saldos',
+    titulo: 'Saldos de maquileros',
+    descripcion:
+      'Maquileros activos con saldo distinto de cero, con drill-down al estado de cuenta',
+    ruta: '/esma/saldos',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-desglosado',
+    titulo: 'Desglosado',
+    descripcion: 'Detalle por orden/modelo, exportable a Excel y como PDF del estado de cuenta',
+    ruta: '/esma/desglosado',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-pagos-semanales',
+    titulo: 'Pagos semanales',
+    descripcion: 'Los pagos a maquileros de la semana, con su total',
+    ruta: '/esma/pagos-semanales',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-recibos-semanales',
+    titulo: 'Recibos semanales de maquila',
+    descripcion: 'Recibos del periodo por maquilero y modelo, valuados al precio pactado',
+    ruta: '/esma/recibos-semanales',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
   // Sub-vista de EsMa (F3-E4): la cola de validación de cargos de maquila que proponen los recibos.
   // Cuelga del módulo EsMa con su permiso operativo `esma.cargo-validar`.
   {

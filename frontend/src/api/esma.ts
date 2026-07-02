@@ -14,16 +14,29 @@ import type {
   CargoEsMaValidar,
   CargosEsMa,
   CargosEsMaQuery,
+  EsMaConceptoRevisable,
   EsMaConciliacion,
   EsMaConciliacionQuery,
+  EsMaDesglosado,
+  EsMaEstadoCuenta,
+  EsMaEstadoCuentaQuery,
+  EsMaMaquileros,
+  EsMaMaquilerosQuery,
   EsMaMovimiento,
   EsMaMovimientoCrear,
   EsMaMovimientosLista,
   EsMaPago,
   EsMaPagoCrear,
   EsMaPagosLista,
+  EsMaPagosSemanales,
+  EsMaPagosSemanalesQuery,
+  EsMaRecibosSemanales,
+  EsMaRecibosSemanalesQuery,
+  EsMaRevision,
   EsMaSaldo,
   EsMaSaldoQuery,
+  EsMaSaldosTodos,
+  EsMaSaldosTodosQuery,
 } from './tipos';
 
 /**
@@ -262,4 +275,195 @@ export function useConciliacionEsMa(
  */
 export function imprimirPagoEsMa(id: number): void {
   window.open(`/api/esma/pagos/${String(id)}/impreso`, '_blank', 'noopener');
+}
+
+// ── F6-E5: estado de cuenta, desglosado, saldos de todos, semanales, selector, revisión ──
+
+/** Filtro de periodo + facturación de las consultas del estado de cuenta. */
+type FiltroPeriodo = { desde?: string; hasta?: string; conFactura?: 'con' | 'sin' };
+
+/** Arma la query string de un filtro de periodo (para los enlaces de descarga de PDF/Excel). */
+function comoQueryString(filtro: FiltroPeriodo): string {
+  const p = new URLSearchParams();
+  if (filtro.desde !== undefined) p.set('desde', filtro.desde);
+  if (filtro.hasta !== undefined) p.set('hasta', filtro.hasta);
+  if (filtro.conFactura !== undefined) p.set('conFactura', filtro.conFactura);
+  const s = p.toString();
+  return s === '' ? '' : `?${s}`;
+}
+
+async function obtenerEstadoCuenta(
+  idMaquilero: number,
+  query: EsMaEstadoCuentaQuery,
+): Promise<EsMaEstadoCuenta> {
+  const { data, error } = await api.GET('/api/esma/maquileros/{id}/estado-cuenta', {
+    params: { path: { id: idMaquilero }, query },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerDesglosado(
+  idMaquilero: number,
+  query: EsMaEstadoCuentaQuery,
+): Promise<EsMaDesglosado> {
+  const { data, error } = await api.GET('/api/esma/maquileros/{id}/desglosado', {
+    params: { path: { id: idMaquilero }, query },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerSaldosTodos(query: EsMaSaldosTodosQuery): Promise<EsMaSaldosTodos> {
+  const { data, error } = await api.GET('/api/esma/saldos', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerPagosSemanales(query: EsMaPagosSemanalesQuery): Promise<EsMaPagosSemanales> {
+  const { data, error } = await api.GET('/api/esma/pagos-semanales', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerRecibosSemanales(
+  query: EsMaRecibosSemanalesQuery,
+): Promise<EsMaRecibosSemanales> {
+  const { data, error } = await api.GET('/api/esma/recibos-semanales', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function obtenerMaquileros(query: EsMaMaquilerosQuery): Promise<EsMaMaquileros> {
+  const { data, error } = await api.GET('/api/esma/maquileros', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+async function revisarPartida(concepto: EsMaConceptoRevisable, id: number): Promise<EsMaRevision> {
+  const { data, error } = await api.POST('/api/esma/movimientos/{concepto}/{id}/revisar', {
+    params: { path: { concepto, id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Estado de cuenta unificado de un maquilero (deshabilitado sin maquilero). */
+export function useEstadoCuenta(
+  idMaquilero: number | undefined,
+  query: EsMaEstadoCuentaQuery = {},
+): UseQueryResult<EsMaEstadoCuenta, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CUENTA_ESMA, 'estado-cuenta', idMaquilero, query],
+    queryFn: () => obtenerEstadoCuenta(idMaquilero as number, query),
+    enabled: idMaquilero !== undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Estado de cuenta desglosado de un maquilero (deshabilitado sin maquilero). */
+export function useDesglosado(
+  idMaquilero: number | undefined,
+  query: EsMaEstadoCuentaQuery = {},
+): UseQueryResult<EsMaDesglosado, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CUENTA_ESMA, 'desglosado', idMaquilero, query],
+    queryFn: () => obtenerDesglosado(idMaquilero as number, query),
+    enabled: idMaquilero !== undefined,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Saldos de todos los maquileros con saldo ≠ 0 (drill-down). */
+export function useSaldosTodos(
+  query: EsMaSaldosTodosQuery = {},
+): UseQueryResult<EsMaSaldosTodos, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CUENTA_ESMA, 'saldos-todos', query],
+    queryFn: () => obtenerSaldosTodos(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Pagos del periodo (consulta semanal). */
+export function usePagosSemanales(
+  query: EsMaPagosSemanalesQuery = {},
+): UseQueryResult<EsMaPagosSemanales, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CUENTA_ESMA, 'pagos-semanales', query],
+    queryFn: () => obtenerPagosSemanales(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Recibos de maquila del periodo (consulta semanal EsMa). */
+export function useRecibosSemanalesEsMa(
+  query: EsMaRecibosSemanalesQuery = {},
+): UseQueryResult<EsMaRecibosSemanales, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CUENTA_ESMA, 'recibos-semanales', query],
+    queryFn: () => obtenerRecibosSemanales(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Selector de maquileros activos (por tipo costura/estampado). */
+export function useMaquilerosEsMa(
+  query: EsMaMaquilerosQuery = {},
+): UseQueryResult<EsMaMaquileros, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_CUENTA_ESMA, 'maquileros', query],
+    queryFn: () => obtenerMaquileros(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Argumentos de la revisión de una partida. */
+export interface ArgsRevisar {
+  concepto: EsMaConceptoRevisable;
+  id: number;
+}
+
+/** Revisa (autoriza) una partida capturada → revisada e invalida la cuenta. */
+export function useRevisarMovimiento(): UseMutationResult<EsMaRevision, ErrorDeApi, ArgsRevisar> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ concepto, id }: ArgsRevisar) => revisarPartida(concepto, id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_CUENTA_ESMA }),
+  });
+}
+
+/**
+ * Abre el impreso PDF (R9) del estado de cuenta de un maquilero por periodo en una pestaña nueva. La
+ * auth viaja por la cookie de sesión (mismo origen), así que basta `window.open`.
+ */
+export function imprimirEstadoCuenta(idMaquilero: number, filtro: FiltroPeriodo = {}): void {
+  window.open(
+    `/api/esma/maquileros/${String(idMaquilero)}/desglosado/impreso${comoQueryString(filtro)}`,
+    '_blank',
+    'noopener',
+  );
+}
+
+/** Descarga el Excel (.xlsx) del estado de cuenta desglosado de un maquilero por periodo. */
+export function descargarExcelEstadoCuenta(idMaquilero: number, filtro: FiltroPeriodo = {}): void {
+  window.open(
+    `/api/esma/maquileros/${String(idMaquilero)}/desglosado/excel${comoQueryString(filtro)}`,
+    '_blank',
+    'noopener',
+  );
 }
