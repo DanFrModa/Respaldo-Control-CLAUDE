@@ -359,12 +359,16 @@ export type SaldoSalida = z.infer<typeof esquemaSaldoSalida>;
 
 // ── Conciliación EsMa vs recibos (cuadre por orden+maquilero+proceso) ─────────────────────────────
 
-/** Filtros de la conciliación: periodo (por fecha de recibo) y opcional maquilero. */
+/** Filtros de la conciliación: periodo (por fecha de recibo), opcional maquilero y estatus de pago. */
 export const esquemaConciliacionQuery = z
   .object({
     desde: z.iso.date().optional().describe('Fecha inicial (YYYY-MM-DD), inclusiva.'),
     hasta: z.iso.date().optional().describe('Fecha final (YYYY-MM-DD), inclusiva.'),
     idMaquilero: z.coerce.number().int().positive().optional().describe('Filtra por un maquilero.'),
+    pagadas: z
+      .enum(['todas', 'pagadas', 'no-pagadas'])
+      .default('todas')
+      .describe('Filtra por estatus "pagada" de la orden (F6-E5 add-on).'),
   })
   .describe('Filtros de la conciliación EsMa vs recibos.');
 
@@ -387,6 +391,10 @@ export const esquemaConciliacionFila = z
     recibido: z.number().describe('Σ piezas recibidas (recibos vivos del periodo).'),
     cargado: z.number().describe('Σ piezas cargadas a EsMa (cargos validados).'),
     faltantePorCargar: z.number().describe('recibido − cargado (>0 = falta cargar a EsMa).'),
+    // ── F6-E5 add-on: contexto de producción/pago de la orden ────────────────────────────────────
+    cortado: z.number().describe('Σ piezas cortadas de la orden (F3/wip).'),
+    entregado: z.number().describe('Σ piezas entregadas al cliente de la orden (F3/wip).'),
+    pagada: z.boolean().describe('¿La orden está pagada? (estatus derivado + override).'),
   })
   .describe('Cuadre recibido vs cargado por orden+maquilero+proceso.');
 
@@ -461,3 +469,315 @@ export const esquemaOrdenPagadaSalida = z
 
 /** Forma del estatus "pagada". */
 export type OrdenPagadaSalida = z.infer<typeof esquemaOrdenPagadaSalida>;
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// F6-E5 · Estado de cuenta, desglosado, saldos de todos, consultas semanales, selector de
+// maquileros y revisión de partidas (doc 07-EsMa §1/§4). Todo son consultas de solo lectura /
+// agregación (A1: la lógica vive en el dominio) salvo `revisar` (transición de estado).
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Conceptos del estado de cuenta UNIFICADO (los 4 renglones que se fusionan en la línea de tiempo). */
+export const CONCEPTOS_ESTADO_CUENTA = ['cargo', 'abono', 'descuento', 'pago'] as const;
+/** Clave de un concepto del estado de cuenta unificado. */
+export type ConceptoEstadoCuentaClave = (typeof CONCEPTOS_ESTADO_CUENTA)[number];
+
+// ── Estado de cuenta UNIFICADO (los 4 conceptos por fecha) ────────────────────────────────────────
+
+/** Filtros del estado de cuenta: periodo (por fecha del movimiento) y segmento de facturación. */
+export const esquemaEstadoCuentaQuery = z
+  .object({
+    desde: z.iso.date().optional().describe('Fecha inicial (YYYY-MM-DD), inclusiva.'),
+    hasta: z.iso.date().optional().describe('Fecha final (YYYY-MM-DD), inclusiva.'),
+    conFactura: z
+      .enum(['con', 'sin'])
+      .optional()
+      .describe('Segmenta por facturación (con/sin). Omitir = todo junto.'),
+  })
+  .describe('Filtros del estado de cuenta de un maquilero.');
+
+/** Parámetros del estado de cuenta ya coaccionados. */
+export type EstadoCuentaQuery = z.infer<typeof esquemaEstadoCuentaQuery>;
+
+/**
+ * Un renglón del estado de cuenta unificado (cargo/abono/descuento/pago) con su marca de revisión.
+ * `estadoRevision` es TEXTO libre porque cada concepto tiene su propio conjunto (cargo:
+ * propuesto/validado; abono/descuento/pago: capturado/revisado). `pendienteRevision` unifica la marca.
+ */
+export const esquemaEstadoCuentaMovimiento = z
+  .object({
+    concepto: z.enum(CONCEPTOS_ESTADO_CUENTA).describe('Concepto del renglón.'),
+    id: z.number().int().describe('Id del movimiento del concepto.'),
+    fecha: z.string().describe('Fecha del movimiento (YYYY-MM-DD).'),
+    referencia: z.string().describe('Referencia legible (orden+proceso, u observaciones).'),
+    monto: z
+      .number()
+      .nullable()
+      .describe('Importe con signo contable (null si se ocultan importes).'),
+    estadoRevision: z
+      .string()
+      .describe('Estado del renglón (propuesto/validado o capturado/revisado).'),
+    pendienteRevision: z.boolean().describe('true si el renglón está pendiente de revisión.'),
+  })
+  .describe('Renglón del estado de cuenta unificado.');
+
+/** Forma de un renglón del estado de cuenta. */
+export type EstadoCuentaMovimiento = z.infer<typeof esquemaEstadoCuentaMovimiento>;
+
+/** Estado de cuenta unificado de un maquilero: la línea de tiempo de los 4 conceptos + el saldo. */
+export const esquemaEstadoCuentaSalida = z
+  .object({
+    idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
+    maquilero: z.string().describe('Nombre del maquilero.'),
+    desde: z.string().nullable().describe('Inicio del periodo (YYYY-MM-DD) o null.'),
+    hasta: z.string().nullable().describe('Fin del periodo (YYYY-MM-DD) o null.'),
+    conFactura: z
+      .enum(['con', 'sin'])
+      .nullable()
+      .describe('Segmento aplicado o null (todo junto).'),
+    saldo: esquemaSaldoSalida.describe('Saldo derivado (all-time) + su desglose por concepto.'),
+    movimientos: z
+      .array(esquemaEstadoCuentaMovimiento)
+      .describe('Renglones del periodo, ordenados por fecha (fecha+id).'),
+  })
+  .describe('Estado de cuenta unificado de un maquilero.');
+
+/** Forma del estado de cuenta unificado. */
+export type EstadoCuentaSalida = z.infer<typeof esquemaEstadoCuentaSalida>;
+
+// ── Estado de cuenta DESGLOSADO (detalle por orden/modelo — fuente del PDF/Excel) ─────────────────
+
+/** Un cargo desglosado por orden/modelo/cantidad/precio/importe (detalle imprimible). */
+export const esquemaDesglosadoCargo = z
+  .object({
+    idCargo: z.number().int().describe('Id del cargo.'),
+    fecha: z.string().describe('Fecha del cargo (YYYY-MM-DD).'),
+    folioOrden: z.number().int().describe('Folio de la orden.'),
+    codigoModelo: z.string().describe('Código del modelo de la orden.'),
+    descripcionModelo: z.string().nullable().describe('Descripción del modelo, o null.'),
+    tipoProceso: z.string().describe('Nombre del proceso de maquila.'),
+    cantidad: z.number().nullable().describe('Cantidad real (o null si aún propuesto).'),
+    precio: z.number().nullable().describe('Precio real unitario (o null / oculto).'),
+    importe: z.number().nullable().describe('cantidad × precio (o null / oculto).'),
+    sinCosto: z.boolean().describe('Cargo sin costo (segundas no pagadas, decisión f).'),
+    conFactura: z.boolean().nullable().describe('Con/sin factura o null (sin definir).'),
+  })
+  .describe('Cargo desglosado (detalle imprimible).');
+
+/** Forma de un cargo desglosado. */
+export type DesglosadoCargo = z.infer<typeof esquemaDesglosadoCargo>;
+
+/** Estado de cuenta desglosado: cargos por orden/modelo + abonos/descuentos/pagos + saldo. */
+export const esquemaDesglosadoSalida = z
+  .object({
+    idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
+    maquilero: z.string().describe('Nombre del maquilero.'),
+    desde: z.string().nullable().describe('Inicio del periodo (YYYY-MM-DD) o null.'),
+    hasta: z.string().nullable().describe('Fin del periodo (YYYY-MM-DD) o null.'),
+    conFactura: z.enum(['con', 'sin']).nullable().describe('Segmento aplicado o null.'),
+    cargos: z.array(esquemaDesglosadoCargo).describe('Cargos del periodo, por orden/modelo.'),
+    abonos: z.array(esquemaMovimientoEsMaSalida).describe('Abonos del periodo.'),
+    descuentos: z.array(esquemaMovimientoEsMaSalida).describe('Descuentos del periodo.'),
+    pagos: z.array(esquemaPagoSalida).describe('Pagos del periodo.'),
+    saldo: esquemaSaldoSalida.describe('Saldo derivado (all-time) + su desglose.'),
+  })
+  .describe('Estado de cuenta desglosado de un maquilero.');
+
+/** Forma del estado de cuenta desglosado. */
+export type DesglosadoSalida = z.infer<typeof esquemaDesglosadoSalida>;
+
+// ── Saldos de TODOS los maquileros (tablero, drill-down) ──────────────────────────────────────────
+
+/** Filtro del tablero de saldos: segmento de facturación. */
+export const esquemaSaldosTodosQuery = z
+  .object({
+    conFactura: z
+      .enum(['con', 'sin'])
+      .optional()
+      .describe('Segmenta los saldos por facturación (con/sin). Omitir = todo junto.'),
+  })
+  .describe('Filtros del tablero de saldos de maquileros.');
+
+/** Parámetros del tablero de saldos ya coaccionados. */
+export type SaldosTodosQuery = z.infer<typeof esquemaSaldosTodosQuery>;
+
+/** Saldo de un maquilero en el tablero (drill-down al estado de cuenta). */
+export const esquemaSaldoTodosFila = z
+  .object({
+    idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
+    maquilero: z.string().describe('Nombre del maquilero.'),
+    corto: z.string().nullable().describe('Clave corta del taller, o null.'),
+    totalCargos: z.number().nullable().describe('Σ cargos validados no sin-costo (o null).'),
+    totalAbonos: z.number().nullable().describe('Σ abonos (o null).'),
+    totalPagos: z.number().nullable().describe('Σ pagos (o null).'),
+    totalDescuentos: z.number().nullable().describe('Σ descuentos (o null).'),
+    saldo: z.number().nullable().describe('Saldo derivado (o null si se ocultan importes).'),
+  })
+  .describe('Saldo de un maquilero en el tablero.');
+
+/** Forma de una fila del tablero de saldos. */
+export type SaldoTodosFila = z.infer<typeof esquemaSaldoTodosFila>;
+
+/** Tablero de saldos: maquileros activos con saldo ≠ 0. */
+export const esquemaSaldosTodosSalida = z
+  .object({
+    conFactura: z.enum(['con', 'sin']).nullable().describe('Segmento aplicado o null.'),
+    filas: z.array(esquemaSaldoTodosFila).describe('Maquileros activos con saldo ≠ 0.'),
+    totalSaldo: z.number().nullable().describe('Σ de los saldos (o null si se ocultan importes).'),
+  })
+  .describe('Saldos de todos los maquileros.');
+
+/** Forma del tablero de saldos. */
+export type SaldosTodosSalida = z.infer<typeof esquemaSaldosTodosSalida>;
+
+// ── Pagos semanales (navegación por semana) ───────────────────────────────────────────────────────
+
+/** Filtro de pagos semanales: rango (lo resuelve el frontend por semana). */
+export const esquemaPagosSemanalesQuery = z
+  .object({
+    desde: z.iso.date().optional().describe('Fecha inicial (YYYY-MM-DD), inclusiva.'),
+    hasta: z.iso.date().optional().describe('Fecha final (YYYY-MM-DD), inclusiva.'),
+  })
+  .describe('Filtros de pagos semanales.');
+
+/** Parámetros de pagos semanales ya coaccionados. */
+export type PagosSemanalesQuery = z.infer<typeof esquemaPagosSemanalesQuery>;
+
+/** Un pago en la consulta semanal (encabezado, sin el detalle de aplicaciones). */
+export const esquemaPagoSemanalFila = z
+  .object({
+    id: z.number().int().describe('Id del pago.'),
+    idMaquilero: z.number().int().describe('Maquilero (Proveedor).'),
+    maquilero: z.string().describe('Nombre del maquilero.'),
+    fecha: z.string().describe('Fecha del pago (YYYY-MM-DD).'),
+    monto: z.number().nullable().describe('Importe del pago (null si se ocultan importes).'),
+    conFactura: z.boolean().nullable().describe('Con/sin factura o null.'),
+    estadoRevision: z.enum(ESTADOS_REVISION_ESMA).describe('Estado de revisión.'),
+    numAplicaciones: z.number().int().describe('Cantidad de cargos que cubre el pago.'),
+  })
+  .describe('Pago en la consulta semanal.');
+
+/** Forma de un pago semanal. */
+export type PagoSemanalFila = z.infer<typeof esquemaPagoSemanalFila>;
+
+/** Pagos del periodo con su total. */
+export const esquemaPagosSemanalesSalida = z
+  .object({
+    desde: z.string().nullable().describe('Inicio del periodo (YYYY-MM-DD) o null.'),
+    hasta: z.string().nullable().describe('Fin del periodo (YYYY-MM-DD) o null.'),
+    filas: z.array(esquemaPagoSemanalFila).describe('Pagos del periodo (más recientes primero).'),
+    total: z.number().nullable().describe('Σ de los pagos del periodo (o null si se ocultan).'),
+  })
+  .describe('Pagos semanales.');
+
+/** Forma de los pagos semanales. */
+export type PagosSemanalesSalida = z.infer<typeof esquemaPagosSemanalesSalida>;
+
+// ── Recibos semanales de maquila (ex RecibosSemanalesMaq, menú 3.8) ───────────────────────────────
+
+/** Filtro de recibos semanales de maquila (EsMa): periodo + opcional maquilero. */
+export const esquemaRecibosSemanalesEsMaQuery = z
+  .object({
+    desde: z.iso.date().optional().describe('Fecha inicial (YYYY-MM-DD), inclusiva.'),
+    hasta: z.iso.date().optional().describe('Fecha final (YYYY-MM-DD), inclusiva.'),
+    idMaquilero: z.coerce.number().int().positive().optional().describe('Filtra por un maquilero.'),
+  })
+  .describe('Filtros de recibos semanales de maquila (EsMa).');
+
+/** Parámetros de recibos semanales EsMa ya coaccionados. */
+export type RecibosSemanalesEsMaQuery = z.infer<typeof esquemaRecibosSemanalesEsMaQuery>;
+
+/** Un recibo de maquila del periodo, por maquilero/modelo (con su importe valuado al precio pactado). */
+export const esquemaReciboSemanalEsMaFila = z
+  .object({
+    idRecibo: z.number().int().describe('Id del recibo (EtapaMovimiento).'),
+    folioRecibo: z.number().int().describe('Folio del recibo.'),
+    fecha: z.string().describe('Fecha del recibo (YYYY-MM-DD).'),
+    idMaquilero: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Maquilero (Proveedor) o null (sin asignar).'),
+    maquilero: z.string().describe('Nombre del maquilero.'),
+    folioOrden: z.number().int().describe('Folio de la orden.'),
+    codigoModelo: z.string().describe('Código del modelo.'),
+    tipoProceso: z.string().describe('Nombre del proceso.'),
+    cantidad: z.number().describe('Σ piezas recibidas.'),
+    importe: z
+      .number()
+      .nullable()
+      .describe('cantidad × precio pactado (null si se ocultan importes).'),
+  })
+  .describe('Recibo de maquila del periodo (por maquilero/modelo).');
+
+/** Forma de un recibo semanal EsMa. */
+export type ReciboSemanalEsMaFila = z.infer<typeof esquemaReciboSemanalEsMaFila>;
+
+/** Recibos de maquila del periodo con sus totales. */
+export const esquemaRecibosSemanalesEsMaSalida = z
+  .object({
+    desde: z.string().nullable().describe('Inicio del periodo (YYYY-MM-DD) o null.'),
+    hasta: z.string().nullable().describe('Fin del periodo (YYYY-MM-DD) o null.'),
+    filas: z.array(esquemaReciboSemanalEsMaFila).describe('Recibos del periodo.'),
+    totalCantidad: z.number().describe('Σ piezas recibidas del periodo.'),
+    totalImporte: z.number().nullable().describe('Σ importes valuados (o null si se ocultan).'),
+  })
+  .describe('Recibos semanales de maquila (EsMa).');
+
+/** Forma de los recibos semanales EsMa. */
+export type RecibosSemanalesEsMaSalida = z.infer<typeof esquemaRecibosSemanalesEsMaSalida>;
+
+// ── Selector de maquileros de EsMa (activos + por tipo) ───────────────────────────────────────────
+
+/** Tipo de maquilero para el selector: costura o estampado (mapea al rol del proveedor). */
+export const TIPOS_MAQUILERO_ESMA = ['costura', 'estampado'] as const;
+/** Clave de tipo de maquilero. */
+export type TipoMaquileroEsMaClave = (typeof TIPOS_MAQUILERO_ESMA)[number];
+
+/** Filtro del selector de maquileros: por tipo (opcional). */
+export const esquemaMaquilerosEsMaQuery = z
+  .object({
+    tipo: z
+      .enum(TIPOS_MAQUILERO_ESMA)
+      .optional()
+      .describe('Filtra por tipo (costura/estampado). Omitir = cualquier rol de maquila.'),
+  })
+  .describe('Filtros del selector de maquileros.');
+
+/** Parámetros del selector ya coaccionados. */
+export type MaquilerosEsMaQuery = z.infer<typeof esquemaMaquilerosEsMaQuery>;
+
+/** Un maquilero para el selector (id + nombre + clave corta). */
+export const esquemaMaquileroEsMaFila = z
+  .object({
+    id: z.number().int().describe('Maquilero (Proveedor).'),
+    nombre: z.string().describe('Nombre del maquilero.'),
+    corto: z.string().nullable().describe('Clave corta del taller, o null.'),
+  })
+  .describe('Maquilero para el selector.');
+
+/** Forma de una fila del selector de maquileros. */
+export type MaquileroEsMaFila = z.infer<typeof esquemaMaquileroEsMaFila>;
+
+/** Lista del selector de maquileros. */
+export const esquemaMaquilerosEsMaLista = z
+  .object({
+    filas: z.array(esquemaMaquileroEsMaFila).describe('Maquileros activos del tipo pedido.'),
+  })
+  .describe('Selector de maquileros de EsMa.');
+
+/** Forma del selector de maquileros. */
+export type MaquilerosEsMaLista = z.infer<typeof esquemaMaquilerosEsMaLista>;
+
+// ── Revisión (autorización) de una partida (abono/descuento/pago) ─────────────────────────────────
+
+/** Resultado de revisar (autorizar) una partida: su nuevo estado de revisión. */
+export const esquemaRevisionSalida = z
+  .object({
+    concepto: z.enum(CONCEPTOS_MOVIMIENTO_ESMA).describe('Concepto (abono/descuento/pago).'),
+    id: z.number().int().describe('Id del movimiento revisado.'),
+    estadoRevision: z.enum(ESTADOS_REVISION_ESMA).describe('Estado de revisión resultante.'),
+  })
+  .describe('Resultado de la revisión de una partida.');
+
+/** Forma del resultado de revisión. */
+export type RevisionSalida = z.infer<typeof esquemaRevisionSalida>;

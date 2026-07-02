@@ -85,9 +85,12 @@ vi.mock('@/api/esma', () => ({
     isError: false,
     error: null,
   }),
-}));
-vi.mock('@/api/proveedores', () => ({
-  useProveedores: () => ({ data: { datos: [{ id: 5, nombre: 'Maquila SA' }] } }),
+  // F6-E5: el selector de maquilero usa el nuevo endpoint (activos + rol de maquila).
+  useMaquilerosEsMa: () => ({
+    data: { filas: [{ id: 5, nombre: 'Maquila SA', corto: null }] },
+    isPending: false,
+    isError: false,
+  }),
 }));
 
 describe('CapturaPagosPagina (F6-E4)', () => {

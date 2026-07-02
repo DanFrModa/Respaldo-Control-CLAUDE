@@ -1165,6 +1165,8 @@ export interface paths {
                 asegurado: boolean | null;
                 /** @description Observaciones de pago (talleres), o null. */
                 obsPago: string | null;
+                /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
+                modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
                 /** @description Roles/servicios del proveedor. */
                 roles: {
                   /** @description Id del rol. */
@@ -1333,6 +1335,8 @@ export interface paths {
             corto?: string;
             asegurado?: boolean;
             obsPago?: string;
+            /** @enum {string} */
+            modalidadFacturacion?: 'solo_con' | 'solo_sin' | 'ambos';
           };
         };
       };
@@ -1403,6 +1407,8 @@ export interface paths {
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
               obsPago: string | null;
+              /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
+              modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
               /** @description Roles/servicios del proveedor. */
               roles: {
                 /** @description Id del rol. */
@@ -1607,6 +1613,8 @@ export interface paths {
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
               obsPago: string | null;
+              /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
+              modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
               /** @description Roles/servicios del proveedor. */
               roles: {
                 /** @description Id del rol. */
@@ -1800,6 +1808,8 @@ export interface paths {
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
               obsPago: string | null;
+              /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
+              modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
               /** @description Roles/servicios del proveedor. */
               roles: {
                 /** @description Id del rol. */
@@ -1958,6 +1968,7 @@ export interface paths {
             corto?: string | null;
             asegurado?: boolean;
             obsPago?: string | null;
+            modalidadFacturacion?: ('solo_con' | 'solo_sin' | 'ambos') | null;
           };
         };
       };
@@ -2028,6 +2039,8 @@ export interface paths {
               asegurado: boolean | null;
               /** @description Observaciones de pago (talleres), o null. */
               obsPago: string | null;
+              /** @description Modalidad de facturación EsMa (solo_con/solo_sin/ambos), o null (sin definir). */
+              modalidadFacturacion: ('solo_con' | 'solo_sin' | 'ambos') | null;
               /** @description Roles/servicios del proveedor. */
               roles: {
                 /** @description Id del rol. */
@@ -33246,6 +33259,8 @@ export interface paths {
           hasta?: string;
           /** @description Filtra por un maquilero. */
           idMaquilero?: number;
+          /** @description Filtra por estatus "pagada" de la orden (F6-E5 add-on). */
+          pagadas?: 'todas' | 'pagadas' | 'no-pagadas';
         };
         header?: never;
         path?: never;
@@ -33284,6 +33299,12 @@ export interface paths {
                 cargado: number;
                 /** @description recibido − cargado (>0 = falta cargar a EsMa). */
                 faltantePorCargar: number;
+                /** @description Σ piezas cortadas de la orden (F3/wip). */
+                cortado: number;
+                /** @description Σ piezas entregadas al cliente de la orden (F3/wip). */
+                entregado: number;
+                /** @description ¿La orden está pagada? (estatus derivado + override). */
+                pagada: boolean;
               }[];
               /** @description Cargos sin recibo ligado. */
               cargosSinRecibo: {
@@ -33658,6 +33679,1420 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/maquileros': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Selector de maquileros activos (por tipo costura/estampado) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por tipo (costura/estampado). Omitir = cualquier rol de maquila. */
+          tipo?: 'costura' | 'estampado';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Selector de maquileros de EsMa. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Maquileros activos del tipo pedido. */
+              filas: {
+                /** @description Maquilero (Proveedor). */
+                id: number;
+                /** @description Nombre del maquilero. */
+                nombre: string;
+                /** @description Clave corta del taller, o null. */
+                corto: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/saldos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Saldos de todos los maquileros activos con saldo ≠ 0 (drill-down) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Segmenta los saldos por facturación (con/sin). Omitir = todo junto. */
+          conFactura?: 'con' | 'sin';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Saldos de todos los maquileros. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Segmento aplicado o null. */
+              conFactura: ('con' | 'sin') | null;
+              /** @description Maquileros activos con saldo ≠ 0. */
+              filas: {
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Clave corta del taller, o null. */
+                corto: string | null;
+                /** @description Σ cargos validados no sin-costo (o null). */
+                totalCargos: number | null;
+                /** @description Σ abonos (o null). */
+                totalAbonos: number | null;
+                /** @description Σ pagos (o null). */
+                totalPagos: number | null;
+                /** @description Σ descuentos (o null). */
+                totalDescuentos: number | null;
+                /** @description Saldo derivado (o null si se ocultan importes). */
+                saldo: number | null;
+              }[];
+              /** @description Σ de los saldos (o null si se ocultan importes). */
+              totalSaldo: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/pagos-semanales': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Pagos del periodo con su total (navegación por semana en el frontend) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Pagos semanales. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Inicio del periodo (YYYY-MM-DD) o null. */
+              desde: string | null;
+              /** @description Fin del periodo (YYYY-MM-DD) o null. */
+              hasta: string | null;
+              /** @description Pagos del periodo (más recientes primero). */
+              filas: {
+                /** @description Id del pago. */
+                id: number;
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Fecha del pago (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Importe del pago (null si se ocultan importes). */
+                monto: number | null;
+                /** @description Con/sin factura o null. */
+                conFactura: boolean | null;
+                /**
+                 * @description Estado de revisión.
+                 * @enum {string}
+                 */
+                estadoRevision: 'capturado' | 'revisado';
+                /** @description Cantidad de cargos que cubre el pago. */
+                numAplicaciones: number;
+              }[];
+              /** @description Σ de los pagos del periodo (o null si se ocultan). */
+              total: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/recibos-semanales': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Recibos de maquila del periodo por maquilero/modelo (importes ocultables) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Filtra por un maquilero. */
+          idMaquilero?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Recibos semanales de maquila (EsMa). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Inicio del periodo (YYYY-MM-DD) o null. */
+              desde: string | null;
+              /** @description Fin del periodo (YYYY-MM-DD) o null. */
+              hasta: string | null;
+              /** @description Recibos del periodo. */
+              filas: {
+                /** @description Id del recibo (EtapaMovimiento). */
+                idRecibo: number;
+                /** @description Folio del recibo. */
+                folioRecibo: number;
+                /** @description Fecha del recibo (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Maquilero (Proveedor) o null (sin asignar). */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Folio de la orden. */
+                folioOrden: number;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Nombre del proceso. */
+                tipoProceso: string;
+                /** @description Σ piezas recibidas. */
+                cantidad: number;
+                /** @description cantidad × precio pactado (null si se ocultan importes). */
+                importe: number | null;
+              }[];
+              /** @description Σ piezas recibidas del periodo. */
+              totalCantidad: number;
+              /** @description Σ importes valuados (o null si se ocultan). */
+              totalImporte: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/movimientos/{concepto}/{id}/revisar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revisar (autorizar) una partida capturada → revisada */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Concepto del movimiento a revisar. */
+          concepto: 'abono' | 'descuento' | 'pago';
+          /** @description Id del movimiento. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resultado de la revisión de una partida. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Concepto (abono/descuento/pago).
+               * @enum {string}
+               */
+              concepto: 'abono' | 'descuento' | 'pago';
+              /** @description Id del movimiento revisado. */
+              id: number;
+              /**
+               * @description Estado de revisión resultante.
+               * @enum {string}
+               */
+              estadoRevision: 'capturado' | 'revisado';
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/maquileros/{id}/estado-cuenta': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Estado de cuenta unificado de un maquilero (4 conceptos por fecha + saldo) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Segmenta por facturación (con/sin). Omitir = todo junto. */
+          conFactura?: 'con' | 'sin';
+        };
+        header?: never;
+        path: {
+          /** @description Id del maquilero (Proveedor). */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Estado de cuenta unificado de un maquilero. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Maquilero (Proveedor). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Inicio del periodo (YYYY-MM-DD) o null. */
+              desde: string | null;
+              /** @description Fin del periodo (YYYY-MM-DD) o null. */
+              hasta: string | null;
+              /** @description Segmento aplicado o null (todo junto). */
+              conFactura: ('con' | 'sin') | null;
+              /** @description Saldo derivado (all-time) + su desglose por concepto. */
+              saldo: {
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Segmento aplicado o null (todo junto). */
+                conFactura: ('con' | 'sin') | null;
+                /** @description Σ cargos validados no sin-costo (o null). */
+                totalCargos: number | null;
+                /** @description Σ abonos (o null). */
+                totalAbonos: number | null;
+                /** @description Σ pagos (o null). */
+                totalPagos: number | null;
+                /** @description Σ descuentos (o null). */
+                totalDescuentos: number | null;
+                /** @description Saldo derivado (o null si se ocultan importes). */
+                saldo: number | null;
+              };
+              /** @description Renglones del periodo, ordenados por fecha (fecha+id). */
+              movimientos: {
+                /**
+                 * @description Concepto del renglón.
+                 * @enum {string}
+                 */
+                concepto: 'cargo' | 'abono' | 'descuento' | 'pago';
+                /** @description Id del movimiento del concepto. */
+                id: number;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Referencia legible (orden+proceso, u observaciones). */
+                referencia: string;
+                /** @description Importe con signo contable (null si se ocultan importes). */
+                monto: number | null;
+                /** @description Estado del renglón (propuesto/validado o capturado/revisado). */
+                estadoRevision: string;
+                /** @description true si el renglón está pendiente de revisión. */
+                pendienteRevision: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/maquileros/{id}/desglosado': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Estado de cuenta desglosado por orden/modelo (+ movimientos + saldo) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Segmenta por facturación (con/sin). Omitir = todo junto. */
+          conFactura?: 'con' | 'sin';
+        };
+        header?: never;
+        path: {
+          /** @description Id del maquilero (Proveedor). */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Estado de cuenta desglosado de un maquilero. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Maquilero (Proveedor). */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Inicio del periodo (YYYY-MM-DD) o null. */
+              desde: string | null;
+              /** @description Fin del periodo (YYYY-MM-DD) o null. */
+              hasta: string | null;
+              /** @description Segmento aplicado o null. */
+              conFactura: ('con' | 'sin') | null;
+              /** @description Cargos del periodo, por orden/modelo. */
+              cargos: {
+                /** @description Id del cargo. */
+                idCargo: number;
+                /** @description Fecha del cargo (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Folio de la orden. */
+                folioOrden: number;
+                /** @description Código del modelo de la orden. */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Nombre del proceso de maquila. */
+                tipoProceso: string;
+                /** @description Cantidad real (o null si aún propuesto). */
+                cantidad: number | null;
+                /** @description Precio real unitario (o null / oculto). */
+                precio: number | null;
+                /** @description cantidad × precio (o null / oculto). */
+                importe: number | null;
+                /** @description Cargo sin costo (segundas no pagadas, decisión f). */
+                sinCosto: boolean;
+                /** @description Con/sin factura o null (sin definir). */
+                conFactura: boolean | null;
+              }[];
+              /** @description Abonos del periodo. */
+              abonos: {
+                /** @description Id del movimiento. */
+                id: number;
+                /**
+                 * @description Concepto (abono/descuento/pago).
+                 * @enum {string}
+                 */
+                concepto: 'abono' | 'descuento' | 'pago';
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Importe del movimiento (null si se ocultan importes). */
+                monto: number | null;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Con/sin factura o null (sin definir). */
+                conFactura: boolean | null;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /**
+                 * @description Estado de revisión.
+                 * @enum {string}
+                 */
+                estadoRevision: 'capturado' | 'revisado';
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                creadoEn: string;
+              }[];
+              /** @description Descuentos del periodo. */
+              descuentos: {
+                /** @description Id del movimiento. */
+                id: number;
+                /**
+                 * @description Concepto (abono/descuento/pago).
+                 * @enum {string}
+                 */
+                concepto: 'abono' | 'descuento' | 'pago';
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Importe del movimiento (null si se ocultan importes). */
+                monto: number | null;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Con/sin factura o null (sin definir). */
+                conFactura: boolean | null;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /**
+                 * @description Estado de revisión.
+                 * @enum {string}
+                 */
+                estadoRevision: 'capturado' | 'revisado';
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                creadoEn: string;
+              }[];
+              /** @description Pagos del periodo. */
+              pagos: {
+                /** @description Id del pago. */
+                id: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Importe total del pago (null si se ocultan importes). */
+                monto: number | null;
+                /** @description Fecha del pago (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Con/sin factura o null. */
+                conFactura: boolean | null;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /**
+                 * @description Estado de revisión.
+                 * @enum {string}
+                 */
+                estadoRevision: 'capturado' | 'revisado';
+                /** @description Cargos cubiertos por el pago. */
+                aplicaciones: {
+                  /** @description Cargo pagado. */
+                  idCargo: number;
+                  /** @description Orden del cargo. */
+                  idOrden: number;
+                  /** @description Folio de la orden. */
+                  folioOrden: number;
+                  /** @description Proceso de maquila del cargo. */
+                  tipoProceso: string;
+                  /** @description Prendas cubiertas por este pago en ese cargo. */
+                  cantidad: number;
+                  /** @description Importe aplicado (null si se ocultan importes). */
+                  importe: number | null;
+                }[];
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                creadoEn: string;
+              }[];
+              /** @description Saldo derivado (all-time) + su desglose. */
+              saldo: {
+                /** @description Maquilero (Proveedor). */
+                idMaquilero: number;
+                /** @description Nombre del maquilero. */
+                maquilero: string;
+                /** @description Segmento aplicado o null (todo junto). */
+                conFactura: ('con' | 'sin') | null;
+                /** @description Σ cargos validados no sin-costo (o null). */
+                totalCargos: number | null;
+                /** @description Σ abonos (o null). */
+                totalAbonos: number | null;
+                /** @description Σ pagos (o null). */
+                totalPagos: number | null;
+                /** @description Σ descuentos (o null). */
+                totalDescuentos: number | null;
+                /** @description Saldo derivado (o null si se ocultan importes). */
+                saldo: number | null;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/maquileros/{id}/desglosado/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Estado de cuenta del maquilero por periodo (PDF, R9) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Segmenta por facturación (con/sin). Omitir = todo junto. */
+          conFactura?: 'con' | 'sin';
+        };
+        header?: never;
+        path: {
+          /** @description Id del maquilero (Proveedor). */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/esma/maquileros/{id}/desglosado/excel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Estado de cuenta desglosado del maquilero (Excel .xlsx) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Segmenta por facturación (con/sin). Omitir = todo junto. */
+          conFactura?: 'con' | 'sin';
+        };
+        header?: never;
+        path: {
+          /** @description Id del maquilero (Proveedor). */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

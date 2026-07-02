@@ -1,9 +1,9 @@
 import { Loader2Icon, Printer, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa } from '@/api/esma';
-import { useProveedores } from '@/api/proveedores';
+import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa, useMaquilerosEsMa } from '@/api/esma';
 import type { CargosEsMaQuery } from '@/api/tipos';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,12 +21,7 @@ import {
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
-import { moneda } from './comun';
-
-/** Fecha de hoy en formato YYYY-MM-DD. */
-function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import { hoyISO, moneda, type PartidaInicial } from './comun';
 
 /**
  * CAPTURA DE PAGOS a un maquilero (F6-E4, decisión g "prendas por pagar"): se elige el maquilero,
@@ -39,22 +34,22 @@ function hoyISO(): string {
  */
 export function CapturaPagosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
+  const location = useLocation();
   const puedePagar = tienePermiso('esma.ver-pagos');
 
-  const [idMaquilero, setIdMaquilero] = useState<string>('');
+  // "Duplicar partida" / entrada desde el estado de cuenta: pre-selecciona el maquilero.
+  const inicial = (location.state ?? null) as PartidaInicial | null;
+  const [idMaquilero, setIdMaquilero] = useState<string>(
+    inicial?.idMaquilero !== undefined ? String(inicial.idMaquilero) : '',
+  );
   const [fecha, setFecha] = useState(hoyISO());
-  const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>('');
-  const [observaciones, setObservaciones] = useState('');
+  const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>(inicial?.conFactura ?? '');
+  const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? '');
   // Cargos seleccionados: idCargo → cantidad (texto). La presencia de la clave = incluido.
   const [seleccion, setSeleccion] = useState<Record<number, string>>({});
   const [pagoImpreso, setPagoImpreso] = useState<number | null>(null);
 
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-  });
+  const maquileros = useMaquilerosEsMa({});
 
   const idNum = idMaquilero === '' ? undefined : Number(idMaquilero);
 
@@ -159,9 +154,9 @@ export function CapturaPagosPagina(): React.JSX.Element {
                 data-testid="pago-maquilero"
               >
                 <option value="">Elige un maquilero…</option>
-                {(maquileros.data?.datos ?? []).map((m) => (
+                {(maquileros.data?.filas ?? []).map((m) => (
                   <option key={m.id} value={String(m.id)}>
-                    {m.nombre}
+                    {m.corto ? `${m.nombre} (${m.corto})` : m.nombre}
                   </option>
                 ))}
               </SelectNativo>

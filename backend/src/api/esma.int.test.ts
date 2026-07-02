@@ -259,3 +259,73 @@ describe('API EsMa (F6-E4)', () => {
     expect(saldo.statusCode).toBe(403);
   });
 });
+
+describe('API EsMa — estado de cuenta (F6-E5)', () => {
+  it('las consultas responden 200 con esma.ver-pagos', async () => {
+    const admin = await cookieAdmin();
+    const cookie = await usuarioConPermisos(admin, 'consultaesma', ['esma.ver-pagos']);
+    const rutas = [
+      `/api/esma/maquileros/${String(idMaquilero)}/estado-cuenta`,
+      `/api/esma/maquileros/${String(idMaquilero)}/desglosado`,
+      '/api/esma/saldos',
+      '/api/esma/pagos-semanales',
+      '/api/esma/recibos-semanales',
+      '/api/esma/maquileros?tipo=costura',
+    ];
+    for (const url of rutas) {
+      const res = await app.inject({ method: 'GET', url, headers: { cookie } });
+      expect(res.statusCode).toBe(200);
+    }
+  });
+
+  it('deny-by-default: solo esma.ver-pagos NO puede revisar una partida (403); el admin sí (200)', async () => {
+    const admin = await cookieAdmin();
+    // El admin crea un abono para tener una partida que revisar.
+    const abono = await app.inject({
+      method: 'POST',
+      url: '/api/esma/abonos',
+      headers: { cookie: admin },
+      payload: { idMaquilero, monto: 30, fecha: '2026-07-01' },
+    });
+    expect(abono.statusCode).toBe(201);
+    const idAbono = abono.json<{ id: number }>().id;
+
+    const soloVer = await usuarioConPermisos(admin, 'soloverpagos', ['esma.ver-pagos']);
+    const negado = await app.inject({
+      method: 'POST',
+      url: `/api/esma/movimientos/abono/${String(idAbono)}/revisar`,
+      headers: { cookie: soloVer },
+    });
+    expect(negado.statusCode).toBe(403);
+
+    const ok = await app.inject({
+      method: 'POST',
+      url: `/api/esma/movimientos/abono/${String(idAbono)}/revisar`,
+      headers: { cookie: admin },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json<{ estadoRevision: string }>().estadoRevision).toBe('revisado');
+  });
+
+  it('el desglosado responde 200 en PDF y en Excel con su content-type', async () => {
+    const cookie = await cookieAdmin();
+
+    const pdf = await app.inject({
+      method: 'GET',
+      url: `/api/esma/maquileros/${String(idMaquilero)}/desglosado/impreso`,
+      headers: { cookie },
+    });
+    expect(pdf.statusCode).toBe(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    expect(pdf.rawPayload.subarray(0, 4).toString('latin1')).toBe('%PDF');
+
+    const xlsx = await app.inject({
+      method: 'GET',
+      url: `/api/esma/maquileros/${String(idMaquilero)}/desglosado/excel`,
+      headers: { cookie },
+    });
+    expect(xlsx.statusCode).toBe(200);
+    expect(xlsx.headers['content-type']).toContain('spreadsheetml');
+    expect(xlsx.rawPayload.subarray(0, 2).toString('latin1')).toBe('PK');
+  });
+});
