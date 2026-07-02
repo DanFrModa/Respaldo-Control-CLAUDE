@@ -65,6 +65,12 @@ export const ENTIDAD_MAPEO = {
   etapaReciboEstampado: 'EtapaReciboEstampado',
   /** F3-E6: IdEsMa_Recibos viejo → EsMaCargo.id nuevo. */
   cargoEsMa: 'CargoEsMa',
+  /** F6-E6: IdEsMa_Abonos viejo → AbonoMaquilero.id nuevo. */
+  abonoMaquilero: 'AbonoMaquilero',
+  /** F6-E6: IdEsMa_Desc viejo → DescuentoMaquilero.id nuevo. */
+  descuentoMaquilero: 'DescuentoMaquilero',
+  /** F6-E6: IdEsMa_Pagos viejo → PagoMaquilero.id nuevo (pago histórico LIBRE, sin aplicaciones). */
+  pagoMaquilero: 'PagoMaquilero',
   /** F4-E6: IdOrdCompra viejo → OrdenCompra.id nuevo. */
   ordenCompra: 'OrdenCompra',
   /** F4-E6: IdNotas viejo → NotaSalida.id nuevo. */
@@ -79,6 +85,12 @@ export const ENTIDAD_MAPEO = {
   movTraspasoTelaEntrada: 'MovTraspasoTelaEntrada',
   /** F4-E6 (telas): IdTelasColores legacy → Lote sintetizado (lote-por-color, decisión f). */
   loteLegacyTela: 'LoteLegacyTela',
+  /** F6-E6 (calidad): IdCC_Catalogo viejo → DefectoCatalogo.id nuevo. */
+  defectoCatalogo: 'DefectoCatalogo',
+  /** F6-E6 (calidad): IdCC_Auditorias viejo → Auditoria.id nuevo. */
+  auditoria: 'Auditoria',
+  /** F6-E6 (calidad): IdCC_AuditoriasDet viejo → AuditoriaDefecto.id nuevo. */
+  auditoriaDefecto: 'AuditoriaDefecto',
 } as const;
 
 /** Una clave de entidad de mapeo. */

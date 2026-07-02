@@ -42,7 +42,13 @@ import {
   type HistorialMaquileroSalida,
   type SugerenciaAqlSalida,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type Prisma, type PrismaClient } from '../../datos/index.js';
+import {
+  TipoEtapaMovimiento,
+  type Prisma,
+  type PrismaClient,
+  type ResultadoAuditoria,
+  type TipoAuditoria,
+} from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -77,8 +83,9 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 import { resolverPlanPorLote, type RenglonPlanResuelto } from './planes-aql.js';
 
-/** Clave de la secuencia de folios de auditorías (A3, por empresa). */
-const CLAVE_SECUENCIA_AUDITORIA = 'auditoria';
+/** Clave de la secuencia de folios de auditorías (A3, por empresa). Exportada para que el ETL del
+ * histórico (F6-E6) recalibre la serie al máximo folio migrado tras preservar los folios viejos. */
+export const CLAVE_SECUENCIA_AUDITORIA = 'auditoria';
 /** Códigos de los tipos de movimiento de las patas del traspaso de reclasificación (seed F3-E3). */
 const COD_TRANSFERENCIA_SALIDA = 'transferencia-salida';
 const COD_TRANSFERENCIA_ENTRADA = 'transferencia-entrada';
@@ -1169,4 +1176,163 @@ export async function cancelarAuditoria(
 
   dispararPublicacion();
   return obtenerAuditoriaProyectada(sesion, idAuditoria, bd);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MODO MIGRACIÓN del histórico de auditorías (F6-E6) — capa de dominio (A1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * El servicio normal (`crearAuditoria` + `capturarResultado`) está afinado para la CAPTURA nueva:
+ * genera el folio de la SECUENCIA (A3), propone maquilero/muestra del plan AQL, pre-carga los
+ * favoritos con 0 fallas, deja el resultado en `no_calificado` y —al capturar— PUBLICA el evento
+ * `auditoria-calidad-resuelta` al outbox (auto-avance de la RC de F5). El histórico, en cambio, ya
+ * viene RESUELTO en el viejo (`CC_Auditorias`: NumAuditoria, Resultado, TipoAuditoria, Cancelada +
+ * `CC_AuditoriasDet`: las fallas por defecto), así que el modo migración PRESERVA esos datos tal
+ * cual y —sobre todo— NO dispara efectos derivados.
+ *
+ * ⭐ SIN EFECTO DE RC (excepción JUSTIFICADA a PLANMAESTRO §7 — igual que F3-E6/F5): migrar 488
+ * auditorías NO debe encolar 488 eventos de auto-avance de la RC (esa historia ya se cargó por su
+ * propio ETL en F5). Por eso `crearAuditoriaMigrada` NO llama a `registrarEventoOutbox`.
+ *
+ * Lo que RELAJA respecto al servicio normal (excepciones históricas, documentadas):
+ *  • Folio `numAuditoria` EXPLÍCITO (preserva `CC_Auditorias.NumAuditoria`), NO de la secuencia. El
+ *    ETL recalibra la secuencia "auditoria" al máximo folio migrado por empresa al terminar (como
+ *    F2 con los folios de orden), para que la primera captura nueva no choque el `@@unique`.
+ *  • Resultado + tipo + muestra + fechas + cancelación EXPLÍCITOS (del viejo), sin pasar por la cola
+ *    de validación ni el plan AQL. `resultadoManual = true` (decisión (a): el veredicto lo puso el
+ *    humano en su día).
+ *  • Los defectos vienen YA resueltos a `idDefecto` de v2 (el loader los mapeó); se agrupan por
+ *    defecto SUMANDO fallas (defensa del `@@unique(idAuditoria, idDefecto)`: el viejo trae pares
+ *    duplicados — p. ej. la auditoría 488). NO se pre-cargan favoritos (se migra lo que el viejo tenía).
+ *  • `elaboroPorId`/`auditorPorId` NO tienen FK física (ADR-0005): se preserva el id de usuario VIEJO
+ *    como texto (el loader los pasa); F9 migrará los usuarios y podrá remapearlos. `0`/vacío → null.
+ *
+ * Lo que CONSERVA (sigue siendo del dominio): A2 (encabezado + detalle + bitácora en UNA tx), A7
+ * (bitácora `operacion:'migracion'` con el snapshot viejo), A9 (`idEmpresa` EXPLÍCITO — el loader lo
+ * deriva de la orden). Idempotencia: el loader resuelve "ya existe" por el `MapeoMigracion` de
+ * `IdCC_Auditorias` (y, defensivamente, por el `@@unique(idEmpresa, numAuditoria)`) ANTES de llamar.
+ */
+
+/** Un renglón defecto→fallas de una auditoría histórica (ya resuelto a `idDefecto` de v2). */
+export interface DefectoAuditoriaMigrado {
+  idDefecto: number;
+  /** Fallas contadas (≥0). Se saneará a ≥0 al agrupar. */
+  numFallas: number;
+}
+
+/** Una auditoría histórica a migrar (snapshot del viejo `CC_Auditorias` + `CC_AuditoriasDet`). */
+export interface AuditoriaMigrada {
+  /** Folio EXPLÍCITO = `CC_Auditorias.NumAuditoria` (preserva la numeración histórica). */
+  numAuditoria: number | bigint;
+  idEmpresa: number;
+  idOrden: number;
+  /** Maquilero de costura auditado (Proveedor). NULL si el viejo no lo trae/mapea. */
+  idMaquilero?: number | null;
+  fechaElaboracion: Date;
+  fechaAuditoria: Date;
+  /** Id de usuario VIEJO que elaboró (texto sin FK); null si `0`/vacío. */
+  elaboroPorId?: string | null;
+  /** Id de usuario VIEJO que auditó (texto sin FK); null si `0`/vacío. */
+  auditorPorId?: string | null;
+  tamanoMuestra: number;
+  resultado: ResultadoAuditoria;
+  tipoAuditoria: TipoAuditoria;
+  observaciones?: string | null;
+  /** Cancelación (borrado suave) histórica (`CC_Auditorias.Cancelada`). */
+  cancelada?: boolean;
+  /** Motivo de la cancelación histórica (el viejo no lo trae → un texto por defecto). */
+  motivoCancelacion?: string | null;
+  /** Identificador VIEJO (`IdCC_Auditorias`) para la bitácora (trazabilidad). */
+  claveVieja?: string;
+  defectos: readonly DefectoAuditoriaMigrado[];
+}
+
+/** Resultado de migrar una auditoría (con sus defectos creados, para mapear el detalle viejo). */
+export interface ResultadoAuditoriaMigrada {
+  idAuditoria: number;
+  /** `AuditoriaDefecto` creados (id + idDefecto) — el loader mapea cada `IdCC_AuditoriasDet` a estos. */
+  defectos: { id: number; idDefecto: number }[];
+}
+
+/**
+ * Crea una auditoría HISTÓRICA con su detalle (defecto→fallas), en UNA transacción (A2/A7). Preserva
+ * folio/resultado/tipo/fechas/cancelación del viejo; NO publica el evento de RC (ver el bloque de
+ * TSDoc de arriba). Los defectos se agrupan por `idDefecto` sumando fallas (defensa del `@@unique`).
+ * Idempotencia: la resuelve el LOADER por `MapeoMigracion` ANTES de llamar; aquí solo se crea.
+ */
+export async function crearAuditoriaMigrada(
+  sesion: SesionUsuario,
+  entrada: AuditoriaMigrada,
+  bd?: ContextoBd,
+): Promise<ResultadoAuditoriaMigrada> {
+  return enTransaccion(async (tx) => {
+    // Agrupa defectos por idDefecto sumando fallas (el viejo trae pares duplicados; el @@unique
+    // (idAuditoria, idDefecto) exige uno solo por defecto). Fallas saneadas a ≥0.
+    const porDefecto = new Map<number, number>();
+    for (const d of entrada.defectos) {
+      porDefecto.set(d.idDefecto, (porDefecto.get(d.idDefecto) ?? 0) + Math.max(0, d.numFallas));
+    }
+    const cancelada = entrada.cancelada ?? false;
+
+    const auditoria = await tx.auditoria.create({
+      data: {
+        numAuditoria: BigInt(entrada.numAuditoria),
+        idEmpresa: entrada.idEmpresa,
+        idOrden: entrada.idOrden,
+        idMaquilero: entrada.idMaquilero ?? null,
+        fechaElaboracion: entrada.fechaElaboracion,
+        fechaAuditoria: entrada.fechaAuditoria,
+        elaboroPorId: entrada.elaboroPorId ?? null,
+        auditorPorId: entrada.auditorPorId ?? null,
+        tamanoMuestra: entrada.tamanoMuestra,
+        muestraManual: false,
+        resultado: entrada.resultado,
+        resultadoManual: true,
+        tipoAuditoria: entrada.tipoAuditoria,
+        observaciones: entrada.observaciones ?? null,
+        cancelada,
+        ...(cancelada
+          ? {
+              canceladaEn: entrada.fechaAuditoria,
+              canceladaPorId: sesion.id,
+              motivoCancelacion:
+                entrada.motivoCancelacion ??
+                'Cancelada en el sistema anterior (sin motivo registrado)',
+            }
+          : {}),
+        defectos: {
+          create: [...porDefecto.entries()].map(([idDefecto, numFallas]) => ({
+            idDefecto,
+            numFallas,
+            ...datosCreacion(sesion),
+          })),
+        },
+        ...datosCreacion(sesion),
+      },
+      include: { defectos: { select: { id: true, idDefecto: true } } },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Auditoria',
+      idEntidad: auditoria.id,
+      accion: 'CREAR',
+      datos: {
+        operacion: 'migracion',
+        numAuditoria: String(entrada.numAuditoria),
+        idEmpresa: entrada.idEmpresa,
+        idOrden: entrada.idOrden,
+        resultado: entrada.resultado,
+        tipoAuditoria: entrada.tipoAuditoria,
+        cancelada,
+        defectos: auditoria.defectos.length,
+        ...(entrada.claveVieja === undefined ? {} : { claveVieja: entrada.claveVieja }),
+      },
+    });
+
+    return {
+      idAuditoria: auditoria.id,
+      defectos: auditoria.defectos.map((d) => ({ id: d.id, idDefecto: d.idDefecto })),
+    };
+  }, bd);
 }
