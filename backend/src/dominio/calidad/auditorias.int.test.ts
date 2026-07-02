@@ -24,7 +24,12 @@ import type {
   Talla,
 } from '../../datos/index.js';
 import type { ClavePermiso } from '../../contrato/index.js';
-import { ErrorConflicto, ErrorPermiso } from '../../comun/errores.js';
+import {
+  ErrorConflicto,
+  ErrorNoEncontrado,
+  ErrorPermiso,
+  ErrorValidacion,
+} from '../../comun/errores.js';
 import { registrarMovimientoPt as registrarMovimientoPtMotor } from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
@@ -32,8 +37,12 @@ import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import type { MensajeEventoDominio } from '../../comun/cola-eventos.js';
 import { procesarEventoAutoAvance } from '../ruta-critica/autoAvance.js';
 import {
+  cancelarAuditoria,
   capturarResultado,
   crearAuditoria,
+  historialPorMaquilero,
+  listarAuditorias,
+  modificarAuditoria,
   obtenerAuditoria,
   obtenerContextoOrden,
   reclasificar,
@@ -59,6 +68,7 @@ const PERM: ClavePermiso[] = [
   'calidad.ver',
   'calidad.generar-auditorias',
   'calidad.actualizar-auditorias',
+  'calidad.modificar-auditorias',
   'calidad.administrar-catalogo',
 ];
 
@@ -548,5 +558,191 @@ describe('Auditorías — reclasificación Primeras↔Segundas (kardex, D3)', ()
     expect(await existenciaBucket(almSegundas.id, tallaCH.id, idOrden)).toBe(4);
     expect(await existenciaBucket(almPrimeras.id, tallaCH.id, null)).toBe(5);
     expect(await existenciaBucket(almSegundas.id, tallaCH.id, null)).toBe(0);
+  });
+});
+
+describe('Auditorías — consulta/listado (F6-E3)', () => {
+  it('filtra por resultado y ordena determinista (numAuditoria desc)', async () => {
+    const a1 = await crearAuditoria(sesion(), { idOrden, tipoAuditoria: 'final' }, bd());
+    const a2 = await crearAuditoria(sesion(), { idOrden, tipoAuditoria: 'final' }, bd());
+    const a3 = await crearAuditoria(sesion(), { idOrden, tipoAuditoria: 'final' }, bd());
+    await capturarResultado(sesion(), a1.id, { resultado: 'aprobado', defectos: [] }, bd());
+    await capturarResultado(sesion(), a2.id, { resultado: 'reprobado', defectos: [] }, bd());
+    // a3 queda sin calificar.
+
+    const todas = await listarAuditorias(sesion(), {}, bd());
+    expect(todas.total).toBe(3);
+    // Orden determinista: folio descendente.
+    expect(todas.datos.map((a) => a.numAuditoria)).toEqual([a3, a2, a1].map((x) => x.numAuditoria));
+
+    const soloAprobadas = await listarAuditorias(sesion(), { resultado: 'aprobado' }, bd());
+    expect(soloAprobadas.total).toBe(1);
+    expect(soloAprobadas.datos[0]?.id).toBe(a1.id);
+  });
+
+  it('trae Σ de fallas por fila y NO incluye canceladas por defecto', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      a.id,
+      { resultado: 'reprobado', defectos: [{ idDefecto: idFav1, numFallas: 3 }] },
+      bd(),
+    );
+    const b = await crearAuditoria(sesion(), { idOrden }, bd());
+    await cancelarAuditoria(sesion(), b.id, { motivo: 'duplicada' }, bd());
+
+    const vivas = await listarAuditorias(sesion(), {}, bd());
+    expect(vivas.total).toBe(1);
+    expect(vivas.datos[0]?.totalFallas).toBe(3);
+
+    const conCanceladas = await listarAuditorias(sesion(), { incluirCanceladas: true }, bd());
+    expect(conCanceladas.total).toBe(2);
+  });
+
+  it('lista solo con calidad.ver; sin permiso lanza ErrorPermiso', async () => {
+    const sin = sesionDePrueba({ idEmpresaActiva: empresa.id });
+    await expect(listarAuditorias(sin, {}, bd())).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+});
+
+describe('Auditorías — modificar encabezado (F6-E3)', () => {
+  it('cambia tipo/fechas/observaciones y deja bitácora MODIFICAR', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden, tipoAuditoria: 'en_piso' }, bd());
+    const mod = await modificarAuditoria(
+      sesion(),
+      a.id,
+      { tipoAuditoria: 'final', fechaAuditoria: '2026-07-15', observaciones: 'revisada' },
+      bd(),
+    );
+    expect(mod.tipoAuditoria).toBe('final');
+    expect(mod.fechaAuditoria).toBe('2026-07-15');
+    expect(mod.observaciones).toBe('revisada');
+    const bit = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Auditoria', idEntidad: String(a.id), accion: 'MODIFICAR' },
+      orderBy: { id: 'desc' },
+    });
+    expect((bit.datos as { operacion?: string }).operacion).toBe('modificar-datos');
+  });
+
+  it('rechaza un maquilero que no participó en la orden (ErrorValidacion)', async () => {
+    const otro = await crearProveedorConRol('Ajeno SA', 'maquila-estampado');
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await expect(
+      modificarAuditoria(sesion(), a.id, { idMaquilero: otro.id }, bd()),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+
+  it('exige calidad.modificar-auditorias (deny-by-default)', async () => {
+    const soloVer = sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['calidad.ver', 'calidad.generar-auditorias'],
+    });
+    const a = await crearAuditoria(soloVer, { idOrden }, bd());
+    await expect(
+      modificarAuditoria(soloVer, a.id, { observaciones: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('no permite modificar una auditoría cancelada (ErrorConflicto)', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await cancelarAuditoria(sesion(), a.id, { motivo: 'error' }, bd());
+    await expect(
+      modificarAuditoria(sesion(), a.id, { observaciones: 'x' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('cambiar el TIPO re-evalúa la RC: final aprobada (completada) → en_piso la des-completa', async () => {
+    const idRuta = await crearProcesoAuditoriaRC();
+    const a = await crearAuditoria(sesion(), { idOrden, tipoAuditoria: 'final' }, bd());
+    await capturarResultado(sesion(), a.id, { resultado: 'aprobado', defectos: [] }, bd());
+    await drenarUltimoEvento('auditoria-calidad-resuelta');
+    let r = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
+    expect(r.estado).toBe('completado');
+
+    // Al bajar el tipo a en_piso, ya no hay auditoría FINAL aprobada viva → des-completa.
+    await modificarAuditoria(sesion(), a.id, { tipoAuditoria: 'en_piso' }, bd());
+    await drenarUltimoEvento('auditoria-calidad-resuelta');
+    r = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
+    expect(r.estado).not.toBe('completado');
+    expect(r.fechaReal).toBeNull();
+  });
+});
+
+describe('Auditorías — cancelar (borrado suave, F6-E3)', () => {
+  it('marca cancelada, anexa el motivo a observaciones y lo deja en bitácora', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    const cancelada = await cancelarAuditoria(sesion(), a.id, { motivo: 'orden duplicada' }, bd());
+    expect(cancelada.cancelada).toBe(true);
+    expect(cancelada.observaciones).toContain('orden duplicada');
+
+    const bit = await cliente.bitacora.findFirstOrThrow({
+      where: { entidad: 'Auditoria', idEntidad: String(a.id), accion: 'CANCELAR' },
+    });
+    expect((bit.datos as { motivo?: string }).motivo).toBe('orden duplicada');
+
+    // No se puede cancelar dos veces.
+    await expect(
+      cancelarAuditoria(sesion(), a.id, { motivo: 'otra vez' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+  });
+
+  it('exige calidad.modificar-auditorias (deny-by-default)', async () => {
+    const soloVer = sesionDePrueba({
+      idEmpresaActiva: empresa.id,
+      permisos: ['calidad.ver', 'calidad.generar-auditorias'],
+    });
+    const a = await crearAuditoria(soloVer, { idOrden }, bd());
+    await expect(cancelarAuditoria(soloVer, a.id, { motivo: 'x' }, bd())).rejects.toBeInstanceOf(
+      ErrorPermiso,
+    );
+  });
+
+  it('des-completa el proceso `auditoria` de la RC al cancelar una FINAL aprobada', async () => {
+    const idRuta = await crearProcesoAuditoriaRC();
+    const a = await crearAuditoria(sesion(), { idOrden, tipoAuditoria: 'final' }, bd());
+    await capturarResultado(sesion(), a.id, { resultado: 'aprobado', defectos: [] }, bd());
+    await drenarUltimoEvento('auditoria-calidad-resuelta');
+    let r = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
+    expect(r.estado).toBe('completado');
+
+    await cancelarAuditoria(sesion(), a.id, { motivo: 'se rehará' }, bd());
+    await drenarUltimoEvento('auditoria-calidad-resuelta');
+    r = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
+    expect(r.estado).not.toBe('completado');
+    expect(r.fechaReal).toBeNull();
+  });
+});
+
+describe('Auditorías — historial por maquilero (F6-E3)', () => {
+  it('% de aprobación = aprobadas / calificadas (1 aprobada + 1 reprobada = 50)', async () => {
+    const a1 = await crearAuditoria(sesion(), { idOrden }, bd());
+    const a2 = await crearAuditoria(sesion(), { idOrden }, bd());
+    await crearAuditoria(sesion(), { idOrden }, bd()); // sin calificar → NO cuenta en el porcentaje.
+    await capturarResultado(sesion(), a1.id, { resultado: 'aprobado', defectos: [] }, bd());
+    await capturarResultado(sesion(), a2.id, { resultado: 'reprobado', defectos: [] }, bd());
+
+    const h = await historialPorMaquilero(sesion(), { idMaquilero: maquilero.id }, bd());
+    expect(h.total).toBe(3);
+    expect(h.aprobadas).toBe(1);
+    expect(h.reprobadas).toBe(1);
+    expect(h.noCalificadas).toBe(1);
+    expect(h.porcentajeAprobacion).toBe(50);
+    expect(h.auditorias).toHaveLength(3);
+  });
+
+  it('sin auditorías calificadas → porcentaje null; canceladas no cuentan', async () => {
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(sesion(), a.id, { resultado: 'aprobado', defectos: [] }, bd());
+    await cancelarAuditoria(sesion(), a.id, { motivo: 'anulada' }, bd());
+
+    const h = await historialPorMaquilero(sesion(), { idMaquilero: maquilero.id }, bd());
+    expect(h.total).toBe(0);
+    expect(h.porcentajeAprobacion).toBeNull();
+  });
+
+  it('maquilero inexistente → ErrorNoEncontrado', async () => {
+    await expect(
+      historialPorMaquilero(sesion(), { idMaquilero: 999999 }, bd()),
+    ).rejects.toBeInstanceOf(ErrorNoEncontrado);
   });
 });

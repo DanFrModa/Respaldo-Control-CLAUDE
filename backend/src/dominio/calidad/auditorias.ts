@@ -29,19 +29,31 @@
  * auditoría FINAL aprobada VIVA, lo auto-completa; si no, lo des-completa (idempotente, decisión (f)).
  */
 import {
+  esquemaAuditoriaCancelarCuerpo,
   esquemaAuditoriaCrear,
+  esquemaAuditoriaModificarCuerpo,
   esquemaAuditoriaResultadoCuerpo,
   esquemaReclasificacionCuerpo,
+  RESULTADOS_AUDITORIA,
+  TIPOS_AUDITORIA,
   type AuditoriaContextoSalida,
+  type AuditoriaResumenSalida,
   type AuditoriaSalida,
+  type HistorialMaquileroSalida,
   type SugerenciaAqlSalida,
 } from '../../contrato/index.js';
 import { TipoEtapaMovimiento, type Prisma, type PrismaClient } from '../../datos/index.js';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  armarPagina,
+  esquemaPaginacion,
+  rangoPrisma,
+  type Pagina,
+} from '../../comun/paginacion.js';
 import {
   EVENTOS_OUTBOX,
   VERSION_AUDITORIA_CALIDAD,
@@ -781,4 +793,380 @@ export async function obtenerContextoOrden(
     maquileros,
     muestra,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Consulta LIGERA: listado paginado + historial por maquilero (F6-E3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Filtros del listado con tipos NATIVOS (ya coaccionados por el contrato en la ruta): folio de orden,
+ * maquilero, resultado, tipo, rango de `fechaAuditoria` y bandera `incluirCanceladas`. `orderBy`
+ * determinista (col + `id desc`), regla del proyecto para los listados. Extiende la paginación estándar.
+ */
+export const esquemaListarAuditorias = esquemaPaginacion.extend({
+  folioOrden: z.number().int().positive().optional(),
+  idMaquilero: z.number().int().positive().optional(),
+  resultado: z.enum(RESULTADOS_AUDITORIA).optional(),
+  tipoAuditoria: z.enum(TIPOS_AUDITORIA).optional(),
+  desde: z.iso.date().optional(),
+  hasta: z.iso.date().optional(),
+  incluirCanceladas: z.boolean().default(false),
+  ordenarPor: z.enum(['numAuditoria', 'fechaAuditoria']).default('numAuditoria'),
+  direccion: z.enum(['asc', 'desc']).default('desc'),
+});
+
+/** Parámetros del listado de auditorías. */
+export type ParametrosListarAuditorias = z.input<typeof esquemaListarAuditorias>;
+
+/** Filtros del historial por maquilero (rango de fechas de auditoría, tipos nativos). */
+export const esquemaHistorialPorMaquilero = z.object({
+  idMaquilero: z.number().int().positive(),
+  desde: z.iso.date().optional(),
+  hasta: z.iso.date().optional(),
+});
+
+/** Parámetros del historial por maquilero. */
+export type ParametrosHistorialMaquilero = z.input<typeof esquemaHistorialPorMaquilero>;
+
+/** `select` LIGERO del resumen: SIN los renglones de defecto ni la sugerencia (solo el encabezado). */
+const seleccionResumen = {
+  id: true,
+  numAuditoria: true,
+  idMaquilero: true,
+  fechaAuditoria: true,
+  tipoAuditoria: true,
+  resultado: true,
+  tamanoMuestra: true,
+  cancelada: true,
+  maquilero: { select: { nombre: true } },
+  orden: { select: { folio: true, modelo: { select: { codigo: true } } } },
+} satisfies Prisma.AuditoriaSelect;
+
+type AuditoriaResumenBd = Prisma.AuditoriaGetPayload<{ select: typeof seleccionResumen }>;
+
+/** Proyecta un renglón de resumen a la forma JSON del contrato (con Σ fallas ya resuelta). */
+function aResumenSalida(a: AuditoriaResumenBd, totalFallas: number): AuditoriaResumenSalida {
+  return {
+    id: a.id,
+    numAuditoria: Number(a.numAuditoria),
+    folioOrden: a.orden.folio === null ? null : Number(a.orden.folio),
+    codigoModelo: a.orden.modelo.codigo,
+    idMaquilero: a.idMaquilero,
+    maquilero: a.maquilero?.nombre ?? null,
+    fechaAuditoria: aFechaIso(a.fechaAuditoria),
+    tipoAuditoria: a.tipoAuditoria,
+    resultado: a.resultado,
+    tamanoMuestra: a.tamanoMuestra,
+    totalFallas,
+    cancelada: a.cancelada,
+  };
+}
+
+/**
+ * Σ de fallas (numFallas) por auditoría para un conjunto de ids, en UNA consulta agregada (groupBy).
+ * Evita cargar los renglones de defecto por fila (proyección ligera): devuelve un mapa id→Σ.
+ */
+async function fallasPorAuditoria(
+  cliente: ClienteBd,
+  ids: readonly number[],
+): Promise<Map<number, number>> {
+  if (ids.length === 0) {
+    return new Map();
+  }
+  const grupos = await cliente.auditoriaDefecto.groupBy({
+    by: ['idAuditoria'],
+    where: { idAuditoria: { in: [...ids] } },
+    _sum: { numFallas: true },
+  });
+  return new Map(grupos.map((g) => [g.idAuditoria, g._sum.numFallas ?? 0]));
+}
+
+/** Convierte una fecha `YYYY-MM-DD` a un `Date` UTC de medianoche (para comparar `@db.Date`). */
+function aFechaUtc(iso: string): Date {
+  return new Date(`${iso}T00:00:00.000Z`);
+}
+
+/**
+ * Lista auditorías con filtros, orden y paginación EN SERVIDOR (F6-E3). Permiso `calidad.ver`.
+ * Proyección LIGERA (resumen): NO trae los renglones de defecto ni la sugerencia; `totalFallas` se
+ * resuelve con UN groupBy para la página. `orderBy` determinista. A9: sellado por la empresa activa.
+ */
+export async function listarAuditorias(
+  sesion: SesionUsuario,
+  parametros: ParametrosListarAuditorias = {},
+  bd?: ContextoBd,
+): Promise<Pagina<AuditoriaResumenSalida>> {
+  verificarPermiso(sesion, 'calidad.ver');
+  const filtros = validarEntrada(esquemaListarAuditorias, parametros);
+
+  const rangoFecha =
+    filtros.desde === undefined && filtros.hasta === undefined
+      ? undefined
+      : {
+          ...(filtros.desde === undefined ? {} : { gte: aFechaUtc(filtros.desde) }),
+          ...(filtros.hasta === undefined ? {} : { lte: aFechaUtc(filtros.hasta) }),
+        };
+
+  const where: Prisma.AuditoriaWhereInput = {
+    idEmpresa: sesion.idEmpresaActiva,
+    ...(filtros.incluirCanceladas ? {} : { cancelada: false }),
+    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
+    ...(filtros.resultado === undefined ? {} : { resultado: filtros.resultado }),
+    ...(filtros.tipoAuditoria === undefined ? {} : { tipoAuditoria: filtros.tipoAuditoria }),
+    ...(filtros.folioOrden === undefined ? {} : { orden: { folio: BigInt(filtros.folioOrden) } }),
+    ...(rangoFecha === undefined ? {} : { fechaAuditoria: rangoFecha }),
+  };
+
+  const cliente = clienteLectura(bd);
+  const [total, filas] = await Promise.all([
+    cliente.auditoria.count({ where }),
+    cliente.auditoria.findMany({
+      where,
+      select: seleccionResumen,
+      orderBy: [{ [filtros.ordenarPor]: filtros.direccion }, { id: 'desc' }],
+      ...rangoPrisma(filtros),
+    }),
+  ]);
+
+  const fallas = await fallasPorAuditoria(
+    cliente,
+    filas.map((f) => f.id),
+  );
+  const datos = filas.map((f) => aResumenSalida(f, fallas.get(f.id) ?? 0));
+  return armarPagina(datos, total, filtros);
+}
+
+/**
+ * Historial de auditorías VIVAS (no canceladas) de un maquilero + agregados (F6-E3). Permiso
+ * `calidad.ver`. Verifica que el maquilero exista. `porcentajeAprobacion` = aprobadas / (aprobadas +
+ * reprobadas) × 100 SOLO sobre las CALIFICADAS (las `no_calificado` no cuentan); `null` si no hay
+ * ninguna calificada (con 1 aprobada y 1 reprobada = 50). A9: filtra por la empresa activa.
+ */
+export async function historialPorMaquilero(
+  sesion: SesionUsuario,
+  parametros: ParametrosHistorialMaquilero,
+  bd?: ContextoBd,
+): Promise<HistorialMaquileroSalida> {
+  verificarPermiso(sesion, 'calidad.ver');
+  const filtros = validarEntrada(esquemaHistorialPorMaquilero, parametros);
+  const cliente = clienteLectura(bd);
+
+  const maquilero = await cliente.proveedor.findUnique({
+    where: { id: filtros.idMaquilero },
+    select: { id: true, nombre: true },
+  });
+  if (maquilero === null) {
+    throw new ErrorNoEncontrado('Proveedor', filtros.idMaquilero);
+  }
+
+  const rangoFecha =
+    filtros.desde === undefined && filtros.hasta === undefined
+      ? undefined
+      : {
+          ...(filtros.desde === undefined ? {} : { gte: aFechaUtc(filtros.desde) }),
+          ...(filtros.hasta === undefined ? {} : { lte: aFechaUtc(filtros.hasta) }),
+        };
+
+  const where: Prisma.AuditoriaWhereInput = {
+    idEmpresa: sesion.idEmpresaActiva,
+    idMaquilero: filtros.idMaquilero,
+    cancelada: false,
+    ...(rangoFecha === undefined ? {} : { fechaAuditoria: rangoFecha }),
+  };
+
+  const filas = await cliente.auditoria.findMany({
+    where,
+    select: seleccionResumen,
+    orderBy: [{ numAuditoria: 'desc' }, { id: 'desc' }],
+  });
+  const fallas = await fallasPorAuditoria(
+    cliente,
+    filas.map((f) => f.id),
+  );
+  const auditorias = filas.map((f) => aResumenSalida(f, fallas.get(f.id) ?? 0));
+
+  const aprobadas = auditorias.filter((a) => a.resultado === 'aprobado').length;
+  const reprobadas = auditorias.filter((a) => a.resultado === 'reprobado').length;
+  const noCalificadas = auditorias.filter((a) => a.resultado === 'no_calificado').length;
+  const calificadas = aprobadas + reprobadas;
+  const porcentajeAprobacion =
+    calificadas === 0 ? null : Math.round((aprobadas / calificadas) * 10000) / 100;
+
+  return {
+    idMaquilero: maquilero.id,
+    maquilero: maquilero.nombre,
+    total: auditorias.length,
+    aprobadas,
+    reprobadas,
+    noCalificadas,
+    porcentajeAprobacion,
+    auditorias,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Modificar encabezado / cancelar (borrado suave) — F6-E3
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Modificación de encabezado (campos del esquema compartido). */
+export type EntradaAuditoriaModificar = z.input<typeof esquemaAuditoriaModificarCuerpo>;
+/** Cancelación (campos del esquema compartido). */
+export type EntradaAuditoriaCancelar = z.input<typeof esquemaAuditoriaCancelarCuerpo>;
+
+/**
+ * Modifica los datos de ENCABEZADO de una auditoría (F6-E3 — ex `CC_ModificarDatos`). Permiso
+ * `calidad.modificar-auditorias`. En UNA transacción (A2): edita `idMaquilero` (que debe seguir
+ * siendo uno de los propuestos de la orden, reusa `maquilerosDeOrden`), `fechaElaboracion`,
+ * `fechaAuditoria`, `tipoAuditoria` y `observaciones`. NO toca las fallas (eso es la captura). No se
+ * permite sobre una auditoría cancelada. Bitácora A7 con los campos cambiados. Publica el evento de
+ * calidad al OUTBOX (misma tx) para que la RC re-evalúe el proceso `auditoria`: cambiar el TIPO puede
+ * volver una auditoría en completante (final+aprobado) o dejarla de serlo (idempotente, decisión (f)).
+ */
+export async function modificarAuditoria(
+  sesion: SesionUsuario,
+  idAuditoria: number,
+  entrada: EntradaAuditoriaModificar,
+  bd?: ContextoBd,
+): Promise<AuditoriaSalida> {
+  verificarPermiso(sesion, 'calidad.modificar-auditorias');
+  const datos = validarEntrada(esquemaAuditoriaModificarCuerpo, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  await enTransaccion(async (tx) => {
+    const actual = await tx.auditoria.findFirst({
+      where: { id: idAuditoria, idEmpresa },
+      select: { id: true, idOrden: true, cancelada: true, idMaquilero: true },
+    });
+    if (actual === null) {
+      throw new ErrorNoEncontrado('Auditoria', idAuditoria);
+    }
+    if (actual.cancelada) {
+      throw new ErrorConflicto('La auditoría está cancelada; no se puede modificar.');
+    }
+
+    // Maquilero: si viene (no null), debe ser de los propuestos de la orden (mismo criterio que el alta).
+    if (datos.idMaquilero != null) {
+      const maquileros = await maquilerosDeOrden(tx, actual.idOrden);
+      if (!maquileros.some((m) => m.id === datos.idMaquilero)) {
+        throw new ErrorValidacion(
+          'El maquilero elegido no es de los que participaron en la orden (envío/recibo o asignado).',
+        );
+      }
+    }
+
+    const cambios: Prisma.AuditoriaUpdateInput = { ...datosModificacion(sesion) };
+    const bitacora: Record<string, Prisma.InputJsonValue | null> = {
+      operacion: 'modificar-datos',
+    };
+    if (datos.idMaquilero !== undefined) {
+      cambios.maquilero =
+        datos.idMaquilero === null ? { disconnect: true } : { connect: { id: datos.idMaquilero } };
+      bitacora.idMaquilero = { de: actual.idMaquilero, a: datos.idMaquilero };
+    }
+    if (datos.fechaElaboracion !== undefined) {
+      cambios.fechaElaboracion = aFechaUtc(datos.fechaElaboracion);
+      bitacora.fechaElaboracion = datos.fechaElaboracion;
+    }
+    if (datos.fechaAuditoria !== undefined) {
+      cambios.fechaAuditoria = aFechaUtc(datos.fechaAuditoria);
+      bitacora.fechaAuditoria = datos.fechaAuditoria;
+    }
+    if (datos.tipoAuditoria !== undefined) {
+      cambios.tipoAuditoria = datos.tipoAuditoria;
+      bitacora.tipoAuditoria = datos.tipoAuditoria;
+    }
+    if (datos.observaciones !== undefined) {
+      cambios.observaciones = datos.observaciones;
+      bitacora.observaciones = datos.observaciones;
+    }
+
+    await tx.auditoria.update({ where: { id: idAuditoria }, data: cambios });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Auditoria',
+      idEntidad: idAuditoria,
+      accion: 'MODIFICAR',
+      datos: bitacora,
+    });
+
+    // OUTBOX (F5-E6): la auto-completación de la RC depende de `tipoAuditoria=final && aprobado`, así
+    // que cambiar el encabezado (sobre todo el TIPO) puede volver una auditoría en completante o
+    // dejarla de serlo. Se publica en TODA modificación (el consumidor re-lee el estado físico y es
+    // idempotente): así la RC se re-evalúa y no sobre/sub-reporta el proceso `auditoria` de la orden.
+    const payload: EventoAuditoriaCalidad = { idEmpresa, idOrden: actual.idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.auditoriaCalidadResuelta,
+      VERSION_AUDITORIA_CALIDAD,
+      idEmpresa,
+      payload,
+    );
+  }, bd);
+
+  dispararPublicacion();
+  return obtenerAuditoriaProyectada(sesion, idAuditoria, bd);
+}
+
+/**
+ * Cancela una auditoría (F6-E3): borrado SUAVE (`cancelada = true`). Permiso
+ * `calidad.modificar-auditorias`. En UNA transacción (A2): marca cancelada, ANEXA el motivo a las
+ * observaciones (visible sin migración), lo deja en Bitácora (A7) y publica el evento de calidad al
+ * OUTBOX para que el auto-avance de la RC des-complete el proceso `auditoria` de la orden (una
+ * auditoría cancelada ya no es "viva"; el consumidor re-evalúa idempotente). No se puede cancelar dos
+ * veces (409).
+ */
+export async function cancelarAuditoria(
+  sesion: SesionUsuario,
+  idAuditoria: number,
+  entrada: EntradaAuditoriaCancelar,
+  bd?: ContextoBd,
+): Promise<AuditoriaSalida> {
+  verificarPermiso(sesion, 'calidad.modificar-auditorias');
+  const datos = validarEntrada(esquemaAuditoriaCancelarCuerpo, entrada);
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  await enTransaccion(async (tx) => {
+    const actual = await tx.auditoria.findFirst({
+      where: { id: idAuditoria, idEmpresa },
+      select: { id: true, idOrden: true, cancelada: true, observaciones: true },
+    });
+    if (actual === null) {
+      throw new ErrorNoEncontrado('Auditoria', idAuditoria);
+    }
+    if (actual.cancelada) {
+      throw new ErrorConflicto('La auditoría ya está cancelada.');
+    }
+
+    const nota = `[Cancelada: ${datos.motivo}]`;
+    const observaciones =
+      actual.observaciones === null || actual.observaciones === ''
+        ? nota
+        : `${actual.observaciones}\n${nota}`;
+
+    await tx.auditoria.update({
+      where: { id: idAuditoria },
+      data: { cancelada: true, observaciones, ...datosModificacion(sesion) },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Auditoria',
+      idEntidad: idAuditoria,
+      accion: 'CANCELAR',
+      datos: { motivo: datos.motivo, idOrden: actual.idOrden },
+    });
+
+    // OUTBOX (F5-E6): igual que la captura, la RC re-evalúa el proceso `auditoria` de la orden. Al
+    // cancelar, si esta era la única auditoría FINAL aprobada viva, el proceso se des-completa.
+    const payload: EventoAuditoriaCalidad = { idEmpresa, idOrden: actual.idOrden };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.auditoriaCalidadResuelta,
+      VERSION_AUDITORIA_CALIDAD,
+      idEmpresa,
+      payload,
+    );
+  }, bd);
+
+  dispararPublicacion();
+  return obtenerAuditoriaProyectada(sesion, idAuditoria, bd);
 }

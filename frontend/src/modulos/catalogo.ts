@@ -601,6 +601,27 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['calidad.generar-auditorias'],
     subVista: true,
   },
+  // Sub-vistas de Calidad (F6-E3): consulta de auditorías (con impreso y modificar/cancelar) e
+  // historial por maquilero (% de aprobación). Las gobierna `calidad.ver` (las acciones de escritura
+  // de la consulta exigen además `calidad.modificar-auditorias`, que el backend re-verifica, A1).
+  {
+    clave: 'calidad-consulta-auditorias',
+    titulo: 'Consulta de auditorías',
+    descripcion: 'Busca auditorías, imprime su PDF y modifica o cancela las existentes',
+    ruta: '/calidad/auditorias',
+    icono: 'portapapeles',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'calidad-historial-maquilero',
+    titulo: 'Auditorías por maquilero',
+    descripcion: 'Historial y porcentaje de aprobación operativo de cada maquilero',
+    ruta: '/calidad/auditorias/maquilero',
+    icono: 'medalla',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
   // Sub-vistas de Calidad (F6-E1): catálogos base del sistema AQL. Cuelgan del módulo Calidad y
   // las gobierna `calidad.ver` (consulta) / `calidad.administrar-catalogo` (escritura; el backend
   // re-verifica, A1).

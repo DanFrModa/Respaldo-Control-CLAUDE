@@ -44,3 +44,33 @@ test.describe('Auditorías de calidad (F6-E2)', () => {
     await expect(page.getByRole('alert')).toBeVisible();
   });
 });
+
+/**
+ * E2E de la CONSULTA de auditorías (F6-E3) contra el stack real. Como en F6-E2, el flujo transaccional
+ * completo (alta → captura → impreso → modificar/cancelar) vive en los tests de INTEGRACIÓN (Postgres
+ * efímero): sembrar por la UI una orden COMPLETA + maquilero + auditoría sería frágil. Aquí se verifica
+ * que las nuevas pantallas cargan desde la portada de Calidad y wirean sus controles principales.
+ */
+test.describe('Consulta de auditorías (F6-E3)', () => {
+  test('la consulta carga desde la portada con sus filtros', async ({ page }) => {
+    await entrarComoAdmin(page);
+    await page.goto('/calidad');
+    await page.getByTestId('calidad-consulta-auditorias').click();
+
+    await expect(page.getByRole('heading', { name: 'Consulta de auditorías' })).toBeVisible();
+    // Filtros de servidor presentes (maquilero + resultado).
+    await expect(page.getByTestId('filtro-maquilero-auditoria')).toBeVisible();
+    await expect(page.getByTestId('filtro-resultado-auditoria')).toBeVisible();
+  });
+
+  test('el historial por maquilero carga y wirea el selector', async ({ page }) => {
+    await entrarComoAdmin(page);
+    await page.goto('/calidad');
+    await page.getByTestId('calidad-historial-maquilero').click();
+
+    await expect(page.getByRole('heading', { name: 'Auditorías por maquilero' })).toBeVisible();
+    await expect(page.getByTestId('historial-maquilero')).toBeVisible();
+    // Sin maquilero elegido, invita a seleccionar uno.
+    await expect(page.getByText(/Selecciona un maquilero/i)).toBeVisible();
+  });
+});

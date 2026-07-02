@@ -99094,6 +99094,1497 @@
         }
       }
     },
+    "/api/calidad/auditorias": {
+      "get": {
+        "summary": "Listar auditorías (paginado + filtros por orden/maquilero/resultado/tipo/fechas)",
+        "tags": [
+          "calidad"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "folioOrden",
+            "required": false,
+            "description": "Filtra por folio de la orden auditada."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idMaquilero",
+            "required": false,
+            "description": "Filtra por maquilero auditado."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "aprobado",
+                "reprobado",
+                "no_calificado"
+              ]
+            },
+            "in": "query",
+            "name": "resultado",
+            "required": false,
+            "description": "Filtra por resultado."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en_piso",
+                "final",
+                "no_definida"
+              ]
+            },
+            "in": "query",
+            "name": "tipoAuditoria",
+            "required": false,
+            "description": "Filtra por tipo de auditoría."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha de auditoría mínima (YYYY-MM-DD, inclusive)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha de auditoría máxima (YYYY-MM-DD, inclusive)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirCanceladas",
+            "required": false,
+            "description": "Incluye las canceladas (\"true\"/\"false\")."
+          },
+          {
+            "schema": {
+              "default": "numAuditoria",
+              "type": "string",
+              "enum": [
+                "numAuditoria",
+                "fechaAuditoria"
+              ]
+            },
+            "in": "query",
+            "name": "ordenarPor",
+            "required": false,
+            "description": "Columna de ordenamiento."
+          },
+          {
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "description": "Dirección del orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de auditorías.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la auditoría."
+                          },
+                          "numAuditoria": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio consecutivo por empresa."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden auditada (legible)."
+                          },
+                          "codigoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del modelo de la orden (legible)."
+                          },
+                          "idMaquilero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Maquilero auditado, o null."
+                          },
+                          "maquilero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del maquilero, o null."
+                          },
+                          "fechaAuditoria": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            "description": "Fecha en que se auditó (YYYY-MM-DD)."
+                          },
+                          "tipoAuditoria": {
+                            "type": "string",
+                            "enum": [
+                              "en_piso",
+                              "final",
+                              "no_definida"
+                            ],
+                            "description": "Tipo de auditoría."
+                          },
+                          "resultado": {
+                            "type": "string",
+                            "enum": [
+                              "aprobado",
+                              "reprobado",
+                              "no_calificado"
+                            ],
+                            "description": "Veredicto manual del auditor."
+                          },
+                          "tamanoMuestra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño de muestra inspeccionado."
+                          },
+                          "totalFallas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Σ de fallas de todos los defectos (derivado)."
+                          },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "Si la auditoría está cancelada (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "numAuditoria",
+                          "folioOrden",
+                          "codigoModelo",
+                          "idMaquilero",
+                          "maquilero",
+                          "fechaAuditoria",
+                          "tipoAuditoria",
+                          "resultado",
+                          "tamanoMuestra",
+                          "totalFallas",
+                          "cancelada"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Resumen de una auditoría para el listado."
+                      },
+                      "description": "Auditorías de la página."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página de auditorías."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Dar de alta una auditoría de calidad (folio, muestra y favoritos automáticos)",
+        "tags": [
+          "calidad"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idOrden": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "idMaquilero": {
+                    "description": "Maquilero auditado (de los propuestos de la orden). Si se omite, se propone el primero.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "fechaElaboracion": {
+                    "description": "Fecha de elaboración (YYYY-MM-DD). Por defecto hoy.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "fechaAuditoria": {
+                    "description": "Fecha en que se auditó la prenda (YYYY-MM-DD). Por defecto hoy.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "tipoAuditoria": {
+                    "default": "no_definida",
+                    "description": "Tipo de auditoría (en piso / final / sin definir).",
+                    "type": "string",
+                    "enum": [
+                      "en_piso",
+                      "final",
+                      "no_definida"
+                    ]
+                  }
+                },
+                "required": [
+                  "idOrden"
+                ],
+                "description": "Datos de alta de una auditoría de calidad."
+              }
+            }
+          },
+          "description": "Datos de alta de una auditoría de calidad."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Auditoría de calidad con su detalle y sugerencia AQL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la auditoría."
+                    },
+                    "numAuditoria": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden auditada."
+                    },
+                    "folioOrden": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio de la orden (legible)."
+                    },
+                    "codigoModelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de la orden (legible)."
+                    },
+                    "idMaquilero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Maquilero auditado, o null."
+                    },
+                    "maquilero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero, o null."
+                    },
+                    "fechaElaboracion": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha de elaboración (YYYY-MM-DD)."
+                    },
+                    "fechaAuditoria": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha en que se auditó (YYYY-MM-DD)."
+                    },
+                    "elaboroPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Usuario que dio de alta la auditoría."
+                    },
+                    "auditorPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Usuario que auditó."
+                    },
+                    "tamanoMuestra": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tamaño de muestra inspeccionado."
+                    },
+                    "muestraManual": {
+                      "type": "boolean",
+                      "description": "Si la muestra se sobre-escribió a mano."
+                    },
+                    "resultado": {
+                      "type": "string",
+                      "enum": [
+                        "aprobado",
+                        "reprobado",
+                        "no_calificado"
+                      ],
+                      "description": "Veredicto manual del auditor."
+                    },
+                    "resultadoManual": {
+                      "type": "boolean",
+                      "description": "Siempre true en v2 (el resultado lo decide el humano)."
+                    },
+                    "tipoAuditoria": {
+                      "type": "string",
+                      "enum": [
+                        "en_piso",
+                        "final",
+                        "no_definida"
+                      ],
+                      "description": "Tipo de auditoría."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones del auditor."
+                    },
+                    "cancelada": {
+                      "type": "boolean",
+                      "description": "Si la auditoría está cancelada (borrado suave)."
+                    },
+                    "totalFallas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ de fallas de todos los defectos (derivado)."
+                    },
+                    "defectos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idDefecto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del defecto."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave de negocio del defecto."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del defecto."
+                          },
+                          "nivelAQL": {
+                            "type": "number",
+                            "description": "Nivel AQL del defecto (1 / 2.5 / 10)."
+                          },
+                          "favorito": {
+                            "type": "boolean",
+                            "description": "Si el defecto es favorito (se pre-cargó al alta)."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Si el defecto sigue activo en el catálogo."
+                          },
+                          "numFallas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Número de prendas con este defecto en la muestra."
+                          }
+                        },
+                        "required": [
+                          "idDefecto",
+                          "clave",
+                          "descripcion",
+                          "nivelAQL",
+                          "favorito",
+                          "activo",
+                          "numFallas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón defecto → nº de fallas de una auditoría."
+                      },
+                      "description": "Renglones defecto → fallas."
+                    },
+                    "sugerencia": {
+                      "type": "object",
+                      "properties": {
+                        "resoluble": {
+                          "type": "boolean",
+                          "description": "Falso si no hay plan/renglón para resolver la sugerencia."
+                        },
+                        "idPlan": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Plan AQL default usado, o null."
+                        },
+                        "nombrePlan": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre del plan, o null."
+                        },
+                        "tamanoLote": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cantidad de la orden usada como tamaño de lote."
+                        },
+                        "tamanoMuestra": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tamaño de muestra del plan, o null."
+                        },
+                        "niveles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "nivelAQL": {
+                                "type": "number",
+                                "description": "Nivel AQL (1 / 2.5 / 10)."
+                              },
+                              "totalFallas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Σ de fallas de los defectos de este nivel."
+                              },
+                              "aceptar": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Número de aceptación (Ac) del plan para este nivel."
+                              },
+                              "rechazar": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Número de rechazo (Re) del plan para este nivel."
+                              },
+                              "sugerencia": {
+                                "type": "string",
+                                "enum": [
+                                  "aprobar",
+                                  "reprobar"
+                                ],
+                                "description": "aprobar si total ≤ Ac; reprobar si total ≥ Re (informativo)."
+                              }
+                            },
+                            "required": [
+                              "nivelAQL",
+                              "totalFallas",
+                              "aceptar",
+                              "rechazar",
+                              "sugerencia"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Sugerencia informativa por nivel AQL."
+                          },
+                          "description": "Sugerencia por nivel AQL."
+                        },
+                        "sugerenciaGlobal": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "aprobar",
+                                "reprobar"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "reprobar si algún nivel sugiere reprobar; aprobar si todos aprueban; null si no resoluble."
+                        },
+                        "mensaje": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Explica por qué no es resoluble, o null."
+                        }
+                      },
+                      "required": [
+                        "resoluble",
+                        "idPlan",
+                        "nombrePlan",
+                        "tamanoLote",
+                        "tamanoMuestra",
+                        "niveles",
+                        "sugerenciaGlobal",
+                        "mensaje"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Sugerencia AQL informativa (no vinculante)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "numAuditoria",
+                    "idEmpresa",
+                    "idOrden",
+                    "folioOrden",
+                    "codigoModelo",
+                    "idMaquilero",
+                    "maquilero",
+                    "fechaElaboracion",
+                    "fechaAuditoria",
+                    "elaboroPorId",
+                    "auditorPorId",
+                    "tamanoMuestra",
+                    "muestraManual",
+                    "resultado",
+                    "resultadoManual",
+                    "tipoAuditoria",
+                    "observaciones",
+                    "cancelada",
+                    "totalFallas",
+                    "defectos",
+                    "sugerencia",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Auditoría de calidad con su detalle y sugerencia AQL."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calidad/auditorias/maquilero/{idMaquilero}": {
+      "get": {
+        "summary": "Historial de auditorías de un maquilero con su % de aprobación operativo",
+        "tags": [
+          "calidad"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha de auditoría mínima (YYYY-MM-DD, inclusive)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha de auditoría máxima (YYYY-MM-DD, inclusive)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idMaquilero",
+            "required": true,
+            "description": "Id del maquilero."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial de auditorías de un maquilero con % de aprobación operativo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idMaquilero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Maquilero consultado."
+                    },
+                    "maquilero": {
+                      "type": "string",
+                      "description": "Nombre del maquilero."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de auditorías vivas del maquilero en el rango."
+                    },
+                    "aprobadas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Auditorías con resultado aprobado."
+                    },
+                    "reprobadas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Auditorías con resultado reprobado."
+                    },
+                    "noCalificadas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Auditorías sin calificar (no_calificado)."
+                    },
+                    "porcentajeAprobacion": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Aprobadas / (aprobadas + reprobadas), 0–100; null si no hay calificadas."
+                    },
+                    "auditorias": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la auditoría."
+                          },
+                          "numAuditoria": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio consecutivo por empresa."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden auditada (legible)."
+                          },
+                          "codigoModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del modelo de la orden (legible)."
+                          },
+                          "idMaquilero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Maquilero auditado, o null."
+                          },
+                          "maquilero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del maquilero, o null."
+                          },
+                          "fechaAuditoria": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                            "description": "Fecha en que se auditó (YYYY-MM-DD)."
+                          },
+                          "tipoAuditoria": {
+                            "type": "string",
+                            "enum": [
+                              "en_piso",
+                              "final",
+                              "no_definida"
+                            ],
+                            "description": "Tipo de auditoría."
+                          },
+                          "resultado": {
+                            "type": "string",
+                            "enum": [
+                              "aprobado",
+                              "reprobado",
+                              "no_calificado"
+                            ],
+                            "description": "Veredicto manual del auditor."
+                          },
+                          "tamanoMuestra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño de muestra inspeccionado."
+                          },
+                          "totalFallas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Σ de fallas de todos los defectos (derivado)."
+                          },
+                          "cancelada": {
+                            "type": "boolean",
+                            "description": "Si la auditoría está cancelada (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "numAuditoria",
+                          "folioOrden",
+                          "codigoModelo",
+                          "idMaquilero",
+                          "maquilero",
+                          "fechaAuditoria",
+                          "tipoAuditoria",
+                          "resultado",
+                          "tamanoMuestra",
+                          "totalFallas",
+                          "cancelada"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Resumen de una auditoría para el listado."
+                      },
+                      "description": "Auditorías vivas del maquilero (resumen)."
+                    }
+                  },
+                  "required": [
+                    "idMaquilero",
+                    "maquilero",
+                    "total",
+                    "aprobadas",
+                    "reprobadas",
+                    "noCalificadas",
+                    "porcentajeAprobacion",
+                    "auditorias"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Historial de auditorías de un maquilero con % de aprobación operativo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/calidad/auditorias/{id}": {
       "get": {
         "summary": "Obtener una auditoría con sus renglones y la sugerencia AQL",
@@ -99687,11 +101178,9 @@
             }
           }
         }
-      }
-    },
-    "/api/calidad/auditorias": {
-      "post": {
-        "summary": "Dar de alta una auditoría de calidad (folio, muestra y favoritos automáticos)",
+      },
+      "patch": {
+        "summary": "Modificar los datos de encabezado de una auditoría (no toca las fallas)",
         "tags": [
           "calidad"
         ],
@@ -99702,13 +101191,8 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "idOrden": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
                   "idMaquilero": {
-                    "description": "Maquilero auditado (de los propuestos de la orden). Si se omite, se propone el primero.",
+                    "description": "Maquilero auditado (de los propuestos de la orden), o null para quitarlo.",
                     "anyOf": [
                       {
                         "type": "integer",
@@ -99721,19 +101205,18 @@
                     ]
                   },
                   "fechaElaboracion": {
-                    "description": "Fecha de elaboración (YYYY-MM-DD). Por defecto hoy.",
+                    "description": "Fecha de elaboración (YYYY-MM-DD).",
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
                   "fechaAuditoria": {
-                    "description": "Fecha en que se auditó la prenda (YYYY-MM-DD). Por defecto hoy.",
+                    "description": "Fecha en que se auditó (YYYY-MM-DD).",
                     "type": "string",
                     "format": "date",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
                   },
                   "tipoAuditoria": {
-                    "default": "no_definida",
                     "description": "Tipo de auditoría (en piso / final / sin definir).",
                     "type": "string",
                     "enum": [
@@ -99741,24 +101224,46 @@
                       "final",
                       "no_definida"
                     ]
+                  },
+                  "observaciones": {
+                    "description": "Observaciones (texto libre), o null.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   }
                 },
-                "required": [
-                  "idOrden"
-                ],
-                "description": "Datos de alta de una auditoría de calidad."
+                "description": "Modificación del encabezado de una auditoría (no toca las fallas)."
               }
             }
           },
-          "description": "Datos de alta de una auditoría de calidad."
+          "description": "Modificación del encabezado de una auditoría (no toca las fallas)."
         },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la auditoría."
+          }
+        ],
         "security": [
           {
             "cookieSesion": []
           }
         ],
         "responses": {
-          "201": {
+          "200": {
             "description": "Auditoría de calidad con su detalle y sugerencia AQL.",
             "content": {
               "application/json": {
@@ -101516,6 +103021,797 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calidad/auditorias/{id}/cancelacion": {
+      "post": {
+        "summary": "Cancelar una auditoría (borrado suave con motivo; des-completa la RC)",
+        "tags": [
+          "calidad"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500,
+                    "description": "Motivo de la cancelación (obligatorio)."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Cancelación (borrado suave) de una auditoría con motivo."
+              }
+            }
+          },
+          "description": "Cancelación (borrado suave) de una auditoría con motivo."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la auditoría."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auditoría de calidad con su detalle y sugerencia AQL.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la auditoría."
+                    },
+                    "numAuditoria": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio consecutivo por empresa."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Orden auditada."
+                    },
+                    "folioOrden": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio de la orden (legible)."
+                    },
+                    "codigoModelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo de la orden (legible)."
+                    },
+                    "idMaquilero": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Maquilero auditado, o null."
+                    },
+                    "maquilero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero, o null."
+                    },
+                    "fechaElaboracion": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha de elaboración (YYYY-MM-DD)."
+                    },
+                    "fechaAuditoria": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                      "description": "Fecha en que se auditó (YYYY-MM-DD)."
+                    },
+                    "elaboroPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Usuario que dio de alta la auditoría."
+                    },
+                    "auditorPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Usuario que auditó."
+                    },
+                    "tamanoMuestra": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Tamaño de muestra inspeccionado."
+                    },
+                    "muestraManual": {
+                      "type": "boolean",
+                      "description": "Si la muestra se sobre-escribió a mano."
+                    },
+                    "resultado": {
+                      "type": "string",
+                      "enum": [
+                        "aprobado",
+                        "reprobado",
+                        "no_calificado"
+                      ],
+                      "description": "Veredicto manual del auditor."
+                    },
+                    "resultadoManual": {
+                      "type": "boolean",
+                      "description": "Siempre true en v2 (el resultado lo decide el humano)."
+                    },
+                    "tipoAuditoria": {
+                      "type": "string",
+                      "enum": [
+                        "en_piso",
+                        "final",
+                        "no_definida"
+                      ],
+                      "description": "Tipo de auditoría."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones del auditor."
+                    },
+                    "cancelada": {
+                      "type": "boolean",
+                      "description": "Si la auditoría está cancelada (borrado suave)."
+                    },
+                    "totalFallas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ de fallas de todos los defectos (derivado)."
+                    },
+                    "defectos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idDefecto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del defecto."
+                          },
+                          "clave": {
+                            "type": "string",
+                            "description": "Clave de negocio del defecto."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del defecto."
+                          },
+                          "nivelAQL": {
+                            "type": "number",
+                            "description": "Nivel AQL del defecto (1 / 2.5 / 10)."
+                          },
+                          "favorito": {
+                            "type": "boolean",
+                            "description": "Si el defecto es favorito (se pre-cargó al alta)."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Si el defecto sigue activo en el catálogo."
+                          },
+                          "numFallas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Número de prendas con este defecto en la muestra."
+                          }
+                        },
+                        "required": [
+                          "idDefecto",
+                          "clave",
+                          "descripcion",
+                          "nivelAQL",
+                          "favorito",
+                          "activo",
+                          "numFallas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón defecto → nº de fallas de una auditoría."
+                      },
+                      "description": "Renglones defecto → fallas."
+                    },
+                    "sugerencia": {
+                      "type": "object",
+                      "properties": {
+                        "resoluble": {
+                          "type": "boolean",
+                          "description": "Falso si no hay plan/renglón para resolver la sugerencia."
+                        },
+                        "idPlan": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Plan AQL default usado, o null."
+                        },
+                        "nombrePlan": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre del plan, o null."
+                        },
+                        "tamanoLote": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cantidad de la orden usada como tamaño de lote."
+                        },
+                        "tamanoMuestra": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tamaño de muestra del plan, o null."
+                        },
+                        "niveles": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "nivelAQL": {
+                                "type": "number",
+                                "description": "Nivel AQL (1 / 2.5 / 10)."
+                              },
+                              "totalFallas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Σ de fallas de los defectos de este nivel."
+                              },
+                              "aceptar": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Número de aceptación (Ac) del plan para este nivel."
+                              },
+                              "rechazar": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Número de rechazo (Re) del plan para este nivel."
+                              },
+                              "sugerencia": {
+                                "type": "string",
+                                "enum": [
+                                  "aprobar",
+                                  "reprobar"
+                                ],
+                                "description": "aprobar si total ≤ Ac; reprobar si total ≥ Re (informativo)."
+                              }
+                            },
+                            "required": [
+                              "nivelAQL",
+                              "totalFallas",
+                              "aceptar",
+                              "rechazar",
+                              "sugerencia"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Sugerencia informativa por nivel AQL."
+                          },
+                          "description": "Sugerencia por nivel AQL."
+                        },
+                        "sugerenciaGlobal": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "aprobar",
+                                "reprobar"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "reprobar si algún nivel sugiere reprobar; aprobar si todos aprueban; null si no resoluble."
+                        },
+                        "mensaje": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Explica por qué no es resoluble, o null."
+                        }
+                      },
+                      "required": [
+                        "resoluble",
+                        "idPlan",
+                        "nombrePlan",
+                        "tamanoLote",
+                        "tamanoMuestra",
+                        "niveles",
+                        "sugerenciaGlobal",
+                        "mensaje"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Sugerencia AQL informativa (no vinculante)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "numAuditoria",
+                    "idEmpresa",
+                    "idOrden",
+                    "folioOrden",
+                    "codigoModelo",
+                    "idMaquilero",
+                    "maquilero",
+                    "fechaElaboracion",
+                    "fechaAuditoria",
+                    "elaboroPorId",
+                    "auditorPorId",
+                    "tamanoMuestra",
+                    "muestraManual",
+                    "resultado",
+                    "resultadoManual",
+                    "tipoAuditoria",
+                    "observaciones",
+                    "cancelada",
+                    "totalFallas",
+                    "defectos",
+                    "sugerencia",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Auditoría de calidad con su detalle y sugerencia AQL."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/calidad/auditorias/{id}/impreso": {
+      "get": {
+        "summary": "Impreso de una auditoría de calidad (PDF)",
+        "tags": [
+          "calidad"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la auditoría."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {

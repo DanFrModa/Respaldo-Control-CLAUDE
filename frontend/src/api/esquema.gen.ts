@@ -42136,146 +42136,97 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/calidad/auditorias/{id}': {
+  '/api/calidad/auditorias': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Obtener una auditoría con sus renglones y la sugerencia AQL */
+    /** Listar auditorías (paginado + filtros por orden/maquilero/resultado/tipo/fechas) */
     get: {
       parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Id de la auditoría. */
-          id: number;
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página. */
+          porPagina?: number;
+          /** @description Filtra por folio de la orden auditada. */
+          folioOrden?: number;
+          /** @description Filtra por maquilero auditado. */
+          idMaquilero?: number;
+          /** @description Filtra por resultado. */
+          resultado?: 'aprobado' | 'reprobado' | 'no_calificado';
+          /** @description Filtra por tipo de auditoría. */
+          tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+          /** @description Fecha de auditoría mínima (YYYY-MM-DD, inclusive). */
+          desde?: string;
+          /** @description Fecha de auditoría máxima (YYYY-MM-DD, inclusive). */
+          hasta?: string;
+          /** @description Incluye las canceladas ("true"/"false"). */
+          incluirCanceladas?: string;
+          /** @description Columna de ordenamiento. */
+          ordenarPor?: 'numAuditoria' | 'fechaAuditoria';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
         };
+        header?: never;
+        path?: never;
         cookie?: never;
       };
       requestBody?: never;
       responses: {
-        /** @description Auditoría de calidad con su detalle y sugerencia AQL. */
+        /** @description Página de auditorías. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             'application/json': {
-              /** @description Id de la auditoría. */
-              id: number;
-              /** @description Folio consecutivo por empresa. */
-              numAuditoria: number;
-              idEmpresa: number;
-              /** @description Orden auditada. */
-              idOrden: number;
-              /** @description Folio de la orden (legible). */
-              folioOrden: number | null;
-              /** @description Código del modelo de la orden (legible). */
-              codigoModelo: string | null;
-              /** @description Maquilero auditado, o null. */
-              idMaquilero: number | null;
-              /** @description Nombre del maquilero, o null. */
-              maquilero: string | null;
-              /**
-               * Format: date
-               * @description Fecha de elaboración (YYYY-MM-DD).
-               */
-              fechaElaboracion: string;
-              /**
-               * Format: date
-               * @description Fecha en que se auditó (YYYY-MM-DD).
-               */
-              fechaAuditoria: string;
-              /** @description Usuario que dio de alta la auditoría. */
-              elaboroPorId: string | null;
-              /** @description Usuario que auditó. */
-              auditorPorId: string | null;
-              /** @description Tamaño de muestra inspeccionado. */
-              tamanoMuestra: number;
-              /** @description Si la muestra se sobre-escribió a mano. */
-              muestraManual: boolean;
-              /**
-               * @description Veredicto manual del auditor.
-               * @enum {string}
-               */
-              resultado: 'aprobado' | 'reprobado' | 'no_calificado';
-              /** @description Siempre true en v2 (el resultado lo decide el humano). */
-              resultadoManual: boolean;
-              /**
-               * @description Tipo de auditoría.
-               * @enum {string}
-               */
-              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
-              /** @description Observaciones del auditor. */
-              observaciones: string | null;
-              /** @description Si la auditoría está cancelada (borrado suave). */
-              cancelada: boolean;
-              /** @description Σ de fallas de todos los defectos (derivado). */
-              totalFallas: number;
-              /** @description Renglones defecto → fallas. */
-              defectos: {
-                /** @description Id del defecto. */
-                idDefecto: number;
-                /** @description Clave de negocio del defecto. */
-                clave: string;
-                /** @description Descripción del defecto. */
-                descripcion: string;
-                /** @description Nivel AQL del defecto (1 / 2.5 / 10). */
-                nivelAQL: number;
-                /** @description Si el defecto es favorito (se pre-cargó al alta). */
-                favorito: boolean;
-                /** @description Si el defecto sigue activo en el catálogo. */
-                activo: boolean;
-                /** @description Número de prendas con este defecto en la muestra. */
-                numFallas: number;
+              /** @description Auditorías de la página. */
+              datos: {
+                /** @description Id de la auditoría. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                numAuditoria: number;
+                /** @description Folio de la orden auditada (legible). */
+                folioOrden: number | null;
+                /** @description Código del modelo de la orden (legible). */
+                codigoModelo: string | null;
+                /** @description Maquilero auditado, o null. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero, o null. */
+                maquilero: string | null;
+                /**
+                 * Format: date
+                 * @description Fecha en que se auditó (YYYY-MM-DD).
+                 */
+                fechaAuditoria: string;
+                /**
+                 * @description Tipo de auditoría.
+                 * @enum {string}
+                 */
+                tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+                /**
+                 * @description Veredicto manual del auditor.
+                 * @enum {string}
+                 */
+                resultado: 'aprobado' | 'reprobado' | 'no_calificado';
+                /** @description Tamaño de muestra inspeccionado. */
+                tamanoMuestra: number;
+                /** @description Σ de fallas de todos los defectos (derivado). */
+                totalFallas: number;
+                /** @description Si la auditoría está cancelada (borrado suave). */
+                cancelada: boolean;
               }[];
-              /** @description Sugerencia AQL informativa (no vinculante). */
-              sugerencia: {
-                /** @description Falso si no hay plan/renglón para resolver la sugerencia. */
-                resoluble: boolean;
-                /** @description Plan AQL default usado, o null. */
-                idPlan: number | null;
-                /** @description Nombre del plan, o null. */
-                nombrePlan: string | null;
-                /** @description Cantidad de la orden usada como tamaño de lote. */
-                tamanoLote: number;
-                /** @description Tamaño de muestra del plan, o null. */
-                tamanoMuestra: number | null;
-                /** @description Sugerencia por nivel AQL. */
-                niveles: {
-                  /** @description Nivel AQL (1 / 2.5 / 10). */
-                  nivelAQL: number;
-                  /** @description Σ de fallas de los defectos de este nivel. */
-                  totalFallas: number;
-                  /** @description Número de aceptación (Ac) del plan para este nivel. */
-                  aceptar: number;
-                  /** @description Número de rechazo (Re) del plan para este nivel. */
-                  rechazar: number;
-                  /**
-                   * @description aprobar si total ≤ Ac; reprobar si total ≥ Re (informativo).
-                   * @enum {string}
-                   */
-                  sugerencia: 'aprobar' | 'reprobar';
-                }[];
-                /** @description reprobar si algún nivel sugiere reprobar; aprobar si todos aprueban; null si no resoluble. */
-                sugerenciaGlobal: ('aprobar' | 'reprobar') | null;
-                /** @description Explica por qué no es resoluble, o null. */
-                mensaje: string | null;
-              };
-              /**
-               * Format: date-time
-               * @description Fecha de alta (ISO 8601).
-               */
-              creadoEn: string;
-              creadoPorId: string | null;
-              /**
-               * Format: date-time
-               * @description Última modificación (ISO 8601).
-               */
-              modificadoEn: string;
-              modificadoPorId: string | null;
+              /** @description Total que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
             };
           };
         };
@@ -42361,22 +42312,6 @@ export interface paths {
         };
       };
     };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/calidad/auditorias': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
     put?: never;
     /** Dar de alta una auditoría de calidad (folio, muestra y favoritos automáticos) */
     post: {
@@ -42622,6 +42557,656 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  '/api/calidad/auditorias/maquilero/{idMaquilero}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Historial de auditorías de un maquilero con su % de aprobación operativo */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha de auditoría mínima (YYYY-MM-DD, inclusive). */
+          desde?: string;
+          /** @description Fecha de auditoría máxima (YYYY-MM-DD, inclusive). */
+          hasta?: string;
+        };
+        header?: never;
+        path: {
+          /** @description Id del maquilero. */
+          idMaquilero: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Historial de auditorías de un maquilero con % de aprobación operativo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Maquilero consultado. */
+              idMaquilero: number;
+              /** @description Nombre del maquilero. */
+              maquilero: string;
+              /** @description Total de auditorías vivas del maquilero en el rango. */
+              total: number;
+              /** @description Auditorías con resultado aprobado. */
+              aprobadas: number;
+              /** @description Auditorías con resultado reprobado. */
+              reprobadas: number;
+              /** @description Auditorías sin calificar (no_calificado). */
+              noCalificadas: number;
+              /** @description Aprobadas / (aprobadas + reprobadas), 0–100; null si no hay calificadas. */
+              porcentajeAprobacion: number | null;
+              /** @description Auditorías vivas del maquilero (resumen). */
+              auditorias: {
+                /** @description Id de la auditoría. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                numAuditoria: number;
+                /** @description Folio de la orden auditada (legible). */
+                folioOrden: number | null;
+                /** @description Código del modelo de la orden (legible). */
+                codigoModelo: string | null;
+                /** @description Maquilero auditado, o null. */
+                idMaquilero: number | null;
+                /** @description Nombre del maquilero, o null. */
+                maquilero: string | null;
+                /**
+                 * Format: date
+                 * @description Fecha en que se auditó (YYYY-MM-DD).
+                 */
+                fechaAuditoria: string;
+                /**
+                 * @description Tipo de auditoría.
+                 * @enum {string}
+                 */
+                tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+                /**
+                 * @description Veredicto manual del auditor.
+                 * @enum {string}
+                 */
+                resultado: 'aprobado' | 'reprobado' | 'no_calificado';
+                /** @description Tamaño de muestra inspeccionado. */
+                tamanoMuestra: number;
+                /** @description Σ de fallas de todos los defectos (derivado). */
+                totalFallas: number;
+                /** @description Si la auditoría está cancelada (borrado suave). */
+                cancelada: boolean;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/calidad/auditorias/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener una auditoría con sus renglones y la sugerencia AQL */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la auditoría. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Auditoría de calidad con su detalle y sugerencia AQL. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la auditoría. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              numAuditoria: number;
+              idEmpresa: number;
+              /** @description Orden auditada. */
+              idOrden: number;
+              /** @description Folio de la orden (legible). */
+              folioOrden: number | null;
+              /** @description Código del modelo de la orden (legible). */
+              codigoModelo: string | null;
+              /** @description Maquilero auditado, o null. */
+              idMaquilero: number | null;
+              /** @description Nombre del maquilero, o null. */
+              maquilero: string | null;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /**
+               * Format: date
+               * @description Fecha en que se auditó (YYYY-MM-DD).
+               */
+              fechaAuditoria: string;
+              /** @description Usuario que dio de alta la auditoría. */
+              elaboroPorId: string | null;
+              /** @description Usuario que auditó. */
+              auditorPorId: string | null;
+              /** @description Tamaño de muestra inspeccionado. */
+              tamanoMuestra: number;
+              /** @description Si la muestra se sobre-escribió a mano. */
+              muestraManual: boolean;
+              /**
+               * @description Veredicto manual del auditor.
+               * @enum {string}
+               */
+              resultado: 'aprobado' | 'reprobado' | 'no_calificado';
+              /** @description Siempre true en v2 (el resultado lo decide el humano). */
+              resultadoManual: boolean;
+              /**
+               * @description Tipo de auditoría.
+               * @enum {string}
+               */
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              /** @description Observaciones del auditor. */
+              observaciones: string | null;
+              /** @description Si la auditoría está cancelada (borrado suave). */
+              cancelada: boolean;
+              /** @description Σ de fallas de todos los defectos (derivado). */
+              totalFallas: number;
+              /** @description Renglones defecto → fallas. */
+              defectos: {
+                /** @description Id del defecto. */
+                idDefecto: number;
+                /** @description Clave de negocio del defecto. */
+                clave: string;
+                /** @description Descripción del defecto. */
+                descripcion: string;
+                /** @description Nivel AQL del defecto (1 / 2.5 / 10). */
+                nivelAQL: number;
+                /** @description Si el defecto es favorito (se pre-cargó al alta). */
+                favorito: boolean;
+                /** @description Si el defecto sigue activo en el catálogo. */
+                activo: boolean;
+                /** @description Número de prendas con este defecto en la muestra. */
+                numFallas: number;
+              }[];
+              /** @description Sugerencia AQL informativa (no vinculante). */
+              sugerencia: {
+                /** @description Falso si no hay plan/renglón para resolver la sugerencia. */
+                resoluble: boolean;
+                /** @description Plan AQL default usado, o null. */
+                idPlan: number | null;
+                /** @description Nombre del plan, o null. */
+                nombrePlan: string | null;
+                /** @description Cantidad de la orden usada como tamaño de lote. */
+                tamanoLote: number;
+                /** @description Tamaño de muestra del plan, o null. */
+                tamanoMuestra: number | null;
+                /** @description Sugerencia por nivel AQL. */
+                niveles: {
+                  /** @description Nivel AQL (1 / 2.5 / 10). */
+                  nivelAQL: number;
+                  /** @description Σ de fallas de los defectos de este nivel. */
+                  totalFallas: number;
+                  /** @description Número de aceptación (Ac) del plan para este nivel. */
+                  aceptar: number;
+                  /** @description Número de rechazo (Re) del plan para este nivel. */
+                  rechazar: number;
+                  /**
+                   * @description aprobar si total ≤ Ac; reprobar si total ≥ Re (informativo).
+                   * @enum {string}
+                   */
+                  sugerencia: 'aprobar' | 'reprobar';
+                }[];
+                /** @description reprobar si algún nivel sugiere reprobar; aprobar si todos aprueban; null si no resoluble. */
+                sugerenciaGlobal: ('aprobar' | 'reprobar') | null;
+                /** @description Explica por qué no es resoluble, o null. */
+                mensaje: string | null;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Modificar los datos de encabezado de una auditoría (no toca las fallas) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la auditoría. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Modificación del encabezado de una auditoría (no toca las fallas). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Maquilero auditado (de los propuestos de la orden), o null para quitarlo. */
+            idMaquilero?: number | null;
+            /**
+             * Format: date
+             * @description Fecha de elaboración (YYYY-MM-DD).
+             */
+            fechaElaboracion?: string;
+            /**
+             * Format: date
+             * @description Fecha en que se auditó (YYYY-MM-DD).
+             */
+            fechaAuditoria?: string;
+            /**
+             * @description Tipo de auditoría (en piso / final / sin definir).
+             * @enum {string}
+             */
+            tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+            /** @description Observaciones (texto libre), o null. */
+            observaciones?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Auditoría de calidad con su detalle y sugerencia AQL. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la auditoría. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              numAuditoria: number;
+              idEmpresa: number;
+              /** @description Orden auditada. */
+              idOrden: number;
+              /** @description Folio de la orden (legible). */
+              folioOrden: number | null;
+              /** @description Código del modelo de la orden (legible). */
+              codigoModelo: string | null;
+              /** @description Maquilero auditado, o null. */
+              idMaquilero: number | null;
+              /** @description Nombre del maquilero, o null. */
+              maquilero: string | null;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /**
+               * Format: date
+               * @description Fecha en que se auditó (YYYY-MM-DD).
+               */
+              fechaAuditoria: string;
+              /** @description Usuario que dio de alta la auditoría. */
+              elaboroPorId: string | null;
+              /** @description Usuario que auditó. */
+              auditorPorId: string | null;
+              /** @description Tamaño de muestra inspeccionado. */
+              tamanoMuestra: number;
+              /** @description Si la muestra se sobre-escribió a mano. */
+              muestraManual: boolean;
+              /**
+               * @description Veredicto manual del auditor.
+               * @enum {string}
+               */
+              resultado: 'aprobado' | 'reprobado' | 'no_calificado';
+              /** @description Siempre true en v2 (el resultado lo decide el humano). */
+              resultadoManual: boolean;
+              /**
+               * @description Tipo de auditoría.
+               * @enum {string}
+               */
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              /** @description Observaciones del auditor. */
+              observaciones: string | null;
+              /** @description Si la auditoría está cancelada (borrado suave). */
+              cancelada: boolean;
+              /** @description Σ de fallas de todos los defectos (derivado). */
+              totalFallas: number;
+              /** @description Renglones defecto → fallas. */
+              defectos: {
+                /** @description Id del defecto. */
+                idDefecto: number;
+                /** @description Clave de negocio del defecto. */
+                clave: string;
+                /** @description Descripción del defecto. */
+                descripcion: string;
+                /** @description Nivel AQL del defecto (1 / 2.5 / 10). */
+                nivelAQL: number;
+                /** @description Si el defecto es favorito (se pre-cargó al alta). */
+                favorito: boolean;
+                /** @description Si el defecto sigue activo en el catálogo. */
+                activo: boolean;
+                /** @description Número de prendas con este defecto en la muestra. */
+                numFallas: number;
+              }[];
+              /** @description Sugerencia AQL informativa (no vinculante). */
+              sugerencia: {
+                /** @description Falso si no hay plan/renglón para resolver la sugerencia. */
+                resoluble: boolean;
+                /** @description Plan AQL default usado, o null. */
+                idPlan: number | null;
+                /** @description Nombre del plan, o null. */
+                nombrePlan: string | null;
+                /** @description Cantidad de la orden usada como tamaño de lote. */
+                tamanoLote: number;
+                /** @description Tamaño de muestra del plan, o null. */
+                tamanoMuestra: number | null;
+                /** @description Sugerencia por nivel AQL. */
+                niveles: {
+                  /** @description Nivel AQL (1 / 2.5 / 10). */
+                  nivelAQL: number;
+                  /** @description Σ de fallas de los defectos de este nivel. */
+                  totalFallas: number;
+                  /** @description Número de aceptación (Ac) del plan para este nivel. */
+                  aceptar: number;
+                  /** @description Número de rechazo (Re) del plan para este nivel. */
+                  rechazar: number;
+                  /**
+                   * @description aprobar si total ≤ Ac; reprobar si total ≥ Re (informativo).
+                   * @enum {string}
+                   */
+                  sugerencia: 'aprobar' | 'reprobar';
+                }[];
+                /** @description reprobar si algún nivel sugiere reprobar; aprobar si todos aprueban; null si no resoluble. */
+                sugerenciaGlobal: ('aprobar' | 'reprobar') | null;
+                /** @description Explica por qué no es resoluble, o null. */
+                mensaje: string | null;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     trace?: never;
   };
   '/api/calidad/auditorias/{id}/resultado': {
@@ -43129,6 +43714,357 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/calidad/auditorias/{id}/cancelacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar una auditoría (borrado suave con motivo; des-completa la RC) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la auditoría. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cancelación (borrado suave) de una auditoría con motivo. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo de la cancelación (obligatorio). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Auditoría de calidad con su detalle y sugerencia AQL. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la auditoría. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              numAuditoria: number;
+              idEmpresa: number;
+              /** @description Orden auditada. */
+              idOrden: number;
+              /** @description Folio de la orden (legible). */
+              folioOrden: number | null;
+              /** @description Código del modelo de la orden (legible). */
+              codigoModelo: string | null;
+              /** @description Maquilero auditado, o null. */
+              idMaquilero: number | null;
+              /** @description Nombre del maquilero, o null. */
+              maquilero: string | null;
+              /**
+               * Format: date
+               * @description Fecha de elaboración (YYYY-MM-DD).
+               */
+              fechaElaboracion: string;
+              /**
+               * Format: date
+               * @description Fecha en que se auditó (YYYY-MM-DD).
+               */
+              fechaAuditoria: string;
+              /** @description Usuario que dio de alta la auditoría. */
+              elaboroPorId: string | null;
+              /** @description Usuario que auditó. */
+              auditorPorId: string | null;
+              /** @description Tamaño de muestra inspeccionado. */
+              tamanoMuestra: number;
+              /** @description Si la muestra se sobre-escribió a mano. */
+              muestraManual: boolean;
+              /**
+               * @description Veredicto manual del auditor.
+               * @enum {string}
+               */
+              resultado: 'aprobado' | 'reprobado' | 'no_calificado';
+              /** @description Siempre true en v2 (el resultado lo decide el humano). */
+              resultadoManual: boolean;
+              /**
+               * @description Tipo de auditoría.
+               * @enum {string}
+               */
+              tipoAuditoria: 'en_piso' | 'final' | 'no_definida';
+              /** @description Observaciones del auditor. */
+              observaciones: string | null;
+              /** @description Si la auditoría está cancelada (borrado suave). */
+              cancelada: boolean;
+              /** @description Σ de fallas de todos los defectos (derivado). */
+              totalFallas: number;
+              /** @description Renglones defecto → fallas. */
+              defectos: {
+                /** @description Id del defecto. */
+                idDefecto: number;
+                /** @description Clave de negocio del defecto. */
+                clave: string;
+                /** @description Descripción del defecto. */
+                descripcion: string;
+                /** @description Nivel AQL del defecto (1 / 2.5 / 10). */
+                nivelAQL: number;
+                /** @description Si el defecto es favorito (se pre-cargó al alta). */
+                favorito: boolean;
+                /** @description Si el defecto sigue activo en el catálogo. */
+                activo: boolean;
+                /** @description Número de prendas con este defecto en la muestra. */
+                numFallas: number;
+              }[];
+              /** @description Sugerencia AQL informativa (no vinculante). */
+              sugerencia: {
+                /** @description Falso si no hay plan/renglón para resolver la sugerencia. */
+                resoluble: boolean;
+                /** @description Plan AQL default usado, o null. */
+                idPlan: number | null;
+                /** @description Nombre del plan, o null. */
+                nombrePlan: string | null;
+                /** @description Cantidad de la orden usada como tamaño de lote. */
+                tamanoLote: number;
+                /** @description Tamaño de muestra del plan, o null. */
+                tamanoMuestra: number | null;
+                /** @description Sugerencia por nivel AQL. */
+                niveles: {
+                  /** @description Nivel AQL (1 / 2.5 / 10). */
+                  nivelAQL: number;
+                  /** @description Σ de fallas de los defectos de este nivel. */
+                  totalFallas: number;
+                  /** @description Número de aceptación (Ac) del plan para este nivel. */
+                  aceptar: number;
+                  /** @description Número de rechazo (Re) del plan para este nivel. */
+                  rechazar: number;
+                  /**
+                   * @description aprobar si total ≤ Ac; reprobar si total ≥ Re (informativo).
+                   * @enum {string}
+                   */
+                  sugerencia: 'aprobar' | 'reprobar';
+                }[];
+                /** @description reprobar si algún nivel sugiere reprobar; aprobar si todos aprueban; null si no resoluble. */
+                sugerenciaGlobal: ('aprobar' | 'reprobar') | null;
+                /** @description Explica por qué no es resoluble, o null. */
+                mensaje: string | null;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/calidad/auditorias/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Impreso de una auditoría de calidad (PDF) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la auditoría. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;

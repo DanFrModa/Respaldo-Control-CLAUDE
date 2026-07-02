@@ -1,4 +1,12 @@
-import { CheckCircle, ClipboardCheck, ClipboardList, Medal, type LucideIcon } from 'lucide-react';
+import {
+  BarChart3,
+  CheckCircle,
+  ClipboardCheck,
+  ClipboardList,
+  FileSearch,
+  Medal,
+  type LucideIcon,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
@@ -34,6 +42,24 @@ const SUB_VISTAS: readonly SubvistaCalidad[] = [
     icono: ClipboardCheck,
     tono: 'pt',
     permiso: 'calidad.generar-auditorias',
+  },
+  {
+    clave: 'consulta-auditorias',
+    titulo: 'Consulta de auditorías',
+    descripcion: 'Busca auditorías, imprime su PDF y modifica o cancela las existentes.',
+    ruta: '/calidad/auditorias',
+    icono: FileSearch,
+    tono: 'servicios',
+    permiso: 'calidad.ver',
+  },
+  {
+    clave: 'historial-maquilero',
+    titulo: 'Auditorías por maquilero',
+    descripcion: 'Historial y porcentaje de aprobación operativo de cada maquilero.',
+    ruta: '/calidad/auditorias/maquilero',
+    icono: BarChart3,
+    tono: 'neutro',
+    permiso: 'calidad.ver',
   },
   {
     clave: 'defectos',
