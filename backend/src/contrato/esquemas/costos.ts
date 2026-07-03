@@ -1,0 +1,350 @@
+import { z } from 'zod';
+
+/**
+ * Esquemas Zod del MOTOR DE COSTEO (Módulo 6, F7-E1; doc `06-Costos-y-EDR.md` §2/§3/§5; D1/D2).
+ * UNA sola definición de reglas para UI y servidor (alimenta el OpenAPI). Toda la lógica vive en
+ * `dominio/costos/*` (A1); aquí solo las FORMAS.
+ *
+ * Modelo de costeo (D2, 2026-07-02):
+ *  • Pre-costo por modelo = receta `paraPreCosto` × precios de catálogo + maquila del modelo. El
+ *    bordado entra UNA vez por modelo, SIN cantidad. La REGALÍA NO es componente del costo.
+ *  • Costo real por orden = componentes en DOBLE juego teórico (`*Calc`) / guardado (`*Cost`);
+ *    `costoTotal` = Σ de los GUARDADOS. Costo unitario = `costoTotal` ÷ base de prorrateo (default
+ *    `cortado` = piezas cortadas).
+ *  • Precio sugerido (lista de precios): utilidad + regalías SOBRE LA VENTA, redondeo AL ALZA.
+ */
+
+// ── Base de prorrateo (D2) ──────────────────────────────────────────────────────────────────────
+
+/** Base sobre la que se divide el costo total para el unitario (D2). */
+export const esquemaBaseProrrateo = z
+  .enum(['cortado', 'recibido', 'vendido'])
+  .describe('Base de prorrateo del costo unitario (cortado=CantCorte, recibido=costura, vendido).');
+
+/** Base de prorrateo del costo unitario. */
+export type BaseProrrateo = z.infer<typeof esquemaBaseProrrateo>;
+
+// ── Pre-costo por modelo (receta × catálogo) ─────────────────────────────────────────────────────
+
+/** Un renglón de tela del pre-costo (consumo × precio de catálogo). */
+const esquemaPreCostoTela = z.object({
+  idTela: z.number().int().describe('Id de la tela.'),
+  tela: z.string().describe('Nombre de la tela.'),
+  consumoPorPrenda: z.number().describe('Consumo de tela por prenda (receta).'),
+  precioUnitario: z
+    .number()
+    .nullable()
+    .describe('Precio de catálogo por unidad (o null sin importes).'),
+  importe: z.number().nullable().describe('consumo × precio (o null sin importes).'),
+});
+
+/** Un renglón de avío del pre-costo (consumo × precio de catálogo). */
+const esquemaPreCostoAvio = z.object({
+  idAvio: z.number().int().describe('Id del avío.'),
+  clave: z.string().describe('Clave del avío.'),
+  descripcion: z.string().describe('Descripción del avío.'),
+  consumoPorPrenda: z.number().describe('Consumo de avío por prenda (receta).'),
+  precioUnitario: z
+    .number()
+    .nullable()
+    .describe('Precio de referencia por unidad (o null sin importes).'),
+  importe: z.number().nullable().describe('consumo × precio (o null sin importes).'),
+});
+
+/** Un renglón de bordado del pre-costo (precio UNA vez por modelo, sin cantidad). */
+const esquemaPreCostoBordado = z.object({
+  idBordado: z.number().int().describe('Id del bordado/estampado.'),
+  bordado: z.string().describe('Nombre del bordado/estampado.'),
+  precio: z.number().nullable().describe('Precio del bordado en el modelo (o null sin importes).'),
+});
+
+/**
+ * PRE-COSTO de un modelo: la receta `paraPreCosto` valuada a precios de catálogo + la maquila del
+ * modelo, con el precio de venta SUGERIDO (utilidad + regalías parametrizadas, redondeo al alza).
+ * Los importes/costos van en `null` cuando la sesión no tiene `consultas.ver-importes`.
+ */
+export const esquemaPreCostoModelo = z
+  .object({
+    idModelo: z.number().int().describe('Id del modelo.'),
+    codigo: z.string().describe('Código del modelo.'),
+    descripcion: z.string().nullable().describe('Descripción del modelo.'),
+    telas: z.array(esquemaPreCostoTela).describe('Telas de la receta (paraPreCosto).'),
+    avios: z.array(esquemaPreCostoAvio).describe('Avíos de la receta (paraPreCosto).'),
+    bordados: z.array(esquemaPreCostoBordado).describe('Bordados del modelo (sin cantidad).'),
+    totalTela: z.number().nullable().describe('Σ importes de tela (o null sin importes).'),
+    totalAvios: z.number().nullable().describe('Σ importes de avíos (o null sin importes).'),
+    totalBordado: z.number().nullable().describe('Σ precios de bordado (o null sin importes).'),
+    maquila: z.number().nullable().describe('Maquila base del modelo (o null sin importes).'),
+    costoTotal: z
+      .number()
+      .nullable()
+      .describe('Costo estimado = tela + avíos + bordado + maquila (SIN regalías, D2).'),
+    utilidadSugerida: z
+      .number()
+      .nullable()
+      .describe('% de utilidad usado en el precio sugerido (config. de la empresa).'),
+    regaliasBase: z
+      .number()
+      .nullable()
+      .describe('% de regalías (sobre la venta) usado en el precio sugerido.'),
+    precioSugerido: z
+      .number()
+      .nullable()
+      .describe('Precio de venta sugerido (parametrizado, redondeo al alza) o null sin importes.'),
+  })
+  .describe('Pre-costo estimado de un modelo (receta × catálogo + maquila) + precio sugerido.');
+
+/** Forma del pre-costo de un modelo. */
+export type PreCostoModelo = z.infer<typeof esquemaPreCostoModelo>;
+
+// ── Lista de precios (por género) ────────────────────────────────────────────────────────────────
+
+/** Filtros de la LISTA DE PRECIOS: por género y estado (activos/inactivos). */
+export const esquemaListaPreciosQuery = z
+  .object({
+    idGenero: z.coerce.number().int().positive().optional().describe('Filtra por género.'),
+    incluirInactivos: z
+      .stringbool()
+      .default(false)
+      .describe('Si true, incluye también los modelos descontinuados.'),
+  })
+  .describe('Filtros de la lista de precios (género + activos/inactivos).');
+
+/** Parámetros de la lista de precios ya coaccionados. */
+export type ListaPreciosQuery = z.infer<typeof esquemaListaPreciosQuery>;
+
+/** Un renglón de la lista de precios: modelo con su costo estimado y su precio sugerido. */
+export const esquemaListaPreciosFila = z.object({
+  idModelo: z.number().int().describe('Id del modelo.'),
+  codigo: z.string().describe('Código del modelo.'),
+  descripcion: z.string().nullable().describe('Descripción del modelo.'),
+  genero: z.string().nullable().describe('Género del modelo (o null).'),
+  activo: z.boolean().describe('¿El modelo está activo?'),
+  costo: z.number().nullable().describe('Costo estimado (pre-costo) o null sin importes.'),
+  precioSugerido: z.number().nullable().describe('Precio de venta sugerido o null sin importes.'),
+});
+
+/** Respuesta de la lista de precios. */
+export const esquemaListaPreciosSalida = z
+  .object({
+    utilidadSugerida: z.number().nullable().describe('% de utilidad aplicado.'),
+    regaliasBase: z.number().nullable().describe('% de regalías aplicado (sobre la venta).'),
+    filas: z.array(esquemaListaPreciosFila).describe('Modelos con costo y precio sugerido.'),
+  })
+  .describe('Lista de precios sugeridos por modelo (parametrizada).');
+
+/** Forma de la lista de precios. */
+export type ListaPreciosSalida = z.infer<typeof esquemaListaPreciosSalida>;
+
+// ── Costo real por orden (teórico + guardado) ────────────────────────────────────────────────────
+
+/** Cantidades DERIVADAS de la orden (por suma de EtapaMovimientoDet), base del prorrateo. */
+const esquemaCantidadesOrden = z.object({
+  pedido: z.number().int().describe('Total pedido (Σ matriz de la orden).'),
+  cortado: z.number().int().describe('Piezas cortadas (Σ etapas de corte vivas).'),
+  recibido: z.number().int().describe('Piezas recibidas de costura (mete a PT).'),
+  vendido: z.number().int().describe('Piezas entregadas a cliente.'),
+});
+
+/** Componentes TEÓRICOS de la orden (receta × precios vigentes × piezas cortadas). */
+const esquemaCostoTeorico = z.object({
+  telaPorPrenda: z.number().nullable().describe('Costo de tela por prenda (receta paraCosto).'),
+  aviosPorPrenda: z.number().nullable().describe('Costo de avíos por prenda (receta paraCosto).'),
+  procesosPorPrenda: z
+    .number()
+    .nullable()
+    .describe('Costo de procesos por prenda (maquila + estampado + bordados).'),
+  tela: z.number().nullable().describe('Tela teórica total = por prenda × cortado.'),
+  avios: z.number().nullable().describe('Avíos teóricos totales = por prenda × cortado.'),
+  procesos: z.number().nullable().describe('Procesos teóricos totales = por prenda × cortado.'),
+  total: z.number().nullable().describe('Costo teórico total = tela + avíos + procesos.'),
+});
+
+/** Componentes GUARDADOS del costo de la orden (lo que se persiste en CostoOrden). */
+const esquemaCostoGuardado = z.object({
+  telaCalc: z.number().nullable().describe('Tela teórica congelada al guardar.'),
+  telaCost: z.number().nullable().describe('Tela GUARDADA (ajustable).'),
+  procesosCalc: z.number().nullable().describe('Procesos teóricos congelados al guardar.'),
+  procesosCost: z.number().nullable().describe('Procesos GUARDADOS (ajustables).'),
+  aviosCalc: z.number().nullable().describe('Avíos teóricos congelados al guardar.'),
+  aviosCost: z.number().nullable().describe('Avíos GUARDADOS (ajustables).'),
+  otros: z.number().nullable().describe('Otros costos.'),
+  descOtros: z.string().nullable().describe('Descripción de otros costos.'),
+  costoTotal: z.number().nullable().describe('Costo total = Σ de los guardados.'),
+  baseProrrateo: esquemaBaseProrrateo.describe('Base de prorrateo elegida.'),
+  observaciones: z.string().nullable().describe('Observaciones.'),
+  creadoEn: z.string().describe('Fecha de captura (ISO).'),
+  modificadoEn: z.string().describe('Última modificación (ISO).'),
+});
+
+/** El costo unitario y la base usada para calcularlo. */
+const esquemaCostoUnitario = z.object({
+  base: esquemaBaseProrrateo.describe('Base usada (cortado por defecto).'),
+  cantidadBase: z.number().int().describe('Piezas de la base (divisor).'),
+  costoUnitario: z
+    .number()
+    .nullable()
+    .describe('costoTotal ÷ cantidadBase, o null si la base es 0 o sin importes.'),
+});
+
+/**
+ * COSTO de una orden: el TEÓRICO calculado en vivo + el GUARDADO (o null si aún no se costea) +
+ * las cantidades derivadas + el costo unitario. Importes en `null` sin `consultas.ver-importes`.
+ */
+export const esquemaCostoOrdenSalida = z
+  .object({
+    idOrden: z.number().int().describe('Id de la orden.'),
+    folio: z.number().int().describe('Folio de la orden.'),
+    idModelo: z.number().int().describe('Modelo de la orden.'),
+    codigoModelo: z.string().describe('Código del modelo.'),
+    descripcionModelo: z.string().nullable().describe('Descripción del modelo.'),
+    idCliente: z.number().int().describe('Cliente de la orden.'),
+    cliente: z.string().describe('Nombre del cliente.'),
+    noCostear: z
+      .boolean()
+      .describe('Si true, la orden está marcada "no costear" (no se guarda costo).'),
+    cantidades: esquemaCantidadesOrden.describe('Cantidades derivadas de la orden.'),
+    teorico: esquemaCostoTeorico.describe('Componentes teóricos (receta × precios).'),
+    guardado: esquemaCostoGuardado
+      .nullable()
+      .describe('Costo guardado (o null si no se ha costeado).'),
+    unitario: esquemaCostoUnitario.describe('Costo unitario y su base.'),
+  })
+  .describe('Costo real de una orden: teórico + guardado + cantidades + unitario.');
+
+/** Forma del costo de una orden. */
+export type CostoOrdenSalida = z.infer<typeof esquemaCostoOrdenSalida>;
+
+/** Cuerpo para GUARDAR/ajustar el costo de una orden (PUT). */
+export const esquemaCostoOrdenGuardarCuerpo = z
+  .object({
+    telaCost: z.number().min(0).nullable().optional().describe('Tela guardada (≥0) o null.'),
+    procesosCost: z
+      .number()
+      .min(0)
+      .nullable()
+      .optional()
+      .describe('Procesos guardados (≥0) o null.'),
+    aviosCost: z.number().min(0).nullable().optional().describe('Avíos guardados (≥0) o null.'),
+    otros: z.number().min(0).nullable().optional().describe('Otros costos (≥0) o null.'),
+    descOtros: z.string().trim().max(200).nullable().optional().describe('Descripción de otros.'),
+    baseProrrateo: esquemaBaseProrrateo.default('cortado').describe('Base de prorrateo.'),
+    observaciones: z.string().trim().max(500).nullable().optional().describe('Observaciones.'),
+  })
+  .describe('Componentes guardados del costo de una orden (el total lo arma el servidor).');
+
+/** Cuerpo para guardar el costo de una orden. */
+export type CostoOrdenGuardarCuerpo = z.infer<typeof esquemaCostoOrdenGuardarCuerpo>;
+
+// ── Lista de costos (grid modelo/orden) ──────────────────────────────────────────────────────────
+
+/** Filtros de la LISTA DE COSTOS (órdenes ya costeadas). */
+export const esquemaListaCostosQuery = z
+  .object({
+    pagina: z.coerce.number().int().min(1).default(1).describe('Página (1-based).'),
+    porPagina: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .default(20)
+      .describe('Renglones por página.'),
+    busqueda: z.string().trim().max(200).optional().describe('Folio, código de modelo o cliente.'),
+    idModelo: z.coerce.number().int().positive().optional().describe('Filtra por modelo.'),
+    idCliente: z.coerce.number().int().positive().optional().describe('Filtra por cliente.'),
+    ordenarPor: z
+      .enum(['folio', 'costoTotal', 'fecha'])
+      .default('folio')
+      .describe('Columna de orden.'),
+    direccion: z.enum(['asc', 'desc']).default('desc').describe('Dirección del orden.'),
+  })
+  .describe('Filtros, orden y paginación de la lista de costos.');
+
+/** Parámetros de la lista de costos ya coaccionados. */
+export type ListaCostosQuery = z.infer<typeof esquemaListaCostosQuery>;
+
+/** Un renglón de la lista de costos. */
+export const esquemaListaCostosFila = z.object({
+  idOrden: z.number().int().describe('Id de la orden.'),
+  folio: z.number().int().describe('Folio de la orden.'),
+  idModelo: z.number().int().describe('Modelo.'),
+  codigoModelo: z.string().describe('Código del modelo.'),
+  idCliente: z.number().int().describe('Cliente.'),
+  cliente: z.string().describe('Nombre del cliente.'),
+  fecha: z.string().nullable().describe('Fecha de la orden (YYYY-MM-DD) o null.'),
+  cortado: z.number().int().describe('Piezas cortadas.'),
+  costoTotal: z.number().nullable().describe('Costo total guardado (o null sin importes).'),
+  costoUnitario: z.number().nullable().describe('Costo unitario (o null sin importes / base 0).'),
+  baseProrrateo: esquemaBaseProrrateo.describe('Base de prorrateo guardada.'),
+});
+
+/** Respuesta paginada de la lista de costos. */
+export const esquemaListaCostosPagina = z
+  .object({
+    datos: z.array(esquemaListaCostosFila).describe('Órdenes costeadas de la página.'),
+    total: z.number().int().describe('Total de órdenes costeadas que cumplen el filtro.'),
+    pagina: z.number().int().describe('Página devuelta.'),
+    porPagina: z.number().int().describe('Renglones por página.'),
+    totalPaginas: z.number().int().describe('Total de páginas.'),
+  })
+  .describe('Página de la lista de costos.');
+
+/** Forma de la lista de costos. */
+export type ListaCostosPagina = z.infer<typeof esquemaListaCostosPagina>;
+
+// ── Márgenes por pedido ──────────────────────────────────────────────────────────────────────────
+
+/** Filtros de los MÁRGENES POR PEDIDO (mes/año/cliente sobre `fechaHasta` del pedido). */
+export const esquemaMargenesQuery = z
+  .object({
+    anio: z.coerce.number().int().min(2000).max(2100).optional().describe('Año (fechaHasta).'),
+    mes: z.coerce.number().int().min(1).max(12).optional().describe('Mes 1-12 (fechaHasta).'),
+    idCliente: z.coerce.number().int().positive().optional().describe('Filtra por cliente.'),
+  })
+  .describe('Filtros de márgenes por pedido.');
+
+/** Parámetros de márgenes ya coaccionados. */
+export type MargenesQuery = z.infer<typeof esquemaMargenesQuery>;
+
+/**
+ * Un renglón de MÁRGENES POR PEDIDO. Margen = 1 − (costoUnitario ÷ (precio − bonificaciones))
+ * (fórmula de Daniel, D2 #6). Solo agrega órdenes con costo ≠ 0. Importes en `null` sin permiso.
+ */
+export const esquemaMargenPedidoFila = z.object({
+  idPedido: z.number().int().describe('Id del pedido.'),
+  folio: z.number().int().describe('Folio del pedido.'),
+  idCliente: z.number().int().describe('Cliente.'),
+  cliente: z.string().describe('Nombre del cliente.'),
+  fechaHasta: z.string().nullable().describe('Fecha de entrega comprometida (hasta) o null.'),
+  cantidad: z.number().int().describe('Piezas pedidas (de las órdenes con costo).'),
+  importe: z.number().nullable().describe('Σ (precio × cantidad) o null sin importes.'),
+  margenPromedio: z
+    .number()
+    .nullable()
+    .describe('Promedio simple de los márgenes por orden (fracción).'),
+  margenPonderado: z
+    .number()
+    .nullable()
+    .describe('Margen ponderado por cantidad (fracción) o null sin importes.'),
+  margenPesosPorPieza: z
+    .number()
+    .nullable()
+    .describe('Margen en $ por pieza (precio neto − costo unitario) o null sin importes.'),
+});
+
+/** Respuesta de márgenes por pedido: filas + totales. */
+export const esquemaMargenesSalida = z
+  .object({
+    filas: z
+      .array(esquemaMargenPedidoFila)
+      .describe('Márgenes por pedido (órdenes con costo ≠ 0).'),
+    totalImporte: z
+      .number()
+      .nullable()
+      .describe('Σ importes de todos los pedidos (o null sin importes).'),
+    totalPiezas: z.number().int().describe('Σ piezas de todos los pedidos.'),
+  })
+  .describe('Costos y márgenes por pedido.');
+
+/** Forma de la respuesta de márgenes por pedido. */
+export type MargenesSalida = z.infer<typeof esquemaMargenesSalida>;

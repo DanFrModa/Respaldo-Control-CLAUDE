@@ -7,7 +7,7 @@
 |---|--------|-------------------|--------|
 | D0 | General | **Rediseñar con libertad.** CONTROL se hizo hace ~30 años con medios limitados; hay inconsistencias conocidas. Se autoriza proponer y aplicar mejoras de diseño en todo el sistema, dejándolas documentadas para el desarrollo nuevo. | ✅ Registrada |
 | D1 | 06 — Costos y EDR | El costeo debe usar el **costo ACTUAL**, no el viejo/congelado (`CostoViejo`). No replicar la lógica de `CostoBueno`. | ✅ Registrada |
-| D2 | 06 — Costos y EDR | El módulo **no está en uso** por detalles pendientes; se **rediseñará** con mejoras del dueño (pendientes de definir). | 🕓 Por detallar |
+| D2 | 06 — Costos y EDR | **Rediseño de Costos/EDR — resuelto con Daniel (2026-07-02).** Costo por prenda = tela (importe total ÷ prendas **cortadas**) + procesos (maquila/estampado/otros) + avíos (costura y empaque); **la regalía SALE del costo** (va sobre la venta). EDR **nuevo** derivado de la **facturación real** (modelo, precio, cantidad, cliente → totales por cliente); precio **ponderado** si un modelo se facturó a varios precios. Precio sugerido se redondea **al alza**. El histórico de EDR **no se migra** (se arranca con 2026). Detalle abajo. | ✅ Registrada |
 | D3 | 04 — Inventarios | La existencia NO debe editarse a mano ni por eventos de foco; debe ser **el resultado de sumar los movimientos** (kardex transaccional). | ✅ Registrada |
 | D4 | 03 — Producción / 04 — Inventarios | **Tallas ilimitadas** (eliminar el límite de 8). **TODA etapa del WIP se registra por color × talla**: corte, envío y recibo de costura, envío y recibo de estampado, y entrega al cliente. El **inventario de PT** también por **modelo × color × talla × almacén**. | ✅ Registrada |
 | D5 | 04 — Inventarios (Telas) | Una tela/lote puede traer **N telas acompañantes** (cuerpo + cardigan + otras), **del mismo lote y color** (eliminar el límite de 2). El inventario de telas debe ligar acompañantes por **lote/color**. | ✅ Registrada |
@@ -31,8 +31,22 @@
 - **Fecha:** 2026-06-09.
 
 ### D2 — Rediseño del módulo de Costos/EDR
-- El dueño aportará la lista de detalles a corregir antes de reconstruirlo.
-- **Pendiente:** que Daniel enumere los "varios detalles" del módulo.
+**Resuelto con Daniel el 2026-07-02** (sesión de arranque de F7; cierra el "por detallar" que quedó de 2026-06-09). Daniel no tiene hojas de cuadre "hechas", pero describió las fórmulas; el cuadre numérico se valida cuando entregue sus números o Gabriel arme un caso. Reglas cerradas:
+
+1. **Fórmula de costo (por prenda).** Costo = **A)** importe total de la tela ÷ **prendas cortadas** (`CantCorte` = base de prorrateo `cortado`, default) + **B)** costo de maquila/estampado u **otros procesos** + **C)** costo de **avíos** de costura y empaque. El módulo viejo no costeaba bien los avíos (solo tela y maquila); v2 sí los costea al detalle.
+2. **Regalía FUERA del costo.** La regalía ya **no es un componente del costo**: se aplica **sobre la venta** (Daniel la paga sobre lo facturado). En el costeo desaparece `regaliasCalc/regaliasCost`; los componentes quedan tela / procesos (maquila+estampado+otros) / avíos (+ `otros` para flexibilidad).
+3. **Regalías siempre sobre la venta.** En la **lista de precios** el precio sugerido lleva la regalía sobre el precio (parametrizada con `ConfiguracionEmpresa.regaliasBase` = 10%, ya seedeada). Se ajusta el precio de venta para absorberla.
+4. **Redondeo del precio sugerido: al alza (techo).** No el `CInt` del viejo (redondeo al más cercano) — se redondea **hacia arriba** a entero.
+5. **Utilidad parametrizada.** El `×2` viejo = `ConfiguracionEmpresa.utilidadSugerida` (seedeada 50). Precio sugerido = f(costo, utilidadSugerida, regaliasBase) con redondeo al alza.
+6. **Margen por pedido (fórmula de Daniel).** `margen = 1 − ( Costo ÷ ( PrecioVenta − bonificaciones del cliente ) )`. Las **bonificaciones del cliente** (costo logístico, publicidad, etc.) se **restan de la venta** (precio neto), no del costo. Ej.: `((70 ÷ 100) − 1) × −1 = 30%`.
+7. **EDR nuevo, derivado de la FACTURACIÓN real.** El EDR se arma de la facturación por modelo de cada mes (**modelo, precio, cantidad, cliente**), se le pone el costo y se sacan **totales por cliente** (además del corte por empresa de la nota siguiente). El **precio manda desde lo facturado, NO desde el pedido**; si el mismo modelo se facturó a **varios precios → precio ponderado**. Como en F7 aún no existe el módulo de facturación/CFDI (es F8/D12), la pantalla de **conciliación captura/importa la facturación del mes**, pre-propuesta como comodín desde las **entregas a cliente** de F3, y el usuario la ajusta al número **realmente facturado**. Cuando llegue F8/CFDI se alimenta sola.
+8. **Gastos del EDR: globales por mes** (como hoy — se capturan una vez al mes, sin empresa). Ventas y Costo se **desglosan por empresa** (y por cliente) desde las líneas; Gastos/Intereses/Bonificaciones/Resultado quedan a nivel **mensual consolidado**. El diseño deja lugar para gastos por empresa a futuro sin rehacer el esquema.
+9. **"Entrega a tiempo"** (KPI de F7-E3) se mide contra la **fecha planeada del último proceso de la Ruta Crítica** (`fechaReal ≤ fechaPlaneada`), para que la RC tenga sentido.
+10. **Auditoría 5S: fuera de F7** (nunca se usó — 0 filas). Se retoma más adelante dentro de Calidad. En F7-E5 se construye **solo el inventario cíclico**.
+11. **Histórico de EDR: NO se migra** — se arranca con información **de este año (2026)**. Sí se migra el histórico de **costeos de órdenes** (`CostoOrd`, ~2,513) en E6 (barato y da contexto), pero **no** los 44 encabezados/1,431 líneas de EDR viejo.
+12. **Auto-alimentar la productividad** desde movimientos/recibos (doc 05 obs. 4) queda como **mejora futura** (fuera de F7).
+
+- **Fecha:** 2026-07-02.
 
 ### D4 — Tallas ilimitadas + inventario de PT por talla y color
 - **Hoy:** columnas fijas `T1..T8` (orden) y `TC1..TC8` (corte/entrega/recibo). El IPT guarda existencia solo por **modelo × almacén** (pierde talla y color).

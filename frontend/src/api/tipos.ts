@@ -1134,3 +1134,43 @@ export type RegistroBitacora = BitacoraPagina['datos'][number];
 export type AccionBitacora = RegistroBitacora['accion'];
 /** Parámetros de consulta del listado de bitácora (querystring). */
 export type BitacoraQuery = NonNullable<paths['/api/admin/bitacora']['get']['parameters']['query']>;
+
+// ── Costos (Módulo 6, F7-E1) ──────────────────────────────────────────────────
+/** Pre-costo de un modelo (`GET /api/costos/pre-costo/{idModelo}`). */
+export type PreCostoModelo =
+  paths['/api/costos/pre-costo/{idModelo}']['get']['responses']['200']['content']['application/json'];
+/** Lista de precios sugeridos (`GET /api/costos/lista-precios`). */
+export type ListaPrecios =
+  paths['/api/costos/lista-precios']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la lista de precios. */
+export type ListaPreciosFila = ListaPrecios['filas'][number];
+/** Parámetros de la lista de precios (querystring). */
+export type ListaPreciosQuery = NonNullable<
+  paths['/api/costos/lista-precios']['get']['parameters']['query']
+>;
+/** Costo de una orden: teórico + guardado + unitario (`GET /api/costos/ordenes/{idOrden}`). */
+export type CostoOrden =
+  paths['/api/costos/ordenes/{idOrden}']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo para guardar/ajustar el costo de una orden (`PUT /api/costos/ordenes/{idOrden}`). */
+export type CostoOrdenGuardar =
+  paths['/api/costos/ordenes/{idOrden}']['put']['requestBody']['content']['application/json'];
+/** Base de prorrateo del costo unitario. */
+export type BaseProrrateo = NonNullable<CostoOrdenGuardar['baseProrrateo']>;
+/** Página de la lista de costos (`GET /api/costos/ordenes`). */
+export type ListaCostos =
+  paths['/api/costos/ordenes']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la lista de costos. */
+export type ListaCostosFila = ListaCostos['datos'][number];
+/** Parámetros de la lista de costos (querystring). */
+export type ListaCostosQuery = NonNullable<
+  paths['/api/costos/ordenes']['get']['parameters']['query']
+>;
+/** Costos y márgenes por pedido (`GET /api/costos/margenes-por-pedido`). */
+export type Margenes =
+  paths['/api/costos/margenes-por-pedido']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de márgenes por pedido. */
+export type MargenPedidoFila = Margenes['filas'][number];
+/** Parámetros de márgenes por pedido (querystring). */
+export type MargenesQuery = NonNullable<
+  paths['/api/costos/margenes-por-pedido']['get']['parameters']['query']
+>;

@@ -778,6 +778,33 @@ export {
   type SeguimientoEntregaQuery,
 } from './esquemas/entrega-cliente.js';
 
+// ── Costos: motor de costeo (Módulo 6, F7-E1; doc 06-Costos-y-EDR; D1/D2) ──
+export {
+  esquemaBaseProrrateo,
+  esquemaPreCostoModelo,
+  esquemaListaPreciosQuery,
+  esquemaListaPreciosFila,
+  esquemaListaPreciosSalida,
+  esquemaCostoOrdenSalida,
+  esquemaCostoOrdenGuardarCuerpo,
+  esquemaListaCostosQuery,
+  esquemaListaCostosFila,
+  esquemaListaCostosPagina,
+  esquemaMargenesQuery,
+  esquemaMargenPedidoFila,
+  esquemaMargenesSalida,
+  type BaseProrrateo,
+  type PreCostoModelo,
+  type ListaPreciosQuery,
+  type ListaPreciosSalida,
+  type CostoOrdenSalida,
+  type CostoOrdenGuardarCuerpo,
+  type ListaCostosQuery,
+  type ListaCostosPagina,
+  type MargenesQuery,
+  type MargenesSalida,
+} from './esquemas/costos.js';
+
 // ── Tablero WIP + existencias en poder del maquilero (F3-E5; doc 03-Produccion form Proceso/MaqExis) ──
 export {
   esquemaTableroWipQuery,

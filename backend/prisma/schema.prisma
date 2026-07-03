@@ -97,6 +97,8 @@ model Empresa {
   diasFestivos      DiaFestivo[]
   /// Auditorías de calidad de esta empresa (F6-E2, A9 — folio por empresa). Restrict.
   auditorias        Auditoria[]
+  /// Costos reales de órdenes de esta empresa (F7-E1, A9). Restrict.
+  costosOrden       CostoOrden[]
 
   @@map("empresas")
 }
@@ -1933,6 +1935,8 @@ model Orden {
   auditorias        Auditoria[]
   /// Renglones de kardex PT que PERTENECEN a esta orden (F6-E2 "PT por orden"). Restrict.
   movimientosDetPt  MovimientoDetPt[]
+  /// Costo real de la orden (F7-E1, 1:1 opcional). Cascade: el costeo pertenece a la orden.
+  costoOrden        CostoOrden?
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -4133,4 +4137,77 @@ model AuditoriaDefecto {
   @@unique([idAuditoria, idDefecto])
   @@index([idDefecto])
   @@map("auditoria_defecto")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COSTOS (Módulo 6, F7-E1) — costo REAL por orden (doc 06-Costos-y-EDR §3; D1/D2).
+// El PRE-COSTO por modelo NO es tabla: es cálculo de dominio sobre la receta
+// (receta paraPreCosto × precios de catálogo + maquila — verificado: `PreCostos`
+// no era tabla en el viejo). El EDR (F7-E2) referenciará `CostoOrden`. Auditoría
+// A7 + Bitácora (módulo financiero). Valuación a costo ACTUAL (D1): sin CostoViejo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Base de prorrateo del costo unitario de la orden (D2): sobre qué cantidad se
+/// divide el `costoTotal` para obtener el costo por prenda. `cortado` (DEFAULT,
+/// confirmado por Daniel: tela ÷ prendas cortadas = `CantCorte` del viejo);
+/// `recibido` = piezas recibidas de costura (prenda terminada, `generaEntradaPt`);
+/// `vendido` = piezas entregadas a cliente. Las tres se DERIVAN por suma directa de
+/// `EtapaMovimientoDet` (nunca un acumulador — D3/D4).
+enum BaseProrrateo {
+  cortado
+  recibido
+  vendido
+
+  @@map("base_prorrateo")
+}
+
+/// Costo REAL por orden (F7-E1 — ex `CostoOrd`, doc 06-Costos-y-EDR §3). 1:1 con la
+/// orden (`idOrden` @unique). Componentes en DOBLE juego (doc 06 §3):
+///  • `*Calc` = TEÓRICOS, snapshot de la receta × precios vigentes al momento de
+///    guardar (se recalculan en vivo para comparar, pero también se congelan aquí);
+///  • `*Cost` = los GUARDADOS (el usuario confirma o AJUSTA los teóricos).
+/// `costoTotal` se ARMA con los guardados: `telaCost + procesosCost + aviosCost +
+/// otros` (doc 06 §3). La REGALÍA NO es componente del costo (D2, 2026-07-02): va
+/// sobre la VENTA (lista de precios) — por eso NO hay `regaliasCalc/regaliasCost`.
+/// `procesos` = maquila + estampado + otros procesos; `avios` = habilitación de
+/// costura + empaque. `otros`/`descOtros` dan flexibilidad. Todo NULLABLE (un
+/// componente sin capturar cuenta como 0 en el total — patrón ceronulo). Valuación
+/// a costo ACTUAL (D1). Auditoría A7. Cascade hacia `Orden`; Restrict hacia `Empresa`.
+model CostoOrden {
+  id        Int     @id @default(autoincrement())
+  idOrden   Int     @unique @map("id_orden")
+  orden     Orden   @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  /// Empresa dueña (A9). Se persiste para acotar las consultas/reportes por empresa activa.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Tela — teórico (receta paraCosto × precio × base) y GUARDADO (ex `TelaCost`).
+  telaCalc     Decimal? @map("tela_calc") @db.Decimal(14, 2)
+  telaCost     Decimal? @map("tela_cost") @db.Decimal(14, 2)
+  /// Procesos: maquila + estampado + otros procesos — teórico y GUARDADO (ex `MaquilaCost`+`BordCost`).
+  procesosCalc Decimal? @map("procesos_calc") @db.Decimal(14, 2)
+  procesosCost Decimal? @map("procesos_cost") @db.Decimal(14, 2)
+  /// Avíos: habilitación de costura + empaque — teórico y GUARDADO (ex `HabCost`).
+  aviosCalc    Decimal? @map("avios_calc") @db.Decimal(14, 2)
+  aviosCost    Decimal? @map("avios_cost") @db.Decimal(14, 2)
+  /// Otros costos + su descripción (ex `CostoOrd.Otros`/`DescOtros`), para flexibilidad.
+  otros        Decimal? @db.Decimal(14, 2)
+  descOtros    String?  @map("desc_otros")
+
+  /// Costo TOTAL de la orden = Σ de los GUARDADOS (doc 06 §3). Lo ARMA el dominio al
+  /// guardar (nunca se edita a mano ni suma los teóricos). NULLABLE hasta el primer guardado.
+  costoTotal   Decimal? @map("costo_total") @db.Decimal(14, 2)
+
+  /// Base de prorrateo del costo unitario (D2). Default `cortado` (= `CantCorte`).
+  baseProrrateo BaseProrrateo @default(cortado) @map("base_prorrateo")
+
+  observaciones String? @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@map("costo_orden")
 }

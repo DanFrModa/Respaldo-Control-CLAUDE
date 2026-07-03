@@ -37,6 +37,10 @@ export const MODULOS_PERMISO = {
   esma: 'Estados de cuenta de maquileros',
   rc: 'Ruta Crítica',
   calidad: 'Control de calidad',
+  // Costos y márgenes (Módulo 6, F7-E1) — costo real por orden + márgenes por pedido (ex nivel ≤30,
+  // menú 6). El PRE-COSTO tiene su propio módulo (`precostos`, ex nivel ≤45, accesible desde Modelos).
+  costos: 'Costos y márgenes',
+  precostos: 'Pre-costos',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
@@ -646,6 +650,31 @@ export const CATALOGO_PERMISOS = [
       formulario: 'PedidosPorMes/Otras',
       descripcion: 'Ver Importes Totales (TotalImporte) y Precios. En varias consultas',
     },
+  },
+
+  // ── Costos y márgenes (Módulo 6, F7-E1; doc 06-Costos-y-EDR) — permisos NUEVOS de v2 ──────
+  // El módulo financiero de costeo. `costos.ver` (consultar costos de orden, lista de costos y
+  // márgenes por pedido) y `costos.capturar` (guardar/ajustar el costo de una orden) absorben el
+  // nivel ≤30 (menú 6 Costos era Directivo). `precostos.consultar` absorbe el nivel ≤45 (la pantalla
+  // `PreCostos`, accesible también desde MODELOS). Para OCULTAR los importes/precios ($) en las
+  // pantallas que el usuario sí ve, se REUSA `consultas.ver-importes` (ex acceso #2, transversal) —
+  // no se crea un permiso de importes propio (F2 ya lo tenía). La lista de precios sí es del pre-costo.
+  {
+    clave: 'costos.ver',
+    modulo: 'costos',
+    descripcion:
+      'Consultar el costo real de una orden, la lista de costos y los márgenes por pedido (menú Costos, nivel ≤30)',
+  },
+  {
+    clave: 'costos.capturar',
+    modulo: 'costos',
+    descripcion: 'Capturar o ajustar el costo real de una orden de producción (nivel ≤30)',
+  },
+  {
+    clave: 'precostos.consultar',
+    modulo: 'precostos',
+    descripcion:
+      'Consultar el pre-costo (estimado) de un modelo y la lista de precios sugeridos (nivel ≤45)',
   },
 
   // ── Administración (nuevos en v2, sin equivalente granular en el viejo) ──────
