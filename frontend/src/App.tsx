@@ -29,6 +29,11 @@ import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
 import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
 import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
 import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
+import { EdrPagina } from '@/modulos/edr/EdrPagina';
+import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
+import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
+import { EdrPorMesPagina } from '@/modulos/edr/EdrPorMesPagina';
+import { EdrPorAnioPagina } from '@/modulos/edr/EdrPorAnioPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
@@ -225,6 +230,13 @@ const router = createBrowserRouter([
           { path: 'costos/costeo', element: <CosteoOrdenPagina /> },
           { path: 'costos/lista', element: <ListaCostosPagina /> },
           { path: 'costos/margenes', element: <MargenesPagina /> },
+          // EDR (Módulo 6, F7-E2): hub + gestión del mes (edr.capturar) y conciliación/por mes/por
+          // año (edr.ver). Rutas estáticas antes del catch-all ":modulo".
+          { path: 'edr', element: <EdrPagina /> },
+          { path: 'edr/mes', element: <GestionMesPagina /> },
+          { path: 'edr/conciliacion', element: <ConciliacionPagina /> },
+          { path: 'edr/por-mes', element: <EdrPorMesPagina /> },
+          { path: 'edr/por-anio', element: <EdrPorAnioPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

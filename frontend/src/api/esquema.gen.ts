@@ -136,6 +136,8 @@ export interface paths {
                 | 'costos.ver'
                 | 'costos.capturar'
                 | 'precostos.consultar'
+                | 'edr.ver'
+                | 'edr.capturar'
                 | 'usuarios.administrar'
                 | 'roles.administrar'
                 | 'admin.ver-bitacora'
@@ -48708,6 +48710,1906 @@ export interface paths {
         };
         header?: never;
         path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/generar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Genera (o reconcilia) el EDR de un mes desde las entregas a cliente */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Periodo (año/mes) a generar/reconciliar. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Año del EDR. */
+            anio: number;
+            /** @description Mes del EDR (1-12). */
+            mes: number;
+          };
+        };
+      };
+      responses: {
+        /** @description EDR calculado de un mes (a costo actual). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado global del mes. */
+              encabezado: {
+                /** @description Id del EDR. */
+                id: number;
+                /** @description Año. */
+                anio: number;
+                /** @description Mes 1-12. */
+                mes: number;
+                /** @description Gastos del mes. */
+                gastos: number;
+                /** @description Intereses del mes. */
+                intereses: number;
+                /** @description Bonificaciones del mes (SUMAN). */
+                bonificaciones: number;
+                /** @description Otros (± al resultado). */
+                otros: number;
+                /** @description Descripción de otros. */
+                descOtros: string | null;
+                /** @description Observaciones. */
+                observaciones: string | null;
+                /** @description Alta (ISO). */
+                creadoEn: string;
+                /** @description Última modificación (ISO). */
+                modificadoEn: string;
+              };
+              /** @description Σ(cantVendida × precioVenta) de todas las líneas. */
+              ventas: number;
+              /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
+              costo: number;
+              /** @description Gastos del mes (del encabezado). */
+              gastos: number;
+              /** @description Intereses del mes. */
+              intereses: number;
+              /** @description Bonificaciones del mes (SUMAN). */
+              bonificaciones: number;
+              /** @description Otros (± al resultado). */
+              otros: number;
+              /** @description Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros. */
+              resultado: number;
+              /** @description Σ cantVendida de las líneas. */
+              totalPiezas: number;
+              /** @description Número de líneas del mes. */
+              totalLineas: number;
+              /** @description Cuántas líneas quedaron sin costo (a revisar). */
+              lineasSinCosto: number;
+              /** @description Corte por empresa. */
+              cortesEmpresa: {
+                /** @description Id de la empresa o cliente. */
+                id: number;
+                /** @description Nombre de la empresa o cliente. */
+                nombre: string;
+                /** @description Ventas del corte. */
+                ventas: number;
+                /** @description Costo (actual) del corte. */
+                costo: number;
+                /** @description Ventas − Costo (sin gastos globales). */
+                utilidadBruta: number;
+              }[];
+              /** @description Corte por cliente. */
+              cortesCliente: {
+                /** @description Id de la empresa o cliente. */
+                id: number;
+                /** @description Nombre de la empresa o cliente. */
+                nombre: string;
+                /** @description Ventas del corte. */
+                ventas: number;
+                /** @description Costo (actual) del corte. */
+                costo: number;
+                /** @description Ventas − Costo (sin gastos globales). */
+                utilidadBruta: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/por-mes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** EDR de un mes (o existe:false si aún no se genera) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Año. */
+          anio: number;
+          /** @description Mes 1-12. */
+          mes: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description EDR de un mes (o indicador de que no existe). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description ¿Ya se generó el EDR de este mes? */
+              existe: boolean;
+              /** @description Año consultado. */
+              anio: number;
+              /** @description Mes consultado. */
+              mes: number;
+              /** @description EDR calculado (null si no existe). */
+              edr: {
+                /** @description Encabezado global del mes. */
+                encabezado: {
+                  /** @description Id del EDR. */
+                  id: number;
+                  /** @description Año. */
+                  anio: number;
+                  /** @description Mes 1-12. */
+                  mes: number;
+                  /** @description Gastos del mes. */
+                  gastos: number;
+                  /** @description Intereses del mes. */
+                  intereses: number;
+                  /** @description Bonificaciones del mes (SUMAN). */
+                  bonificaciones: number;
+                  /** @description Otros (± al resultado). */
+                  otros: number;
+                  /** @description Descripción de otros. */
+                  descOtros: string | null;
+                  /** @description Observaciones. */
+                  observaciones: string | null;
+                  /** @description Alta (ISO). */
+                  creadoEn: string;
+                  /** @description Última modificación (ISO). */
+                  modificadoEn: string;
+                };
+                /** @description Σ(cantVendida × precioVenta) de todas las líneas. */
+                ventas: number;
+                /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
+                costo: number;
+                /** @description Gastos del mes (del encabezado). */
+                gastos: number;
+                /** @description Intereses del mes. */
+                intereses: number;
+                /** @description Bonificaciones del mes (SUMAN). */
+                bonificaciones: number;
+                /** @description Otros (± al resultado). */
+                otros: number;
+                /** @description Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros. */
+                resultado: number;
+                /** @description Σ cantVendida de las líneas. */
+                totalPiezas: number;
+                /** @description Número de líneas del mes. */
+                totalLineas: number;
+                /** @description Cuántas líneas quedaron sin costo (a revisar). */
+                lineasSinCosto: number;
+                /** @description Corte por empresa. */
+                cortesEmpresa: {
+                  /** @description Id de la empresa o cliente. */
+                  id: number;
+                  /** @description Nombre de la empresa o cliente. */
+                  nombre: string;
+                  /** @description Ventas del corte. */
+                  ventas: number;
+                  /** @description Costo (actual) del corte. */
+                  costo: number;
+                  /** @description Ventas − Costo (sin gastos globales). */
+                  utilidadBruta: number;
+                }[];
+                /** @description Corte por cliente. */
+                cortesCliente: {
+                  /** @description Id de la empresa o cliente. */
+                  id: number;
+                  /** @description Nombre de la empresa o cliente. */
+                  nombre: string;
+                  /** @description Ventas del corte. */
+                  ventas: number;
+                  /** @description Costo (actual) del corte. */
+                  costo: number;
+                  /** @description Ventas − Costo (sin gastos globales). */
+                  utilidadBruta: number;
+                }[];
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/por-anio': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Comparativo mensual del EDR de un año (con corte por empresa) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Año. */
+          anio: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Comparativo anual del EDR. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Año. */
+              anio: number;
+              /** @description Los meses del año que ya tienen EDR. */
+              meses: {
+                /** @description Mes 1-12. */
+                mes: number;
+                /** @description Id del EDR de ese mes. */
+                idEdr: number;
+                /** @description Ventas del mes. */
+                ventas: number;
+                /** @description Costo (actual) del mes. */
+                costo: number;
+                /** @description Gastos del mes. */
+                gastos: number;
+                /** @description Intereses del mes. */
+                intereses: number;
+                /** @description Bonificaciones del mes. */
+                bonificaciones: number;
+                /** @description Otros del mes. */
+                otros: number;
+                /** @description Resultado del mes. */
+                resultado: number;
+              }[];
+              /** @description Corte anual por empresa. */
+              porEmpresa: {
+                /** @description Empresa. */
+                idEmpresa: number;
+                /** @description Nombre de la empresa. */
+                empresa: string;
+                /** @description Ventas del año. */
+                ventas: number;
+                /** @description Costo del año. */
+                costo: number;
+                /** @description Ventas − Costo del año. */
+                utilidadBruta: number;
+              }[];
+              /** @description Σ ventas del año. */
+              totalVentas: number;
+              /** @description Σ costo del año. */
+              totalCosto: number;
+              /** @description Σ resultado del año. */
+              totalResultado: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/por-anio/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** EDR anual en PDF (R9) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Año. */
+          anio: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/lineas/{idLinea}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Ajusta la cantidad/precio facturado de una línea (marca ajustada) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la línea del EDR. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      /** @description Ajuste de la cantidad/precio facturado de una línea del EDR. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Cantidad vendida (≥0). */
+            cantVendida: number;
+            /** @description Precio de venta FACTURADO por prenda (≥0). */
+            precioVenta: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Una línea del EDR con su costo actual. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la línea. */
+              id: number;
+              /** @description Id del EDR al que pertenece. */
+              idEdr: number;
+              /** @description Orden vendida (null en manuales). */
+              idOrden: number | null;
+              /** @description Folio de la orden (null en manuales). */
+              folioOrden: number | null;
+              /** @description Empresa de la línea. */
+              idEmpresa: number;
+              /** @description Nombre de la empresa. */
+              empresa: string;
+              /** @description Cliente de la línea. */
+              idCliente: number | null;
+              /** @description Nombre del cliente. */
+              cliente: string | null;
+              /** @description Modelo vendido. */
+              idModelo: number | null;
+              /** @description Código del modelo. */
+              modelo: string | null;
+              /** @description Descripción (líneas manuales). */
+              descripcion: string | null;
+              /** @description Cantidad vendida. */
+              cantVendida: number;
+              /** @description Precio de venta facturado por prenda. */
+              precioVenta: number;
+              /** @description cantVendida × precioVenta. */
+              importe: number;
+              /** @description Costo unitario ACTUAL (o null si la línea no tiene costo). */
+              costoUnitActual: number | null;
+              /** @description Costo total actual de la línea (0 si sin costo). */
+              costoActual: number;
+              /** @description true si la línea no tiene costo (sin orden/CostoOrden). */
+              sinCosto: boolean;
+              /** @description Costo histórico congelado (solo ETL E6). */
+              costoHistorico: number | null;
+              /**
+               * @description Origen de la línea.
+               * @enum {string}
+               */
+              origen: 'automatica' | 'ajustada' | 'manual';
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    /** Elimina una línea manual (rechaza automáticas/ajustadas) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la línea del EDR. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resultado de la eliminación. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              eliminada: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** EDR calculado (encabezado + totales a costo actual + cortes) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del EDR. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description EDR calculado de un mes (a costo actual). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado global del mes. */
+              encabezado: {
+                /** @description Id del EDR. */
+                id: number;
+                /** @description Año. */
+                anio: number;
+                /** @description Mes 1-12. */
+                mes: number;
+                /** @description Gastos del mes. */
+                gastos: number;
+                /** @description Intereses del mes. */
+                intereses: number;
+                /** @description Bonificaciones del mes (SUMAN). */
+                bonificaciones: number;
+                /** @description Otros (± al resultado). */
+                otros: number;
+                /** @description Descripción de otros. */
+                descOtros: string | null;
+                /** @description Observaciones. */
+                observaciones: string | null;
+                /** @description Alta (ISO). */
+                creadoEn: string;
+                /** @description Última modificación (ISO). */
+                modificadoEn: string;
+              };
+              /** @description Σ(cantVendida × precioVenta) de todas las líneas. */
+              ventas: number;
+              /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
+              costo: number;
+              /** @description Gastos del mes (del encabezado). */
+              gastos: number;
+              /** @description Intereses del mes. */
+              intereses: number;
+              /** @description Bonificaciones del mes (SUMAN). */
+              bonificaciones: number;
+              /** @description Otros (± al resultado). */
+              otros: number;
+              /** @description Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros. */
+              resultado: number;
+              /** @description Σ cantVendida de las líneas. */
+              totalPiezas: number;
+              /** @description Número de líneas del mes. */
+              totalLineas: number;
+              /** @description Cuántas líneas quedaron sin costo (a revisar). */
+              lineasSinCosto: number;
+              /** @description Corte por empresa. */
+              cortesEmpresa: {
+                /** @description Id de la empresa o cliente. */
+                id: number;
+                /** @description Nombre de la empresa o cliente. */
+                nombre: string;
+                /** @description Ventas del corte. */
+                ventas: number;
+                /** @description Costo (actual) del corte. */
+                costo: number;
+                /** @description Ventas − Costo (sin gastos globales). */
+                utilidadBruta: number;
+              }[];
+              /** @description Corte por cliente. */
+              cortesCliente: {
+                /** @description Id de la empresa o cliente. */
+                id: number;
+                /** @description Nombre de la empresa o cliente. */
+                nombre: string;
+                /** @description Ventas del corte. */
+                ventas: number;
+                /** @description Costo (actual) del corte. */
+                costo: number;
+                /** @description Ventas − Costo (sin gastos globales). */
+                utilidadBruta: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    /** Actualiza el encabezado global del mes (gastos/intereses/…) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del EDR. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Campos del encabezado global del EDR del mes (todo opcional). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Gastos del mes (≥0). */
+            gastos?: number;
+            /** @description Intereses del mes (≥0). */
+            intereses?: number;
+            /** @description Bonificaciones del mes (≥0, SUMAN). */
+            bonificaciones?: number;
+            /** @description Otros (± al resultado; puede ser negativo). */
+            otros?: number;
+            /** @description Descripción de otros. */
+            descOtros?: string | null;
+            /** @description Observaciones. */
+            observaciones?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description EDR calculado de un mes (a costo actual). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Encabezado global del mes. */
+              encabezado: {
+                /** @description Id del EDR. */
+                id: number;
+                /** @description Año. */
+                anio: number;
+                /** @description Mes 1-12. */
+                mes: number;
+                /** @description Gastos del mes. */
+                gastos: number;
+                /** @description Intereses del mes. */
+                intereses: number;
+                /** @description Bonificaciones del mes (SUMAN). */
+                bonificaciones: number;
+                /** @description Otros (± al resultado). */
+                otros: number;
+                /** @description Descripción de otros. */
+                descOtros: string | null;
+                /** @description Observaciones. */
+                observaciones: string | null;
+                /** @description Alta (ISO). */
+                creadoEn: string;
+                /** @description Última modificación (ISO). */
+                modificadoEn: string;
+              };
+              /** @description Σ(cantVendida × precioVenta) de todas las líneas. */
+              ventas: number;
+              /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
+              costo: number;
+              /** @description Gastos del mes (del encabezado). */
+              gastos: number;
+              /** @description Intereses del mes. */
+              intereses: number;
+              /** @description Bonificaciones del mes (SUMAN). */
+              bonificaciones: number;
+              /** @description Otros (± al resultado). */
+              otros: number;
+              /** @description Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros. */
+              resultado: number;
+              /** @description Σ cantVendida de las líneas. */
+              totalPiezas: number;
+              /** @description Número de líneas del mes. */
+              totalLineas: number;
+              /** @description Cuántas líneas quedaron sin costo (a revisar). */
+              lineasSinCosto: number;
+              /** @description Corte por empresa. */
+              cortesEmpresa: {
+                /** @description Id de la empresa o cliente. */
+                id: number;
+                /** @description Nombre de la empresa o cliente. */
+                nombre: string;
+                /** @description Ventas del corte. */
+                ventas: number;
+                /** @description Costo (actual) del corte. */
+                costo: number;
+                /** @description Ventas − Costo (sin gastos globales). */
+                utilidadBruta: number;
+              }[];
+              /** @description Corte por cliente. */
+              cortesCliente: {
+                /** @description Id de la empresa o cliente. */
+                id: number;
+                /** @description Nombre de la empresa o cliente. */
+                nombre: string;
+                /** @description Ventas del corte. */
+                ventas: number;
+                /** @description Costo (actual) del corte. */
+                costo: number;
+                /** @description Ventas − Costo (sin gastos globales). */
+                utilidadBruta: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/{id}/lineas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Conciliación de líneas del EDR (a costo actual, filtrable) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por empresa. */
+          idEmpresa?: number;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por modelo. */
+          idModelo?: number;
+          /** @description Filtra por origen de la línea. */
+          origen?: 'automatica' | 'ajustada' | 'manual';
+        };
+        header?: never;
+        path: {
+          /** @description Id del EDR. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Conciliación de las líneas del EDR de un mes. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del EDR. */
+              idEdr: number;
+              /** @description Año. */
+              anio: number;
+              /** @description Mes 1-12. */
+              mes: number;
+              /** @description Líneas del EDR (filtradas). */
+              lineas: {
+                /** @description Id de la línea. */
+                id: number;
+                /** @description Id del EDR al que pertenece. */
+                idEdr: number;
+                /** @description Orden vendida (null en manuales). */
+                idOrden: number | null;
+                /** @description Folio de la orden (null en manuales). */
+                folioOrden: number | null;
+                /** @description Empresa de la línea. */
+                idEmpresa: number;
+                /** @description Nombre de la empresa. */
+                empresa: string;
+                /** @description Cliente de la línea. */
+                idCliente: number | null;
+                /** @description Nombre del cliente. */
+                cliente: string | null;
+                /** @description Modelo vendido. */
+                idModelo: number | null;
+                /** @description Código del modelo. */
+                modelo: string | null;
+                /** @description Descripción (líneas manuales). */
+                descripcion: string | null;
+                /** @description Cantidad vendida. */
+                cantVendida: number;
+                /** @description Precio de venta facturado por prenda. */
+                precioVenta: number;
+                /** @description cantVendida × precioVenta. */
+                importe: number;
+                /** @description Costo unitario ACTUAL (o null si la línea no tiene costo). */
+                costoUnitActual: number | null;
+                /** @description Costo total actual de la línea (0 si sin costo). */
+                costoActual: number;
+                /** @description true si la línea no tiene costo (sin orden/CostoOrden). */
+                sinCosto: boolean;
+                /** @description Costo histórico congelado (solo ETL E6). */
+                costoHistorico: number | null;
+                /**
+                 * @description Origen de la línea.
+                 * @enum {string}
+                 */
+                origen: 'automatica' | 'ajustada' | 'manual';
+              }[];
+              /** @description Σ cantVendida de las líneas mostradas. */
+              totalPiezas: number;
+              /** @description Σ importes de las líneas mostradas. */
+              totalVentas: number;
+              /** @description Σ costo actual de las líneas mostradas. */
+              totalCosto: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Agrega una línea manual al EDR (sin orden, costo 0) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del EDR. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de una línea manual del EDR (sin orden; costo 0). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Empresa (debe ser paraEdr). */
+            idEmpresa: number;
+            /** @description Cliente de la línea. */
+            idCliente: number;
+            /** @description Modelo (opcional). */
+            idModelo?: number;
+            /** @description Descripción libre. */
+            descripcion?: string | null;
+            /** @description Cantidad vendida (≥0). */
+            cantVendida: number;
+            /** @description Precio de venta facturado por prenda (≥0). */
+            precioVenta: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Una línea del EDR con su costo actual. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la línea. */
+              id: number;
+              /** @description Id del EDR al que pertenece. */
+              idEdr: number;
+              /** @description Orden vendida (null en manuales). */
+              idOrden: number | null;
+              /** @description Folio de la orden (null en manuales). */
+              folioOrden: number | null;
+              /** @description Empresa de la línea. */
+              idEmpresa: number;
+              /** @description Nombre de la empresa. */
+              empresa: string;
+              /** @description Cliente de la línea. */
+              idCliente: number | null;
+              /** @description Nombre del cliente. */
+              cliente: string | null;
+              /** @description Modelo vendido. */
+              idModelo: number | null;
+              /** @description Código del modelo. */
+              modelo: string | null;
+              /** @description Descripción (líneas manuales). */
+              descripcion: string | null;
+              /** @description Cantidad vendida. */
+              cantVendida: number;
+              /** @description Precio de venta facturado por prenda. */
+              precioVenta: number;
+              /** @description cantVendida × precioVenta. */
+              importe: number;
+              /** @description Costo unitario ACTUAL (o null si la línea no tiene costo). */
+              costoUnitActual: number | null;
+              /** @description Costo total actual de la línea (0 si sin costo). */
+              costoActual: number;
+              /** @description true si la línea no tiene costo (sin orden/CostoOrden). */
+              sinCosto: boolean;
+              /** @description Costo histórico congelado (solo ETL E6). */
+              costoHistorico: number | null;
+              /**
+               * @description Origen de la línea.
+               * @enum {string}
+               */
+              origen: 'automatica' | 'ajustada' | 'manual';
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/{id}/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** EDR mensual en PDF (R9) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del EDR. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/edr/{id}/excel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** EDR mensual en Excel (.xlsx) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del EDR. */
+          id: number;
+        };
         cookie?: never;
       };
       requestBody?: never;

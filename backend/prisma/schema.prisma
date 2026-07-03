@@ -64,41 +64,44 @@ model Empresa {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  configuracion     ConfiguracionEmpresa?
-  almacenes         Almacen[]
-  secuencias        Secuencia[]
+  configuracion       ConfiguracionEmpresa?
+  almacenes           Almacen[]
+  secuencias          Secuencia[]
   /// Pedidos internos de esta empresa (F2-E1, A9 — folio por empresa). Restrict.
-  pedidos           Pedido[]
+  pedidos             Pedido[]
   /// Órdenes de producción de esta empresa (F2-E2, A9 — folio por empresa). Restrict.
-  ordenes           Orden[]
+  ordenes             Orden[]
   /// Etapas de producción (corte/envío/recibo/entrega) de esta empresa (F3-E1, A9). Restrict.
-  etapasMovimiento  EtapaMovimiento[]
+  etapasMovimiento    EtapaMovimiento[]
   /// Movimientos de kardex de esta empresa (F3-E1, A9 — folio por empresa). Restrict.
-  movimientos       Movimiento[]
+  movimientos         Movimiento[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
-  cargosEsMa        EsMaCargo[]
+  cargosEsMa          EsMaCargo[]
   /// Abonos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
-  abonosMaquilero   AbonoMaquilero[]
+  abonosMaquilero     AbonoMaquilero[]
   /// Descuentos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
   descuentosMaquilero DescuentoMaquilero[]
   /// Pagos a maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
-  pagosMaquilero    PagoMaquilero[]
+  pagosMaquilero      PagoMaquilero[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
-  ordenesCompra     OrdenCompra[]
+  ordenesCompra       OrdenCompra[]
   /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
-  recepcionesCompra RecepcionCompra[]
+  recepcionesCompra   RecepcionCompra[]
   /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
-  eventosOutbox     EventoOutbox[]
+  eventosOutbox       EventoOutbox[]
   /// Notas de salida de materiales a maquileros de esta empresa (F4-E5, A9 — folio por empresa). Restrict.
-  notasSalida       NotaSalida[]
+  notasSalida         NotaSalida[]
   /// Calendario laboral de la RC de esta empresa (F5-E2, 1:1). Restrict.
-  calendario        CalendarioEmpresa?
+  calendario          CalendarioEmpresa?
   /// Días festivos de la RC de esta empresa (F5-E2). Restrict.
-  diasFestivos      DiaFestivo[]
+  diasFestivos        DiaFestivo[]
   /// Auditorías de calidad de esta empresa (F6-E2, A9 — folio por empresa). Restrict.
-  auditorias        Auditoria[]
+  auditorias          Auditoria[]
   /// Costos reales de órdenes de esta empresa (F7-E1, A9). Restrict.
-  costosOrden       CostoOrden[]
+  costosOrden         CostoOrden[]
+  /// Renglones del Estado de Resultados (EDR) de esta empresa (F7-E2, D2 #6). El EDR es GLOBAL
+  /// (encabezado por mes, sin empresa); solo las líneas se sellan por empresa para el corte. Restrict.
+  edrLineas           EdrLinea[]
 
   @@map("empresas")
 }
@@ -906,11 +909,13 @@ model Cliente {
   direccion String?
   activo    Boolean @default(true)
 
-  campos  ClienteCampo[]
+  campos    ClienteCampo[]
   /// Pedidos internos del cliente (F2-E1, Restrict hacia el cliente).
-  pedidos Pedido[]
+  pedidos   Pedido[]
   /// Órdenes de producción del cliente (F2-E2, Restrict hacia el cliente).
-  ordenes Orden[]
+  ordenes   Orden[]
+  /// Renglones del EDR asociados a este cliente (F7-E2, corte por cliente). Restrict.
+  edrLineas EdrLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1391,6 +1396,8 @@ model Modelo {
   ordenes          Orden[]
   /// Renglones de kardex PT de este modelo (F3-E1, D4 — dimensión PT: modelo×color×talla). Restrict.
   movimientosDetPt MovimientoDetPt[]
+  /// Renglones del EDR asociados a este modelo (F7-E2, para el desglose por modelo). Restrict.
+  edrLineas        EdrLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1937,6 +1944,9 @@ model Orden {
   movimientosDetPt  MovimientoDetPt[]
   /// Costo real de la orden (F7-E1, 1:1 opcional). Cascade: el costeo pertenece a la orden.
   costoOrden        CostoOrden?
+  /// Renglones del EDR que valúan las ventas de esta orden en un mes (F7-E2). Restrict: una orden
+  /// referida por un EDR no se borra físico (las líneas automáticas se reconcilian, no se cascadean).
+  edrLineas         EdrLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2520,10 +2530,10 @@ model EsMaCargo {
   /// Prendas de este cargo YA PAGADAS (F6-E4, decisión (g) — "prendas por pagar"). Suma de las
   /// `PagoAplicacion.cantidad` que consumió este cargo; se actualiza bajo lock por maquilero al
   /// aplicar un pago. El "pagado" se DERIVA (cantidadPagada ≥ cantidadReal): no hay bandera editable.
-  cantidadPagada Decimal @default(0) @map("cantidad_pagada") @db.Decimal(14, 2)
+  cantidadPagada Decimal  @default(0) @map("cantidad_pagada") @db.Decimal(14, 2)
   /// Segundas SIN COSTO (F6-E4, decisión (f)): prenda reclasificada a 2ª que NO se le paga al
   /// maquilero. Un cargo `sinCosto` se EXCLUYE del saldo y del pago (importe 0). Default false.
-  sinCosto       Boolean @default(false) @map("sin_costo")
+  sinCosto       Boolean  @default(false) @map("sin_costo")
   /// Modalidad de facturación de ESTE movimiento (F6-E4, decisión (h)): true con factura, false sin
   /// factura, null sin definir. Se fija al VALIDAR según la `modalidadFacturacion` del proveedor.
   conFactura     Boolean? @map("con_factura")
@@ -2590,10 +2600,10 @@ enum EstadoRevisionEsMa {
 
 /// ABONO a la cuenta de un maquilero (F6-E4; ex `EsMaAbonos`). Movimiento plano.
 model AbonoMaquilero {
-  id        Int     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   /// Empresa dueña del movimiento (A9). Restrict.
-  idEmpresa Int     @map("id_empresa")
-  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
   /// Maquilero (Proveedor) al que se le abona. Restrict.
   idMaquilero Int       @map("id_maquilero")
   maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
@@ -2619,10 +2629,10 @@ model AbonoMaquilero {
 
 /// DESCUENTO a la cuenta de un maquilero (F6-E4; ex `EsMaDescuentos`). Movimiento plano.
 model DescuentoMaquilero {
-  id        Int     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   /// Empresa dueña del movimiento (A9). Restrict.
-  idEmpresa Int     @map("id_empresa")
-  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
   /// Maquilero (Proveedor) al que se le descuenta. Restrict.
   idMaquilero Int       @map("id_maquilero")
   maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
@@ -2649,10 +2659,10 @@ model DescuentoMaquilero {
 /// el pago se aplica a uno o más cargos consumiendo sus "prendas por pagar". `monto` = Σ importes
 /// aplicados (se sella al capturar). El recibo de pago (R9) se imprime de este registro.
 model PagoMaquilero {
-  id        Int     @id @default(autoincrement())
+  id          Int       @id @default(autoincrement())
   /// Empresa dueña del movimiento (A9). Restrict.
-  idEmpresa Int     @map("id_empresa")
-  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
   /// Maquilero (Proveedor) al que se le paga. Restrict.
   idMaquilero Int       @map("id_maquilero")
   maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
@@ -2682,10 +2692,10 @@ model PagoMaquilero {
 /// pagaron y por qué importe. El saldo "por pagar" de un cargo = `cantidadReal − Σ cantidad` de sus
 /// aplicaciones; pagar de más se BLOQUEA en el dominio (anti-doble-pago duro). PK (idPago, idCargo).
 model PagoAplicacion {
-  idPago Int           @map("id_pago")
-  pago   PagoMaquilero @relation(fields: [idPago], references: [id], onDelete: Cascade)
-  idCargo Int       @map("id_cargo")
-  cargo   EsMaCargo @relation(fields: [idCargo], references: [id], onDelete: Restrict)
+  idPago  Int           @map("id_pago")
+  pago    PagoMaquilero @relation(fields: [idPago], references: [id], onDelete: Cascade)
+  idCargo Int           @map("id_cargo")
+  cargo   EsMaCargo     @relation(fields: [idCargo], references: [id], onDelete: Restrict)
 
   /// Prendas de este cargo cubiertas por el pago (>0, ≤ prendas por pagar del cargo). Decimal.
   cantidad Decimal @db.Decimal(14, 2)
@@ -4196,7 +4206,7 @@ model CostoOrden {
 
   /// Costo TOTAL de la orden = Σ de los GUARDADOS (doc 06 §3). Lo ARMA el dominio al
   /// guardar (nunca se edita a mano ni suma los teóricos). NULLABLE hasta el primer guardado.
-  costoTotal   Decimal? @map("costo_total") @db.Decimal(14, 2)
+  costoTotal Decimal? @map("costo_total") @db.Decimal(14, 2)
 
   /// Base de prorrateo del costo unitario (D2). Default `cortado` (= `CantCorte`).
   baseProrrateo BaseProrrateo @default(cortado) @map("base_prorrateo")
@@ -4210,4 +4220,113 @@ model CostoOrden {
 
   @@index([idEmpresa])
   @@map("costo_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Estado de Resultados (EDR) — F7-E2 (doc 06-Costos-y-EDR §4; DECISIONES.md D1/D2)
+//
+// El P&L mensual de la empresa, GENERADO automáticamente y valuado SIEMPRE a COSTO ACTUAL (D1):
+// el costo NUNCA se congela en la línea; se recalcula desde `CostoOrden` al leer. A diferencia de
+// otros módulos, el EDR es CONSOLIDADO (no se acota a la empresa activa): el encabezado `Edr` es
+// GLOBAL por mes y los cortes por empresa/cliente se DERIVAN de las líneas (D2 #6). Solo entran
+// empresas `paraEdr=true`; se excluyen órdenes `noCostear=true` (lo aplica el dominio).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Origen de una línea del EDR (F7-E2). `automatica` = propuesta por el generador desde las
+/// entregas a cliente del mes (se RECONCILIA en cada re-generación). `ajustada` = una automática
+/// que el usuario editó (precio/cantidad); ya NO se toca al re-generar. `manual` = línea capturada
+/// a mano (sin orden); tampoco se toca al re-generar.
+enum EdrOrigenLinea {
+  automatica
+  ajustada
+  manual
+
+  @@map("edr_origen_linea")
+}
+
+/// Encabezado GLOBAL del Estado de Resultados de un mes (F7-E2 — ex `EdoResult`, doc 06 §4). Uno
+/// por (año, mes): NO lleva `idEmpresa` (es consolidado; el corte por empresa se deriva de las
+/// líneas, D2 #6). Los gastos/intereses/bonificaciones/otros son GLOBALES del mes (D2 #6). Ventas y
+/// Costo se DERIVAN de las líneas al leer (nunca se persisten aquí).
+model Edr {
+  id   Int @id @default(autoincrement())
+  /// Año del estado de resultados (viejo: año de `EdoResult.Fecha`).
+  anio Int
+  /// Mes 1-12 del estado de resultados (viejo: mes de `EdoResult.Fecha`).
+  mes  Int
+
+  /// Gastos del mes (viejo: `EdoResult.Gastos`). Globales (D2 #6).
+  gastos         Decimal @default(0) @db.Decimal(14, 2)
+  /// Intereses del mes (viejo: `EdoResult.Intereses`).
+  intereses      Decimal @default(0) @db.Decimal(14, 2)
+  /// Bonificaciones del mes (viejo: `EdoResult.Bonificaciones`). SUMAN al resultado (doc 06 §4).
+  bonificaciones Decimal @default(0) @db.Decimal(14, 2)
+  /// Otros (± al resultado) + su descripción (viejo: `EdoResult.Otros`/`DescOtros`).
+  otros          Decimal @default(0) @db.Decimal(14, 2)
+  descOtros      String? @map("desc_otros")
+  observaciones  String? @db.Text
+
+  /// Líneas de venta del mes (una por orden vendida + manuales). Cascade: son del encabezado.
+  lineas EdrLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([anio, mes])
+  @@map("edr")
+}
+
+/// Renglón del EDR (F7-E2 — ex `EdoResultDet`, doc 06 §4): una venta del mes, por orden/modelo. El
+/// PRECIO manda de lo FACTURADO (D2 #5); mientras Finanzas/CFDI no exista, se PRE-PROPONE desde las
+/// entregas a cliente de F3 y el usuario ajusta a lo realmente facturado. El COSTO NO se guarda aquí
+/// (D1): se recalcula desde `CostoOrden` al leer. `@@unique([idEdr, idOrden])` ancla la idempotencia
+/// del generador (los NULL de las líneas manuales conviven, Postgres permite múltiples NULL).
+model EdrLinea {
+  id    Int @id @default(autoincrement())
+  idEdr Int @map("id_edr")
+  edr   Edr @relation(fields: [idEdr], references: [id], onDelete: Cascade)
+
+  /// Orden vendida (viejo: liga vía `EdoResultDet.IdCostoOrd`). NULL en líneas manuales. Restrict.
+  idOrden Int?   @map("id_orden")
+  orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Empresa de la línea (para el corte por empresa; solo `paraEdr=true`, lo valida el dominio).
+  idEmpresa   Int      @map("id_empresa")
+  empresa     Empresa  @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Cliente de la línea (para el corte por cliente). NULL solo en históricos sin cliente. Restrict.
+  idCliente   Int?     @map("id_cliente")
+  cliente     Cliente? @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  /// Modelo vendido (viejo: `EdoResultDet.ModeloC`). NULL en manuales sin modelo. Restrict.
+  idModelo    Int?     @map("id_modelo")
+  modelo      Modelo?  @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  /// Descripción libre para líneas manuales (viejo: no existía). NULL en automáticas.
+  descripcion String?
+
+  /// Cantidad vendida (viejo: `EdoResultDet.CantVendida`). En automáticas = Σ entregas del mes.
+  cantVendida Int     @map("cant_vendida")
+  /// Precio de venta FACTURADO por prenda (viejo: `EdoResultDet.PrecioVenta`). Editable (D2 #5).
+  precioVenta Decimal @map("precio_venta") @db.Decimal(14, 2)
+
+  /// Costo histórico congelado (viejo: `EdoResultDet.CostoViejo`). SOLO-INFORMATIVO: el EDR valúa a
+  /// costo ACTUAL (D1); esta columna la llena el ETL de E6 para conservar el dato histórico. NUNCA se
+  /// usa para el cálculo del resultado; nace NULL en toda línea generada por v2.
+  costoHistorico Decimal? @map("costo_historico") @db.Decimal(14, 2)
+
+  /// Origen de la línea (automática/ajustada/manual) — gobierna la reconciliación (ver enum).
+  origen EdrOrigenLinea @default(automatica)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEdr, idOrden])
+  @@index([idEdr])
+  @@index([idEmpresa])
+  @@index([idCliente])
+  @@index([idModelo])
+  @@index([idOrden])
+  @@map("edr_linea")
 }
