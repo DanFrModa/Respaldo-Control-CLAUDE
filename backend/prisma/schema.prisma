@@ -4330,3 +4330,31 @@ model EdrLinea {
   @@index([idOrden])
   @@map("edr_linea")
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INDICADORES · F7-E3 — Motor de KPIs en segundo plano (plan §11; doc 08 §4.4 /
+// doc 09 §5.3 / MEJORAS 03-WIP / D11). Los TABLEROS directivos se calculan sobre
+// VISTAS MATERIALIZADAS (SQL crudo en la migración `20260703140000_f7_e3_kpis`,
+// NO son modelos Prisma: se consultan por `$queryRaw`) que refresca un job de
+// pg-boss (`comun/jobs/refrescar-kpis.ts`). La CAPTURA nunca espera un recálculo:
+// las pantallas leen la vista ya materializada y muestran "datos al: <fecha>".
+// Esta tabla es el ÚNICO modelo Prisma del módulo: guarda ese timestamp.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Sello de la última actualización de las vistas materializadas de KPIs (F7-E3). Fila
+/// SINGLETON (`clave = "global"`, @unique): la estampa `refrescarKpis` tras refrescar las
+/// vistas; el API la devuelve como "datos al: <fecha/hora>" para que el usuario sepa qué
+/// tan frescos son los números. No lleva `idEmpresa`: el refresco es global (las vistas ya
+/// llevan la empresa por fila y el dominio filtra por la empresa activa, A9).
+model KpiRefresco {
+  id           Int      @id @default(autoincrement())
+  /// Clave del singleton (siempre "global"): ancla el upsert idempotente del job.
+  clave        String   @unique @default("global")
+  /// Momento en que terminó el último refresco de las vistas materializadas.
+  refrescadoEn DateTime @map("refrescado_en")
+
+  creadoEn     DateTime @default(now()) @map("creado_en")
+  modificadoEn DateTime @updatedAt @map("modificado_en")
+
+  @@map("kpi_refresco")
+}

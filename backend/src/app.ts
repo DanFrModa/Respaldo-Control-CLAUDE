@@ -23,6 +23,7 @@ import { rutasMrp } from './api/compras/mrp.rutas.js';
 import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
 import { rutasCostos } from './api/costos/costos.rutas.js';
 import { rutasEdr } from './api/edr/edr.rutas.js';
+import { rutasIndicadores } from './api/indicadores/indicadores.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
@@ -261,6 +262,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // (D2 #5), concilia el precio facturado, encabezado de gastos global (D2 #6) y cortes por empresa/
   // cliente. RBAC edr.ver/edr.capturar (mismos roles que costos). Impresos R9 (PDF mensual/anual, Excel).
   await app.register(rutasEdr, { prefix: '/api' });
+  // INDICADORES (Módulo Indicadores, F7-E3): tableros directivos calculados en SEGUNDO PLANO sobre
+  // vistas materializadas (KPIs de Ruta Crítica/D11, calidad por maquilero/F6, WIP analítico/F3). La
+  // captura NUNCA espera el recálculo (plan §11): /indicadores/refrescar solo encola el job. RBAC
+  // indicadores.ver (directivo/gerencial). Impresos R9 (PDF + Excel). Agregación en SQL (no en cliente).
+  await app.register(rutasIndicadores, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

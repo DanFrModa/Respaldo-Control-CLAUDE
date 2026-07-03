@@ -843,6 +843,24 @@ export {
   type EdrPorAnioSalida,
 } from './esquemas/edr.js';
 
+// ── Indicadores: tableros directivos calculados en segundo plano (Módulo Indicadores, F7-E3; plan §11) ──
+export {
+  esquemaKpisRcQuery,
+  esquemaKpisRc,
+  esquemaKpisCalidadQuery,
+  esquemaKpisCalidad,
+  esquemaKpisWipQuery,
+  esquemaKpisWip,
+  esquemaRefrescoEncolado,
+  type KpisRcQuery,
+  type KpisRc,
+  type KpisCalidadQuery,
+  type KpisCalidad,
+  type KpisWipQuery,
+  type KpisWip,
+  type RefrescoEncolado,
+} from './esquemas/indicadores.js';
+
 // ── Tablero WIP + existencias en poder del maquilero (F3-E5; doc 03-Produccion form Proceso/MaqExis) ──
 export {
   esquemaTableroWipQuery,

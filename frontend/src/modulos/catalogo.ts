@@ -863,10 +863,39 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
   {
     clave: 'indicadores',
     titulo: 'Indicadores',
-    descripcion: 'KPIs de entregas, tiempos y desempeño derivados de la Ruta Crítica',
+    descripcion: 'Tableros directivos: entregas a tiempo, calidad por maquilero y WIP analítico',
     ruta: '/indicadores',
     icono: 'grafica',
-    permisos: 'autenticado',
+    permisos: ['indicadores.ver'],
+  },
+  // Sub-vistas de Indicadores (F7-E3): 3 tableros directivos calculados en segundo plano (vistas
+  // materializadas). Todos `indicadores.ver`; el backend re-verifica el permiso (A1).
+  {
+    clave: 'indicadores-ruta-critica',
+    titulo: 'KPIs de Ruta Crítica',
+    descripcion: 'Entregas a tiempo, lead time, cuellos de botella y desempeño (PDF/Excel)',
+    ruta: '/indicadores/ruta-critica',
+    icono: 'ruta',
+    permisos: ['indicadores.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'indicadores-calidad',
+    titulo: 'Calidad por maquilero',
+    descripcion: '% de aprobación por maquilero, defectos top y tendencia (PDF/Excel)',
+    ruta: '/indicadores/calidad',
+    icono: 'medalla',
+    permisos: ['indicadores.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'indicadores-wip',
+    titulo: 'WIP analítico',
+    descripcion: 'Prendas atoradas por etapa y avance por orden (PDF/Excel)',
+    ruta: '/indicadores/wip',
+    icono: 'paquete',
+    permisos: ['indicadores.ver'],
+    subVista: true,
   },
   {
     clave: 'documental',
