@@ -21,6 +21,7 @@ import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
 import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
 import { rutasMrp } from './api/compras/mrp.rutas.js';
 import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
+import { rutasCostos } from './api/costos/costos.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
@@ -249,6 +250,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // apoyo. RBAC por ruta (calidad.generar-auditorias el alta; calidad.actualizar-auditorias la captura
   // y reclasificación; calidad.ver el detalle).
   await app.register(rutasAuditorias, { prefix: '/api' });
+  // COSTOS (Módulo 6, F7-E1): pre-costo por modelo + lista de precios (precostos.consultar), costo real
+  // por orden con doble juego teórico/guardado y base de prorrateo (costos.ver/.capturar), lista de
+  // costos y márgenes por pedido (costos.ver, fórmula D2). Impresos R9 (lista de precios PDF, márgenes
+  // PDF/Excel). Importes ocultos sin consultas.ver-importes. La regalía va sobre la venta, no en el costo.
+  await app.register(rutasCostos, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

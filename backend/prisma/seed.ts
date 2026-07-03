@@ -158,8 +158,10 @@ function definirRoles(): {
     'calidad.administrar-catalogo',
   );
 
-  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
-  const gerencial = sin(directivo, 'ordenes.ver-costos');
+  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 (F7-E1)
+  // eso son el botón legado de costos de la orden (`ordenes.ver-costos`) Y el módulo NUEVO de Costos
+  // (`costos.ver`/`costos.capturar`, menú 6). Conserva el PRE-COSTO (`precostos.consultar`, nivel ≤45).
+  const gerencial = sin(directivo, 'ordenes.ver-costos', 'costos.ver', 'costos.capturar');
 
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
   // en consultas Y en el módulo Pedidos (F2-E1: `pedidos.importes` oculta `precio`/totales,
@@ -177,6 +179,8 @@ function definirRoles(): {
     'ordenes.ver-precio-real-maquila',
     'ordenes.administrar',
     'ordenes.cancelar',
+    // Nivel 47 y abajo ya no acceden al pre-costo (era ≤45): Directivo/Gerencial/Ventas sí.
+    'precostos.consultar',
   );
 
   // Nivel 50 — Asistente: su única restricción extra era el MENÚ de catálogos de la RC

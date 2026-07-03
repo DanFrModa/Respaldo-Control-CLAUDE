@@ -72,6 +72,9 @@ describe('catálogo de permisos', () => {
       'compras.cancelar',
       'compras.recibir',
       'compras.ver',
+      // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
+      'costos.capturar',
+      'costos.ver',
       'empresas.administrar',
       // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
       'esma.cargo-validar',
@@ -102,6 +105,8 @@ describe('catálogo de permisos', () => {
       'pedidos.administrar',
       'pedidos.importes',
       'pedidos.ver',
+      // Pre-costo por modelo + lista de precios (Módulo 6, F7-E1, nivel ≤45).
+      'precostos.consultar',
       // Producción / WIP (Módulo 4, F3): corte/envío/recibo/entrega/wip-ver/cancelar (nuevos de v2).
       'produccion.cancelar',
       'produccion.corte',

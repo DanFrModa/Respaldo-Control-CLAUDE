@@ -33,7 +33,7 @@ Construir (F0–F9)     : ██████░░░░  F6 de 10 ✅ · F7 a F
 | **F4 · Compras / MRP** | 6 | ✅ COMPLETA (6/6, 22-jun-2026) |
 | **F5 · Ruta Crítica ⭐** | 7 | ✅ COMPLETA (7/7, 23-jun-2026) |
 | **F6 · Calidad + EsMa** | 6 | ✅ COMPLETA (6/6, 2-jul-2026) |
-| **F7 · Costos / EDR + Indicadores** | 6 | ⬜ |
+| **F7 · Costos / EDR + Indicadores** | 6 | 🟡 EN CURSO (E1 ✅, 3-jul-2026) |
 | **F8 · Finanzas (CxC/CxP + CFDI)** | 6 | ⬜ |
 | **F9 · Migración + Go-live** | 7 | ⬜ |
 
@@ -151,13 +151,13 @@ Cada fase tiene su **ficha completa** en `docs/hoja-de-ruta/F#-etapas.md`: por e
 | **F6-E5** | EsMa: estado de cuenta, saldos de todos, semanales, desglosado (Excel) + impreso R9 + vista móvil | 1 coder + 1 reviewer | ✅ **1-jul-2026** (reviewer APROBÓ; pend. commit/PR + verif. Gabriel) |
 | **F6-E6** | ETL Calidad + EsMa, reporte de cuadre v1 vs v2, docs y cierre de fase | 2 coders en paralelo + 1 reviewer | ✅ **2-jul-2026** (reviewer APROBÓ; pend. verif. Gabriel) · cierre de fase F6 |
 
-### F7 · Costos / EDR + Indicadores — ⬜ pendiente
+### F7 · Costos / EDR + Indicadores — 🟡 EN CURSO (1/6)
 
-**Salida:** Costos y tableros cuadran contra el cálculo manual. · **Ficha completa:** [`docs/hoja-de-ruta/F7-etapas.md`](docs/hoja-de-ruta/F7-etapas.md)
+**Salida:** Costos y tableros cuadran contra el cálculo manual. · **Ficha completa:** [`docs/hoja-de-ruta/F7-etapas.md`](docs/hoja-de-ruta/F7-etapas.md) · **Decisiones de negocio cerradas con Daniel (2026-07-02):** ver `DECISIONES.md` D2 (12 puntos) — regalía fuera del costo, redondeo del precio al alza, EDR desde facturación real, gastos globales, entrega-a-tiempo vs RC, 5S fuera, histórico de EDR no se migra.
 
 | Etapa | Qué entrega | Equipo | Estado |
 |---|---|---|---|
-| **F7-E1** | Motor de costeo: pre-costo, costo de orden y márgenes por pedido (D1) | 1 coder + 1 reviewer | ⬜ |
+| **F7-E1** | Motor de costeo: pre-costo, costo de orden y márgenes por pedido (D1) | 1 coder + 1 reviewer | ✅ **3-jul-2026** (reviewer APROBÓ; CI verde; pend. verif. Gabriel en prueba) |
 | **F7-E2** | EDR automatizado: generación desde entregas, conciliación, consultas | 1 coder + 1 reviewer | ⬜ |
 | **F7-E3** | Motor de KPIs en segundo plano (pg-boss) + tableros directivos (D11) | 1 coder + 1 reviewer (+1 coder opcional para páginas) | ⬜ |
 | **F7-E4** | Productividad unificada IP/Almacén + fichas confiables + muestrarios | 1 coder + 1 reviewer | ⬜ |

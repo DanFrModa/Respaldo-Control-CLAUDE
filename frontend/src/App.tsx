@@ -23,6 +23,12 @@ import { RecibosSemanalesEsMaPagina } from '@/modulos/esma/RecibosSemanalesEsMaP
 import { SaldosMaquilerosPagina } from '@/modulos/esma/SaldosMaquilerosPagina';
 import { ValidacionCargosPagina } from '@/modulos/esma/ValidacionCargosPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { CostosPagina } from '@/modulos/costos/CostosPagina';
+import { CosteoOrdenPagina } from '@/modulos/costos/CosteoOrdenPagina';
+import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
+import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
+import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
+import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
@@ -210,6 +216,15 @@ const router = createBrowserRouter([
           { path: 'calidad/auditorias', element: <ConsultaAuditoriasPagina /> },
           { path: 'calidad/auditorias/maquilero', element: <AuditoriasPorMaquileroPagina /> },
           { path: 'calidad/auditorias/:id', element: <CapturaAuditoriaPagina /> },
+          // Costos (Módulo 6, F7-E1): hub + pre-costo/lista de precios (precostos.consultar) y
+          // costeo de orden/lista de costos/márgenes (costos.ver/.capturar). Rutas estáticas antes
+          // del catch-all ":modulo".
+          { path: 'costos', element: <CostosPagina /> },
+          { path: 'costos/pre-costo', element: <PreCostoPagina /> },
+          { path: 'costos/lista-precios', element: <ListaPreciosPagina /> },
+          { path: 'costos/costeo', element: <CosteoOrdenPagina /> },
+          { path: 'costos/lista', element: <ListaCostosPagina /> },
+          { path: 'costos/margenes', element: <MargenesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
