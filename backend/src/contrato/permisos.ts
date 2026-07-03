@@ -643,6 +643,17 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Poder Accesar al form. (Meter la productividad de Almacen)',
     },
   },
+  // Tableros directivos de indicadores (Módulo Indicadores, F7-E3, A4) — permiso NUEVO de v2. Gobierna
+  // los 3 TABLEROS calculados en segundo plano (KPIs de Ruta Crítica/D11, calidad por maquilero/F6,
+  // WIP analítico/F3). Es de DIRECCIÓN/GERENCIA (los `indicadores.*` legado de arriba son CAPTURA de
+  // productividad/cíclicos, operativos): se reparte como los tableros directivos → Administrador,
+  // AdministracionDireccion, Directivo y Gerencial (a diferencia de `costos.ver`/`edr.ver`, que
+  // Gerencial NO tiene por ser financieros; estos KPIs no revelan costos ni precios).
+  {
+    clave: 'indicadores.ver',
+    modulo: 'indicadores',
+    descripcion: 'Consultar los tableros directivos de indicadores (Ruta Crítica, calidad y WIP)',
+  },
 
   // ── Consultas transversales ──────────────────────────────────────────────────
   {

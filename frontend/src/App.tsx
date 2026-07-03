@@ -34,6 +34,10 @@ import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
 import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
 import { EdrPorMesPagina } from '@/modulos/edr/EdrPorMesPagina';
 import { EdrPorAnioPagina } from '@/modulos/edr/EdrPorAnioPagina';
+import { IndicadoresPagina } from '@/modulos/indicadores/IndicadoresPagina';
+import { TableroRcPagina } from '@/modulos/indicadores/TableroRcPagina';
+import { TableroCalidadPagina } from '@/modulos/indicadores/TableroCalidadPagina';
+import { TableroWipPagina as TableroWipIndicadoresPagina } from '@/modulos/indicadores/TableroWipPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
@@ -237,6 +241,12 @@ const router = createBrowserRouter([
           { path: 'edr/conciliacion', element: <ConciliacionPagina /> },
           { path: 'edr/por-mes', element: <EdrPorMesPagina /> },
           { path: 'edr/por-anio', element: <EdrPorAnioPagina /> },
+          // Indicadores (Módulo Indicadores, F7-E3): hub + 3 tableros directivos (RC, calidad, WIP),
+          // todos `indicadores.ver`. Rutas estáticas antes del catch-all ":modulo".
+          { path: 'indicadores', element: <IndicadoresPagina /> },
+          { path: 'indicadores/ruta-critica', element: <TableroRcPagina /> },
+          { path: 'indicadores/calidad', element: <TableroCalidadPagina /> },
+          { path: 'indicadores/wip', element: <TableroWipIndicadoresPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

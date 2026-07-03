@@ -4,6 +4,7 @@ import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
 import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
 import { registrarAutoAvanceRc } from './dominio/ruta-critica/autoAvance.js';
 import { registrarBarridoRiesgoRc } from './comun/jobs/riesgo-rc.js';
+import { registrarRefrescoKpis } from './comun/jobs/refrescar-kpis.js';
 
 /**
  * Punto de entrada del servicio de API.
@@ -56,6 +57,14 @@ await iniciarMotorJobs((mensaje, error) => {
 // inactivo (tests/CI). Best-effort: si fallan, la app sigue (el job se puede re-disparar).
 await registrarHandlerCpm();
 await registrarBarridoRiesgoRc((mensaje, error) => {
+  app.log.error({ error }, mensaje);
+});
+
+// Registra el REFRESCO recurrente de las VISTAS MATERIALIZADAS de KPIs (F7-E3): worker de la cola
+// `kpi-refrescar` (lo consumen el cron y los envíos on-demand del endpoint /indicadores/refrescar) +
+// schedule cron. La captura NUNCA espera el recálculo (plan §11). NO-OP si el motor está inactivo
+// (tests/CI). Best-effort: si falla, la app sigue (el refresco se puede re-disparar).
+await registrarRefrescoKpis((mensaje, error) => {
   app.log.error({ error }, mensaje);
 });
 

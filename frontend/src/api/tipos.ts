@@ -1214,3 +1214,36 @@ export type EdrLineaAjustar =
   paths['/api/edr/lineas/{idLinea}']['put']['requestBody']['content']['application/json'];
 /** Origen de una línea del EDR. */
 export type EdrOrigenLinea = EdrLinea['origen'];
+
+// ── Indicadores: tableros directivos (Módulo Indicadores, F7-E3) ──────────────
+/** Tablero de KPIs de Ruta Crítica (`GET /api/indicadores/rc`). */
+export type KpisRc =
+  paths['/api/indicadores/rc']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero de Ruta Crítica (querystring). */
+export type KpisRcQuery = NonNullable<paths['/api/indicadores/rc']['get']['parameters']['query']>;
+/** Un renglón de lead time por proceso. */
+export type LeadTimeProceso = KpisRc['leadTime'][number];
+/** Un renglón de cuello de botella. */
+export type CuelloBotella = KpisRc['cuellosBotella'][number];
+/** Un renglón de desempeño por responsable. */
+export type DesempenoResponsable = KpisRc['desempeno'][number];
+/** Un punto de la tendencia de la RC. */
+export type TendenciaRc = KpisRc['tendencia'][number];
+/** Tablero de calidad por maquilero (`GET /api/indicadores/calidad-maquileros`). */
+export type KpisCalidad =
+  paths['/api/indicadores/calidad-maquileros']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero de calidad (querystring). */
+export type KpisCalidadQuery = NonNullable<
+  paths['/api/indicadores/calidad-maquileros']['get']['parameters']['query']
+>;
+/** Un renglón de aprobación por maquilero. */
+export type CalidadMaquilero = KpisCalidad['maquileros'][number];
+/** Un defecto top. */
+export type DefectoTop = KpisCalidad['defectosTop'][number];
+/** Tablero WIP analítico (`GET /api/indicadores/wip`). */
+export type KpisWip =
+  paths['/api/indicadores/wip']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero WIP (querystring). */
+export type KpisWipQuery = NonNullable<paths['/api/indicadores/wip']['get']['parameters']['query']>;
+/** Una orden del tablero WIP. */
+export type WipKpiFila = KpisWip['datos'][number];

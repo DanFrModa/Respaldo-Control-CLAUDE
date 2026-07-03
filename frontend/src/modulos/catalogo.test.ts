@@ -40,13 +40,15 @@ describe('catalogo de modulos del menu', () => {
     // Costos deja de ser "autenticado": ahora lo gobiernan `precostos.consultar`/`costos.ver`.
     // F7-E2: +1 módulo EDR (`edr.ver`) → 14 planeados, +4 sub-vistas del EDR (gestión del mes con
     // `edr.capturar`; conciliación, por mes y por año con `edr.ver`) = 66 sub-vistas → 80 entradas.
+    // F7-E3: el módulo Indicadores deja de ser "autenticado" (ahora `indicadores.ver`) y suma 3
+    // sub-vistas (RC, calidad y WIP, todas con `indicadores.ver`) = 69 sub-vistas → 83 entradas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(14);
-    expect(MODULOS_MENU).toHaveLength(80);
+    expect(MODULOS_MENU).toHaveLength(83);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(80);
+    expect(new Set(claves).size).toBe(83);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(80);
+    expect(new Set(rutas).size).toBe(83);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -74,8 +76,8 @@ describe('catalogo de modulos del menu', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver), Pedidos
     // (pedidos.ver, F2-E1) y Órdenes (ordenes.ver, F2-E3) NO son "autenticado"; Calidad
-    // (calidad.ver, F6-E1) y Costos (precostos.consultar/costos.ver, F7-E1) tampoco; el resto sí
-    // -> 8 visibles sin permisos.
+    // (calidad.ver, F6-E1), Costos (precostos.consultar/costos.ver, F7-E1) e Indicadores
+    // (indicadores.ver, F7-E3) tampoco; el resto sí -> 7 visibles sin permisos.
     expect(visibles.map((m) => m.clave)).not.toContain('administracion');
     expect(visibles.map((m) => m.clave)).not.toContain('modelos');
     expect(visibles.map((m) => m.clave)).not.toContain('galeria-modelos');
@@ -84,7 +86,8 @@ describe('catalogo de modulos del menu', () => {
     expect(visibles.map((m) => m.clave)).not.toContain('ordenes');
     expect(visibles.map((m) => m.clave)).not.toContain('calidad');
     expect(visibles.map((m) => m.clave)).not.toContain('costos');
-    expect(visibles).toHaveLength(8);
+    expect(visibles.map((m) => m.clave)).not.toContain('indicadores');
+    expect(visibles).toHaveLength(7);
   });
 
   it('oculta Administracion sin un permiso administrativo', () => {
@@ -142,7 +145,9 @@ describe('catalogo de modulos del menu', () => {
     // ya no es "autenticado").
     // F7-E1: el módulo Costos requiere `precostos.consultar`/`costos.ver` (no en este set) y sus 5
     // sub-vistas también → Costos ya no cuenta (antes era "autenticado") → 38 baja a 37.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(37);
+    // F7-E3: el módulo Indicadores requiere `indicadores.ver` (no en este set) y sus 3 sub-vistas
+    // también → Indicadores ya no cuenta (antes era "autenticado") → 37 baja a 36.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(36);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {

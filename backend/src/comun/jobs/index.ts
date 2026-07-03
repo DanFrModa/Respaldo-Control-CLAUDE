@@ -34,6 +34,13 @@ export const COLAS_JOBS = {
    * el bootstrap con `schedule` (pg-boss); el handler vive en `comun/jobs/riesgo-rc.ts`.
    */
   barridoRiesgoRc: 'rc-barrido-riesgo',
+  /**
+   * REFRESCO de las VISTAS MATERIALIZADAS de KPIs (F7-E3, plan §11): recalcula los tableros
+   * directivos (entregas a tiempo, lead time, cuellos, desempeño, calidad, WIP) SIN que la captura
+   * espere. Lo programa el bootstrap con `schedule` (cron) y lo dispara on-demand el endpoint
+   * `POST /api/indicadores/refrescar`. El handler vive en `comun/jobs/refrescar-kpis.ts`.
+   */
+  refrescarKpis: 'kpi-refrescar',
 } as const;
 
 /** Nombre válido de cola de jobs. */

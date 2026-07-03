@@ -174,7 +174,9 @@ function definirRoles(): {
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
   // en consultas Y en el módulo Pedidos (F2-E1: `pedidos.importes` oculta `precio`/totales,
   // doc 02-Pedidos §3). Ventas SÍ captura pedidos (alta/edición), solo no ve los importes.
-  const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes');
+  // Los TABLEROS directivos de indicadores (F7-E3, `indicadores.ver`) son de DIRECCIÓN/GERENCIA →
+  // se cortan aquí (los conservan Administrador, AdministracionDireccion, Directivo y Gerencial).
+  const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes', 'indicadores.ver');
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera
   // modificar órdenes y los precios de maquila (importes de la orden). En v2 (F2-E2) "no

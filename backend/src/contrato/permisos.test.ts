@@ -83,6 +83,8 @@ describe('catálogo de permisos', () => {
       'esma.cargo-validar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Indicadores (Módulo Indicadores, F7-E3): tableros directivos (RC/calidad/WIP) — nuevo de v2.
+      'indicadores.ver',
       // Inventario de avíos por kardex (Módulo 4, F4-E1, R4): ver/mover (nuevos de v2).
       'inventario-avios.mover',
       'inventario-avios.ver',
