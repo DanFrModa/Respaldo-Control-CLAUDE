@@ -1174,3 +1174,43 @@ export type MargenPedidoFila = Margenes['filas'][number];
 export type MargenesQuery = NonNullable<
   paths['/api/costos/margenes-por-pedido']['get']['parameters']['query']
 >;
+
+// ── EDR: Estado de Resultados (Módulo 6, F7-E2) ───────────────────────────────
+/** EDR calculado de un mes (`GET /api/edr/{id}`). */
+export type EdrCalculado =
+  paths['/api/edr/{id}']['get']['responses']['200']['content']['application/json'];
+/** Encabezado global del mes. */
+export type EdrEncabezado = EdrCalculado['encabezado'];
+/** Un corte del EDR (por empresa o cliente). */
+export type EdrCorte = EdrCalculado['cortesEmpresa'][number];
+/** EDR de un mes o indicador de que no existe (`GET /api/edr/por-mes`). */
+export type EdrPorMes =
+  paths['/api/edr/por-mes']['get']['responses']['200']['content']['application/json'];
+/** Comparativo anual del EDR (`GET /api/edr/por-anio`). */
+export type EdrPorAnio =
+  paths['/api/edr/por-anio']['get']['responses']['200']['content']['application/json'];
+/** Un mes del comparativo anual. */
+export type EdrPorAnioMes = EdrPorAnio['meses'][number];
+/** Conciliación de líneas del EDR (`GET /api/edr/{id}/lineas`). */
+export type EdrLineas =
+  paths['/api/edr/{id}/lineas']['get']['responses']['200']['content']['application/json'];
+/** Una línea del EDR con su costo actual. */
+export type EdrLinea = EdrLineas['lineas'][number];
+/** Filtros de la conciliación de líneas. */
+export type EdrLineasQuery = NonNullable<
+  paths['/api/edr/{id}/lineas']['get']['parameters']['query']
+>;
+/** Cuerpo para generar/reconciliar el EDR de un mes (`POST /api/edr/generar`). */
+export type EdrGenerar =
+  paths['/api/edr/generar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo para actualizar el encabezado del mes (`PUT /api/edr/{id}`). */
+export type EdrEncabezadoCuerpo =
+  paths['/api/edr/{id}']['put']['requestBody']['content']['application/json'];
+/** Cuerpo para agregar una línea manual (`POST /api/edr/{id}/lineas`). */
+export type EdrLineaManual =
+  paths['/api/edr/{id}/lineas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo para ajustar una línea (`PUT /api/edr/lineas/{idLinea}`). */
+export type EdrLineaAjustar =
+  paths['/api/edr/lineas/{idLinea}']['put']['requestBody']['content']['application/json'];
+/** Origen de una línea del EDR. */
+export type EdrOrigenLinea = EdrLinea['origen'];

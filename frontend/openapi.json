@@ -141,6 +141,8 @@
                           "costos.ver",
                           "costos.capturar",
                           "precostos.consultar",
+                          "edr.ver",
+                          "edr.capturar",
                           "usuarios.administrar",
                           "roles.administrar",
                           "admin.ver-bitacora",
@@ -114205,6 +114207,4090 @@
             "name": "idCliente",
             "required": false,
             "description": "Filtra por cliente."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/generar": {
+      "post": {
+        "summary": "Genera (o reconcilia) el EDR de un mes desde las entregas a cliente",
+        "tags": [
+          "edr"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "anio": {
+                    "type": "integer",
+                    "minimum": 2000,
+                    "maximum": 2100,
+                    "description": "Año del EDR."
+                  },
+                  "mes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 12,
+                    "description": "Mes del EDR (1-12)."
+                  }
+                },
+                "required": [
+                  "anio",
+                  "mes"
+                ],
+                "description": "Periodo (año/mes) a generar/reconciliar."
+              }
+            }
+          },
+          "description": "Periodo (año/mes) a generar/reconciliar."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EDR calculado de un mes (a costo actual).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "encabezado": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del EDR."
+                        },
+                        "anio": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Año."
+                        },
+                        "mes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Mes 1-12."
+                        },
+                        "gastos": {
+                          "type": "number",
+                          "description": "Gastos del mes."
+                        },
+                        "intereses": {
+                          "type": "number",
+                          "description": "Intereses del mes."
+                        },
+                        "bonificaciones": {
+                          "type": "number",
+                          "description": "Bonificaciones del mes (SUMAN)."
+                        },
+                        "otros": {
+                          "type": "number",
+                          "description": "Otros (± al resultado)."
+                        },
+                        "descOtros": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Descripción de otros."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones."
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "description": "Alta (ISO)."
+                        },
+                        "modificadoEn": {
+                          "type": "string",
+                          "description": "Última modificación (ISO)."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "anio",
+                        "mes",
+                        "gastos",
+                        "intereses",
+                        "bonificaciones",
+                        "otros",
+                        "descOtros",
+                        "observaciones",
+                        "creadoEn",
+                        "modificadoEn"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Encabezado global del mes."
+                    },
+                    "ventas": {
+                      "type": "number",
+                      "description": "Σ(cantVendida × precioVenta) de todas las líneas."
+                    },
+                    "costo": {
+                      "type": "number",
+                      "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
+                    },
+                    "gastos": {
+                      "type": "number",
+                      "description": "Gastos del mes (del encabezado)."
+                    },
+                    "intereses": {
+                      "type": "number",
+                      "description": "Intereses del mes."
+                    },
+                    "bonificaciones": {
+                      "type": "number",
+                      "description": "Bonificaciones del mes (SUMAN)."
+                    },
+                    "otros": {
+                      "type": "number",
+                      "description": "Otros (± al resultado)."
+                    },
+                    "resultado": {
+                      "type": "number",
+                      "description": "Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ cantVendida de las líneas."
+                    },
+                    "totalLineas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Número de líneas del mes."
+                    },
+                    "lineasSinCosto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas líneas quedaron sin costo (a revisar)."
+                    },
+                    "cortesEmpresa": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la empresa o cliente."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la empresa o cliente."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del corte."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del corte."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo (sin gastos globales)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte del EDR por empresa o por cliente."
+                      },
+                      "description": "Corte por empresa."
+                    },
+                    "cortesCliente": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la empresa o cliente."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la empresa o cliente."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del corte."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del corte."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo (sin gastos globales)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte del EDR por empresa o por cliente."
+                      },
+                      "description": "Corte por cliente."
+                    }
+                  },
+                  "required": [
+                    "encabezado",
+                    "ventas",
+                    "costo",
+                    "gastos",
+                    "intereses",
+                    "bonificaciones",
+                    "otros",
+                    "resultado",
+                    "totalPiezas",
+                    "totalLineas",
+                    "lineasSinCosto",
+                    "cortesEmpresa",
+                    "cortesCliente"
+                  ],
+                  "additionalProperties": false,
+                  "description": "EDR calculado de un mes (a costo actual)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/por-mes": {
+      "get": {
+        "summary": "EDR de un mes (o existe:false si aún no se genera)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "anio",
+            "required": true,
+            "description": "Año."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "in": "query",
+            "name": "mes",
+            "required": true,
+            "description": "Mes 1-12."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EDR de un mes (o indicador de que no existe).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "existe": {
+                      "type": "boolean",
+                      "description": "¿Ya se generó el EDR de este mes?"
+                    },
+                    "anio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Año consultado."
+                    },
+                    "mes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Mes consultado."
+                    },
+                    "edr": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "encabezado": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del EDR."
+                                },
+                                "anio": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Año."
+                                },
+                                "mes": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Mes 1-12."
+                                },
+                                "gastos": {
+                                  "type": "number",
+                                  "description": "Gastos del mes."
+                                },
+                                "intereses": {
+                                  "type": "number",
+                                  "description": "Intereses del mes."
+                                },
+                                "bonificaciones": {
+                                  "type": "number",
+                                  "description": "Bonificaciones del mes (SUMAN)."
+                                },
+                                "otros": {
+                                  "type": "number",
+                                  "description": "Otros (± al resultado)."
+                                },
+                                "descOtros": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Descripción de otros."
+                                },
+                                "observaciones": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Observaciones."
+                                },
+                                "creadoEn": {
+                                  "type": "string",
+                                  "description": "Alta (ISO)."
+                                },
+                                "modificadoEn": {
+                                  "type": "string",
+                                  "description": "Última modificación (ISO)."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "anio",
+                                "mes",
+                                "gastos",
+                                "intereses",
+                                "bonificaciones",
+                                "otros",
+                                "descOtros",
+                                "observaciones",
+                                "creadoEn",
+                                "modificadoEn"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Encabezado global del mes."
+                            },
+                            "ventas": {
+                              "type": "number",
+                              "description": "Σ(cantVendida × precioVenta) de todas las líneas."
+                            },
+                            "costo": {
+                              "type": "number",
+                              "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
+                            },
+                            "gastos": {
+                              "type": "number",
+                              "description": "Gastos del mes (del encabezado)."
+                            },
+                            "intereses": {
+                              "type": "number",
+                              "description": "Intereses del mes."
+                            },
+                            "bonificaciones": {
+                              "type": "number",
+                              "description": "Bonificaciones del mes (SUMAN)."
+                            },
+                            "otros": {
+                              "type": "number",
+                              "description": "Otros (± al resultado)."
+                            },
+                            "resultado": {
+                              "type": "number",
+                              "description": "Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros."
+                            },
+                            "totalPiezas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Σ cantVendida de las líneas."
+                            },
+                            "totalLineas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Número de líneas del mes."
+                            },
+                            "lineasSinCosto": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántas líneas quedaron sin costo (a revisar)."
+                            },
+                            "cortesEmpresa": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Id de la empresa o cliente."
+                                  },
+                                  "nombre": {
+                                    "type": "string",
+                                    "description": "Nombre de la empresa o cliente."
+                                  },
+                                  "ventas": {
+                                    "type": "number",
+                                    "description": "Ventas del corte."
+                                  },
+                                  "costo": {
+                                    "type": "number",
+                                    "description": "Costo (actual) del corte."
+                                  },
+                                  "utilidadBruta": {
+                                    "type": "number",
+                                    "description": "Ventas − Costo (sin gastos globales)."
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "nombre",
+                                  "ventas",
+                                  "costo",
+                                  "utilidadBruta"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Corte del EDR por empresa o por cliente."
+                              },
+                              "description": "Corte por empresa."
+                            },
+                            "cortesCliente": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Id de la empresa o cliente."
+                                  },
+                                  "nombre": {
+                                    "type": "string",
+                                    "description": "Nombre de la empresa o cliente."
+                                  },
+                                  "ventas": {
+                                    "type": "number",
+                                    "description": "Ventas del corte."
+                                  },
+                                  "costo": {
+                                    "type": "number",
+                                    "description": "Costo (actual) del corte."
+                                  },
+                                  "utilidadBruta": {
+                                    "type": "number",
+                                    "description": "Ventas − Costo (sin gastos globales)."
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "nombre",
+                                  "ventas",
+                                  "costo",
+                                  "utilidadBruta"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Corte del EDR por empresa o por cliente."
+                              },
+                              "description": "Corte por cliente."
+                            }
+                          },
+                          "required": [
+                            "encabezado",
+                            "ventas",
+                            "costo",
+                            "gastos",
+                            "intereses",
+                            "bonificaciones",
+                            "otros",
+                            "resultado",
+                            "totalPiezas",
+                            "totalLineas",
+                            "lineasSinCosto",
+                            "cortesEmpresa",
+                            "cortesCliente"
+                          ],
+                          "additionalProperties": false,
+                          "description": "EDR calculado de un mes (a costo actual)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "EDR calculado (null si no existe)."
+                    }
+                  },
+                  "required": [
+                    "existe",
+                    "anio",
+                    "mes",
+                    "edr"
+                  ],
+                  "additionalProperties": false,
+                  "description": "EDR de un mes (o indicador de que no existe)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/por-anio": {
+      "get": {
+        "summary": "Comparativo mensual del EDR de un año (con corte por empresa)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "anio",
+            "required": true,
+            "description": "Año."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comparativo anual del EDR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "anio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Año."
+                    },
+                    "meses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "mes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Mes 1-12."
+                          },
+                          "idEdr": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del EDR de ese mes."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del mes."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del mes."
+                          },
+                          "gastos": {
+                            "type": "number",
+                            "description": "Gastos del mes."
+                          },
+                          "intereses": {
+                            "type": "number",
+                            "description": "Intereses del mes."
+                          },
+                          "bonificaciones": {
+                            "type": "number",
+                            "description": "Bonificaciones del mes."
+                          },
+                          "otros": {
+                            "type": "number",
+                            "description": "Otros del mes."
+                          },
+                          "resultado": {
+                            "type": "number",
+                            "description": "Resultado del mes."
+                          }
+                        },
+                        "required": [
+                          "mes",
+                          "idEdr",
+                          "ventas",
+                          "costo",
+                          "gastos",
+                          "intereses",
+                          "bonificaciones",
+                          "otros",
+                          "resultado"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un mes del comparativo anual del EDR."
+                      },
+                      "description": "Los meses del año que ya tienen EDR."
+                    },
+                    "porEmpresa": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idEmpresa": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Empresa."
+                          },
+                          "empresa": {
+                            "type": "string",
+                            "description": "Nombre de la empresa."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del año."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo del año."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo del año."
+                          }
+                        },
+                        "required": [
+                          "idEmpresa",
+                          "empresa",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte anual por empresa."
+                      },
+                      "description": "Corte anual por empresa."
+                    },
+                    "totalVentas": {
+                      "type": "number",
+                      "description": "Σ ventas del año."
+                    },
+                    "totalCosto": {
+                      "type": "number",
+                      "description": "Σ costo del año."
+                    },
+                    "totalResultado": {
+                      "type": "number",
+                      "description": "Σ resultado del año."
+                    }
+                  },
+                  "required": [
+                    "anio",
+                    "meses",
+                    "porEmpresa",
+                    "totalVentas",
+                    "totalCosto",
+                    "totalResultado"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Comparativo anual del EDR."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/por-anio/impreso": {
+      "get": {
+        "summary": "EDR anual en PDF (R9)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "anio",
+            "required": true,
+            "description": "Año."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/lineas/{idLinea}": {
+      "put": {
+        "summary": "Ajusta la cantidad/precio facturado de una línea (marca ajustada)",
+        "tags": [
+          "edr"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cantVendida": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cantidad vendida (≥0)."
+                  },
+                  "precioVenta": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Precio de venta FACTURADO por prenda (≥0)."
+                  }
+                },
+                "required": [
+                  "cantVendida",
+                  "precioVenta"
+                ],
+                "description": "Ajuste de la cantidad/precio facturado de una línea del EDR."
+              }
+            }
+          },
+          "description": "Ajuste de la cantidad/precio facturado de una línea del EDR."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id de la línea del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Una línea del EDR con su costo actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la línea."
+                    },
+                    "idEdr": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del EDR al que pertenece."
+                    },
+                    "idOrden": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Orden vendida (null en manuales)."
+                    },
+                    "folioOrden": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio de la orden (null en manuales)."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa de la línea."
+                    },
+                    "empresa": {
+                      "type": "string",
+                      "description": "Nombre de la empresa."
+                    },
+                    "idCliente": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cliente de la línea."
+                    },
+                    "cliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del cliente."
+                    },
+                    "idModelo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo vendido."
+                    },
+                    "modelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción (líneas manuales)."
+                    },
+                    "cantVendida": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad vendida."
+                    },
+                    "precioVenta": {
+                      "type": "number",
+                      "description": "Precio de venta facturado por prenda."
+                    },
+                    "importe": {
+                      "type": "number",
+                      "description": "cantVendida × precioVenta."
+                    },
+                    "costoUnitActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario ACTUAL (o null si la línea no tiene costo)."
+                    },
+                    "costoActual": {
+                      "type": "number",
+                      "description": "Costo total actual de la línea (0 si sin costo)."
+                    },
+                    "sinCosto": {
+                      "type": "boolean",
+                      "description": "true si la línea no tiene costo (sin orden/CostoOrden)."
+                    },
+                    "costoHistorico": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo histórico congelado (solo ETL E6)."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "automatica",
+                        "ajustada",
+                        "manual"
+                      ],
+                      "description": "Origen de la línea."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idEdr",
+                    "idOrden",
+                    "folioOrden",
+                    "idEmpresa",
+                    "empresa",
+                    "idCliente",
+                    "cliente",
+                    "idModelo",
+                    "modelo",
+                    "descripcion",
+                    "cantVendida",
+                    "precioVenta",
+                    "importe",
+                    "costoUnitActual",
+                    "costoActual",
+                    "sinCosto",
+                    "costoHistorico",
+                    "origen"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Una línea del EDR con su costo actual."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Elimina una línea manual (rechaza automáticas/ajustadas)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id de la línea del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de la eliminación.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eliminada": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "eliminada"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de la eliminación."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/{id}": {
+      "get": {
+        "summary": "EDR calculado (encabezado + totales a costo actual + cortes)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EDR calculado de un mes (a costo actual).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "encabezado": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del EDR."
+                        },
+                        "anio": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Año."
+                        },
+                        "mes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Mes 1-12."
+                        },
+                        "gastos": {
+                          "type": "number",
+                          "description": "Gastos del mes."
+                        },
+                        "intereses": {
+                          "type": "number",
+                          "description": "Intereses del mes."
+                        },
+                        "bonificaciones": {
+                          "type": "number",
+                          "description": "Bonificaciones del mes (SUMAN)."
+                        },
+                        "otros": {
+                          "type": "number",
+                          "description": "Otros (± al resultado)."
+                        },
+                        "descOtros": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Descripción de otros."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones."
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "description": "Alta (ISO)."
+                        },
+                        "modificadoEn": {
+                          "type": "string",
+                          "description": "Última modificación (ISO)."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "anio",
+                        "mes",
+                        "gastos",
+                        "intereses",
+                        "bonificaciones",
+                        "otros",
+                        "descOtros",
+                        "observaciones",
+                        "creadoEn",
+                        "modificadoEn"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Encabezado global del mes."
+                    },
+                    "ventas": {
+                      "type": "number",
+                      "description": "Σ(cantVendida × precioVenta) de todas las líneas."
+                    },
+                    "costo": {
+                      "type": "number",
+                      "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
+                    },
+                    "gastos": {
+                      "type": "number",
+                      "description": "Gastos del mes (del encabezado)."
+                    },
+                    "intereses": {
+                      "type": "number",
+                      "description": "Intereses del mes."
+                    },
+                    "bonificaciones": {
+                      "type": "number",
+                      "description": "Bonificaciones del mes (SUMAN)."
+                    },
+                    "otros": {
+                      "type": "number",
+                      "description": "Otros (± al resultado)."
+                    },
+                    "resultado": {
+                      "type": "number",
+                      "description": "Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ cantVendida de las líneas."
+                    },
+                    "totalLineas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Número de líneas del mes."
+                    },
+                    "lineasSinCosto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas líneas quedaron sin costo (a revisar)."
+                    },
+                    "cortesEmpresa": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la empresa o cliente."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la empresa o cliente."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del corte."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del corte."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo (sin gastos globales)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte del EDR por empresa o por cliente."
+                      },
+                      "description": "Corte por empresa."
+                    },
+                    "cortesCliente": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la empresa o cliente."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la empresa o cliente."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del corte."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del corte."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo (sin gastos globales)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte del EDR por empresa o por cliente."
+                      },
+                      "description": "Corte por cliente."
+                    }
+                  },
+                  "required": [
+                    "encabezado",
+                    "ventas",
+                    "costo",
+                    "gastos",
+                    "intereses",
+                    "bonificaciones",
+                    "otros",
+                    "resultado",
+                    "totalPiezas",
+                    "totalLineas",
+                    "lineasSinCosto",
+                    "cortesEmpresa",
+                    "cortesCliente"
+                  ],
+                  "additionalProperties": false,
+                  "description": "EDR calculado de un mes (a costo actual)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Actualiza el encabezado global del mes (gastos/intereses/…)",
+        "tags": [
+          "edr"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gastos": {
+                    "description": "Gastos del mes (≥0).",
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "intereses": {
+                    "description": "Intereses del mes (≥0).",
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "bonificaciones": {
+                    "description": "Bonificaciones del mes (≥0, SUMAN).",
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "otros": {
+                    "description": "Otros (± al resultado; puede ser negativo).",
+                    "type": "number"
+                  },
+                  "descOtros": {
+                    "description": "Descripción de otros.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "observaciones": {
+                    "description": "Observaciones.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 1000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "description": "Campos del encabezado global del EDR del mes (todo opcional)."
+              }
+            }
+          },
+          "description": "Campos del encabezado global del EDR del mes (todo opcional)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "EDR calculado de un mes (a costo actual).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "encabezado": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del EDR."
+                        },
+                        "anio": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Año."
+                        },
+                        "mes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Mes 1-12."
+                        },
+                        "gastos": {
+                          "type": "number",
+                          "description": "Gastos del mes."
+                        },
+                        "intereses": {
+                          "type": "number",
+                          "description": "Intereses del mes."
+                        },
+                        "bonificaciones": {
+                          "type": "number",
+                          "description": "Bonificaciones del mes (SUMAN)."
+                        },
+                        "otros": {
+                          "type": "number",
+                          "description": "Otros (± al resultado)."
+                        },
+                        "descOtros": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Descripción de otros."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones."
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "description": "Alta (ISO)."
+                        },
+                        "modificadoEn": {
+                          "type": "string",
+                          "description": "Última modificación (ISO)."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "anio",
+                        "mes",
+                        "gastos",
+                        "intereses",
+                        "bonificaciones",
+                        "otros",
+                        "descOtros",
+                        "observaciones",
+                        "creadoEn",
+                        "modificadoEn"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Encabezado global del mes."
+                    },
+                    "ventas": {
+                      "type": "number",
+                      "description": "Σ(cantVendida × precioVenta) de todas las líneas."
+                    },
+                    "costo": {
+                      "type": "number",
+                      "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
+                    },
+                    "gastos": {
+                      "type": "number",
+                      "description": "Gastos del mes (del encabezado)."
+                    },
+                    "intereses": {
+                      "type": "number",
+                      "description": "Intereses del mes."
+                    },
+                    "bonificaciones": {
+                      "type": "number",
+                      "description": "Bonificaciones del mes (SUMAN)."
+                    },
+                    "otros": {
+                      "type": "number",
+                      "description": "Otros (± al resultado)."
+                    },
+                    "resultado": {
+                      "type": "number",
+                      "description": "Ventas − Costo − Gastos − Intereses + Bonificaciones + Otros."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ cantVendida de las líneas."
+                    },
+                    "totalLineas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Número de líneas del mes."
+                    },
+                    "lineasSinCosto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas líneas quedaron sin costo (a revisar)."
+                    },
+                    "cortesEmpresa": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la empresa o cliente."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la empresa o cliente."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del corte."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del corte."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo (sin gastos globales)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte del EDR por empresa o por cliente."
+                      },
+                      "description": "Corte por empresa."
+                    },
+                    "cortesCliente": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la empresa o cliente."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre de la empresa o cliente."
+                          },
+                          "ventas": {
+                            "type": "number",
+                            "description": "Ventas del corte."
+                          },
+                          "costo": {
+                            "type": "number",
+                            "description": "Costo (actual) del corte."
+                          },
+                          "utilidadBruta": {
+                            "type": "number",
+                            "description": "Ventas − Costo (sin gastos globales)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "nombre",
+                          "ventas",
+                          "costo",
+                          "utilidadBruta"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Corte del EDR por empresa o por cliente."
+                      },
+                      "description": "Corte por cliente."
+                    }
+                  },
+                  "required": [
+                    "encabezado",
+                    "ventas",
+                    "costo",
+                    "gastos",
+                    "intereses",
+                    "bonificaciones",
+                    "otros",
+                    "resultado",
+                    "totalPiezas",
+                    "totalLineas",
+                    "lineasSinCosto",
+                    "cortesEmpresa",
+                    "cortesCliente"
+                  ],
+                  "additionalProperties": false,
+                  "description": "EDR calculado de un mes (a costo actual)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/{id}/lineas": {
+      "get": {
+        "summary": "Conciliación de líneas del EDR (a costo actual, filtrable)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idEmpresa",
+            "required": false,
+            "description": "Filtra por empresa."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCliente",
+            "required": false,
+            "description": "Filtra por cliente."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idModelo",
+            "required": false,
+            "description": "Filtra por modelo."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "automatica",
+                "ajustada",
+                "manual"
+              ]
+            },
+            "in": "query",
+            "name": "origen",
+            "required": false,
+            "description": "Filtra por origen de la línea."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conciliación de las líneas del EDR de un mes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idEdr": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del EDR."
+                    },
+                    "anio": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Año."
+                    },
+                    "mes": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Mes 1-12."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la línea."
+                          },
+                          "idEdr": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del EDR al que pertenece."
+                          },
+                          "idOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Orden vendida (null en manuales)."
+                          },
+                          "folioOrden": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la orden (null en manuales)."
+                          },
+                          "idEmpresa": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Empresa de la línea."
+                          },
+                          "empresa": {
+                            "type": "string",
+                            "description": "Nombre de la empresa."
+                          },
+                          "idCliente": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Cliente de la línea."
+                          },
+                          "cliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del cliente."
+                          },
+                          "idModelo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Modelo vendido."
+                          },
+                          "modelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Código del modelo."
+                          },
+                          "descripcion": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción (líneas manuales)."
+                          },
+                          "cantVendida": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cantidad vendida."
+                          },
+                          "precioVenta": {
+                            "type": "number",
+                            "description": "Precio de venta facturado por prenda."
+                          },
+                          "importe": {
+                            "type": "number",
+                            "description": "cantVendida × precioVenta."
+                          },
+                          "costoUnitActual": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo unitario ACTUAL (o null si la línea no tiene costo)."
+                          },
+                          "costoActual": {
+                            "type": "number",
+                            "description": "Costo total actual de la línea (0 si sin costo)."
+                          },
+                          "sinCosto": {
+                            "type": "boolean",
+                            "description": "true si la línea no tiene costo (sin orden/CostoOrden)."
+                          },
+                          "costoHistorico": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo histórico congelado (solo ETL E6)."
+                          },
+                          "origen": {
+                            "type": "string",
+                            "enum": [
+                              "automatica",
+                              "ajustada",
+                              "manual"
+                            ],
+                            "description": "Origen de la línea."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idEdr",
+                          "idOrden",
+                          "folioOrden",
+                          "idEmpresa",
+                          "empresa",
+                          "idCliente",
+                          "cliente",
+                          "idModelo",
+                          "modelo",
+                          "descripcion",
+                          "cantVendida",
+                          "precioVenta",
+                          "importe",
+                          "costoUnitActual",
+                          "costoActual",
+                          "sinCosto",
+                          "costoHistorico",
+                          "origen"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una línea del EDR con su costo actual."
+                      },
+                      "description": "Líneas del EDR (filtradas)."
+                    },
+                    "totalPiezas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Σ cantVendida de las líneas mostradas."
+                    },
+                    "totalVentas": {
+                      "type": "number",
+                      "description": "Σ importes de las líneas mostradas."
+                    },
+                    "totalCosto": {
+                      "type": "number",
+                      "description": "Σ costo actual de las líneas mostradas."
+                    }
+                  },
+                  "required": [
+                    "idEdr",
+                    "anio",
+                    "mes",
+                    "lineas",
+                    "totalPiezas",
+                    "totalVentas",
+                    "totalCosto"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Conciliación de las líneas del EDR de un mes."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Agrega una línea manual al EDR (sin orden, costo 0)",
+        "tags": [
+          "edr"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idEmpresa": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Empresa (debe ser paraEdr)."
+                  },
+                  "idCliente": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cliente de la línea."
+                  },
+                  "idModelo": {
+                    "description": "Modelo (opcional).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "descripcion": {
+                    "description": "Descripción libre.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "cantVendida": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cantidad vendida (≥0)."
+                  },
+                  "precioVenta": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Precio de venta facturado por prenda (≥0)."
+                  }
+                },
+                "required": [
+                  "idEmpresa",
+                  "idCliente",
+                  "cantVendida",
+                  "precioVenta"
+                ],
+                "description": "Alta de una línea manual del EDR (sin orden; costo 0)."
+              }
+            }
+          },
+          "description": "Alta de una línea manual del EDR (sin orden; costo 0)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Una línea del EDR con su costo actual.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la línea."
+                    },
+                    "idEdr": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del EDR al que pertenece."
+                    },
+                    "idOrden": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Orden vendida (null en manuales)."
+                    },
+                    "folioOrden": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio de la orden (null en manuales)."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa de la línea."
+                    },
+                    "empresa": {
+                      "type": "string",
+                      "description": "Nombre de la empresa."
+                    },
+                    "idCliente": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cliente de la línea."
+                    },
+                    "cliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del cliente."
+                    },
+                    "idModelo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Modelo vendido."
+                    },
+                    "modelo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Código del modelo."
+                    },
+                    "descripcion": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Descripción (líneas manuales)."
+                    },
+                    "cantVendida": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cantidad vendida."
+                    },
+                    "precioVenta": {
+                      "type": "number",
+                      "description": "Precio de venta facturado por prenda."
+                    },
+                    "importe": {
+                      "type": "number",
+                      "description": "cantVendida × precioVenta."
+                    },
+                    "costoUnitActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario ACTUAL (o null si la línea no tiene costo)."
+                    },
+                    "costoActual": {
+                      "type": "number",
+                      "description": "Costo total actual de la línea (0 si sin costo)."
+                    },
+                    "sinCosto": {
+                      "type": "boolean",
+                      "description": "true si la línea no tiene costo (sin orden/CostoOrden)."
+                    },
+                    "costoHistorico": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo histórico congelado (solo ETL E6)."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "enum": [
+                        "automatica",
+                        "ajustada",
+                        "manual"
+                      ],
+                      "description": "Origen de la línea."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idEdr",
+                    "idOrden",
+                    "folioOrden",
+                    "idEmpresa",
+                    "empresa",
+                    "idCliente",
+                    "cliente",
+                    "idModelo",
+                    "modelo",
+                    "descripcion",
+                    "cantVendida",
+                    "precioVenta",
+                    "importe",
+                    "costoUnitActual",
+                    "costoActual",
+                    "sinCosto",
+                    "costoHistorico",
+                    "origen"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Una línea del EDR con su costo actual."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/{id}/impreso": {
+      "get": {
+        "summary": "EDR mensual en PDF (R9)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del EDR."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/edr/{id}/excel": {
+      "get": {
+        "summary": "EDR mensual en Excel (.xlsx)",
+        "tags": [
+          "edr"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del EDR."
           }
         ],
         "security": [

@@ -22,6 +22,7 @@ import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
 import { rutasMrp } from './api/compras/mrp.rutas.js';
 import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
 import { rutasCostos } from './api/costos/costos.rutas.js';
+import { rutasEdr } from './api/edr/edr.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
@@ -255,6 +256,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // costos y márgenes por pedido (costos.ver, fórmula D2). Impresos R9 (lista de precios PDF, márgenes
   // PDF/Excel). Importes ocultos sin consultas.ver-importes. La regalía va sobre la venta, no en el costo.
   await app.register(rutasCostos, { prefix: '/api' });
+  // EDR (Módulo 6, F7-E2): Estado de Resultados mensual CONSOLIDADO (todas las empresas paraEdr),
+  // valuado a COSTO ACTUAL (D1). Genera/reconcilia las líneas desde las entregas a cliente del mes
+  // (D2 #5), concilia el precio facturado, encabezado de gastos global (D2 #6) y cortes por empresa/
+  // cliente. RBAC edr.ver/edr.capturar (mismos roles que costos). Impresos R9 (PDF mensual/anual, Excel).
+  await app.register(rutasEdr, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

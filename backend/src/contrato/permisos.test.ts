@@ -75,6 +75,9 @@ describe('catálogo de permisos', () => {
       // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
       'costos.capturar',
       'costos.ver',
+      // Estado de Resultados (Módulo 6, F7-E2): consultar + capturar/generar/conciliar (nivel ≤30).
+      'edr.capturar',
+      'edr.ver',
       'empresas.administrar',
       // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
       'esma.cargo-validar',

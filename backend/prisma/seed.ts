@@ -158,10 +158,18 @@ function definirRoles(): {
     'calidad.administrar-catalogo',
   );
 
-  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 (F7-E1)
-  // eso son el botón legado de costos de la orden (`ordenes.ver-costos`) Y el módulo NUEVO de Costos
-  // (`costos.ver`/`costos.capturar`, menú 6). Conserva el PRE-COSTO (`precostos.consultar`, nivel ≤45).
-  const gerencial = sin(directivo, 'ordenes.ver-costos', 'costos.ver', 'costos.capturar');
+  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
+  // botón legado de costos de la orden (`ordenes.ver-costos`), el módulo de Costos (`costos.ver`/
+  // `costos.capturar`, menú 6, F7-E1) Y el Estado de Resultados (`edr.ver`/`edr.capturar`, menú 6.2,
+  // F7-E2). Conserva el PRE-COSTO (`precostos.consultar`, nivel ≤45).
+  const gerencial = sin(
+    directivo,
+    'ordenes.ver-costos',
+    'costos.ver',
+    'costos.capturar',
+    'edr.ver',
+    'edr.capturar',
+  );
 
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
   // en consultas Y en el módulo Pedidos (F2-E1: `pedidos.importes` oculta `precio`/totales,

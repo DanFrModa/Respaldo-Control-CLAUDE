@@ -38,13 +38,15 @@ describe('catalogo de modulos del menu', () => {
     // F7-E1: +5 sub-vistas de Costos (pre-costo y lista de precios con `precostos.consultar`; costeo
     // de orden, lista de costos y márgenes con `costos.ver`) = 62 sub-vistas → 75 entradas. El módulo
     // Costos deja de ser "autenticado": ahora lo gobiernan `precostos.consultar`/`costos.ver`.
+    // F7-E2: +1 módulo EDR (`edr.ver`) → 14 planeados, +4 sub-vistas del EDR (gestión del mes con
+    // `edr.capturar`; conciliación, por mes y por año con `edr.ver`) = 66 sub-vistas → 80 entradas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
-    expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(75);
+    expect(planeados).toHaveLength(14);
+    expect(MODULOS_MENU).toHaveLength(80);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(75);
+    expect(new Set(claves).size).toBe(80);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(75);
+    expect(new Set(rutas).size).toBe(80);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

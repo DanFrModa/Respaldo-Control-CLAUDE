@@ -41,6 +41,10 @@ export const MODULOS_PERMISO = {
   // menú 6). El PRE-COSTO tiene su propio módulo (`precostos`, ex nivel ≤45, accesible desde Modelos).
   costos: 'Costos y márgenes',
   precostos: 'Pre-costos',
+  // Estado de Resultados (EDR, Módulo 6, F7-E2) — el P&L mensual consolidado. Módulo financiero
+  // propio (ex nivel ≤30, menú 6.2), separado de `costos` porque tiene su propio flujo (generar mes
+  // + conciliar ventas). Se reparte a los MISMOS roles que `costos` (directivo/dirección/admin).
+  edr: 'Estado de resultados',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
@@ -675,6 +679,25 @@ export const CATALOGO_PERMISOS = [
     modulo: 'precostos',
     descripcion:
       'Consultar el pre-costo (estimado) de un modelo y la lista de precios sugeridos (nivel ≤45)',
+  },
+
+  // ── Estado de Resultados (EDR, Módulo 6, F7-E2; doc 06-Costos-y-EDR §4) — permisos NUEVOS de v2 ──
+  // El P&L mensual consolidado, valuado a costo ACTUAL (D1). `edr.ver` (consultar el EDR por mes/año)
+  // y `edr.capturar` (capturar el encabezado global, generar el mes desde las entregas y conciliar/
+  // ajustar sus líneas) absorben el nivel ≤30 (menú 6.2 EDR era Directivo). Todo el EDR es financiero
+  // → no se ocultan columnas por `consultas.ver-importes` (a diferencia de costos): el módulo entero
+  // se protege con `edr.ver`. Mismo reparto por rol que `costos.ver`/`costos.capturar`.
+  {
+    clave: 'edr.ver',
+    modulo: 'edr',
+    descripcion:
+      'Consultar el estado de resultados mensual y anual (ventas, costo actual y resultado) (nivel ≤30)',
+  },
+  {
+    clave: 'edr.capturar',
+    modulo: 'edr',
+    descripcion:
+      'Capturar el encabezado, generar y conciliar las líneas del estado de resultados (nivel ≤30)',
   },
 
   // ── Administración (nuevos en v2, sin equivalente granular en el viejo) ──────

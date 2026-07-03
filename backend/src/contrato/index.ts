@@ -805,6 +805,44 @@ export {
   type MargenesSalida,
 } from './esquemas/costos.js';
 
+// ── EDR: Estado de Resultados mensual (Módulo 6, F7-E2; doc 06-Costos-y-EDR §4; D1/D2) ──
+export {
+  esquemaEdrOrigenLinea,
+  esquemaEdrGenerarCuerpo,
+  esquemaEdrEncabezadoCuerpo,
+  esquemaEdrLineaAjustarCuerpo,
+  esquemaEdrLineaManualCuerpo,
+  esquemaEdrLineasQuery,
+  esquemaEdrPorMesQuery,
+  esquemaEdrPorAnioQuery,
+  esquemaEdrEncabezadoSalida,
+  esquemaEdrLineaSalida,
+  esquemaEdrCorteSalida,
+  esquemaEdrCalculado,
+  esquemaEdrPorMesSalida,
+  esquemaEdrLineasSalida,
+  esquemaEdrPorAnioMes,
+  esquemaEdrPorAnioEmpresa,
+  esquemaEdrPorAnioSalida,
+  type EdrOrigenLineaClave,
+  type DatosEdrGenerar,
+  type DatosEdrEncabezado,
+  type DatosEdrLineaAjustar,
+  type DatosEdrLineaManual,
+  type EdrLineasQuery,
+  type EdrPorMesQuery,
+  type EdrPorAnioQuery,
+  type EdrEncabezadoSalida,
+  type EdrLineaSalida,
+  type EdrCorteSalida,
+  type EdrCalculado,
+  type EdrPorMesSalida,
+  type EdrLineasSalida,
+  type EdrPorAnioMes,
+  type EdrPorAnioEmpresa,
+  type EdrPorAnioSalida,
+} from './esquemas/edr.js';
+
 // ── Tablero WIP + existencias en poder del maquilero (F3-E5; doc 03-Produccion form Proceso/MaqExis) ──
 export {
   esquemaTableroWipQuery,
