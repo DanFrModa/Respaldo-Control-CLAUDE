@@ -18,7 +18,7 @@ test.describe('Costos (F7-E1)', () => {
     await page.goto('/costos');
     await expect(page.getByRole('heading', { name: 'Costos', exact: true })).toBeVisible();
     await expect(page.getByTestId('costos-pre-costo')).toBeVisible();
-    await expect(page.getByTestId('costos-costeo')).toBeVisible();
+    await expect(page.getByTestId('costos-costeo-orden')).toBeVisible();
     await expect(page.getByTestId('costos-margenes')).toBeVisible();
   });
 
