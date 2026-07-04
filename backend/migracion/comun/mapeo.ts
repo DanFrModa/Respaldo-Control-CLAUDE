@@ -91,6 +91,22 @@ export const ENTIDAD_MAPEO = {
   auditoria: 'Auditoria',
   /** F6-E6 (calidad): IdCC_AuditoriasDet viejo → AuditoriaDefecto.id nuevo. */
   auditoriaDefecto: 'AuditoriaDefecto',
+  /** F7-E6 (costos): IdCostoOrd viejo → CostoOrden.id nuevo (la liga real es por `idOrden` @unique). */
+  costoOrden: 'CostoOrden',
+  /** F7-E6 (indicadores): IdIP_Personal viejo → PersonalArea.id nuevo (área ip). */
+  personalIp: 'PersonalIp',
+  /** F7-E6 (indicadores): IdIP_Actividades viejo → ActividadProductividad.id nuevo (área ip). */
+  actividadIp: 'ActividadIp',
+  /** F7-E6 (indicadores): IdAlm_Prd_Act viejo → ActividadProductividad.id nuevo (área almacén). */
+  actividadAlmacen: 'ActividadAlmacen',
+  /** F7-E6 (indicadores): IdIP_Productiv viejo → RegistroProductividad.id nuevo (área ip). */
+  productividadIp: 'ProductividadIp',
+  /** F7-E6 (indicadores): IdAlm_Prd_Det viejo → RegistroProductividad.id nuevo (área almacén). */
+  productividadAlmacen: 'ProductividadAlmacen',
+  /** F7-E6 (indicadores): IdIP_MuesPend viejo → Muestrario.id nuevo. */
+  muestrario: 'Muestrario',
+  /** F7-E6 (indicadores): IdAlm_InvCic viejo → InventarioCiclico.id nuevo (histórico Proscai, D6). */
+  inventarioCiclicoHist: 'InventarioCiclicoHist',
 } as const;
 
 /** Una clave de entidad de mapeo. */

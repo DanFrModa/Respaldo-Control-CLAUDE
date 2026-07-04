@@ -346,6 +346,11 @@ export async function listarInventariosCiclicos(
   const cliente = clienteLectura(bd);
   const where: Prisma.InventarioCiclicoWhereInput = {
     idEmpresa: sesion.idEmpresaActiva,
+    // La BANDEJA viva solo muestra conteos de almacenes ACTIVOS: no se opera un conteo en un almacén
+    // dado de baja. Esto excluye por diseño los cíclicos HISTÓRICOS Proscai (F7-E6), que viven en el
+    // almacén sentinela `(Migración Proscai)` INACTIVO — así no tapan la operación real (toman los
+    // folios más nuevos). Siguen 100% consultables por id (resumen/conteo/exactitud) y en el cuadre.
+    almacen: { activo: true },
     ...(filtros.estado === undefined ? {} : { estado: filtros.estado }),
     ...(filtros.idAlmacen === undefined ? {} : { idAlmacen: filtros.idAlmacen }),
   };
