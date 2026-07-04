@@ -102,6 +102,12 @@ model Empresa {
   /// Renglones del Estado de Resultados (EDR) de esta empresa (F7-E2, D2 #6). El EDR es GLOBAL
   /// (encabezado por mes, sin empresa); solo las líneas se sellan por empresa para el corte. Restrict.
   edrLineas           EdrLinea[]
+  /// Registros de productividad (IP/almacén) de esta empresa (F7-E4, A9). Restrict.
+  registrosProductividad RegistroProductividad[]
+  /// Verificaciones de confiabilidad de fichas técnicas por orden de esta empresa (F7-E4, A9). Restrict.
+  fichasVerificacion     FichaVerificacion[]
+  /// Muestrarios pendientes de esta empresa (F7-E4, A9). Restrict.
+  muestrarios            Muestrario[]
 
   @@map("empresas")
 }
@@ -121,6 +127,11 @@ model ConfiguracionEmpresa {
   regaliasBase     Decimal? @map("regalias_base") @db.Decimal(10, 4)
   /// Días de colchón que la Ruta Crítica agrega a la costura (viejo: `ColchonCostura`).
   colchonCostura   Int?     @map("colchon_costura")
+  /// Jornada base (horas/día) del ALMACÉN para el índice de productividad (F7-E4; viejo:
+  /// constante `HorasBaseAlm = 9`, doc 05 §B.1). Antes era una constante hardcodeada en la
+  /// consulta `Ind_Alm_Productividad`; en v2 es parámetro por empresa. Default 9 (el valor
+  /// histórico); el backfill de la migración lo fija en las filas ya sembradas.
+  jornadaBaseAlmacen Int    @default(9) @map("jornada_base_almacen")
 
   /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
   fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
@@ -697,6 +708,8 @@ model Temporada {
 
   /// Modelos clasificados en esta temporada (F1-E4, FK nullable Restrict).
   modelos Modelo[]
+  /// Muestrarios pendientes de esta temporada (F7-E4, FK nullable Restrict).
+  muestrarios Muestrario[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -916,6 +929,10 @@ model Cliente {
   ordenes   Orden[]
   /// Renglones del EDR asociados a este cliente (F7-E2, corte por cliente). Restrict.
   edrLineas EdrLinea[]
+  /// Registros de productividad de almacén ligados a este cliente (F7-E4, opcional). Restrict.
+  registrosProductividad RegistroProductividad[]
+  /// Muestrarios pendientes de este cliente (F7-E4). Restrict.
+  muestrarios            Muestrario[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1947,6 +1964,9 @@ model Orden {
   /// Renglones del EDR que valúan las ventas de esta orden en un mes (F7-E2). Restrict: una orden
   /// referida por un EDR no se borra físico (las líneas automáticas se reconcilian, no se cascadean).
   edrLineas         EdrLinea[]
+  /// Verificaciones de confiabilidad de la ficha técnica de esta orden (F7-E4). Cascade: el checklist
+  /// pertenece a la orden (si la orden desapareciera, sus verificaciones también).
+  fichasVerificacion FichaVerificacion[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -4357,4 +4377,253 @@ model KpiRefresco {
   modificadoEn DateTime @updatedAt @map("modificado_en")
 
   @@map("kpi_refresco")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Productividad unificada IP / Almacén (Módulo Indicadores, F7-E4 — doc 05 §A.1/§B.1;
+// MEJORAS 05 §1: "motor de KPIs/productividad configurable por área"). Se DESPIVOTA el
+// patrón repetido del viejo (IP_* y Alm_Prd_*) a un solo motor, distinguido por `area`
+// (D4/A6: filas configurables en vez de tablas paralelas). Auditoría A7; A9 por empresa.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Área a la que pertenece un dato de productividad (F7-E4). Unifica los dos módulos
+/// gemelos del viejo (Ingeniería del Producto y Almacén) en un solo motor.
+enum AreaProductividad {
+  ip
+  almacen
+
+  @@map("area_productividad")
+}
+
+/// Persona del área para el índice de productividad (F7-E4; ← `IP_Personal`, doc 05 §A.1).
+/// Es un catálogo GLOBAL (sin idEmpresa — ADR-0007): las personas son las mismas para todas
+/// las empresas del grupo. El almacén casi no captura personas individuales (usa la cuadrilla
+/// `personas` del registro), por eso `horasBase` es opcional y solo aplica al índice de IP.
+model PersonalArea {
+  id        Int               @id @default(autoincrement())
+  /// Nombre de la persona (viejo: `IP_Personal.NombreIP`). Único por área.
+  nombre    String
+  /// Área de la persona (ip/almacen). Casi siempre `ip`.
+  area      AreaProductividad
+  /// Jornada base (horas/día) de la persona para el índice de IP (viejo: `HorasBase`). Solo IP.
+  horasBase Decimal?          @map("horas_base") @db.Decimal(5, 2)
+  /// Puesto (viejo: `IP_Personal.Puesto`).
+  puesto    String?
+  /// Borrado suave (plan §4): una persona que se va se desactiva, jamás se borra.
+  activo    Boolean           @default(true)
+
+  /// Registros de productividad capturados a nombre de esta persona (F7-E4, Restrict).
+  registros RegistroProductividad[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([area, nombre])
+  @@map("personal_area")
+}
+
+/// Catálogo de actividades productivas por área (F7-E4; ← `IP_Actividades` + `Alm_Prd_Act`,
+/// doc 05 §A.1/§B.1). Una actividad pertenece a UNA área; los estándares que no aplican al
+/// área quedan NULL (A6: campos configurables, no columnas fijas por cada módulo del viejo):
+/// IP usa `porcentajeD`; almacén usa `pzPersDia` (+ `porcenPzas`). Catálogo GLOBAL (ADR-0007).
+model ActividadProductividad {
+  id          Int               @id @default(autoincrement())
+  /// Nombre de la actividad (viejo: `IP_Actividades.Actividad` / `Alm_Prd_Act.ActividadAlm`). Único por área.
+  nombre      String
+  /// Área de la actividad (ip/almacen).
+  area        AreaProductividad
+  /// Peso/estándar de la actividad de IP (viejo: `IP_Actividades.PorcentajeD`). Solo IP.
+  porcentajeD Decimal?          @map("porcentaje_d") @db.Decimal(10, 4)
+  /// Estándar piezas/persona/día de la actividad de almacén (viejo: `Alm_Prd_Act.Pz_Pers_Dia`). Solo almacén.
+  pzPersDia   Decimal?          @map("pz_pers_dia") @db.Decimal(10, 4)
+  /// Peso de piezas de la actividad de almacén (viejo: `Alm_Prd_Act.PorcenPzas`). Solo almacén.
+  porcenPzas  Decimal?          @map("porcen_pzas") @db.Decimal(10, 4)
+  /// Borrado suave (plan §4).
+  activo      Boolean           @default(true)
+
+  /// Registros de productividad de esta actividad (F7-E4, Restrict).
+  registros RegistroProductividad[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([area, nombre])
+  @@map("actividad_productividad")
+}
+
+/// Registro diario de productividad (F7-E4; ← `IP_Productiv` + `Alm_Prd`/`Alm_Prd_Det`, doc
+/// 05 §A.1/§B.1). Un registro es de UNA área (la de su actividad). Para IP lleva `idPersona`
+/// (y `personas` = 1); para almacén lleva la cuadrilla `personas` (y opcionalmente `idCliente`).
+/// Cancelación SUAVE (auditada, A7); NUNCA se edita/borra: se cancela y se re-captura. A9.
+model RegistroProductividad {
+  id        Int               @id @default(autoincrement())
+  idEmpresa Int               @map("id_empresa")
+  empresa   Empresa           @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Fecha del trabajo (viejo: `IP_Productiv.Fecha` / `Alm_Prd.FechaAlm`). Solo día.
+  fecha     DateTime          @db.Date
+  /// Área del registro (redundante con la de la actividad; se sella para filtrar el tablero).
+  area      AreaProductividad
+
+  idActividad Int                    @map("id_actividad")
+  actividad   ActividadProductividad @relation(fields: [idActividad], references: [id], onDelete: Restrict)
+
+  /// Persona (solo IP; viejo: `IP_Productiv.IdIp_Personal`). NULL en almacén (cuadrilla).
+  idPersona Int?          @map("id_persona")
+  persona   PersonalArea? @relation(fields: [idPersona], references: [id], onDelete: Restrict)
+
+  /// Cantidad producida (viejo: `IP_Productiv.CantidadAct` / `Alm_Prd_Det.Piezas`).
+  cantidad        Decimal @db.Decimal(12, 2)
+  /// Horas trabajadas (viejo: `HorasTrabajadas`). Debe ser > 0 (división en el índice).
+  horasTrabajadas Decimal @map("horas_trabajadas") @db.Decimal(6, 2)
+  /// Cuadrilla que trabajó (viejo: `Alm_Prd.Personas`). Almacén > 1; IP = 1. Debe ser > 0.
+  personas        Int     @default(1)
+
+  /// Cliente al que se le procesó (solo almacén, opcional; viejo: `Alm_Prd_Det.IdClientes`). Restrict.
+  idCliente Int?     @map("id_cliente")
+  cliente   Cliente? @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+
+  /// Cancelación suave con motivo (A7): un registro erróneo se cancela, no se borra.
+  cancelado         Boolean   @default(false)
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa, area, fecha])
+  @@index([idActividad])
+  @@index([idPersona])
+  @@index([idCliente])
+  @@map("registro_productividad")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fichas confiables (Módulo Indicadores, F7-E4 — doc 05 §A.2; ex `IP_InfConf` +
+// `Ind_IP_InfConfiable`). Checklist de confiabilidad de la ficha técnica POR ORDEN,
+// modelado por FILAS (reactivo × orden) en vez de las 8 columnas fijas del viejo (A6).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Reactivo (aspecto a verificar) del checklist de confiabilidad de la ficha (F7-E4, A6 —
+/// configurable, ← columnas fijas `InfGeneral..MedidasPrendas` de `IP_InfConf`). Catálogo
+/// GLOBAL (ADR-0007). El seed siembra los 8 fijos del viejo (doc 05 §A.2); se pueden agregar
+/// más sin migración. Hook a futuro: si se construye la ficha estructurada (R5, módulo 12),
+/// los reactivos podrán derivarse de sus secciones en vez de capturarse a mano.
+model ChecklistFichaDef {
+  id       Int     @id @default(autoincrement())
+  /// Clave estable del reactivo (viejo nombre de columna, p. ej. "InfGeneral"). Única global.
+  clave    String  @unique
+  /// Etiqueta para UI (español), p. ej. "Información de tela".
+  etiqueta String
+  /// Orden de despliegue en el checklist.
+  orden    Int     @default(0)
+  /// Borrado suave (plan §4): un reactivo que se retira se desactiva, no se borra.
+  activo   Boolean @default(true)
+
+  /// Verificaciones de este reactivo en las órdenes (F7-E4, Restrict).
+  verificaciones FichaVerificacion[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("checklist_ficha_def")
+}
+
+/// Verificación de UN reactivo del checklist en UNA orden (F7-E4; doc 05 §A.2). Modelado por
+/// FILAS (una fila reactivo × orden) — el anti-patrón del viejo eran 8 columnas booleanas
+/// fijas. `revisorId`/`fecha` = quién marcó y cuándo (sin FK física a usuarios, ADR-0005). El
+/// indicador "% de fichas confiables" (ex `Ind_IP_InfConfiable`) = Σ hecho ÷ Σ reactivos. A9.
+model FichaVerificacion {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  idReactivo Int               @map("id_reactivo")
+  reactivo   ChecklistFichaDef @relation(fields: [idReactivo], references: [id], onDelete: Restrict)
+
+  /// ¿El aspecto está OK en la ficha? (viejo: cada columna booleana).
+  hecho     Boolean   @default(false)
+  /// Usuario que verificó (sin FK física, ADR-0005; viejo: `IP_InfConf.IdUsuarios`).
+  revisorId String?   @map("revisor_id")
+  /// Fecha de la revisión (viejo: `IP_InfConf.FechaRevision`).
+  fecha     DateTime? @db.Date
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idReactivo])
+  @@index([idEmpresa])
+  @@index([idReactivo])
+  @@map("ficha_verificacion")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Muestrarios pendientes (Módulo Indicadores, F7-E4 — doc 05 §A.3; ← `IP_MuesPend`).
+// Seguimiento de boards y muestras solicitados: solicitud → seguimiento → entrega. A9.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Muestrario pendiente (F7-E4; ← `IP_MuesPend`, doc 05 §A.3). KPI de cumplimiento =
+/// `fechaEntregado <= fechaRequerida`. Cancelación suave con motivo (A7). A9 por empresa.
+model Muestrario {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  idCliente Int     @map("id_cliente")
+  cliente   Cliente @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+
+  /// Categoría del muestrario (viejo: `IP_MuesPend.Categoria`).
+  categoria   String?
+  /// Temporada (viejo: `IP_MuesPend.Temporada`). FK nullable al catálogo (Restrict).
+  idTemporada Int?       @map("id_temporada")
+  temporada   Temporada? @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+
+  /// Cuántos boards se piden (viejo: `CantBoards`).
+  cantBoards   Int @default(0) @map("cant_boards")
+  /// Cuántas muestras se piden (viejo: `CantMuestras`).
+  cantMuestras Int @default(0) @map("cant_muestras")
+
+  /// Fecha de solicitud (viejo: `FechaSolicitado`).
+  fechaSolicitado DateTime  @map("fecha_solicitado") @db.Date
+  /// Fecha requerida/compromiso (viejo: `FechaRequerida`).
+  fechaRequerida  DateTime  @map("fecha_requerida") @db.Date
+  /// Fecha en que se entregó (viejo: `FechaEntregado`). NULL = pendiente.
+  fechaEntregado  DateTime? @map("fecha_entregado") @db.Date
+
+  /// Boards que quedaron listos (viejo: `BoardsOK`).
+  boardsOK   Int @default(0) @map("boards_ok")
+  /// Muestras que quedaron listas (viejo: `MuestrasOK`).
+  muestrasOK Int @default(0) @map("muestras_ok")
+
+  /// Usuario solicitante (sin FK física, ADR-0005; viejo: `IdUsuarioSolicitante`).
+  solicitanteId String? @map("solicitante_id")
+
+  /// Cancelación suave con motivo (viejo: `Cancelado`; A7).
+  cancelado         Boolean   @default(false)
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa, fechaRequerida])
+  @@index([idCliente])
+  @@index([idTemporada])
+  @@map("muestrarios")
 }

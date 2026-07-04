@@ -55,3 +55,39 @@ export function selloDatosAl(datosAl: string | null | undefined): string {
   }
   return `Datos al: ${new Date(datosAl).toLocaleString('es-MX')}`;
 }
+
+/** Formatea un número con hasta `dec` decimales (F7-E4 índices), o "—" si es null. */
+export function numero(valor: number | null | undefined, dec = 2): string {
+  if (valor === null || valor === undefined) {
+    return '—';
+  }
+  return valor.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: dec });
+}
+
+/** Fecha ISO (AAAA-MM-DD) de un Date en zona local. */
+function aIso(fecha: Date): string {
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, '0');
+  const d = String(fecha.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Atajos de fecha de la captura móvil (F7-E4, doc 05 §A.1 "Hoy/Ayer/Sábado"). */
+export const atajosFecha = {
+  hoy(): string {
+    return aIso(new Date());
+  },
+  ayer(): string {
+    const f = new Date();
+    f.setDate(f.getDate() - 1);
+    return aIso(f);
+  },
+  /** El sábado más reciente (hoy si es sábado). */
+  sabado(): string {
+    const f = new Date();
+    // getDay(): 0=domingo … 6=sábado. Retrocede al sábado anterior o de hoy.
+    const dif = (f.getDay() - 6 + 7) % 7;
+    f.setDate(f.getDate() - dif);
+    return aIso(f);
+  },
+};
