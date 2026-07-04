@@ -38,6 +38,11 @@ import { IndicadoresPagina } from '@/modulos/indicadores/IndicadoresPagina';
 import { TableroRcPagina } from '@/modulos/indicadores/TableroRcPagina';
 import { TableroCalidadPagina } from '@/modulos/indicadores/TableroCalidadPagina';
 import { TableroWipPagina as TableroWipIndicadoresPagina } from '@/modulos/indicadores/TableroWipPagina';
+import { CapturaProductividadPagina } from '@/modulos/indicadores/CapturaProductividadPagina';
+import { TableroProductividadPagina } from '@/modulos/indicadores/TableroProductividadPagina';
+import { ProductividadCatalogosPagina } from '@/modulos/indicadores/ProductividadCatalogosPagina';
+import { FichasConfiablesPagina } from '@/modulos/indicadores/FichasConfiablesPagina';
+import { MuestrariosPagina } from '@/modulos/indicadores/MuestrariosPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
@@ -247,6 +252,16 @@ const router = createBrowserRouter([
           { path: 'indicadores/ruta-critica', element: <TableroRcPagina /> },
           { path: 'indicadores/calidad', element: <TableroCalidadPagina /> },
           { path: 'indicadores/wip', element: <TableroWipIndicadoresPagina /> },
+          // Indicadores · CAPTURA (F7-E4): productividad (captura/tablero/catálogos), fichas
+          // confiables y muestrarios. Cada pantalla re-verifica su permiso en el backend (A1).
+          { path: 'indicadores/productividad/captura', element: <CapturaProductividadPagina /> },
+          { path: 'indicadores/productividad/tablero', element: <TableroProductividadPagina /> },
+          {
+            path: 'indicadores/productividad/catalogos',
+            element: <ProductividadCatalogosPagina />,
+          },
+          { path: 'indicadores/fichas-confiables', element: <FichasConfiablesPagina /> },
+          { path: 'indicadores/muestrarios', element: <MuestrariosPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

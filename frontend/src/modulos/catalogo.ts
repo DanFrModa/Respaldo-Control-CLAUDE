@@ -863,10 +863,19 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
   {
     clave: 'indicadores',
     titulo: 'Indicadores',
-    descripcion: 'Tableros directivos: entregas a tiempo, calidad por maquilero y WIP analítico',
+    descripcion: 'Tableros directivos, productividad, fichas confiables y muestrarios',
     ruta: '/indicadores',
     icono: 'grafica',
-    permisos: ['indicadores.ver'],
+    // Visible con CUALQUIER permiso del módulo: los tableros directivos (`indicadores.ver`) o la
+    // captura operativa de F7-E4 (productividad IP/almacén, fichas, muestrarios). El backend
+    // re-verifica el permiso fino de cada pantalla (A1/A4).
+    permisos: [
+      'indicadores.ver',
+      'indicadores.ip-productividad',
+      'indicadores.almacen-productividad',
+      'indicadores.ip-confiabilidad',
+      'indicadores.ip-muestrarios',
+    ],
   },
   // Sub-vistas de Indicadores (F7-E3): 3 tableros directivos calculados en segundo plano (vistas
   // materializadas). Todos `indicadores.ver`; el backend re-verifica el permiso (A1).
@@ -895,6 +904,54 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/indicadores/wip',
     icono: 'paquete',
     permisos: ['indicadores.ver'],
+    subVista: true,
+  },
+  // Sub-vistas de Indicadores (F7-E4): motor de PRODUCTIVIDAD unificado IP/almacén (captura móvil con
+  // atajos, tablero vs estándar y catálogos), FICHAS confiables (checklist por orden + % confiable) y
+  // MUESTRARIOS pendientes (solicitud→entrega + KPI). Cada una con su permiso operativo de área/aspecto.
+  {
+    clave: 'productividad-captura',
+    titulo: 'Captura de productividad',
+    descripcion: 'Registra la productividad de IP y almacén (Hoy/Ayer/Sábado)',
+    ruta: '/indicadores/productividad/captura',
+    icono: 'portapapeles',
+    permisos: ['indicadores.ip-productividad', 'indicadores.almacen-productividad'],
+    subVista: true,
+  },
+  {
+    clave: 'productividad-tablero',
+    titulo: 'Productividad vs estándar',
+    descripcion: 'Índices agregados por periodo, actividad y persona',
+    ruta: '/indicadores/productividad/tablero',
+    icono: 'grafica',
+    permisos: ['indicadores.ip-productividad', 'indicadores.almacen-productividad'],
+    subVista: true,
+  },
+  {
+    clave: 'productividad-catalogos',
+    titulo: 'Catálogos de productividad',
+    descripcion: 'Personas y actividades por área, con sus estándares',
+    ruta: '/indicadores/productividad/catalogos',
+    icono: 'libreria',
+    permisos: ['indicadores.ip-productividad', 'indicadores.almacen-productividad'],
+    subVista: true,
+  },
+  {
+    clave: 'fichas-confiables',
+    titulo: 'Fichas confiables',
+    descripcion: 'Checklist de confiabilidad de la ficha técnica por orden y su %',
+    ruta: '/indicadores/fichas-confiables',
+    icono: 'portapapeles',
+    permisos: ['indicadores.ip-confiabilidad'],
+    subVista: true,
+  },
+  {
+    clave: 'muestrarios',
+    titulo: 'Muestrarios',
+    descripcion: 'Boards y muestras solicitados, con su cumplimiento',
+    ruta: '/indicadores/muestrarios',
+    icono: 'paquete',
+    permisos: ['indicadores.ip-muestrarios'],
     subVista: true,
   },
   {

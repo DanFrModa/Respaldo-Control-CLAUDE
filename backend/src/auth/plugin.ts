@@ -55,6 +55,13 @@ declare module 'fastify' {
      * obtiene la sesión con `req.obtenerSesion()`.
      */
     conPermiso(clave: ClavePermiso): preHandlerAsyncHookHandler;
+    /**
+     * Guard de autorización con ALGUNO de varios permisos (deny-by-default): exige sesión y que
+     * tenga AL MENOS uno de los indicados. Útil para pantallas que sirven a más de un rol/área
+     * (p. ej. la lectura de productividad, visible con `indicadores.ip-productividad` O
+     * `indicadores.almacen-productividad`). El servicio de dominio reaplica el permiso fino (A1).
+     */
+    conAlgunPermiso(...claves: ClavePermiso[]): preHandlerAsyncHookHandler;
   }
 }
 
@@ -159,6 +166,23 @@ export function registrarAuth(app: FastifyInstance, opciones: OpcionesAuth = {})
           .send({ codigo: 'NO_AUTENTICADO', mensaje: 'Necesitas iniciar sesión.' });
       }
       if (!sesion.permisos.has(clave)) {
+        return reply
+          .code(403)
+          .send({ codigo: 'PERMISO', mensaje: 'No tienes permiso para realizar esta operación.' });
+      }
+      return undefined;
+    };
+  });
+
+  app.decorate('conAlgunPermiso', (...claves: ClavePermiso[]): preHandlerAsyncHookHandler => {
+    return async (request, reply) => {
+      const sesion = await request.obtenerSesion();
+      if (sesion === null) {
+        return reply
+          .code(401)
+          .send({ codigo: 'NO_AUTENTICADO', mensaje: 'Necesitas iniciar sesión.' });
+      }
+      if (!claves.some((clave) => sesion.permisos.has(clave))) {
         return reply
           .code(403)
           .send({ codigo: 'PERMISO', mensaje: 'No tienes permiso para realizar esta operación.' });

@@ -24,6 +24,9 @@ import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
 import { rutasCostos } from './api/costos/costos.rutas.js';
 import { rutasEdr } from './api/edr/edr.rutas.js';
 import { rutasIndicadores } from './api/indicadores/indicadores.rutas.js';
+import { rutasProductividad } from './api/indicadores/productividad.rutas.js';
+import { rutasFichas } from './api/indicadores/fichas.rutas.js';
+import { rutasMuestrarios } from './api/indicadores/muestrarios.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
@@ -267,6 +270,14 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // captura NUNCA espera el recálculo (plan §11): /indicadores/refrescar solo encola el job. RBAC
   // indicadores.ver (directivo/gerencial). Impresos R9 (PDF + Excel). Agregación en SQL (no en cliente).
   await app.register(rutasIndicadores, { prefix: '/api' });
+  // INDICADORES · CAPTURA (Módulo Indicadores, F7-E4): motor de PRODUCTIVIDAD unificado IP/almacén
+  // (personas, actividades y registros diarios; índice vs estándar por fórmula de área; tablero
+  // agregado en servidor), FICHAS CONFIABLES (checklist por orden + % confiable) y MUESTRARIOS
+  // pendientes (solicitud→entrega + KPI de cumplimiento). RBAC por área/aspecto (indicadores.ip-*/
+  // almacen-productividad, ip-confiabilidad, ip-muestrarios); fecha libre con indicadores.fecha-libre.
+  await app.register(rutasProductividad, { prefix: '/api' });
+  await app.register(rutasFichas, { prefix: '/api' });
+  await app.register(rutasMuestrarios, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

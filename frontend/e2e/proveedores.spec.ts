@@ -24,7 +24,7 @@ test.describe('CRUD de Proveedores', () => {
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos' })
+      .getByRole('link', { name: 'Catálogos', exact: true })
       .click();
     await page.getByTestId('catalogo-proveedores').click();
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();

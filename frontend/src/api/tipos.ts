@@ -1247,3 +1247,101 @@ export type KpisWip =
 export type KpisWipQuery = NonNullable<paths['/api/indicadores/wip']['get']['parameters']['query']>;
 /** Una orden del tablero WIP. */
 export type WipKpiFila = KpisWip['datos'][number];
+
+// ── Indicadores · Productividad unificada IP/Almacén (F7-E4) ──────────────────
+/** Página de personal del área (`GET /api/indicadores/productividad/personal`). */
+export type PersonalPagina =
+  paths['/api/indicadores/productividad/personal']['get']['responses']['200']['content']['application/json'];
+/** Una persona del área. */
+export type PersonalArea = PersonalPagina['datos'][number];
+/** Filtros del listado de personal. */
+export type PersonalQuery = NonNullable<
+  paths['/api/indicadores/productividad/personal']['get']['parameters']['query']
+>;
+/** Alta de persona (`POST`). */
+export type PersonalCrear =
+  paths['/api/indicadores/productividad/personal']['post']['requestBody']['content']['application/json'];
+/** Edición de persona (`PATCH`). */
+export type PersonalEditar =
+  paths['/api/indicadores/productividad/personal/{id}']['patch']['requestBody']['content']['application/json'];
+/** Página de actividades (`GET /api/indicadores/productividad/actividades`). */
+export type ActividadPagina =
+  paths['/api/indicadores/productividad/actividades']['get']['responses']['200']['content']['application/json'];
+/** Una actividad productiva. */
+export type ActividadProductividad = ActividadPagina['datos'][number];
+/** Filtros del listado de actividades. */
+export type ActividadQuery = NonNullable<
+  paths['/api/indicadores/productividad/actividades']['get']['parameters']['query']
+>;
+/** Alta de actividad (`POST`). */
+export type ActividadCrear =
+  paths['/api/indicadores/productividad/actividades']['post']['requestBody']['content']['application/json'];
+/** Edición de actividad (`PATCH`). */
+export type ActividadEditar =
+  paths['/api/indicadores/productividad/actividades/{id}']['patch']['requestBody']['content']['application/json'];
+/** Página de registros de productividad (`GET /api/indicadores/productividad/registros`). */
+export type RegistrosProductividadPagina =
+  paths['/api/indicadores/productividad/registros']['get']['responses']['200']['content']['application/json'];
+/** Un registro de productividad (con índice). */
+export type RegistroProductividad = RegistrosProductividadPagina['datos'][number];
+/** Filtros del listado de registros. */
+export type RegistrosProductividadQuery = NonNullable<
+  paths['/api/indicadores/productividad/registros']['get']['parameters']['query']
+>;
+/** Alta de registro (`POST`). */
+export type RegistroProductividadCrear =
+  paths['/api/indicadores/productividad/registros']['post']['requestBody']['content']['application/json'];
+/** Tablero de productividad (`GET /api/indicadores/productividad/tablero`). */
+export type TableroProductividad =
+  paths['/api/indicadores/productividad/tablero']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero de productividad. */
+export type TableroProductividadQuery = NonNullable<
+  paths['/api/indicadores/productividad/tablero']['get']['parameters']['query']
+>;
+/** Una fila del tablero de productividad. */
+export type TableroProductividadFila = TableroProductividad['filas'][number];
+
+// ── Indicadores · Fichas confiables (F7-E4) ──────────────────────────────────
+/** Lista de reactivos del checklist (`GET /api/indicadores/fichas/reactivos`). */
+export type ReactivosFichaLista =
+  paths['/api/indicadores/fichas/reactivos']['get']['responses']['200']['content']['application/json'];
+/** Un reactivo del checklist. */
+export type ReactivoFicha = ReactivosFichaLista['datos'][number];
+/** Checklist de confiabilidad de una orden (`GET /api/indicadores/fichas/ordenes/{idOrden}`). */
+export type FichaOrden =
+  paths['/api/indicadores/fichas/ordenes/{idOrden}']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo para guardar el checklist (`PUT`). */
+export type VerificarFichaOrden =
+  paths['/api/indicadores/fichas/ordenes/{idOrden}']['put']['requestBody']['content']['application/json'];
+/** Indicador de % de fichas confiables (`GET /api/indicadores/fichas/confiables`). */
+export type FichasConfiables =
+  paths['/api/indicadores/fichas/confiables']['get']['responses']['200']['content']['application/json'];
+/** Filtros del indicador de fichas confiables. */
+export type FichasConfiablesQuery = NonNullable<
+  paths['/api/indicadores/fichas/confiables']['get']['parameters']['query']
+>;
+/** Una orden en el indicador de fichas confiables. */
+export type FichaConfiableFila = FichasConfiables['datos'][number];
+
+// ── Indicadores · Muestrarios pendientes (F7-E4) ─────────────────────────────
+/** Página de muestrarios (`GET /api/indicadores/muestrarios`). */
+export type MuestrariosPagina =
+  paths['/api/indicadores/muestrarios']['get']['responses']['200']['content']['application/json'];
+/** Un muestrario (con estado/cumplimiento). */
+export type Muestrario = MuestrariosPagina['datos'][number];
+/** Filtros del listado de muestrarios. */
+export type MuestrariosQuery = NonNullable<
+  paths['/api/indicadores/muestrarios']['get']['parameters']['query']
+>;
+/** Alta (solicitud) de muestrario (`POST`). */
+export type MuestrarioCrear =
+  paths['/api/indicadores/muestrarios']['post']['requestBody']['content']['application/json'];
+/** Edición de muestrario (`PATCH`). */
+export type MuestrarioEditar =
+  paths['/api/indicadores/muestrarios/{id}']['patch']['requestBody']['content']['application/json'];
+/** Entrega de muestrario (`POST .../entregar`). */
+export type MuestrarioEntregar =
+  paths['/api/indicadores/muestrarios/{id}/entregar']['post']['requestBody']['content']['application/json'];
+/** KPI de cumplimiento de muestrarios (`GET .../cumplimiento`). */
+export type MuestrariosCumplimiento =
+  paths['/api/indicadores/muestrarios/cumplimiento']['get']['responses']['200']['content']['application/json'];

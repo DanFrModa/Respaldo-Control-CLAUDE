@@ -42,13 +42,16 @@ describe('catalogo de modulos del menu', () => {
     // `edr.capturar`; conciliación, por mes y por año con `edr.ver`) = 66 sub-vistas → 80 entradas.
     // F7-E3: el módulo Indicadores deja de ser "autenticado" (ahora `indicadores.ver`) y suma 3
     // sub-vistas (RC, calidad y WIP, todas con `indicadores.ver`) = 69 sub-vistas → 83 entradas.
+    // F7-E4: el módulo Indicadores amplía sus permisos (captura operativa) y suma 5 sub-vistas
+    // (captura/tablero/catálogos de productividad, fichas confiables y muestrarios) = 74 sub-vistas
+    // → 88 entradas.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(14);
-    expect(MODULOS_MENU).toHaveLength(83);
+    expect(MODULOS_MENU).toHaveLength(88);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(83);
+    expect(new Set(claves).size).toBe(88);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(83);
+    expect(new Set(rutas).size).toBe(88);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

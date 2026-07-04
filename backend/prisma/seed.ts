@@ -599,6 +599,38 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 3g. Reactivos del checklist de FICHAS CONFIABLES (F7-E4) — los 8 fijos del viejo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los 8 reactivos fijos del checklist de confiabilidad de la ficha técnica del sistema viejo
+ * (`IP_InfConf`, doc 05 §A.2): eran columnas booleanas; en v2 son FILAS configurables (A6). Se
+ * siembran de forma idempotente por `clave`; se pueden agregar más sin migración. El `orden`
+ * respeta la secuencia del formulario viejo.
+ */
+const REACTIVOS_FICHA_BASE: { clave: string; etiqueta: string; orden: number }[] = [
+  { clave: 'InfGeneral', etiqueta: 'Información general', orden: 1 },
+  { clave: 'InfTela', etiqueta: 'Información de tela', orden: 2 },
+  { clave: 'InfHab', etiqueta: 'Información de habilitación', orden: 3 },
+  { clave: 'Medidas', etiqueta: 'Medidas de habilitación', orden: 4 },
+  { clave: 'Dibujo', etiqueta: 'Dibujo', orden: 5 },
+  { clave: 'InfEtiqueta', etiqueta: 'Información de etiqueta', orden: 6 },
+  { clave: 'EspCostura', etiqueta: 'Especificaciones de costura', orden: 7 },
+  { clave: 'MedidasPrendas', etiqueta: 'Medidas en prenda', orden: 8 },
+];
+
+async function sembrarReactivosFicha(prisma: PrismaClient): Promise<void> {
+  for (const reactivo of REACTIVOS_FICHA_BASE) {
+    await prisma.checklistFichaDef.upsert({
+      where: { clave: reactivo.clave },
+      // Idempotente: no pisa etiqueta/orden/activo si ya existe (pudieron editarse en producción).
+      update: {},
+      create: { clave: reactivo.clave, etiqueta: reactivo.etiqueta, orden: reactivo.orden },
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 4. Usuario admin (contraseña TEMPORAL — cambiarla en el primer inicio de sesión)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -660,6 +692,9 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarGeneros(prisma);
   await sembrarTiposMovimiento(prisma);
   await sembrarAlmacenesPt(prisma);
+  // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
+  // filas configurables (A6). Idempotente por clave.
+  await sembrarReactivosFicha(prisma);
   await sembrarAdmin(prisma);
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").
