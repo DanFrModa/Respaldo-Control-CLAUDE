@@ -26,6 +26,7 @@ test.describe('CRUD de Almacenes', () => {
       .first()
       .getByRole('link', {
         name: 'Catálogos',
+        exact: true,
       })
       .click();
     await page.getByRole('link', { name: /Almacenes/ }).click();
