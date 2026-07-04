@@ -535,3 +535,27 @@ Tomadas por el equipo al construir el ETL del histórico de Calidad y EsMa + el 
 - **Aplica en:** F6-E6 (criterio de salida de la fase).
 
 - **Fecha (E6.1–E6.4):** 2026-07-02.
+
+---
+
+### Hallazgos y decisiones del ETL de F7-E6 (cierre de fase) — 2026-07-03
+
+Tomadas por el equipo al construir el ETL del histórico de **Costos + Indicadores** y el reporte de cuadre. Consistentes con **D2** (cerrada con Daniel 2026-07-02). Las marcadas **(a ratificar con Daniel)** son defaults seguros o refinamientos; no bloquean el cierre de F7 pero conviene confirmarlas antes de F9.
+
+#### (F7-E6.1) — EDR histórico NO se migra; costeos SÍ (D2#11)
+- El ETL NO toca `EdoResult`/`EdoResultDet` (verificado por grep en el diff). Solo migra **costeos** (`CostoOrd`, 2,513) e **indicadores** completos. Consistente con **D2 punto 11** (el EDR arranca 2026).
+
+#### (F7-E6.2) — Regalía fuera del costo (D2): el delta v1−v2 es ESPERADO y se LISTA
+- Verificado empíricamente sobre `CostoOrd.csv`: el `Costo` viejo **SÍ incluía** la regalía (305/362 filas con `RegaliasCost`≠0 casan con-regalía, 0 sin-regalía; 57 no casan por inconsistencias del dato viejo, LISTADAS). Mapeo D2: `telaCost←TelaCost`, `aviosCost←HabCost`, `procesosCost←MaquilaCost+BordCost`; **`RegaliasCost` NO se migra** → `costoTotal` v2 = `Costo` viejo − `RegaliasCost`. El delta = Σ `RegaliasCost` sale en el cuadre como **ESPERADO por diseño**, nunca corregido en silencio (§7); el `Costo` viejo se preserva en `MapeoMigracion` para trazabilidad.
+- **Aplica en:** F7-E6 (`etl-costos`, `cuadre-f7`).
+
+#### (F7-E6.3) — Cíclico histórico Proscai en modo migración (D6), SIN cambio de esquema
+- `crearInventarioCiclicoMigrado` (nuevo, `dominio/indicadores/migracion.ts`): registros `cerrado`, `cantTeorica=CantProscai` (**origen externo, NO comparable al kardex v2**), `cantReal=CantReal`, **SIN ajuste de kardex** (no toca existencias ni `existencia_pt`), sentinelas color/talla `(sin especificar)` + almacén `(Migración Proscai)` **INACTIVO**, `idOrden` NULL, **1 encabezado por fila** (fiel a la bitácora plana vieja e idempotencia limpia). La bandeja viva `listarInventariosCiclicos` filtra `almacen:{activo:true}` → los ~542 históricos NO tapan la operación pero siguen 100% consultables por detalle/exactitud y los cuenta el cuadre.
+- **(a ratificar con Daniel):** granularidad 1:1 por fila vs. agrupar por fecha.
+
+#### (F7-E6.4) — Preservación de usuario histórico (D11) y omisiones LISTADAS
+- Fichas `revisorId` y muestrarios `solicitanteId` se preservan como el `id` del usuario viejo (texto sin FK, ADR-0005; F9 remapea), mismo precedente que F5 (`capturadoPor`). Filas no mapeadas se LISTAN, nunca se inventan: órdenes sin mapeo de F2, `noCostear`, persona/actividad sin mapeo, ~20 registros de productividad con horas fuera de rango (0/>24), `ModeloIC` sin match por código, y los **clientes-texto de muestrarios "Walmart"(4)/"Soriana"(1) se OMITEN** (no se crean clientes desde el ETL).
+- **(a ratificar con Daniel):** si quiere esos 5 muestrarios, se crea primero el cliente en el catálogo.
+- **Aplica en:** F7-E6 (todos los loaders de indicadores).
+
+- **Fecha (F7-E6.1–F7-E6.4):** 2026-07-03.
