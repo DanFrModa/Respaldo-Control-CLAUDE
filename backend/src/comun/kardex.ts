@@ -40,6 +40,13 @@ export interface LineaMovimientoPt {
   idModelo: number;
   idColor: number;
   idTalla: number;
+  /**
+   * ORDEN de producción a la que PERTENECEN estas prendas (F6-E2 "PT por orden" — ADR-0014). La
+   * existencia PT es por modelo×color×talla×ORDEN×almacén. NULL/ausente = bucket "sin orden"
+   * (movimiento manual/traspaso/histórico). El dominio decide: recibo/entrega/reclasificación la
+   * pasan; los movimientos manuales no.
+   */
+  idOrden?: number | null;
   /** Cantidad de prendas, entera y POSITIVA (≥1). El signo lo aplica el kardex por la dirección. */
   cantidad: number;
 }
@@ -114,15 +121,18 @@ export async function bloquearArticuloPt(
   idModelo: number,
   idColor: number,
   idTalla: number,
+  idOrden: number | null,
 ): Promise<void> {
-  // Dos claves int4 estables a partir de las 5 dimensiones (pg_advisory_xact_lock(int4, int4)).
-  // No precisa ser criptográfico ni libre de colisiones: una colisión (dos artículos×almacén
+  // Dos claves int4 estables a partir de las 6 dimensiones (pg_advisory_xact_lock(int4, int4)).
+  // No precisa ser criptográfico ni libre de colisiones: una colisión (dos artículos×orden×almacén
   // distintos que caigan en la misma pareja de claves) solo hace que dos transacciones que NO
   // competían por el mismo saldo se serialicen de más (pierden algo de paralelismo) — NUNCA
-  // afecta la correctitud (la suma de `existenciaPtBloqueada` se filtra por las 5 dimensiones
-  // reales, no por la clave del lock). Se combinan con mezclas simples para que colisione poco.
+  // afecta la correctitud (la suma de `existenciaPtBloqueada` se filtra por las 6 dimensiones
+  // reales, no por la clave del lock). La ORDEN entra a la clave (F6-E2 "PT por orden"): dos
+  // operaciones sobre el MISMO artículo pero ÓRDENES distintas ya no compiten por el mismo saldo,
+  // así que no deben sobre-serializarse. `idOrden` NULL (bucket "sin orden") se mapea a 0.
   const clave1 = (idEmpresa * 1_000_003 + idAlmacen) | 0;
-  const clave2 = ((idModelo * 1_000_003 + idColor) * 31 + idTalla) | 0;
+  const clave2 = (((idModelo * 1_000_003 + idColor) * 31 + idTalla) * 31 + (idOrden ?? 0)) | 0;
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(${clave1}::int, ${clave2}::int)`;
 }
 
@@ -141,7 +151,12 @@ export async function existenciaPtBloqueada(
   idModelo: number,
   idColor: number,
   idTalla: number,
+  idOrden: number | null,
 ): Promise<number> {
+  // La ORDEN entra a la dimensión de existencia (F6-E2 "PT por orden"): se compara con
+  // `IS NOT DISTINCT FROM` para que el bucket "sin orden" (NULL) case consigo mismo (mismo patrón
+  // que `id_lote` NULL en tela). Así una salida/entrega/reclasificación valida contra el saldo de
+  // SU orden (o del bucket sin orden), no contra el total del modelo.
   const filas = await tx.$queryRaw<{ existencia: bigint | null }[]>`
     SELECT COALESCE(SUM(
       d."cantidad" * CASE t."direccion"
@@ -158,6 +173,7 @@ export async function existenciaPtBloqueada(
       AND d."id_modelo" = ${idModelo}
       AND d."id_color" = ${idColor}
       AND d."id_talla" = ${idTalla}
+      AND d."id_orden" IS NOT DISTINCT FROM ${idOrden}
   `;
   return Number(filas[0]?.existencia ?? 0n);
 }
@@ -209,6 +225,7 @@ export async function registrarMovimientoPt(
             idModelo: linea.idModelo,
             idColor: linea.idColor,
             idTalla: linea.idTalla,
+            idOrden: linea.idOrden ?? null,
             cantidad: linea.cantidad,
           })),
         },
@@ -384,6 +401,9 @@ export async function cancelarMovimientoPt(
             idModelo: det.idModelo,
             idColor: det.idColor,
             idTalla: det.idTalla,
+            // El inverso hereda la ORDEN del renglón original (F6-E2 "PT por orden"): así neutraliza
+            // el MISMO bucket de orden y la existencia por orden no queda descuadrada.
+            idOrden: det.idOrden,
             cantidad: det.cantidad,
           })),
         },

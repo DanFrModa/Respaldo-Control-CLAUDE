@@ -126,6 +126,9 @@ describe('Movimiento manual (F3-E3)', () => {
     expect(fila?.existencia).toBe(30);
     expect(fila?.color).toBe('Rojo');
     expect(fila?.modelo).toBe('A-100');
+    // PT por orden (F6-E2): un movimiento MANUAL cae en el bucket SIN orden (idOrden/folioOrden null).
+    expect(fila?.idOrden).toBeNull();
+    expect(fila?.folioOrden).toBeNull();
   });
 
   it('salida dentro de la existencia descuenta', async () => {

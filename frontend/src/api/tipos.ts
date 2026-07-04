@@ -850,6 +850,117 @@ export type CargosEsMaQuery = NonNullable<paths['/api/esma/cargos']['get']['para
 export type CargoEsMaValidar =
   paths['/api/esma/cargos/{id}/validar']['post']['requestBody']['content']['application/json'];
 
+// ── EsMa corazón contable: abonos/descuentos/pagos, saldo y conciliación (F6-E4) ──
+
+/** Cuerpo de captura de un abono o descuento (`POST /api/esma/{abonos,descuentos}`). */
+export type EsMaMovimientoCrear =
+  paths['/api/esma/abonos']['post']['requestBody']['content']['application/json'];
+/** Un movimiento plano de EsMa (abono/descuento) tal como lo devuelve el API. */
+export type EsMaMovimiento =
+  paths['/api/esma/abonos']['post']['responses']['201']['content']['application/json'];
+/** Lista de abonos/descuentos de un maquilero (`GET /api/esma/maquileros/{id}/{abonos,descuentos}`). */
+export type EsMaMovimientosLista =
+  paths['/api/esma/maquileros/{id}/abonos']['get']['responses']['200']['content']['application/json'];
+
+/** Cuerpo de captura de un pago ligado a cargos (`POST /api/esma/pagos`). */
+export type EsMaPagoCrear =
+  paths['/api/esma/pagos']['post']['requestBody']['content']['application/json'];
+/** Un renglón de aplicación del pago a un cargo (parte del cuerpo). */
+export type EsMaPagoAplicacionEntrada = EsMaPagoCrear['aplicaciones'][number];
+/** Un pago a un maquilero (con sus aplicaciones a cargos) tal como lo devuelve el API. */
+export type EsMaPago =
+  paths['/api/esma/pagos']['post']['responses']['201']['content']['application/json'];
+/** Una aplicación (cargo cubierto) de un pago. */
+export type EsMaPagoAplicacion = EsMaPago['aplicaciones'][number];
+/** Lista de pagos de un maquilero (`GET /api/esma/maquileros/{id}/pagos`). */
+export type EsMaPagosLista =
+  paths['/api/esma/maquileros/{id}/pagos']['get']['responses']['200']['content']['application/json'];
+
+/** Saldo derivado de un maquilero (`GET /api/esma/maquileros/{id}/saldo`). */
+export type EsMaSaldo =
+  paths['/api/esma/maquileros/{id}/saldo']['get']['responses']['200']['content']['application/json'];
+/** Parámetros del saldo (segmento con/sin factura). */
+export type EsMaSaldoQuery = NonNullable<
+  paths['/api/esma/maquileros/{id}/saldo']['get']['parameters']['query']
+>;
+
+/** Conciliación EsMa vs recibos del periodo (`GET /api/esma/conciliacion`). */
+export type EsMaConciliacion =
+  paths['/api/esma/conciliacion']['get']['responses']['200']['content']['application/json'];
+/** Una fila del cuadre (orden + maquilero + proceso). */
+export type EsMaConciliacionFila = EsMaConciliacion['filas'][number];
+/** Un cargo sin recibo ligado (parte de la conciliación). */
+export type EsMaCargoSinRecibo = EsMaConciliacion['cargosSinRecibo'][number];
+/** Parámetros de la conciliación (querystring). */
+export type EsMaConciliacionQuery = NonNullable<
+  paths['/api/esma/conciliacion']['get']['parameters']['query']
+>;
+
+// ── EsMa experiencia de usuario: estado de cuenta, semanales, saldos, selector (F6-E5) ──
+
+/** Estado de cuenta unificado de un maquilero (`GET /api/esma/maquileros/{id}/estado-cuenta`). */
+export type EsMaEstadoCuenta =
+  paths['/api/esma/maquileros/{id}/estado-cuenta']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del estado de cuenta unificado. */
+export type EsMaEstadoCuentaMovimiento = EsMaEstadoCuenta['movimientos'][number];
+/** Parámetros del estado de cuenta (querystring). */
+export type EsMaEstadoCuentaQuery = NonNullable<
+  paths['/api/esma/maquileros/{id}/estado-cuenta']['get']['parameters']['query']
+>;
+
+/** Estado de cuenta desglosado de un maquilero (`GET /api/esma/maquileros/{id}/desglosado`). */
+export type EsMaDesglosado =
+  paths['/api/esma/maquileros/{id}/desglosado']['get']['responses']['200']['content']['application/json'];
+/** Un cargo desglosado (detalle por orden/modelo). */
+export type EsMaDesglosadoCargo = EsMaDesglosado['cargos'][number];
+
+/** Saldos de todos los maquileros (`GET /api/esma/saldos`). */
+export type EsMaSaldosTodos =
+  paths['/api/esma/saldos']['get']['responses']['200']['content']['application/json'];
+/** Una fila del tablero de saldos. */
+export type EsMaSaldoTodosFila = EsMaSaldosTodos['filas'][number];
+/** Parámetros del tablero de saldos (querystring). */
+export type EsMaSaldosTodosQuery = NonNullable<
+  paths['/api/esma/saldos']['get']['parameters']['query']
+>;
+
+/** Pagos semanales (`GET /api/esma/pagos-semanales`). */
+export type EsMaPagosSemanales =
+  paths['/api/esma/pagos-semanales']['get']['responses']['200']['content']['application/json'];
+/** Un pago en la consulta semanal. */
+export type EsMaPagoSemanalFila = EsMaPagosSemanales['filas'][number];
+/** Parámetros de pagos semanales (querystring). */
+export type EsMaPagosSemanalesQuery = NonNullable<
+  paths['/api/esma/pagos-semanales']['get']['parameters']['query']
+>;
+
+/** Recibos semanales de maquila EsMa (`GET /api/esma/recibos-semanales`). */
+export type EsMaRecibosSemanales =
+  paths['/api/esma/recibos-semanales']['get']['responses']['200']['content']['application/json'];
+/** Un recibo de maquila del periodo. */
+export type EsMaReciboSemanalFila = EsMaRecibosSemanales['filas'][number];
+/** Parámetros de recibos semanales EsMa (querystring). */
+export type EsMaRecibosSemanalesQuery = NonNullable<
+  paths['/api/esma/recibos-semanales']['get']['parameters']['query']
+>;
+
+/** Selector de maquileros de EsMa (`GET /api/esma/maquileros`). */
+export type EsMaMaquileros =
+  paths['/api/esma/maquileros']['get']['responses']['200']['content']['application/json'];
+/** Un maquilero del selector. */
+export type EsMaMaquileroFila = EsMaMaquileros['filas'][number];
+/** Parámetros del selector de maquileros (querystring). */
+export type EsMaMaquilerosQuery = NonNullable<
+  paths['/api/esma/maquileros']['get']['parameters']['query']
+>;
+
+/** Resultado de revisar una partida (`POST /api/esma/movimientos/{concepto}/{id}/revisar`). */
+export type EsMaRevision =
+  paths['/api/esma/movimientos/{concepto}/{id}/revisar']['post']['responses']['200']['content']['application/json'];
+/** Concepto de una partida revisable (abono/descuento/pago). */
+export type EsMaConceptoRevisable =
+  paths['/api/esma/movimientos/{concepto}/{id}/revisar']['post']['parameters']['path']['concepto'];
+
 // ── Entrega a cliente (F3-E5) — cierre del ciclo de la orden ──────────────────
 
 /** Una entrega a cliente tal como la devuelve el API (con su matriz color×talla). */
@@ -903,3 +1014,363 @@ export type ExistenciaMaquileroFila = ExistenciaMaquilero['filas'][number];
 export type ExistenciaMaquileroQuery = NonNullable<
   paths['/api/produccion/existencias-maquilero']['get']['parameters']['query']
 >;
+
+// ── Calidad (F6-E1): defectos, tipos de producto, planes AQL y bitácora ──────
+
+/** Página de defectos (`GET /api/calidad/defectos`). */
+export type DefectosPagina =
+  paths['/api/calidad/defectos']['get']['responses']['200']['content']['application/json'];
+/** Un defecto tal como lo devuelve el API (con sus tipos de producto ligados). */
+export type Defecto = DefectosPagina['datos'][number];
+/** Severidad informativa de un defecto. */
+export type SeveridadDefecto = Defecto['severidad'];
+/** Parámetros de consulta del listado de defectos (querystring). */
+export type DefectosQuery = NonNullable<
+  paths['/api/calidad/defectos']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de defecto (`POST /api/calidad/defectos`). */
+export type DefectoCrear =
+  paths['/api/calidad/defectos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de defecto (`PATCH /api/calidad/defectos/{id}`). */
+export type DefectoEditar =
+  paths['/api/calidad/defectos/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Página de tipos de producto (`GET /api/calidad/tipos-producto`). */
+export type TiposProductoPagina =
+  paths['/api/calidad/tipos-producto']['get']['responses']['200']['content']['application/json'];
+/** Un tipo de producto tal como lo devuelve el API. */
+export type TipoProducto = TiposProductoPagina['datos'][number];
+/** Parámetros de consulta del listado de tipos de producto (querystring). */
+export type TiposProductoQuery = NonNullable<
+  paths['/api/calidad/tipos-producto']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de tipo de producto (`POST /api/calidad/tipos-producto`). */
+export type TipoProductoCrear =
+  paths['/api/calidad/tipos-producto']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de tipo de producto (`PATCH /api/calidad/tipos-producto/{id}`). */
+export type TipoProductoEditar =
+  paths['/api/calidad/tipos-producto/{id}']['patch']['requestBody']['content']['application/json'];
+
+/** Página de planes AQL (`GET /api/calidad/planes-aql`). */
+export type PlanesAqlPagina =
+  paths['/api/calidad/planes-aql']['get']['responses']['200']['content']['application/json'];
+/** Un plan AQL tal como lo devuelve el API (con sus renglones y límites). */
+export type PlanAql = PlanesAqlPagina['datos'][number];
+/** Un renglón del plan AQL (rango de lote → muestra + límites). */
+export type PlanAqlRenglon = PlanAql['renglones'][number];
+/** Parámetros de consulta del listado de planes AQL (querystring). */
+export type PlanesAqlQuery = NonNullable<
+  paths['/api/calidad/planes-aql']['get']['parameters']['query']
+>;
+/** Cuerpo de alta de plan AQL (`POST /api/calidad/planes-aql`). */
+export type PlanAqlCrear =
+  paths['/api/calidad/planes-aql']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de plan AQL (`PATCH /api/calidad/planes-aql/{id}`). */
+export type PlanAqlEditar =
+  paths['/api/calidad/planes-aql/{id}']['patch']['requestBody']['content']['application/json'];
+/** Resultado de la resolución del plan (`GET /api/calidad/planes-aql/resolver`). */
+export type ResolverPlan =
+  paths['/api/calidad/planes-aql/resolver']['get']['responses']['200']['content']['application/json'];
+/** Parámetros de la resolución del plan (querystring). */
+export type ResolverPlanQuery = NonNullable<
+  paths['/api/calidad/planes-aql/resolver']['get']['parameters']['query']
+>;
+
+/** Una auditoría de calidad con su detalle y sugerencia (`GET /api/calidad/auditorias/{id}`). */
+export type Auditoria =
+  paths['/api/calidad/auditorias/{id}']['get']['responses']['200']['content']['application/json'];
+/** Un renglón defecto → fallas de una auditoría. */
+export type AuditoriaDefecto = Auditoria['defectos'][number];
+/** Veredicto de una auditoría (aprobado/reprobado/no_calificado). */
+export type ResultadoAuditoria = Auditoria['resultado'];
+/** Tipo de auditoría (en piso / final / sin definir). */
+export type TipoAuditoria = Auditoria['tipoAuditoria'];
+/** Sugerencia AQL informativa de una auditoría. */
+export type SugerenciaAql = Auditoria['sugerencia'];
+/** Cuerpo de alta de auditoría (`POST /api/calidad/auditorias`). */
+export type AuditoriaCrear =
+  paths['/api/calidad/auditorias']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de captura de resultado (`PATCH /api/calidad/auditorias/{id}/resultado`). */
+export type AuditoriaResultado =
+  paths['/api/calidad/auditorias/{id}/resultado']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de reclasificación (`POST /api/calidad/auditorias/{id}/reclasificacion`). */
+export type AuditoriaReclasificacion =
+  paths['/api/calidad/auditorias/{id}/reclasificacion']['post']['requestBody']['content']['application/json'];
+/** Contexto de una orden para el alta (`GET /api/calidad/auditorias/orden/{idOrden}/contexto`). */
+export type AuditoriaContexto =
+  paths['/api/calidad/auditorias/orden/{idOrden}/contexto']['get']['responses']['200']['content']['application/json'];
+/** Un maquilero propuesto en el contexto de la orden. */
+export type MaquileroPropuesto = AuditoriaContexto['maquileros'][number];
+
+/** Página de auditorías (consulta, `GET /api/calidad/auditorias`). */
+export type AuditoriasPagina =
+  paths['/api/calidad/auditorias']['get']['responses']['200']['content']['application/json'];
+/** Resumen ligero de una auditoría (una fila del listado). */
+export type AuditoriaResumen = AuditoriasPagina['datos'][number];
+/** Parámetros de consulta del listado de auditorías (querystring). */
+export type AuditoriasQuery = NonNullable<
+  paths['/api/calidad/auditorias']['get']['parameters']['query']
+>;
+/** Cuerpo de modificación de encabezado (`PATCH /api/calidad/auditorias/{id}`). */
+export type AuditoriaModificar =
+  paths['/api/calidad/auditorias/{id}']['patch']['requestBody']['content']['application/json'];
+/** Cuerpo de cancelación (`POST /api/calidad/auditorias/{id}/cancelacion`). */
+export type AuditoriaCancelar =
+  paths['/api/calidad/auditorias/{id}/cancelacion']['post']['requestBody']['content']['application/json'];
+/** Historial de auditorías de un maquilero (`GET /api/calidad/auditorias/maquilero/{idMaquilero}`). */
+export type HistorialMaquilero =
+  paths['/api/calidad/auditorias/maquilero/{idMaquilero}']['get']['responses']['200']['content']['application/json'];
+/** Parámetros del historial por maquilero (querystring). */
+export type HistorialMaquileroQuery = NonNullable<
+  paths['/api/calidad/auditorias/maquilero/{idMaquilero}']['get']['parameters']['query']
+>;
+
+/** Página de bitácora (`GET /api/admin/bitacora`). */
+export type BitacoraPagina =
+  paths['/api/admin/bitacora']['get']['responses']['200']['content']['application/json'];
+/** Un registro de bitácora tal como lo devuelve el API. */
+export type RegistroBitacora = BitacoraPagina['datos'][number];
+/** Acción registrada en la bitácora. */
+export type AccionBitacora = RegistroBitacora['accion'];
+/** Parámetros de consulta del listado de bitácora (querystring). */
+export type BitacoraQuery = NonNullable<paths['/api/admin/bitacora']['get']['parameters']['query']>;
+
+// ── Costos (Módulo 6, F7-E1) ──────────────────────────────────────────────────
+/** Pre-costo de un modelo (`GET /api/costos/pre-costo/{idModelo}`). */
+export type PreCostoModelo =
+  paths['/api/costos/pre-costo/{idModelo}']['get']['responses']['200']['content']['application/json'];
+/** Lista de precios sugeridos (`GET /api/costos/lista-precios`). */
+export type ListaPrecios =
+  paths['/api/costos/lista-precios']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la lista de precios. */
+export type ListaPreciosFila = ListaPrecios['filas'][number];
+/** Parámetros de la lista de precios (querystring). */
+export type ListaPreciosQuery = NonNullable<
+  paths['/api/costos/lista-precios']['get']['parameters']['query']
+>;
+/** Costo de una orden: teórico + guardado + unitario (`GET /api/costos/ordenes/{idOrden}`). */
+export type CostoOrden =
+  paths['/api/costos/ordenes/{idOrden}']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo para guardar/ajustar el costo de una orden (`PUT /api/costos/ordenes/{idOrden}`). */
+export type CostoOrdenGuardar =
+  paths['/api/costos/ordenes/{idOrden}']['put']['requestBody']['content']['application/json'];
+/** Base de prorrateo del costo unitario. */
+export type BaseProrrateo = NonNullable<CostoOrdenGuardar['baseProrrateo']>;
+/** Página de la lista de costos (`GET /api/costos/ordenes`). */
+export type ListaCostos =
+  paths['/api/costos/ordenes']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la lista de costos. */
+export type ListaCostosFila = ListaCostos['datos'][number];
+/** Parámetros de la lista de costos (querystring). */
+export type ListaCostosQuery = NonNullable<
+  paths['/api/costos/ordenes']['get']['parameters']['query']
+>;
+/** Costos y márgenes por pedido (`GET /api/costos/margenes-por-pedido`). */
+export type Margenes =
+  paths['/api/costos/margenes-por-pedido']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de márgenes por pedido. */
+export type MargenPedidoFila = Margenes['filas'][number];
+/** Parámetros de márgenes por pedido (querystring). */
+export type MargenesQuery = NonNullable<
+  paths['/api/costos/margenes-por-pedido']['get']['parameters']['query']
+>;
+
+// ── EDR: Estado de Resultados (Módulo 6, F7-E2) ───────────────────────────────
+/** EDR calculado de un mes (`GET /api/edr/{id}`). */
+export type EdrCalculado =
+  paths['/api/edr/{id}']['get']['responses']['200']['content']['application/json'];
+/** Encabezado global del mes. */
+export type EdrEncabezado = EdrCalculado['encabezado'];
+/** Un corte del EDR (por empresa o cliente). */
+export type EdrCorte = EdrCalculado['cortesEmpresa'][number];
+/** EDR de un mes o indicador de que no existe (`GET /api/edr/por-mes`). */
+export type EdrPorMes =
+  paths['/api/edr/por-mes']['get']['responses']['200']['content']['application/json'];
+/** Comparativo anual del EDR (`GET /api/edr/por-anio`). */
+export type EdrPorAnio =
+  paths['/api/edr/por-anio']['get']['responses']['200']['content']['application/json'];
+/** Un mes del comparativo anual. */
+export type EdrPorAnioMes = EdrPorAnio['meses'][number];
+/** Conciliación de líneas del EDR (`GET /api/edr/{id}/lineas`). */
+export type EdrLineas =
+  paths['/api/edr/{id}/lineas']['get']['responses']['200']['content']['application/json'];
+/** Una línea del EDR con su costo actual. */
+export type EdrLinea = EdrLineas['lineas'][number];
+/** Filtros de la conciliación de líneas. */
+export type EdrLineasQuery = NonNullable<
+  paths['/api/edr/{id}/lineas']['get']['parameters']['query']
+>;
+/** Cuerpo para generar/reconciliar el EDR de un mes (`POST /api/edr/generar`). */
+export type EdrGenerar =
+  paths['/api/edr/generar']['post']['requestBody']['content']['application/json'];
+/** Cuerpo para actualizar el encabezado del mes (`PUT /api/edr/{id}`). */
+export type EdrEncabezadoCuerpo =
+  paths['/api/edr/{id}']['put']['requestBody']['content']['application/json'];
+/** Cuerpo para agregar una línea manual (`POST /api/edr/{id}/lineas`). */
+export type EdrLineaManual =
+  paths['/api/edr/{id}/lineas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo para ajustar una línea (`PUT /api/edr/lineas/{idLinea}`). */
+export type EdrLineaAjustar =
+  paths['/api/edr/lineas/{idLinea}']['put']['requestBody']['content']['application/json'];
+/** Origen de una línea del EDR. */
+export type EdrOrigenLinea = EdrLinea['origen'];
+
+// ── Indicadores: tableros directivos (Módulo Indicadores, F7-E3) ──────────────
+/** Tablero de KPIs de Ruta Crítica (`GET /api/indicadores/rc`). */
+export type KpisRc =
+  paths['/api/indicadores/rc']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero de Ruta Crítica (querystring). */
+export type KpisRcQuery = NonNullable<paths['/api/indicadores/rc']['get']['parameters']['query']>;
+/** Un renglón de lead time por proceso. */
+export type LeadTimeProceso = KpisRc['leadTime'][number];
+/** Un renglón de cuello de botella. */
+export type CuelloBotella = KpisRc['cuellosBotella'][number];
+/** Un renglón de desempeño por responsable. */
+export type DesempenoResponsable = KpisRc['desempeno'][number];
+/** Un punto de la tendencia de la RC. */
+export type TendenciaRc = KpisRc['tendencia'][number];
+/** Tablero de calidad por maquilero (`GET /api/indicadores/calidad-maquileros`). */
+export type KpisCalidad =
+  paths['/api/indicadores/calidad-maquileros']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero de calidad (querystring). */
+export type KpisCalidadQuery = NonNullable<
+  paths['/api/indicadores/calidad-maquileros']['get']['parameters']['query']
+>;
+/** Un renglón de aprobación por maquilero. */
+export type CalidadMaquilero = KpisCalidad['maquileros'][number];
+/** Un defecto top. */
+export type DefectoTop = KpisCalidad['defectosTop'][number];
+/** Tablero WIP analítico (`GET /api/indicadores/wip`). */
+export type KpisWip =
+  paths['/api/indicadores/wip']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero WIP (querystring). */
+export type KpisWipQuery = NonNullable<paths['/api/indicadores/wip']['get']['parameters']['query']>;
+/** Una orden del tablero WIP. */
+export type WipKpiFila = KpisWip['datos'][number];
+
+// ── Indicadores · Productividad unificada IP/Almacén (F7-E4) ──────────────────
+/** Página de personal del área (`GET /api/indicadores/productividad/personal`). */
+export type PersonalPagina =
+  paths['/api/indicadores/productividad/personal']['get']['responses']['200']['content']['application/json'];
+/** Una persona del área. */
+export type PersonalArea = PersonalPagina['datos'][number];
+/** Filtros del listado de personal. */
+export type PersonalQuery = NonNullable<
+  paths['/api/indicadores/productividad/personal']['get']['parameters']['query']
+>;
+/** Alta de persona (`POST`). */
+export type PersonalCrear =
+  paths['/api/indicadores/productividad/personal']['post']['requestBody']['content']['application/json'];
+/** Edición de persona (`PATCH`). */
+export type PersonalEditar =
+  paths['/api/indicadores/productividad/personal/{id}']['patch']['requestBody']['content']['application/json'];
+/** Página de actividades (`GET /api/indicadores/productividad/actividades`). */
+export type ActividadPagina =
+  paths['/api/indicadores/productividad/actividades']['get']['responses']['200']['content']['application/json'];
+/** Una actividad productiva. */
+export type ActividadProductividad = ActividadPagina['datos'][number];
+/** Filtros del listado de actividades. */
+export type ActividadQuery = NonNullable<
+  paths['/api/indicadores/productividad/actividades']['get']['parameters']['query']
+>;
+/** Alta de actividad (`POST`). */
+export type ActividadCrear =
+  paths['/api/indicadores/productividad/actividades']['post']['requestBody']['content']['application/json'];
+/** Edición de actividad (`PATCH`). */
+export type ActividadEditar =
+  paths['/api/indicadores/productividad/actividades/{id}']['patch']['requestBody']['content']['application/json'];
+/** Página de registros de productividad (`GET /api/indicadores/productividad/registros`). */
+export type RegistrosProductividadPagina =
+  paths['/api/indicadores/productividad/registros']['get']['responses']['200']['content']['application/json'];
+/** Un registro de productividad (con índice). */
+export type RegistroProductividad = RegistrosProductividadPagina['datos'][number];
+/** Filtros del listado de registros. */
+export type RegistrosProductividadQuery = NonNullable<
+  paths['/api/indicadores/productividad/registros']['get']['parameters']['query']
+>;
+/** Alta de registro (`POST`). */
+export type RegistroProductividadCrear =
+  paths['/api/indicadores/productividad/registros']['post']['requestBody']['content']['application/json'];
+/** Tablero de productividad (`GET /api/indicadores/productividad/tablero`). */
+export type TableroProductividad =
+  paths['/api/indicadores/productividad/tablero']['get']['responses']['200']['content']['application/json'];
+/** Filtros del tablero de productividad. */
+export type TableroProductividadQuery = NonNullable<
+  paths['/api/indicadores/productividad/tablero']['get']['parameters']['query']
+>;
+/** Una fila del tablero de productividad. */
+export type TableroProductividadFila = TableroProductividad['filas'][number];
+
+// ── Indicadores · Fichas confiables (F7-E4) ──────────────────────────────────
+/** Lista de reactivos del checklist (`GET /api/indicadores/fichas/reactivos`). */
+export type ReactivosFichaLista =
+  paths['/api/indicadores/fichas/reactivos']['get']['responses']['200']['content']['application/json'];
+/** Un reactivo del checklist. */
+export type ReactivoFicha = ReactivosFichaLista['datos'][number];
+/** Checklist de confiabilidad de una orden (`GET /api/indicadores/fichas/ordenes/{idOrden}`). */
+export type FichaOrden =
+  paths['/api/indicadores/fichas/ordenes/{idOrden}']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo para guardar el checklist (`PUT`). */
+export type VerificarFichaOrden =
+  paths['/api/indicadores/fichas/ordenes/{idOrden}']['put']['requestBody']['content']['application/json'];
+/** Indicador de % de fichas confiables (`GET /api/indicadores/fichas/confiables`). */
+export type FichasConfiables =
+  paths['/api/indicadores/fichas/confiables']['get']['responses']['200']['content']['application/json'];
+/** Filtros del indicador de fichas confiables. */
+export type FichasConfiablesQuery = NonNullable<
+  paths['/api/indicadores/fichas/confiables']['get']['parameters']['query']
+>;
+/** Una orden en el indicador de fichas confiables. */
+export type FichaConfiableFila = FichasConfiables['datos'][number];
+
+// ── Indicadores · Muestrarios pendientes (F7-E4) ─────────────────────────────
+/** Página de muestrarios (`GET /api/indicadores/muestrarios`). */
+export type MuestrariosPagina =
+  paths['/api/indicadores/muestrarios']['get']['responses']['200']['content']['application/json'];
+/** Un muestrario (con estado/cumplimiento). */
+export type Muestrario = MuestrariosPagina['datos'][number];
+/** Filtros del listado de muestrarios. */
+export type MuestrariosQuery = NonNullable<
+  paths['/api/indicadores/muestrarios']['get']['parameters']['query']
+>;
+/** Alta (solicitud) de muestrario (`POST`). */
+export type MuestrarioCrear =
+  paths['/api/indicadores/muestrarios']['post']['requestBody']['content']['application/json'];
+/** Edición de muestrario (`PATCH`). */
+export type MuestrarioEditar =
+  paths['/api/indicadores/muestrarios/{id}']['patch']['requestBody']['content']['application/json'];
+/** Entrega de muestrario (`POST .../entregar`). */
+export type MuestrarioEntregar =
+  paths['/api/indicadores/muestrarios/{id}/entregar']['post']['requestBody']['content']['application/json'];
+/** KPI de cumplimiento de muestrarios (`GET .../cumplimiento`). */
+export type MuestrariosCumplimiento =
+  paths['/api/indicadores/muestrarios/cumplimiento']['get']['responses']['200']['content']['application/json'];
+
+// ── Indicadores · Inventario cíclico (F7-E5) ─────────────────────────────────
+/** Página de inventarios cíclicos (`GET /api/indicadores/ciclicos`). */
+export type InventariosCiclicosPagina =
+  paths['/api/indicadores/ciclicos']['get']['responses']['200']['content']['application/json'];
+/** Resumen (encabezado) de un cíclico. */
+export type InventarioCiclicoResumen = InventariosCiclicosPagina['datos'][number];
+/** Filtros del listado de cíclicos. */
+export type InventariosCiclicosQuery = NonNullable<
+  paths['/api/indicadores/ciclicos']['get']['parameters']['query']
+>;
+/** Alta de un cíclico (`POST`). */
+export type InventarioCiclicoCrear =
+  paths['/api/indicadores/ciclicos']['post']['requestBody']['content']['application/json'];
+/** Estado del ciclo de vida de un cíclico. */
+export type EstadoInventarioCiclico = InventarioCiclicoResumen['estado'];
+/** Vista de CONTEO ciego (`GET .../conteo`). */
+export type ConteoCiclico =
+  paths['/api/indicadores/ciclicos/{id}/conteo']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de conteo ciego. */
+export type ConteoCiclicoRenglon = ConteoCiclico['renglones'][number];
+/** Captura de conteo (`POST .../conteo`). */
+export type ConteoCiclicoCapturar =
+  paths['/api/indicadores/ciclicos/{id}/conteo']['post']['requestBody']['content']['application/json'];
+/** Vista de EXACTITUD (`GET .../exactitud`). */
+export type ExactitudCiclico =
+  paths['/api/indicadores/ciclicos/{id}/exactitud']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de exactitud (teórico vs real). */
+export type ExactitudCiclicoRenglon = ExactitudCiclico['renglones'][number];

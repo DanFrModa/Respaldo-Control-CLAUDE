@@ -77,6 +77,7 @@ function proveedor(id: number, nombre: string, activo = true): Proveedor {
     corto: null,
     asegurado: null,
     obsPago: null,
+    modalidadFacturacion: null,
     roles: [],
     cantidadAdjuntos: 0,
     activo,

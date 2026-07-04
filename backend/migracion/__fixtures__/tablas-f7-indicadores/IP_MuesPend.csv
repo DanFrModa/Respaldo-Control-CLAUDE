@@ -1,0 +1,4 @@
+"IdIP_MuesPend","Cliente","Categoria","Temporada","CantBoards","CantMuestras","FechaSolicitado","FechaRequerida","FechaEntregado","BoardsOK","MuestrasOK","IdUsuarioSolicitante","Cancelado"
+1,"Cliente Uno","Ninos","Primavera Verano",5,10,09/12/2008 00:00:00,10/12/2008 00:00:00,17/02/2009 00:00:00,4,9,27,0
+2,"NoExiste","Damas","Primavera Verano",2,3,09/12/2008 00:00:00,10/12/2008 00:00:00,,0,0,27,0
+3,"Cliente Uno","Ninos","Otono",1,2,09/12/2008 00:00:00,20/12/2008 00:00:00,,1,0,0,0

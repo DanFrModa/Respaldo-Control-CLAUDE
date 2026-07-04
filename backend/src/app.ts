@@ -21,7 +21,18 @@ import { rutasOrdenesCompra } from './api/compras/ordenes-compra.rutas.js';
 import { rutasRecepcionesCompra } from './api/compras/recepciones.rutas.js';
 import { rutasMrp } from './api/compras/mrp.rutas.js';
 import { rutasNotasSalida } from './api/notas/notas-salida.rutas.js';
+import { rutasCostos } from './api/costos/costos.rutas.js';
+import { rutasEdr } from './api/edr/edr.rutas.js';
+import { rutasIndicadores } from './api/indicadores/indicadores.rutas.js';
+import { rutasProductividad } from './api/indicadores/productividad.rutas.js';
+import { rutasFichas } from './api/indicadores/fichas.rutas.js';
+import { rutasMuestrarios } from './api/indicadores/muestrarios.rutas.js';
+import { rutasCiclicos } from './api/indicadores/ciclicos.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
+import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
+import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
+import { rutasCuentaEsMa } from './api/esma/cuenta.rutas.js';
+import { rutasEstadoCuentaEsMa } from './api/esma/estado-cuenta.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
@@ -30,6 +41,11 @@ import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
+import { rutasBitacora } from './api/admin/bitacora.rutas.js';
+import { rutasAuditorias } from './api/calidad/auditorias.rutas.js';
+import { rutasDefectos } from './api/calidad/defectos.rutas.js';
+import { rutasPlanesAql } from './api/calidad/planes-aql.rutas.js';
+import { rutasTiposProducto } from './api/calidad/tipos-producto.rutas.js';
 import { rutasBandejaRc } from './api/ruta-critica/bandeja.rutas.js';
 import { rutasConcentradoRc } from './api/ruta-critica/concentrado.rutas.js';
 import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
@@ -195,6 +211,16 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // EsMa (F3-E4) — cola de validación de cargos de maquila derivados de los recibos (propuesto →
   // validado, ajustando cantidad/precio reales). RBAC esma.cargo-validar.
   await app.register(rutasCargosEsMa, { prefix: '/api' });
+  // EsMa (F6-E4) — corazón contable: abonos/descuentos (esma.modificar), pagos ligados a cargos con
+  // anti-doble-pago (esma.ver-pagos) + recibo de pago PDF, saldo derivado (D3), conciliación vs recibos
+  // y estatus "orden pagada" derivado + override. Importes ocultos sin consultas.ver-importes.
+  await app.register(rutasMovimientosEsMa, { prefix: '/api' });
+  await app.register(rutasPagosEsMa, { prefix: '/api' });
+  await app.register(rutasCuentaEsMa, { prefix: '/api' });
+  // EsMa (F6-E5) — experiencia de usuario: estado de cuenta unificado + desglosado (+ PDF R9 + Excel),
+  // saldos de todos, pagos/recibos semanales, selector de maquileros y revisión de partidas. Consulta
+  // con esma.ver-pagos; revisar con esma.modificar. Importes ocultos sin consultas.ver-importes.
+  await app.register(rutasEstadoCuentaEsMa, { prefix: '/api' });
   // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
   // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
   // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias
@@ -219,10 +245,49 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // crudo, sin pivoteo en el cliente), paginado/filtrable/ordenable, + export a Excel del mismo
   // resultado. Solo lectura; RBAC rc.ruta-ver (reusado); A9 por empresa activa.
   await app.register(rutasConcentradoRc, { prefix: '/api' });
+  // CALIDAD (Módulo 8, F6-E1) — base configurable: catálogo de defectos enriquecido (severidad/
+  // categoría/etiqueta por tipo), tipos de producto (clasificación de modelos) y el motor de planes
+  // de muestreo AQL como DATOS (CRUD + resolución lote+nivel → muestra/límites). RBAC por ruta
+  // (calidad.ver consulta / calidad.administrar-catalogo muta).
+  await app.register(rutasDefectos, { prefix: '/api' });
+  await app.register(rutasTiposProducto, { prefix: '/api' });
+  await app.register(rutasPlanesAql, { prefix: '/api' });
+  // Calidad — núcleo de auditorías (F6-E2): alta + captura de resultados + reclasificación + GETs de
+  // apoyo. RBAC por ruta (calidad.generar-auditorias el alta; calidad.actualizar-auditorias la captura
+  // y reclasificación; calidad.ver el detalle).
+  await app.register(rutasAuditorias, { prefix: '/api' });
+  // COSTOS (Módulo 6, F7-E1): pre-costo por modelo + lista de precios (precostos.consultar), costo real
+  // por orden con doble juego teórico/guardado y base de prorrateo (costos.ver/.capturar), lista de
+  // costos y márgenes por pedido (costos.ver, fórmula D2). Impresos R9 (lista de precios PDF, márgenes
+  // PDF/Excel). Importes ocultos sin consultas.ver-importes. La regalía va sobre la venta, no en el costo.
+  await app.register(rutasCostos, { prefix: '/api' });
+  // EDR (Módulo 6, F7-E2): Estado de Resultados mensual CONSOLIDADO (todas las empresas paraEdr),
+  // valuado a COSTO ACTUAL (D1). Genera/reconcilia las líneas desde las entregas a cliente del mes
+  // (D2 #5), concilia el precio facturado, encabezado de gastos global (D2 #6) y cortes por empresa/
+  // cliente. RBAC edr.ver/edr.capturar (mismos roles que costos). Impresos R9 (PDF mensual/anual, Excel).
+  await app.register(rutasEdr, { prefix: '/api' });
+  // INDICADORES (Módulo Indicadores, F7-E3): tableros directivos calculados en SEGUNDO PLANO sobre
+  // vistas materializadas (KPIs de Ruta Crítica/D11, calidad por maquilero/F6, WIP analítico/F3). La
+  // captura NUNCA espera el recálculo (plan §11): /indicadores/refrescar solo encola el job. RBAC
+  // indicadores.ver (directivo/gerencial). Impresos R9 (PDF + Excel). Agregación en SQL (no en cliente).
+  await app.register(rutasIndicadores, { prefix: '/api' });
+  // INDICADORES · CAPTURA (Módulo Indicadores, F7-E4): motor de PRODUCTIVIDAD unificado IP/almacén
+  // (personas, actividades y registros diarios; índice vs estándar por fórmula de área; tablero
+  // agregado en servidor), FICHAS CONFIABLES (checklist por orden + % confiable) y MUESTRARIOS
+  // pendientes (solicitud→entrega + KPI de cumplimiento). RBAC por área/aspecto (indicadores.ip-*/
+  // almacen-productividad, ip-confiabilidad, ip-muestrarios); fecha libre con indicadores.fecha-libre.
+  await app.register(rutasProductividad, { prefix: '/api' });
+  await app.register(rutasFichas, { prefix: '/api' });
+  await app.register(rutasMuestrarios, { prefix: '/api' });
+  // Inventario cíclico (Módulo Indicadores / Almacén, F7-E5): alta que CONGELA el teórico (D6),
+  // conteo CIEGO y ajuste como MOVIMIENTO de kardex (D3). RBAC `indicadores.ciclicos-*`.
+  await app.register(rutasCiclicos, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });
   await app.register(rutasRoles, { prefix: '/api' });
+  // Consulta de BITÁCORA (F6-E1, transversal) — lectura del log de auditoría A7 (admin.ver-bitacora).
+  await app.register(rutasBitacora, { prefix: '/api' });
 
   return app;
 }

@@ -12,8 +12,40 @@ import { CatalogosPagina } from '@/modulos/catalogos/CatalogosPagina';
 import { ClientesPagina } from '@/modulos/clientes/ClientesPagina';
 import { ColoresPagina } from '@/modulos/colores/ColoresPagina';
 import { EmpresasPagina } from '@/modulos/empresas/EmpresasPagina';
+import { CapturaMovimientoPagina } from '@/modulos/esma/CapturaMovimientoPagina';
+import { CapturaPagosPagina } from '@/modulos/esma/CapturaPagosPagina';
+import { ConciliacionCargosPagina } from '@/modulos/esma/ConciliacionCargosPagina';
+import { DesglosadoPagina } from '@/modulos/esma/DesglosadoPagina';
+import { EsMaPagina } from '@/modulos/esma/EsMaPagina';
+import { EstadoCuentaPagina } from '@/modulos/esma/EstadoCuentaPagina';
+import { PagosSemanalesPagina } from '@/modulos/esma/PagosSemanalesPagina';
+import { RecibosSemanalesEsMaPagina } from '@/modulos/esma/RecibosSemanalesEsMaPagina';
+import { SaldosMaquilerosPagina } from '@/modulos/esma/SaldosMaquilerosPagina';
 import { ValidacionCargosPagina } from '@/modulos/esma/ValidacionCargosPagina';
 import { EtiquetasMarcaPagina } from '@/modulos/etiquetas-marca/EtiquetasMarcaPagina';
+import { CostosPagina } from '@/modulos/costos/CostosPagina';
+import { CosteoOrdenPagina } from '@/modulos/costos/CosteoOrdenPagina';
+import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
+import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
+import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
+import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
+import { EdrPagina } from '@/modulos/edr/EdrPagina';
+import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
+import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
+import { EdrPorMesPagina } from '@/modulos/edr/EdrPorMesPagina';
+import { EdrPorAnioPagina } from '@/modulos/edr/EdrPorAnioPagina';
+import { IndicadoresPagina } from '@/modulos/indicadores/IndicadoresPagina';
+import { TableroRcPagina } from '@/modulos/indicadores/TableroRcPagina';
+import { TableroCalidadPagina } from '@/modulos/indicadores/TableroCalidadPagina';
+import { TableroWipPagina as TableroWipIndicadoresPagina } from '@/modulos/indicadores/TableroWipPagina';
+import { CapturaProductividadPagina } from '@/modulos/indicadores/CapturaProductividadPagina';
+import { TableroProductividadPagina } from '@/modulos/indicadores/TableroProductividadPagina';
+import { ProductividadCatalogosPagina } from '@/modulos/indicadores/ProductividadCatalogosPagina';
+import { FichasConfiablesPagina } from '@/modulos/indicadores/FichasConfiablesPagina';
+import { MuestrariosPagina } from '@/modulos/indicadores/MuestrariosPagina';
+import { InventariosCiclicosPagina } from '@/modulos/indicadores/InventariosCiclicosPagina';
+import { ConteoCiclicoPagina } from '@/modulos/indicadores/ConteoCiclicoPagina';
+import { ExactitudCiclicoPagina } from '@/modulos/indicadores/ExactitudCiclicoPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
@@ -50,6 +82,15 @@ import { ReciboMaquilaPagina } from '@/modulos/produccion/ReciboMaquilaPagina';
 import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPagina';
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
+import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
+import { AltaAuditoriaPagina } from '@/modulos/calidad/AltaAuditoriaPagina';
+import { AuditoriasPorMaquileroPagina } from '@/modulos/calidad/AuditoriasPorMaquileroPagina';
+import { CalidadPagina } from '@/modulos/calidad/CalidadPagina';
+import { CapturaAuditoriaPagina } from '@/modulos/calidad/CapturaAuditoriaPagina';
+import { ConsultaAuditoriasPagina } from '@/modulos/calidad/ConsultaAuditoriasPagina';
+import { DefectosPagina } from '@/modulos/calidad/DefectosPagina';
+import { PlanesAqlPagina } from '@/modulos/calidad/PlanesAqlPagina';
+import { TiposProductoPagina } from '@/modulos/calidad/TiposProductoPagina';
 import { BandejaTareasPagina } from '@/modulos/ruta-critica/BandejaTareasPagina';
 import { ConcentradoPagina } from '@/modulos/ruta-critica/ConcentradoPagina';
 import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
@@ -154,7 +195,19 @@ const router = createBrowserRouter([
           { path: 'inventarios/telas/salida-orden', element: <SalidaTelaOrdenPagina /> },
           { path: 'inventarios/materiales/traspasos', element: <TraspasoMaterialesPagina /> },
           { path: 'inventarios/materiales/ajustes', element: <AjusteMaterialesPagina /> },
+          // EsMa (Módulo 7): portada-hub + validación de cargos (F3-E4), corazón contable (F6-E4) y la
+          // experiencia de usuario del estado de cuenta (F6-E5). Rutas estáticas antes de cualquier :param.
+          { path: 'esma', element: <EsMaPagina /> },
+          { path: 'esma/estado-cuenta', element: <EstadoCuentaPagina /> },
+          { path: 'esma/saldos', element: <SaldosMaquilerosPagina /> },
+          { path: 'esma/desglosado', element: <DesglosadoPagina /> },
+          { path: 'esma/pagos-semanales', element: <PagosSemanalesPagina /> },
+          { path: 'esma/recibos-semanales', element: <RecibosSemanalesEsMaPagina /> },
           { path: 'esma/validacion-cargos', element: <ValidacionCargosPagina /> },
+          { path: 'esma/conciliacion', element: <ConciliacionCargosPagina /> },
+          { path: 'esma/abonos', element: <CapturaMovimientoPagina concepto="abonos" /> },
+          { path: 'esma/descuentos', element: <CapturaMovimientoPagina concepto="descuentos" /> },
+          { path: 'esma/pagos', element: <CapturaPagosPagina /> },
           // Ruta Crítica (Módulo 8) — portada-hub de las sub-vistas (antes caía en ":modulo").
           { path: 'ruta-critica', element: <RutaCriticaPagina /> },
           // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.
@@ -169,11 +222,60 @@ const router = createBrowserRouter([
           { path: 'ruta-critica/concentrado', element: <ConcentradoPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden/programar', element: <ProgramarRcPagina /> },
+          // Calidad (Módulo 9, F6-E1) — catálogos base: defectos, tipos de producto, planes AQL.
+          { path: 'calidad', element: <CalidadPagina /> },
+          { path: 'calidad/defectos', element: <DefectosPagina /> },
+          { path: 'calidad/tipos-producto', element: <TiposProductoPagina /> },
+          { path: 'calidad/planes-aql', element: <PlanesAqlPagina /> },
+          // Auditorías de calidad (F6-E2): alta + captura de resultados.
+          { path: 'calidad/auditorias/nueva', element: <AltaAuditoriaPagina /> },
+          // Consulta + historial por maquilero (F6-E3). Rutas estáticas antes de `:id`.
+          { path: 'calidad/auditorias', element: <ConsultaAuditoriasPagina /> },
+          { path: 'calidad/auditorias/maquilero', element: <AuditoriasPorMaquileroPagina /> },
+          { path: 'calidad/auditorias/:id', element: <CapturaAuditoriaPagina /> },
+          // Costos (Módulo 6, F7-E1): hub + pre-costo/lista de precios (precostos.consultar) y
+          // costeo de orden/lista de costos/márgenes (costos.ver/.capturar). Rutas estáticas antes
+          // del catch-all ":modulo".
+          { path: 'costos', element: <CostosPagina /> },
+          { path: 'costos/pre-costo', element: <PreCostoPagina /> },
+          { path: 'costos/lista-precios', element: <ListaPreciosPagina /> },
+          { path: 'costos/costeo', element: <CosteoOrdenPagina /> },
+          { path: 'costos/lista', element: <ListaCostosPagina /> },
+          { path: 'costos/margenes', element: <MargenesPagina /> },
+          // EDR (Módulo 6, F7-E2): hub + gestión del mes (edr.capturar) y conciliación/por mes/por
+          // año (edr.ver). Rutas estáticas antes del catch-all ":modulo".
+          { path: 'edr', element: <EdrPagina /> },
+          { path: 'edr/mes', element: <GestionMesPagina /> },
+          { path: 'edr/conciliacion', element: <ConciliacionPagina /> },
+          { path: 'edr/por-mes', element: <EdrPorMesPagina /> },
+          { path: 'edr/por-anio', element: <EdrPorAnioPagina /> },
+          // Indicadores (Módulo Indicadores, F7-E3): hub + 3 tableros directivos (RC, calidad, WIP),
+          // todos `indicadores.ver`. Rutas estáticas antes del catch-all ":modulo".
+          { path: 'indicadores', element: <IndicadoresPagina /> },
+          { path: 'indicadores/ruta-critica', element: <TableroRcPagina /> },
+          { path: 'indicadores/calidad', element: <TableroCalidadPagina /> },
+          { path: 'indicadores/wip', element: <TableroWipIndicadoresPagina /> },
+          // Indicadores · CAPTURA (F7-E4): productividad (captura/tablero/catálogos), fichas
+          // confiables y muestrarios. Cada pantalla re-verifica su permiso en el backend (A1).
+          { path: 'indicadores/productividad/captura', element: <CapturaProductividadPagina /> },
+          { path: 'indicadores/productividad/tablero', element: <TableroProductividadPagina /> },
+          {
+            path: 'indicadores/productividad/catalogos',
+            element: <ProductividadCatalogosPagina />,
+          },
+          { path: 'indicadores/fichas-confiables', element: <FichasConfiablesPagina /> },
+          { path: 'indicadores/muestrarios', element: <MuestrariosPagina /> },
+          // Indicadores · Inventario cíclico (F7-E5): lista/alta + conteo ciego + exactitud/ajuste.
+          { path: 'indicadores/ciclicos', element: <InventariosCiclicosPagina /> },
+          { path: 'indicadores/ciclicos/:id/conteo', element: <ConteoCiclicoPagina /> },
+          { path: 'indicadores/ciclicos/:id/exactitud', element: <ExactitudCiclicoPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
           // Configuración de la RC por empresa (colchón + calendario + festivos).
           { path: 'administracion/ruta-critica', element: <ConfiguracionRcPagina /> },
+          // Bitácora de auditoría (A7, F6-E1).
+          { path: 'administracion/bitacora', element: <BitacoraPagina /> },
           { path: ':modulo', element: <Proximamente /> },
           { path: '*', element: <NoEncontrado /> },
         ],

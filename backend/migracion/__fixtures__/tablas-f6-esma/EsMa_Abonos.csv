@@ -1,0 +1,5 @@
+"IdEsMa_Abonos","IdEsMa","AbonoEsMa","ObsAbonos"
+1,1,"$500.00","Abono normal"
+2,1,"-$200.00","Saldo anterior negativo"
+3,2,,"Abono sin monto (nulo -> 0)"
+4,3,"$999.00","Abono de maquilero sin mapeo (OMITIDO)"

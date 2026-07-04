@@ -27,13 +27,33 @@ describe('catalogo de modulos del menu', () => {
     // y dependencias) + 3 sub-vistas de F5-E2 (plantillas de ruta, reglas de duración y
     // configuración de RC por empresa) + 1 sub-vista de F5-E5 (bandeja de tareas) + 1 sub-vista de
     // F5-E7 (concentrado planeado vs real) = 41 sub-vistas.
+    // F6-E1: +3 sub-vistas de Calidad (defectos, tipos de producto, planes AQL) + 1 sub-vista de
+    // Administración (bitácora) = 45 sub-vistas → 58 entradas. F6-E2: +1 sub-vista de Calidad
+    // (auditorías de calidad, `calidad.generar-auditorias`) = 46 sub-vistas → 59 entradas. F6-E3:
+    // +2 sub-vistas de Calidad (consulta de auditorías e historial por maquilero, `calidad.ver`) =
+    // 48 sub-vistas → 61 entradas. F6-E4: +4 sub-vistas de EsMa (conciliación y pagos con
+    // `esma.ver-pagos`; abonos y descuentos con `esma.modificar`) = 52 sub-vistas → 65 entradas.
+    // F6-E5: +5 sub-vistas de EsMa (estado de cuenta, saldos, desglosado, pagos y recibos semanales,
+    // todas con `esma.ver-pagos`) = 57 sub-vistas → 70 entradas.
+    // F7-E1: +5 sub-vistas de Costos (pre-costo y lista de precios con `precostos.consultar`; costeo
+    // de orden, lista de costos y márgenes con `costos.ver`) = 62 sub-vistas → 75 entradas. El módulo
+    // Costos deja de ser "autenticado": ahora lo gobiernan `precostos.consultar`/`costos.ver`.
+    // F7-E2: +1 módulo EDR (`edr.ver`) → 14 planeados, +4 sub-vistas del EDR (gestión del mes con
+    // `edr.capturar`; conciliación, por mes y por año con `edr.ver`) = 66 sub-vistas → 80 entradas.
+    // F7-E3: el módulo Indicadores deja de ser "autenticado" (ahora `indicadores.ver`) y suma 3
+    // sub-vistas (RC, calidad y WIP, todas con `indicadores.ver`) = 69 sub-vistas → 83 entradas.
+    // F7-E4: el módulo Indicadores amplía sus permisos (captura operativa) y suma 5 sub-vistas
+    // (captura/tablero/catálogos de productividad, fichas confiables y muestrarios) = 74 sub-vistas
+    // → 88 entradas.
+    // F7-E5: +1 sub-vista de Indicadores (inventarios cíclicos, `indicadores.ciclicos-*`); las
+    // pantallas de conteo/exactitud son detalle (rutas en App, NO en el menú) = 75 sub-vistas → 89.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
-    expect(planeados).toHaveLength(13);
-    expect(MODULOS_MENU).toHaveLength(54);
+    expect(planeados).toHaveLength(14);
+    expect(MODULOS_MENU).toHaveLength(89);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(54);
+    expect(new Set(claves).size).toBe(89);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(54);
+    expect(new Set(rutas).size).toBe(89);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
@@ -60,15 +80,19 @@ describe('catalogo de modulos del menu', () => {
   it('muestra los modulos "autenticado" con cualquier sesion (incluso sin permisos)', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver), Pedidos
-    // (pedidos.ver, F2-E1) y Órdenes (ordenes.ver, F2-E3) NO son "autenticado"; el resto sí ->
-    // 10 visibles sin permisos.
+    // (pedidos.ver, F2-E1) y Órdenes (ordenes.ver, F2-E3) NO son "autenticado"; Calidad
+    // (calidad.ver, F6-E1), Costos (precostos.consultar/costos.ver, F7-E1) e Indicadores
+    // (indicadores.ver, F7-E3) tampoco; el resto sí -> 7 visibles sin permisos.
     expect(visibles.map((m) => m.clave)).not.toContain('administracion');
     expect(visibles.map((m) => m.clave)).not.toContain('modelos');
     expect(visibles.map((m) => m.clave)).not.toContain('galeria-modelos');
     expect(visibles.map((m) => m.clave)).not.toContain('codigos-barra');
     expect(visibles.map((m) => m.clave)).not.toContain('pedidos');
     expect(visibles.map((m) => m.clave)).not.toContain('ordenes');
-    expect(visibles).toHaveLength(10);
+    expect(visibles.map((m) => m.clave)).not.toContain('calidad');
+    expect(visibles.map((m) => m.clave)).not.toContain('costos');
+    expect(visibles.map((m) => m.clave)).not.toContain('indicadores');
+    expect(visibles).toHaveLength(7);
   });
 
   it('oculta Administracion sin un permiso administrativo', () => {
@@ -121,7 +145,14 @@ describe('catalogo de modulos del menu', () => {
     // F4-E1) + la Configuración de RC por empresa (F5-E2, gobernada por `empresas.administrar`,
     // que sí está en este set) = 39. Las sub-vistas de RC `rc.catalogo-ver` (procesos/dependencias
     // de F5-E1 y plantillas/reglas de F5-E2) NO entran: ese permiso no está en este set.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(39);
+    // F6-E1: Calidad y sus 3 sub-vistas requieren `calidad.ver` (no en este set); bitácora
+    // requiere `admin.ver-bitacora` (no en este set) → el total baja de 39 a 38 (calidad
+    // ya no es "autenticado").
+    // F7-E1: el módulo Costos requiere `precostos.consultar`/`costos.ver` (no en este set) y sus 5
+    // sub-vistas también → Costos ya no cuenta (antes era "autenticado") → 38 baja a 37.
+    // F7-E3: el módulo Indicadores requiere `indicadores.ver` (no en este set) y sus 3 sub-vistas
+    // también → Indicadores ya no cuenta (antes era "autenticado") → 37 baja a 36.
+    expect(filtrarModulosVisibles(todos)).toHaveLength(36);
   });
 
   it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {

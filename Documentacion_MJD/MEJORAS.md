@@ -67,7 +67,7 @@ Estas aplican a **todo el sistema**, no a un módulo:
 - Unificar el patrón **productividad** (IP y Almacén comparten estructura) en un motor de KPIs configurable. 🟡
 - Columnas `1s..16s` de 5S → normalizar a tabla de reactivos (A6). 🟡
 - **Definir el rol de ERPs externos (Proscai, Monarch):** hoy el inventario cíclico compara contra `CantProscai`. Decidir si CONTROL v2 los reemplaza o se integra. 🔴
-- Reducir captura manual diaria alimentándola de datos existentes. 🟢
+- Reducir captura manual diaria alimentándola de datos existentes. 🟢 → **DESCARTADO para F7 (F7-E4, 3-jul-2026):** el motor de productividad se construyó con **captura MANUAL** (con atajos Hoy/Ayer/Sábado). La auto-alimentación desde movimientos/recibos ya existentes (doc 05 Observación 4) queda como **mejora futura** (no bloquea): requiere mapear cada actividad de productividad a un evento de origen y decidir la regla de conteo; se retomará si Daniel la prioriza.
 
 ### Clientes / Búsqueda (transversal)
 - **Campos de referencia configurables por cliente** (generaliza `Monarch`): cada cliente define sus campos (No. pedido, estilo, CEDIS…), todos buscables. → **DECISIÓN D7** (modelo en DECISIONES.md). 🔴

@@ -19,6 +19,7 @@ import { hashPassword } from 'better-auth/crypto';
 import { CATALOGO_PERMISOS, CLAVES_PERMISO, type ClavePermiso } from '../src/contrato/index.js';
 import { crearClientePrisma, type PrismaClient } from '../src/datos/index.js';
 
+import { sembrarCalidad } from './seed-calidad.js';
 import { sembrarRutaCritica } from './seed-ruta-critica.js';
 import { sembrarRutaCriticaPlantillas } from './seed-ruta-critica-plantillas.js';
 
@@ -151,15 +152,31 @@ function definirRoles(): {
     // AdministracionDireccion (mismo reparto que el resto de catálogos). El `ver` y los
     // permisos operativos de producción/inventario cascadean (siguen en el conjunto).
     'tipos-proceso.administrar',
+    // F6-E1 — catálogo de Calidad (defectos/tipos de producto/planes AQL): administrar solo
+    // Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos). El
+    // `calidad.ver` y la consulta de bitácora cascadean (siguen en el conjunto del directivo).
+    'calidad.administrar-catalogo',
   );
 
-  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos".
-  const gerencial = sin(directivo, 'ordenes.ver-costos');
+  // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
+  // botón legado de costos de la orden (`ordenes.ver-costos`), el módulo de Costos (`costos.ver`/
+  // `costos.capturar`, menú 6, F7-E1) Y el Estado de Resultados (`edr.ver`/`edr.capturar`, menú 6.2,
+  // F7-E2). Conserva el PRE-COSTO (`precostos.consultar`, nivel ≤45).
+  const gerencial = sin(
+    directivo,
+    'ordenes.ver-costos',
+    'costos.ver',
+    'costos.capturar',
+    'edr.ver',
+    'edr.capturar',
+  );
 
   // Nivel 45 — Ventas: "sin ver el total de ventas en $ en Pedidos" → importes/precios
   // en consultas Y en el módulo Pedidos (F2-E1: `pedidos.importes` oculta `precio`/totales,
   // doc 02-Pedidos §3). Ventas SÍ captura pedidos (alta/edición), solo no ve los importes.
-  const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes');
+  // Los TABLEROS directivos de indicadores (F7-E3, `indicadores.ver`) son de DIRECCIÓN/GERENCIA →
+  // se cortan aquí (los conservan Administrador, AdministracionDireccion, Directivo y Gerencial).
+  const ventas = sin(gerencial, 'consultas.ver-importes', 'pedidos.importes', 'indicadores.ver');
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera
   // modificar órdenes y los precios de maquila (importes de la orden). En v2 (F2-E2) "no
@@ -172,6 +189,8 @@ function definirRoles(): {
     'ordenes.ver-precio-real-maquila',
     'ordenes.administrar',
     'ordenes.cancelar',
+    // Nivel 47 y abajo ya no acceden al pre-costo (era ≤45): Directivo/Gerencial/Ventas sí.
+    'precostos.consultar',
   );
 
   // Nivel 50 — Asistente: su única restricción extra era el MENÚ de catálogos de la RC
@@ -538,12 +557,37 @@ const TIPOS_MOVIMIENTO_F4: {
   { codigo: 'salida-por-nota', nombre: 'Salida de Avío por Nota', direccion: 'salida' },
 ];
 
+/**
+ * Tipos de movimiento NUEVOS de F7-E5 (ajuste por inventario CÍCLICO). El ajuste que reconcilia el
+ * conteo físico contra el kardex se aplica como MOVIMIENTO (D3, nunca editando un saldo); se usan
+ * tipos DEDICADOS (en vez del `ajuste-entrada`/`-salida` genérico) para poder rastrear en el kardex
+ * qué diferencias vinieron de un cíclico. Entra por SEED (no por migración) → el deploy a `prueba`
+ * requiere SEED_ON_START=true.
+ */
+const TIPOS_MOVIMIENTO_F7: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  {
+    codigo: 'ajuste-ciclico-entrada',
+    nombre: 'Ajuste por Cíclico (Entrada)',
+    direccion: 'entrada',
+  },
+  { codigo: 'ajuste-ciclico-salida', nombre: 'Ajuste por Cíclico (Salida)', direccion: 'salida' },
+];
+
 async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
   await verificarTiposMovimientoContraCsv();
   // Los 19 canónicos del CSV + los 2 nuevos de F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex
-  // de telas y avíos). Idempotente: el `update: {}` no pisa nombre/dirección/activo si ya existen
-  // (pudieron editarse en producción).
-  for (const tipo of [...TIPOS_MOVIMIENTO_BASE, ...TIPOS_MOVIMIENTO_V2, ...TIPOS_MOVIMIENTO_F4]) {
+  // de telas y avíos) + los 2 de F7-E5 (ajuste por cíclico). Idempotente: el `update: {}` no pisa
+  // nombre/dirección/activo si ya existen (pudieron editarse en producción).
+  for (const tipo of [
+    ...TIPOS_MOVIMIENTO_BASE,
+    ...TIPOS_MOVIMIENTO_V2,
+    ...TIPOS_MOVIMIENTO_F4,
+    ...TIPOS_MOVIMIENTO_F7,
+  ]) {
     await prisma.tipoMovimientoInventario.upsert({
       where: { codigo: tipo.codigo },
       update: {},
@@ -576,6 +620,38 @@ async function sembrarAlmacenesPt(prisma: PrismaClient): Promise<void> {
     if (existente === null) {
       await prisma.almacen.create({ data: { nombre, tipo: 'PT', idEmpresa: null } });
     }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3g. Reactivos del checklist de FICHAS CONFIABLES (F7-E4) — los 8 fijos del viejo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Los 8 reactivos fijos del checklist de confiabilidad de la ficha técnica del sistema viejo
+ * (`IP_InfConf`, doc 05 §A.2): eran columnas booleanas; en v2 son FILAS configurables (A6). Se
+ * siembran de forma idempotente por `clave`; se pueden agregar más sin migración. El `orden`
+ * respeta la secuencia del formulario viejo.
+ */
+const REACTIVOS_FICHA_BASE: { clave: string; etiqueta: string; orden: number }[] = [
+  { clave: 'InfGeneral', etiqueta: 'Información general', orden: 1 },
+  { clave: 'InfTela', etiqueta: 'Información de tela', orden: 2 },
+  { clave: 'InfHab', etiqueta: 'Información de habilitación', orden: 3 },
+  { clave: 'Medidas', etiqueta: 'Medidas de habilitación', orden: 4 },
+  { clave: 'Dibujo', etiqueta: 'Dibujo', orden: 5 },
+  { clave: 'InfEtiqueta', etiqueta: 'Información de etiqueta', orden: 6 },
+  { clave: 'EspCostura', etiqueta: 'Especificaciones de costura', orden: 7 },
+  { clave: 'MedidasPrendas', etiqueta: 'Medidas en prenda', orden: 8 },
+];
+
+async function sembrarReactivosFicha(prisma: PrismaClient): Promise<void> {
+  for (const reactivo of REACTIVOS_FICHA_BASE) {
+    await prisma.checklistFichaDef.upsert({
+      where: { clave: reactivo.clave },
+      // Idempotente: no pisa etiqueta/orden/activo si ya existe (pudieron editarse en producción).
+      update: {},
+      create: { clave: reactivo.clave, etiqueta: reactivo.etiqueta, orden: reactivo.orden },
+    });
   }
 }
 
@@ -641,6 +717,9 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   await sembrarGeneros(prisma);
   await sembrarTiposMovimiento(prisma);
   await sembrarAlmacenesPt(prisma);
+  // Fichas confiables (F7-E4): los 8 reactivos fijos del checklist del viejo (IP_InfConf), ahora
+  // filas configurables (A6). Idempotente por clave.
+  await sembrarReactivosFicha(prisma);
   await sembrarAdmin(prisma);
   // Ruta Crítica (F5-E1): roles funcionales + 26 procesos reales + roles N:M + dependencias +
   // checklist de IP de ejemplo. Después de los roles base de F0 (reúsa "Administrador").
@@ -649,6 +728,10 @@ export async function sembrar(prisma: PrismaClient): Promise<void> {
   // 2 plantillas reales (1/6 y 6/6) con su encadenamiento propio + calendario L–V y festivos MX
   // de la empresa favorita. Después de F5-E1 (necesita los procesos) y de la empresa favorita.
   await sembrarRutaCriticaPlantillas(prisma);
+  // Calidad (F6-E1): tipos de producto base (lista corta editable, decisión (d)) + UN plan de
+  // muestreo AQL default (ISO 2859 nivel general II, AQL 1.0/2.5/10) como DATOS. Idempotente; no
+  // siembra defectos (los carga el ETL de F6-E6).
+  await sembrarCalidad(prisma);
 }
 
 // Punto de entrada al ejecutarse como script (`prisma db seed` → `tsx prisma/seed.ts`).

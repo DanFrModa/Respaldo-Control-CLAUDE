@@ -227,6 +227,9 @@ function datosEnriquecidosCrear(
   if (datos.corto !== undefined) data.corto = datos.corto;
   if (datos.asegurado !== undefined) data.asegurado = datos.asegurado;
   if (datos.obsPago !== undefined) data.obsPago = datos.obsPago;
+  // Facturación EsMa (F6-E5, decisión h).
+  if (datos.modalidadFacturacion !== undefined)
+    data.modalidadFacturacion = datos.modalidadFacturacion;
   return data;
 }
 
@@ -322,6 +325,15 @@ function aplicarEnriquecidosEditar(
     if (datos.limiteCredito !== anterior) {
       cambios.limiteCredito = datos.limiteCredito;
       detalle.limiteCredito = { de: anterior, a: datos.limiteCredito };
+    }
+  }
+
+  // `modalidadFacturacion` es enum (F6-E5): omitir = no tocar; `null` = borrar (sin definir).
+  if (datos.modalidadFacturacion !== undefined) {
+    const nuevo = datos.modalidadFacturacion;
+    if (nuevo !== actual.modalidadFacturacion) {
+      cambios.modalidadFacturacion = nuevo;
+      detalle.modalidadFacturacion = { de: actual.modalidadFacturacion, a: nuevo };
     }
   }
   return detalle;

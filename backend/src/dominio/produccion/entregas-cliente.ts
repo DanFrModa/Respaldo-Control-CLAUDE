@@ -214,11 +214,13 @@ async function validarNoNegativo(
   idEmpresa: number,
   idAlmacen: number,
   idModelo: number,
+  idOrden: number,
   celdas: Celda[],
 ): Promise<void> {
   const ordenadas = [...celdas].sort((a, b) => a.idColor - b.idColor || a.idTalla - b.idTalla);
   for (const c of ordenadas) {
-    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla);
+    // PT por orden (F6-E2): valida contra el saldo de ESA orden, no contra el total del modelo.
+    await bloquearArticuloPt(tx, idEmpresa, idAlmacen, idModelo, c.idColor, c.idTalla, idOrden);
     const existencia = await existenciaPtBloqueada(
       tx,
       idEmpresa,
@@ -226,11 +228,12 @@ async function validarNoNegativo(
       idModelo,
       c.idColor,
       c.idTalla,
+      idOrden,
     );
     if (existencia - c.cantidad < 0) {
       throw new ErrorConflicto(
         `No hay existencia suficiente para entregar: se intenta sacar ${c.cantidad} pza(s) de un ` +
-          `artículo con ${existencia} en existencia en el almacén (no se permite dejar negativo).`,
+          `artículo con ${existencia} en existencia de esta orden en el almacén (no se permite dejar negativo).`,
       );
     }
   }
@@ -395,7 +398,14 @@ export async function registrarEntregaCliente(
 
     // Concurrencia + decisión (b): bloquea por artículo y valida no-negativo por suma directa
     // (nunca la vista) DENTRO de la transacción → dos entregas del mismo artículo no dejan negativo.
-    await validarNoNegativo(tx, orden.idEmpresa, datos.idAlmacen, orden.idModelo, celdas);
+    await validarNoNegativo(
+      tx,
+      orden.idEmpresa,
+      datos.idAlmacen,
+      orden.idModelo,
+      datos.idOrden,
+      celdas,
+    );
 
     const folio = await siguienteFolio(tx, orden.idEmpresa, CLAVE_SECUENCIA_ETAPA);
     const entrega = await tx.etapaMovimiento.create({
@@ -426,6 +436,7 @@ export async function registrarEntregaCliente(
       idModelo: orden.idModelo,
       idColor: c.idColor,
       idTalla: c.idTalla,
+      idOrden: datos.idOrden,
       cantidad: c.cantidad,
     }));
     await registrarMovimientoPtMotor(
@@ -734,6 +745,7 @@ export async function seguimientoEntregaOrden(
       WHERE e."id_empresa" = ${idEmpresa}
         AND e."id_modelo" = ${orden.idModelo}
         AND e."id_almacen" = ${filtros.idAlmacen}
+        AND e."id_orden" = ${idOrden}
     `;
     for (const f of filas) {
       disponible.set(claveCelda(f.idColor, f.idTalla), Number(f.existencia));

@@ -44,6 +44,8 @@ describe('catálogo de permisos', () => {
   it('incluye los permisos nuevos de administración y de catálogos de v2', () => {
     const nuevos = catalogo.filter((p) => p.origen === undefined).map((p) => p.clave);
     expect(nuevos.sort()).toEqual([
+      // Consulta de la bitácora del sistema (F6-E1, transversal): lectura del motor A7.
+      'admin.ver-bitacora',
       'almacenes.administrar',
       'almacenes.ver',
       // Catálogos de materiales (F1-E3): avíos (R1) + proveedores.
@@ -52,6 +54,11 @@ describe('catálogo de permisos', () => {
       // Catálogos de materiales (F1-E3): bordados/estampados (R2) + foto.
       'bordados.administrar',
       'bordados.ver',
+      // Calidad — base configurable (Módulo 8, F6-E1): ver + administrar el catálogo de
+      // defectos/tipos de producto/planes AQL (nuevos de v2; los `calidad.*-auditorias` LEGADO
+      // del núcleo de auditorías tienen origen).
+      'calidad.administrar-catalogo',
+      'calidad.ver',
       // Catálogos estructurados (F1-E2): clientes (D7) + tallas/curvas (D4).
       // NOTA (fusión de terceros, D12/R15): maquileros/cortadores se fusionaron en proveedores.
       'clientes.administrar',
@@ -65,11 +72,19 @@ describe('catálogo de permisos', () => {
       'compras.cancelar',
       'compras.recibir',
       'compras.ver',
+      // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
+      'costos.capturar',
+      'costos.ver',
+      // Estado de Resultados (Módulo 6, F7-E2): consultar + capturar/generar/conciliar (nivel ≤30).
+      'edr.capturar',
+      'edr.ver',
       'empresas.administrar',
       // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
       'esma.cargo-validar',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
+      // Indicadores (Módulo Indicadores, F7-E3): tableros directivos (RC/calidad/WIP) — nuevo de v2.
+      'indicadores.ver',
       // Inventario de avíos por kardex (Módulo 4, F4-E1, R4): ver/mover (nuevos de v2).
       'inventario-avios.mover',
       'inventario-avios.ver',
@@ -95,6 +110,8 @@ describe('catálogo de permisos', () => {
       'pedidos.administrar',
       'pedidos.importes',
       'pedidos.ver',
+      // Pre-costo por modelo + lista de precios (Módulo 6, F7-E1, nivel ≤45).
+      'precostos.consultar',
       // Producción / WIP (Módulo 4, F3): corte/envío/recibo/entrega/wip-ver/cancelar (nuevos de v2).
       'produccion.cancelar',
       'produccion.corte',

@@ -64,6 +64,8 @@ function fichaConBordado(precio: number | null): ModeloFicha {
     curvaTalla: null,
     idGenero: null,
     genero: null,
+    idTipoProducto: null,
+    tipoProducto: null,
     cantidadFotos: 0,
     urlFotoPrincipal: null,
     activo: true,

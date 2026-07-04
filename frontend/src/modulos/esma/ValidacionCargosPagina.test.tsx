@@ -39,7 +39,13 @@ function cola(): CargosEsMa {
         cantidadReal: null,
         precioReal: null,
         importeReal: null,
+        sinCosto: false,
+        conFactura: null,
+        cantidadPagada: 0,
+        porPagar: 0,
+        pagado: false,
         estado: 'propuesto',
+        estadoConciliacion: 'capturado',
         observaciones: null,
         validadoEn: null,
         validadoPorId: null,
@@ -105,5 +111,25 @@ describe('ValidacionCargosPagina (F3-E4)', () => {
     expect(args.id).toBe(7);
     expect(args.cuerpo.cantidadReal).toBe(50);
     expect(args.cuerpo.precioReal).toBe(9);
+  });
+
+  it('envía sinCosto y conFactura cuando se marcan en el diálogo (decisiones f/h)', async () => {
+    const usuario = userEvent.setup();
+    useCargosEsMa.mockReturnValue({ data: cola(), isPending: false, isError: false, error: null });
+    renderConProveedores(<ValidacionCargosPagina />, { sesion: sesion() });
+
+    const tabla = screen.getByTestId('cargos-tabla');
+    await usuario.click(within(tabla).getByTestId('cargo-validar'));
+
+    await usuario.click(screen.getByTestId('cargo-sin-costo'));
+    await usuario.selectOptions(screen.getByTestId('cargo-con-factura'), 'con');
+    await usuario.click(screen.getByTestId('confirmar-validar-cargo'));
+
+    expect(validarMutate).toHaveBeenCalledTimes(1);
+    const args = validarMutate.mock.calls[0]?.[0] as {
+      cuerpo: { sinCosto: boolean; conFactura?: boolean };
+    };
+    expect(args.cuerpo.sinCosto).toBe(true);
+    expect(args.cuerpo.conFactura).toBe(true);
   });
 });

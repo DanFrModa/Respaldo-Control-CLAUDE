@@ -205,6 +205,12 @@ export const esquemaExistenciasPtQuery = z
     idColor: z.coerce.number().int().positive().optional().describe('Filtra por un color.'),
     idTalla: z.coerce.number().int().positive().optional().describe('Filtra por una talla.'),
     idAlmacen: z.coerce.number().int().positive().optional().describe('Filtra por un almacén.'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra por una orden de producción (F6-E2: existencia por orden).'),
     incluirCeros: z
       .stringbool()
       .default(false)
@@ -226,6 +232,18 @@ const esquemaExistenciaPtFila = z.object({
   ordenTalla: z.number().int().describe('Orden del catálogo de la talla (para ordenar columnas).'),
   idAlmacen: z.number().int().describe('Id del almacén.'),
   almacen: z.string().describe('Nombre del almacén.'),
+  idOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe(
+      'Orden de producción de las prendas, o null (bucket sin orden: histórico/manual/ajuste).',
+    ),
+  folioOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Folio de la orden, o null si es del bucket sin orden.'),
   existencia: z.number().int().describe('Existencia actual (Σ de movimientos, D3).'),
 });
 
@@ -256,6 +274,12 @@ export const esquemaKardexPtQuery = z
     idColor: z.coerce.number().int().positive().optional().describe('Filtra por un color.'),
     idTalla: z.coerce.number().int().positive().optional().describe('Filtra por una talla.'),
     idAlmacen: z.coerce.number().int().positive().optional().describe('Filtra por un almacén.'),
+    idOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra por una orden de producción (F6-E2).'),
   })
   .describe('Filtros del kardex de un modelo.');
 
@@ -276,6 +300,12 @@ const esquemaKardexPtRenglon = z.object({
   color: z.string().describe('Nombre del color.'),
   idTalla: z.number().int().describe('Talla del renglón.'),
   etiquetaTalla: z.string().describe('Etiqueta de la talla.'),
+  idOrden: z
+    .number()
+    .int()
+    .nullable()
+    .describe('Orden de producción del renglón, o null (bucket sin orden).'),
+  folioOrden: z.number().int().nullable().describe('Folio de la orden, o null.'),
   entrada: z.number().int().describe('Piezas que entran en este renglón (0 si es salida).'),
   salida: z.number().int().describe('Piezas que salen en este renglón (0 si es entrada).'),
   saldo: z.number().int().describe('Saldo corrido del artículo tras este movimiento.'),

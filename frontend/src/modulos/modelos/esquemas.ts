@@ -62,6 +62,8 @@ export const esquemaModeloFormulario = z.object({
   idTemporada: z.string(),
   idCurvaTalla: z.string(),
   idGenero: z.string(),
+  /** Tipo de producto (F6-E1, opcional). */
+  idTipoProducto: z.string(),
 });
 
 /** Datos del formulario de modelo. */

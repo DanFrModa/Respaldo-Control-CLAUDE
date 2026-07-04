@@ -34,7 +34,7 @@ import { registrarBitacora } from '../../comun/auditoria.js';
 import { registrarConsumidorEventos, type MensajeEventoDominio } from '../../comun/cola-eventos.js';
 import { EVENTOS_OUTBOX } from '../../comun/eventos-dominio.js';
 import { COLAS_JOBS, encolarJob, type PayloadRecalcularRuta } from '../../comun/jobs/index.js';
-import { TipoEventoProceso } from '../../datos/index.js';
+import { ResultadoAuditoria, TipoAuditoria, TipoEventoProceso } from '../../datos/index.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
 
 /** Fecha de hoy a medianoche UTC (sin hora). Misma convención que el resto de la RC. */
@@ -578,6 +578,12 @@ interface PayloadMaterialCancelado {
   idsOrden: number[];
 }
 
+/** Payload tipado del evento de auditoría de calidad resuelta (espejo de `EventoAuditoriaCalidad`). */
+interface PayloadAuditoriaCalidad {
+  idEmpresa: number;
+  idOrden: number;
+}
+
 /**
  * Resuelve si el `idTipoProceso` de un envío/recibo es de COSTURA (`generaEntradaPt`). Lectura suelta
  * (no necesita la tx de escritura). `null` (corte/entrega) → false (no aplica).
@@ -632,6 +638,13 @@ export async function procesarEventoAutoAvance(
   if (tipo === EVENTOS_OUTBOX.materialRecibidoCancelado) {
     const p = payload as PayloadMaterialCancelado;
     await procesarMaterialCancelado(p, tipo, bd);
+    return;
+  }
+
+  // ── Auditoría de calidad capturada/cambiada (F6-E2) ────────────────────────────────────────
+  if (tipo === EVENTOS_OUTBOX.auditoriaCalidadResuelta) {
+    const p = payload as PayloadAuditoriaCalidad;
+    await procesarAuditoriaCalidad(p, tipo, bd);
     return;
   }
 
@@ -709,6 +722,56 @@ async function procesarMaterialCancelado(
     }, bd);
     if (cambio) await encolarRecalculo(idOrden, p.idEmpresa);
   }
+}
+
+/**
+ * Re-evalúa el proceso `auditoria` de una orden tras capturar/cambiar una auditoría (F6-E2). El estado
+ * FÍSICO es: ¿la orden tiene una auditoría FINAL aprobada VIVA? Si sí → el proceso se auto-completa con
+ * la fecha de esa auditoría; si no → se des-completa (decisión (f)). Idempotente (re-lee la BD, no
+ * confía en el evento como delta). Las auditorías de PISO no completan el proceso (control intermedio).
+ * Bajo el lock de la orden. Devuelve si hubo cambio.
+ */
+async function reevaluarAuditoria(tx: Tx, idOrden: number, evento: string): Promise<boolean> {
+  const renglones = await renglonesPorTipoEvento(tx, idOrden, TipoEventoProceso.auditoria);
+  if (renglones.length === 0) return false;
+
+  const aprobada = await tx.auditoria.findFirst({
+    where: {
+      idOrden,
+      cancelada: false,
+      tipoAuditoria: TipoAuditoria.final,
+      resultado: ResultadoAuditoria.aprobado,
+    },
+    orderBy: { fechaAuditoria: 'desc' },
+    select: { fechaAuditoria: true },
+  });
+  const completo = aprobada !== null;
+  const comp: ResultadoCompletitud = { completo, hayAvance: completo };
+  const fechaFisica = aprobada?.fechaAuditoria ?? hoyUtc();
+
+  let cambio = false;
+  for (const renglon of renglones) {
+    const c = await aplicarAProceso(tx, renglon, comp, {
+      evento,
+      tipoEvento: TipoEventoProceso.auditoria,
+      fechaFisica,
+    });
+    cambio = cambio || c;
+  }
+  return cambio;
+}
+
+/** Re-evalúa el proceso `auditoria` de la orden de un evento de auditoría de calidad (F6-E2). */
+async function procesarAuditoriaCalidad(
+  p: PayloadAuditoriaCalidad,
+  evento: string,
+  bd?: ContextoBd,
+): Promise<void> {
+  const cambio = await enTransaccion(async (tx) => {
+    await bloquearCapturasDeOrden(tx, p.idEmpresa, p.idOrden);
+    return reevaluarAuditoria(tx, p.idOrden, evento);
+  }, bd);
+  if (cambio) await encolarRecalculo(p.idOrden, p.idEmpresa);
 }
 
 /** Fecha (`@db.Date`) de una `RecepcionCompra`; hoy UTC si no existe (defensivo). */

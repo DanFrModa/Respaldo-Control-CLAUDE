@@ -7,3 +7,6 @@ src/datos/generated/
 
 # Contrato OpenAPI generado (lo emite `npm run openapi`; no se formatea a mano)
 openapi.json
+
+# Artefacto LOCAL del ETL (gitignored; chequeo rápido de estado, no se formatea ni versiona)
+migracion/_progreso.ts

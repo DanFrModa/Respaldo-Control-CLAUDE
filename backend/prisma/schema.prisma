@@ -64,31 +64,52 @@ model Empresa {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  configuracion     ConfiguracionEmpresa?
-  almacenes         Almacen[]
-  secuencias        Secuencia[]
+  configuracion          ConfiguracionEmpresa?
+  almacenes              Almacen[]
+  secuencias             Secuencia[]
   /// Pedidos internos de esta empresa (F2-E1, A9 — folio por empresa). Restrict.
-  pedidos           Pedido[]
+  pedidos                Pedido[]
   /// Órdenes de producción de esta empresa (F2-E2, A9 — folio por empresa). Restrict.
-  ordenes           Orden[]
+  ordenes                Orden[]
   /// Etapas de producción (corte/envío/recibo/entrega) de esta empresa (F3-E1, A9). Restrict.
-  etapasMovimiento  EtapaMovimiento[]
+  etapasMovimiento       EtapaMovimiento[]
   /// Movimientos de kardex de esta empresa (F3-E1, A9 — folio por empresa). Restrict.
-  movimientos       Movimiento[]
+  movimientos            Movimiento[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
-  cargosEsMa        EsMaCargo[]
+  cargosEsMa             EsMaCargo[]
+  /// Abonos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
+  abonosMaquilero        AbonoMaquilero[]
+  /// Descuentos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
+  descuentosMaquilero    DescuentoMaquilero[]
+  /// Pagos a maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
+  pagosMaquilero         PagoMaquilero[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
-  ordenesCompra     OrdenCompra[]
+  ordenesCompra          OrdenCompra[]
   /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
-  recepcionesCompra RecepcionCompra[]
+  recepcionesCompra      RecepcionCompra[]
   /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
-  eventosOutbox     EventoOutbox[]
+  eventosOutbox          EventoOutbox[]
   /// Notas de salida de materiales a maquileros de esta empresa (F4-E5, A9 — folio por empresa). Restrict.
-  notasSalida       NotaSalida[]
+  notasSalida            NotaSalida[]
   /// Calendario laboral de la RC de esta empresa (F5-E2, 1:1). Restrict.
-  calendario        CalendarioEmpresa?
+  calendario             CalendarioEmpresa?
   /// Días festivos de la RC de esta empresa (F5-E2). Restrict.
-  diasFestivos      DiaFestivo[]
+  diasFestivos           DiaFestivo[]
+  /// Auditorías de calidad de esta empresa (F6-E2, A9 — folio por empresa). Restrict.
+  auditorias             Auditoria[]
+  /// Costos reales de órdenes de esta empresa (F7-E1, A9). Restrict.
+  costosOrden            CostoOrden[]
+  /// Renglones del Estado de Resultados (EDR) de esta empresa (F7-E2, D2 #6). El EDR es GLOBAL
+  /// (encabezado por mes, sin empresa); solo las líneas se sellan por empresa para el corte. Restrict.
+  edrLineas              EdrLinea[]
+  /// Registros de productividad (IP/almacén) de esta empresa (F7-E4, A9). Restrict.
+  registrosProductividad RegistroProductividad[]
+  /// Verificaciones de confiabilidad de fichas técnicas por orden de esta empresa (F7-E4, A9). Restrict.
+  fichasVerificacion     FichaVerificacion[]
+  /// Muestrarios pendientes de esta empresa (F7-E4, A9). Restrict.
+  muestrarios            Muestrario[]
+  /// Inventarios cíclicos de esta empresa (F7-E5, A9). Restrict.
+  inventariosCiclicos    InventarioCiclico[]
 
   @@map("empresas")
 }
@@ -103,11 +124,16 @@ model ConfiguracionEmpresa {
   empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
 
   /// Utilidad sugerida para costeo (viejo: `UtilidadSujerida`).
-  utilidadSugerida Decimal? @map("utilidad_sugerida") @db.Decimal(10, 4)
+  utilidadSugerida   Decimal? @map("utilidad_sugerida") @db.Decimal(10, 4)
   /// Porcentaje base de regalías (viejo: `Regalias`).
-  regaliasBase     Decimal? @map("regalias_base") @db.Decimal(10, 4)
+  regaliasBase       Decimal? @map("regalias_base") @db.Decimal(10, 4)
   /// Días de colchón que la Ruta Crítica agrega a la costura (viejo: `ColchonCostura`).
-  colchonCostura   Int?     @map("colchon_costura")
+  colchonCostura     Int?     @map("colchon_costura")
+  /// Jornada base (horas/día) del ALMACÉN para el índice de productividad (F7-E4; viejo:
+  /// constante `HorasBaseAlm = 9`, doc 05 §B.1). Antes era una constante hardcodeada en la
+  /// consulta `Ind_Alm_Productividad`; en v2 es parámetro por empresa. Default 9 (el valor
+  /// histórico); el backfill de la migración lo fija en las filas ya sembradas.
+  jornadaBaseAlmacen Int      @default(9) @map("jornada_base_almacen")
 
   /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
   fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
@@ -351,6 +377,9 @@ model Almacen {
   /// Notas de salida cuyos avíos salen de este almacén origen (F4-E5, decisión (g)). Restrict.
   notasSalida NotaSalida[]
 
+  /// Inventarios cíclicos que cuentan este almacén (F7-E5). Restrict.
+  inventariosCiclicos InventarioCiclico[]
+
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
 }
@@ -541,6 +570,13 @@ model Proveedor {
   /// Observaciones específicas de pago (ex `Maquilero.obsPago`).
   obsPago   String?  @map("obs_pago")
 
+  /// Modalidad de facturación del maquilero para su cuenta EsMa (F6-E4, decisión (h)):
+  /// `solo_con` factura siempre, `solo_sin` nunca, `ambos` opera de las dos formas (y en
+  /// ese caso su estado de cuenta se segmenta en dos, E5). NULLABLE: los proveedores ya
+  /// migrados no lo traen (default sensato en el dominio: se deriva de `factura` en la UI;
+  /// null se trata como "no definido" y exige elegir con-factura por movimiento). Ver enum.
+  modalidadFacturacion ModalidadFacturacion? @map("modalidad_facturacion")
+
   /// Borrado suave (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
@@ -557,6 +593,12 @@ model Proveedor {
   etapasMovimiento        EtapaMovimiento[]
   /// Cargos a su cuenta de maquila (EsMa) como maquilero (F3-E1). Restrict.
   cargosEsMa              EsMaCargo[]
+  /// Abonos a su cuenta de maquila (EsMa, F6-E4). Restrict.
+  abonosMaquilero         AbonoMaquilero[]
+  /// Descuentos a su cuenta de maquila (EsMa, F6-E4). Restrict.
+  descuentosMaquilero     DescuentoMaquilero[]
+  /// Pagos recibidos como maquilero (EsMa, F6-E4). Restrict.
+  pagosMaquilero          PagoMaquilero[]
   /// Lotes de tela que este proveedor surtió (F4-E1, D5). Restrict.
   lotes                   Lote[]
   /// Órdenes de compra emitidas a este proveedor (F4-E2). Restrict.
@@ -565,6 +607,8 @@ model Proveedor {
   requerimientosSugeridos RequerimientoOrden[] @relation("RequerimientoProveedorSugerido")
   /// Notas de salida donde este proveedor es el MAQUILERO destino del envío (F4-E5). Restrict.
   notasSalida             NotaSalida[]
+  /// Auditorías de calidad donde este proveedor es el MAQUILERO auditado (F6-E2). Restrict.
+  auditorias              Auditoria[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -668,7 +712,9 @@ model Temporada {
   activo Boolean @default(true)
 
   /// Modelos clasificados en esta temporada (F1-E4, FK nullable Restrict).
-  modelos Modelo[]
+  modelos     Modelo[]
+  /// Muestrarios pendientes de esta temporada (F7-E4, FK nullable Restrict).
+  muestrarios Muestrario[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -724,6 +770,8 @@ model Color {
   lotes                  Lote[]
   /// Cantidades de la matriz talla×color de renglones de OC en este color (F4-E2). Restrict.
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
+  /// Renglones de inventario cíclico en este color (F7-E5). Restrict.
+  inventarioCiclicoDet   InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -812,6 +860,8 @@ model Talla {
   movimientosDetPt       MovimientoDetPt[]
   /// Cantidades de la matriz talla×color de renglones de OC en esta talla (F4-E2). Restrict.
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
+  /// Renglones de inventario cíclico en esta talla (F7-E5). Restrict.
+  inventarioCiclicoDet   InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -881,11 +931,17 @@ model Cliente {
   direccion String?
   activo    Boolean @default(true)
 
-  campos  ClienteCampo[]
+  campos                 ClienteCampo[]
   /// Pedidos internos del cliente (F2-E1, Restrict hacia el cliente).
-  pedidos Pedido[]
+  pedidos                Pedido[]
   /// Órdenes de producción del cliente (F2-E2, Restrict hacia el cliente).
-  ordenes Orden[]
+  ordenes                Orden[]
+  /// Renglones del EDR asociados a este cliente (F7-E2, corte por cliente). Restrict.
+  edrLineas              EdrLinea[]
+  /// Registros de productividad de almacén ligados a este cliente (F7-E4, opcional). Restrict.
+  registrosProductividad RegistroProductividad[]
+  /// Muestrarios pendientes de este cliente (F7-E4). Restrict.
+  muestrarios            Muestrario[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1335,32 +1391,41 @@ model Modelo {
   maquilaBase Decimal? @map("maquila_base") @db.Decimal(12, 2)
 
   /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
-  idTemporada  Int?        @map("id_temporada")
-  temporada    Temporada?  @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+  idTemporada    Int?          @map("id_temporada")
+  temporada      Temporada?    @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
   /// Curva de tallas del modelo (D4, opcional). Restrict (igual que temporada).
-  idCurvaTalla Int?        @map("id_curva_talla")
-  curvaTalla   CurvaTalla? @relation(fields: [idCurvaTalla], references: [id], onDelete: Restrict)
+  idCurvaTalla   Int?          @map("id_curva_talla")
+  curvaTalla     CurvaTalla?   @relation(fields: [idCurvaTalla], references: [id], onDelete: Restrict)
   /// Género (opcional; se poblará en el ETL E7). Restrict (igual que temporada).
-  idGenero     Int?        @map("id_genero")
-  genero       Genero?     @relation(fields: [idGenero], references: [id], onDelete: Restrict)
+  idGenero       Int?          @map("id_genero")
+  genero         Genero?       @relation(fields: [idGenero], references: [id], onDelete: Restrict)
+  /// Tipo de producto para Calidad (F6-E1, decisión (d)): la auditoría hereda este tipo del
+  /// modelo para filtrar los defectos aplicables. NULLABLE y sin default (no rompe los modelos
+  /// existentes; se asigna desde la pantalla de Modelos). Restrict (igual que temporada/género).
+  idTipoProducto Int?          @map("id_tipo_producto")
+  tipoProducto   TipoProducto? @relation(fields: [idTipoProducto], references: [id], onDelete: Restrict)
 
   /// Borrado suave = descontinuar (plan §4: patrón conservado del sistema viejo).
   activo Boolean @default(true)
 
   /// Fotos del modelo en R2 (N por modelo).
-  fotos            ModeloFoto[]
+  fotos                ModeloFoto[]
   /// BOM — telas del modelo (N:N a Tela con consumo + banderas).
-  telas            ModeloTela[]
+  telas                ModeloTela[]
   /// BOM — avíos del modelo (N:N a Avio con consumo + banderas).
-  avios            ModeloAvio[]
+  avios                ModeloAvio[]
   /// BOM — bordados/estampados del modelo (N:N a Bordado con precio).
-  bordados         ModeloBordado[]
+  bordados             ModeloBordado[]
   /// Renglones de pedidos internos que piden este modelo (F2-E1, Restrict hacia el modelo).
-  pedidoLineas     PedidoLinea[]
+  pedidoLineas         PedidoLinea[]
   /// Órdenes de producción de este modelo (F2-E2, Restrict hacia el modelo).
-  ordenes          Orden[]
+  ordenes              Orden[]
   /// Renglones de kardex PT de este modelo (F3-E1, D4 — dimensión PT: modelo×color×talla). Restrict.
-  movimientosDetPt MovimientoDetPt[]
+  movimientosDetPt     MovimientoDetPt[]
+  /// Renglones del EDR asociados a este modelo (F7-E2, para el desglose por modelo). Restrict.
+  edrLineas            EdrLinea[]
+  /// Renglones de inventario cíclico de este modelo (F7-E5). Restrict.
+  inventarioCiclicoDet InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1822,8 +1887,13 @@ model Orden {
   compForzada   Boolean  @default(false) @map("comp_forzada")
   /// Observaciones de maquila (viejo: `ObsMaquila`).
   obsMaquila    String?  @map("obs_maquila") @db.Text
-  /// Maquila ya pagada (viejo: `Pagada`). DATO conservado; su motor (EsMa/finanzas) llega en F6.
+  /// Maquila ya pagada (viejo: `Pagada`). En F6-E4 es un estado DERIVADO (D3): la orden queda
+  /// pagada cuando TODOS sus cargos EsMa pagables (validados, no sin-costo) están pagados. NO se
+  /// edita a mano salvo el override `pagadaForzada`; lo recalcula el dominio al aplicar un pago.
   pagada        Boolean? @map("pagada")
+  /// Override MANUAL AUDITADO de `pagada` (F6-E4, decisión (f)): si viene (true/false) fuerza el
+  /// estatus y la derivación deja de pisarlo; null = derivación automática. Se registra en bitácora.
+  pagadaForzada Boolean? @map("pagada_forzada")
 
   /// Estado DERIVADO (no editable): capturada/completa/cancelada (ver enum `EstadoOrden`).
   estado          EstadoOrden @default(capturada)
@@ -1880,22 +1950,36 @@ model Orden {
   /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
   rutaProcesos         RutaOrden[]
 
-  lineas            OrdenLinea[]
-  referencias       OrdenReferencia[]
-  comentarios       OrdenComentario[]
+  lineas               OrdenLinea[]
+  referencias          OrdenReferencia[]
+  comentarios          OrdenComentario[]
   /// Etapas de producción de esta orden (corte/envío/recibo/entrega) (F3-E1, D4). Restrict.
-  etapasMovimiento  EtapaMovimiento[]
+  etapasMovimiento     EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) derivados de los recibos de esta orden (F3-E1). Restrict.
-  cargosEsMa        EsMaCargo[]
+  cargosEsMa           EsMaCargo[]
   /// Renglones de orden de compra ligados a esta orden de producción (F4-E2, R7: la
   /// liga es POR LÍNEA para cruzar gasto↔producción sin prorrateos). Restrict.
-  ordenCompraLineas OrdenCompraLinea[]
+  ordenCompraLineas    OrdenCompraLinea[]
   /// Ligas N:N (a nivel encabezado) entre esta orden de producción y sus OC (F4-E2). Restrict.
-  ordenesCompra     OrdenCompraOrden[]
+  ordenesCompra        OrdenCompraOrden[]
   /// Snapshot de explosión MRP de esta orden (F4-E4, R3). Se reemplaza al regenerar. Cascade.
-  requerimientos    RequerimientoOrden[]
+  requerimientos       RequerimientoOrden[]
   /// Renglones de nota de salida (avíos/telas enviados a maquila) ligados a esta orden (F4-E5). Restrict.
-  notaSalidaLineas  NotaSalidaLinea[]
+  notaSalidaLineas     NotaSalidaLinea[]
+  /// Auditorías de calidad de esta orden (F6-E2). Restrict (una orden con auditorías no se borra).
+  auditorias           Auditoria[]
+  /// Renglones de kardex PT que PERTENECEN a esta orden (F6-E2 "PT por orden"). Restrict.
+  movimientosDetPt     MovimientoDetPt[]
+  /// Costo real de la orden (F7-E1, 1:1 opcional). Cascade: el costeo pertenece a la orden.
+  costoOrden           CostoOrden?
+  /// Renglones del EDR que valúan las ventas de esta orden en un mes (F7-E2). Restrict: una orden
+  /// referida por un EDR no se borra físico (las líneas automáticas se reconcilian, no se cascadean).
+  edrLineas            EdrLinea[]
+  /// Verificaciones de confiabilidad de la ficha técnica de esta orden (F7-E4). Cascade: el checklist
+  /// pertenece a la orden (si la orden desapareciera, sus verificaciones también).
+  fichasVerificacion   FichaVerificacion[]
+  /// Renglones de inventario cíclico ligados a esta orden (F7-E5 "PT por orden"). Restrict.
+  inventarioCiclicoDet InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2306,10 +2390,12 @@ model Movimiento {
 
   /// Renglones de nota de salida de TELA que REFERENCIAN este movimiento `salida-tela-orden` como
   /// documento de envío (F4-E5, decisión (e): la nota no descuenta tela, la referencia). Inversa.
-  notaLineasSalidaTela NotaSalidaLinea[] @relation("NotaLineaSalidaTela")
+  notaLineasSalidaTela NotaSalidaLinea[]      @relation("NotaLineaSalidaTela")
   /// Renglones de nota de salida de AVÍO cuyo descuento (`salida-por-nota`) GENERÓ este movimiento
   /// al confirmar la nota (F4-E5, R4). Inversa informativa.
-  notaLineasAvio       NotaSalidaLinea[] @relation("NotaLineaAvio")
+  notaLineasAvio       NotaSalidaLinea[]      @relation("NotaLineaAvio")
+  /// Renglones de inventario cíclico cuyo AJUSTE generó este movimiento (F7-E5). Inversa informativa.
+  ajustesCiclico       InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2343,6 +2429,15 @@ model MovimientoDetPt {
   idTalla      Int        @map("id_talla")
   talla        Talla      @relation(fields: [idTalla], references: [id], onDelete: Restrict)
 
+  /// ORDEN de producción a la que PERTENECEN estas prendas (F6-E2 "PT por orden" — restaura el
+  /// `IPT_Modelos.IdOrdenes` de v1; ver ADR-0014, enmienda de ADR-0010). NULLABLE: el histórico
+  /// migrado (`origenTipo='migracion'`) y los movimientos manuales/traspasos NO la traen (bucket
+  /// "sin orden"). Con esta columna la existencia PT pasa a ser por modelo×color×talla×ORDEN×almacén;
+  /// la suma directa y el advisory lock casan el NULL con `IS NOT DISTINCT FROM`. Restrict (una
+  /// orden con PT en el kardex no se borra físico).
+  idOrden Int?   @map("id_orden")
+  orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
   /// Cantidad de prendas (positiva; el signo lo da la dirección del tipo de movimiento).
   cantidad  Int
   /// Costo unitario al momento del movimiento. NULLABLE y NULL en toda F3 (D1/D2 — ADR-0010 §4).
@@ -2355,6 +2450,8 @@ model MovimientoDetPt {
 
   @@index([idMovimiento])
   @@index([idModelo, idColor, idTalla])
+  @@index([idOrden])
+  @@index([idOrden, idModelo, idColor, idTalla])
   @@map("movimiento_det_pt")
 }
 
@@ -2465,7 +2562,21 @@ model EsMaCargo {
   /// Precio real validado por el admin (F3-E4). NULL mientras esté `propuesto`. Decimal.
   precioReal   Decimal? @map("precio_real") @db.Decimal(12, 2)
 
-  /// Estado del cargo (propuesto/validado/cancelado). Ver enum `EstadoCargoEsMa`.
+  /// Prendas de este cargo YA PAGADAS (F6-E4, decisión (g) — "prendas por pagar"). Suma de las
+  /// `PagoAplicacion.cantidad` que consumió este cargo; se actualiza bajo lock por maquilero al
+  /// aplicar un pago. El "pagado" se DERIVA (cantidadPagada ≥ cantidadReal): no hay bandera editable.
+  cantidadPagada Decimal  @default(0) @map("cantidad_pagada") @db.Decimal(14, 2)
+  /// Segundas SIN COSTO (F6-E4, decisión (f)): prenda reclasificada a 2ª que NO se le paga al
+  /// maquilero. Un cargo `sinCosto` se EXCLUYE del saldo y del pago (importe 0). Default false.
+  sinCosto       Boolean  @default(false) @map("sin_costo")
+  /// Modalidad de facturación de ESTE movimiento (F6-E4, decisión (h)): true con factura, false sin
+  /// factura, null sin definir. Se fija al VALIDAR según la `modalidadFacturacion` del proveedor.
+  conFactura     Boolean? @map("con_factura")
+
+  /// Estado del cargo (propuesto/validado/cancelado). Ver enum `EstadoCargoEsMa`. NOTA (F6-E4): los
+  /// 3 estados de conciliación "capturado/revisado/pagado" NO se persisten aparte — se PROYECTAN de
+  /// `estado` (propuesto=capturado, validado=revisado) + `cantidadPagada` (pagado). No hay columna
+  /// redundante `estadoConciliacion` (D3: un solo dato de verdad).
   estado        EstadoCargoEsMa @default(propuesto)
   observaciones String?         @db.Text
 
@@ -2478,6 +2589,10 @@ model EsMaCargo {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
+  /// Pagos aplicados a este cargo (F6-E4, puente N:N; decisión (g)). Restrict (no borrar un cargo
+  /// con pagos aplicados).
+  aplicacionesPago PagoAplicacion[]
+
   @@index([idEmpresa])
   @@index([idEtapaRecibo])
   @@index([idMaquilero])
@@ -2485,6 +2600,146 @@ model EsMaCargo {
   @@index([idTipoProceso])
   @@index([estado])
   @@map("esma_cargo")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EsMa — MOVIMIENTOS de la cuenta corriente de maquileros (F6-E4, doc
+// `Documentacion_MJD/07-EsMa-Estados-de-Cuenta-Maquileros.md`; DECISIONES.md §F6 (e)–(h)).
+// Corazón contable: los 3 conceptos PLANOS que completan el ciclo junto al cargo (nacido en
+// F3). "Planos" = sin encabezado EsMa; el maquilero + la fecha + las observaciones viven en
+// CADA movimiento (mejora sobre el viejo, que llevaba un encabezado por maquilero). Todos con
+// `idEmpresa` (A9, Restrict), `idMaquilero`→Proveedor (Restrict), `monto` Decimal(14,2), `fecha`,
+// `conFactura` (decisión h), `estadoRevision` (asteriscos Rev del viejo → E5) y auditoría A7.
+// El SALDO NUNCA se persiste: es la suma derivada (D3) `Σcargos + Σabonos − Σpagos − Σdescuentos`.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Modalidad de facturación de un maquilero/movimiento EsMa (F6-E4, decisión (h), R15). `ambos`
+/// obliga a elegir con/sin factura por movimiento (y su estado de cuenta se segmenta en dos, E5).
+enum ModalidadFacturacion {
+  solo_con
+  solo_sin
+  ambos
+
+  @@map("modalidad_facturacion")
+}
+
+/// Estado de revisión de un movimiento EsMa (F6-E4; ex asteriscos `Rev` del `EsMa_EdoCta` viejo).
+/// `capturado` recién metido; `revisado` confirmado por quien supervisa (la transición fina la
+/// opera E5). Default `capturado`.
+enum EstadoRevisionEsMa {
+  capturado
+  revisado
+
+  @@map("estado_revision_esma")
+}
+
+/// ABONO a la cuenta de un maquilero (F6-E4; ex `EsMaAbonos`). Movimiento plano.
+model AbonoMaquilero {
+  id          Int       @id @default(autoincrement())
+  /// Empresa dueña del movimiento (A9). Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Maquilero (Proveedor) al que se le abona. Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Importe del abono (positivo). Decimal.
+  monto          Decimal            @db.Decimal(14, 2)
+  /// Fecha del movimiento (date-only).
+  fecha          DateTime           @db.Date
+  /// Con/sin factura (decisión h). Null = sin definir. Se resuelve del proveedor al capturar.
+  conFactura     Boolean?           @map("con_factura")
+  observaciones  String?            @db.Text
+  estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idMaquilero])
+  @@map("abono_maquilero")
+}
+
+/// DESCUENTO a la cuenta de un maquilero (F6-E4; ex `EsMaDescuentos`). Movimiento plano.
+model DescuentoMaquilero {
+  id          Int       @id @default(autoincrement())
+  /// Empresa dueña del movimiento (A9). Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Maquilero (Proveedor) al que se le descuenta. Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Importe del descuento (positivo). Decimal.
+  monto          Decimal            @db.Decimal(14, 2)
+  /// Fecha del movimiento (date-only).
+  fecha          DateTime           @db.Date
+  conFactura     Boolean?           @map("con_factura")
+  observaciones  String?            @db.Text
+  estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idMaquilero])
+  @@map("descuento_maquilero")
+}
+
+/// PAGO a un maquilero (F6-E4; ex `EsMaPagos`). Movimiento plano LIGADO a cargos (decisión (g)):
+/// el pago se aplica a uno o más cargos consumiendo sus "prendas por pagar". `monto` = Σ importes
+/// aplicados (se sella al capturar). El recibo de pago (R9) se imprime de este registro.
+model PagoMaquilero {
+  id          Int       @id @default(autoincrement())
+  /// Empresa dueña del movimiento (A9). Restrict.
+  idEmpresa   Int       @map("id_empresa")
+  empresa     Empresa   @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Maquilero (Proveedor) al que se le paga. Restrict.
+  idMaquilero Int       @map("id_maquilero")
+  maquilero   Proveedor @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Importe total del pago (= Σ `aplicaciones.importe`). Decimal.
+  monto          Decimal            @db.Decimal(14, 2)
+  /// Fecha del pago (date-only).
+  fecha          DateTime           @db.Date
+  conFactura     Boolean?           @map("con_factura")
+  observaciones  String?            @db.Text
+  estadoRevision EstadoRevisionEsMa @default(capturado) @map("estado_revision")
+
+  /// Aplicaciones del pago a cargos concretos (decisión (g)). Cascade (el detalle vive con el pago).
+  aplicaciones PagoAplicacion[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@index([idMaquilero])
+  @@map("pago_maquilero")
+}
+
+/// Aplicación de un PAGO a un CARGO (F6-E4, puente decisión (g)): cuántas prendas de ese cargo se
+/// pagaron y por qué importe. El saldo "por pagar" de un cargo = `cantidadReal − Σ cantidad` de sus
+/// aplicaciones; pagar de más se BLOQUEA en el dominio (anti-doble-pago duro). PK (idPago, idCargo).
+model PagoAplicacion {
+  idPago  Int           @map("id_pago")
+  pago    PagoMaquilero @relation(fields: [idPago], references: [id], onDelete: Cascade)
+  idCargo Int           @map("id_cargo")
+  cargo   EsMaCargo     @relation(fields: [idCargo], references: [id], onDelete: Restrict)
+
+  /// Prendas de este cargo cubiertas por el pago (>0, ≤ prendas por pagar del cargo). Decimal.
+  cantidad Decimal @db.Decimal(14, 2)
+  /// Importe aplicado (= cantidad × precioReal del cargo). Decimal.
+  importe  Decimal @db.Decimal(14, 2)
+
+  @@id([idPago, idCargo])
+  @@index([idCargo])
+  @@map("pago_aplicacion")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3617,4 +3872,876 @@ model RutaOrdenChecklist {
 
   @@index([idRutaOrden])
   @@map("ruta_orden_checklist")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CALIDAD (F6-E1) — Control de calidad: catálogo de defectos enriquecido + tipos de
+// producto + motor de planes de muestreo AQL como DATOS (no código). doc funcional
+// `09-Control-de-Calidad.md` §2/§5; MEJORAS 09; DECISIONES.md §F6 (a)–(d). El núcleo
+// transaccional de auditorías llega en F6-E2 (este E1 es solo la base configurable).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Severidad del defecto (doc 09 §5.4: categorías/severidad para el catálogo). Es METADATO
+/// INFORMATIVO (categorización + KPIs de F7): NO entra en ningún veredicto de auditoría
+/// (decisión (a) — el resultado lo decide el auditor a mano en E2). Por eso vive como enum
+/// libre, sin pesos ni números de aceptación.
+enum SeveridadDefecto {
+  critico
+  mayor
+  menor
+
+  @@map("severidad_defecto")
+}
+
+/// Tipo de producto (F6-E1, decisión (d) — DECISIONES.md §F6). Catálogo CORTO y editable que
+/// clasifica los modelos (playera, pantalón, sudadera…) para FILTRAR qué defectos aplican a una
+/// auditoría (NO para el plan AQL: hay un solo plan para todos, decisión (c)). El tipo se hereda
+/// del modelo (`Modelo.tipoProductoId`) y en el alta de auditoría se puede sobre-escribir (E2).
+/// GLOBAL como los catálogos de F1 (sin idEmpresa); borrado suave + auditoría A7.
+model TipoProducto {
+  id     Int     @id @default(autoincrement())
+  /// Nombre del tipo (único global, insensible a mayúsculas lo valida el dominio).
+  nombre String  @unique
+  activo Boolean @default(true)
+
+  /// Modelos clasificados con este tipo (F1, Restrict: un tipo en uso por un modelo no se borra
+  /// físico → se desactiva).
+  modelos         Modelo[]
+  /// Defectos etiquetados con este tipo (M:N por `DefectoTipoProducto`). Cascade desde el puente.
+  defectosLigados DefectoTipoProducto[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("tipos_producto")
+}
+
+/// Defecto del catálogo de calidad (F6-E1 — ex `CC_Catalogo`, doc 09 §2). `nivelAQL` numérico
+/// (1.0 / 2.5 / 10 — el AQL al que pertenece el defecto, doc 09 §2: la columna AQL del viejo trae
+/// '1'/'2.5'/'10' limpios). `favorito` = se pre-carga en toda auditoría nueva (ex `Favorito`,
+/// E2). `severidad` es METADATO (no veredicto, decisión (a)). `aplicaGeneral=true` → el defecto
+/// aplica a TODOS los tipos de producto sin importar las ligas de `DefectoTipoProducto` (decisión
+/// (d)). GLOBAL (sin idEmpresa — catálogo maestro como F1); borrado suave (un defecto con
+/// auditorías históricas NO se borra físico, solo se inactiva); auditoría A7.
+model DefectoCatalogo {
+  id            Int              @id @default(autoincrement())
+  /// Clave de negocio del defecto (ex `CC_Catalogo.Clave`). Única global.
+  clave         String           @unique
+  descripcion   String
+  /// Página/referencia del manual de calidad donde se ilustra (ex `Pag`). Opcional.
+  pag           String?
+  /// Nivel AQL al que pertenece el defecto (1.0 / 2.5 / 10). Numérico para agrupar por nivel en E2.
+  nivelAQL      Decimal          @map("nivel_aql") @db.Decimal(4, 2)
+  /// Se pre-carga en toda auditoría nueva (ex `CC_Catalogo.Favorito` — hoy 33 favoritos).
+  favorito      Boolean          @default(false)
+  /// Categoría libre para agrupar defectos (doc 09 §5.4). Opcional.
+  categoria     String?
+  /// Severidad informativa (NO entra en el veredicto, decisión (a)).
+  severidad     SeveridadDefecto @default(menor)
+  /// ¿Aplica a TODOS los tipos de producto? (decisión (d)). Si es `true`, las ligas de
+  /// `DefectoTipoProducto` se ignoran (el defecto es universal).
+  aplicaGeneral Boolean          @default(false) @map("aplica_general")
+  activo        Boolean          @default(true)
+
+  /// Tipos de producto a los que aplica este defecto (M:N por `DefectoTipoProducto`). Cuando
+  /// `aplicaGeneral=true` estas ligas no importan (aplica a todos).
+  tiposLigados      DefectoTipoProducto[]
+  /// Renglones de auditoría que cuentan fallas de este defecto (F6-E2). Restrict (en uso ⇒ se desactiva).
+  auditoriaDefectos AuditoriaDefecto[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("defectos_catalogo")
+}
+
+/// Puente M:N defecto ↔ tipo de producto (F6-E1, decisión (d)). Un defecto aplica a los tipos
+/// ligados aquí (salvo que `DefectoCatalogo.aplicaGeneral=true`, que lo hace universal). PK
+/// compuesta: una liga única por par. Cascade desde ambos extremos (reescribir las ligas de un
+/// defecto en la tx; quitar un tipo arrastra sus ligas).
+model DefectoTipoProducto {
+  idDefecto      Int @map("id_defecto")
+  idTipoProducto Int @map("id_tipo_producto")
+
+  defecto      DefectoCatalogo @relation(fields: [idDefecto], references: [id], onDelete: Cascade)
+  tipoProducto TipoProducto    @relation(fields: [idTipoProducto], references: [id], onDelete: Cascade)
+
+  @@id([idDefecto, idTipoProducto])
+  @@index([idTipoProducto])
+  @@map("defecto_tipo_producto")
+}
+
+/// Plan de muestreo AQL (F6-E1 — doc 09 §5.2; ISO 2859 nivel general II, AQL 1.0/2.5/10). Es la
+/// tabla de muestreo COMO DATOS (no motor estadístico — "no sobre-diseñar"). Decisión (c): hay UN
+/// solo plan default activo para todos (sin asignación por cliente ni tipo de producto). El plan
+/// sirve para la MUESTRA (decisión (b)); el límite acepta/rechaza queda como referencia (el
+/// veredicto lo decide el auditor a mano en E2, decisión (a)). GLOBAL; auditoría A7.
+model PlanMuestreoAQL {
+  id     Int     @id @default(autoincrement())
+  /// Nombre del plan (único global). Ej. "ISO 2859 — Nivel general II".
+  nombre String  @unique
+  /// Solo un plan default es el activo que el resolver usa (decisión (c)). Borrado suave.
+  activo Boolean @default(true)
+
+  /// Renglones por rango de tamaño de lote (Cascade: reescribir el plan en la tx A2).
+  renglones PlanMuestreoRenglon[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("planes_muestreo_aql")
+}
+
+/// Renglón del plan AQL por RANGO de tamaño de lote → tamaño de muestra (F6-E1, doc 09 §5.2). El
+/// resolver elige el renglón cuyo [loteMin, loteMax] contiene el tamaño del lote y devuelve
+/// `tamanoMuestra` (decisión (b): la muestra es lo vinculante). `loteMax` null = "en adelante"
+/// (último rango abierto). Cascade desde el plan.
+model PlanMuestreoRenglon {
+  id            Int             @id @default(autoincrement())
+  idPlan        Int             @map("id_plan")
+  plan          PlanMuestreoAQL @relation(fields: [idPlan], references: [id], onDelete: Cascade)
+  /// Tamaño de lote mínimo del rango (inclusivo).
+  loteMin       Int             @map("lote_min")
+  /// Tamaño de lote máximo del rango (inclusivo); null = sin tope (último rango abierto).
+  loteMax       Int?            @map("lote_max")
+  /// Tamaño de muestra para este rango (cuántas piezas se inspeccionan).
+  tamanoMuestra Int             @map("tamano_muestra")
+
+  /// Límites acepta/rechaza por nivel AQL de este renglón (Cascade).
+  limites PlanMuestreoLimite[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idPlan])
+  @@map("plan_muestreo_renglon")
+}
+
+/// Límite acepta/rechaza de un renglón del plan POR NIVEL AQL (F6-E1, doc 09 §2: en ISO 2859 cada
+/// nivel AQL tiene su PROPIO número de aceptación/rechazo). El resolver, dado (lote, nivel),
+/// localiza el renglón por lote y este límite por `nivelAQL`. `aceptar` = máximo de defectos para
+/// APROBAR; `rechazar` = mínimo para RECHAZAR (normalmente aceptar+1). Es REFERENCIA (el veredicto
+/// es manual en E2, decisión (a)). Un nivel único por renglón.
+model PlanMuestreoLimite {
+  id        Int                 @id @default(autoincrement())
+  idRenglon Int                 @map("id_renglon")
+  renglon   PlanMuestreoRenglon @relation(fields: [idRenglon], references: [id], onDelete: Cascade)
+  /// Nivel AQL al que aplica el límite (1.0 / 2.5 / 10).
+  nivelAQL  Decimal             @map("nivel_aql") @db.Decimal(4, 2)
+  /// Número de aceptación (Ac): hasta este número de defectos, se ACEPTA.
+  aceptar   Int
+  /// Número de rechazo (Re): a partir de este número de defectos, se RECHAZA.
+  rechazar  Int
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idRenglon, nivelAQL])
+  @@map("plan_muestreo_limite")
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// AUDITORÍAS DE CALIDAD (F6-E2) — núcleo transaccional del Control de calidad. doc
+// funcional `09-Control-de-Calidad.md` §1/§2/§4; DECISIONES.md §F6 (a)/(b). Una
+// auditoría inspecciona una MUESTRA de prendas de una orden (recibidas de un
+// maquilero), cuenta las fallas por defecto y deja un RESULTADO que el auditor
+// decide A MANO (decisión (a) — el cálculo por nivel AQL es solo sugerencia
+// informativa, NO vinculante; la severidad del defecto NO entra en el veredicto).
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Resultado de una auditoría de calidad (doc 09 §2). Lo decide el auditor A MANO
+/// (decisión (a)); el cálculo por nivel AQL del plan es solo SUGERENCIA. `no_calificado`
+/// es el estado inicial (capturada sin veredicto). Una auditoría FINAL `aprobado`
+/// auto-completa el proceso de RC "auditoría" de la orden (F5/F6 integración).
+enum ResultadoAuditoria {
+  aprobado
+  reprobado
+  no_calificado
+
+  @@map("resultado_auditoria")
+}
+
+/// Tipo de auditoría (doc 09 §1: en piso durante la producción, o final al recibir).
+/// `no_definida` para los casos viejos/sin clasificar. Solo una auditoría `final`
+/// `aprobado` gatilla el auto-avance de la RC (la de piso es un control intermedio).
+enum TipoAuditoria {
+  en_piso
+  final
+  no_definida
+
+  @@map("tipo_auditoria")
+}
+
+/// Auditoría de calidad de una orden (F6-E2 — ex `CC_Auditorias`, doc 09 §2). Folio
+/// `numAuditoria` por SECUENCIA ATÓMICA por empresa (A3 — reemplaza el `Max()+1` del
+/// viejo `AumentarNumAudit`). `idMaquilero` es el `Proveedor` con rol de maquila al que
+/// se le audita la prenda (NO existe tabla Maquilero — fusión de terceros D12/R15); se
+/// PROPONE desde las entregas reales de la orden y se puede ELEGIR. Doble responsable:
+/// `elaboroPorId` (quien la dio de alta) + `auditorPorId` (quien la auditó) — referencias
+/// de usuario SIN FK físico, mismo criterio que la Bitácora (ADR-0005). `tamanoMuestra`
+/// se propone del plan AQL default según la cantidad de la orden (decisión (b), vinculante)
+/// y solo se cambia a mano con permiso (`muestraManual`). `resultado` se persiste MANUAL
+/// (decisión (a)). Cancelación = borrado SUAVE (la auditoría nunca se borra; A7). A9.
+model Auditoria {
+  id           Int        @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "auditoria"; viejo: `CC_Auditorias.NumAudit`).
+  numAuditoria BigInt     @map("num_auditoria")
+  /// Empresa dueña de la auditoría y de su numeración (A9).
+  idEmpresa    Int        @map("id_empresa")
+  empresa      Empresa    @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Orden auditada (doc 09 §2 — `CC_Auditorias.IdOrdenes`). Restrict.
+  idOrden      Int        @map("id_orden")
+  orden        Orden      @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+  /// Maquilero auditado (Proveedor con rol maquila; D12/R15). Propuesto de las entregas
+  /// reales de la orden. Nullable (puede no haberse asignado). Restrict.
+  idMaquilero  Int?       @map("id_maquilero")
+  maquilero    Proveedor? @relation(fields: [idMaquilero], references: [id], onDelete: Restrict)
+
+  /// Fecha en que se ELABORÓ la auditoría (alta). `@db.Date`.
+  fechaElaboracion DateTime @map("fecha_elaboracion") @db.Date
+  /// Fecha en que se AUDITÓ físicamente la prenda. `@db.Date`. Es la fecha que se escribe
+  /// como `fechaReal` del proceso de RC si la auditoría final aprobada lo auto-completa.
+  fechaAuditoria   DateTime @map("fecha_auditoria") @db.Date
+
+  /// Quién dio de alta la auditoría (usuario de sesión). Sin FK físico (ADR-0005).
+  elaboroPorId String? @map("elaboro_por_id")
+  /// Quién auditó (responsable de calidad). Sin FK físico (ADR-0005).
+  auditorPorId String? @map("auditor_por_id")
+
+  /// Tamaño de muestra inspeccionado. Se PROPONE del plan AQL default por la cantidad de la
+  /// orden (decisión (b)); cambiarlo a mano exige permiso y enciende `muestraManual`.
+  tamanoMuestra Int     @map("tamano_muestra")
+  /// `true` si el `tamanoMuestra` se sobre-escribió a mano (decisión (b) — gate por permiso).
+  muestraManual Boolean @default(false) @map("muestra_manual")
+
+  /// Veredicto MANUAL del auditor (decisión (a)). `no_calificado` mientras no se captura.
+  resultado       ResultadoAuditoria @default(no_calificado)
+  /// Siempre `true` en v2: el resultado lo decide el humano (la sugerencia AQL NO es vinculante).
+  /// Se conserva como bandera para el ETL del histórico y para KPIs de F7.
+  resultadoManual Boolean            @default(true) @map("resultado_manual")
+  /// Tipo de auditoría (en piso / final / no definida). Solo `final` + `aprobado` gatilla la RC.
+  tipoAuditoria   TipoAuditoria      @default(no_definida) @map("tipo_auditoria")
+
+  /// Observaciones del auditor (justifica el veredicto manual). Nullable.
+  observaciones String? @db.Text
+
+  /// Cancelación SUAVE (borrado lógico, A7): la auditoría nunca se borra ni se edita destructivo.
+  /// La MODIFICACIÓN/cancelación es F6-E3; aquí solo el esquema. NULL = viva.
+  cancelada         Boolean   @default(false)
+  canceladaEn       DateTime? @map("cancelada_en")
+  /// Usuario que canceló (sin FK físico, ADR-0005).
+  canceladaPorId    String?   @map("cancelada_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion") @db.Text
+
+  /// Renglones defecto → nº de fallas (todos los favoritos se pre-cargan al alta). Cascade.
+  defectos AuditoriaDefecto[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, numAuditoria])
+  @@index([idEmpresa])
+  @@index([idOrden])
+  @@index([idMaquilero])
+  @@map("auditorias")
+}
+
+/// Renglón defecto → nº de fallas de una auditoría (F6-E2 — ex `CC_AuditoriasDet`, doc 09 §2).
+/// Al dar de alta una auditoría se PRE-CARGAN todos los defectos favoritos activos con
+/// `numFallas = 0` (ex `InsertarFav`); el auditor captura cuántas fallas vio de cada uno. Un
+/// defecto aparece UNA vez por auditoría (@@unique). El nivel AQL para la sugerencia se lee del
+/// `DefectoCatalogo` (NO se snapshotea). Cascade desde la auditoría; Restrict hacia el defecto
+/// (un defecto con auditorías históricas no se borra físico — se desactiva).
+model AuditoriaDefecto {
+  id          Int             @id @default(autoincrement())
+  idAuditoria Int             @map("id_auditoria")
+  auditoria   Auditoria       @relation(fields: [idAuditoria], references: [id], onDelete: Cascade)
+  idDefecto   Int             @map("id_defecto")
+  defecto     DefectoCatalogo @relation(fields: [idDefecto], references: [id], onDelete: Restrict)
+
+  /// Número de prendas con este defecto en la muestra. Entero ≥ 0.
+  numFallas Int @default(0) @map("num_fallas")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idAuditoria, idDefecto])
+  @@index([idDefecto])
+  @@map("auditoria_defecto")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COSTOS (Módulo 6, F7-E1) — costo REAL por orden (doc 06-Costos-y-EDR §3; D1/D2).
+// El PRE-COSTO por modelo NO es tabla: es cálculo de dominio sobre la receta
+// (receta paraPreCosto × precios de catálogo + maquila — verificado: `PreCostos`
+// no era tabla en el viejo). El EDR (F7-E2) referenciará `CostoOrden`. Auditoría
+// A7 + Bitácora (módulo financiero). Valuación a costo ACTUAL (D1): sin CostoViejo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Base de prorrateo del costo unitario de la orden (D2): sobre qué cantidad se
+/// divide el `costoTotal` para obtener el costo por prenda. `cortado` (DEFAULT,
+/// confirmado por Daniel: tela ÷ prendas cortadas = `CantCorte` del viejo);
+/// `recibido` = piezas recibidas de costura (prenda terminada, `generaEntradaPt`);
+/// `vendido` = piezas entregadas a cliente. Las tres se DERIVAN por suma directa de
+/// `EtapaMovimientoDet` (nunca un acumulador — D3/D4).
+enum BaseProrrateo {
+  cortado
+  recibido
+  vendido
+
+  @@map("base_prorrateo")
+}
+
+/// Costo REAL por orden (F7-E1 — ex `CostoOrd`, doc 06-Costos-y-EDR §3). 1:1 con la
+/// orden (`idOrden` @unique). Componentes en DOBLE juego (doc 06 §3):
+///  • `*Calc` = TEÓRICOS, snapshot de la receta × precios vigentes al momento de
+///    guardar (se recalculan en vivo para comparar, pero también se congelan aquí);
+///  • `*Cost` = los GUARDADOS (el usuario confirma o AJUSTA los teóricos).
+/// `costoTotal` se ARMA con los guardados: `telaCost + procesosCost + aviosCost +
+/// otros` (doc 06 §3). La REGALÍA NO es componente del costo (D2, 2026-07-02): va
+/// sobre la VENTA (lista de precios) — por eso NO hay `regaliasCalc/regaliasCost`.
+/// `procesos` = maquila + estampado + otros procesos; `avios` = habilitación de
+/// costura + empaque. `otros`/`descOtros` dan flexibilidad. Todo NULLABLE (un
+/// componente sin capturar cuenta como 0 en el total — patrón ceronulo). Valuación
+/// a costo ACTUAL (D1). Auditoría A7. Cascade hacia `Orden`; Restrict hacia `Empresa`.
+model CostoOrden {
+  id        Int     @id @default(autoincrement())
+  idOrden   Int     @unique @map("id_orden")
+  orden     Orden   @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  /// Empresa dueña (A9). Se persiste para acotar las consultas/reportes por empresa activa.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Tela — teórico (receta paraCosto × precio × base) y GUARDADO (ex `TelaCost`).
+  telaCalc     Decimal? @map("tela_calc") @db.Decimal(14, 2)
+  telaCost     Decimal? @map("tela_cost") @db.Decimal(14, 2)
+  /// Procesos: maquila + estampado + otros procesos — teórico y GUARDADO (ex `MaquilaCost`+`BordCost`).
+  procesosCalc Decimal? @map("procesos_calc") @db.Decimal(14, 2)
+  procesosCost Decimal? @map("procesos_cost") @db.Decimal(14, 2)
+  /// Avíos: habilitación de costura + empaque — teórico y GUARDADO (ex `HabCost`).
+  aviosCalc    Decimal? @map("avios_calc") @db.Decimal(14, 2)
+  aviosCost    Decimal? @map("avios_cost") @db.Decimal(14, 2)
+  /// Otros costos + su descripción (ex `CostoOrd.Otros`/`DescOtros`), para flexibilidad.
+  otros        Decimal? @db.Decimal(14, 2)
+  descOtros    String?  @map("desc_otros")
+
+  /// Costo TOTAL de la orden = Σ de los GUARDADOS (doc 06 §3). Lo ARMA el dominio al
+  /// guardar (nunca se edita a mano ni suma los teóricos). NULLABLE hasta el primer guardado.
+  costoTotal Decimal? @map("costo_total") @db.Decimal(14, 2)
+
+  /// Base de prorrateo del costo unitario (D2). Default `cortado` (= `CantCorte`).
+  baseProrrateo BaseProrrateo @default(cortado) @map("base_prorrateo")
+
+  observaciones String? @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa])
+  @@map("costo_orden")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Estado de Resultados (EDR) — F7-E2 (doc 06-Costos-y-EDR §4; DECISIONES.md D1/D2)
+//
+// El P&L mensual de la empresa, GENERADO automáticamente y valuado SIEMPRE a COSTO ACTUAL (D1):
+// el costo NUNCA se congela en la línea; se recalcula desde `CostoOrden` al leer. A diferencia de
+// otros módulos, el EDR es CONSOLIDADO (no se acota a la empresa activa): el encabezado `Edr` es
+// GLOBAL por mes y los cortes por empresa/cliente se DERIVAN de las líneas (D2 #6). Solo entran
+// empresas `paraEdr=true`; se excluyen órdenes `noCostear=true` (lo aplica el dominio).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Origen de una línea del EDR (F7-E2). `automatica` = propuesta por el generador desde las
+/// entregas a cliente del mes (se RECONCILIA en cada re-generación). `ajustada` = una automática
+/// que el usuario editó (precio/cantidad); ya NO se toca al re-generar. `manual` = línea capturada
+/// a mano (sin orden); tampoco se toca al re-generar.
+enum EdrOrigenLinea {
+  automatica
+  ajustada
+  manual
+
+  @@map("edr_origen_linea")
+}
+
+/// Encabezado GLOBAL del Estado de Resultados de un mes (F7-E2 — ex `EdoResult`, doc 06 §4). Uno
+/// por (año, mes): NO lleva `idEmpresa` (es consolidado; el corte por empresa se deriva de las
+/// líneas, D2 #6). Los gastos/intereses/bonificaciones/otros son GLOBALES del mes (D2 #6). Ventas y
+/// Costo se DERIVAN de las líneas al leer (nunca se persisten aquí).
+model Edr {
+  id   Int @id @default(autoincrement())
+  /// Año del estado de resultados (viejo: año de `EdoResult.Fecha`).
+  anio Int
+  /// Mes 1-12 del estado de resultados (viejo: mes de `EdoResult.Fecha`).
+  mes  Int
+
+  /// Gastos del mes (viejo: `EdoResult.Gastos`). Globales (D2 #6).
+  gastos         Decimal @default(0) @db.Decimal(14, 2)
+  /// Intereses del mes (viejo: `EdoResult.Intereses`).
+  intereses      Decimal @default(0) @db.Decimal(14, 2)
+  /// Bonificaciones del mes (viejo: `EdoResult.Bonificaciones`). SUMAN al resultado (doc 06 §4).
+  bonificaciones Decimal @default(0) @db.Decimal(14, 2)
+  /// Otros (± al resultado) + su descripción (viejo: `EdoResult.Otros`/`DescOtros`).
+  otros          Decimal @default(0) @db.Decimal(14, 2)
+  descOtros      String? @map("desc_otros")
+  observaciones  String? @db.Text
+
+  /// Líneas de venta del mes (una por orden vendida + manuales). Cascade: son del encabezado.
+  lineas EdrLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([anio, mes])
+  @@map("edr")
+}
+
+/// Renglón del EDR (F7-E2 — ex `EdoResultDet`, doc 06 §4): una venta del mes, por orden/modelo. El
+/// PRECIO manda de lo FACTURADO (D2 #5); mientras Finanzas/CFDI no exista, se PRE-PROPONE desde las
+/// entregas a cliente de F3 y el usuario ajusta a lo realmente facturado. El COSTO NO se guarda aquí
+/// (D1): se recalcula desde `CostoOrden` al leer. `@@unique([idEdr, idOrden])` ancla la idempotencia
+/// del generador (los NULL de las líneas manuales conviven, Postgres permite múltiples NULL).
+model EdrLinea {
+  id    Int @id @default(autoincrement())
+  idEdr Int @map("id_edr")
+  edr   Edr @relation(fields: [idEdr], references: [id], onDelete: Cascade)
+
+  /// Orden vendida (viejo: liga vía `EdoResultDet.IdCostoOrd`). NULL en líneas manuales. Restrict.
+  idOrden Int?   @map("id_orden")
+  orden   Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Empresa de la línea (para el corte por empresa; solo `paraEdr=true`, lo valida el dominio).
+  idEmpresa   Int      @map("id_empresa")
+  empresa     Empresa  @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Cliente de la línea (para el corte por cliente). NULL solo en históricos sin cliente. Restrict.
+  idCliente   Int?     @map("id_cliente")
+  cliente     Cliente? @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  /// Modelo vendido (viejo: `EdoResultDet.ModeloC`). NULL en manuales sin modelo. Restrict.
+  idModelo    Int?     @map("id_modelo")
+  modelo      Modelo?  @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  /// Descripción libre para líneas manuales (viejo: no existía). NULL en automáticas.
+  descripcion String?
+
+  /// Cantidad vendida (viejo: `EdoResultDet.CantVendida`). En automáticas = Σ entregas del mes.
+  cantVendida Int     @map("cant_vendida")
+  /// Precio de venta FACTURADO por prenda (viejo: `EdoResultDet.PrecioVenta`). Editable (D2 #5).
+  precioVenta Decimal @map("precio_venta") @db.Decimal(14, 2)
+
+  /// Costo histórico congelado (viejo: `EdoResultDet.CostoViejo`). SOLO-INFORMATIVO: el EDR valúa a
+  /// costo ACTUAL (D1); esta columna la llena el ETL de E6 para conservar el dato histórico. NUNCA se
+  /// usa para el cálculo del resultado; nace NULL en toda línea generada por v2.
+  costoHistorico Decimal? @map("costo_historico") @db.Decimal(14, 2)
+
+  /// Origen de la línea (automática/ajustada/manual) — gobierna la reconciliación (ver enum).
+  origen EdrOrigenLinea @default(automatica)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEdr, idOrden])
+  @@index([idEdr])
+  @@index([idEmpresa])
+  @@index([idCliente])
+  @@index([idModelo])
+  @@index([idOrden])
+  @@map("edr_linea")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INDICADORES · F7-E3 — Motor de KPIs en segundo plano (plan §11; doc 08 §4.4 /
+// doc 09 §5.3 / MEJORAS 03-WIP / D11). Los TABLEROS directivos se calculan sobre
+// VISTAS MATERIALIZADAS (SQL crudo en la migración `20260703140000_f7_e3_kpis`,
+// NO son modelos Prisma: se consultan por `$queryRaw`) que refresca un job de
+// pg-boss (`comun/jobs/refrescar-kpis.ts`). La CAPTURA nunca espera un recálculo:
+// las pantallas leen la vista ya materializada y muestran "datos al: <fecha>".
+// Esta tabla es el ÚNICO modelo Prisma del módulo: guarda ese timestamp.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Sello de la última actualización de las vistas materializadas de KPIs (F7-E3). Fila
+/// SINGLETON (`clave = "global"`, @unique): la estampa `refrescarKpis` tras refrescar las
+/// vistas; el API la devuelve como "datos al: <fecha/hora>" para que el usuario sepa qué
+/// tan frescos son los números. No lleva `idEmpresa`: el refresco es global (las vistas ya
+/// llevan la empresa por fila y el dominio filtra por la empresa activa, A9).
+model KpiRefresco {
+  id           Int      @id @default(autoincrement())
+  /// Clave del singleton (siempre "global"): ancla el upsert idempotente del job.
+  clave        String   @unique @default("global")
+  /// Momento en que terminó el último refresco de las vistas materializadas.
+  refrescadoEn DateTime @map("refrescado_en")
+
+  creadoEn     DateTime @default(now()) @map("creado_en")
+  modificadoEn DateTime @updatedAt @map("modificado_en")
+
+  @@map("kpi_refresco")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Productividad unificada IP / Almacén (Módulo Indicadores, F7-E4 — doc 05 §A.1/§B.1;
+// MEJORAS 05 §1: "motor de KPIs/productividad configurable por área"). Se DESPIVOTA el
+// patrón repetido del viejo (IP_* y Alm_Prd_*) a un solo motor, distinguido por `area`
+// (D4/A6: filas configurables en vez de tablas paralelas). Auditoría A7; A9 por empresa.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Área a la que pertenece un dato de productividad (F7-E4). Unifica los dos módulos
+/// gemelos del viejo (Ingeniería del Producto y Almacén) en un solo motor.
+enum AreaProductividad {
+  ip
+  almacen
+
+  @@map("area_productividad")
+}
+
+/// Persona del área para el índice de productividad (F7-E4; ← `IP_Personal`, doc 05 §A.1).
+/// Es un catálogo GLOBAL (sin idEmpresa — ADR-0007): las personas son las mismas para todas
+/// las empresas del grupo. El almacén casi no captura personas individuales (usa la cuadrilla
+/// `personas` del registro), por eso `horasBase` es opcional y solo aplica al índice de IP.
+model PersonalArea {
+  id        Int               @id @default(autoincrement())
+  /// Nombre de la persona (viejo: `IP_Personal.NombreIP`). Único por área.
+  nombre    String
+  /// Área de la persona (ip/almacen). Casi siempre `ip`.
+  area      AreaProductividad
+  /// Jornada base (horas/día) de la persona para el índice de IP (viejo: `HorasBase`). Solo IP.
+  horasBase Decimal?          @map("horas_base") @db.Decimal(5, 2)
+  /// Puesto (viejo: `IP_Personal.Puesto`).
+  puesto    String?
+  /// Borrado suave (plan §4): una persona que se va se desactiva, jamás se borra.
+  activo    Boolean           @default(true)
+
+  /// Registros de productividad capturados a nombre de esta persona (F7-E4, Restrict).
+  registros RegistroProductividad[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([area, nombre])
+  @@map("personal_area")
+}
+
+/// Catálogo de actividades productivas por área (F7-E4; ← `IP_Actividades` + `Alm_Prd_Act`,
+/// doc 05 §A.1/§B.1). Una actividad pertenece a UNA área; los estándares que no aplican al
+/// área quedan NULL (A6: campos configurables, no columnas fijas por cada módulo del viejo):
+/// IP usa `porcentajeD`; almacén usa `pzPersDia` (+ `porcenPzas`). Catálogo GLOBAL (ADR-0007).
+model ActividadProductividad {
+  id          Int               @id @default(autoincrement())
+  /// Nombre de la actividad (viejo: `IP_Actividades.Actividad` / `Alm_Prd_Act.ActividadAlm`). Único por área.
+  nombre      String
+  /// Área de la actividad (ip/almacen).
+  area        AreaProductividad
+  /// Peso/estándar de la actividad de IP (viejo: `IP_Actividades.PorcentajeD`). Solo IP.
+  porcentajeD Decimal?          @map("porcentaje_d") @db.Decimal(10, 4)
+  /// Estándar piezas/persona/día de la actividad de almacén (viejo: `Alm_Prd_Act.Pz_Pers_Dia`). Solo almacén.
+  pzPersDia   Decimal?          @map("pz_pers_dia") @db.Decimal(10, 4)
+  /// Peso de piezas de la actividad de almacén (viejo: `Alm_Prd_Act.PorcenPzas`). Solo almacén.
+  porcenPzas  Decimal?          @map("porcen_pzas") @db.Decimal(10, 4)
+  /// Borrado suave (plan §4).
+  activo      Boolean           @default(true)
+
+  /// Registros de productividad de esta actividad (F7-E4, Restrict).
+  registros RegistroProductividad[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([area, nombre])
+  @@map("actividad_productividad")
+}
+
+/// Registro diario de productividad (F7-E4; ← `IP_Productiv` + `Alm_Prd`/`Alm_Prd_Det`, doc
+/// 05 §A.1/§B.1). Un registro es de UNA área (la de su actividad). Para IP lleva `idPersona`
+/// (y `personas` = 1); para almacén lleva la cuadrilla `personas` (y opcionalmente `idCliente`).
+/// Cancelación SUAVE (auditada, A7); NUNCA se edita/borra: se cancela y se re-captura. A9.
+model RegistroProductividad {
+  id        Int               @id @default(autoincrement())
+  idEmpresa Int               @map("id_empresa")
+  empresa   Empresa           @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Fecha del trabajo (viejo: `IP_Productiv.Fecha` / `Alm_Prd.FechaAlm`). Solo día.
+  fecha     DateTime          @db.Date
+  /// Área del registro (redundante con la de la actividad; se sella para filtrar el tablero).
+  area      AreaProductividad
+
+  idActividad Int                    @map("id_actividad")
+  actividad   ActividadProductividad @relation(fields: [idActividad], references: [id], onDelete: Restrict)
+
+  /// Persona (solo IP; viejo: `IP_Productiv.IdIp_Personal`). NULL en almacén (cuadrilla).
+  idPersona Int?          @map("id_persona")
+  persona   PersonalArea? @relation(fields: [idPersona], references: [id], onDelete: Restrict)
+
+  /// Cantidad producida (viejo: `IP_Productiv.CantidadAct` / `Alm_Prd_Det.Piezas`).
+  cantidad        Decimal @db.Decimal(12, 2)
+  /// Horas trabajadas (viejo: `HorasTrabajadas`). Debe ser > 0 (división en el índice).
+  horasTrabajadas Decimal @map("horas_trabajadas") @db.Decimal(6, 2)
+  /// Cuadrilla que trabajó (viejo: `Alm_Prd.Personas`). Almacén > 1; IP = 1. Debe ser > 0.
+  personas        Int     @default(1)
+
+  /// Cliente al que se le procesó (solo almacén, opcional; viejo: `Alm_Prd_Det.IdClientes`). Restrict.
+  idCliente Int?     @map("id_cliente")
+  cliente   Cliente? @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+
+  /// Cancelación suave con motivo (A7): un registro erróneo se cancela, no se borra.
+  cancelado         Boolean   @default(false)
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa, area, fecha])
+  @@index([idActividad])
+  @@index([idPersona])
+  @@index([idCliente])
+  @@map("registro_productividad")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fichas confiables (Módulo Indicadores, F7-E4 — doc 05 §A.2; ex `IP_InfConf` +
+// `Ind_IP_InfConfiable`). Checklist de confiabilidad de la ficha técnica POR ORDEN,
+// modelado por FILAS (reactivo × orden) en vez de las 8 columnas fijas del viejo (A6).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Reactivo (aspecto a verificar) del checklist de confiabilidad de la ficha (F7-E4, A6 —
+/// configurable, ← columnas fijas `InfGeneral..MedidasPrendas` de `IP_InfConf`). Catálogo
+/// GLOBAL (ADR-0007). El seed siembra los 8 fijos del viejo (doc 05 §A.2); se pueden agregar
+/// más sin migración. Hook a futuro: si se construye la ficha estructurada (R5, módulo 12),
+/// los reactivos podrán derivarse de sus secciones en vez de capturarse a mano.
+model ChecklistFichaDef {
+  id       Int     @id @default(autoincrement())
+  /// Clave estable del reactivo (viejo nombre de columna, p. ej. "InfGeneral"). Única global.
+  clave    String  @unique
+  /// Etiqueta para UI (español), p. ej. "Información de tela".
+  etiqueta String
+  /// Orden de despliegue en el checklist.
+  orden    Int     @default(0)
+  /// Borrado suave (plan §4): un reactivo que se retira se desactiva, no se borra.
+  activo   Boolean @default(true)
+
+  /// Verificaciones de este reactivo en las órdenes (F7-E4, Restrict).
+  verificaciones FichaVerificacion[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("checklist_ficha_def")
+}
+
+/// Verificación de UN reactivo del checklist en UNA orden (F7-E4; doc 05 §A.2). Modelado por
+/// FILAS (una fila reactivo × orden) — el anti-patrón del viejo eran 8 columnas booleanas
+/// fijas. `revisorId`/`fecha` = quién marcó y cuándo (sin FK física a usuarios, ADR-0005). El
+/// indicador "% de fichas confiables" (ex `Ind_IP_InfConfiable`) = Σ hecho ÷ Σ reactivos. A9.
+model FichaVerificacion {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  idReactivo Int               @map("id_reactivo")
+  reactivo   ChecklistFichaDef @relation(fields: [idReactivo], references: [id], onDelete: Restrict)
+
+  /// ¿El aspecto está OK en la ficha? (viejo: cada columna booleana).
+  hecho     Boolean   @default(false)
+  /// Usuario que verificó (sin FK física, ADR-0005; viejo: `IP_InfConf.IdUsuarios`).
+  revisorId String?   @map("revisor_id")
+  /// Fecha de la revisión (viejo: `IP_InfConf.FechaRevision`).
+  fecha     DateTime? @db.Date
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idOrden, idReactivo])
+  @@index([idEmpresa])
+  @@index([idReactivo])
+  @@map("ficha_verificacion")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Muestrarios pendientes (Módulo Indicadores, F7-E4 — doc 05 §A.3; ← `IP_MuesPend`).
+// Seguimiento de boards y muestras solicitados: solicitud → seguimiento → entrega. A9.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Muestrario pendiente (F7-E4; ← `IP_MuesPend`, doc 05 §A.3). KPI de cumplimiento =
+/// `fechaEntregado <= fechaRequerida`. Cancelación suave con motivo (A7). A9 por empresa.
+model Muestrario {
+  id        Int     @id @default(autoincrement())
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  idCliente Int     @map("id_cliente")
+  cliente   Cliente @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+
+  /// Categoría del muestrario (viejo: `IP_MuesPend.Categoria`).
+  categoria   String?
+  /// Temporada (viejo: `IP_MuesPend.Temporada`). FK nullable al catálogo (Restrict).
+  idTemporada Int?       @map("id_temporada")
+  temporada   Temporada? @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+
+  /// Cuántos boards se piden (viejo: `CantBoards`).
+  cantBoards   Int @default(0) @map("cant_boards")
+  /// Cuántas muestras se piden (viejo: `CantMuestras`).
+  cantMuestras Int @default(0) @map("cant_muestras")
+
+  /// Fecha de solicitud (viejo: `FechaSolicitado`).
+  fechaSolicitado DateTime  @map("fecha_solicitado") @db.Date
+  /// Fecha requerida/compromiso (viejo: `FechaRequerida`).
+  fechaRequerida  DateTime  @map("fecha_requerida") @db.Date
+  /// Fecha en que se entregó (viejo: `FechaEntregado`). NULL = pendiente.
+  fechaEntregado  DateTime? @map("fecha_entregado") @db.Date
+
+  /// Boards que quedaron listos (viejo: `BoardsOK`).
+  boardsOK   Int @default(0) @map("boards_ok")
+  /// Muestras que quedaron listas (viejo: `MuestrasOK`).
+  muestrasOK Int @default(0) @map("muestras_ok")
+
+  /// Usuario solicitante (sin FK física, ADR-0005; viejo: `IdUsuarioSolicitante`).
+  solicitanteId String? @map("solicitante_id")
+
+  /// Cancelación suave con motivo (viejo: `Cancelado`; A7).
+  cancelado         Boolean   @default(false)
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idEmpresa, fechaRequerida])
+  @@index([idCliente])
+  @@index([idTemporada])
+  @@map("muestrarios")
+}
+
+/// Estado del ciclo de vida de un inventario cíclico (F7-E5; doc 05-Indicadores; ← forms `Alm_IC_*`).
+/// Máquina de estados: `abierto` (recién dado de alta, con el teórico ya CONGELADO — D6) → `contado`
+/// (todos sus renglones tienen conteo físico) → `cerrado` (el ajuste ya se aplicó al kardex, D3: no se
+/// re-genera). `cancelado` = abortado antes de cerrar (cancelación suave con motivo, A7).
+enum EstadoInventarioCiclico {
+  abierto
+  contado
+  cerrado
+  cancelado
+
+  @@map("estado_inventario_ciclico")
+}
+
+/// INVENTARIO CÍCLICO — encabezado (F7-E5; doc 05-Indicadores; ← forms `Alm_IC_Alta`/`_Cont`/
+/// `_Consulta`). Cuenta el físico contra el KARDEX de v2 (D3/D6): el ALTA CONGELA el teórico por
+/// artículo (`InventarioCiclicoDet.cantTeorica`) para que no cambie mientras se cuenta; el conteo es
+/// CIEGO (el capturista NO ve el teórico); el ajuste se aplica SOLO como MOVIMIENTO de kardex (D3),
+/// jamás editando un saldo. A9 por empresa; folio por secuencia (A3); auditoría A7 + cancelación suave.
+model InventarioCiclico {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "inventario-ciclico"). Referencia humana de la hoja.
+  folio     BigInt
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Almacén que se cuenta (D4: existencia por …×almacén). Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  /// Fecha del alta (el instante en que se congeló el teórico).
+  fecha  DateTime                @db.Date
+  estado EstadoInventarioCiclico @default(abierto)
+
+  observaciones String? @db.Text
+
+  /// Renglones (artículos) del conteo, a la granularidad REAL del kardex (…×orden). Cascade.
+  detalles InventarioCiclicoDet[]
+
+  /// Cancelación suave con motivo (A7): abortar el conteo sin generar ajuste.
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idEmpresa, estado])
+  @@index([idAlmacen])
+  @@map("inventarios_ciclicos")
+}
+
+/// INVENTARIO CÍCLICO — detalle (F7-E5). Un renglón por ARTÍCULO de kardex a su granularidad REAL:
+/// modelo×color×talla×ORDEN×almacén (el almacén sale del encabezado; F6-E2 "PT por orden", ADR-0014).
+/// `idOrden` NULLABLE (bucket "sin orden" = movimientos manuales/traspasos/histórico). Se llavea así a
+/// PROPÓSITO (decisión del lead F7-E5): el teórico se congela por artículo con
+/// `existenciaPtBloqueada(...,idOrden)` y el ajuste es un movimiento de kardex 1:1 sobre la MISMA llave
+/// — no hay que repartir el delta entre órdenes y la validación no-negativo funciona por artículo.
+/// Cascade hacia el encabezado; Restrict hacia los catálogos.
+model InventarioCiclicoDet {
+  id                  Int               @id @default(autoincrement())
+  idInventarioCiclico Int               @map("id_inventario_ciclico")
+  inventario          InventarioCiclico @relation(fields: [idInventarioCiclico], references: [id], onDelete: Cascade)
+
+  idModelo Int    @map("id_modelo")
+  modelo   Modelo @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  idColor  Int    @map("id_color")
+  color    Color  @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla  Int    @map("id_talla")
+  talla    Talla  @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+  /// Orden dueña de estas prendas (F6-E2 "PT por orden"); NULL = bucket "sin orden". Restrict.
+  idOrden  Int?   @map("id_orden")
+  orden    Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Existencia TEÓRICA CONGELADA al dar de alta (D6): Σ de movimientos del artículo en ese instante.
+  cantTeorica Int  @map("cant_teorica")
+  /// Cantidad contada FÍSICAMENTE (conteo ciego). NULL hasta capturar el conteo del renglón.
+  cantReal    Int? @map("cant_real")
+
+  contadoEn    DateTime? @map("contado_en")
+  contadoPorId String?   @map("contado_por_id")
+
+  /// Movimiento de kardex del AJUSTE que reconcilió este renglón (D3): la existencia SOLO cambia por
+  /// movimiento, nunca editando un saldo. NULL hasta generar el ajuste. Restrict (traza).
+  idMovimientoAjuste Int?        @map("id_movimiento_ajuste")
+  movimientoAjuste   Movimiento? @relation(fields: [idMovimientoAjuste], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Un artículo (…×orden) NO se repite dentro del mismo conteo (el alta lo enumera 1 vez desde la
+  /// vista agregada). NOTA: Postgres trata los NULL de `id_orden` como distintos, así que la unicidad
+  /// del bucket "sin orden" la garantiza el dominio (enumera una sola fila por artículo).
+  @@unique([idInventarioCiclico, idModelo, idColor, idTalla, idOrden])
+  @@index([idInventarioCiclico])
+  @@index([idMovimientoAjuste])
+  @@map("inventario_ciclico_det")
 }

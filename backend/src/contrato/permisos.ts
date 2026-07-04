@@ -37,10 +37,21 @@ export const MODULOS_PERMISO = {
   esma: 'Estados de cuenta de maquileros',
   rc: 'Ruta Crítica',
   calidad: 'Control de calidad',
+  // Costos y márgenes (Módulo 6, F7-E1) — costo real por orden + márgenes por pedido (ex nivel ≤30,
+  // menú 6). El PRE-COSTO tiene su propio módulo (`precostos`, ex nivel ≤45, accesible desde Modelos).
+  costos: 'Costos y márgenes',
+  precostos: 'Pre-costos',
+  // Estado de Resultados (EDR, Módulo 6, F7-E2) — el P&L mensual consolidado. Módulo financiero
+  // propio (ex nivel ≤30, menú 6.2), separado de `costos` porque tiene su propio flujo (generar mes
+  // + conciliar ventas). Se reparte a los MISMOS roles que `costos` (directivo/dirección/admin).
+  edr: 'Estado de resultados',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
   roles: 'Administración de roles',
+  // Administración transversal del sistema (F6-E1): la consulta de la bitácora (lectura del
+  // motor A7). No tenía equivalente granular en el viejo (lo regía el nivel).
+  admin: 'Administración del sistema',
   almacenes: 'Almacenes',
   empresas: 'Empresas',
   // ── Catálogos maestros (F1-E1, globales — ADR-0007) ────────────────────────
@@ -533,6 +544,23 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Se pueden Actualizar las auditorias (Solo algunos datos, dando doble click)',
     },
   },
+  // Calidad — base configurable (Módulo 8, F6-E1, A4) — permisos NUEVOS de v2. Gobiernan el
+  // catálogo de defectos enriquecido, los tipos de producto y el motor de planes AQL. Mismo
+  // reparto que un catálogo maestro: `ver` (consulta) y `administrar-catalogo` (alta/edición/
+  // des-reactivación de defectos, tipos de producto y planes). Los `calidad.*-auditorias`
+  // LEGADO (arriba, de Accesos.csv) son del NÚCLEO de auditorías (F6-E2+); NO se reutilizan
+  // para el catálogo configurable.
+  {
+    clave: 'calidad.ver',
+    modulo: 'calidad',
+    descripcion: 'Consultar el catálogo de defectos, tipos de producto y planes de muestreo AQL',
+  },
+  {
+    clave: 'calidad.administrar-catalogo',
+    modulo: 'calidad',
+    descripcion:
+      'Administrar el catálogo de defectos, tipos de producto y planes AQL (alta, edición, desactivación)',
+  },
 
   // ── Indicadores ──────────────────────────────────────────────────────────────
   {
@@ -615,6 +643,17 @@ export const CATALOGO_PERMISOS = [
       descripcion: 'Poder Accesar al form. (Meter la productividad de Almacen)',
     },
   },
+  // Tableros directivos de indicadores (Módulo Indicadores, F7-E3, A4) — permiso NUEVO de v2. Gobierna
+  // los 3 TABLEROS calculados en segundo plano (KPIs de Ruta Crítica/D11, calidad por maquilero/F6,
+  // WIP analítico/F3). Es de DIRECCIÓN/GERENCIA (los `indicadores.*` legado de arriba son CAPTURA de
+  // productividad/cíclicos, operativos): se reparte como los tableros directivos → Administrador,
+  // AdministracionDireccion, Directivo y Gerencial (a diferencia de `costos.ver`/`edr.ver`, que
+  // Gerencial NO tiene por ser financieros; estos KPIs no revelan costos ni precios).
+  {
+    clave: 'indicadores.ver',
+    modulo: 'indicadores',
+    descripcion: 'Consultar los tableros directivos de indicadores (Ruta Crítica, calidad y WIP)',
+  },
 
   // ── Consultas transversales ──────────────────────────────────────────────────
   {
@@ -628,6 +667,50 @@ export const CATALOGO_PERMISOS = [
     },
   },
 
+  // ── Costos y márgenes (Módulo 6, F7-E1; doc 06-Costos-y-EDR) — permisos NUEVOS de v2 ──────
+  // El módulo financiero de costeo. `costos.ver` (consultar costos de orden, lista de costos y
+  // márgenes por pedido) y `costos.capturar` (guardar/ajustar el costo de una orden) absorben el
+  // nivel ≤30 (menú 6 Costos era Directivo). `precostos.consultar` absorbe el nivel ≤45 (la pantalla
+  // `PreCostos`, accesible también desde MODELOS). Para OCULTAR los importes/precios ($) en las
+  // pantallas que el usuario sí ve, se REUSA `consultas.ver-importes` (ex acceso #2, transversal) —
+  // no se crea un permiso de importes propio (F2 ya lo tenía). La lista de precios sí es del pre-costo.
+  {
+    clave: 'costos.ver',
+    modulo: 'costos',
+    descripcion:
+      'Consultar el costo real de una orden, la lista de costos y los márgenes por pedido (menú Costos, nivel ≤30)',
+  },
+  {
+    clave: 'costos.capturar',
+    modulo: 'costos',
+    descripcion: 'Capturar o ajustar el costo real de una orden de producción (nivel ≤30)',
+  },
+  {
+    clave: 'precostos.consultar',
+    modulo: 'precostos',
+    descripcion:
+      'Consultar el pre-costo (estimado) de un modelo y la lista de precios sugeridos (nivel ≤45)',
+  },
+
+  // ── Estado de Resultados (EDR, Módulo 6, F7-E2; doc 06-Costos-y-EDR §4) — permisos NUEVOS de v2 ──
+  // El P&L mensual consolidado, valuado a costo ACTUAL (D1). `edr.ver` (consultar el EDR por mes/año)
+  // y `edr.capturar` (capturar el encabezado global, generar el mes desde las entregas y conciliar/
+  // ajustar sus líneas) absorben el nivel ≤30 (menú 6.2 EDR era Directivo). Todo el EDR es financiero
+  // → no se ocultan columnas por `consultas.ver-importes` (a diferencia de costos): el módulo entero
+  // se protege con `edr.ver`. Mismo reparto por rol que `costos.ver`/`costos.capturar`.
+  {
+    clave: 'edr.ver',
+    modulo: 'edr',
+    descripcion:
+      'Consultar el estado de resultados mensual y anual (ventas, costo actual y resultado) (nivel ≤30)',
+  },
+  {
+    clave: 'edr.capturar',
+    modulo: 'edr',
+    descripcion:
+      'Capturar el encabezado, generar y conciliar las líneas del estado de resultados (nivel ≤30)',
+  },
+
   // ── Administración (nuevos en v2, sin equivalente granular en el viejo) ──────
   {
     clave: 'usuarios.administrar',
@@ -638,6 +721,15 @@ export const CATALOGO_PERMISOS = [
     clave: 'roles.administrar',
     modulo: 'roles',
     descripcion: 'Administrar roles y sus permisos',
+  },
+  // Consulta de la BITÁCORA del sistema (F6-E1, A4/A7) — permiso NUEVO de v2. F0 entregó el motor
+  // de auditoría A7 SOLO como escritura (sin endpoint de lectura); E1 agrega el GET de bitácora y
+  // su pantalla de consulta para que la administración pueda auditar los cambios sin SQL. Lo regía
+  // el nivel en el viejo (no era un acceso granular).
+  {
+    clave: 'admin.ver-bitacora',
+    modulo: 'admin',
+    descripcion: 'Consultar la bitácora de cambios del sistema (auditoría A7)',
   },
   {
     clave: 'almacenes.ver',

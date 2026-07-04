@@ -4,6 +4,7 @@ import {
   CalendarRange,
   Calculator,
   ChartLine,
+  ClipboardList,
   Factory,
   Files,
   Images,
@@ -54,7 +55,8 @@ export type IconoModulo =
   | 'calculadora'
   | 'grafica'
   | 'archivo'
-  | 'engrane';
+  | 'engrane'
+  | 'portapapeles';
 
 /**
  * Mapa nombre estable -> componente Lucide. Vive aqui (modulo de datos, no
@@ -81,6 +83,7 @@ export const ICONOS_MODULO: Record<IconoModulo, LucideIcon> = {
   grafica: ChartLine,
   archivo: Files,
   engrane: Settings,
+  portapapeles: ClipboardList,
 };
 
 export interface ModuloMenu {
@@ -584,7 +587,70 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     descripcion: 'Auditorías AQL y catálogo de defectos',
     ruta: '/calidad',
     icono: 'medalla',
-    permisos: 'autenticado',
+    permisos: ['calidad.ver'],
+  },
+  // Sub-vista de Calidad (F6-E2): ALTA de auditoría (la operación de piso). Cuelga del módulo
+  // Calidad; la gobierna `calidad.generar-auditorias` (la captura de resultados se llega desde el
+  // alta y exige `calidad.actualizar-auditorias`, que el backend re-verifica, A1).
+  {
+    clave: 'calidad-auditorias',
+    titulo: 'Auditorías de calidad',
+    descripcion: 'Inspecciona una muestra de una orden, captura fallas y resuelve aprobar/reprobar',
+    ruta: '/calidad/auditorias/nueva',
+    icono: 'portapapeles',
+    permisos: ['calidad.generar-auditorias'],
+    subVista: true,
+  },
+  // Sub-vistas de Calidad (F6-E3): consulta de auditorías (con impreso y modificar/cancelar) e
+  // historial por maquilero (% de aprobación). Las gobierna `calidad.ver` (las acciones de escritura
+  // de la consulta exigen además `calidad.modificar-auditorias`, que el backend re-verifica, A1).
+  {
+    clave: 'calidad-consulta-auditorias',
+    titulo: 'Consulta de auditorías',
+    descripcion: 'Busca auditorías, imprime su PDF y modifica o cancela las existentes',
+    ruta: '/calidad/auditorias',
+    icono: 'portapapeles',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'calidad-historial-maquilero',
+    titulo: 'Auditorías por maquilero',
+    descripcion: 'Historial y porcentaje de aprobación operativo de cada maquilero',
+    ruta: '/calidad/auditorias/maquilero',
+    icono: 'medalla',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  // Sub-vistas de Calidad (F6-E1): catálogos base del sistema AQL. Cuelgan del módulo Calidad y
+  // las gobierna `calidad.ver` (consulta) / `calidad.administrar-catalogo` (escritura; el backend
+  // re-verifica, A1).
+  {
+    clave: 'calidad-defectos',
+    titulo: 'Catálogo de defectos',
+    descripcion: 'Defectos del sistema AQL con severidad, nivel y tipos de producto aplicables',
+    ruta: '/calidad/defectos',
+    icono: 'portapapeles',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'calidad-tipos-producto',
+    titulo: 'Tipos de producto',
+    descripcion: 'Segmentación de producto para acotar qué defectos aplican a cada familia',
+    ruta: '/calidad/tipos-producto',
+    icono: 'medalla',
+    permisos: ['calidad.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'calidad-planes-aql',
+    titulo: 'Planes AQL',
+    descripcion: 'Tablas de muestreo AQL: tamaño de muestra y límites de aceptación/rechazo',
+    ruta: '/calidad/planes-aql',
+    icono: 'medalla',
+    permisos: ['calidad.ver'],
+    subVista: true,
   },
   {
     clave: 'esma',
@@ -593,6 +659,55 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/esma',
     icono: 'billete',
     permisos: 'autenticado',
+  },
+  // Sub-vistas de EsMa (F6-E5, experiencia de usuario): estado de cuenta, saldos, desglosado y las
+  // consultas semanales. Todas de LECTURA DE CUENTA (`esma.ver-pagos`); el backend re-verifica (A1).
+  {
+    clave: 'esma-estado-cuenta',
+    titulo: 'Estado de cuenta',
+    descripcion:
+      'La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha',
+    ruta: '/esma/estado-cuenta',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-saldos',
+    titulo: 'Saldos de maquileros',
+    descripcion:
+      'Maquileros activos con saldo distinto de cero, con drill-down al estado de cuenta',
+    ruta: '/esma/saldos',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-desglosado',
+    titulo: 'Desglosado',
+    descripcion: 'Detalle por orden/modelo, exportable a Excel y como PDF del estado de cuenta',
+    ruta: '/esma/desglosado',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-pagos-semanales',
+    titulo: 'Pagos semanales',
+    descripcion: 'Los pagos a maquileros de la semana, con su total',
+    ruta: '/esma/pagos-semanales',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-recibos-semanales',
+    titulo: 'Recibos semanales de maquila',
+    descripcion: 'Recibos del periodo por maquilero y modelo, valuados al precio pactado',
+    ruta: '/esma/recibos-semanales',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
   },
   // Sub-vista de EsMa (F3-E4): la cola de validación de cargos de maquila que proponen los recibos.
   // Cuelga del módulo EsMa con su permiso operativo `esma.cargo-validar`.
@@ -605,21 +720,257 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['esma.cargo-validar'],
     subVista: true,
   },
+  // Sub-vistas de EsMa (F6-E4, corazón contable): conciliación y pagos + lectura de cuenta
+  // (`esma.ver-pagos`); abonos y descuentos (`esma.modificar`). El backend re-verifica (A1).
+  {
+    clave: 'esma-conciliacion',
+    titulo: 'Conciliación de cargos',
+    descripcion: 'Cuadra lo recibido de maquila vs lo cargado a EsMa y detecta lo faltante',
+    ruta: '/esma/conciliacion',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-abonos',
+    titulo: 'Abonos',
+    descripcion: 'Captura abonos a la cuenta corriente de un maquilero',
+    ruta: '/esma/abonos',
+    icono: 'billete',
+    permisos: ['esma.modificar'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-descuentos',
+    titulo: 'Descuentos',
+    descripcion: 'Captura descuentos a la cuenta corriente de un maquilero',
+    ruta: '/esma/descuentos',
+    icono: 'billete',
+    permisos: ['esma.modificar'],
+    subVista: true,
+  },
+  {
+    clave: 'esma-pagos',
+    titulo: 'Pagos',
+    descripcion: 'Paga cargos validados (prendas por pagar) e imprime el recibo de pago',
+    ruta: '/esma/pagos',
+    icono: 'billete',
+    permisos: ['esma.ver-pagos'],
+    subVista: true,
+  },
   {
     clave: 'costos',
-    titulo: 'Costos y EDR',
-    descripcion: 'Pre-costo, costo real y estado de resultados',
+    titulo: 'Costos',
+    descripcion: 'Pre-costo por modelo, costo real por orden y márgenes por pedido',
     ruta: '/costos',
     icono: 'calculadora',
-    permisos: 'autenticado',
+    permisos: ['precostos.consultar', 'costos.ver'],
+  },
+  // Sub-vistas de Costos (F7-E1): pre-costo y lista de precios (precostos.consultar, nivel ≤45);
+  // costeo de orden, lista de costos y márgenes por pedido (costos.ver, nivel ≤30). El EDR llega en
+  // F7-E2. Cuelgan del módulo Costos; el backend re-verifica cada permiso (A1).
+  {
+    clave: 'costos-pre-costo',
+    titulo: 'Pre-costo por modelo',
+    descripcion: 'Costo estimado de un modelo (receta × catálogo + maquila) y precio sugerido',
+    ruta: '/costos/pre-costo',
+    icono: 'camisa',
+    permisos: ['precostos.consultar'],
+    subVista: true,
+  },
+  {
+    clave: 'costos-lista-precios',
+    titulo: 'Lista de precios',
+    descripcion: 'Precio de venta sugerido por modelo (utilidad + regalías), con PDF por género',
+    ruta: '/costos/lista-precios',
+    icono: 'archivo',
+    permisos: ['precostos.consultar'],
+    subVista: true,
+  },
+  {
+    clave: 'costos-costeo',
+    titulo: 'Costeo de orden',
+    descripcion: 'Costo real de una orden: teórico vs guardado, con su costo unitario por base',
+    ruta: '/costos/costeo',
+    icono: 'calculadora',
+    permisos: ['costos.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'costos-lista',
+    titulo: 'Lista de costos',
+    descripcion: 'Órdenes ya costeadas con su costo total y unitario',
+    ruta: '/costos/lista',
+    icono: 'lista-tareas',
+    permisos: ['costos.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'costos-margenes',
+    titulo: 'Márgenes por pedido',
+    descripcion: 'Importe, margen promedio, margen ponderado y margen $ por pieza (PDF/Excel)',
+    ruta: '/costos/margenes',
+    icono: 'grafica',
+    permisos: ['costos.ver'],
+    subVista: true,
+  },
+  // Estado de Resultados (Módulo 6, F7-E2): el P&L mensual consolidado, a costo actual. Módulo propio
+  // (menú 6.2) con 4 sub-vistas. `edr.ver` para consultar; `edr.capturar` para generar/conciliar.
+  {
+    clave: 'edr',
+    titulo: 'Estado de resultados',
+    descripcion: 'P&L mensual consolidado desde las entregas a cliente, a costo actual (PDF/Excel)',
+    ruta: '/edr',
+    icono: 'grafica',
+    permisos: ['edr.ver'],
+  },
+  {
+    clave: 'edr-mes',
+    titulo: 'Gestión del mes',
+    descripcion: 'Crea/selecciona un mes, captura gastos y genera las ventas del EDR',
+    ruta: '/edr/mes',
+    icono: 'portapapeles',
+    permisos: ['edr.capturar'],
+    subVista: true,
+  },
+  {
+    clave: 'edr-conciliacion',
+    titulo: 'Conciliación de ventas',
+    descripcion: 'Ajusta el precio facturado y las cantidades; agrega o borra líneas manuales',
+    ruta: '/edr/conciliacion',
+    icono: 'lista-tareas',
+    permisos: ['edr.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'edr-por-mes',
+    titulo: 'EDR por mes',
+    descripcion: 'Resultado del mes con corte por empresa y por cliente (PDF/Excel)',
+    ruta: '/edr/por-mes',
+    icono: 'grafica',
+    permisos: ['edr.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'edr-por-anio',
+    titulo: 'EDR por año',
+    descripcion: 'Comparativo mensual del año, con corte por empresa (PDF)',
+    ruta: '/edr/por-anio',
+    icono: 'calendario',
+    permisos: ['edr.ver'],
+    subVista: true,
   },
   {
     clave: 'indicadores',
     titulo: 'Indicadores',
-    descripcion: 'KPIs de entregas, tiempos y desempeño derivados de la Ruta Crítica',
+    descripcion: 'Tableros directivos, productividad, fichas confiables y muestrarios',
     ruta: '/indicadores',
     icono: 'grafica',
-    permisos: 'autenticado',
+    // Visible con CUALQUIER permiso del módulo: los tableros directivos (`indicadores.ver`) o la
+    // captura operativa de F7-E4 (productividad IP/almacén, fichas, muestrarios). El backend
+    // re-verifica el permiso fino de cada pantalla (A1/A4).
+    permisos: [
+      'indicadores.ver',
+      'indicadores.ip-productividad',
+      'indicadores.almacen-productividad',
+      'indicadores.ip-confiabilidad',
+      'indicadores.ip-muestrarios',
+      'indicadores.ciclicos-alta',
+      'indicadores.ciclicos-conteo',
+      'indicadores.ciclicos-consulta',
+    ],
+  },
+  // Sub-vistas de Indicadores (F7-E3): 3 tableros directivos calculados en segundo plano (vistas
+  // materializadas). Todos `indicadores.ver`; el backend re-verifica el permiso (A1).
+  {
+    clave: 'indicadores-ruta-critica',
+    titulo: 'KPIs de Ruta Crítica',
+    descripcion: 'Entregas a tiempo, lead time, cuellos de botella y desempeño (PDF/Excel)',
+    ruta: '/indicadores/ruta-critica',
+    icono: 'ruta',
+    permisos: ['indicadores.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'indicadores-calidad',
+    titulo: 'Calidad por maquilero',
+    descripcion: '% de aprobación por maquilero, defectos top y tendencia (PDF/Excel)',
+    ruta: '/indicadores/calidad',
+    icono: 'medalla',
+    permisos: ['indicadores.ver'],
+    subVista: true,
+  },
+  {
+    clave: 'indicadores-wip',
+    titulo: 'WIP analítico',
+    descripcion: 'Prendas atoradas por etapa y avance por orden (PDF/Excel)',
+    ruta: '/indicadores/wip',
+    icono: 'paquete',
+    permisos: ['indicadores.ver'],
+    subVista: true,
+  },
+  // Sub-vistas de Indicadores (F7-E4): motor de PRODUCTIVIDAD unificado IP/almacén (captura móvil con
+  // atajos, tablero vs estándar y catálogos), FICHAS confiables (checklist por orden + % confiable) y
+  // MUESTRARIOS pendientes (solicitud→entrega + KPI). Cada una con su permiso operativo de área/aspecto.
+  {
+    clave: 'productividad-captura',
+    titulo: 'Captura de productividad',
+    descripcion: 'Registra la productividad de IP y almacén (Hoy/Ayer/Sábado)',
+    ruta: '/indicadores/productividad/captura',
+    icono: 'portapapeles',
+    permisos: ['indicadores.ip-productividad', 'indicadores.almacen-productividad'],
+    subVista: true,
+  },
+  {
+    clave: 'productividad-tablero',
+    titulo: 'Productividad vs estándar',
+    descripcion: 'Índices agregados por periodo, actividad y persona',
+    ruta: '/indicadores/productividad/tablero',
+    icono: 'grafica',
+    permisos: ['indicadores.ip-productividad', 'indicadores.almacen-productividad'],
+    subVista: true,
+  },
+  {
+    clave: 'productividad-catalogos',
+    titulo: 'Catálogos de productividad',
+    descripcion: 'Personas y actividades por área, con sus estándares',
+    ruta: '/indicadores/productividad/catalogos',
+    icono: 'libreria',
+    permisos: ['indicadores.ip-productividad', 'indicadores.almacen-productividad'],
+    subVista: true,
+  },
+  {
+    clave: 'fichas-confiables',
+    titulo: 'Fichas confiables',
+    descripcion: 'Checklist de confiabilidad de la ficha técnica por orden y su %',
+    ruta: '/indicadores/fichas-confiables',
+    icono: 'portapapeles',
+    permisos: ['indicadores.ip-confiabilidad'],
+    subVista: true,
+  },
+  {
+    clave: 'muestrarios',
+    titulo: 'Muestrarios',
+    descripcion: 'Boards y muestras solicitados, con su cumplimiento',
+    ruta: '/indicadores/muestrarios',
+    icono: 'paquete',
+    permisos: ['indicadores.ip-muestrarios'],
+    subVista: true,
+  },
+  {
+    clave: 'inventarios-ciclicos',
+    titulo: 'Inventarios cíclicos',
+    descripcion:
+      'Conteo físico contra el kardex: el alta congela el teórico y el ajuste es un movimiento',
+    ruta: '/indicadores/ciclicos',
+    icono: 'paquete',
+    // Visible con cualquiera de los tres permisos del módulo cíclico (alta/conteo/consulta).
+    permisos: [
+      'indicadores.ciclicos-alta',
+      'indicadores.ciclicos-conteo',
+      'indicadores.ciclicos-consulta',
+    ],
+    subVista: true,
   },
   {
     clave: 'documental',
@@ -651,6 +1002,18 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/administracion/ruta-critica',
     icono: 'calendario',
     permisos: ['empresas.administrar'],
+    subVista: true,
+  },
+  // Sub-vista de Administración (F6-E1): bitácora de auditoría (A7) — registro inmutable de
+  // todas las acciones del sistema (quién, qué, cuándo, sobre qué). Solo lectura.
+  // La gobierna `admin.ver-bitacora`.
+  {
+    clave: 'bitacora',
+    titulo: 'Bitácora',
+    descripcion: 'Auditoría de cambios del sistema: quién, qué, cuándo y sobre qué registro',
+    ruta: '/administracion/bitacora',
+    icono: 'portapapeles',
+    permisos: ['admin.ver-bitacora'],
     subVista: true,
   },
 ] as const;
