@@ -45,13 +45,15 @@ describe('catalogo de modulos del menu', () => {
     // F7-E4: el módulo Indicadores amplía sus permisos (captura operativa) y suma 5 sub-vistas
     // (captura/tablero/catálogos de productividad, fichas confiables y muestrarios) = 74 sub-vistas
     // → 88 entradas.
+    // F7-E5: +1 sub-vista de Indicadores (inventarios cíclicos, `indicadores.ciclicos-*`); las
+    // pantallas de conteo/exactitud son detalle (rutas en App, NO en el menú) = 75 sub-vistas → 89.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
     expect(planeados).toHaveLength(14);
-    expect(MODULOS_MENU).toHaveLength(88);
+    expect(MODULOS_MENU).toHaveLength(89);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(88);
+    expect(new Set(claves).size).toBe(89);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(88);
+    expect(new Set(rutas).size).toBe(89);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

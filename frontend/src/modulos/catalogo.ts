@@ -875,6 +875,9 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
       'indicadores.almacen-productividad',
       'indicadores.ip-confiabilidad',
       'indicadores.ip-muestrarios',
+      'indicadores.ciclicos-alta',
+      'indicadores.ciclicos-conteo',
+      'indicadores.ciclicos-consulta',
     ],
   },
   // Sub-vistas de Indicadores (F7-E3): 3 tableros directivos calculados en segundo plano (vistas
@@ -952,6 +955,21 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     ruta: '/indicadores/muestrarios',
     icono: 'paquete',
     permisos: ['indicadores.ip-muestrarios'],
+    subVista: true,
+  },
+  {
+    clave: 'inventarios-ciclicos',
+    titulo: 'Inventarios cíclicos',
+    descripcion:
+      'Conteo físico contra el kardex: el alta congela el teórico y el ajuste es un movimiento',
+    ruta: '/indicadores/ciclicos',
+    icono: 'paquete',
+    // Visible con cualquiera de los tres permisos del módulo cíclico (alta/conteo/consulta).
+    permisos: [
+      'indicadores.ciclicos-alta',
+      'indicadores.ciclicos-conteo',
+      'indicadores.ciclicos-consulta',
+    ],
     subVista: true,
   },
   {

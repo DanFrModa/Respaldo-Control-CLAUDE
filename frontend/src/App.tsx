@@ -43,6 +43,9 @@ import { TableroProductividadPagina } from '@/modulos/indicadores/TableroProduct
 import { ProductividadCatalogosPagina } from '@/modulos/indicadores/ProductividadCatalogosPagina';
 import { FichasConfiablesPagina } from '@/modulos/indicadores/FichasConfiablesPagina';
 import { MuestrariosPagina } from '@/modulos/indicadores/MuestrariosPagina';
+import { InventariosCiclicosPagina } from '@/modulos/indicadores/InventariosCiclicosPagina';
+import { ConteoCiclicoPagina } from '@/modulos/indicadores/ConteoCiclicoPagina';
+import { ExactitudCiclicoPagina } from '@/modulos/indicadores/ExactitudCiclicoPagina';
 import { AjusteMaterialesPagina } from '@/modulos/inventarios/AjusteMaterialesPagina';
 import { ExistenciasAviosPagina } from '@/modulos/inventarios/ExistenciasAviosPagina';
 import { ExistenciasPtPagina } from '@/modulos/inventarios/ExistenciasPtPagina';
@@ -262,6 +265,10 @@ const router = createBrowserRouter([
           },
           { path: 'indicadores/fichas-confiables', element: <FichasConfiablesPagina /> },
           { path: 'indicadores/muestrarios', element: <MuestrariosPagina /> },
+          // Indicadores · Inventario cíclico (F7-E5): lista/alta + conteo ciego + exactitud/ajuste.
+          { path: 'indicadores/ciclicos', element: <InventariosCiclicosPagina /> },
+          { path: 'indicadores/ciclicos/:id/conteo', element: <ConteoCiclicoPagina /> },
+          { path: 'indicadores/ciclicos/:id/exactitud', element: <ExactitudCiclicoPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },

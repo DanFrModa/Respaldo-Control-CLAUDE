@@ -947,6 +947,32 @@ export {
   type MuestrariosCumplimiento,
 } from './esquemas/muestrarios.js';
 
+// ── Inventario cíclico (Módulo Indicadores / Almacén, F7-E5; doc 05; ex Alm_IC_*) ──
+export {
+  esquemaEstadoInventarioCiclico,
+  esquemaInventarioCiclicoCrear,
+  esquemaConteoRenglonEntrada,
+  esquemaInventarioCiclicoConteo,
+  esquemaInventarioCiclicoCancelar,
+  esquemaInventarioCiclicoResumen,
+  esquemaInventariosCiclicosQuery,
+  esquemaInventariosCiclicosPagina,
+  esquemaConteoRenglon,
+  esquemaConteoSalida,
+  esquemaExactitudRenglon,
+  esquemaExactitudTotales,
+  esquemaExactitudSalida,
+  type EstadoInventarioCiclicoValor,
+  type DatosInventarioCiclicoCrear,
+  type DatosInventarioCiclicoConteo,
+  type DatosInventarioCiclicoCancelar,
+  type InventarioCiclicoResumen,
+  type InventariosCiclicosQuery,
+  type InventariosCiclicosPagina,
+  type ConteoSalida,
+  type ExactitudSalida,
+} from './esquemas/inventario-ciclico.js';
+
 // ── Tablero WIP + existencias en poder del maquilero (F3-E5; doc 03-Produccion form Proceso/MaqExis) ──
 export {
   esquemaTableroWipQuery,

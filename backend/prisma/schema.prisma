@@ -64,50 +64,52 @@ model Empresa {
   modificadoEn    DateTime @updatedAt @map("modificado_en")
   modificadoPorId String?  @map("modificado_por_id")
 
-  configuracion       ConfiguracionEmpresa?
-  almacenes           Almacen[]
-  secuencias          Secuencia[]
+  configuracion          ConfiguracionEmpresa?
+  almacenes              Almacen[]
+  secuencias             Secuencia[]
   /// Pedidos internos de esta empresa (F2-E1, A9 — folio por empresa). Restrict.
-  pedidos             Pedido[]
+  pedidos                Pedido[]
   /// Órdenes de producción de esta empresa (F2-E2, A9 — folio por empresa). Restrict.
-  ordenes             Orden[]
+  ordenes                Orden[]
   /// Etapas de producción (corte/envío/recibo/entrega) de esta empresa (F3-E1, A9). Restrict.
-  etapasMovimiento    EtapaMovimiento[]
+  etapasMovimiento       EtapaMovimiento[]
   /// Movimientos de kardex de esta empresa (F3-E1, A9 — folio por empresa). Restrict.
-  movimientos         Movimiento[]
+  movimientos            Movimiento[]
   /// Cargos a maquileros (EsMa) de esta empresa (F3-E1, A9). Restrict.
-  cargosEsMa          EsMaCargo[]
+  cargosEsMa             EsMaCargo[]
   /// Abonos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
-  abonosMaquilero     AbonoMaquilero[]
+  abonosMaquilero        AbonoMaquilero[]
   /// Descuentos a la cuenta de maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
-  descuentosMaquilero DescuentoMaquilero[]
+  descuentosMaquilero    DescuentoMaquilero[]
   /// Pagos a maquileros de esta empresa (EsMa, F6-E4, A9). Restrict.
-  pagosMaquilero      PagoMaquilero[]
+  pagosMaquilero         PagoMaquilero[]
   /// Órdenes de compra de esta empresa (F4-E2, A9 — folio por empresa). Restrict.
-  ordenesCompra       OrdenCompra[]
+  ordenesCompra          OrdenCompra[]
   /// Recepciones de compra de esta empresa (F4-E3, A9 — folio por empresa). Restrict.
-  recepcionesCompra   RecepcionCompra[]
+  recepcionesCompra      RecepcionCompra[]
   /// Eventos de dominio (outbox) de esta empresa (F4-E3, patrón outbox/pg-boss). Restrict.
-  eventosOutbox       EventoOutbox[]
+  eventosOutbox          EventoOutbox[]
   /// Notas de salida de materiales a maquileros de esta empresa (F4-E5, A9 — folio por empresa). Restrict.
-  notasSalida         NotaSalida[]
+  notasSalida            NotaSalida[]
   /// Calendario laboral de la RC de esta empresa (F5-E2, 1:1). Restrict.
-  calendario          CalendarioEmpresa?
+  calendario             CalendarioEmpresa?
   /// Días festivos de la RC de esta empresa (F5-E2). Restrict.
-  diasFestivos        DiaFestivo[]
+  diasFestivos           DiaFestivo[]
   /// Auditorías de calidad de esta empresa (F6-E2, A9 — folio por empresa). Restrict.
-  auditorias          Auditoria[]
+  auditorias             Auditoria[]
   /// Costos reales de órdenes de esta empresa (F7-E1, A9). Restrict.
-  costosOrden         CostoOrden[]
+  costosOrden            CostoOrden[]
   /// Renglones del Estado de Resultados (EDR) de esta empresa (F7-E2, D2 #6). El EDR es GLOBAL
   /// (encabezado por mes, sin empresa); solo las líneas se sellan por empresa para el corte. Restrict.
-  edrLineas           EdrLinea[]
+  edrLineas              EdrLinea[]
   /// Registros de productividad (IP/almacén) de esta empresa (F7-E4, A9). Restrict.
   registrosProductividad RegistroProductividad[]
   /// Verificaciones de confiabilidad de fichas técnicas por orden de esta empresa (F7-E4, A9). Restrict.
   fichasVerificacion     FichaVerificacion[]
   /// Muestrarios pendientes de esta empresa (F7-E4, A9). Restrict.
   muestrarios            Muestrario[]
+  /// Inventarios cíclicos de esta empresa (F7-E5, A9). Restrict.
+  inventariosCiclicos    InventarioCiclico[]
 
   @@map("empresas")
 }
@@ -122,16 +124,16 @@ model ConfiguracionEmpresa {
   empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
 
   /// Utilidad sugerida para costeo (viejo: `UtilidadSujerida`).
-  utilidadSugerida Decimal? @map("utilidad_sugerida") @db.Decimal(10, 4)
+  utilidadSugerida   Decimal? @map("utilidad_sugerida") @db.Decimal(10, 4)
   /// Porcentaje base de regalías (viejo: `Regalias`).
-  regaliasBase     Decimal? @map("regalias_base") @db.Decimal(10, 4)
+  regaliasBase       Decimal? @map("regalias_base") @db.Decimal(10, 4)
   /// Días de colchón que la Ruta Crítica agrega a la costura (viejo: `ColchonCostura`).
-  colchonCostura   Int?     @map("colchon_costura")
+  colchonCostura     Int?     @map("colchon_costura")
   /// Jornada base (horas/día) del ALMACÉN para el índice de productividad (F7-E4; viejo:
   /// constante `HorasBaseAlm = 9`, doc 05 §B.1). Antes era una constante hardcodeada en la
   /// consulta `Ind_Alm_Productividad`; en v2 es parámetro por empresa. Default 9 (el valor
   /// histórico); el backfill de la migración lo fija en las filas ya sembradas.
-  jornadaBaseAlmacen Int    @default(9) @map("jornada_base_almacen")
+  jornadaBaseAlmacen Int      @default(9) @map("jornada_base_almacen")
 
   /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
   fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
@@ -374,6 +376,9 @@ model Almacen {
 
   /// Notas de salida cuyos avíos salen de este almacén origen (F4-E5, decisión (g)). Restrict.
   notasSalida NotaSalida[]
+
+  /// Inventarios cíclicos que cuentan este almacén (F7-E5). Restrict.
+  inventariosCiclicos InventarioCiclico[]
 
   @@unique([idEmpresa, nombre])
   @@map("almacenes")
@@ -707,7 +712,7 @@ model Temporada {
   activo Boolean @default(true)
 
   /// Modelos clasificados en esta temporada (F1-E4, FK nullable Restrict).
-  modelos Modelo[]
+  modelos     Modelo[]
   /// Muestrarios pendientes de esta temporada (F7-E4, FK nullable Restrict).
   muestrarios Muestrario[]
 
@@ -765,6 +770,8 @@ model Color {
   lotes                  Lote[]
   /// Cantidades de la matriz talla×color de renglones de OC en este color (F4-E2). Restrict.
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
+  /// Renglones de inventario cíclico en este color (F7-E5). Restrict.
+  inventarioCiclicoDet   InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -853,6 +860,8 @@ model Talla {
   movimientosDetPt       MovimientoDetPt[]
   /// Cantidades de la matriz talla×color de renglones de OC en esta talla (F4-E2). Restrict.
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
+  /// Renglones de inventario cíclico en esta talla (F7-E5). Restrict.
+  inventarioCiclicoDet   InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -922,13 +931,13 @@ model Cliente {
   direccion String?
   activo    Boolean @default(true)
 
-  campos    ClienteCampo[]
+  campos                 ClienteCampo[]
   /// Pedidos internos del cliente (F2-E1, Restrict hacia el cliente).
-  pedidos   Pedido[]
+  pedidos                Pedido[]
   /// Órdenes de producción del cliente (F2-E2, Restrict hacia el cliente).
-  ordenes   Orden[]
+  ordenes                Orden[]
   /// Renglones del EDR asociados a este cliente (F7-E2, corte por cliente). Restrict.
-  edrLineas EdrLinea[]
+  edrLineas              EdrLinea[]
   /// Registros de productividad de almacén ligados a este cliente (F7-E4, opcional). Restrict.
   registrosProductividad RegistroProductividad[]
   /// Muestrarios pendientes de este cliente (F7-E4). Restrict.
@@ -1400,21 +1409,23 @@ model Modelo {
   activo Boolean @default(true)
 
   /// Fotos del modelo en R2 (N por modelo).
-  fotos            ModeloFoto[]
+  fotos                ModeloFoto[]
   /// BOM — telas del modelo (N:N a Tela con consumo + banderas).
-  telas            ModeloTela[]
+  telas                ModeloTela[]
   /// BOM — avíos del modelo (N:N a Avio con consumo + banderas).
-  avios            ModeloAvio[]
+  avios                ModeloAvio[]
   /// BOM — bordados/estampados del modelo (N:N a Bordado con precio).
-  bordados         ModeloBordado[]
+  bordados             ModeloBordado[]
   /// Renglones de pedidos internos que piden este modelo (F2-E1, Restrict hacia el modelo).
-  pedidoLineas     PedidoLinea[]
+  pedidoLineas         PedidoLinea[]
   /// Órdenes de producción de este modelo (F2-E2, Restrict hacia el modelo).
-  ordenes          Orden[]
+  ordenes              Orden[]
   /// Renglones de kardex PT de este modelo (F3-E1, D4 — dimensión PT: modelo×color×talla). Restrict.
-  movimientosDetPt MovimientoDetPt[]
+  movimientosDetPt     MovimientoDetPt[]
   /// Renglones del EDR asociados a este modelo (F7-E2, para el desglose por modelo). Restrict.
-  edrLineas        EdrLinea[]
+  edrLineas            EdrLinea[]
+  /// Renglones de inventario cíclico de este modelo (F7-E5). Restrict.
+  inventarioCiclicoDet InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1939,34 +1950,36 @@ model Orden {
   /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
   rutaProcesos         RutaOrden[]
 
-  lineas            OrdenLinea[]
-  referencias       OrdenReferencia[]
-  comentarios       OrdenComentario[]
+  lineas               OrdenLinea[]
+  referencias          OrdenReferencia[]
+  comentarios          OrdenComentario[]
   /// Etapas de producción de esta orden (corte/envío/recibo/entrega) (F3-E1, D4). Restrict.
-  etapasMovimiento  EtapaMovimiento[]
+  etapasMovimiento     EtapaMovimiento[]
   /// Cargos a maquileros (EsMa) derivados de los recibos de esta orden (F3-E1). Restrict.
-  cargosEsMa        EsMaCargo[]
+  cargosEsMa           EsMaCargo[]
   /// Renglones de orden de compra ligados a esta orden de producción (F4-E2, R7: la
   /// liga es POR LÍNEA para cruzar gasto↔producción sin prorrateos). Restrict.
-  ordenCompraLineas OrdenCompraLinea[]
+  ordenCompraLineas    OrdenCompraLinea[]
   /// Ligas N:N (a nivel encabezado) entre esta orden de producción y sus OC (F4-E2). Restrict.
-  ordenesCompra     OrdenCompraOrden[]
+  ordenesCompra        OrdenCompraOrden[]
   /// Snapshot de explosión MRP de esta orden (F4-E4, R3). Se reemplaza al regenerar. Cascade.
-  requerimientos    RequerimientoOrden[]
+  requerimientos       RequerimientoOrden[]
   /// Renglones de nota de salida (avíos/telas enviados a maquila) ligados a esta orden (F4-E5). Restrict.
-  notaSalidaLineas  NotaSalidaLinea[]
+  notaSalidaLineas     NotaSalidaLinea[]
   /// Auditorías de calidad de esta orden (F6-E2). Restrict (una orden con auditorías no se borra).
-  auditorias        Auditoria[]
+  auditorias           Auditoria[]
   /// Renglones de kardex PT que PERTENECEN a esta orden (F6-E2 "PT por orden"). Restrict.
-  movimientosDetPt  MovimientoDetPt[]
+  movimientosDetPt     MovimientoDetPt[]
   /// Costo real de la orden (F7-E1, 1:1 opcional). Cascade: el costeo pertenece a la orden.
-  costoOrden        CostoOrden?
+  costoOrden           CostoOrden?
   /// Renglones del EDR que valúan las ventas de esta orden en un mes (F7-E2). Restrict: una orden
   /// referida por un EDR no se borra físico (las líneas automáticas se reconcilian, no se cascadean).
-  edrLineas         EdrLinea[]
+  edrLineas            EdrLinea[]
   /// Verificaciones de confiabilidad de la ficha técnica de esta orden (F7-E4). Cascade: el checklist
   /// pertenece a la orden (si la orden desapareciera, sus verificaciones también).
-  fichasVerificacion FichaVerificacion[]
+  fichasVerificacion   FichaVerificacion[]
+  /// Renglones de inventario cíclico ligados a esta orden (F7-E5 "PT por orden"). Restrict.
+  inventarioCiclicoDet InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2377,10 +2390,12 @@ model Movimiento {
 
   /// Renglones de nota de salida de TELA que REFERENCIAN este movimiento `salida-tela-orden` como
   /// documento de envío (F4-E5, decisión (e): la nota no descuenta tela, la referencia). Inversa.
-  notaLineasSalidaTela NotaSalidaLinea[] @relation("NotaLineaSalidaTela")
+  notaLineasSalidaTela NotaSalidaLinea[]      @relation("NotaLineaSalidaTela")
   /// Renglones de nota de salida de AVÍO cuyo descuento (`salida-por-nota`) GENERÓ este movimiento
   /// al confirmar la nota (F4-E5, R4). Inversa informativa.
-  notaLineasAvio       NotaSalidaLinea[] @relation("NotaLineaAvio")
+  notaLineasAvio       NotaSalidaLinea[]      @relation("NotaLineaAvio")
+  /// Renglones de inventario cíclico cuyo AJUSTE generó este movimiento (F7-E5). Inversa informativa.
+  ajustesCiclico       InventarioCiclicoDet[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -4626,4 +4641,107 @@ model Muestrario {
   @@index([idCliente])
   @@index([idTemporada])
   @@map("muestrarios")
+}
+
+/// Estado del ciclo de vida de un inventario cíclico (F7-E5; doc 05-Indicadores; ← forms `Alm_IC_*`).
+/// Máquina de estados: `abierto` (recién dado de alta, con el teórico ya CONGELADO — D6) → `contado`
+/// (todos sus renglones tienen conteo físico) → `cerrado` (el ajuste ya se aplicó al kardex, D3: no se
+/// re-genera). `cancelado` = abortado antes de cerrar (cancelación suave con motivo, A7).
+enum EstadoInventarioCiclico {
+  abierto
+  contado
+  cerrado
+  cancelado
+
+  @@map("estado_inventario_ciclico")
+}
+
+/// INVENTARIO CÍCLICO — encabezado (F7-E5; doc 05-Indicadores; ← forms `Alm_IC_Alta`/`_Cont`/
+/// `_Consulta`). Cuenta el físico contra el KARDEX de v2 (D3/D6): el ALTA CONGELA el teórico por
+/// artículo (`InventarioCiclicoDet.cantTeorica`) para que no cambie mientras se cuenta; el conteo es
+/// CIEGO (el capturista NO ve el teórico); el ajuste se aplica SOLO como MOVIMIENTO de kardex (D3),
+/// jamás editando un saldo. A9 por empresa; folio por secuencia (A3); auditoría A7 + cancelación suave.
+model InventarioCiclico {
+  id        Int     @id @default(autoincrement())
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "inventario-ciclico"). Referencia humana de la hoja.
+  folio     BigInt
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+
+  /// Almacén que se cuenta (D4: existencia por …×almacén). Restrict.
+  idAlmacen Int     @map("id_almacen")
+  almacen   Almacen @relation(fields: [idAlmacen], references: [id], onDelete: Restrict)
+
+  /// Fecha del alta (el instante en que se congeló el teórico).
+  fecha  DateTime                @db.Date
+  estado EstadoInventarioCiclico @default(abierto)
+
+  observaciones String? @db.Text
+
+  /// Renglones (artículos) del conteo, a la granularidad REAL del kardex (…×orden). Cascade.
+  detalles InventarioCiclicoDet[]
+
+  /// Cancelación suave con motivo (A7): abortar el conteo sin generar ajuste.
+  canceladoEn       DateTime? @map("cancelado_en")
+  canceladoPorId    String?   @map("cancelado_por_id")
+  motivoCancelacion String?   @map("motivo_cancelacion")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idEmpresa, estado])
+  @@index([idAlmacen])
+  @@map("inventarios_ciclicos")
+}
+
+/// INVENTARIO CÍCLICO — detalle (F7-E5). Un renglón por ARTÍCULO de kardex a su granularidad REAL:
+/// modelo×color×talla×ORDEN×almacén (el almacén sale del encabezado; F6-E2 "PT por orden", ADR-0014).
+/// `idOrden` NULLABLE (bucket "sin orden" = movimientos manuales/traspasos/histórico). Se llavea así a
+/// PROPÓSITO (decisión del lead F7-E5): el teórico se congela por artículo con
+/// `existenciaPtBloqueada(...,idOrden)` y el ajuste es un movimiento de kardex 1:1 sobre la MISMA llave
+/// — no hay que repartir el delta entre órdenes y la validación no-negativo funciona por artículo.
+/// Cascade hacia el encabezado; Restrict hacia los catálogos.
+model InventarioCiclicoDet {
+  id                  Int               @id @default(autoincrement())
+  idInventarioCiclico Int               @map("id_inventario_ciclico")
+  inventario          InventarioCiclico @relation(fields: [idInventarioCiclico], references: [id], onDelete: Cascade)
+
+  idModelo Int    @map("id_modelo")
+  modelo   Modelo @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  idColor  Int    @map("id_color")
+  color    Color  @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  idTalla  Int    @map("id_talla")
+  talla    Talla  @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+  /// Orden dueña de estas prendas (F6-E2 "PT por orden"); NULL = bucket "sin orden". Restrict.
+  idOrden  Int?   @map("id_orden")
+  orden    Orden? @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  /// Existencia TEÓRICA CONGELADA al dar de alta (D6): Σ de movimientos del artículo en ese instante.
+  cantTeorica Int  @map("cant_teorica")
+  /// Cantidad contada FÍSICAMENTE (conteo ciego). NULL hasta capturar el conteo del renglón.
+  cantReal    Int? @map("cant_real")
+
+  contadoEn    DateTime? @map("contado_en")
+  contadoPorId String?   @map("contado_por_id")
+
+  /// Movimiento de kardex del AJUSTE que reconcilió este renglón (D3): la existencia SOLO cambia por
+  /// movimiento, nunca editando un saldo. NULL hasta generar el ajuste. Restrict (traza).
+  idMovimientoAjuste Int?        @map("id_movimiento_ajuste")
+  movimientoAjuste   Movimiento? @relation(fields: [idMovimientoAjuste], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  /// Un artículo (…×orden) NO se repite dentro del mismo conteo (el alta lo enumera 1 vez desde la
+  /// vista agregada). NOTA: Postgres trata los NULL de `id_orden` como distintos, así que la unicidad
+  /// del bucket "sin orden" la garantiza el dominio (enumera una sola fila por artículo).
+  @@unique([idInventarioCiclico, idModelo, idColor, idTalla, idOrden])
+  @@index([idInventarioCiclico])
+  @@index([idMovimientoAjuste])
+  @@map("inventario_ciclico_det")
 }
