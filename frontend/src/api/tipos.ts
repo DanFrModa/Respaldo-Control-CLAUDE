@@ -1345,3 +1345,32 @@ export type MuestrarioEntregar =
 /** KPI de cumplimiento de muestrarios (`GET .../cumplimiento`). */
 export type MuestrariosCumplimiento =
   paths['/api/indicadores/muestrarios/cumplimiento']['get']['responses']['200']['content']['application/json'];
+
+// ── Indicadores · Inventario cíclico (F7-E5) ─────────────────────────────────
+/** Página de inventarios cíclicos (`GET /api/indicadores/ciclicos`). */
+export type InventariosCiclicosPagina =
+  paths['/api/indicadores/ciclicos']['get']['responses']['200']['content']['application/json'];
+/** Resumen (encabezado) de un cíclico. */
+export type InventarioCiclicoResumen = InventariosCiclicosPagina['datos'][number];
+/** Filtros del listado de cíclicos. */
+export type InventariosCiclicosQuery = NonNullable<
+  paths['/api/indicadores/ciclicos']['get']['parameters']['query']
+>;
+/** Alta de un cíclico (`POST`). */
+export type InventarioCiclicoCrear =
+  paths['/api/indicadores/ciclicos']['post']['requestBody']['content']['application/json'];
+/** Estado del ciclo de vida de un cíclico. */
+export type EstadoInventarioCiclico = InventarioCiclicoResumen['estado'];
+/** Vista de CONTEO ciego (`GET .../conteo`). */
+export type ConteoCiclico =
+  paths['/api/indicadores/ciclicos/{id}/conteo']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de conteo ciego. */
+export type ConteoCiclicoRenglon = ConteoCiclico['renglones'][number];
+/** Captura de conteo (`POST .../conteo`). */
+export type ConteoCiclicoCapturar =
+  paths['/api/indicadores/ciclicos/{id}/conteo']['post']['requestBody']['content']['application/json'];
+/** Vista de EXACTITUD (`GET .../exactitud`). */
+export type ExactitudCiclico =
+  paths['/api/indicadores/ciclicos/{id}/exactitud']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de exactitud (teórico vs real). */
+export type ExactitudCiclicoRenglon = ExactitudCiclico['renglones'][number];

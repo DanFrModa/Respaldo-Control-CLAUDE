@@ -557,12 +557,37 @@ const TIPOS_MOVIMIENTO_F4: {
   { codigo: 'salida-por-nota', nombre: 'Salida de Avío por Nota', direccion: 'salida' },
 ];
 
+/**
+ * Tipos de movimiento NUEVOS de F7-E5 (ajuste por inventario CÍCLICO). El ajuste que reconcilia el
+ * conteo físico contra el kardex se aplica como MOVIMIENTO (D3, nunca editando un saldo); se usan
+ * tipos DEDICADOS (en vez del `ajuste-entrada`/`-salida` genérico) para poder rastrear en el kardex
+ * qué diferencias vinieron de un cíclico. Entra por SEED (no por migración) → el deploy a `prueba`
+ * requiere SEED_ON_START=true.
+ */
+const TIPOS_MOVIMIENTO_F7: {
+  codigo: string;
+  nombre: string;
+  direccion: 'entrada' | 'salida' | 'traspaso';
+}[] = [
+  {
+    codigo: 'ajuste-ciclico-entrada',
+    nombre: 'Ajuste por Cíclico (Entrada)',
+    direccion: 'entrada',
+  },
+  { codigo: 'ajuste-ciclico-salida', nombre: 'Ajuste por Cíclico (Salida)', direccion: 'salida' },
+];
+
 async function sembrarTiposMovimiento(prisma: PrismaClient): Promise<void> {
   await verificarTiposMovimientoContraCsv();
   // Los 19 canónicos del CSV + los 2 nuevos de F3-E3 (patas del traspaso) + los 3 de F4-E1 (kardex
-  // de telas y avíos). Idempotente: el `update: {}` no pisa nombre/dirección/activo si ya existen
-  // (pudieron editarse en producción).
-  for (const tipo of [...TIPOS_MOVIMIENTO_BASE, ...TIPOS_MOVIMIENTO_V2, ...TIPOS_MOVIMIENTO_F4]) {
+  // de telas y avíos) + los 2 de F7-E5 (ajuste por cíclico). Idempotente: el `update: {}` no pisa
+  // nombre/dirección/activo si ya existen (pudieron editarse en producción).
+  for (const tipo of [
+    ...TIPOS_MOVIMIENTO_BASE,
+    ...TIPOS_MOVIMIENTO_V2,
+    ...TIPOS_MOVIMIENTO_F4,
+    ...TIPOS_MOVIMIENTO_F7,
+  ]) {
     await prisma.tipoMovimientoInventario.upsert({
       where: { codigo: tipo.codigo },
       update: {},

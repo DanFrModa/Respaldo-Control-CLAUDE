@@ -27,6 +27,7 @@ import { rutasIndicadores } from './api/indicadores/indicadores.rutas.js';
 import { rutasProductividad } from './api/indicadores/productividad.rutas.js';
 import { rutasFichas } from './api/indicadores/fichas.rutas.js';
 import { rutasMuestrarios } from './api/indicadores/muestrarios.rutas.js';
+import { rutasCiclicos } from './api/indicadores/ciclicos.rutas.js';
 import { rutasCargosEsMa } from './api/esma/cargos.rutas.js';
 import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
@@ -278,6 +279,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasProductividad, { prefix: '/api' });
   await app.register(rutasFichas, { prefix: '/api' });
   await app.register(rutasMuestrarios, { prefix: '/api' });
+  // Inventario cíclico (Módulo Indicadores / Almacén, F7-E5): alta que CONGELA el teórico (D6),
+  // conteo CIEGO y ajuste como MOVIMIENTO de kardex (D3). RBAC `indicadores.ciclicos-*`.
+  await app.register(rutasCiclicos, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

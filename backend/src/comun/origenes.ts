@@ -35,6 +35,8 @@ export const ORIGEN = {
   notaSalida: 'nota-salida',
   /** Carga del ETL histórico de inventario (F3-E6 — IPT_Movs; F4-E6 — telas/avíos). */
   migracion: 'migracion',
+  /** Ajuste de kardex PT generado por un inventario cíclico (F7-E5). El `origenId` es el id del cíclico. */
+  ajusteCiclico: 'ajuste-ciclico',
 } as const;
 
 /** Discriminador válido de `Movimiento.origenTipo`. */
