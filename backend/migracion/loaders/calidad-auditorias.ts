@@ -22,7 +22,7 @@
  *    tamanoMuestra` (0 si vacío). Fechas `@db.Date`; si falta `FechaAuditoria` cae a `FechaElaboracion`
  *    (y viceversa).
  *  • `IdUsuariosElaboro/Auditor → elaboroPorId/auditorPorId` como TEXTO del id viejo (sin FK,
- *    ADR-0005); `0`/vacío → null (F9 migrará usuarios y podrá remapearlos).
+ *    ADR-0005); `0`/vacío → null (F10 migrará usuarios y podrá remapearlos).
  *
  * Detalle: cada renglón de `CC_AuditoriasDet` resuelve `idDefecto` por el mapa 'DefectoCatalogo'.
  * Si el defecto no está mapeado, el renglón se OMITE + reporta. El `@@unique(idAuditoria, idDefecto)`

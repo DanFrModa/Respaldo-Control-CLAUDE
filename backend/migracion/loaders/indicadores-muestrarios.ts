@@ -15,7 +15,7 @@
  *  • `Temporada` es TEXTO ("Primavera Verano"); se resuelve por nombre contra el catálogo. Sin match
  *    → sin temporada (idTemporada es opcional).
  *  • `IdUsuarioSolicitante` viejo se PRESERVA como `solicitanteId` (sesión con ese id; sin FK,
- *    ADR-0005; F9 remapea). Si es 0/vacío → sesión de sistema.
+ *    ADR-0005; F10 remapea). Si es 0/vacío → sesión de sistema.
  */
 import {
   actualizarMuestrario,

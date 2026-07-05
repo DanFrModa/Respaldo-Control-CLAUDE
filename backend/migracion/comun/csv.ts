@@ -8,7 +8,7 @@
  *    CP850 da `ñ` → "Montaño"); la `ó` es `0xA2` (latin-1 daría `¢` → "Algod¢n"; CP850 da `ó`
  *    → "Algodón"). Afecta ñ/á/é/í/ó/ú en TODO el dump. Node no trae cp850 nativo
  *    (Buffer/TextDecoder no lo soportan) → se decodifica con `iconv-lite`.
- *    NOTA: este encoding aplica a TODO el ETL (E7, F9); corregir la nota de "latin-1" de
+ *    NOTA: este encoding aplica a TODO el ETL (E7, F10); corregir la nota de "latin-1" de
  *    CLAUDE.md §4 al cierre de la etapa.
  *  • **Parser CSV REAL** (`csv-parse`): varios CSV tienen campos multilínea entre comillas
  *    (p. ej. `Maquileros.Telefonos`, `Estampadores.Direccion`). JAMÁS contar líneas con

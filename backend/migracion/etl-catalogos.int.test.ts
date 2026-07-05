@@ -16,7 +16,7 @@
  *  • Cargas end-to-end vía servicios de dominio, con conteos EXACTOS deterministas de los
  *    fixtures (cada uno ejercita un escenario: fusión de terceros, rol por TipoProv,
  *    fallback de precio de avío, unificación de telas, variantes A/B, tallas raras).
- *  • El mapeo `MapeoMigracion` se persiste (entregable de E7/F2/F4/F9).
+ *  • El mapeo `MapeoMigracion` se persiste (entregable de E7/F2/F4/F10).
  */
 import { fileURLToPath } from 'node:url';
 

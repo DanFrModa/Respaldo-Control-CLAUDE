@@ -7,7 +7,7 @@
  * empresa activa: la unicidad de `nombre` es global (`@unique`).
  *
  * F1-E1B (R15, D12 — `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §4)
- * convierte este catálogo en el cimiento de las CxP de F8. Agrega:
+ * convierte este catálogo en el cimiento de las CxP de F9. Agrega:
  *  • Campos fiscales/comerciales/operativos (todos nullable: los 443 proveedores que
  *    migran en F1-E6 no los traen). La condición de pago se modela como `diasCredito`
  *    (Int? — `null`/`0` = contado; ver `crearProveedor`).

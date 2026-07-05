@@ -33,7 +33,7 @@ describe('catálogo de permisos', () => {
     // Fusión de terceros (D12/R15): al eliminar el catálogo `maquileros` se quitaron sus
     // dos accesos LEGADO (idAcceso 15 "programar maquileros" y 37 "alta de asegurados"),
     // que pertenecen a flujos de PRODUCCIÓN/EsMa (F3/F6), no al catálogo. Se remapearán en
-    // el ETL de `UsuAccesos` (F8). El resto de los ids del sistema viejo (1–38) siguen 1:1.
+    // el ETL de `UsuAccesos` (F10). El resto de los ids del sistema viejo (1–38) siguen 1:1.
     const idsViejos = catalogo.flatMap((p) => (p.origen ? [p.origen.idAcceso] : []));
     const esperados = Array.from({ length: 38 }, (_, i) => i + 1).filter(
       (id) => id !== 15 && id !== 37,

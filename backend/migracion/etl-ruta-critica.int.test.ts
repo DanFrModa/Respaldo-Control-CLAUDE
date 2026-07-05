@@ -12,7 +12,7 @@
  *  • Catálogos: 26 procesos (no se re-crean), 7 telas, 9 aplicaciones, 11 factores, 6 artículos, 1 fam.
  *  • Roles responsables N:M: 54 vigentes materializadas (ProcesoDefRol), 14 HUÉRFANAS listadas.
  *  • Plantillas: las 6 del CSV (2 ya sembradas por E2 → existentes; 4 nuevas).
- *  • UsuarioRol: dmasri (v2 existe) recibe rol Administrador; blanca/lina/jose quedan PENDIENTES F9.
+ *  • UsuarioRol: dmasri (v2 existe) recibe rol Administrador; blanca/lina/jose quedan PENDIENTES F10.
  *  • Rutas históricas: las órdenes mapeadas (4938/4939) migran sus renglones + checklist IP3/IP4;
  *    la orden 0 y las no mapeadas se OMITEN.
  *  • Estado RC de órdenes: 4938/4939 reciben sus campos RC; 9999 (sin mapeo) se omite.
@@ -125,7 +125,7 @@ describe('ETL de Ruta Crítica F5-E7 (integración, fixtures committeados)', () 
     expect(r1.plantillas.creadas + r1.plantillas.existentes).toBe(6);
     expect(await cliente.plantillaRuta.count()).toBe(6);
 
-    // ── UsuarioRol: dmasri (v2 existe) recibe rol; blanca/lina/jose pendientes F9. ──
+    // ── UsuarioRol: dmasri (v2 existe) recibe rol; blanca/lina/jose pendientes F10. ──
     expect(r1.usuariosRoles.conTipo).toBe(4); // dmasri, blanca, lina, jose
     expect(r1.usuariosRoles.casadosV2).toBe(1); // solo dmasri existe en v2
     expect(r1.usuariosRoles.pendientesF9).toBe(3); // blanca, lina, jose

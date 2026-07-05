@@ -45,7 +45,7 @@ async function sembrarEmpresa(prisma: PrismaClient): Promise<number> {
   });
 
   // Valores vigentes de Propiedades.csv: UtilidadSujerida=50, Regalias=10, ColchonCostura=1.
-  // Las fechas de inventario físico y el almacén PT por defecto los traerá la migración (F8).
+  // Las fechas de inventario físico y el almacén PT por defecto los traerá la migración (F10).
   await prisma.configuracionEmpresa.upsert({
     where: { idEmpresa: empresa.id },
     update: {},

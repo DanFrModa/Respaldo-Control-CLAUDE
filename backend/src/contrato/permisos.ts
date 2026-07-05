@@ -94,7 +94,7 @@ export type ModuloPermiso = keyof typeof MODULOS_PERMISO;
 
 /**
  * Referencia al permiso original del sistema viejo (tabla `Accesos`).
- * Se conserva como metadato para trazabilidad y para la migración de `UsuAccesos` (F8):
+ * Se conserva como metadato para trazabilidad y para la migración de `UsuAccesos` (F10):
  * `descripcion` es el texto EXACTO de `Accesos.Descripcion` (con su ortografía original).
  */
 export interface OrigenAcceso {
@@ -273,7 +273,7 @@ export const CATALOGO_PERMISOS = [
   // es un Proveedor con roles de servicio). Los accesos granulares 15 y 37 del sistema
   // viejo (programar maquileros / alta de asegurados) pertenecen a flujos de PRODUCCIÓN
   // (programación, EsMa) que se modelarán en sus fases (F3/F6) con su propio permiso; NO
-  // son del catálogo. Se omiten aquí; el ETL de `UsuAccesos` (F8) los remapeará entonces.
+  // son del catálogo. Se omiten aquí; el ETL de `UsuAccesos` (F10) los remapeará entonces.
 
   // ── Etiquetas de marca ───────────────────────────────────────────────────────
   // LEGADO (F0, de Accesos.csv; módulo `etiquetas`): SIN uso en el código de v2. El

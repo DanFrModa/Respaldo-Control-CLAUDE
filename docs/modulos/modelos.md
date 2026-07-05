@@ -19,7 +19,7 @@
 |---|---|
 | `Modelo` | `IdModelos` viejo → `id` de `Modelo` en v2 |
 
-Consumido por: F2 (Pedidos), F4 (Producción), F9 (Finanzas).
+Consumido por: F2 (Pedidos), F3 (Producción), F4 (Compras/MRP), F7 (Costos), F8 (Desarrollo y Cotización) y F9 (Finanzas).
 
 ## Decisiones de diseño
 

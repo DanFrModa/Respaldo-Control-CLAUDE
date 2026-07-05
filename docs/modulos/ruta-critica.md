@@ -116,7 +116,7 @@ ETL idempotente, por lotes, **CP850** (`comun/csv.ts`), vía dominio modo-migrac
   (9) → `DuracionPorAplicacion`. **Materializa las 54 `ProcesoDefRol` vigentes** de `RC_ProcUsua`.
 - **Plantillas** (`plantillas.ts`): `CP_Tiempos` (156) → `PlantillaRutaProceso` + tiempos.
 - **Roles de usuario** (`usuarios-roles.ts`): `Usuarios.IdRC_TipoUsuarios` (23 de 137) → `UsuarioRol`
-  contra el RBAC único (A4, casa los `RC_TipoUsuarios` contra los roles de E1). Ver caveat F9 abajo.
+  contra el RBAC único (A4, casa los `RC_TipoUsuarios` contra los roles de E1). Ver caveat F10 abajo.
 - **Ruta histórica** (`ruta-orden.ts`): `RC` (181 renglones) → `RutaOrden` con `FechaEst`/`FechaReal`
   + **`RC.IdUsuario`→`capturadoPorId`** + **`RC.FechaUsuarioRC`→`capturadoEn`** (el dato que alimenta
   el KPI D11 "quién y cuándo capturó"); `RC_IP3`/`RC_IP4` → `RutaOrdenChecklist`. Idempotente:
@@ -133,11 +133,11 @@ ETL idempotente, por lotes, **CP850** (`comun/csv.ts`), vía dominio modo-migrac
    el cuadre, no "corregido".
 3. **Checklist = 9 ítems** (`RC_IP3` 6 columnas + `RC_IP4` 3 columnas reales), **no 12** como decía
    la ficha: el ETL lee las columnas reales del CSV; documentado.
-4. **UsuarioRol ↔ F9 (dependencia cruzada):** los 137 usuarios del viejo **aún no están migrados a
-   v2** (eso es F9); hoy solo existe `admin`. El ETL **no crea usuarios**: casa cada uno de los 23
+4. **UsuarioRol ↔ F10 (dependencia cruzada):** los 137 usuarios del viejo **aún no están migrados a
+   v2** (eso es F10); hoy solo existe `admin`. El ETL **no crea usuarios**: casa cada uno de los 23
    con tipo contra un usuario v2 existente por su login y, los que aún no existen, los **lista como
-   "UsuarioRol pendiente hasta F9"**. Como es idempotente, **re-correr el ETL después de F9 los
-   materializa automáticamente**. *Implicación operativa:* hasta F9, la Bandeja con datos reales se
+   "UsuarioRol pendiente hasta F10"**. Como es idempotente, **re-correr el ETL después de F10 los
+   materializa automáticamente**. *Implicación operativa:* hasta F10, la Bandeja con datos reales se
    demuestra con un usuario sembrado al que se le asigna un rol RC (no "entrando como" uno de los 23).
 5. **Solo migran rutas de órdenes ya migradas** (mapeo de F2-E5): las `RC` que apuntan a órdenes no
    migradas (p. ej. de las 6 empresas viejas inactivas) se omiten y listan, consistente con la
