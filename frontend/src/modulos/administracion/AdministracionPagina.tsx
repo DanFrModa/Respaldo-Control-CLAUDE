@@ -1,4 +1,4 @@
-import { Building2, ClipboardList, Users, type LucideIcon } from 'lucide-react';
+import { Building2, ClipboardList, Coins, ListChecks, Users, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
@@ -63,6 +63,24 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     icono: ClipboardList,
     tono: 'servicios',
     permiso: 'admin.ver-bitacora',
+  },
+  {
+    clave: 'conceptos-costo',
+    titulo: 'Conceptos de costo',
+    descripcion: 'Catálogo global de conceptos del pre-costeo (además de tela, avíos y maquila).',
+    ruta: '/administracion/conceptos-costo',
+    icono: Coins,
+    tono: 'servicios',
+    permiso: 'concepto-costo.administrar',
+  },
+  {
+    clave: 'estados-lista',
+    titulo: 'Estados de lista de precios',
+    descripcion: 'Catálogo global de estados del ciclo de vida de una lista de precios.',
+    ruta: '/administracion/estados-lista',
+    icono: ListChecks,
+    tono: 'avios',
+    permiso: 'estado-lista.administrar',
   },
 ];
 

@@ -39,6 +39,12 @@ vi.mock('@/api/clientes', () => ({
   useActualizarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useDesactivarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
   useReactivarCampoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  // Hooks del editor de departamentos (montado en el detalle): inertes.
+  useDepartamentosCliente: () => ({ data: [], isPending: false, isError: false, error: null }),
+  useAgregarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useActualizarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useDesactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
+  useReactivarDepartamentoCliente: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 /** Cliente de ejemplo (con sus campos embebidos, vacíos por defecto). */

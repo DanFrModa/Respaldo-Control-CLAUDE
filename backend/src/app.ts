@@ -12,7 +12,15 @@ import { rutasEmpresas } from './api/empresas/empresas.rutas.js';
 import { rutasEtiquetasMarca } from './api/etiquetas-marca/etiquetas-marca.rutas.js';
 import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
+import { rutasMedidasAvioTalla } from './api/modelos/medidas-avio-talla.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
+// Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1) — catálogos de configuración +
+// sub-recursos de Tela/Cliente/Modelo. Los módulos de Proyecto/Precosto/Lista/Negociación llegan
+// en E2–E6 (su modelo de datos ya nace en la migración de E1).
+import { rutasConceptosCosto } from './api/desarrollo/conceptos-costo.rutas.js';
+import { rutasEstadosLista } from './api/desarrollo/estados-lista.rutas.js';
+import { rutasTelaProveedores } from './api/telas/tela-proveedores.rutas.js';
+import { rutasClienteDepartamentos } from './api/clientes/cliente-departamentos.rutas.js';
 import { rutasInventarioAvios } from './api/inventarios/avios.rutas.js';
 import { rutasMovimientosPt } from './api/inventarios/movimientos-pt.rutas.js';
 import { rutasInventarioTelas } from './api/inventarios/telas.rutas.js';
@@ -282,6 +290,16 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // Inventario cíclico (Módulo Indicadores / Almacén, F7-E5): alta que CONGELA el teórico (D6),
   // conteo CIEGO y ajuste como MOVIMIENTO de kardex (D3). RBAC `indicadores.ciclicos-*`.
   await app.register(rutasCiclicos, { prefix: '/api' });
+  // Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1, D13/R16–R20). Catálogos de
+  // configuración de la fase (conceptos de costo R19, estados de lista R20; patrón `tipos-proceso`,
+  // admin-only server-side) + sub-recursos habilitadores: precios de tela por proveedor/color (R17,
+  // bajo `telas.*`), departamentos del cliente (bajo `clientes.*`) y medidas por talla del BOM (R18,
+  // bajo `modelos.*`). Los flujos de Proyecto/Precosto/Lista/Negociación llegan en E2–E6.
+  await app.register(rutasConceptosCosto, { prefix: '/api' });
+  await app.register(rutasEstadosLista, { prefix: '/api' });
+  await app.register(rutasTelaProveedores, { prefix: '/api' });
+  await app.register(rutasClienteDepartamentos, { prefix: '/api' });
+  await app.register(rutasMedidasAvioTalla, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

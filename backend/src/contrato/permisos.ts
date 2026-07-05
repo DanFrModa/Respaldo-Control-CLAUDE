@@ -87,6 +87,15 @@ export const MODULOS_PERMISO = {
   // ── Notas de salida estructuradas (Módulo 5, F4-E5, R4/R9) ──
   // El documento de envío de materiales a un maquilero contra una orden de producción.
   notas: 'Notas de salida',
+  // ── Desarrollo, Cotización y Listas de Precios (Módulo 15, F8 — D13/R16–R20) ──
+  // La capa previa al pedido: proyectos de desarrollo por Cliente+Departamento, precosteo
+  // persistido/amarrado y listas de precios con aprobación/negociación. Los catálogos de
+  // configuración de la fase (conceptos de costo R19, estados de lista R20) tienen su propio
+  // módulo (patrón `tipos-proceso`: catálogo con bandera admin-only server-side).
+  'concepto-costo': 'Conceptos de costo',
+  'estado-lista': 'Estados de lista de precios',
+  desarrollo: 'Desarrollo y cotización',
+  listas: 'Listas de precios',
 } as const;
 
 /** Clave de módulo funcional (prefijo de toda {@link ClavePermiso}). */
@@ -992,6 +1001,78 @@ export const CATALOGO_PERMISOS = [
     clave: 'notas.cancelar',
     modulo: 'notas',
     descripcion: 'Cancelar (suave, con motivo) notas de salida; reversa los avíos descontados (D3)',
+  },
+
+  // ── Desarrollo, Cotización y Listas de Precios (Módulo 15, F8, A4 — doc
+  //    PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md; D13/R16–R20) ──────────────
+  // Permisos NUEVOS de v2 de TODA la fase, sembrados desde F8-E1 (patrón F3-E1). Los catálogos
+  // de configuración (conceptos de costo, estados de lista) siguen el patrón `tipos-proceso`
+  // (`ver`/`administrar`); su `administrar` se reparte solo a los roles de administración total
+  // (como el resto de catálogos maestros). ClienteDepartamento (bajo Cliente), TelaProveedor
+  // (bajo Tela) y las medidas por talla del BOM (bajo Modelo) NO llevan permiso propio: se
+  // gobiernan con `clientes.*`/`telas.*`/`modelos.*` respectivamente (sub-catálogo embebido).
+  // Los IMPORTES se ocultan con el transversal `consultas.ver-importes` (ya existe).
+  {
+    clave: 'concepto-costo.ver',
+    modulo: 'concepto-costo',
+    descripcion: 'Consultar el catálogo de conceptos de costo del precosto (R19)',
+  },
+  {
+    clave: 'concepto-costo.administrar',
+    modulo: 'concepto-costo',
+    descripcion:
+      'Administrar los conceptos de costo (alta, edición, desactivación). Los conceptos FIJOS (tela/avíos/maquila) no se desactivan (server-side)',
+  },
+  {
+    clave: 'estado-lista.ver',
+    modulo: 'estado-lista',
+    descripcion: 'Consultar el catálogo de estados de lista de precios (R20)',
+  },
+  {
+    clave: 'estado-lista.administrar',
+    modulo: 'estado-lista',
+    descripcion: 'Administrar los estados de lista de precios (alta, edición, desactivación)',
+  },
+  {
+    clave: 'desarrollo.ver',
+    modulo: 'desarrollo',
+    descripcion:
+      'Consultar proyectos de desarrollo, desarrollos y sus precostos (R16/R17); la vista 360 desde la orden (E6)',
+  },
+  {
+    clave: 'desarrollo.administrar',
+    modulo: 'desarrollo',
+    descripcion:
+      'Administrar proyectos y desarrollos: alta, edición, apagar/archivar (borrado suave con motivo) y ligar a orden (R16/E6)',
+  },
+  {
+    clave: 'desarrollo.precostear',
+    modulo: 'desarrollo',
+    descripcion:
+      'Generar, editar y CONGELAR el precosto persistido de un desarrollo (R17/R18/R19). Las versiones congeladas son inmutables',
+  },
+  {
+    clave: 'listas.ver',
+    modulo: 'listas',
+    descripcion: 'Consultar listas de precios por cliente, sus renglones y su negociación (R20)',
+  },
+  {
+    clave: 'listas.administrar',
+    modulo: 'listas',
+    descripcion:
+      'Crear y editar listas de precios (factores del cliente, generar renglones desde los precostos congelados) (R20a)',
+  },
+  {
+    clave: 'listas.aprobar',
+    modulo: 'listas',
+    descripcion:
+      'Aprobar o teclear el precio de cada renglón de la lista (el dueño): fija `precioAprobado` con rastro de quién/cuándo (R20a)',
+  },
+  {
+    clave: 'listas.negociar',
+    modulo: 'listas',
+    descripcion:
+      'Negociar por versiones (rondas + acuerdos) y mover el estado de la lista (dueño y gerente comercial, decisión (h)) (R20b)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

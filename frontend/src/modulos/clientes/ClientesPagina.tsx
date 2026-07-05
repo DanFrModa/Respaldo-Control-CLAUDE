@@ -1,4 +1,4 @@
-import { Contact, ListChecks, Mail, MapPin, Phone, UserRound } from 'lucide-react';
+import { Building2, Contact, ListChecks, Mail, MapPin, Phone, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCliente } from './DialogoCliente';
 import { EditorCamposCliente } from './EditorCamposCliente';
+import { EditorDepartamentosCliente } from './EditorDepartamentosCliente';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -247,6 +248,15 @@ function DetalleCliente({
         ) : (
           <CamposSoloLectura cliente={cliente} />
         )}
+      </SeccionDetalle>
+
+      <SeccionDetalle titulo="Departamentos (D13/R16)" icono={Building2}>
+        {/* Los departamentos no van embebidos en el cliente: el editor los lista siempre
+            (solo lectura sin permiso o cliente inactivo) y habilita el CRUD para administrar. */}
+        <EditorDepartamentosCliente
+          idCliente={cliente.id}
+          deshabilitado={!puedeAdministrar || !cliente.activo}
+        />
       </SeccionDetalle>
 
       <Historial creadoEn={cliente.creadoEn} modificadoEn={cliente.modificadoEn} />

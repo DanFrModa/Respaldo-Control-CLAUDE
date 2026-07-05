@@ -50,7 +50,7 @@
 
 ---
 
-## F8-E1 · Cimientos de datos: precios amarrados (telas por proveedor/color), medidas por talla, conceptos/estados/departamentos + modelo de datos de TODA la fase — ⬜ pendiente
+## F8-E1 · Cimientos de datos: precios amarrados (telas por proveedor/color), medidas por talla, conceptos/estados/departamentos + modelo de datos de TODA la fase — ✅ E1a+E1b (pend. verif. de Gabriel en `prueba`)
 
 **Objetivo:** Construir las **tres mejoras habilitadoras** de la propuesta §7 — (A) precio de insumo amarrado a proveedor (el hueco grande: telas), (B) medida por talla en ciertos avíos, (C) conceptos de costo extensibles — y dejar el **modelo de datos de TODA la fase en UNA sola migración aditiva** (patrón F3-E1: las tablas de E2–E6 nacen aquí aunque su dominio/UI llegue después), con **los permisos de toda la fase sembrados** desde ahora. Va primero porque el precosteo preciso (E3) y el MRP enganchado (E6) leen de estos catálogos; si la resolución de precios no queda sólida aquí, todo lo demás hereda el defecto.
 
@@ -97,6 +97,15 @@
 - `backend/prisma/schema.prisma`: `Tela` (~1050), `TelaColor` (~1107), `Avio` (~1207), `AvioProveedor` (~1266, el espejo a imitar), `ModeloTela` (~1480), `ModeloAvio` (~1508), `Talla`/`CurvaTalla` (~847/875), `Cliente` (~925), `TipoProceso` (~806, patrón catálogo-con-bandera)
 - `backend/src/dominio/costos/pre-costo.ts` (el precosteo F7 que se extiende), `backend/src/contrato/permisos.ts` + `backend/prisma/seed.ts` (`sembrarPermisos`)
 - docs/hoja-de-ruta/F3-etapas.md E1 (patrón "modelo de datos de toda la fase en una migración" + permisos de fase sembrados temprano)
+
+**✅ Nota de cierre (E1a backend + E1b pantallas, 2026-07-04 — pend. verif. de Gabriel en `prueba`):**
+- **Construida en 2 sub-piezas** (contingencia de la ficha): **E1a** (backend) y **E1b** (pantallas), cada una con coder + **reviewer independiente que APROBÓ**. Validaciones locales verdes: backend `typecheck`/`lint`/`format`/`test:unit` (750) + `openapi`; frontend `typecheck`/`lint`/`format`/`test` (491)/`build`. Integración (testcontainers) y e2e corren en CI.
+- **Migración única aditiva** `20260704120000_f8_e1_cimientos_precios`: 15 tablas + 2 enums + columnas de amarre (`ModeloTela.idTelaProveedor`, `ModeloAvio.idAvioProveedor`+`consumoPorTalla`) — verificada línea por línea vs schema, **aditiva pura (cero DROP/ALTER)**. **El deploy a `prueba` requiere `SEED_ON_START=true`** (siembra los permisos + conceptos/estados nuevos).
+- **Helper `dominio/costos/resolucion-precios.ts`**: cascada de tela (color-amarrado → amarre → color-referencia → sugerido) y de avío (amarre → más barato → referencia), con tests de las 7 rutas; `calcularPreCosto` de F7 **extendido** con fallback intacto (test de **no-regresión** verde).
+- **Desviaciones vs esta ficha (justificadas):** (1) el amarre de avío se unificó a **`idAvioProveedor`** (casa con `OrdenCompraLinea.idAvioProveedor` de F4 y con `ModeloTela.idTelaProveedor`); (2) se agregaron permisos propios **`concepto-costo.*`** y **`estado-lista.*`** para el CRUD admin → **13 permisos** F8 en total (no 7).
+- **Reparto de permisos** (refinado con Gabriel, ver `DECISIONES.md` F8): `*.ver` amplios; `desarrollo.administrar`/`desarrollo.precostear`/`listas.administrar` **cortados en Logística hacia abajo** (precedente `precostos.consultar` de F7); `listas.aprobar`/`listas.negociar` restringidos (D13-h).
+- **Pantallas (E1b):** precios por proveedor en Tela (+ grid color×precio, importes ocultos sin `consultas.ver-importes`), medidas por talla en el BOM (checkbox → tabla de tallas de la curva, lazy, solo avíos guardados), departamentos en Cliente (con error de nombre duplicado), CRUD admin de conceptos/estados (respeta `fijo` no-desactivable). **Sin módulo nuevo al menú** (viven en pantallas existentes) → `login.spec` intacto.
+- **Pendiente:** verificación de Gabriel en `prueba` (checklist de "Verificación de Gabriel" de arriba) y luego PR de `prueba` → `main`.
 
 ---
 
@@ -286,6 +295,7 @@
   - `generarOCDesdeExplosion` hereda proveedor/precio sugeridos (ya lo hace para avíos); **todo editable al comprar** (decisión de Daniel).
   - **Tests de NO-REGRESIÓN de F4**: órdenes de modelos sin amarres/medidas explotan idéntico a hoy.
 - **Vista 360 desde la orden**: en el detalle de la orden (F2), sección "Desarrollo" cuando hay liga — proyecto, número del cliente, precosto vigente, lista/precio acordado, acuerdos de negociación (solo lectura, permiso `desarrollo.ver`).
+- **Adjuntos de la orden (R6 — confirmado por Gabriel 2026-07-04):** repositorio de archivos de apoyo (Excel/PDF/imágenes) ligados a la **orden de producción** — subir/descargar/eliminar con metadatos (nombre, tipo, fecha, quién subió), reutilizando el motor `backend/src/comun/archivos.ts` + Cloudflare R2 (mismo patrón que las fotos de modelos/bordados). Nace en F8 porque la fase arranca **sin ETL** y Daniel quiere cargar aquí los archivos viejos de apoyo por orden. Permiso: ligado al de ver/editar la orden (definir el permiso fino al construir); recordar la deuda técnica de borrado físico en R2 (CLAUDE.md §8) al implementar el "eliminar". **NO es la ficha técnica estructurada (R5), que sigue pendiente aparte.**
 - **Tablero del módulo**: desarrollos por estado (en desarrollo / cotizado / en lista / ligado / apagado) filtrable por cliente/departamento/temporada — el pulso de la capa de pre-venta.
 - **Cierre de fase**: `docs/modulos/desarrollo-cotizacion.md` (cómo quedó el módulo: esquema final, resolución de precios, fórmula de lista, decisiones tomadas y desviaciones de esta ficha); actualización de `docs/modulos/compras-mrp.md` (el MRP ahora sugiere telas); verificación del criterio de salida completo en `prueba`; OpenAPI + cliente regenerados.
 
@@ -309,6 +319,7 @@
 - [ ] Generar la OC desde la explosión → hereda proveedor/precio; cambiarle el proveedor a un renglón → se puede (editable al comprar)
 - [ ] Explosionar una orden VIEJA (modelo sin amarres) → idéntico que antes de la fase
 - [ ] Abrir el tablero de desarrollos y el archivo del departamento; apagar un desarrollo que no llegó a producción
+- [ ] **R6:** en una orden de producción, subir un Excel y un PDF de apoyo → verlos con quién/cuándo, descargarlos, y eliminar uno
 - [ ] CIERRE DE FASE: recorrer el criterio de salida completo en `prueba` y dar el visto bueno para el PR de `prueba` → `main`
 
 **Equipo:** 1 coder + 1 reviewer (el cambio al MRP es quirúrgico pero delicado: la review carga la mano ahí y en la no-regresión)

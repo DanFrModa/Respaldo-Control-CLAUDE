@@ -195,6 +195,18 @@ export type ClienteCampoCrear =
 export type ClienteCampoEditar =
   paths['/api/clientes/{id}/campos/{idCampo}']['patch']['requestBody']['content']['application/json'];
 
+/** Lista de departamentos de un cliente (`GET /api/clientes/{idCliente}/departamentos`, D13/R16). */
+export type ClienteDepartamentosLista =
+  paths['/api/clientes/{idCliente}/departamentos']['get']['responses']['200']['content']['application/json'];
+/** Un departamento de un cliente (D13/R16). */
+export type ClienteDepartamento = ClienteDepartamentosLista['datos'][number];
+/** Cuerpo de alta de un departamento (`POST /api/clientes/{idCliente}/departamentos`). */
+export type ClienteDepartamentoCrear =
+  paths['/api/clientes/{idCliente}/departamentos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edicion de un departamento (`PATCH /api/clientes/{idCliente}/departamentos/{id}`). */
+export type ClienteDepartamentoEditar =
+  paths['/api/clientes/{idCliente}/departamentos/{id}']['patch']['requestBody']['content']['application/json'];
+
 // ── Pedidos (Modulo PEDIDOS, F2-E1) — pedido interno + pedido real ────────────
 
 /** Pagina de pedidos internos (`GET /api/pedidos`). */

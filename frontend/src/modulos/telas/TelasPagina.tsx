@@ -1,4 +1,4 @@
-import { Layers, Palette, Ruler, Star, Tag } from 'lucide-react';
+import { Layers, Palette, Ruler, Star, Tag, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -28,6 +28,7 @@ import {
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoTela } from './DialogoTela';
+import { EditorProveedoresTela } from './EditorProveedoresTela';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -67,6 +68,7 @@ function hayTexto(valor: string | null): valor is string {
 export function TelasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('telas.administrar');
+  const puedeVerImportes = tienePermiso('consultas.ver-importes');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -207,7 +209,13 @@ export function TelasPagina(): React.JSX.Element {
             {t.favorito ? <TipoBadge tono="pt">Favorita</TipoBadge> : null}
           </span>
         )}
-        renderDetalle={(t) => <DetalleTela t={t} />}
+        renderDetalle={(t) => (
+          <DetalleTela
+            t={t}
+            puedeAdministrar={puedeAdministrar}
+            puedeVerImportes={puedeVerImportes}
+          />
+        )}
       />
 
       <DialogoTela
@@ -244,7 +252,15 @@ export function TelasPagina(): React.JSX.Element {
  * Cada campo de texto solo se pinta si tiene dato. Usa las piezas de `@/modulos/detalle`
  * para verse igual que el resto.
  */
-function DetalleTela({ t }: { t: Tela }): React.JSX.Element {
+function DetalleTela({
+  t,
+  puedeAdministrar,
+  puedeVerImportes,
+}: {
+  t: Tela;
+  puedeAdministrar: boolean;
+  puedeVerImportes: boolean;
+}): React.JSX.Element {
   return (
     <>
       <SeccionDetalle titulo="Datos de la tela" icono={Layers}>
@@ -299,6 +315,16 @@ function DetalleTela({ t }: { t: Tela }): React.JSX.Element {
             ))}
           </ul>
         )}
+      </SeccionDetalle>
+
+      {/* Precios por proveedor (R17): a quién se le compra la tela y a qué precio (por color). */}
+      <SeccionDetalle titulo="Precios por proveedor" icono={Truck}>
+        <EditorProveedoresTela
+          idTela={t.id}
+          colores={t.colores.map((color) => ({ idColor: color.idColor, nombre: color.nombre }))}
+          deshabilitado={!puedeAdministrar || !t.activo}
+          puedeVerImportes={puedeVerImportes}
+        />
       </SeccionDetalle>
 
       <Historial creadoEn={t.creadoEn} modificadoEn={t.modificadoEn} />

@@ -56,6 +56,11 @@ vi.mock('@/api/telas', () => ({
 // El diálogo se aisla (tiene su propio test): evita arrastrar el form completo.
 vi.mock('./DialogoTela', () => ({ DialogoTela: () => null }));
 
+// El editor de precios por proveedor se aisla (tiene su propio test): evita arrastrar sus hooks.
+vi.mock('./EditorProveedoresTela', () => ({
+  EditorProveedoresTela: () => <div data-testid="editor-proveedores-tela-mock" />,
+}));
+
 /** Tela de ejemplo. */
 function tela(id: number, nombre: string, sobre: Partial<Tela> = {}): Tela {
   return {

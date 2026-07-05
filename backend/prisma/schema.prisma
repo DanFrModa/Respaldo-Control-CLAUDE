@@ -110,6 +110,10 @@ model Empresa {
   muestrarios            Muestrario[]
   /// Inventarios cíclicos de esta empresa (F7-E5, A9). Restrict.
   inventariosCiclicos    InventarioCiclico[]
+  /// Proyectos de desarrollo de esta empresa (F8-E1/E2, A9 — folio por empresa). Restrict.
+  proyectos              Proyecto[]
+  /// Listas de precios por cliente de esta empresa (F8-E1/E4, A9 — folio por empresa). Restrict.
+  listasPrecios          ListaPrecios[]
 
   @@map("empresas")
 }
@@ -609,6 +613,8 @@ model Proveedor {
   notasSalida             NotaSalida[]
   /// Auditorías de calidad donde este proveedor es el MAQUILERO auditado (F6-E2). Restrict.
   auditorias              Auditoria[]
+  /// Precios de telas que surte este proveedor (F8-E1, D13/R17 — espejo de AvioProveedor). Restrict.
+  telaProveedores         TelaProveedor[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -715,6 +721,8 @@ model Temporada {
   modelos     Modelo[]
   /// Muestrarios pendientes de esta temporada (F7-E4, FK nullable Restrict).
   muestrarios Muestrario[]
+  /// Proyectos de desarrollo clasificados en esta temporada (F8-E2, FK nullable Restrict).
+  proyectos   Proyecto[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -772,6 +780,8 @@ model Color {
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
   /// Renglones de inventario cíclico en este color (F7-E5). Restrict.
   inventarioCiclicoDet   InventarioCiclicoDet[]
+  /// Precios por color de un proveedor de tela (F8-E1, D13). Restrict.
+  telaProveedorColores   TelaProveedorColor[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -862,6 +872,8 @@ model Talla {
   ordenCompraLineasTalla OrdenCompraLineaTalla[]
   /// Renglones de inventario cíclico en esta talla (F7-E5). Restrict.
   inventarioCiclicoDet   InventarioCiclicoDet[]
+  /// Medidas por talla de avíos del BOM (F8-E1, R18). Restrict.
+  modeloAvioTallas       ModeloAvioTalla[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -942,6 +954,14 @@ model Cliente {
   registrosProductividad RegistroProductividad[]
   /// Muestrarios pendientes de este cliente (F7-E4). Restrict.
   muestrarios            Muestrario[]
+  /// Departamentos del cliente (F8-E1, D13 — ej. NIÑOS/DAMAS). Cascade (config del cliente).
+  departamentos          ClienteDepartamento[]
+  /// Factores de lista de precios del cliente (F8-E1/E4, con override por departamento). Cascade.
+  factores               ClienteFactores[]
+  /// Proyectos de desarrollo de este cliente (F8-E2). Restrict.
+  proyectos              Proyecto[]
+  /// Listas de precios de este cliente (F8-E4). Restrict.
+  listasPrecios          ListaPrecios[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1087,6 +1107,10 @@ model Tela {
   requerimientos     RequerimientoOrden[]
   /// Renglones de nota de salida que envían esta tela a maquila (F4-E5). Restrict.
   notaSalidaLineas   NotaSalidaLinea[]
+  /// Precios de esta tela por proveedor (F8-E1, D13/R17 — espejo de AvioProveedor). Cascade (config de la tela).
+  proveedoresPrecio  TelaProveedor[]
+  /// Renglones de precosto que valúan esta tela (F8-E3, traza del amarre). Restrict.
+  precostoLineas     PrecostoLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1246,6 +1270,8 @@ model Avio {
   requerimientos     RequerimientoOrden[]
   /// Renglones de nota de salida que descuentan este avío al confirmar (F4-E5, R4). Restrict.
   notaSalidaLineas   NotaSalidaLinea[]
+  /// Renglones de precosto que valúan este avío (F8-E3, traza del amarre). Restrict.
+  precostoLineas     PrecostoLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1320,6 +1346,8 @@ model Bordado {
 
   /// Renglones del BOM de modelos que usan este bordado (F1-E4, Restrict hacia el bordado).
   modelos ModeloBordado[]
+  /// Renglones de precosto que valúan este bordado (F8-E3, traza). Restrict.
+  precostoLineas PrecostoLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1426,6 +1454,8 @@ model Modelo {
   edrLineas            EdrLinea[]
   /// Renglones de inventario cíclico de este modelo (F7-E5). Restrict.
   inventarioCiclicoDet InventarioCiclicoDet[]
+  /// Desarrollos (proyectos de cotización) de este modelo (F8-E2, D13/R16). Restrict.
+  desarrollos          Desarrollo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1488,6 +1518,12 @@ model ModeloTela {
   paraProduccion   Boolean @default(true) @map("para_produccion")
   /// 🔑 Entra en el COSTEO real de la orden.
   paraCosto        Boolean @default(true) @map("para_costo")
+  /// F8-E1 (R17): amarre OPCIONAL al renglón proveedor–tela–precio elegido por Desarrollo. La
+  /// cascada de resolución de precios (dominio/costos/resolucion-precios.ts) lo PREFIERE; NULL =
+  /// sin amarre → cascada por color/sugerido. SetNull: si el renglón proveedor se retira de la
+  /// tela, el amarre se limpia (degrada a la cascada, nunca cuelga).
+  idTelaProveedor  Int?           @map("id_tela_proveedor")
+  telaProveedor    TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
 
   modelo Modelo @relation(fields: [idModelo], references: [id], onDelete: Cascade)
   tela   Tela   @relation(fields: [idTela], references: [id], onDelete: Restrict)
@@ -1499,6 +1535,7 @@ model ModeloTela {
 
   @@id([idModelo, idTela])
   @@index([idTela])
+  @@index([idTelaProveedor])
   @@map("modelo_tela")
 }
 
@@ -1516,6 +1553,18 @@ model ModeloAvio {
   paraProduccion   Boolean @default(true) @map("para_produccion")
   /// 🔑 Entra en el COSTEO real.
   paraCosto        Boolean @default(true) @map("para_costo")
+  /// F8-E1 (R18): ¿este avío se consume por TALLA (cierres, elástico…)? Si true, las medidas viven
+  /// en `tallas` (ModeloAvioTalla) y el precosto usa su PROMEDIO SIMPLE (decisión (g)); el MRP (E6)
+  /// compra por medida×curva. Si false, se usa `consumoPorPrenda`. Default false.
+  consumoPorTalla   Boolean @default(false) @map("consumo_por_talla")
+  /// F8-E1 (R17): amarre OPCIONAL al `AvioProveedor` elegido por Desarrollo. Guarda el PROVEEDOR del
+  /// par: `(idAvio de este renglón, idAvioProveedor)` → `AvioProveedor`. SIN FK de relación (mismo
+  /// criterio y NOMBRE que `OrdenCompraLinea.idAvioProveedor` de F4: el par se reconstruye con
+  /// `idAvio`, sin tocar `AvioProveedor`). NULL = sin amarre → el MRP (E6) cae a "más barato" (F4).
+  idAvioProveedor   Int?    @map("id_avio_proveedor")
+
+  /// Medidas por talla de este avío (F8-E1, R18) cuando `consumoPorTalla`. Cascade (FK compuesta).
+  tallas ModeloAvioTalla[]
 
   modelo Modelo @relation(fields: [idModelo], references: [id], onDelete: Cascade)
   avio   Avio   @relation(fields: [idAvio], references: [id], onDelete: Restrict)
@@ -1527,6 +1576,7 @@ model ModeloAvio {
 
   @@id([idModelo, idAvio])
   @@index([idAvio])
+  @@index([idAvioProveedor])
   @@map("modelo_avio")
 }
 
@@ -1980,6 +2030,8 @@ model Orden {
   fichasVerificacion   FichaVerificacion[]
   /// Renglones de inventario cíclico ligados a esta orden (F7-E5 "PT por orden"). Restrict.
   inventarioCiclicoDet InventarioCiclicoDet[]
+  /// Liga desarrollo↔orden (F8-E6): a lo más un desarrollo por orden. Cascade.
+  desarrolloOrden      DesarrolloOrden?
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -4744,4 +4796,487 @@ model InventarioCiclicoDet {
   @@index([idInventarioCiclico])
   @@index([idMovimientoAjuste])
   @@map("inventario_ciclico_det")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DESARROLLO, COTIZACIÓN y LISTAS DE PRECIOS (Módulo 15, F8 — decisión D13,
+// requisitos R16–R20; propuesta PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md).
+// TODA la fase nace en UNA migración aditiva (patrón F3-E1): las tablas de E2–E6 se crean
+// AQUÍ aunque su dominio/UI llegue en etapas posteriores. GLOBAL vs por-empresa según el caso
+// (catálogos globales — ADR-0007; Proyecto/ListaPrecios por empresa con folio A3/A9). Auditoría
+// uniforme (A7) y borrado suave donde aplica. Las REGLAS (cascada de resolución de precios,
+// congelado inmutable, snapshot de factores, estados derivados) viven en el DOMINIO, no en la BD
+// (E1a: el helper de resolución de precios; E3/E4/E5: precosto/lista/negociación).
+//
+// AMARRES al proveedor del avío (ModeloAvio.idAvioProveedor, PrecostoLinea.idAvioProveedor): son
+// ESCALARES sin FK, con el MISMO nombre que F4 (`OrdenCompraLinea.idAvioProveedor`) — el par
+// (idAvio, idAvioProveedor) reconstruye el `AvioProveedor` sin tocar ese modelo (PK compuesta, R1).
+// El amarre de TELA sí es FK real (TelaProveedor tiene surrogate `id`).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Concepto de costo del precosto (F8-E1, R19). Catálogo GLOBAL que gobierna por DATO los renglones
+/// del precosto (como `TipoProceso` gobierna el kardex): tela/avíos/maquila FIJOS + estampado/
+/// bordado/otros AMPLIABLES. `fijo=true` (tela/avíos/maquila) ⇒ no desactivable (lo exige el dominio
+/// de admin). Patrón catálogo-con-bandera de F3-E1. La REGALÍA no es concepto del costo (D2: va sobre
+/// la venta — factor de la lista, E4).
+model ConceptoCosto {
+  id     Int     @id @default(autoincrement())
+  /// Clave estable kebab-case (ej. "tela", "estampado"). Única global.
+  codigo String  @unique
+  nombre String
+  /// Orden de despliegue (lo gestiona el dominio; no único en BD).
+  orden  Int     @default(0)
+  /// Concepto FIJO (tela/avíos/maquila): no se puede desactivar (lo exige el dominio de admin).
+  fijo   Boolean @default(false)
+  activo Boolean @default(true)
+
+  /// Renglones de precosto de este concepto (F8-E3). Restrict.
+  precostoLineas PrecostoLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("concepto_costo")
+}
+
+/// Estado de una lista de precios (F8-E1, R20). Catálogo GLOBAL configurable (los estados de lista
+/// son ampliables, decisión de Daniel). `esCierre=true` (cerrada/ya-pedida) bloquea nuevas rondas de
+/// negociación (regla de dominio, E5). Patrón catálogo-con-bandera.
+model EstadoLista {
+  id       Int     @id @default(autoincrement())
+  /// Clave estable kebab-case (ej. "abierta", "en-negociacion"). Única global.
+  codigo   String  @unique
+  nombre   String
+  orden    Int     @default(0)
+  /// ¿Es un estado de CIERRE? (cerrada/ya-pedida) — bloquea nuevas rondas/ediciones de renglón (E5).
+  esCierre Boolean @default(false) @map("es_cierre")
+  activo   Boolean @default(true)
+
+  /// Listas de precios en este estado (F8-E4). Restrict.
+  listas ListaPrecios[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("estado_lista")
+}
+
+/// Departamento de un cliente (F8-E1, D13 — ej. C&A/NIÑOS). Catálogo chico capturado a mano; los
+/// proyectos y listas viven por Cliente+Departamento. `nombre` único DENTRO del cliente. Cascade
+/// hacia Cliente (config del cliente, como `ClienteCampo`); Restrict hacia él desde proyectos/listas.
+model ClienteDepartamento {
+  id        Int     @id @default(autoincrement())
+  idCliente Int     @map("id_cliente")
+  cliente   Cliente @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  nombre    String
+  activo    Boolean @default(true)
+
+  proyectos     Proyecto[]
+  factores      ClienteFactores[]
+  listasPrecios ListaPrecios[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idCliente, nombre])
+  @@index([idCliente])
+  @@map("cliente_departamento")
+}
+
+/// Precio de una TELA por PROVEEDOR (F8-E1, D13/R17 — el hueco grande: hoy solo hay
+/// `Tela.precioSugerido` genérico y `TelaColor.precio` sin proveedor). ESPEJO de `AvioProveedor`
+/// (R1), que NO se toca. Lleva surrogate `id` (lo referencian `TelaProveedorColor`, el amarre del
+/// BOM `ModeloTela.idTelaProveedor` y el precosto). `precio` NULLABLE como en AvioProveedor (los que
+/// manejan precio por color pueden dejarlo nulo). `manejaPrecioPorColor` = ciertos proveedores
+/// cotizan distinto por color → el precio fino vive en `TelaProveedorColor`. Cascade hacia Tela
+/// (config de la tela, permite reescribir el set en la tx A2); Restrict hacia Proveedor.
+model TelaProveedor {
+  id                   Int       @id @default(autoincrement())
+  idTela               Int       @map("id_tela")
+  tela                 Tela      @relation(fields: [idTela], references: [id], onDelete: Cascade)
+  idProveedor          Int       @map("id_proveedor")
+  proveedor            Proveedor @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Precio base al que este proveedor surte la tela (por unidad de compra). Nullable.
+  precio               Decimal?  @db.Decimal(12, 2)
+  /// ¿Este proveedor cotiza distinto por COLOR? Entonces el precio fino vive en TelaProveedorColor.
+  manejaPrecioPorColor Boolean   @default(false) @map("maneja_precio_por_color")
+  /// Condiciones comerciales (texto libre; ej. "USD, LAB Manzanillo" — decisión (d): sin motor FX).
+  condiciones          String?
+  activo               Boolean   @default(true)
+
+  colores        TelaProveedorColor[]
+  /// Renglones del BOM AMARRADOS a este proveedor–tela (F8-E1, R17). SetNull al quitar el renglón.
+  modelosTela    ModeloTela[]
+  /// Renglones de precosto que salieron de este amarre (F8-E3, traza). SetNull.
+  precostoLineas PrecostoLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idTela, idProveedor])
+  @@index([idProveedor])
+  @@map("tela_proveedor")
+}
+
+/// Precio de una TELA de un PROVEEDOR por COLOR (F8-E1, D13) — solo para proveedores con
+/// `TelaProveedor.manejaPrecioPorColor`. PK compuesta (renglón proveedor, color). Cascade hacia el
+/// renglón proveedor (reescribir el grid en la tx); Restrict hacia Color (en uso → se desactiva).
+model TelaProveedorColor {
+  idTelaProveedor Int           @map("id_tela_proveedor")
+  telaProveedor   TelaProveedor @relation(fields: [idTelaProveedor], references: [id], onDelete: Cascade)
+  idColor         Int           @map("id_color")
+  color           Color         @relation(fields: [idColor], references: [id], onDelete: Restrict)
+  precio          Decimal?      @db.Decimal(12, 2)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idTelaProveedor, idColor])
+  @@index([idColor])
+  @@map("tela_proveedor_color")
+}
+
+/// Medida (consumo) por TALLA de un avío del BOM (F8-E1, R18) — cierres, elástico… Solo para
+/// `ModeloAvio.consumoPorTalla=true`. PK compuesta (modelo, avío, talla); FK COMPUESTA a `ModeloAvio`
+/// (su PK es [idModelo, idAvio]). Cascade hacia ModeloAvio (reescribir en la tx); Restrict hacia
+/// Talla. El precosto (E3) usa el PROMEDIO SIMPLE de estas medidas (decisión (g)); el MRP (E6) compra
+/// por medida×curva.
+model ModeloAvioTalla {
+  idModelo Int     @map("id_modelo")
+  idAvio   Int     @map("id_avio")
+  idTalla  Int     @map("id_talla")
+  talla    Talla   @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+  /// Medida (consumo) del avío para esta talla (R18).
+  consumo  Decimal @db.Decimal(12, 4)
+
+  modeloAvio ModeloAvio @relation(fields: [idModelo, idAvio], references: [idModelo, idAvio], onDelete: Cascade)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@id([idModelo, idAvio, idTalla])
+  @@index([idTalla])
+  @@index([idModelo, idAvio])
+  @@map("modelo_avio_talla")
+}
+
+/// Proyecto de desarrollo (F8-E2, R16) = 1 cliente + 1 departamento, con nombre/tema (varios por
+/// departamento/temporada). Agrupa desarrollos. Folio consecutivo POR EMPRESA (A3/A9, secuencia
+/// "proyecto"). El dominio (E2) valida que el departamento PERTENEZCA al cliente (A1). Archivado =
+/// borrado suave (el archivo del departamento es parte del valor).
+model Proyecto {
+  id                    Int                 @id @default(autoincrement())
+  folio                 BigInt
+  idEmpresa             Int                 @map("id_empresa")
+  empresa               Empresa             @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  idCliente             Int                 @map("id_cliente")
+  cliente               Cliente             @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  idClienteDepartamento Int                 @map("id_cliente_departamento")
+  clienteDepartamento   ClienteDepartamento @relation(fields: [idClienteDepartamento], references: [id], onDelete: Restrict)
+  /// Nombre/tema del proyecto (joggers, Disney, básicos…).
+  nombre                String
+  idTemporada           Int?                @map("id_temporada")
+  temporada             Temporada?          @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
+  notas                 String?             @db.Text
+  archivado             Boolean             @default(false)
+
+  desarrollos Desarrollo[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idCliente])
+  @@index([idClienteDepartamento])
+  @@index([idTemporada])
+  @@map("proyectos")
+}
+
+/// Desarrollo (F8-E2, R16): un modelo dentro de un proyecto, con DOS números (el nuestro =
+/// `Modelo.codigo`; el del cliente = `numeroCliente`). El ESTADO es DERIVADO en el dominio (E2): en
+/// desarrollo → cotizado (precosto congelado) → en lista → ligado a producción; `apagado` (borrado
+/// suave con motivo, reversible) lo corta. `@@unique([idProyecto, idModelo])`. Cascade hacia
+/// Proyecto; Restrict hacia Modelo.
+model Desarrollo {
+  id            Int       @id @default(autoincrement())
+  idProyecto    Int       @map("id_proyecto")
+  proyecto      Proyecto  @relation(fields: [idProyecto], references: [id], onDelete: Cascade)
+  idModelo      Int       @map("id_modelo")
+  modelo        Modelo    @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+  /// Número del cliente para este modelo (el "otro número"; opcional).
+  numeroCliente String?   @map("numero_cliente")
+  /// Apagado = borrado suave con motivo (reversible). NUNCA se borra (el archivo es parte del valor).
+  apagado       Boolean   @default(false)
+  apagadoEn     DateTime? @map("apagado_en")
+  apagadoPorId  String?   @map("apagado_por_id")
+  motivoApagado String?   @map("motivo_apagado") @db.Text
+  notas         String?   @db.Text
+
+  precostos    Precosto[]
+  ordenLigadas DesarrolloOrden[]
+  listaLineas  ListaPreciosLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idProyecto, idModelo])
+  @@index([idModelo])
+  @@map("desarrollos")
+}
+
+/// Liga desarrollo ↔ orden de producción (F8-E6): una orden liga a lo más UN desarrollo (`idOrden`
+/// @unique); un desarrollo puede tener N órdenes (resurtidos). Cascade hacia Desarrollo; Restrict
+/// hacia Orden. Al ligar, el precio acordado se PROPONE en el pedido y el MRP hereda lo predefinido
+/// (E6; todo editable por el humano).
+model DesarrolloOrden {
+  id           Int        @id @default(autoincrement())
+  idDesarrollo Int        @map("id_desarrollo")
+  desarrollo   Desarrollo @relation(fields: [idDesarrollo], references: [id], onDelete: Cascade)
+  idOrden      Int        @unique @map("id_orden")
+  orden        Orden      @relation(fields: [idOrden], references: [id], onDelete: Restrict)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idDesarrollo])
+  @@map("desarrollo_orden")
+}
+
+/// Estado de un precosto (F8-E3): `borrador` (editable) → `congelado` (INMUTABLE, base de la
+/// lista/negociación). Patrón enum como `EstadoOrden`.
+enum EstadoPrecosto {
+  borrador
+  congelado
+
+  @@map("estado_precosto")
+}
+
+/// Precosto PERSISTIDO por desarrollo (F8-E3, R17/R18/R19) — el corazón de la fase. Versionable por
+/// congelado inmutable (base del re-costeo de negociación, E5). A lo más UN borrador por desarrollo
+/// (regla de dominio bajo transacción, E3). `costoTotal` es DERIVADO y se persiste al congelar
+/// (snapshot, como `RequerimientoOrden`/`CostoOrden.*Calc`; espíritu D3: las versiones congeladas
+/// NUNCA se editan ni se borran). Cascade hacia Desarrollo.
+model Precosto {
+  id             Int            @id @default(autoincrement())
+  idDesarrollo   Int            @map("id_desarrollo")
+  desarrollo     Desarrollo     @relation(fields: [idDesarrollo], references: [id], onDelete: Cascade)
+  version        Int
+  estado         EstadoPrecosto @default(borrador)
+  congeladoEn    DateTime?      @map("congelado_en")
+  congeladoPorId String?        @map("congelado_por_id")
+  /// Costo total DERIVADO; se persiste al congelar. Nullable en borrador.
+  costoTotal     Decimal?       @map("costo_total") @db.Decimal(12, 2)
+
+  lineas      PrecostoLinea[]
+  /// Renglones de lista que usan esta versión congelada (F8-E4). Restrict.
+  listaLineas ListaPreciosLinea[]
+  /// Eventos de negociación que apuntan a esta versión como ANTERIOR (F8-E5). Restrict.
+  negociacionesComoAnterior NegociacionEvento[] @relation("NegociacionPrecostoAnterior")
+  /// Eventos de negociación que apuntan a esta versión como NUEVA (F8-E5). Restrict.
+  negociacionesComoNuevo    NegociacionEvento[] @relation("NegociacionPrecostoNuevo")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idDesarrollo, version])
+  @@map("precostos")
+}
+
+/// Origen de un renglón de precosto (F8-E3): BOM (tela/avío/bordado) o `manual` (estampado, otros
+/// procesos…). Gobierna el re-cálculo (E3: `recalcularDesdeBom` refresca los BOM sin pisar manuales).
+enum OrigenPrecostoLinea {
+  bom_tela
+  bom_avio
+  bom_bordado
+  manual
+
+  @@map("origen_precosto_linea")
+}
+
+/// Renglón de precosto (F8-E3). Guarda las FK del amarre para TRAZABILIDAD ("de dónde salió este
+/// precio") + el precio/importe ya resueltos (snapshot). Las FK de amarre son todas NULLABLE (un
+/// renglón manual no las trae). El amarre de AVÍO es escalar sin FK (`idAvioProveedor`, par con
+/// `idAvio` → AvioProveedor, mismo nombre que F4); el de TELA es FK real a `TelaProveedor`. Cascade hacia
+/// Precosto; Restrict hacia los catálogos (Tela/Avío/Bordado/Concepto); SetNull hacia TelaProveedor
+/// (si el renglón proveedor se retira, la traza se limpia — el precio usado ya vive en `precioUnit`).
+model PrecostoLinea {
+  id              Int                 @id @default(autoincrement())
+  idPrecosto      Int                 @map("id_precosto")
+  precosto        Precosto            @relation(fields: [idPrecosto], references: [id], onDelete: Cascade)
+  idConceptoCosto Int                 @map("id_concepto_costo")
+  conceptoCosto   ConceptoCosto       @relation(fields: [idConceptoCosto], references: [id], onDelete: Restrict)
+  origen          OrigenPrecostoLinea
+  /// TRAZA del amarre (de dónde salió el precio). Todas nullable.
+  idTela          Int?           @map("id_tela")
+  tela            Tela?          @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  idTelaProveedor Int?           @map("id_tela_proveedor")
+  telaProveedor   TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
+  idAvio          Int?           @map("id_avio")
+  avio            Avio?          @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+  /// Proveedor del amarre de avío (par con `idAvio` → AvioProveedor; SIN FK, mismo nombre que F4). Snapshot.
+  idAvioProveedor Int?           @map("id_avio_proveedor")
+  idBordado       Int?           @map("id_bordado")
+  bordado         Bordado?       @relation(fields: [idBordado], references: [id], onDelete: Restrict)
+  descripcion     String
+  /// Consumo (tela: por prenda; avío por talla: PROMEDIO, decisión (g)). Nullable (bordado/manual).
+  consumo         Decimal?       @db.Decimal(12, 4)
+  precioUnit      Decimal        @map("precio_unit") @db.Decimal(12, 2)
+  importe         Decimal        @db.Decimal(12, 2)
+  notas           String?        @db.Text
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([idPrecosto])
+  @@index([idConceptoCosto])
+  @@index([idTela])
+  @@index([idTelaProveedor])
+  @@index([idAvio])
+  @@index([idBordado])
+  @@map("precosto_linea")
+}
+
+/// Factores de lista de precios de un cliente (F8-E4, R20a). Default por cliente, con override
+/// OPCIONAL por departamento (decisión (a); `idClienteDepartamento` NULL = default del cliente).
+/// `@@unique([idCliente, idClienteDepartamento])` (la unicidad del default-por-cliente —NULL— la
+/// enforcea el dominio de E4, porque Postgres trata los NULL como distintos). Todos MXN (decisión
+/// (d)). % con estilo "sobre la venta" (la fórmula la aplica E4). Cascade hacia Cliente/Departamento.
+model ClienteFactores {
+  id                    Int                  @id @default(autoincrement())
+  idCliente             Int                  @map("id_cliente")
+  cliente               Cliente              @relation(fields: [idCliente], references: [id], onDelete: Cascade)
+  idClienteDepartamento Int?                 @map("id_cliente_departamento")
+  clienteDepartamento   ClienteDepartamento? @relation(fields: [idClienteDepartamento], references: [id], onDelete: Cascade)
+  margenPct             Decimal              @map("margen_pct") @db.Decimal(5, 2)
+  descuentosPct         Decimal              @map("descuentos_pct") @db.Decimal(5, 2)
+  regaliasPct           Decimal              @map("regalias_pct") @db.Decimal(5, 2)
+  costoVentasPct        Decimal              @map("costo_ventas_pct") @db.Decimal(5, 2)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idCliente, idClienteDepartamento])
+  @@index([idCliente])
+  @@index([idClienteDepartamento])
+  @@map("cliente_factores")
+}
+
+/// Lista de precios por Cliente+Departamento (F8-E4, R20a). Folio por empresa (A3/A9, secuencia
+/// "lista-precios"). Los factores son un SNAPSHOT copiado de `ClienteFactores` al crearla, EDITABLE
+/// en la lista (decisión (a); recalcular precios al cambiarlos). Los renglones pueden venir de varios
+/// proyectos del mismo departamento. La lista NO dispara pedidos (propuesta §5). Restrict hacia
+/// empresa/cliente/departamento/estado.
+model ListaPrecios {
+  id                    Int                 @id @default(autoincrement())
+  folio                 BigInt
+  idEmpresa             Int                 @map("id_empresa")
+  empresa               Empresa             @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  idCliente             Int                 @map("id_cliente")
+  cliente               Cliente             @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  idClienteDepartamento Int                 @map("id_cliente_departamento")
+  clienteDepartamento   ClienteDepartamento @relation(fields: [idClienteDepartamento], references: [id], onDelete: Restrict)
+  fecha                 DateTime            @db.Date
+  idEstadoLista         Int                 @map("id_estado_lista")
+  estadoLista           EstadoLista         @relation(fields: [idEstadoLista], references: [id], onDelete: Restrict)
+  /// SNAPSHOT de los factores del cliente al crear la lista (editables aquí). La fórmula (E4) los usa.
+  margenPct             Decimal             @map("margen_pct") @db.Decimal(5, 2)
+  descuentosPct         Decimal             @map("descuentos_pct") @db.Decimal(5, 2)
+  regaliasPct           Decimal             @map("regalias_pct") @db.Decimal(5, 2)
+  costoVentasPct        Decimal             @map("costo_ventas_pct") @db.Decimal(5, 2)
+  notas                 String?             @db.Text
+
+  lineas ListaPreciosLinea[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@index([idCliente])
+  @@index([idClienteDepartamento])
+  @@index([idEstadoLista])
+  @@map("lista_precios")
+}
+
+/// Renglón de una lista de precios (F8-E4). Un desarrollo por lista (`@@unique([idLista,
+/// idDesarrollo])`), con la versión CONGELADA del precosto usada (`idPrecosto`), su costo snapshot,
+/// el precio calculado por la fórmula y el precio APROBADO por el dueño (`precioAprobado`, lo escribe
+/// SOLO quien tiene `listas.aprobar`: aprueba el calculado o teclea otro). Cascade hacia la lista;
+/// Restrict hacia Desarrollo/Precosto.
+model ListaPreciosLinea {
+  id              Int          @id @default(autoincrement())
+  idLista         Int          @map("id_lista")
+  lista           ListaPrecios @relation(fields: [idLista], references: [id], onDelete: Cascade)
+  idDesarrollo    Int          @map("id_desarrollo")
+  desarrollo      Desarrollo   @relation(fields: [idDesarrollo], references: [id], onDelete: Restrict)
+  idPrecosto      Int          @map("id_precosto")
+  precosto        Precosto     @relation(fields: [idPrecosto], references: [id], onDelete: Restrict)
+  costoUnit       Decimal      @map("costo_unit") @db.Decimal(12, 2)
+  precioCalculado Decimal      @map("precio_calculado") @db.Decimal(12, 2)
+  precioAprobado  Decimal?     @map("precio_aprobado") @db.Decimal(12, 2)
+  aprobadoPorId   String?      @map("aprobado_por_id")
+  aprobadoEn      DateTime?    @map("aprobado_en")
+
+  eventos NegociacionEvento[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idLista, idDesarrollo])
+  @@index([idDesarrollo])
+  @@index([idPrecosto])
+  @@map("lista_precios_linea")
+}
+
+/// Evento de negociación por renglón (F8-E5, R20b) — bitácora INMUTABLE (A7: se agrega, jamás se
+/// edita). Registra una ronda (versión anterior/nueva del precosto + precio anterior/nuevo) o un
+/// acuerdo SIN re-costeo (solo precio acordado + nota). Cascade hacia el renglón de lista; Restrict
+/// hacia los precostos referidos (nunca borra la versión que la ronda registró).
+model NegociacionEvento {
+  id                 Int               @id @default(autoincrement())
+  idListaLinea       Int               @map("id_lista_linea")
+  listaLinea         ListaPreciosLinea @relation(fields: [idListaLinea], references: [id], onDelete: Cascade)
+  idPrecostoAnterior Int?              @map("id_precosto_anterior")
+  precostoAnterior   Precosto?         @relation("NegociacionPrecostoAnterior", fields: [idPrecostoAnterior], references: [id], onDelete: Restrict)
+  idPrecostoNuevo    Int?              @map("id_precosto_nuevo")
+  precostoNuevo      Precosto?         @relation("NegociacionPrecostoNuevo", fields: [idPrecostoNuevo], references: [id], onDelete: Restrict)
+  precioAnterior     Decimal?          @map("precio_anterior") @db.Decimal(12, 2)
+  precioNuevo        Decimal?          @map("precio_nuevo") @db.Decimal(12, 2)
+  /// Qué se cambió/acordó (texto). Inmutable.
+  acuerdo            String            @db.Text
+
+  registradoPorId String?  @map("registrado_por_id")
+  registradoEn    DateTime @default(now()) @map("registrado_en")
+
+  @@index([idListaLinea])
+  @@index([idPrecostoAnterior])
+  @@index([idPrecostoNuevo])
+  @@map("negociacion_evento")
 }
