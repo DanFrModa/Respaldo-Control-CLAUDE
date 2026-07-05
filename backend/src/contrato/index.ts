@@ -606,6 +606,38 @@ export {
   type ModeloAvioMedidasSalida,
 } from './esquemas/modelo-avio-talla.js';
 
+// ── Desarrollo: proyectos + desarrollos (Módulo 15, F8-E2; D13/R16) ──
+export {
+  ESTADOS_DESARROLLO,
+  esquemaEstadoDesarrollo,
+  esquemaDesarrolloCrear,
+  esquemaDesarrolloEditar,
+  esquemaDesarrolloApagarCuerpo,
+  esquemaDesarrolloSalida,
+  type EstadoDesarrolloClave,
+  type DatosDesarrolloCrear,
+  type DatosDesarrolloEditar,
+  type DatosDesarrolloApagar,
+  type DesarrolloSalida,
+} from './esquemas/desarrollo.js';
+
+export {
+  esquemaProyectoCrear,
+  esquemaProyectoEditar,
+  esquemaConteosDesarrollo,
+  esquemaProyectoSalida,
+  esquemaProyectoDetalleSalida,
+  esquemaProyectosQuery,
+  esquemaProyectosPagina,
+  type DatosProyectoCrear,
+  type DatosProyectoEditar,
+  type ConteosDesarrollo,
+  type ProyectoSalida,
+  type ProyectoDetalleSalida,
+  type ProyectosQuery,
+  type ProyectosPagina,
+} from './esquemas/proyecto.js';
+
 export {
   DIRECCIONES_MOVIMIENTO,
   ETIQUETAS_DIRECCION_MOVIMIENTO,

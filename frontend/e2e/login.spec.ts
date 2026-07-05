@@ -60,6 +60,8 @@ test.describe('Inicio de sesión', () => {
       'Catálogos',
       'Producción',
       'Inventarios',
+      // Desarrollo (F8-E2): módulo nuevo entre Modelos y Pedidos.
+      'Desarrollo',
       'Ruta Crítica',
       // Sub-vista del concentrado (F5-E7): aparece como enlace del menú con su permiso.
       'Concentrado planeado vs real',

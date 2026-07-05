@@ -59837,6 +59837,2100 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/proyectos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar proyectos de desarrollo */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Texto a buscar (folio o nombre del proyecto). */
+          busqueda?: string;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por departamento del cliente. */
+          idClienteDepartamento?: number;
+          /** @description Filtra por temporada. */
+          idTemporada?: number;
+          /** @description Incluye los proyectos archivados ("true"/"false"). */
+          incluirArchivados?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'folio' | 'nombre' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página de proyectos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Proyectos de la página. */
+              datos: {
+                /** @description Id interno del proyecto. */
+                id: number;
+                /** @description Folio consecutivo por empresa. */
+                folio: number;
+                /** @description Empresa dueña del proyecto y del folio. */
+                idEmpresa: number;
+                /** @description Cliente del proyecto. */
+                idCliente: number;
+                /** @description Nombre del cliente (para la UI). */
+                cliente: string;
+                /** @description Departamento del cliente. */
+                idClienteDepartamento: number;
+                /** @description Nombre del departamento (para la UI). */
+                departamento: string;
+                /** @description Nombre/tema del proyecto. */
+                nombre: string;
+                /** @description Temporada del proyecto, o null. */
+                idTemporada: number | null;
+                /** @description Nombre de la temporada, o null. */
+                temporada: string | null;
+                /** @description Notas del proyecto, o null. */
+                notas: string | null;
+                /** @description Archivado (borrado suave reversible). */
+                archivado: boolean;
+                /** @description Conteo de desarrollos del proyecto por estado derivado. */
+                conteos: {
+                  /** @description Total de desarrollos (incluidos los apagados). */
+                  total: number;
+                  /** @description Desarrollos en desarrollo (default). */
+                  enDesarrollo: number;
+                  /** @description Desarrollos con ≥1 precosto congelado. */
+                  cotizado: number;
+                  /** @description Desarrollos en ≥1 lista de precios. */
+                  enLista: number;
+                  /** @description Desarrollos ligados a ≥1 orden de producción. */
+                  ligadoProduccion: number;
+                  /** @description Desarrollos apagados (borrado suave). */
+                  apagado: number;
+                };
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+              /** @description Total de proyectos que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Crear un proyecto de desarrollo */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Cliente dueño del proyecto. */
+            idCliente: number;
+            /** @description Departamento del cliente (debe pertenecer al cliente). */
+            idClienteDepartamento: number;
+            /** @description Nombre/tema del proyecto (joggers, Disney, básicos…). */
+            nombre: string;
+            /** @description Temporada del proyecto (opcional). */
+            idTemporada?: number;
+            /** @description Notas del proyecto (opcional). */
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Detalle de un proyecto de desarrollo (con sus desarrollos). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno del proyecto. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña del proyecto y del folio. */
+              idEmpresa: number;
+              /** @description Cliente del proyecto. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento (para la UI). */
+              departamento: string;
+              /** @description Nombre/tema del proyecto. */
+              nombre: string;
+              /** @description Temporada del proyecto, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Notas del proyecto, o null. */
+              notas: string | null;
+              /** @description Archivado (borrado suave reversible). */
+              archivado: boolean;
+              /** @description Conteo de desarrollos del proyecto por estado derivado. */
+              conteos: {
+                /** @description Total de desarrollos (incluidos los apagados). */
+                total: number;
+                /** @description Desarrollos en desarrollo (default). */
+                enDesarrollo: number;
+                /** @description Desarrollos con ≥1 precosto congelado. */
+                cotizado: number;
+                /** @description Desarrollos en ≥1 lista de precios. */
+                enLista: number;
+                /** @description Desarrollos ligados a ≥1 orden de producción. */
+                ligadoProduccion: number;
+                /** @description Desarrollos apagados (borrado suave). */
+                apagado: number;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+              /** @description Desarrollos del proyecto (con su estado derivado). */
+              desarrollos: {
+                /** @description Id del desarrollo. */
+                id: number;
+                /** @description Proyecto al que pertenece. */
+                idProyecto: number;
+                /** @description Modelo del catálogo (nuestro número). */
+                idModelo: number;
+                /** @description Código del modelo (nuestro número, para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para el modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Notas del desarrollo, o null. */
+                notas: string | null;
+                /**
+                 * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+                 * @enum {string}
+                 */
+                estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+                /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+                apagado: boolean;
+                /** @description Cuándo se apagó (ISO 8601), o null. */
+                apagadoEn: string | null;
+                /** @description Quién lo apagó, o null. */
+                apagadoPorId: string | null;
+                /** @description Motivo por el que se apagó, o null. */
+                motivoApagado: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proyectos/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener un proyecto de desarrollo */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proyecto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Detalle de un proyecto de desarrollo (con sus desarrollos). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno del proyecto. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña del proyecto y del folio. */
+              idEmpresa: number;
+              /** @description Cliente del proyecto. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento (para la UI). */
+              departamento: string;
+              /** @description Nombre/tema del proyecto. */
+              nombre: string;
+              /** @description Temporada del proyecto, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Notas del proyecto, o null. */
+              notas: string | null;
+              /** @description Archivado (borrado suave reversible). */
+              archivado: boolean;
+              /** @description Conteo de desarrollos del proyecto por estado derivado. */
+              conteos: {
+                /** @description Total de desarrollos (incluidos los apagados). */
+                total: number;
+                /** @description Desarrollos en desarrollo (default). */
+                enDesarrollo: number;
+                /** @description Desarrollos con ≥1 precosto congelado. */
+                cotizado: number;
+                /** @description Desarrollos en ≥1 lista de precios. */
+                enLista: number;
+                /** @description Desarrollos ligados a ≥1 orden de producción. */
+                ligadoProduccion: number;
+                /** @description Desarrollos apagados (borrado suave). */
+                apagado: number;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+              /** @description Desarrollos del proyecto (con su estado derivado). */
+              desarrollos: {
+                /** @description Id del desarrollo. */
+                id: number;
+                /** @description Proyecto al que pertenece. */
+                idProyecto: number;
+                /** @description Modelo del catálogo (nuestro número). */
+                idModelo: number;
+                /** @description Código del modelo (nuestro número, para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para el modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Notas del desarrollo, o null. */
+                notas: string | null;
+                /**
+                 * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+                 * @enum {string}
+                 */
+                estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+                /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+                apagado: boolean;
+                /** @description Cuándo se apagó (ISO 8601), o null. */
+                apagadoEn: string | null;
+                /** @description Quién lo apagó, o null. */
+                apagadoPorId: string | null;
+                /** @description Motivo por el que se apagó, o null. */
+                motivoApagado: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Actualizar un proyecto de desarrollo */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proyecto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Departamento del cliente (si se omite, no se toca; debe pertenecer al cliente). */
+            idClienteDepartamento?: number;
+            /** @description Nombre/tema del proyecto (si se omite, no se toca). */
+            nombre?: string;
+            /** @description Temporada (null para vaciarla; omitir para no tocar). */
+            idTemporada?: number | null;
+            /** @description Notas (null para vaciarlas; omitir para no tocar). */
+            notas?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Detalle de un proyecto de desarrollo (con sus desarrollos). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno del proyecto. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña del proyecto y del folio. */
+              idEmpresa: number;
+              /** @description Cliente del proyecto. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento (para la UI). */
+              departamento: string;
+              /** @description Nombre/tema del proyecto. */
+              nombre: string;
+              /** @description Temporada del proyecto, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Notas del proyecto, o null. */
+              notas: string | null;
+              /** @description Archivado (borrado suave reversible). */
+              archivado: boolean;
+              /** @description Conteo de desarrollos del proyecto por estado derivado. */
+              conteos: {
+                /** @description Total de desarrollos (incluidos los apagados). */
+                total: number;
+                /** @description Desarrollos en desarrollo (default). */
+                enDesarrollo: number;
+                /** @description Desarrollos con ≥1 precosto congelado. */
+                cotizado: number;
+                /** @description Desarrollos en ≥1 lista de precios. */
+                enLista: number;
+                /** @description Desarrollos ligados a ≥1 orden de producción. */
+                ligadoProduccion: number;
+                /** @description Desarrollos apagados (borrado suave). */
+                apagado: number;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+              /** @description Desarrollos del proyecto (con su estado derivado). */
+              desarrollos: {
+                /** @description Id del desarrollo. */
+                id: number;
+                /** @description Proyecto al que pertenece. */
+                idProyecto: number;
+                /** @description Modelo del catálogo (nuestro número). */
+                idModelo: number;
+                /** @description Código del modelo (nuestro número, para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para el modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Notas del desarrollo, o null. */
+                notas: string | null;
+                /**
+                 * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+                 * @enum {string}
+                 */
+                estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+                /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+                apagado: boolean;
+                /** @description Cuándo se apagó (ISO 8601), o null. */
+                apagadoEn: string | null;
+                /** @description Quién lo apagó, o null. */
+                apagadoPorId: string | null;
+                /** @description Motivo por el que se apagó, o null. */
+                motivoApagado: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/proyectos/{id}/archivar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Archivar un proyecto (borrado suave reversible) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proyecto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Detalle de un proyecto de desarrollo (con sus desarrollos). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno del proyecto. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña del proyecto y del folio. */
+              idEmpresa: number;
+              /** @description Cliente del proyecto. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento (para la UI). */
+              departamento: string;
+              /** @description Nombre/tema del proyecto. */
+              nombre: string;
+              /** @description Temporada del proyecto, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Notas del proyecto, o null. */
+              notas: string | null;
+              /** @description Archivado (borrado suave reversible). */
+              archivado: boolean;
+              /** @description Conteo de desarrollos del proyecto por estado derivado. */
+              conteos: {
+                /** @description Total de desarrollos (incluidos los apagados). */
+                total: number;
+                /** @description Desarrollos en desarrollo (default). */
+                enDesarrollo: number;
+                /** @description Desarrollos con ≥1 precosto congelado. */
+                cotizado: number;
+                /** @description Desarrollos en ≥1 lista de precios. */
+                enLista: number;
+                /** @description Desarrollos ligados a ≥1 orden de producción. */
+                ligadoProduccion: number;
+                /** @description Desarrollos apagados (borrado suave). */
+                apagado: number;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+              /** @description Desarrollos del proyecto (con su estado derivado). */
+              desarrollos: {
+                /** @description Id del desarrollo. */
+                id: number;
+                /** @description Proyecto al que pertenece. */
+                idProyecto: number;
+                /** @description Modelo del catálogo (nuestro número). */
+                idModelo: number;
+                /** @description Código del modelo (nuestro número, para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para el modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Notas del desarrollo, o null. */
+                notas: string | null;
+                /**
+                 * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+                 * @enum {string}
+                 */
+                estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+                /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+                apagado: boolean;
+                /** @description Cuándo se apagó (ISO 8601), o null. */
+                apagadoEn: string | null;
+                /** @description Quién lo apagó, o null. */
+                apagadoPorId: string | null;
+                /** @description Motivo por el que se apagó, o null. */
+                motivoApagado: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proyectos/{id}/desarchivar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Desarchivar un proyecto */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proyecto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Detalle de un proyecto de desarrollo (con sus desarrollos). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id interno del proyecto. */
+              id: number;
+              /** @description Folio consecutivo por empresa. */
+              folio: number;
+              /** @description Empresa dueña del proyecto y del folio. */
+              idEmpresa: number;
+              /** @description Cliente del proyecto. */
+              idCliente: number;
+              /** @description Nombre del cliente (para la UI). */
+              cliente: string;
+              /** @description Departamento del cliente. */
+              idClienteDepartamento: number;
+              /** @description Nombre del departamento (para la UI). */
+              departamento: string;
+              /** @description Nombre/tema del proyecto. */
+              nombre: string;
+              /** @description Temporada del proyecto, o null. */
+              idTemporada: number | null;
+              /** @description Nombre de la temporada, o null. */
+              temporada: string | null;
+              /** @description Notas del proyecto, o null. */
+              notas: string | null;
+              /** @description Archivado (borrado suave reversible). */
+              archivado: boolean;
+              /** @description Conteo de desarrollos del proyecto por estado derivado. */
+              conteos: {
+                /** @description Total de desarrollos (incluidos los apagados). */
+                total: number;
+                /** @description Desarrollos en desarrollo (default). */
+                enDesarrollo: number;
+                /** @description Desarrollos con ≥1 precosto congelado. */
+                cotizado: number;
+                /** @description Desarrollos en ≥1 lista de precios. */
+                enLista: number;
+                /** @description Desarrollos ligados a ≥1 orden de producción. */
+                ligadoProduccion: number;
+                /** @description Desarrollos apagados (borrado suave). */
+                apagado: number;
+              };
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+              /** @description Desarrollos del proyecto (con su estado derivado). */
+              desarrollos: {
+                /** @description Id del desarrollo. */
+                id: number;
+                /** @description Proyecto al que pertenece. */
+                idProyecto: number;
+                /** @description Modelo del catálogo (nuestro número). */
+                idModelo: number;
+                /** @description Código del modelo (nuestro número, para la UI). */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Número del cliente para el modelo, o null. */
+                numeroCliente: string | null;
+                /** @description Notas del desarrollo, o null. */
+                notas: string | null;
+                /**
+                 * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+                 * @enum {string}
+                 */
+                estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+                /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+                apagado: boolean;
+                /** @description Cuándo se apagó (ISO 8601), o null. */
+                apagadoEn: string | null;
+                /** @description Quién lo apagó, o null. */
+                apagadoPorId: string | null;
+                /** @description Motivo por el que se apagó, o null. */
+                motivoApagado: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de alta (ISO 8601).
+                 */
+                creadoEn: string;
+                /** @description Id del usuario que lo creó. */
+                creadoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha de la última modificación (ISO 8601).
+                 */
+                modificadoEn: string;
+                /** @description Id del último usuario que lo modificó. */
+                modificadoPorId: string | null;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/proyectos/{idProyecto}/desarrollos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Agregar un desarrollo a un proyecto */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proyecto. */
+          idProyecto: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Modelo del catálogo que se desarrolla (Modelo.id). */
+            idModelo: number;
+            /** @description Número del cliente para este modelo (el "otro número"; opcional). */
+            numeroCliente?: string;
+            /** @description Notas del desarrollo (opcional). */
+            notas?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Desarrollo (un modelo dentro de un proyecto de desarrollo). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del desarrollo. */
+              id: number;
+              /** @description Proyecto al que pertenece. */
+              idProyecto: number;
+              /** @description Modelo del catálogo (nuestro número). */
+              idModelo: number;
+              /** @description Código del modelo (nuestro número, para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Número del cliente para el modelo, o null. */
+              numeroCliente: string | null;
+              /** @description Notas del desarrollo, o null. */
+              notas: string | null;
+              /**
+               * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+               * @enum {string}
+               */
+              estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+              /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+              apagado: boolean;
+              /** @description Cuándo se apagó (ISO 8601), o null. */
+              apagadoEn: string | null;
+              /** @description Quién lo apagó, o null. */
+              apagadoPorId: string | null;
+              /** @description Motivo por el que se apagó, o null. */
+              motivoApagado: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/desarrollos/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Obtener un desarrollo */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Desarrollo (un modelo dentro de un proyecto de desarrollo). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del desarrollo. */
+              id: number;
+              /** @description Proyecto al que pertenece. */
+              idProyecto: number;
+              /** @description Modelo del catálogo (nuestro número). */
+              idModelo: number;
+              /** @description Código del modelo (nuestro número, para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Número del cliente para el modelo, o null. */
+              numeroCliente: string | null;
+              /** @description Notas del desarrollo, o null. */
+              notas: string | null;
+              /**
+               * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+               * @enum {string}
+               */
+              estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+              /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+              apagado: boolean;
+              /** @description Cuándo se apagó (ISO 8601), o null. */
+              apagadoEn: string | null;
+              /** @description Quién lo apagó, o null. */
+              apagadoPorId: string | null;
+              /** @description Motivo por el que se apagó, o null. */
+              motivoApagado: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Actualizar un desarrollo */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Número del cliente (null para vaciarlo; omitir para no tocar). */
+            numeroCliente?: string | null;
+            /** @description Notas del desarrollo (null para vaciarlas; omitir para no tocar). */
+            notas?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Desarrollo (un modelo dentro de un proyecto de desarrollo). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del desarrollo. */
+              id: number;
+              /** @description Proyecto al que pertenece. */
+              idProyecto: number;
+              /** @description Modelo del catálogo (nuestro número). */
+              idModelo: number;
+              /** @description Código del modelo (nuestro número, para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Número del cliente para el modelo, o null. */
+              numeroCliente: string | null;
+              /** @description Notas del desarrollo, o null. */
+              notas: string | null;
+              /**
+               * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+               * @enum {string}
+               */
+              estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+              /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+              apagado: boolean;
+              /** @description Cuándo se apagó (ISO 8601), o null. */
+              apagadoEn: string | null;
+              /** @description Quién lo apagó, o null. */
+              apagadoPorId: string | null;
+              /** @description Motivo por el que se apagó, o null. */
+              motivoApagado: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/desarrollos/{id}/apagar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apagar un desarrollo (borrado suave con motivo) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo por el que se apaga el desarrollo (queda auditado). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Desarrollo (un modelo dentro de un proyecto de desarrollo). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del desarrollo. */
+              id: number;
+              /** @description Proyecto al que pertenece. */
+              idProyecto: number;
+              /** @description Modelo del catálogo (nuestro número). */
+              idModelo: number;
+              /** @description Código del modelo (nuestro número, para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Número del cliente para el modelo, o null. */
+              numeroCliente: string | null;
+              /** @description Notas del desarrollo, o null. */
+              notas: string | null;
+              /**
+               * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+               * @enum {string}
+               */
+              estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+              /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+              apagado: boolean;
+              /** @description Cuándo se apagó (ISO 8601), o null. */
+              apagadoEn: string | null;
+              /** @description Quién lo apagó, o null. */
+              apagadoPorId: string | null;
+              /** @description Motivo por el que se apagó, o null. */
+              motivoApagado: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/desarrollos/{id}/reactivar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reactivar un desarrollo apagado */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Desarrollo (un modelo dentro de un proyecto de desarrollo). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del desarrollo. */
+              id: number;
+              /** @description Proyecto al que pertenece. */
+              idProyecto: number;
+              /** @description Modelo del catálogo (nuestro número). */
+              idModelo: number;
+              /** @description Código del modelo (nuestro número, para la UI). */
+              codigoModelo: string;
+              /** @description Descripción del modelo, o null. */
+              descripcionModelo: string | null;
+              /** @description Número del cliente para el modelo, o null. */
+              numeroCliente: string | null;
+              /** @description Notas del desarrollo, o null. */
+              notas: string | null;
+              /**
+               * @description Estado DERIVADO del desarrollo (calculado por el dominio, no editable).
+               * @enum {string}
+               */
+              estado: 'en-desarrollo' | 'cotizado' | 'en-lista' | 'ligado-produccion' | 'apagado';
+              /** @description Borrado suave: el desarrollo se conserva pero no cuenta. */
+              apagado: boolean;
+              /** @description Cuándo se apagó (ISO 8601), o null. */
+              apagadoEn: string | null;
+              /** @description Quién lo apagó, o null. */
+              apagadoPorId: string | null;
+              /** @description Motivo por el que se apagó, o null. */
+              motivoApagado: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/usuarios': {
     parameters: {
       query?: never;

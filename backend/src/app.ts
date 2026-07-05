@@ -19,6 +19,10 @@ import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
 // en E2–E6 (su modelo de datos ya nace en la migración de E1).
 import { rutasConceptosCosto } from './api/desarrollo/conceptos-costo.rutas.js';
 import { rutasEstadosLista } from './api/desarrollo/estados-lista.rutas.js';
+// Desarrollo (Módulo 15, F8-E2): proyectos por Cliente+Departamento y sus desarrollos (un modelo
+// con dos números; estado DERIVADO). La capa previa a la cotización.
+import { rutasProyectos } from './api/desarrollo/proyectos.rutas.js';
+import { rutasDesarrollos } from './api/desarrollo/desarrollos.rutas.js';
 import { rutasTelaProveedores } from './api/telas/tela-proveedores.rutas.js';
 import { rutasClienteDepartamentos } from './api/clientes/cliente-departamentos.rutas.js';
 import { rutasInventarioAvios } from './api/inventarios/avios.rutas.js';
@@ -300,6 +304,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   await app.register(rutasTelaProveedores, { prefix: '/api' });
   await app.register(rutasClienteDepartamentos, { prefix: '/api' });
   await app.register(rutasMedidasAvioTalla, { prefix: '/api' });
+  // Desarrollo (Módulo 15, F8-E2): proyectos de desarrollo (Cliente+Departamento, folio por empresa
+  // A3/A9) y sus desarrollos (un modelo con dos números; estado DERIVADO, apagado = borrado suave con
+  // motivo). RBAC desarrollo.ver/.administrar (ya sembrados en E1).
+  await app.register(rutasProyectos, { prefix: '/api' });
+  await app.register(rutasDesarrollos, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

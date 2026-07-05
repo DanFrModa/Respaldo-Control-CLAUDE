@@ -109,7 +109,7 @@
 
 ---
 
-## F8-E2 · Proyectos de desarrollo (Cliente + Departamento) + desarrollos (R16) — ⬜ pendiente
+## F8-E2 · Proyectos de desarrollo (Cliente + Departamento) + desarrollos (R16) — ✅ (pend. verif. de Gabriel en `prueba`)
 
 **Objetivo:** El concepto central de la propuesta §2: **Proyecto = 1 cliente + 1 departamento, con nombre/tema** (varios por departamento/temporada: joggers, Disney, básicos…), agrupando **desarrollos** (cada uno un modelo con dos números: el del cliente y el nuestro). Da el "dónde vivir" a todo lo que sigue (precostos E3, listas E4/E5, liga a producción E6).
 
@@ -147,6 +147,16 @@
 - PROPUESTA §2 (concepto central) y §6 (rol Desarrollo); DECISIONES.md D13; REQUISITOS-NUEVOS.md R16
 - `backend/src/comun/secuencias.ts` (`siguienteFolio`), `frontend/src/modulos/catalogo.ts` (`MODULOS_MENU`), patrón lista+detalle en `docs/modulos/patron-crud.md`
 - Trampa CI en CLAUDE.md §8 (login.spec al agregar módulo al menú)
+
+**✅ Nota de cierre (2026-07-04 — pend. verif. de Gabriel en `prueba`):**
+- **1 coder + 1 reviewer independiente que APROBÓ** (sin bloqueantes). Validaciones locales verdes, confirmadas también por el lead: backend `typecheck`/`lint`/`format:check`/`test:unit` (**750**); frontend `typecheck`/`lint`/`format:check`/`test` (**498**)/`build`; OpenAPI + cliente del frontend regenerados sin diff pendiente. Integración (testcontainers) y e2e corren en CI.
+- **SIN migración, SIN permisos nuevos:** las tablas `Proyecto`/`Desarrollo`/`DesarrolloOrden` ya nacieron en la migración única de E1 y `desarrollo.ver`/`desarrollo.administrar` ya estaban sembrados. La etapa fue dominio → API → frontend + módulo nuevo al menú. (El deploy de la fase a `prueba` sigue requiriendo `SEED_ON_START=true` por lo de E1.)
+- **Dominio** (`backend/src/dominio/desarrollo/proyectos.ts` + `desarrollos.ts`): folio de proyecto por secuencia atómica (clave `proyecto`, A3/A9) dentro de la tx; validación *departamento pertenece al cliente* en el dominio (A1, `exigirDepartamentoDeCliente`); **scope por empresa (A9) en todas las lecturas y mutaciones** (verificado sin fugas por el reviewer, con tests cross-empresa); `@@unique([idProyecto, idModelo])` → `ErrorConflicto` claro; apagar/reactivar desarrollo = borrado suave con **motivo + auditoría** (quién/cuándo/por qué), archivar/desarchivar proyecto reversible; ambas actualizaciones **idempotentes** (PATCH sin cambios → no toca `modificadoEn` ni escribe bitácora).
+- **Estado del desarrollo DERIVADO** por un único helper `calcularEstadoDesarrollo` (reutilizado en los conteos, sin doble implementación ni N+1): precedencia `apagado > ligado-produccion > en-lista > cotizado > en-desarrollo`. Se implementó COMPLETO aunque en E2 las relaciones de precosto/lista/orden están vacías (se pueblan en E3/E4/E6).
+- **Frontend:** módulo **"Desarrollo"** en `MODULOS_MENU` entre Modelos y Pedidos (ícono portapapeles, permiso `desarrollo.ver`; **es módulo del plan §5, NO sub-vista**); página lista+detalle (`frontend/src/modulos/desarrollo/`) con diálogos de proyecto/desarrollo, apagar-con-motivo (patrón "touched") y toggle "mostrar apagados" + reactivar. **"Modelo nuevo" lo orquesta el front** en dos pasos (crea Modelo con el endpoint existente → crea el desarrollo con el `id`); el backend recibe `idModelo` (no duplica la creación de modelos; un modelo huérfano ante fallo del 2º paso es aceptable por diseño).
+- **Lecciones de CI aplicadas en la misma etapa:** `login.spec` agrega `'Desarrollo'` a los módulos representativos; `catalogo.test.ts` ajustó los conteos (14→15 planeados, 89→90 total). E2E `desarrollo.spec.ts` ejercita el ciclo crear→agregar desarrollo→apagar con motivo→reactivar.
+- **Menor conocido (dejado a propósito):** al crear/editar proyecto NO se valida el `activo` del departamento en el dominio (el `DialogoProyecto` filtra inactivos en UX y la integridad no se rompe porque el depto sí es del cliente). Se revisita si estorba.
+- **Pendiente:** verificación de Gabriel en `prueba` (checklist de "Verificación de Gabriel" de arriba) tras el deploy con `SEED_ON_START=true`.
 
 ---
 

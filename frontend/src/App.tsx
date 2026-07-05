@@ -73,6 +73,7 @@ import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdene
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
+import { ProyectosPagina } from '@/modulos/desarrollo/ProyectosPagina';
 import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
 import { CorteSemanalPagina } from '@/modulos/produccion/CorteSemanalPagina';
 import { EntregaClientePagina } from '@/modulos/produccion/EntregaClientePagina';
@@ -159,6 +160,8 @@ const router = createBrowserRouter([
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
           { path: 'pedidos', element: <PedidosPagina /> },
+          // Desarrollo (Módulo 15, F8-E2): proyectos + desarrollos (lista + detalle en la misma página).
+          { path: 'desarrollo', element: <ProyectosPagina /> },
           { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
           { path: 'produccion/ordenes', element: <OrdenesPagina /> },
           { path: 'produccion/corte', element: <CapturaCortePagina /> },
