@@ -1,0 +1,2538 @@
+<title>CONTROL v2 — Rediseño (verde, denso)</title>
+<style>
+  /* ============================================================
+     CONTROL v2 — Prototipo de rediseño
+     Dirección: ERP denso "tabla-first", verde de marca, riel oscuro.
+     Tokens en :root; oscuro por @media y por data-theme (toggle).
+     ============================================================ */
+
+  :root {
+    /* Superficies (claro) — neutros con leve sesgo verde */
+    --bg: #f4f7f4;
+    --panel: #ffffff;
+    --panel-2: #fafbfa;
+    --hover: #f1f5f2;
+    --text: #101c16;
+    --muted: #5b6b62;
+    --faint: #8b988f;
+    --border: #e3e9e4;
+    --border-strong: #d2dbd5;
+
+    /* Marca — verde pino/esmeralda (NO teal) */
+    --brand: #0e7c47;
+    --brand-hover: #0b6a3c;
+    --brand-fg: #ffffff;
+    --brand-soft: #e2f2e9;
+    --brand-soft-fg: #0b6a3c;
+    --brand-bright: #16a05c;
+
+    /* Riel de navegación — verde muy oscuro (igual en ambos temas) */
+    --rail-bg: #0b1712;
+    --rail-panel: #0e1c15;
+    --rail-fg: #aebfb5;
+    --rail-fg-strong: #ecf3ef;
+    --rail-active-fg: #55e39a;
+    --rail-active-bg: rgba(52, 217, 138, 0.12);
+    --rail-border: rgba(255, 255, 255, 0.07);
+
+    /* Semánticos (separados del verde de marca) */
+    --ok: #12864e;      --ok-soft: #e3f2e9;
+    --warn: #b3790c;    --warn-soft: #f8efd6;
+    --crit: #cf3b3f;    --crit-soft: #fbe3e3;
+    --info: #2b7f9e;    --info-soft: #e0eef3;
+
+    --shadow: 0 1px 2px rgba(10, 30, 20, 0.04), 0 8px 24px -12px rgba(10, 30, 20, 0.18);
+    --shadow-lg: 0 24px 60px -20px rgba(8, 24, 16, 0.35);
+    --radius: 9px;
+    --radius-sm: 6px;
+    --ff-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --ff-mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0a120e;
+      --panel: #0f1813;
+      --panel-2: #12211a;
+      --hover: #16261d;
+      --text: #e7efe9;
+      --muted: #93a69b;
+      --faint: #6f8377;
+      --border: #1d2b23;
+      --border-strong: #28382e;
+
+      --brand: #22b56c;
+      --brand-hover: #2cc678;
+      --brand-fg: #04140c;
+      --brand-soft: #12291d;
+      --brand-soft-fg: #63e4a4;
+      --brand-bright: #34d98a;
+
+      --ok: #3ac081;      --ok-soft: #12291d;
+      --warn: #d9a441;    --warn-soft: #2c2510;
+      --crit: #e5686b;    --crit-soft: #2e1717;
+      --info: #5ab4d1;    --info-soft: #112630;
+
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px -14px rgba(0,0,0,.6);
+      --shadow-lg: 0 30px 70px -24px rgba(0,0,0,.7);
+    }
+  }
+  /* Overrides explícitos del toggle (ganan a la media query en ambos sentidos) */
+  :root[data-theme="light"] {
+    --bg:#f4f7f4; --panel:#fff; --panel-2:#fafbfa; --hover:#f1f5f2;
+    --text:#101c16; --muted:#5b6b62; --faint:#8b988f; --border:#e3e9e4; --border-strong:#d2dbd5;
+    --brand:#0e7c47; --brand-hover:#0b6a3c; --brand-fg:#fff; --brand-soft:#e2f2e9; --brand-soft-fg:#0b6a3c; --brand-bright:#16a05c;
+    --ok:#12864e; --ok-soft:#e3f2e9; --warn:#b3790c; --warn-soft:#f8efd6; --crit:#cf3b3f; --crit-soft:#fbe3e3; --info:#2b7f9e; --info-soft:#e0eef3;
+    --shadow:0 1px 2px rgba(10,30,20,.04),0 8px 24px -12px rgba(10,30,20,.18); --shadow-lg:0 24px 60px -20px rgba(8,24,16,.35);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0a120e; --panel:#0f1813; --panel-2:#12211a; --hover:#16261d;
+    --text:#e7efe9; --muted:#93a69b; --faint:#6f8377; --border:#1d2b23; --border-strong:#28382e;
+    --brand:#22b56c; --brand-hover:#2cc678; --brand-fg:#04140c; --brand-soft:#12291d; --brand-soft-fg:#63e4a4; --brand-bright:#34d98a;
+    --ok:#3ac081; --ok-soft:#12291d; --warn:#d9a441; --warn-soft:#2c2510; --crit:#e5686b; --crit-soft:#2e1717; --info:#5ab4d1; --info-soft:#112630;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -14px rgba(0,0,0,.6); --shadow-lg:0 30px 70px -24px rgba(0,0,0,.7);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--ff-sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection { background: color-mix(in srgb, var(--brand) 30%, transparent); }
+  button { font-family: inherit; }
+  h1,h2,h3 { margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .num { font-variant-numeric: tabular-nums; }
+  .mono { font-family: var(--ff-mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- App shell ---------- */
+  .app {
+    display: grid;
+    grid-template-columns: var(--rail-w, 216px) 1fr;
+    height: 100svh;
+    overflow: hidden;
+    transition: grid-template-columns .22s cubic-bezier(.4,0,.2,1);
+  }
+  .app.rail-collapsed { --rail-w: 62px; }
+
+  /* ---------- Riel ---------- */
+  .rail {
+    background: var(--rail-bg);
+    color: var(--rail-fg);
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--rail-border);
+    overflow: hidden;
+  }
+  .rail-head {
+    display: flex; align-items: center; gap: 10px;
+    height: 52px; padding: 0 12px 0 14px;
+    border-bottom: 1px solid var(--rail-border);
+  }
+  .logo {
+    width: 30px; height: 30px; border-radius: 8px; flex: none;
+    display: grid; place-items: center;
+    background: linear-gradient(150deg, var(--brand-bright), var(--brand));
+    color: #04140c; box-shadow: 0 4px 12px -4px rgba(34,181,108,.6);
+  }
+  .logo svg { width: 17px; height: 17px; }
+  .brand-word { display: flex; flex-direction: column; line-height: 1.05; white-space: nowrap; overflow: hidden; }
+  .brand-word b { color: var(--rail-fg-strong); font-size: 14px; letter-spacing: .12em; font-weight: 700; }
+  .brand-word span { color: var(--rail-fg); font-size: 10px; letter-spacing: .16em; text-transform: uppercase; opacity: .7; }
+  .rail-collapsed .brand-word, .rail-collapsed .rail-group-label, .rail-collapsed .nav-item span,
+  .rail-collapsed .rail-user-meta, .rail-collapsed .nav-badge,
+  .rail-collapsed .nav-caret, .rail-collapsed .nav-children { display: none; }
+  .rail-collapsed .nav-parent { justify-content: center; }
+  .rail-collapsed .rail-head { padding: 0; justify-content: center; }
+
+  .rail-scroll { flex: 1; overflow-y: auto; padding: 8px 8px 12px; scrollbar-width: thin; }
+  .rail-scroll::-webkit-scrollbar { width: 8px; }
+  .rail-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 8px; }
+  .rail-group-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .13em;
+    color: #6a7d72; padding: 14px 10px 5px; font-weight: 600;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px;
+    width: 100%; border: 0; background: transparent; cursor: pointer;
+    color: var(--rail-fg); text-align: left;
+    padding: 7px 10px; border-radius: 8px; font-size: 13px; position: relative;
+    transition: background .12s, color .12s;
+  }
+  .rail-collapsed .nav-item { justify-content: center; padding: 9px 0; }
+  .nav-item svg { width: 17px; height: 17px; flex: none; opacity: .9; }
+  .nav-item span { flex: 1; white-space: nowrap; overflow: hidden; }
+  .nav-item:hover { background: rgba(255,255,255,.05); color: var(--rail-fg-strong); }
+  .nav-item.active { background: var(--rail-active-bg); color: var(--rail-active-fg); }
+  .nav-item.active svg { opacity: 1; color: var(--rail-active-fg); }
+  .nav-item.active::before {
+    content:""; position:absolute; left:-8px; top:50%; transform: translateY(-50%);
+    width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--brand-bright);
+  }
+  .nav-badge {
+    margin-left: auto; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 20px;
+    background: rgba(255,255,255,.09); color: var(--rail-fg-strong);
+  }
+  .nav-badge.hot { background: color-mix(in srgb, var(--crit) 30%, transparent); color: #ffb4b4; }
+
+  /* Desplegables del menú */
+  .nav-caret { display: inline-flex; align-items: center; color: var(--rail-fg); opacity: .55; transition: transform .18s; }
+  .nav-caret svg { width: 14px; height: 14px; }
+  .nav-caret.open { transform: rotate(90deg); }
+  .nav-parent.has-active { color: var(--rail-fg-strong); }
+  .nav-children { display: flex; flex-direction: column; gap: 1px; max-height: 0; overflow: hidden; transition: max-height .22s ease; position: relative; margin-left: 18px; }
+  .nav-children.open { max-height: 360px; }
+  .nav-children::before { content: ""; position: absolute; left: 3px; top: 4px; bottom: 4px; width: 1px; background: var(--rail-border); }
+  .nav-child {
+    display: flex; align-items: center; gap: 9px; width: 100%; border: 0; background: transparent; cursor: pointer;
+    color: var(--rail-fg); text-align: left; padding: 6px 10px 6px 14px; border-radius: 8px; font-size: 12.5px;
+    transition: background .12s, color .12s;
+  }
+  .nav-child:hover { background: rgba(255,255,255,.05); color: var(--rail-fg-strong); }
+  .nav-child.active { background: var(--rail-active-bg); color: var(--rail-active-fg); }
+  .nav-child span:not(.nav-dot):not(.nav-badge) { flex: 1; white-space: nowrap; overflow: hidden; }
+  .nav-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .45; flex: none; }
+  .nav-child.active .nav-dot { opacity: 1; }
+
+  .rail-foot { border-top: 1px solid var(--rail-border); padding: 8px; }
+  .rail-user {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: transparent; border: 0; cursor: pointer; padding: 6px 8px; border-radius: 8px; color: var(--rail-fg);
+  }
+  .rail-user:hover { background: rgba(255,255,255,.05); }
+  .rail-collapsed .rail-user { justify-content: center; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; color: #04140c;
+    background: linear-gradient(150deg, #7bd6a6, #2f9c66);
+  }
+  .rail-user-meta { text-align: left; line-height: 1.2; overflow: hidden; }
+  .rail-user-meta b { color: var(--rail-fg-strong); font-size: 12.5px; font-weight: 600; display: block; white-space: nowrap; }
+  .rail-user-meta span { color: var(--rail-fg); font-size: 11px; opacity: .7; }
+
+  /* ---------- Zona principal ---------- */
+  .main { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+  .topbar {
+    height: 52px; flex: none; display: flex; align-items: center; gap: 12px;
+    padding: 0 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+  }
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent;
+    color: var(--muted); cursor: pointer; display: grid; place-items: center; flex: none;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .icon-btn:hover { background: var(--hover); color: var(--text); border-color: var(--border); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .crumbs { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); min-width: 0; }
+  .crumbs b { color: var(--text); font-weight: 600; }
+  .crumbs .sep { opacity: .4; }
+
+  .searchbox {
+    margin-left: auto; display: flex; align-items: center; gap: 8px; cursor: text;
+    width: min(340px, 34vw); height: 34px; padding: 0 10px; border-radius: 9px;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--faint);
+    transition: border-color .12s, background .12s;
+  }
+  .searchbox:hover { border-color: var(--border-strong); }
+  .searchbox svg { width: 15px; height: 15px; }
+  .searchbox span { flex: 1; font-size: 12.5px; }
+  .kbd {
+    font-family: var(--ff-mono); font-size: 11px; padding: 1px 6px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  }
+  .company {
+    display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border-radius: 9px;
+    background: var(--brand-soft); color: var(--brand-soft-fg); border: 1px solid transparent; font-weight: 600; font-size: 12.5px;
+  }
+  .company .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); }
+
+  .content { flex: 1; overflow-y: auto; position: relative; }
+  .content-pad { padding: 20px 22px 40px; max-width: 1500px; }
+
+  .page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 18px; }
+  .page-head h1 { font-size: 21px; font-weight: 680; }
+  .page-head .sub { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  .page-head .actions { margin-left: auto; display: flex; gap: 8px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px;
+    border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+    border: 1px solid var(--border-strong); background: var(--panel); color: var(--text);
+    transition: background .12s, border-color .12s, transform .05s;
+  }
+  .btn:hover { background: var(--hover); }
+  .btn:active { transform: translateY(1px); }
+  .btn svg { width: 15px; height: 15px; }
+  .btn.primary { background: var(--brand); color: var(--brand-fg); border-color: transparent; box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--brand) 70%, transparent); }
+  .btn.primary:hover { background: var(--brand-hover); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+  .btn.ghost:hover { background: var(--hover); color: var(--text); }
+
+  /* ---------- KPIs ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 13px 14px;
+    box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; position: relative; overflow: hidden;
+  }
+  .kpi .label { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+  .kpi .val { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .kpi .val small { font-size: 14px; color: var(--muted); font-weight: 600; }
+  .kpi .foot { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+  .trend { display: inline-flex; align-items: center; gap: 3px; font-weight: 600; }
+  .trend.up { color: var(--ok); }
+  .trend.down { color: var(--crit); }
+  .trend svg { width: 12px; height: 12px; }
+  .kpi .spark { position: absolute; right: 10px; bottom: 10px; opacity: .9; }
+
+  .grid-2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; align-items: start; }
+  @media (max-width: 1080px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .card-head h3 { font-size: 13.5px; font-weight: 650; }
+  .card-head .hint { color: var(--faint); font-size: 11.5px; margin-left: auto; }
+
+  /* ---------- Toolbar de tabla ---------- */
+  .toolbar {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
+    border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted);
+    font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap;
+  }
+  .chip:hover { border-color: var(--border-strong); color: var(--text); }
+  .chip.active { background: var(--brand-soft); color: var(--brand-soft-fg); border-color: transparent; font-weight: 600; }
+  .chip svg { width: 14px; height: 14px; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; background: var(--panel-2); color: var(--muted); font-size: 12px; padding: 6px 11px; cursor: pointer; }
+  .seg button.on { background: var(--brand); color: var(--brand-fg); font-weight: 600; }
+  .tool-search {
+    display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 9px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--faint); width: 200px;
+  }
+  .tool-search svg { width: 14px; height: 14px; }
+  .tool-search input { border: 0; background: transparent; outline: none; color: var(--text); font-size: 12.5px; width: 100%; font-family: inherit; }
+  .tool-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .count { color: var(--faint); font-size: 12px; }
+
+  /* ---------- Tabla densa ---------- */
+  .table-wrap { overflow-x: auto; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.data thead th {
+    position: sticky; top: 0; z-index: 2; background: var(--panel-2);
+    text-align: left; font-weight: 600; color: var(--muted); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .04em; padding: 8px 12px;
+    border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  table.data thead th.r, table.data td.r { text-align: right; }
+  table.data tbody td { padding: 7px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.data tbody tr { cursor: pointer; }
+  table.data tbody tr:hover { background: var(--hover); }
+  table.data tbody tr.sel { background: var(--brand-soft); }
+  table.data tbody tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+  .cell-strong { font-weight: 600; color: var(--text); }
+  .cell-code { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); }
+  .cell-sub { color: var(--faint); font-size: 11.5px; }
+  .cellflex { display: flex; align-items: center; gap: 9px; }
+  .thumb {
+    width: 30px; height: 30px; border-radius: 7px; flex: none; display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 11px;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; border: 1px solid transparent;
+  }
+  .badge .d { width: 6px; height: 6px; border-radius: 50%; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok); }
+  .badge.ok .d { background: var(--ok); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .badge.warn .d { background: var(--warn); }
+  .badge.crit { background: var(--crit-soft); color: var(--crit); }
+  .badge.crit .d { background: var(--crit); }
+  .badge.info { background: var(--info-soft); color: var(--info); }
+  .badge.info .d { background: var(--info); }
+  .badge.neutral { background: var(--hover); color: var(--muted); }
+  .badge.neutral .d { background: var(--faint); }
+
+  .swatches { display: inline-flex; }
+  .swatches i { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--panel); margin-left: -5px; display: inline-block; }
+  .swatches i:first-child { margin-left: 0; }
+  .more-colors { font-size: 11px; color: var(--faint); margin-left: 4px; }
+
+  .bar-mini { display: inline-flex; align-items: center; gap: 8px; }
+  .bar-track { width: 62px; height: 6px; border-radius: 4px; background: var(--hover); overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; background: var(--brand); }
+
+  /* ---------- Ruta crítica: lista lateral ---------- */
+  .rc-list { padding: 6px; }
+  .rc-item { display: flex; align-items: center; gap: 11px; padding: 9px 8px; border-radius: 8px; }
+  .rc-item:hover { background: var(--hover); }
+  .rc-sem { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .rc-main { min-width: 0; flex: 1; }
+  .rc-main b { font-size: 12.5px; font-weight: 600; display: block; }
+  .rc-main span { font-size: 11.5px; color: var(--muted); }
+  .rc-when { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+
+  /* barras horizontales (indicadores) */
+  .hbars { display: flex; flex-direction: column; gap: 11px; padding: 13px 15px; }
+  .hbar { display: grid; grid-template-columns: 130px 1fr 54px; align-items: center; gap: 11px; font-size: 12px; }
+  .hbar .hlbl { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar .htrack { height: 9px; border-radius: 5px; background: var(--hover); overflow: hidden; }
+  .hbar .hfill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--brand), var(--brand-bright)); }
+  .hbar .hval { text-align: right; font-family: var(--ff-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+
+  /* donut simple */
+  .donut { width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .donut::after { content: ""; width: 74px; height: 74px; border-radius: 50%; background: var(--panel); }
+  .donut .dc { position: absolute; text-align: center; }
+  .donut .dc b { font-size: 20px; font-weight: 700; }
+  .donut .dc span { font-size: 10.5px; color: var(--muted); display: block; }
+  .legend { display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+  .legend .lg { display: flex; align-items: center; gap: 8px; }
+  .legend .lg i { width: 10px; height: 10px; border-radius: 3px; }
+  .legend .lg .lv { margin-left: auto; font-family: var(--ff-mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  /* cadena de proceso (Ruta Crítica) */
+  .chain { display: inline-flex; align-items: center; }
+  .chain .node { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+  .chain .lnk { width: 13px; height: 2px; flex: none; }
+
+  /* tabs internas */
+  .tabs { display: inline-flex; gap: 2px; background: var(--panel-2); padding: 3px; border-radius: 9px; border: 1px solid var(--border); }
+  .tabs button { border: 0; background: transparent; color: var(--muted); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 7px; cursor: pointer; }
+  .tabs button.on { background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
+
+  /* mini chart de barras */
+  .chartbars { display: flex; align-items: flex-end; gap: 7px; height: 92px; padding: 10px 14px 4px; }
+  .chartbars .b { flex: 1; background: linear-gradient(180deg, var(--brand-bright), var(--brand)); border-radius: 4px 4px 2px 2px; min-height: 4px; position: relative; }
+  .chartbars .b.dim { background: var(--border-strong); }
+  .chartbars .b:hover::after {
+    content: attr(data-v); position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+    margin-bottom: 5px; background: var(--text); color: var(--bg); font-size: 10.5px; padding: 2px 6px; border-radius: 5px; white-space: nowrap;
+  }
+  .chartlabels { display: flex; gap: 7px; padding: 0 14px 12px; }
+  .chartlabels span { flex: 1; text-align: center; font-size: 10.5px; color: var(--faint); }
+
+  /* ---------- Placeholder módulos ---------- */
+  .placeholder { display: grid; place-items: center; min-height: 60vh; text-align: center; }
+  .placeholder .ph-ico { width: 56px; height: 56px; border-radius: 14px; background: var(--brand-soft); color: var(--brand); display: grid; place-items: center; margin: 0 auto 14px; }
+  .placeholder .ph-ico svg { width: 26px; height: 26px; }
+  .placeholder h2 { font-size: 17px; margin-bottom: 6px; }
+  .placeholder p { color: var(--muted); max-width: 380px; margin: 0 auto; }
+
+  /* ---------- Cajón de detalle (slide-over) ---------- */
+  .scrim {
+    position: absolute; inset: 0; background: rgba(6, 18, 12, 0.42); opacity: 0; pointer-events: none;
+    transition: opacity .2s; z-index: 30;
+  }
+  .scrim.show { opacity: 1; pointer-events: auto; }
+  .drawer {
+    position: absolute; top: 0; right: 0; height: 100%; width: min(460px, 92vw);
+    background: var(--panel); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg);
+    transform: translateX(102%); transition: transform .26s cubic-bezier(.4,0,.2,1); z-index: 31;
+    display: flex; flex-direction: column;
+  }
+  .drawer.show { transform: none; }
+  .drawer-head { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; gap: 12px; align-items: flex-start; }
+  .drawer-body { overflow-y: auto; padding: 4px 18px 24px; }
+  .drawer-foot { margin-top: auto; border-top: 1px solid var(--border); padding: 12px 18px; display: flex; gap: 8px; }
+  .dt-hero { width: 46px; height: 46px; border-radius: 11px; flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .dsec { margin-top: 18px; }
+  .dsec > h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 9px; font-weight: 600; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+  .field .k { font-size: 11px; color: var(--faint); margin-bottom: 2px; }
+  .field .v { font-size: 13px; font-weight: 550; }
+  .bom { border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .bom-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; font-size: 12.5px; border-bottom: 1px solid var(--border); }
+  .bom-row:last-child { border-bottom: 0; }
+  .bom-tag { width: 26px; height: 26px; border-radius: 7px; flex: none; display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700; }
+  .bom-row .grow { flex: 1; min-width: 0; }
+  .bom-row .qty { font-family: var(--ff-mono); font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  /* matriz color x talla mini */
+  .matrix { overflow-x: auto; border: 1px solid var(--border); border-radius: 9px; }
+  .matrix table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  .matrix th, .matrix td { padding: 6px 9px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; }
+  .matrix th { background: var(--panel-2); font-weight: 600; color: var(--muted); font-size: 11px; }
+  .matrix td:first-child, .matrix th:first-child { text-align: left; position: sticky; left: 0; background: var(--panel-2); }
+  .matrix td { font-family: var(--ff-mono); font-variant-numeric: tabular-nums; }
+  .matrix td.z { color: var(--faint); }
+  .matrix tr:last-child td { border-bottom: 0; }
+  .matrix tr th:last-child, .matrix td:last-child { border-right: 0; }
+
+  /* ---------- Command palette ---------- */
+  .cmdk-scrim { position: fixed; inset: 0; background: rgba(6,18,12,.5); backdrop-filter: blur(2px); z-index: 90; display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+  .cmdk-scrim.show { display: flex; }
+  .cmdk { width: min(560px, 92vw); background: var(--panel); border: 1px solid var(--border-strong); border-radius: 14px; box-shadow: var(--shadow-lg); overflow: hidden; }
+  .cmdk-input { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .cmdk-input svg { width: 18px; height: 18px; color: var(--muted); }
+  .cmdk-input input { border: 0; outline: 0; background: transparent; font-size: 15px; color: var(--text); width: 100%; font-family: inherit; }
+  .cmdk-list { max-height: 320px; overflow-y: auto; padding: 6px; }
+  .cmdk-sec { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 10px 10px 5px; font-weight: 600; }
+  .cmdk-row { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .cmdk-row:hover, .cmdk-row.hl { background: var(--brand-soft); color: var(--brand-soft-fg); }
+  .cmdk-row svg { width: 16px; height: 16px; opacity: .8; }
+  .cmdk-row .r { margin-left: auto; font-size: 11px; color: var(--faint); }
+
+  /* ---------- Órdenes: centro de comando (split lista + detalle) ---------- */
+  .op-split { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(360px, 1fr); gap: 14px; align-items: start; }
+  .op-list { overflow: hidden; }
+  .op-list .table-wrap { max-height: calc(100svh - 268px); overflow: auto; }
+  table.data.op { font-size: 12px; }
+  table.data.op td { padding: 6px 10px; }
+  table.data.op th { padding: 7px 10px; }
+  .op-detail { position: sticky; top: 2px; max-height: calc(100svh - 96px); overflow-y: auto; padding: 0; }
+  @media (max-width: 1120px) { .op-split { grid-template-columns: 1fr; } .op-detail { position: static; max-height: none; } .op-list .table-wrap { max-height: 460px; } }
+
+  .opd-head { display: flex; gap: 12px; align-items: flex-start; padding: 15px 16px 13px; border-bottom: 1px solid var(--border); }
+  .opd-hero { width: 46px; height: 46px; border-radius: 11px; flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; font-family: var(--ff-mono); background: linear-gradient(150deg, var(--brand-bright), var(--brand)); }
+  .opd-title { display: flex; align-items: center; gap: 8px; }
+  .opd-title h2 { font-size: 16px; font-weight: 680; }
+  .opd-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 12px; border-bottom: 1px solid var(--border); }
+  .opd-act { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 4px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 600; text-align: center; transition: background .12s, color .12s, border-color .12s; }
+  .opd-act:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+  .opd-act svg { width: 17px; height: 17px; }
+  .opd-body { padding: 2px 16px 18px; }
+  .lockchip { display: inline-flex; align-items: center; gap: 3px; font-size: 9px; color: var(--warn); background: var(--warn-soft); padding: 1px 5px; border-radius: 20px; font-weight: 600; text-transform: none; letter-spacing: 0; vertical-align: middle; }
+  .lockchip svg { width: 10px; height: 10px; }
+  .opd-photo-inner { border: 1.5px dashed var(--border-strong); border-radius: 11px; height: 118px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: var(--faint); background: var(--panel-2); font-size: 11.5px; }
+  .opd-photo-inner svg { width: 22px; height: 22px; opacity: .5; }
+  .opd-photo-inner b { color: var(--muted); font-family: var(--ff-mono); font-size: 12px; }
+  .matrix .mtot td { font-weight: 700; border-top: 2px solid var(--border-strong); background: var(--panel-2); }
+
+  /* Detalle: bloque superior fijo (encabezado + botones) */
+  .opd-top { position: sticky; top: 0; z-index: 6; background: var(--panel); border-bottom: 1px solid var(--border); }
+  /* Precios editables + auditoría */
+  .mini-edit { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; font-size: 10px; font-weight: 600; color: var(--brand); background: transparent; border: 0; cursor: pointer; padding: 0; vertical-align: middle; }
+  .mini-edit:hover { text-decoration: underline; }
+  .mini-edit svg { width: 11px; height: 11px; }
+  .tag-real { font-size: 9px; font-weight: 700; color: var(--ok); background: var(--ok-soft); padding: 1px 5px; border-radius: 20px; vertical-align: middle; }
+  .tag-ref { font-size: 9px; font-weight: 700; color: var(--muted); background: var(--hover); padding: 1px 5px; border-radius: 20px; vertical-align: middle; }
+  .audit { font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+  .audit-hint { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 11px; }
+  .audit-hint svg { width: 13px; height: 13px; flex: none; }
+
+  /* Combobox con búsqueda por teclado (proveedores homónimos) */
+  .combo { position: relative; }
+  .combo-input { width: 100%; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: inherit; outline: none; }
+  .combo-input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+  .combo-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 9px; box-shadow: var(--shadow-lg); max-height: 200px; overflow-y: auto; padding: 4px; display: none; }
+  .combo-list.show { display: block; }
+  .combo-opt { padding: 7px 9px; border-radius: 6px; font-size: 12.5px; cursor: pointer; }
+  .combo-opt:hover { background: var(--brand-soft); color: var(--brand-soft-fg); }
+  .combo-empty { padding: 8px 9px; font-size: 12px; color: var(--faint); }
+
+  /* ---------- Pedidos: tabs de mes, filtros, tabla agrupada, totales ---------- */
+  .monthbar { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 14px; }
+  .mtab {
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    font-size: 12.5px; font-weight: 600; padding: 7px 15px; border-radius: 8px; cursor: pointer;
+    transition: background .12s, color .12s, border-color .12s;
+  }
+  .mtab:hover { border-color: var(--border-strong); color: var(--text); }
+  .mtab.on { background: var(--brand); color: var(--brand-fg); border-color: transparent; box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--brand) 70%, transparent); }
+
+  .minisel {
+    height: 30px; padding: 0 28px 0 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--text); font-size: 12px; font-family: inherit; cursor: pointer; appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b988f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 8px center;
+  }
+  .minisel:hover { border-color: var(--border-strong); }
+
+  table.data.pedidos tbody { border-bottom: 2px solid var(--border); }
+  table.data.pedidos tbody:last-child { border-bottom: 0; }
+  tr.grp { cursor: pointer; }
+  tr.grp > td { background: var(--panel-2); padding-top: 9px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
+  tr.grp:hover > td { background: var(--hover); }
+  tr.grp b { color: var(--text); font-size: 13px; font-weight: 700; }
+  .grp-tog { display: inline-flex; align-items: center; gap: 8px; }
+  .grp-tog .chev { display: inline-flex; color: var(--muted); transform: rotate(90deg); transition: transform .18s; }
+  .grp-tog .chev svg { width: 15px; height: 15px; }
+  tbody.collapsed .grp-tog .chev { transform: rotate(0deg); }
+  tbody.collapsed tr.sub { display: none; }
+  .grp-count { font-size: 11px; color: var(--faint); font-weight: 600; background: var(--hover); padding: 1px 7px; border-radius: 20px; }
+  tr.sub > td:first-child { padding-left: 14px; }
+  .sub-mod { position: relative; padding-left: 22px; color: var(--text); font-size: 12.5px; }
+  .sub-mod::before { content: ""; position: absolute; left: 7px; top: 50%; width: 8px; height: 1px; background: var(--border-strong); }
+  tr.sub.sel > td { background: var(--brand-soft); }
+  tr.sub.sel > td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+
+  .totbar { display: flex; align-items: center; gap: 26px; padding: 12px 16px; border-top: 1px solid var(--border); background: var(--panel-2); flex-wrap: wrap; }
+  .totitem { display: flex; flex-direction: column; gap: 0; }
+  .totitem span { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); font-weight: 600; }
+  .totitem b { font-size: 15px; font-weight: 700; }
+  .totitem.grow { flex: 1; min-width: 0; }
+
+  /* ---------- Avance de producción (Proceso) ---------- */
+  .proc-scrim { position: fixed; inset: 0; background: rgba(6,18,12,.5); backdrop-filter: blur(2px); z-index: 97; display: none; }
+  .proc-scrim.show { display: block; }
+  .proc { position: absolute; top: 0; right: 0; height: 100%; width: min(960px, 97vw); background: var(--bg); border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); display: flex; flex-direction: column; transform: translateX(102%); transition: transform .26s cubic-bezier(.4,0,.2,1); }
+  .proc-scrim.show .proc { transform: none; }
+  .proc-head { display: flex; align-items: center; gap: 14px; padding: 15px 20px; border-bottom: 1px solid var(--border); background: var(--panel); }
+  .proc-head .ph-hero { width: 46px; height: 46px; border-radius: 11px; flex: none; display: grid; place-items: center; color: #fff; font-weight: 700; font-family: var(--ff-mono); background: linear-gradient(150deg, var(--brand-bright), var(--brand)); }
+  .proc-head h2 { font-size: 17px; font-weight: 680; }
+  .proc-head .ph-meta { display: flex; gap: 14px; margin-top: 2px; font-size: 12px; color: var(--muted); }
+  .proc-head .ph-meta b { color: var(--text); font-family: var(--ff-mono); }
+  .proc-body { flex: 1; overflow-y: auto; padding: 18px 20px 28px; }
+
+  .proc-steps { display: flex; margin-bottom: 16px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .proc-step { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 6px; background: transparent; border: 0; border-bottom: 2px solid transparent; cursor: pointer; transition: background .12s; }
+  .proc-step + .proc-step { border-left: 1px solid var(--border); }
+  .proc-step:hover { background: var(--hover); }
+  .proc-step .ps-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border-strong); }
+  .proc-step.done .ps-dot { background: var(--ok); }
+  .proc-step.partial .ps-dot { background: var(--warn); }
+  .proc-step .ps-l { font-size: 11.5px; font-weight: 600; color: var(--muted); text-align: center; }
+  .proc-step .ps-n { font-size: 11px; font-family: var(--ff-mono); color: var(--faint); }
+  .proc-step.on { border-bottom-color: var(--brand); background: var(--brand-soft); }
+  .proc-step.on .ps-l { color: var(--brand-soft-fg); }
+
+  .proc-stage { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .proc-stage-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+  .proc-stage-head h3 { font-size: 14px; font-weight: 650; }
+  .proc-note { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--info); background: var(--info-soft); padding: 3px 9px; border-radius: 20px; font-weight: 600; }
+  .proc-note svg { width: 12px; height: 12px; }
+  .proc-empty { padding: 24px; text-align: center; color: var(--faint); font-size: 12.5px; }
+
+  .proc-capture { background: var(--panel-2); border-bottom: 1px solid var(--border); padding: 14px; }
+  .pc-row { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .pc-row.t4 { grid-template-columns: 140px 1fr 1fr 1fr; }
+  .pc-row label { display: flex; flex-direction: column; gap: 5px; }
+  .pc-row .ffk { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .pc-row input, .pc-row select { height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: inherit; outline: none; }
+  .pc-row input:focus, .pc-row select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+  .proc-matrix { overflow-x: auto; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); }
+  .proc-matrix table { border-collapse: collapse; width: 100%; }
+  .proc-matrix th, .proc-matrix td { padding: 5px 7px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-align: center; }
+  .proc-matrix th { background: var(--panel-2); font-size: 11px; color: var(--muted); font-weight: 600; }
+  .proc-matrix td:first-child, .proc-matrix th:first-child { text-align: left; white-space: nowrap; }
+  .proc-matrix tr:last-child td { border-bottom: 0; }
+  .proc-matrix th:last-child, .proc-matrix td:last-child { border-right: 0; }
+  .procq { width: 52px; height: 30px; text-align: center; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--panel-2); color: var(--text); font-family: var(--ff-mono); font-size: 12px; outline: none; }
+  .procq:focus { border-color: var(--brand); background: var(--panel); }
+  .pc-actions { display: flex; align-items: center; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+  .pc-lock { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .pc-lock svg { width: 12px; height: 12px; }
+  .pc-total { font-family: var(--ff-mono); font-weight: 700; color: var(--brand); }
+
+  .proc-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin-top: 16px; }
+  .psum { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .psum span { font-size: 10px; text-transform: uppercase; color: var(--faint); font-weight: 600; letter-spacing: .04em; }
+  .psum b { display: block; font-size: 17px; font-weight: 700; margin-top: 1px; }
+  .psum small { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .proc-summary-title { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 18px 0 2px; }
+
+  /* ---------- Modal de formulario ---------- */
+  .modal-scrim { position: fixed; inset: 0; background: rgba(6,18,12,.5); backdrop-filter: blur(2px); z-index: 95; display: none; align-items: flex-start; justify-content: center; padding: 7vh 16px 16px; }
+  .modal-scrim.show { display: flex; }
+  .modal { width: min(560px, 95vw); background: var(--panel); border: 1px solid var(--border-strong); border-radius: 16px; box-shadow: var(--shadow-lg); overflow: hidden; display: flex; flex-direction: column; max-height: 86vh; }
+  .modal-head { display: flex; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid var(--border); }
+  .modal-head h3 { font-size: 15px; font-weight: 650; flex: 1; }
+  .modal-body { padding: 18px; overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  .modal-foot { border-top: 1px solid var(--border); padding: 13px 18px; display: flex; gap: 8px; justify-content: flex-end; }
+  .ff { display: flex; flex-direction: column; gap: 6px; }
+  .ff.col2 { grid-column: span 2; }
+  .ffk { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .ff input, .ff select {
+    height: 36px; padding: 0 11px; border-radius: 9px; border: 1px solid var(--border-strong);
+    background: var(--panel-2); color: var(--text); font-size: 13px; font-family: inherit; outline: none; width: 100%;
+    transition: border-color .12s, box-shadow .12s;
+  }
+  .ff input::placeholder { color: var(--faint); }
+  .ff input:focus, .ff select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 18%, transparent); }
+  .ff select {
+    appearance: none; padding-right: 30px; cursor: pointer;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b988f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 9px center;
+  }
+
+  /* fila recién agregada */
+  @keyframes flashRow { 0% { background: var(--brand-soft); } 100% { background: transparent; } }
+  .data tbody tr.just-added { animation: flashRow 2.1s ease; }
+  .data tbody tr.just-added td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+
+  /* toast */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 12.5px; font-weight: 600;
+    box-shadow: var(--shadow-lg); z-index: 99; transition: opacity .2s, transform .2s; display:flex; align-items:center; gap:8px; }
+  .toast svg { width: 15px; height: 15px; color: var(--brand-bright); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .banner {
+    margin: 0 0 16px; display: flex; align-items: center; gap: 10px; padding: 9px 13px; border-radius: 10px;
+    background: var(--info-soft); color: var(--info); font-size: 12.5px; border: 1px solid transparent;
+  }
+  .banner svg { width: 16px; height: 16px; flex: none; }
+  .banner b { color: var(--info); }
+
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 0 1fr; }
+    .searchbox { width: auto; }
+    .searchbox span, .company span { display: none; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .modal-body { grid-template-columns: 1fr; }
+    .ff.col2 { grid-column: span 1; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="app" id="app">
+  <!-- ============ RIEL ============ -->
+  <aside class="rail">
+    <div class="rail-head">
+      <div class="logo" title="MJD">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>
+      </div>
+      <div class="brand-word"><b>CONTROL</b><span>Marilyn · MJD</span></div>
+    </div>
+    <nav class="rail-scroll" id="nav"></nav>
+    <div class="rail-foot">
+      <button class="rail-user">
+        <span class="avatar">DM</span>
+        <span class="rail-user-meta"><b>Daniel Masri</b><span>Administrador</span></span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ============ PRINCIPAL ============ -->
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn" id="railToggle" title="Contraer menú (⌘B)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+      </button>
+      <div class="crumbs" id="crumbs"></div>
+      <button class="searchbox" id="openCmdk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Buscar orden, modelo, cliente…</span>
+        <span class="kbd">⌘K</span>
+      </button>
+      <div class="company"><span class="dot"></span><span>FR Moda SA de CV</span></div>
+      <button class="icon-btn" title="Alertas de Ruta Crítica" style="position:relative">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span style="position:absolute;top:5px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--crit);border:1.5px solid var(--panel)"></span>
+      </button>
+      <button class="icon-btn" id="themeToggle" title="Cambiar tema"></button>
+    </header>
+
+    <div class="content" id="content">
+      <div class="content-pad" id="view"></div>
+
+      <!-- Cajón de detalle -->
+      <div class="scrim" id="scrim"></div>
+      <aside class="drawer" id="drawer"></aside>
+    </div>
+  </div>
+</div>
+
+<!-- Command palette -->
+<div class="cmdk-scrim" id="cmdkScrim">
+  <div class="cmdk" role="dialog" aria-label="Buscador global">
+    <div class="cmdk-input">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="cmdkInput" placeholder="Ir a un módulo, buscar una orden…" autocomplete="off">
+      <span class="kbd">esc</span>
+    </div>
+    <div class="cmdk-list" id="cmdkList"></div>
+  </div>
+</div>
+
+<!-- Avance de producción (Proceso) -->
+<div class="proc-scrim" id="procScrim"><div class="proc" id="procPanel"></div></div>
+
+<!-- Modal de formulario (alta de registros) -->
+<div class="modal-scrim" id="modalScrim">
+  <form class="modal" id="modalForm" autocomplete="off">
+    <div class="modal-head">
+      <h3 id="modalTitle"></h3>
+      <button type="button" class="icon-btn" id="modalClose" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn ghost" id="modalCancel">Cancelar</button>
+      <button type="submit" class="btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>Guardar</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Íconos (lucide, inline)
+   ============================================================ */
+const P = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const IC = {
+  resumen: P('<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>'),
+  modelos: P('<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>'),
+  pedidos: P('<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>'),
+  ordenes: P('<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>'),
+  produccion: P('<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88"/><path d="M14.47 14.48 20 20"/><path d="M8.12 8.12 12 12"/>'),
+  compras: P('<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>'),
+  rc: P('<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>'),
+  inventarios: P('<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>'),
+  costos: P('<line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'),
+  indicadores: P('<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>'),
+  calidad: P('<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>'),
+  proveedores: P('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'),
+  usuarios: P('<path d="M18 21a8 8 0 0 0-16 0"/><circle cx="10" cy="8" r="5"/><path d="M22 20c0-3.37-2-6.5-4-8a5 5 0 0 0-.45-8.3"/>'),
+  telas: P('<path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>'),
+  sun: P('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/>'),
+  moon: P('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>'),
+  plus: P('<path d="M5 12h14M12 5v14"/>'),
+  filter: P('<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>'),
+  download: P('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>'),
+  arrowUp: P('<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>'),
+  arrowDown: P('<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>'),
+  check: P('<path d="M20 6 9 17l-5-5"/>'),
+  info: P('<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>'),
+  edit: P('<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>'),
+  printer: P('<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V2h12v7M6 14h12v8H6z"/>'),
+  chevron: P('<path d="m9 18 6-6-6-6"/>'),
+  layers: P('<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>'),
+  notas: P('<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v5h5"/><path d="M10 9H8M16 13H8M16 17H8"/>'),
+  lock: P('<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+  refresh: P('<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>'),
+};
+
+/* ============================================================
+   Datos del menú (agrupados, con permisos simulados)
+   ============================================================ */
+/* Menú con grupos, módulos y desplegables (2 niveles). Un padre con `hijos`
+   SOLO despliega; el hijo navega. Estructura propuesta 4-jul-2026 (Finanzas
+   aparte de Clientes/Proveedores; Compras solo en Inventarios). */
+const NAV = [
+  { grupo: null, items: [ { clave:'resumen', titulo:'Resumen', icono:IC.resumen } ] },
+  { grupo: 'Operación', items: [
+    { clave:'g-desarrollo', titulo:'Desarrollo', icono:IC.modelos, hijos:[
+      { clave:'modelos', titulo:'Modelos' },
+      { clave:'precosteos', titulo:'Pre-costeos' },
+      { clave:'cotizaciones', titulo:'Cotizaciones / Listas de precios' },
+    ]},
+    { clave:'pedidos', titulo:'Pedidos', icono:IC.pedidos, badge:'18' },
+    { clave:'g-produccion', titulo:'Producción', icono:IC.produccion, hijos:[
+      { clave:'ordenes', titulo:'Órdenes (OP)', badge:'47' },
+      { clave:'notas-salida', titulo:'Notas de salida' },
+    ]},
+    { clave:'g-rc', titulo:'Ruta Crítica', icono:IC.rc, badge:'5', hot:true, hijos:[
+      { clave:'rc', titulo:'Mis pendientes' },
+    ]},
+    { clave:'g-calidad', titulo:'Calidad', icono:IC.calidad, hijos:[
+      { clave:'calidad', titulo:'Auditorías' },
+      { clave:'auditores', titulo:'Auditores' },
+    ]},
+  ]},
+  { grupo: 'Inventarios', items: [
+    { clave:'inventarios', titulo:'Inventario PT', icono:IC.inventarios },
+    { clave:'telas', titulo:'Telas', icono:IC.telas },
+    { clave:'avios', titulo:'Avíos', icono:IC.layers },
+    { clave:'compras', titulo:'Compras / MRP', icono:IC.compras },
+  ]},
+  { grupo: 'Comercial', items: [
+    { clave:'g-clientes', titulo:'Clientes', icono:IC.usuarios, hijos:[
+      { clave:'clientes', titulo:'Catálogo' },
+      { clave:'listas-precios', titulo:'Listas de precios' },
+      { clave:'ventas', titulo:'Ventas' },
+    ]},
+    { clave:'proveedores', titulo:'Proveedores', icono:IC.proveedores },
+  ]},
+  { grupo: 'Finanzas', items: [
+    { clave:'cxc', titulo:'Cuentas por cobrar', icono:IC.costos },
+    { clave:'cxp', titulo:'Cuentas por pagar', icono:IC.costos },
+  ]},
+  { grupo: 'Análisis', items: [
+    { clave:'costos', titulo:'Costos', icono:IC.costos },
+    { clave:'edr', titulo:'EDR', icono:IC.indicadores },
+    { clave:'indicadores', titulo:'Indicadores', icono:IC.indicadores },
+  ]},
+  { grupo: 'Sistema', items: [
+    { clave:'g-catbase', titulo:'Catálogos base', icono:IC.telas, hijos:[
+      { clave:'colores', titulo:'Colores' },
+      { clave:'tallas', titulo:'Tallas' },
+      { clave:'temporadas', titulo:'Temporadas' },
+      { clave:'tipos-proceso', titulo:'Tipos de proceso' },
+      { clave:'almacenes', titulo:'Almacenes' },
+    ]},
+    { clave:'usuarios', titulo:'Usuarios y accesos', icono:IC.usuarios },
+  ]},
+];
+
+/* Hojas navegables (aplana padres → hijos), para títulos, buscador y placeholder. */
+const NAV_LEAVES = NAV.flatMap(g => g.items.flatMap(it =>
+  it.hijos ? it.hijos.map(h => ({ ...h, grupo: g.grupo, icono: it.icono }))
+           : [{ ...it, grupo: g.grupo }]
+));
+const TITULOS = Object.fromEntries(NAV_LEAVES.map(l => [l.clave, l.titulo]));
+
+/* ============================================================
+   Render del menú (con desplegables)
+   ============================================================ */
+const navEl = document.getElementById('nav');
+let vistaActual = 'resumen';
+const gruposAbiertos = new Set(['g-produccion']); // pre-abre uno para mostrar el anidado
+
+function renderNav() {
+  navEl.innerHTML = NAV.map(g => {
+    const lbl = g.grupo ? `<div class="rail-group-label">${g.grupo}</div>` : '';
+    const items = g.items.map(it => {
+      if (it.hijos) {
+        const hijoActivo = it.hijos.some(h => h.clave === vistaActual);
+        const abierto = gruposAbiertos.has(it.clave) || hijoActivo;
+        return `
+          <button class="nav-item nav-parent ${hijoActivo?'has-active':''}" data-toggle="${it.clave}" data-first="${it.hijos[0].clave}" title="${it.titulo}">
+            ${it.icono}<span>${it.titulo}</span>
+            ${it.badge ? `<span class="nav-badge ${it.hot?'hot':''}">${it.badge}</span>` : ''}
+            <span class="nav-caret ${abierto?'open':''}">${IC.chevron}</span>
+          </button>
+          <div class="nav-children ${abierto?'open':''}">
+            ${it.hijos.map(h => `<button class="nav-child ${h.clave===vistaActual?'active':''}" data-nav="${h.clave}">
+              <span class="nav-dot"></span><span>${h.titulo}</span>${h.badge?`<span class="nav-badge">${h.badge}</span>`:''}
+            </button>`).join('')}
+          </div>`;
+      }
+      return `
+        <button class="nav-item ${it.clave===vistaActual?'active':''}" data-nav="${it.clave}" title="${it.titulo}">
+          ${it.icono}<span>${it.titulo}</span>
+          ${it.badge ? `<span class="nav-badge ${it.hot?'hot':''}">${it.badge}</span>` : ''}
+        </button>`;
+    }).join('');
+    return lbl + items;
+  }).join('');
+  navEl.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => ir(b.dataset.nav));
+  navEl.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => {
+    if (app.classList.contains('rail-collapsed')) { ir(b.dataset.first); return; }
+    const k = b.dataset.toggle;
+    gruposAbiertos.has(k) ? gruposAbiertos.delete(k) : gruposAbiertos.add(k);
+    renderNav();
+  });
+}
+
+/* ============================================================
+   Vistas
+   ============================================================ */
+const swatch = (c) => `<i style="background:${c}"></i>`;
+const TELAS = { alg:'#5b8def', felpa:'#b06fd6', mezcl:'#e0913a', lycra:'#d94f8a', franela:'#3aa88f' };
+
+function vResumen() {
+  return `
+  <div class="page-head">
+    <div>
+      <h1>Resumen operativo</h1>
+      <div class="sub">Semana 27 · del 29 jun al 5 jul 2026 · actualizado hace 4 min</div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost">${IC.download}Exportar</button>
+      <button class="btn primary" data-add="ordenes">${IC.plus}Nueva orden</button>
+    </div>
+  </div>
+
+  <div class="kpis">
+    ${kpi('Órdenes abiertas','47','', 'up','+6', 'vs. sem. pasada')}
+    ${kpi('En producción (WIP)','12,840','pzas','up','+9%','en 9 maquileros')}
+    ${kpi('Cortado esta semana','8,120','pzas','up','+14%','meta 7,500')}
+    ${kpi('Entregas a tiempo','96.4','%','down','−1.2','RC · últimos 30 d')}
+    ${kpi('Existencia PT','58,417','pzas','up','+2.1%','3 almacenes')}
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h3>Órdenes por vencer</h3><span class="hint">semáforo de Ruta Crítica · próx. 7 días</span></div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr>
+            <th>Orden</th><th>Modelo</th><th>Cliente</th><th class="r">Pzas</th><th>Avance</th><th>Compromiso</th><th>Estado</th>
+          </tr></thead>
+          <tbody>
+            ${ordRow('OP-8841','Playera cuello redondo','Liverpool',1200,86,'Hoy','crit','Atrasada 1 etapa')}
+            ${ordRow('OP-8836','Sudadera con gorro','Coppel',2400,72,'Mañana','warn','En riesgo')}
+            ${ordRow('OP-8829','Short deportivo','Suburbia',900,54,'3 jul','warn','En riesgo')}
+            ${ordRow('OP-8850','Top halter','Shasa',600,40,'5 jul','ok','En tiempo')}
+            ${ordRow('OP-8852','Pants jogger','Sears',1500,28,'5 jul','ok','En tiempo')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="card">
+        <div class="card-head"><h3>Cortes por semana</h3><span class="hint">pzas</span></div>
+        <div class="chartbars">
+          ${[5200,6100,5800,7000,6400,7500,8120].map((v,i)=>`<div class="b ${i===6?'':''}" style="height:${Math.round(v/8120*100)}%" data-v="${v.toLocaleString('es-MX')} pzas"></div>`).join('')}
+        </div>
+        <div class="chartlabels">${['S21','S22','S23','S24','S25','S26','S27'].map(s=>`<span>${s}</span>`).join('')}</div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>Bandeja de Ruta Crítica</h3><span class="hint">a capturar hoy</span></div>
+        <div class="rc-list">
+          ${rcItem('#f0b429','Corte','OP-8836 · Sudadera','Vence hoy 18:00')}
+          ${rcItem('#cf3b3f','Envío a maquila','OP-8841 · Playera','Atrasado')}
+          ${rcItem('#12864e','Recibo estampado','OP-8820 · Top','Mañana')}
+          ${rcItem('#12864e','Auditoría AQL','OP-8815 · Pants','Mañana')}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function kpi(label, val, unit, dir, delta, foot) {
+  return `<div class="kpi">
+    <div class="label">${label}</div>
+    <div class="val num">${val}${unit?` <small>${unit}</small>`:''}</div>
+    <div class="foot">
+      <span class="trend ${dir}">${dir==='up'?IC.arrowUp:IC.arrowDown}${delta}</span>
+      <span style="color:var(--faint)">${foot}</span>
+    </div>
+  </div>`;
+}
+function ordRow(op, modelo, cliente, pzas, avance, comp, sem, estado) {
+  const semColor = sem==='crit'?'crit':sem==='warn'?'warn':'ok';
+  return `<tr>
+    <td><span class="cell-code">${op}</span></td>
+    <td class="cell-strong">${modelo}</td>
+    <td>${cliente}</td>
+    <td class="r num">${pzas.toLocaleString('es-MX')}</td>
+    <td><span class="bar-mini"><span class="bar-track"><span class="bar-fill" style="width:${avance}%"></span></span><span class="num" style="color:var(--muted);font-size:11.5px">${avance}%</span></span></td>
+    <td class="num">${comp}</td>
+    <td><span class="badge ${semColor}"><span class="d"></span>${estado}</span></td>
+  </tr>`;
+}
+function rcItem(color, etapa, orden, when) {
+  return `<div class="rc-item">
+    <span class="rc-sem" style="background:${color}"></span>
+    <span class="rc-main"><b>${etapa}</b><span>${orden}</span></span>
+    <span class="rc-when" style="color:${color}">${when}</span>
+  </div>`;
+}
+
+/* ---- Modelos (tabla-first + cajón) ---- */
+const MODELOS = [
+  ['MJD-1042','Playera cuello redondo','PV26','alg','Algodón peinado 30/1',['#111827','#ffffff','#c026d3','#0e7c47'],'S–XL',1240,'Activo','ok', 84.5],
+  ['MJD-1039','Sudadera con gorro','OI26','felpa','Felpa francesa 320g',['#1f2937','#7c3aed','#dc2626'],'S–XXL',310,'Activo','ok', 168.0],
+  ['MJD-1051','Short deportivo','PV26','mezcl','Mezclilla stretch 8oz',['#1e3a8a','#0e7c47','#111827'],'28–38',980,'Activo','ok', 96.2],
+  ['MJD-1063','Top halter','PV26','lycra','Lycra suplex 240g',['#db2777','#f59e0b','#ffffff','#111827','#0ea5e9'],'CH–G',115,'Activo','ok', 72.0],
+  ['MJD-1068','Pants jogger','OI26','felpa','Felpa perchada 300g',['#111827','#6b7280'],'S–XL',702,'Activo','ok', 142.5],
+  ['MJD-1071','Blusa manga larga','OI26','franela','Franela lavada 180g',['#fecdd3','#e5e7eb','#a3a3a3'],'CH–EG',0,'Borrador','warn', 118.9],
+  ['MJD-1074','Playera polo','PV26','alg','Piqué algodón 200g',['#0e7c47','#1e3a8a','#111827','#ffffff'],'S–XL',540,'Activo','ok', 108.0],
+  ['MJD-1080','Chamarra rompevientos','OI26','lycra','Poliéster ripstop',['#111827','#dc2626','#0ea5e9'],'S–XXL',88,'Borrador','warn', 214.0],
+];
+const TELA_NOMBRE = { alg:'Algodón', felpa:'Felpa', mezcl:'Mezclilla', lycra:'Lycra', franela:'Franela' };
+
+function vModelos() {
+  return `
+  <div class="page-head">
+    <div>
+      <h1>Modelos</h1>
+      <div class="sub">Catálogo de producto · 214 modelos · 8 mostrados</div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost">${IC.download}Exportar</button>
+      <button class="btn primary" data-add="modelos">${IC.plus}Nuevo modelo</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <div class="tool-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input placeholder="Buscar por código o nombre…">
+      </div>
+      <button class="chip active">Todos</button>
+      <button class="chip">Activos</button>
+      <button class="chip">Borrador</button>
+      <button class="chip">${IC.filter}Temporada</button>
+      <button class="chip">${IC.filter}Tela</button>
+      <div class="tool-right">
+        <span class="count">8 de 214</span>
+        <div class="seg"><button class="on">Tabla</button><button>Galería</button></div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data" id="tablaModelos">
+        <thead><tr>
+          <th>Modelo</th><th>Temporada</th><th>Tela principal</th><th>Colores</th><th>Tallas</th>
+          <th class="r">Stock PT</th><th class="r">Costo</th><th>Estado</th>
+        </tr></thead>
+        <tbody>
+          ${MODELOS.map((m,i)=>`
+          <tr data-row="${i}">
+            <td><div class="cellflex">
+              <span class="thumb" style="background:${TELAS[m[3]]}">${m[1].split(' ').map(w=>w[0]).slice(0,2).join('')}</span>
+              <div><div class="cell-strong">${m[1]}</div><div class="cell-code">${m[0]}</div></div>
+            </div></td>
+            <td><span class="badge neutral"><span class="d"></span>${m[2]}</span></td>
+            <td>${m[4]}</td>
+            <td><span class="swatches">${m[5].slice(0,4).map(swatch).join('')}</span>${m[5].length>4?`<span class="more-colors">+${m[5].length-4}</span>`:''}</td>
+            <td class="num">${m[6]}</td>
+            <td class="r num ${m[7]===0?'cell-sub':''}">${m[7].toLocaleString('es-MX')}</td>
+            <td class="r mono">$${m[10].toFixed(2)}</td>
+            <td><span class="badge ${m[9]}"><span class="d"></span>${m[8]}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function drawerModelo(i) {
+  const m = MODELOS[i];
+  const tallas = ['CH','M','G','XL'];
+  const colores = m[5].slice(0,3);
+  return `
+  <div class="drawer-head">
+    <span class="dt-hero" style="background:${TELAS[m[3]]}">${m[1].split(' ').map(w=>w[0]).slice(0,2).join('')}</span>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><h2 style="font-size:16px">${m[1]}</h2><span class="badge ${m[9]}"><span class="d"></span>${m[8]}</span></div>
+      <div class="cell-code" style="margin-top:2px">${m[0]} · Temporada ${m[2]}</div>
+    </div>
+    <button class="icon-btn" id="closeDrawer" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="dsec">
+      <h4>Ficha</h4>
+      <div class="fields">
+        <div class="field"><div class="k">Tela principal</div><div class="v">${m[4]}</div></div>
+        <div class="field"><div class="k">Rango de tallas</div><div class="v">${m[6]}</div></div>
+        <div class="field"><div class="k">Costo actual</div><div class="v mono">$${m[10].toFixed(2)}</div></div>
+        <div class="field"><div class="k">Existencia PT</div><div class="v num">${m[7].toLocaleString('es-MX')} pzas</div></div>
+      </div>
+    </div>
+
+    <div class="dsec">
+      <h4>Receta / BOM</h4>
+      <div class="bom">
+        <div class="bom-row"><span class="bom-tag" style="background:#5b8def">TE</span><div class="grow"><b>${m[4]}</b><div class="cell-sub">Tela · principal</div></div><span class="qty">0.42 kg</span></div>
+        <div class="bom-row"><span class="bom-tag" style="background:#22b56c">AV</span><div class="grow"><b>Hilo poliéster</b><div class="cell-sub">Avío · costura</div></div><span class="qty">180 m</span></div>
+        <div class="bom-row"><span class="bom-tag" style="background:#e0913a">AV</span><div class="grow"><b>Etiqueta tejida MJD</b><div class="cell-sub">Avío · marca</div></div><span class="qty">1 pza</span></div>
+        <div class="bom-row"><span class="bom-tag" style="background:#d94f8a">ES</span><div class="grow"><b>Estampado frontal 2 tintas</b><div class="cell-sub">Servicio · maquila A</div></div><span class="qty">1 aplic.</span></div>
+      </div>
+    </div>
+
+    <div class="dsec">
+      <h4>Matriz color × talla · existencia</h4>
+      <div class="matrix">
+        <table>
+          <thead><tr><th>Color</th>${tallas.map(t=>`<th>${t}</th>`).join('')}<th>Σ</th></tr></thead>
+          <tbody>
+            ${colores.map((c,ci)=>{
+              const fila = tallas.map(()=> Math.round(Math.max(0, (m[7]/12) * (0.5+Math.random()))));
+              const sum = fila.reduce((a,b)=>a+b,0);
+              return `<tr><td><span style="display:inline-flex;align-items:center;gap:7px"><i style="width:12px;height:12px;border-radius:3px;background:${c};display:inline-block;border:1px solid var(--border)"></i>Color ${ci+1}</span></td>${fila.map(v=>`<td class="${v===0?'z':''}">${v}</td>`).join('')}<td style="font-weight:700">${sum}</td></tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn ghost">${IC.printer}Ficha PDF</button>
+    <button class="btn" style="margin-left:auto">${IC.edit}Editar</button>
+    <button class="btn primary" data-add="ordenes">${IC.plus}Crear orden</button>
+  </div>`;
+}
+
+/* ---- Órdenes de producción (pantalla principal / centro de comando) ----
+   Cada OP: empresa · No. OP (consecutivo) · modelo · pedido del cliente (ref
+   "monarch") · cant. ordenada · cortada · maquilero (+n) · estampador · pedido
+   interno · OC de tela (¿ya se compró?) · mes de entrega · cliente. Al elegir
+   una OP, el panel derecho muestra encabezado, precios, matriz color×talla,
+   foto y accesos a módulos relacionados (Hab., Notas salida, O.C., RC…). */
+const OP = [
+  { emp:'FR', op:'5543', modelo:'62349', ref:'619334', ord:1494, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1527', oc:'7901', mes:'octubre', cli:'C&A' },
+  { emp:'FR', op:'5542', modelo:'62348', ref:'619333', ord:1706, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1527', oc:'7901', mes:'octubre', cli:'C&A' },
+  { emp:'FR', op:'5520', modelo:'62239', ref:'618174', ord:7214, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1521', oc:'7794', mes:'octubre', cli:'C&A' },
+  { emp:'FR', op:'5519', modelo:'62238', ref:'618173', ord:6368, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1521', oc:'7794', mes:'octubre', cli:'C&A' },
+  { emp:'FR', op:'5518', modelo:'62237', ref:'618172', ord:5410, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1521', oc:'7794', mes:'octubre', cli:'C&A' },
+  { emp:'FR', op:'5517', modelo:'62236', ref:'618171', ord:5192, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1521', oc:'7794', mes:'octubre', cli:'C&A' },
+  { emp:'FR', op:'5427', modelo:'62183', ref:'613612', ord:3059, corte:3059, maq:'Oscar', nmaq:1, est:'Fernando', ped:'1485', oc:'7654', mes:'julio',   cli:'C&A' },
+  { emp:'FR', op:'5426', modelo:'62182', ref:'613611', ord:1292, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1485', oc:'7654', mes:'agosto',  cli:'C&A' },
+  { emp:'FR', op:'5425', modelo:'62182', ref:'613610', ord:1292, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1485', oc:'7654', mes:'agosto',  cli:'C&A' },
+  { emp:'FR', op:'5424', modelo:'62182', ref:'613609', ord:1726, corte:1726, maq:'Luis',  nmaq:1, est:'Fernando', ped:'1485', oc:'7654', mes:'julio',   cli:'C&A',
+    estatus:'Completa', fecha:'23-dic-25', entrega:'04-jul-26', tela:'Felpa', pMaq:25, pApp:6, pVta:148, obs:'19-1535 TCX', etiqueta:'C&A', foto:'CHERRY ON TOP',
+    tallas:['XC','CH','M','G','XG'], colores:[ {n:'Rojo A', q:[336,336,224,112,112]}, {n:'Rojo B', q:[144,95,185,132,50]} ] },
+  { emp:'FR', op:'5423', modelo:'62181', ref:'613608', ord:1620, corte:0,    maq:'',      nmaq:0, est:'',        ped:'1485', oc:'7654', mes:'agosto',  cli:'C&A' },
+  { emp:'FR', op:'5421', modelo:'62181', ref:'613606', ord:2170, corte:2170, maq:'Oscar', nmaq:1, est:'Fernando', ped:'1485', oc:'7654', mes:'julio',   cli:'C&A' },
+  { emp:'FR', op:'5420', modelo:'62180', ref:'613605', ord:2726, corte:2726, maq:'Oscar', nmaq:1, est:'Fernando', ped:'1485', oc:'7654', mes:'julio',   cli:'C&A' },
+  { emp:'FR', op:'5382', modelo:'62173', ref:'611846', ord:3690, corte:2929, maq:'Rima',  nmaq:1, est:'',        ped:'1471', oc:'7647', mes:'abril',   cli:'C&A' },
+  { emp:'FR', op:'5381', modelo:'62172', ref:'611845', ord:3002, corte:2555, maq:'Rima',  nmaq:1, est:'',        ped:'1471', oc:'7647', mes:'abril',   cli:'C&A' },
+  { emp:'FR', op:'5380', modelo:'62171', ref:'611844', ord:2704, corte:2396, maq:'Rima',  nmaq:1, est:'',        ped:'1471', oc:'7647', mes:'abril',   cli:'C&A' },
+  { emp:'FR', op:'5379', modelo:'62170', ref:'611843', ord:2704, corte:2281, maq:'Rima',  nmaq:1, est:'',        ped:'1471', oc:'7647', mes:'junio',   cli:'C&A' },
+  { emp:'FR', op:'5325', modelo:'62124', ref:'154-40',  ord:514,  corte:520,  maq:'Bruno', nmaq:1, est:'Daniel',  ped:'1450', oc:'7519', mes:'junio',   cli:'Cklass' },
+  { emp:'FR', op:'5207', modelo:'62158', ref:'585328',  ord:1448, corte:1432, maq:'Chilian',nmaq:1,est:'',        ped:'1407', oc:'',     mes:'noviembre',cli:'C&A' },
+  { emp:'FR', op:'5206', modelo:'62157', ref:'585327',  ord:1342, corte:1337, maq:'Edmur', nmaq:1, est:'',        ped:'1407', oc:'',     mes:'noviembre',cli:'Impress' },
+  { emp:'FR', op:'5205', modelo:'62131', ref:'585329',  ord:1342, corte:1365, maq:'Rima',  nmaq:1, est:'',        ped:'1407', oc:'',     mes:'noviembre',cli:'C&A' },
+  { emp:'FR', op:'5202', modelo:'62059', ref:'A17E190', ord:1800, corte:1236, maq:'Oscar', nmaq:1, est:'Ignacio', ped:'1406', oc:'',     mes:'septiembre',cli:'Hang Ten' },
+  { emp:'FR', op:'5201', modelo:'62058', ref:'A17E210', ord:1476, corte:0,    maq:'+',     nmaq:2, est:'',        ped:'1406', oc:'',     mes:'septiembre',cli:'Hang Ten' },
+  { emp:'FR', op:'5121', modelo:'62057', ref:'A17E114', ord:564,  corte:576,  maq:'Cesar', nmaq:1, est:'Francisco',ped:'1386', oc:'',     mes:'abril',   cli:'Hang Ten' },
+  { emp:'FR', op:'5120', modelo:'62056', ref:'A17E113', ord:540,  corte:570,  maq:'Hugo',  nmaq:1, est:'Francisco',ped:'1386', oc:'',     mes:'abril',   cli:'Hang Ten' },
+  { emp:'FR', op:'5119', modelo:'62055', ref:'A17E112', ord:768,  corte:768,  maq:'Cesar', nmaq:1, est:'Gerardo',  ped:'1386', oc:'',     mes:'abril',   cli:'Hang Ten' },
+  { emp:'MF', op:'5095', modelo:'62406', ref:'154-18',  ord:512,  corte:538,  maq:'FR mod',nmaq:1, est:'Fidencio', ped:'1380', oc:'',     mes:'noviembre',cli:'Cklass' },
+];
+let opSel = Math.max(0, OP.findIndex(o => o.op === '5424'));
+const nextOpNum = () => String(Math.max(0, ...OP.map(o => parseInt(o.op,10)||0)) + 1);
+const cap = (s) => s ? s[0].toUpperCase()+s.slice(1) : s;
+const opTallas = (o) => o.tallas || ['CH','M','G','XG'];
+function opColores(o) {
+  if (o.colores) return o.colores;
+  const t = opTallas(o); const base = Math.max(1, Math.round(o.ord/(t.length*2)));
+  const mk = (f) => t.map((_,i)=> Math.max(0, Math.round(base*f*(1-i*0.12))));
+  return [ {n:'Color 1', q:mk(1.15)}, {n:'Color 2', q:mk(0.8)} ];
+}
+const opEstatus = (o) => o.estatus
+  ? ({Completa:['ok','Completa'],Cancelada:['crit','Cancelada']}[o.estatus] || ['info',o.estatus])
+  : o.corte===0 ? ['neutral','Sin cortar'] : o.corte>=o.ord ? ['ok','Cortada'] : ['warn','En proceso'];
+const colorHex = (n) => /rojo/i.test(n)?'#dc2626':/azul/i.test(n)?'#2563eb':/negro/i.test(n)?'#111827':/verde/i.test(n)?'#0e7c47':/blanco/i.test(n)?'#d1d5db':/rosa/i.test(n)?'#db2777':'#6b7280';
+const EMPRESAS_OP = { FR:'FR Moda', MF:'Marilyn Fitness' };
+
+function vOrdenes() {
+  const abiertas = OP.filter(o => opEstatus(o)[1] !== 'Completa').length;
+  return `
+  <div class="page-head">
+    <div><h1>Órdenes de producción</h1><div class="sub">Centro de operación · ${OP.length} en pantalla · ${abiertas} abiertas · filtra por OP, modelo, pedido del cliente, maquilero…</div></div>
+    <div class="actions">
+      <button class="btn ghost">${IC.refresh}Actualizar</button>
+      <button class="btn ghost">${IC.indicadores}Concentrado</button>
+      <button class="btn primary" data-add="ordenes">${IC.plus}Nueva orden</button>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px"><div class="toolbar">
+    <div class="tool-search" style="width:280px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Buscar OP, modelo o pedido del cliente…"></div>
+    <select class="minisel"><option>Cliente</option><option>C&amp;A</option><option>Hang Ten</option><option>Cklass</option><option>Impress</option></select>
+    <select class="minisel"><option>Maquilero</option><option>Oscar</option><option>Rima</option><option>Cesar</option><option>Luis</option></select>
+    <select class="minisel"><option>Estampador</option><option>Fernando</option><option>Francisco</option><option>Ignacio</option></select>
+    <select class="minisel"><option>Empresa</option><option>FR Moda</option><option>Marilyn Fitness</option></select>
+    <select class="minisel"><option>OC tela</option><option>Con OC</option><option>Sin OC</option></select>
+    <div class="tool-right"><span class="count">${OP.length} órdenes</span></div>
+  </div></div>
+
+  <div class="monthbar" style="margin-bottom:12px">
+    <span style="align-self:center;font-size:11px;color:var(--faint);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-right:2px">Mes de entrega</span>
+    ${MESES_PED.map((m,i)=>`<button class="mtab ${i===6?'on':''}">${m}</button>`).join('')}
+    <button class="mtab">Todos</button>
+  </div>
+
+  <div class="op-split">
+    <div class="card op-list">
+      <div class="table-wrap">
+        <table class="data op">
+          <thead><tr>
+            <th>Emp.</th><th>OP</th><th>Modelo</th><th>Pedido cliente</th>
+            <th class="r">Ordenada</th><th class="r">Cortada</th><th>Maquilero</th><th>Estampador</th>
+            <th class="r">P. int.</th><th>OC tela</th><th>Entrega</th><th>Cliente</th><th>Estatus</th>
+          </tr></thead>
+          <tbody>
+            ${OP.map((o,i)=>{ const [bc,bt]=opEstatus(o); return `<tr data-op="${i}" class="${i===opSel?'sel':''}">
+              <td class="cell-sub">${o.emp}</td>
+              <td class="cell-code" style="color:var(--brand);font-weight:600">${o.op}</td>
+              <td class="mono">${o.modelo}</td>
+              <td class="cell-code">${o.ref}</td>
+              <td class="r num">${o.ord.toLocaleString('es-MX')}</td>
+              <td class="r num" style="color:${o.corte===0?'var(--faint)':o.corte>=o.ord?'var(--ok)':'var(--warn)'}">${o.corte.toLocaleString('es-MX')}</td>
+              <td>${o.maq?`${o.maq}${o.nmaq>1?` <span class="grp-count">×${o.nmaq}</span>`:''}`:'<span class="cell-sub">—</span>'}</td>
+              <td>${o.est||'<span class="cell-sub">—</span>'}</td>
+              <td class="r cell-code">${o.ped}</td>
+              <td>${o.oc?`<span class="mono" style="color:var(--ok)">✓ ${o.oc}</span>`:'<span style="color:var(--warn)">falta</span>'}</td>
+              <td>${cap(o.mes)}</td>
+              <td class="cell-strong">${o.cli}</td>
+              <td><span class="badge ${bc}"><span class="d"></span>${bt}</span></td>
+            </tr>`; }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <aside class="card op-detail" id="opDetail">${opDetalle(OP[opSel])}</aside>
+  </div>`;
+}
+
+function accionOP(ic, l) { return `<button class="opd-act" onclick="opAccion('${l}')">${IC[ic]}<span>${l}</span></button>`; }
+function opAccion(l) {
+  const nav = { 'Modelo':'modelos', 'O.C.':'compras', 'Ruta crítica':'rc', 'Consumo tela':'telas' };
+  if (nav[l]) { ir(nav[l]); return; }
+  mostrarToast(l + ' — demo');
+}
+function opDetalle(o) {
+  const [bc,bt] = opEstatus(o);
+  const tallas = opTallas(o), colores = opColores(o);
+  const totCol = tallas.map((_,i)=> colores.reduce((a,c)=>a+(c.q[i]||0),0));
+  const gran = colores.reduce((a,c)=>a+c.q.reduce((x,y)=>x+y,0),0);
+  const pVta=o.pVta??148, pMaq=o.pMaq??25, pApp=o.pApp??6, tela=o.tela??'Felpa';
+  const fecha=o.fecha??'—', entrega=o.entrega??(cap(o.mes)+' 2026');
+  const nombre = (c)=>`<span style="display:inline-flex;align-items:center;gap:7px"><i style="width:11px;height:11px;border-radius:3px;background:${colorHex(c.n)};border:1px solid var(--border)"></i>${c.n}</span>`;
+  return `
+  <div class="opd-top">
+    <div class="opd-head">
+      <div class="opd-hero">${o.modelo.slice(0,3)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="opd-title"><h2>OP ${o.op}</h2><span class="badge ${bc}"><span class="d"></span>${bt}</span></div>
+        <div class="cell-code" style="margin-top:2px">Modelo ${o.modelo} · ${o.cli} · ${EMPRESAS_OP[o.emp]||o.emp}</div>
+      </div>
+    </div>
+    <div class="opd-actions">
+      ${accionOP('modelos','Modelo')}
+      ${accionOP('layers','Habilitación')}
+      ${accionOP('notas','Notas salida')}
+      ${accionOP('compras','O.C.')}
+      ${accionOP('rc','Ruta crítica')}
+      ${accionOP('telas','Consumo tela')}
+      ${accionOP('printer','Imprimir')}
+      ${accionOP('edit','Modificar')}
+    </div>
+    <button class="btn primary" style="margin:10px 12px 12px;width:calc(100% - 24px);justify-content:center" onclick="abrirProceso(opSel)">${IC.produccion}Registrar avance de producción</button>
+  </div>
+  <div class="opd-body">
+    <div class="dsec"><h4>Cantidades por color y talla · total ${gran.toLocaleString('es-MX')}</h4>
+      <div class="matrix"><table>
+        <thead><tr><th>Color</th>${tallas.map(t=>`<th>${t}</th>`).join('')}<th>Total</th></tr></thead>
+        <tbody>
+          ${colores.map(c=>`<tr><td>${nombre(c)}</td>${c.q.map(v=>`<td class="${v===0?'z':''}">${v}</td>`).join('')}<td style="font-weight:700">${c.q.reduce((a,b)=>a+b,0)}</td></tr>`).join('')}
+          <tr class="mtot"><td>Total</td>${totCol.map(v=>`<td>${v}</td>`).join('')}<td>${gran}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="dsec"><h4>Precios</h4><div class="fields">
+      <div class="field"><div class="k">Precio de venta</div><div class="v mono">$${pVta.toFixed(2)}</div></div>
+      ${precioEditable(o,'maquila')}
+      ${precioEditable(o,'aplicacion')}
+      <div class="field"><div class="k">Costo <span class="lockchip">${IC.lock}restringido</span></div><div class="v mono" style="letter-spacing:2px">•••••</div></div>
+    </div></div>
+
+    <div class="dsec"><h4>Encabezado</h4><div class="fields">
+      <div class="field"><div class="k">Fecha alta</div><div class="v">${fecha}</div></div>
+      <div class="field"><div class="k">Fecha entrega</div><div class="v">${entrega}</div></div>
+      <div class="field"><div class="k">Pedido del cliente</div><div class="v mono">${o.ref}</div></div>
+      <div class="field"><div class="k">Pedido interno</div><div class="v mono">${o.ped}-F</div></div>
+      <div class="field"><div class="k">Etiqueta / marca</div><div class="v">${o.etiqueta||o.cli}</div></div>
+      <div class="field"><div class="k">Mes de entrega</div><div class="v">${cap(o.mes)}</div></div>
+      <div class="field col2" style="grid-column:span 2"><div class="k">Observaciones</div><div class="v">${o.obs||'—'}</div></div>
+    </div></div>
+
+    <div class="dsec"><h4>Tela y compra</h4><div class="fields">
+      <div class="field"><div class="k">Tela</div><div class="v">${tela}</div></div>
+      <div class="field"><div class="k">OC de tela</div><div class="v">${o.oc?`<span class="badge ok"><span class="d"></span>Comprada · OC ${o.oc}</span>`:`<span class="badge warn"><span class="d"></span>Falta comprar</span>`}</div></div>
+      <div class="field"><div class="k">Maquilero</div><div class="v">${o.maq||'—'}${o.nmaq>1?` <span class="grp-count">×${o.nmaq}</span>`:''}</div></div>
+      <div class="field"><div class="k">Estampador / bordador</div><div class="v">${o.est||'—'}</div></div>
+    </div></div>
+
+    <div class="dsec"><h4>Foto del modelo</h4>
+      <div class="opd-photo"><div class="opd-photo-inner">${IC.modelos}<span>Foto modelo ${o.modelo}</span>${o.foto?`<b>${o.foto}</b>`:''}</div></div>
+    </div>
+  </div>`;
+}
+function precioEditable(o, tipo) {
+  const isMaq = tipo === 'maquila';
+  const ref  = isMaq ? (o.pMaq ?? 25) : (o.pApp ?? 6);
+  const real = isMaq ? o.pMaqReal : o.pAppReal;
+  const by   = isMaq ? o.pMaqBy : o.pAppBy;
+  const at   = isMaq ? o.pMaqAt : o.pAppAt;
+  const val  = (real ?? ref);
+  const label = isMaq ? 'Precio maquila' : 'Precio aplicación';
+  return `<div class="field">
+    <div class="k">${label}${PUEDE_PRECIOS?`<button class="mini-edit" onclick="abrirPrecioOP('${tipo}')">${IC.edit}editar</button>`:''}</div>
+    <div class="v mono">$${val.toFixed(2)} ${real!=null?'<span class="tag-real">real</span>':'<span class="tag-ref">referencia</span>'}</div>
+    ${by?`<div class="audit">capturó ${by} · ${at}</div>`:''}
+  </div>`;
+}
+function wireOrdenes() {
+  document.querySelectorAll('#view .op-list tbody tr').forEach(tr => {
+    tr.onclick = () => {
+      opSel = +tr.dataset.op;
+      document.querySelectorAll('#view .op-list tbody tr').forEach(x => x.classList.remove('sel'));
+      tr.classList.add('sel');
+      document.getElementById('opDetail').innerHTML = opDetalle(OP[opSel]);
+    };
+    tr.ondblclick = () => abrirProceso(+tr.dataset.op);
+  });
+}
+
+/* ============================================================
+   Avance de producción (Proceso) — movimientos por etapa,
+   multi-proveedor, captura por talla×color con candado, auto-RC.
+   ============================================================ */
+const USUARIO_ACTUAL = 'Daniel Masri';   // en real: sesión (better-auth)
+const PUEDE_PRECIOS = true;              // en real: permiso RBAC (ordenes.precio.editar)
+const CORTADORES = ['Óscar Jiménez','Óscar Hernández','Luis Ramírez','Bruno Salas','César Vega','Hugo Ortiz'];
+const MAQUILEROS = ['Óscar Jiménez','Óscar Hernández','Óscar López','Confecciones León','Maquilas del Bajío','Rima Textil','Costura Express','Textil Guerra'];
+const ESTAMPADORES = ['Estampados Rico','Serigrafía MX','DTF Pro'];
+const BORDADORES = ['Bordados Fernando','Bordados Ignacio','Bordados Francisco'];
+
+/* Combobox con búsqueda por teclado (para maquileros homónimos: Óscar J., Óscar H., …) */
+const norm = (s) => (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function comboHTML(id, opts, ph) {
+  return `<div class="combo" data-opts='${JSON.stringify(opts)}'><input class="combo-input" id="${id}" type="text" placeholder="${ph||'Escribe para buscar…'}" autocomplete="off"><div class="combo-list"></div></div>`;
+}
+function wireCombo(wrap) {
+  const input = wrap.querySelector('.combo-input'), list = wrap.querySelector('.combo-list');
+  const opts = JSON.parse(wrap.dataset.opts);
+  const pinta = () => {
+    const q = norm(input.value);
+    const f = q ? opts.filter(o => norm(o).includes(q)) : opts;
+    list.innerHTML = f.length ? f.map(o => `<div class="combo-opt">${o}</div>`).join('') : '<div class="combo-empty">Sin coincidencias</div>';
+    list.querySelectorAll('.combo-opt').forEach(el => el.onmousedown = (ev) => { ev.preventDefault(); input.value = el.textContent; list.classList.remove('show'); });
+  };
+  input.onfocus = () => { pinta(); list.classList.add('show'); };
+  input.oninput = () => { pinta(); list.classList.add('show'); };
+  input.onblur  = () => setTimeout(() => list.classList.remove('show'), 130);
+}
+function abrirPrecioOP(tipo) {
+  const o = OP[opSel];
+  const isMaq = tipo === 'maquila';
+  const ref = isMaq ? (o.pMaq ?? 25) : (o.pApp ?? 6);
+  const real = isMaq ? o.pMaqReal : o.pAppReal;
+  cerrarCajon(); cerrarCmdk();
+  modalForm.dataset.key = 'precio:' + tipo;
+  modalTitle.textContent = `Precio de ${isMaq?'maquila':'aplicación'} · OP ${o.op}`;
+  modalBody.innerHTML = `
+    <label class="ff"><span class="ffk">Precio de referencia (del modelo)</span><input value="$${(+ref).toFixed(2)}" disabled></label>
+    <label class="ff"><span class="ffk">Precio real negociado ($) *</span><input name="real" type="number" step="any" min="0" value="${real??''}" required></label>
+    <label class="ff col2"><span class="ffk">Negociado con</span>${comboHTML('precioProv', isMaq?MAQUILEROS:[...ESTAMPADORES,...BORDADORES], 'Escribe el proveedor…')}</label>
+    <label class="ff col2"><span class="ffk">Nota</span><input name="nota" type="text" placeholder="Opcional"></label>
+    <div class="ff col2 audit-hint">${IC.lock} Quedará registrado que lo capturó <b>${USUARIO_ACTUAL}</b> el ${hoyStr()}.</div>`;
+  modalScrim.classList.add('show');
+  modalBody.querySelectorAll('.combo').forEach(wireCombo);
+  setTimeout(() => { const el = modalBody.querySelector('input[name=real]'); if (el) { el.focus(); el.select(); } }, 40);
+}
+function guardarPrecio(tipo) {
+  const o = OP[opSel];
+  const real = dec((modalBody.querySelector('input[name=real]')||{}).value);
+  const prov = (document.getElementById('precioProv')||{}).value || '';
+  if (tipo === 'maquila') { o.pMaqReal = real; o.pMaqBy = USUARIO_ACTUAL; o.pMaqAt = hoyStr(); o.pMaqProv = prov; }
+  else { o.pAppReal = real; o.pAppBy = USUARIO_ACTUAL; o.pAppAt = hoyStr(); o.pAppProv = prov; }
+  cerrarForm();
+  const d = document.getElementById('opDetail'); if (d) d.innerHTML = opDetalle(o);
+  mostrarToast(`Precio actualizado · registrado por ${USUARIO_ACTUAL}`);
+}
+const ETAPAS_PROC = [
+  { k:'corte',    l:'Corte',              provL:'Cortador',  provs:CORTADORES,                    rc:'Corte' },
+  { k:'entregaM', l:'Entrega a maquila',  provL:'Maquilero', provs:MAQUILEROS,                    rc:'Envío a maquila' },
+  { k:'reciboM',  l:'Recibo de maquila',  provL:'Maquilero', provs:MAQUILEROS,                    rc:'Recibo de maquila' },
+  { k:'entregaA', l:'Entrega aplicación', provL:'Aplicador', provs:[...ESTAMPADORES,...BORDADORES], tipo:true, rc:'Envío a aplicación' },
+  { k:'reciboA',  l:'Recibo aplicación',  provL:'Aplicador', provs:[...ESTAMPADORES,...BORDADORES], tipo:true, rc:'Recibo de aplicación' },
+];
+const etapaDe = (k) => ETAPAS_PROC.find(e => e.k === k);
+const stageTotal = (o, k) => (o.proc?.[k] || []).reduce((a,m)=>a+m.cant, 0);
+
+function initProc(o) {
+  if (o.proc) return;
+  o.proc = { corte:[], entregaM:[], reciboM:[], entregaA:[], reciboA:[] };
+  if (o.corte > 0) o.proc.corte.push({ fecha:o.fecha||hoyStr(), prov:o.maq||'Óscar Jiménez', cant:o.corte, by:'Daniel Masri', obs:'' });
+  if (o.op === '5424') {
+    const f = 1726;
+    o.proc.entregaM.push({ fecha:'26-jun', prov:'Confecciones León', cant:f, by:'Daniel Masri', obs:'' });
+    o.proc.reciboM.push({ fecha:'01-jul', prov:'Confecciones León', cant:f, by:'Laura Hernández', obs:'' });
+    o.proc.entregaA.push({ fecha:'27-jun', prov:'Estampados Rico', tipo:'Estampado', cant:f, by:'Daniel Masri', obs:'' });
+    o.proc.reciboA.push({ fecha:'02-jul', prov:'Estampados Rico', tipo:'Estampado', cant:f, by:'Laura Hernández', obs:'' });
+  }
+}
+
+let procIdx = -1, procStage = 'corte', procFormOpen = false;
+const procScrim = document.getElementById('procScrim');
+const procPanel = document.getElementById('procPanel');
+
+function abrirProceso(i) {
+  procIdx = i; opSel = i; procStage = 'corte'; procFormOpen = false;
+  initProc(OP[i]);
+  renderProceso();
+  procScrim.classList.add('show');
+}
+function cerrarProceso() {
+  procScrim.classList.remove('show');
+  if (vistaActual === 'ordenes') ir('ordenes');
+}
+function switchStage(k) { procStage = k; procFormOpen = false; renderProceso(); }
+function toggleProcForm() { procFormOpen = !procFormOpen; renderProceso(); }
+function procRecalc() {
+  const t = [...document.querySelectorAll('.procq')].reduce((a,el)=>a+(parseInt(el.value,10)||0), 0);
+  const el = document.getElementById('procTotal'); if (el) el.textContent = t.toLocaleString('es-MX');
+}
+function guardarMov() {
+  const o = OP[procIdx], e = etapaDe(procStage);
+  const cant = [...document.querySelectorAll('.procq')].reduce((a,el)=>a+(parseInt(el.value,10)||0), 0);
+  if (cant <= 0) { mostrarToast('Captura al menos una cantidad'); return; }
+  const mov = {
+    fecha: document.getElementById('procFecha').value || hoyStr(),
+    prov: document.getElementById('procProv').value || '—',
+    cant, by: USUARIO_ACTUAL, obs: document.getElementById('procObs').value || '',
+  };
+  if (e.tipo) mov.tipo = document.getElementById('procTipo').value;
+  o.proc[e.k].push(mov);
+  if (e.k === 'corte') o.corte = stageTotal(o, 'corte');
+  procFormOpen = false;
+  renderProceso();
+  mostrarToast(`${e.l} registrado · Ruta crítica actualizada ✓`);
+}
+function borrarMov(k, idx) {
+  const o = OP[procIdx];
+  o.proc[k].splice(idx, 1);
+  if (k === 'corte') o.corte = stageTotal(o, 'corte');
+  renderProceso();
+}
+
+function renderProceso() {
+  const o = OP[procIdx], e = etapaDe(procStage);
+  const tallas = opTallas(o), colores = opColores(o);
+  const cortada = stageTotal(o,'corte'), entM = stageTotal(o,'entregaM'), recM = stageTotal(o,'reciboM');
+  const entA = stageTotal(o,'entregaA'), recA = stageTotal(o,'reciboA');
+  const st = (v) => v.toLocaleString('es-MX');
+  const pasoEstado = (tot) => tot===0 ? '' : tot>=o.ord ? 'done' : 'partial';
+
+  const steps = ETAPAS_PROC.map(x => {
+    const tot = stageTotal(o, x.k);
+    return `<button class="proc-step ${x.k===procStage?'on':''} ${pasoEstado(tot)}" onclick="switchStage('${x.k}')">
+      <span class="ps-dot"></span><span class="ps-l">${x.l}</span><span class="ps-n">${st(tot)}/${st(o.ord)}</span>
+    </button>`;
+  }).join('');
+
+  const movs = o.proc[e.k] || [];
+  const lista = movs.length ? `<div class="table-wrap"><table class="data"><thead><tr>
+      <th>Fecha</th><th>${e.provL}</th>${e.tipo?'<th>Tipo</th>':''}<th class="r">Cantidad</th><th>Capturó</th><th>Observaciones</th><th></th>
+    </tr></thead><tbody>
+      ${movs.map((m,idx)=>`<tr>
+        <td class="num">${m.fecha}</td>
+        <td class="cell-strong">${m.prov}</td>
+        ${e.tipo?`<td><span class="badge ${m.tipo==='Bordado'?'info':'warn'}"><span class="d"></span>${m.tipo||'—'}</span></td>`:''}
+        <td class="r num">${st(m.cant)}</td>
+        <td class="cell-sub">${m.by||'—'}</td>
+        <td class="cell-sub">${m.obs||'—'}</td>
+        <td class="r"><button class="icon-btn" title="Quitar" onclick="borrarMov('${e.k}',${idx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button></td>
+      </tr>`).join('')}
+    </tbody></table></div>` : `<div class="proc-empty">Aún no se registra ${e.l.toLowerCase()} para esta orden.</div>`;
+
+  const captura = procFormOpen ? `<div class="proc-capture">
+    <div class="pc-row ${e.tipo?'t4':''}">
+      <label><span class="ffk">Fecha</span><input id="procFecha" type="text" value="${hoyStr()}"></label>
+      <label><span class="ffk">${e.provL}</span>${comboHTML('procProv', e.provs, 'Escribe el '+e.provL.toLowerCase()+'…')}</label>
+      ${e.tipo?`<label><span class="ffk">Tipo</span><select id="procTipo"><option>Estampado</option><option>Bordado</option></select></label>`:''}
+      <label><span class="ffk">Observaciones</span><input id="procObs" type="text" placeholder="Opcional"></label>
+    </div>
+    <div class="proc-matrix"><table>
+      <thead><tr><th>Color</th>${tallas.map(t=>`<th>${t}</th>`).join('')}</tr></thead>
+      <tbody>${colores.map((c,ci)=>`<tr><td><span style="display:inline-flex;align-items:center;gap:7px"><i style="width:11px;height:11px;border-radius:3px;background:${colorHex(c.n)};border:1px solid var(--border)"></i>${c.n}</span></td>${tallas.map((_,ti)=>`<td><input class="procq" type="number" min="0" placeholder="0" oninput="procRecalc()"></td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+    <div class="pc-actions">
+      <span class="pc-lock">${IC.lock} Candado: solo colores y tallas de la orden</span>
+      <span class="pc-lock">Captura: <b>${USUARIO_ACTUAL}</b></span>
+      <span style="margin-left:auto">Total capturado: <span class="pc-total" id="procTotal">0</span></span>
+      <button class="btn ghost" onclick="toggleProcForm()">Cancelar</button>
+      <button class="btn primary" onclick="guardarMov()">${IC.check}Guardar movimiento</button>
+    </div>
+  </div>` : '';
+
+  procPanel.innerHTML = `
+    <div class="proc-head">
+      <div class="ph-hero">${o.modelo.slice(0,3)}</div>
+      <div style="flex:1;min-width:0">
+        <h2>Avance de producción · OP ${o.op}</h2>
+        <div class="ph-meta"><span>Modelo <b>${o.modelo}</b></span><span>Pedido interno <b>${o.ped}-F</b></span><span>Cliente <b>${o.cli}</b></span></div>
+      </div>
+      <button class="btn ghost" style="color:var(--crit)" onclick="mostrarToast('Cancelar orden — demo')">Cancelar orden</button>
+      <button class="icon-btn" onclick="cerrarProceso()" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+    <div class="proc-body">
+      <div class="proc-steps">${steps}</div>
+      <div class="proc-stage">
+        <div class="proc-stage-head">
+          <h3>${e.l}</h3>
+          <span class="proc-note">${IC.rc} Se marca en Ruta Crítica automáticamente</span>
+          <button class="btn primary" style="margin-left:auto" onclick="toggleProcForm()">${procFormOpen?IC.chevron:IC.plus}Registrar ${e.l.toLowerCase()}</button>
+        </div>
+        ${captura}
+        ${lista}
+      </div>
+
+      <div class="proc-summary-title">Resumen · costura (maquila)</div>
+      <div class="proc-summary">
+        <div class="psum"><span>Ordenada</span><b class="num">${st(o.ord)}</b></div>
+        <div class="psum"><span>Cortada</span><b class="num">${st(cortada)}</b><small>por cortar ${st(Math.max(0,o.ord-cortada))}</small></div>
+        <div class="psum"><span>Entregada</span><b class="num">${st(entM)}</b><small>por entregar ${st(Math.max(0,cortada-entM))}</small></div>
+        <div class="psum"><span>Recibida</span><b class="num">${st(recM)}</b><small>por recibir ${st(Math.max(0,entM-recM))}</small></div>
+      </div>
+      <div class="proc-summary-title">Resumen · estampado / bordado (aplicación)</div>
+      <div class="proc-summary">
+        <div class="psum"><span>Entregada</span><b class="num">${st(entA)}</b></div>
+        <div class="psum"><span>Recibida</span><b class="num">${st(recA)}</b></div>
+        <div class="psum"><span>Falta por recibir</span><b class="num" style="color:${entA-recA>0?'var(--warn)':'var(--ok)'}">${st(Math.max(0,entA-recA))}</b></div>
+      </div>
+    </div>`;
+  procPanel.querySelectorAll('.combo').forEach(wireCombo);
+}
+
+/* ---- Producción / WIP ---- */
+const PROD = [
+  ['OP-8836','Sudadera con gorro',2400,2400,1600,'Confecciones León','warn','Maquila M'],
+  ['OP-8829','Short deportivo',900,900,0,'Estampados Rico','warn','Estampado'],
+  ['OP-8820','Top halter',600,600,600,'Maquilas del Bajío','ok','Recibo'],
+  ['OP-8841','Playera cuello redondo',1200,0,0,'—','crit','Corte'],
+];
+function vProduccion() {
+  return `
+  <div class="page-head">
+    <div><h1>Producción · WIP</h1><div class="sub">Trabajo en proceso por etapa · tiempo real</div></div>
+    <div class="actions"><button class="btn primary" data-add="produccion">${IC.plus}Registrar corte</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Por cortar','5,300','pzas','down','−8%','')}
+    ${kpi('En maquila (M)','8,940','pzas','up','+12%','')}
+    ${kpi('En estampado (A)','2,100','pzas','up','+4%','')}
+    ${kpi('Por recibir','3,880','pzas','up','+2%','')}
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Órdenes en piso · por etapa</h3><span class="hint">M = costura · A = estampado/aplicación</span></div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Orden</th><th>Modelo</th><th class="r">Cortado</th><th class="r">Enviado</th><th class="r">Recibido</th><th>Maquilero</th><th>Etapa</th></tr></thead>
+        <tbody>
+          ${PROD.map(r=>`<tr>
+            <td class="cell-code">${r[0]}</td><td class="cell-strong">${r[1]}</td>
+            <td class="r num">${r[2].toLocaleString('es-MX')}</td>
+            <td class="r num">${r[3].toLocaleString('es-MX')}</td>
+            <td class="r num">${r[4].toLocaleString('es-MX')}</td>
+            <td>${r[5]}</td>
+            <td><span class="badge ${r[6]}"><span class="d"></span>${r[7]}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---- Pedidos (por mes · pedido interno agrupa varias órdenes) ---- */
+/* Cada pedido interno (folio consecutivo -F) engloba varios modelos; cada
+   modelo = una orden de producción (No. Ord). Van juntos en insumos y entrega. */
+const PEDIDOS_MES = [
+  { folio:'1502-F', cliente:'IB Coppel', empresa:'FR', vig:'04-jul → 04-jul', estatus:'Vigente', modelos:[
+    { modelo:'32138', cant:5201, precio:112.74, fecha:'03-mar', ord:'5489', corte:5366 },
+    { modelo:'52138', cant:600,  precio:133.20, fecha:'03-mar', ord:'5490', corte:638  },
+  ]},
+  { folio:'1479-F', cliente:'C&A', empresa:'FR', vig:'06-jul → 06-jul', estatus:'Vigente', modelos:[
+    { modelo:'51395', cant:1094, precio:185.00, fecha:'19-dic', ord:'5403', corte:1017 },
+    { modelo:'81390', cant:1210, precio:213.00, fecha:'19-dic', ord:'5404', corte:0    },
+  ]},
+  { folio:'1485-F', cliente:'C&A', empresa:'FR', vig:'06-jul → 06-jul', estatus:'Vigente', modelos:[
+    { modelo:'62180', cant:2562, precio:148.00, fecha:'23-dic', ord:'5420', corte:2726 },
+    { modelo:'62181', cant:2038, precio:148.00, fecha:'23-dic', ord:'5421', corte:2170 },
+    { modelo:'62181', cant:1524, precio:148.00, fecha:'23-dic', ord:'5422', corte:0    },
+    { modelo:'62181', cant:1523, precio:148.00, fecha:'23-dic', ord:'5423', corte:0    },
+    { modelo:'62182', cant:1618, precio:148.00, fecha:'23-dic', ord:'5424', corte:1726 },
+    { modelo:'62182', cant:1212, precio:148.00, fecha:'23-dic', ord:'5425', corte:0    },
+    { modelo:'62182', cant:1212, precio:148.00, fecha:'23-dic', ord:'5426', corte:0    },
+    { modelo:'62183', cant:2865, precio:148.00, fecha:'23-dic', ord:'5427', corte:3059 },
+  ]},
+  { folio:'1488-F', cliente:'C&A', empresa:'FR', vig:'06-jul → 06-jul', estatus:'Vigente', modelos:[
+    { modelo:'31178', cant:1194, precio:149.00, fecha:'06-ene', ord:'5436', corte:1282 },
+    { modelo:'71179', cant:1199, precio:185.00, fecha:'06-ene', ord:'5437', corte:0    },
+  ]},
+  { folio:'1496-F', cliente:'C&A', empresa:'FR', vig:'06-jul → 06-jul', estatus:'Vigente', modelos:[
+    { modelo:'61770', cant:3905, precio:125.00, fecha:'25-ene', ord:'5456', corte:3873 },
+    { modelo:'61771', cant:2849, precio:125.00, fecha:'25-ene', ord:'5457', corte:2836 },
+    { modelo:'61772', cant:2801, precio:125.00, fecha:'25-ene', ord:'5458', corte:2704 },
+  ]},
+];
+const MESES_PED = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+const badgePed = (e) => ({Vigente:'info','En producción':'warn',Entregado:'ok',Cancelado:'crit'}[e] || 'neutral');
+const corteBadge = (c, cant) => c>=cant ? ['ok','Cortado'] : c===0 ? ['neutral','Pendiente'] : ['warn','Parcial'];
+const nextOrdPed = () => { let mx=0; PEDIDOS_MES.forEach(p=>p.modelos.forEach(m=>{ const n=parseInt(m.ord,10)||0; if(n>mx)mx=n; })); return String(mx+1); };
+const money = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
+
+function vPedidos() {
+  let totPed=0, totImp=0, totCorte=0, totOrd=0;
+  PEDIDOS_MES.forEach(p => p.modelos.forEach(m => { totPed+=m.cant; totImp+=m.cant*m.precio; totCorte+=m.corte; totOrd++; }));
+  const pct = totPed ? Math.round(totCorte/totPed*100) : 0;
+  return `
+  <div class="page-head">
+    <div><h1>Pedidos</h1><div class="sub">Pedidos internos por mes · cada pedido agrupa varias órdenes de producción (van juntos en insumos y entrega)</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" data-add="pedidos">${IC.plus}Nuevo pedido</button></div>
+  </div>
+
+  <div class="monthbar">
+    ${MESES_PED.map((m,i)=>`<button class="mtab ${i===6?'on':''}">${m}</button>`).join('')}
+    <button class="mtab">Todos</button>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <select class="minisel"><option>Todos los clientes</option><option selected>C&amp;A</option><option>IB Coppel</option><option>Liverpool</option></select>
+      <select class="minisel"><option>2026</option><option>2025</option></select>
+      <select class="minisel"><option>Todas las empresas</option><option>FR Moda</option><option>Marilyn Fitness</option></select>
+      <button class="chip active">Vigentes</button>
+      <button class="chip">Entregados</button>
+      <button class="chip">Cancelados</button>
+      <div class="tool-right">
+        <div class="seg"><button class="on">Pendiente</button><button>Pedida</button></div>
+        <span class="count">${PEDIDOS_MES.length} pedidos · ${totOrd} órdenes</span>
+      </div>
+    </div>
+    <div class="table-wrap"><table class="data pedidos"><thead><tr>
+      <th>Pedido / Modelo</th><th>Cliente</th><th>Vigencia</th><th>No. orden</th>
+      <th class="r">Cant.</th><th class="r">Precio</th><th class="r">Importe</th><th class="r">Corte</th><th>Estatus</th>
+    </tr></thead>
+      ${PEDIDOS_MES.map((p,i)=>{
+        const cant = p.modelos.reduce((a,m)=>a+m.cant,0);
+        const imp  = p.modelos.reduce((a,m)=>a+m.cant*m.precio,0);
+        const cor  = p.modelos.reduce((a,m)=>a+m.corte,0);
+        return `<tbody data-ped="${i}">
+          <tr class="grp">
+            <td><span class="grp-tog"><span class="chev">${IC.chevron}</span><b>${p.folio}</b><span class="grp-count">${p.modelos.length} mod.</span></span></td>
+            <td class="cell-strong">${p.cliente}</td>
+            <td class="num" style="color:var(--muted)">${p.vig}</td>
+            <td></td>
+            <td class="r num cell-strong">${cant.toLocaleString('es-MX')}</td>
+            <td></td>
+            <td class="r mono cell-strong">${money(imp)}</td>
+            <td class="r num" style="color:var(--muted)">${cor.toLocaleString('es-MX')}</td>
+            <td><span class="badge ${badgePed(p.estatus)}"><span class="d"></span>${p.estatus}</span></td>
+          </tr>
+          ${p.modelos.map((m,j)=>{ const [bc,bt]=corteBadge(m.corte,m.cant); return `<tr class="sub" data-ped="${i}" data-mod="${j}">
+            <td><span class="sub-mod mono">${m.modelo}</span></td>
+            <td></td><td></td>
+            <td class="cell-code">${m.ord}</td>
+            <td class="r num">${m.cant.toLocaleString('es-MX')}</td>
+            <td class="r mono">$${m.precio.toFixed(2)}</td>
+            <td class="r mono">${money(m.cant*m.precio)}</td>
+            <td class="r num" style="color:${m.corte>=m.cant?'var(--ok)':m.corte===0?'var(--faint)':'var(--warn)'}">${m.corte.toLocaleString('es-MX')}</td>
+            <td><span class="badge ${bc}"><span class="d"></span>${bt}</span></td>
+          </tr>`; }).join('')}
+        </tbody>`;
+      }).join('')}
+    </table></div>
+    <div class="totbar">
+      <div class="totitem"><span>Pedidos</span><b class="num">${PEDIDOS_MES.length}</b></div>
+      <div class="totitem"><span>Órdenes</span><b class="num">${totOrd}</b></div>
+      <div class="totitem"><span>Piezas pedidas</span><b class="num">${totPed.toLocaleString('es-MX')}</b></div>
+      <div class="totitem"><span>Cortado</span><b class="num">${totCorte.toLocaleString('es-MX')}</b></div>
+      <div class="totitem grow"></div>
+      <div class="totitem"><span>Avance</span><b>${pct}%</b></div>
+      <div class="totitem"><span>Importe total</span><b class="mono" style="color:var(--brand)">${money(totImp)}</b></div>
+    </div>
+  </div>`;
+}
+
+function drawerOrden(p, m) {
+  const imp = m.cant*m.precio;
+  const pct = m.cant ? Math.min(100, Math.round(m.corte/m.cant*100)) : 0;
+  const [bc,bt] = corteBadge(m.corte, m.cant);
+  return `
+  <div class="drawer-head">
+    <span class="dt-hero" style="background:linear-gradient(150deg,var(--brand-bright),var(--brand))">${String(m.modelo).slice(0,2)}</span>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><h2 style="font-size:16px">Modelo ${m.modelo}</h2><span class="badge ${bc}"><span class="d"></span>${bt}</span></div>
+      <div class="cell-code" style="margin-top:2px">Pedido ${p.folio} · ${p.cliente} · Orden ${m.ord}</div>
+    </div>
+    <button class="icon-btn" id="closeDrawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="dsec"><h4>Orden de producción</h4><div class="fields">
+      <div class="field"><div class="k">No. orden</div><div class="v mono">${m.ord}</div></div>
+      <div class="field"><div class="k">Fecha orden</div><div class="v">${m.fecha}</div></div>
+      <div class="field"><div class="k">Cantidad pedida</div><div class="v num">${m.cant.toLocaleString('es-MX')}</div></div>
+      <div class="field"><div class="k">Precio unitario</div><div class="v mono">$${m.precio.toFixed(2)}</div></div>
+      <div class="field"><div class="k">Importe</div><div class="v mono">${money(imp)}</div></div>
+      <div class="field"><div class="k">Cortado</div><div class="v num">${m.corte.toLocaleString('es-MX')} · ${pct}%</div></div>
+    </div></div>
+    <div class="dsec"><h4>Avance de producción</h4>
+      <div style="margin:2px 0 12px"><span class="bar-track" style="width:100%;height:8px;display:block"><span class="bar-fill" style="width:${pct}%"></span></span></div>
+      ${cadenaRC([['Pedido','done'],['Corte', m.corte>0?(m.corte>=m.cant?'done':'active'):'pending'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Entrega','pending']])}
+    </div>
+    <div class="dsec"><h4>Va junto con</h4><div class="bom">
+      ${p.modelos.map(o=>`<div class="bom-row"><span class="bom-tag mono" style="background:${o.modelo===m.modelo?'var(--brand)':'var(--border-strong)'};color:${o.modelo===m.modelo?'#fff':'var(--muted)'}">${String(o.modelo).slice(-2)}</span><div class="grow"><b class="mono">${o.modelo}</b><div class="cell-sub">Orden ${o.ord}</div></div><span class="qty">${o.cant.toLocaleString('es-MX')} pzas</span></div>`).join('')}
+    </div><div class="cell-sub" style="margin-top:8px">Todos los modelos de <b>${p.folio}</b> comparten insumos y se entregan juntos.</div></div>
+  </div>
+  <div class="drawer-foot"><button class="btn ghost">${IC.printer}Imprimir orden</button><button class="btn primary" style="margin-left:auto">${IC.rc}Ver ruta crítica</button></div>`;
+}
+
+function wirePedidos() {
+  document.querySelectorAll('#view .data.pedidos tbody').forEach(tb => {
+    const grp = tb.querySelector('tr.grp');
+    if (grp) grp.onclick = () => tb.classList.toggle('collapsed');
+  });
+  document.querySelectorAll('#view .data.pedidos tr.sub').forEach(tr => {
+    tr.onclick = (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('#view .data.pedidos tr.sub.sel').forEach(x => x.classList.remove('sel'));
+      tr.classList.add('sel');
+      const p = PEDIDOS_MES[+tr.dataset.ped];
+      abrirCajon(drawerOrden(p, p.modelos[+tr.dataset.mod]));
+    };
+  });
+}
+
+/* ---- Ruta Crítica ---- */
+function cadenaRC(pasos) {
+  const col = { done:'var(--ok)', active:'var(--warn)', late:'var(--crit)', pending:'var(--border-strong)' };
+  return `<span class="chain" title="${pasos.map(p=>p[0]).join(' → ')}">` + pasos.map((p,i)=>{
+    const lnk = i ? `<span class="lnk" style="background:${pasos[i-1][1]==='done'?'var(--ok)':'var(--border-strong)'}"></span>` : '';
+    const glow = p[1]==='active'||p[1]==='late' ? `box-shadow:0 0 0 3px color-mix(in srgb, ${col[p[1]]} 22%, transparent)` : '';
+    return `${lnk}<span class="node" style="background:${col[p[1]]};${glow}"></span>`;
+  }).join('') + `</span>`;
+}
+const RC = [
+  ['OP-8841','Playera cuello redondo','Liverpool',[['Pedido','done'],['Corte','late'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Corte','Hoy 18:00','−1 d','crit'],
+  ['OP-8836','Sudadera con gorro','Coppel',[['Pedido','done'],['Corte','done'],['Envío','done'],['Maquila','active'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Maquila (M)','1 jul','0 d','warn'],
+  ['OP-8829','Short deportivo','Suburbia',[['Pedido','done'],['Corte','done'],['Envío','done'],['Estampado','active'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Estampado (A)','3 jul','+1 d','warn'],
+  ['OP-8820','Top halter','Shasa',[['Pedido','done'],['Corte','done'],['Envío','done'],['Maquila','done'],['Recibo','active'],['Calidad','pending'],['Entrega','pending']],'Recibo','2 jul','+2 d','ok'],
+  ['OP-8815','Pants jogger','Sears',[['Pedido','done'],['Corte','done'],['Envío','done'],['Maquila','done'],['Recibo','done'],['Calidad','active'],['Entrega','pending']],'Auditoría AQL','1 jul','+3 d','ok'],
+  ['OP-8850','Top halter','Shasa',[['Pedido','done'],['Corte','active'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Corte','5 jul','+4 d','ok'],
+];
+function vRc() {
+  return `
+  <div class="page-head">
+    <div><h1>Ruta Crítica</h1><div class="sub">Workflow / CPM por orden · 47 rutas activas</div></div>
+    <div class="actions"><button class="btn ghost">${IC.printer}Plan PDF</button><button class="btn primary" data-add="rc">${IC.plus}Programar RC</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('En tiempo','39','','up','+3','de 47 rutas')}
+    ${kpi('En riesgo','6','','down','+2','holgura ≤ 1 día')}
+    ${kpi('Atrasadas','2','','down','+1','requieren acción')}
+    ${kpi('Cumplimiento','96.4','%','down','−1.2','últimos 30 d')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Activas</button><button class="chip">En riesgo</button><button class="chip">Atrasadas</button>
+      <div class="tool-right"><span class="count">6 de 47</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Orden</th><th>Modelo</th><th>Cliente</th><th>Ruta viva</th><th>Etapa actual</th><th>Próx. hito</th><th class="r">Holgura</th><th>Semáforo</th>
+    </tr></thead><tbody>
+      ${RC.map(r=>`<tr>
+        <td class="cell-code">${r[0]}</td>
+        <td class="cell-strong">${r[1]}</td>
+        <td>${r[2]}</td>
+        <td>${cadenaRC(r[3])}</td>
+        <td><span class="badge ${r[7]}"><span class="d"></span>${r[4]}</span></td>
+        <td class="num">${r[5]}</td>
+        <td class="r num" style="color:${r[6].startsWith('−')?'var(--crit)':'var(--muted)'}">${r[6]}</td>
+        <td><span class="badge ${r[7]}"><span class="d"></span>${r[7]==='crit'?'Atrasada':r[7]==='warn'?'En riesgo':'En tiempo'}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* ---- Inventario PT ---- */
+const INV = [
+  ['MJD-1042','Playera cuello redondo','Almacén PT Central', 820, 340, 480],
+  ['MJD-1039','Sudadera con gorro','Almacén PT Central', 310, 120, 190],
+  ['MJD-1051','Short deportivo','Almacén PT Central', 980, 400, 580],
+  ['MJD-1068','Pants jogger','Almacén PT Norte', 702, 250, 452],
+  ['MJD-1074','Playera polo','Almacén PT Central', 540, 60, 480],
+  ['MJD-1063','Top halter','Almacén PT Norte', 115, 0, 115],
+  ['MJD-1042','Playera cuello redondo','Almacén PT Norte', 420, 100, 320],
+];
+function vInventarios() {
+  return `
+  <div class="page-head">
+    <div><h1>Inventario · Producto terminado</h1><div class="sub">Existencias = suma de movimientos (kardex) · 3 almacenes</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Kardex</button><button class="btn primary" data-add="inventarios">${IC.plus}Movimiento</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Existencia total','58,417','pzas','up','+2.1%','')}
+    ${kpi('Comprometido','21,090','pzas','up','+4%','pedidos en firme')}
+    ${kpi('Disponible','37,327','pzas','down','−1%','')}
+    ${kpi('Modelos con stock','186','','up','+5','')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="tabs"><button class="on">Existencias</button><button>Movimientos</button><button>Traspasos</button></div>
+      <button class="chip">${IC.filter}Almacén</button>
+      <div class="tool-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Buscar modelo…"></div>
+      <div class="tool-right"><span class="count">7 renglones</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Modelo</th><th>Almacén</th><th class="r">Existencia</th><th class="r">Comprometido</th><th class="r">Disponible</th><th>Nivel</th>
+    </tr></thead><tbody>
+      ${INV.map(r=>{const pct=Math.round(r[5]/r[3]*100);return `<tr>
+        <td><div><div class="cell-strong">${r[1]}</div><div class="cell-code">${r[0]}</div></div></td>
+        <td>${r[2]}</td>
+        <td class="r num">${r[3].toLocaleString('es-MX')}</td>
+        <td class="r num" style="color:var(--muted)">${r[4].toLocaleString('es-MX')}</td>
+        <td class="r num cell-strong">${r[5].toLocaleString('es-MX')}</td>
+        <td><span class="bar-mini"><span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:${pct<25?'var(--crit)':pct<50?'var(--warn)':'var(--brand)'}"></span></span><span class="num" style="color:var(--muted);font-size:11.5px">${pct}%</span></span></td>
+      </tr>`}).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* ---- Telas y avíos ---- */
+const TONO = { tela:['#4f6bed','Tela'], avio:['#0891b2','Avío'], servicio:['#db2777','Servicio'] };
+const MAT = [
+  ['TEL-0140','Algodón peinado 30/1','tela','Hilaturas del Norte', 1240, 'kg', 128.00],
+  ['TEL-0155','Felpa francesa 320g','tela','Textiles Aztlán', 640, 'kg', 96.50],
+  ['TEL-0162','Mezclilla stretch 8oz','tela','Denim MX', 980, 'm', 74.00],
+  ['AVI-0301','Hilo poliéster Tex 40','avio','Hilos Reyna', 4200, 'cono', 38.00],
+  ['AVI-0318','Etiqueta tejida MJD','avio','Etiquetas Sol', 18000, 'pza', 1.20],
+  ['AVI-0325','Resorte 3 cm','avio','Elásticos GTO', 5600, 'm', 4.80],
+  ['SER-0410','Estampado serigrafía 2 tintas','servicio','Estampados Rico', 0, 'aplic', 6.50],
+];
+function vTelas() {
+  return `
+  <div class="page-head">
+    <div><h1>Telas y avíos</h1><div class="sub">Materiales · inventario valorizado · make-to-order</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" data-add="telas">${IC.plus}Nuevo material</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Valor inventario','$1.84','M','up','+3.2%','tela + avíos')}
+    ${kpi('Telas','142','SKU','up','+4','')}
+    ${kpi('Avíos','318','SKU','up','+11','')}
+    ${kpi('Por debajo de mínimo','9','','down','+3','sugerir compra')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Todos</button><button class="chip">Telas</button><button class="chip">Avíos</button><button class="chip">Servicios</button>
+      <div class="tool-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Buscar material…"></div>
+      <div class="tool-right"><span class="count">7 de 460</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Material</th><th>Tipo</th><th>Proveedor</th><th class="r">Existencia</th><th class="r">Costo unit.</th><th class="r">Valor</th>
+    </tr></thead><tbody>
+      ${MAT.map(m=>{const t=TONO[m[2]];return `<tr>
+        <td><div class="cellflex"><span class="thumb" style="background:${t[0]}">${m[2][0].toUpperCase()}</span><div><div class="cell-strong">${m[1]}</div><div class="cell-code">${m[0]}</div></div></div></td>
+        <td><span class="badge" style="background:color-mix(in srgb,${t[0]} 14%,transparent);color:${t[0]}"><span class="d" style="background:${t[0]}"></span>${t[1]}</span></td>
+        <td>${m[3]}</td>
+        <td class="r num">${m[4].toLocaleString('es-MX')} <span class="cell-sub">${m[5]}</span></td>
+        <td class="r mono">$${m[6].toFixed(2)}</td>
+        <td class="r mono">$${(m[4]*m[6]).toLocaleString('es-MX',{maximumFractionDigits:0})}</td>
+      </tr>`}).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* ---- Compras / MRP ---- */
+const OC = [
+  ['OC-3120','Hilaturas del Norte','Algodón peinado 30/1', 800, 800, 'Recibida','neutral','OP-8841'],
+  ['OC-3121','Textiles Aztlán','Felpa francesa 320g', 500, 200, 'Parcial','warn','OP-8836'],
+  ['OC-3122','Denim MX','Mezclilla stretch 8oz', 420, 0, 'Pendiente','info','OP-8829'],
+  ['OC-3123','Hilos Reyna','Hilo poliéster Tex 40', 60, 0, 'Pendiente','info','—'],
+  ['OC-3124','Etiquetas Sol','Etiqueta tejida MJD', 5000, 5000, 'Recibida','neutral','—'],
+];
+function vCompras() {
+  return `
+  <div class="page-head">
+    <div><h1>Compras / MRP</h1><div class="sub">Órdenes de compra contra orden de producción (make-to-order)</div></div>
+    <div class="actions"><button class="btn ghost">${IC.info}Explosión MRP</button><button class="btn primary" data-add="compras">${IC.plus}Nueva OC</button></div>
+  </div>
+  <div class="banner">${IC.info}<span><b>MRP:</b> 3 materiales por debajo del requerido para las órdenes abiertas — <b>Mezclilla stretch 8oz</b> (falta 420 m), <b>Hilo poliéster Tex 40</b> (falta 60 conos) y <b>Resorte 3 cm</b> (falta 900 m). Genera las OC sugeridas.</span></div>
+  <div class="kpis">
+    ${kpi('OC abiertas','23','','up','+4','')}
+    ${kpi('Por recibir','$482','K','up','+8%','')}
+    ${kpi('Faltantes MRP','3','materiales','down','+1','')}
+    ${kpi('Recibido a tiempo','91','%','up','+2','')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Abiertas</button><button class="chip">Todas</button>
+      <button class="chip">${IC.filter}Proveedor</button>
+      <div class="tool-right"><span class="count">5 de 23</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>OC</th><th>Proveedor</th><th>Material</th><th class="r">Cantidad</th><th>Recepción</th><th>Estado</th><th>Contra orden</th>
+    </tr></thead><tbody>
+      ${OC.map(o=>{const pct=Math.round(o[4]/o[3]*100);return `<tr>
+        <td class="cell-code">${o[0]}</td>
+        <td class="cell-strong">${o[1]}</td>
+        <td>${o[2]}</td>
+        <td class="r num">${o[3].toLocaleString('es-MX')}</td>
+        <td><span class="bar-mini"><span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:${pct===100?'var(--ok)':pct>0?'var(--warn)':'var(--border-strong)'}"></span></span><span class="num" style="color:var(--muted);font-size:11.5px">${pct}%</span></span></td>
+        <td><span class="badge ${o[6]}"><span class="d"></span>${o[5]}</span></td>
+        <td class="cell-code">${o[7]}</td>
+      </tr>`}).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* ---- Proveedores ---- */
+const PROV = [
+  ['PRV-0102','Hilaturas del Norte','Tela','Ing. Laura Méndez','81 8123 4500', 'Algodón, jersey', 128400, 'ok'],
+  ['PRV-0108','Textiles Aztlán','Tela','Sr. Roberto Cano','55 5566 1200', 'Felpa, perchado', 64100, 'ok'],
+  ['PRV-0115','Confecciones León','Maquila (M)','Sra. Ma. Elena Ruiz','477 210 8890', 'Costura', 0, 'ok'],
+  ['PRV-0121','Estampados Rico','Maquila (A)','Sr. Julián Rico','477 330 4521', 'Serigrafía, DTF', 18600, 'warn'],
+  ['PRV-0130','Hilos Reyna','Avío','Sr. Pedro Reyna','33 1244 7788', 'Hilo, conos', 9200, 'ok'],
+  ['PRV-0134','Etiquetas Sol','Avío','Lic. Ana Sol','55 8890 2211', 'Etiquetas tejidas', 2400, 'ok'],
+];
+function vProveedores() {
+  return `
+  <div class="page-head">
+    <div><h1>Proveedores</h1><div class="sub">Catálogo enriquecido · maquileros y materiales · CxP</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" data-add="proveedores">${IC.plus}Nuevo proveedor</button></div>
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Todos</button><button class="chip">Materiales</button><button class="chip">Maquila</button>
+      <div class="tool-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Buscar proveedor…"></div>
+      <div class="tool-right"><span class="count">6 de 84</span></div>
+    </div>
+    <div class="table-wrap"><table class="data" id="tablaProv"><thead><tr>
+      <th>Proveedor</th><th>Tipo</th><th>Contacto</th><th>Surte</th><th class="r">Saldo CxP</th><th>Estado</th>
+    </tr></thead><tbody>
+      ${PROV.map((p,i)=>`<tr data-row="${i}">
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">${p[1].slice(0,2).toUpperCase()}</span><div><div class="cell-strong">${p[1]}</div><div class="cell-code">${p[0]}</div></div></div></td>
+        <td><span class="badge neutral"><span class="d"></span>${p[2]}</span></td>
+        <td>${p[3]}</td>
+        <td class="cell-sub">${p[5]}</td>
+        <td class="r mono">$${p[6].toLocaleString('es-MX')}</td>
+        <td><span class="badge ${p[7]}"><span class="d"></span>${p[7]==='warn'?'Saldo vencido':'Al corriente'}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+function drawerProveedor(i) {
+  const p = PROV[i];
+  return `
+  <div class="drawer-head">
+    <span class="dt-hero" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">${p[1].slice(0,2).toUpperCase()}</span>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><h2 style="font-size:16px">${p[1]}</h2><span class="badge ${p[7]}"><span class="d"></span>${p[7]==='warn'?'Saldo vencido':'Al corriente'}</span></div>
+      <div class="cell-code" style="margin-top:2px">${p[0]} · ${p[2]}</div>
+    </div>
+    <button class="icon-btn" id="closeDrawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="dsec"><h4>Contacto</h4><div class="fields">
+      <div class="field"><div class="k">Responsable</div><div class="v">${p[3]}</div></div>
+      <div class="field"><div class="k">Teléfono</div><div class="v mono">${p[4]}</div></div>
+      <div class="field"><div class="k">RFC</div><div class="v mono">HNO920815AB3</div></div>
+      <div class="field"><div class="k">Días de crédito</div><div class="v num">30</div></div>
+    </div></div>
+    <div class="dsec"><h4>Estado de cuenta (CxP)</h4><div class="fields">
+      <div class="field"><div class="k">Saldo actual</div><div class="v mono" style="font-size:16px">$${p[6].toLocaleString('es-MX')}</div></div>
+      <div class="field"><div class="k">Vencido</div><div class="v mono" style="color:${p[7]==='warn'?'var(--crit)':'var(--muted)'}">$${p[7]==='warn'?'18,600':'0'}</div></div>
+    </div></div>
+    <div class="dsec"><h4>Surte</h4><div class="bom">
+      <div class="bom-row"><span class="bom-tag" style="background:#4f6bed">TE</span><div class="grow"><b>${p[5]}</b><div class="cell-sub">3 materiales activos</div></div><span class="qty">›</span></div>
+    </div></div>
+  </div>
+  <div class="drawer-foot"><button class="btn ghost">${IC.printer}Estado de cuenta</button><button class="btn primary" style="margin-left:auto">${IC.edit}Editar</button></div>`;
+}
+
+/* ---- Costos y EDR ---- */
+const COSTOS = [
+  ['MJD-1042','Playera cuello redondo', 38.2, 12.5, 14.0, 8.0, 11.8, 189.00],
+  ['MJD-1039','Sudadera con gorro', 82.0, 18.0, 22.0, 30.0, 16.0, 320.00],
+  ['MJD-1051','Short deportivo', 41.0, 10.2, 16.0, 18.0, 11.0, 210.00],
+  ['MJD-1068','Pants jogger', 66.5, 14.0, 20.0, 26.0, 16.0, 289.00],
+  ['MJD-1074','Playera polo', 44.0, 16.0, 18.0, 12.0, 18.0, 235.00],
+];
+function vCostos() {
+  return `
+  <div class="page-head">
+    <div><h1>Costos y EDR</h1><div class="sub">Costeo a costo actual · estado de resultados por modelo</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Excel</button><button class="btn primary">${IC.printer}EDR</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Costo prom. modelo','$248','','up','+3.1%','')}
+    ${kpi('Margen bruto prom.','41.2','%','down','−0.8','')}
+    ${kpi('Ventas del mes','$4.62','M','up','+7%','')}
+    ${kpi('Utilidad bruta','$1.90','M','up','+5%','')}
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Costeo por modelo</h3><span class="hint">tela · avíos · corte · maquila · estampado</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Modelo</th><th class="r">Tela</th><th class="r">Avíos</th><th class="r">Corte</th><th class="r">Maquila</th><th class="r">Estamp.</th><th class="r">Costo</th><th class="r">Precio</th><th class="r">Margen</th>
+    </tr></thead><tbody>
+      ${COSTOS.map(c=>{const costo=c[2]+c[3]+c[4]+c[5]+c[6];const margen=Math.round((c[7]-costo)/c[7]*100);return `<tr>
+        <td><div class="cell-strong">${c[1]}</div><div class="cell-code">${c[0]}</div></td>
+        <td class="r mono">$${c[2].toFixed(1)}</td><td class="r mono">$${c[3].toFixed(1)}</td><td class="r mono">$${c[4].toFixed(1)}</td><td class="r mono">$${c[5].toFixed(1)}</td><td class="r mono">$${c[6].toFixed(1)}</td>
+        <td class="r mono cell-strong">$${costo.toFixed(2)}</td>
+        <td class="r mono">$${c[7].toFixed(2)}</td>
+        <td class="r"><span class="badge ${margen>=40?'ok':margen>=30?'warn':'crit'}"><span class="d"></span>${margen}%</span></td>
+      </tr>`}).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* ---- Indicadores ---- */
+function vIndicadores() {
+  const maq = [['Confecciones León',94],['Maquilas del Bajío',88],['Estampados Rico',81],['Costura Express',76],['Textil Guerra',68]];
+  return `
+  <div class="page-head">
+    <div><h1>Indicadores</h1><div class="sub">KPIs de Ingeniería de Producto y Almacén · junio 2026</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Excel</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Productividad','1,624','pzas/día','up','+6%','planta')}
+    ${kpi('Merma de tela','3.1','%','up','−0.4','meta ≤ 4%')}
+    ${kpi('Cumpl. entrega','96.4','%','down','−1.2','')}
+    ${kpi('Reproceso','1.8','%','up','−0.3','')}
+  </div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h3>Cortes por semana</h3><span class="hint">pzas</span></div>
+      <div class="chartbars">${[5200,6100,5800,7000,6400,7500,8120].map(v=>`<div class="b" style="height:${Math.round(v/8120*100)}%" data-v="${v.toLocaleString('es-MX')} pzas"></div>`).join('')}</div>
+      <div class="chartlabels">${['S21','S22','S23','S24','S25','S26','S27'].map(s=>`<span>${s}</span>`).join('')}</div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Productividad por maquilero</h3><span class="hint">% de eficiencia</span></div>
+      <div class="hbars">${maq.map(m=>`<div class="hbar"><span class="hlbl">${m[0]}</span><span class="htrack"><span class="hfill" style="width:${m[1]}%"></span></span><span class="hval">${m[1]}%</span></div>`).join('')}</div>
+    </div>
+  </div>
+  <div style="height:14px"></div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-head"><h3>Mezcla de producción</h3><span class="hint">por línea</span></div>
+      <div style="display:flex;align-items:center;gap:22px;padding:16px 18px">
+        <div class="donut" style="position:relative;background:conic-gradient(var(--brand) 0 46%, var(--brand-bright) 46% 74%, #f0b429 74% 90%, var(--border-strong) 90% 100%)"><span class="dc"><b class="num">214</b><span>modelos</span></span></div>
+        <div class="legend" style="flex:1">
+          <div class="lg"><i style="background:var(--brand)"></i>Playeras<span class="lv">46%</span></div>
+          <div class="lg"><i style="background:var(--brand-bright)"></i>Sudaderas / pants<span class="lv">28%</span></div>
+          <div class="lg"><i style="background:#f0b429"></i>Shorts<span class="lv">16%</span></div>
+          <div class="lg"><i style="background:var(--border-strong)"></i>Otros<span class="lv">10%</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Cumplimiento de entrega</h3><span class="hint">% a tiempo · 6 meses</span></div>
+      <div class="chartbars">${[92,94,95,97,98,96].map(v=>`<div class="b" style="height:${(v-85)/15*100}%" data-v="${v}%"></div>`).join('')}</div>
+      <div class="chartlabels">${['Ene','Feb','Mar','Abr','May','Jun'].map(s=>`<span>${s}</span>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+/* ---- Calidad (AQL) ---- */
+const CAL = [
+  ['AQL-770','OP-8815','Pants jogger', 200, 3, '2.5', 'Aceptada','ok'],
+  ['AQL-769','OP-8820','Top halter', 80, 1, '2.5', 'Aceptada','ok'],
+  ['AQL-768','OP-8829','Short deportivo', 125, 7, '2.5', 'Rechazada','crit'],
+  ['AQL-767','OP-8836','Sudadera con gorro', 315, 5, '2.5', 'Aceptada','ok'],
+  ['AQL-766','OP-8808','Blusa manga larga', 125, 4, '2.5', 'En revisión','warn'],
+];
+function vCalidad() {
+  return `
+  <div class="page-head">
+    <div><h1>Control de calidad · AQL</h1><div class="sub">Auditorías por muestreo (MIL-STD-105 / ISO 2859)</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" data-add="calidad">${IC.plus}Nueva auditoría</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Aceptación','92.6','%','up','+1.4','últimos 30 d')}
+    ${kpi('Auditorías','48','','up','+6','este mes')}
+    ${kpi('Rechazos','4','','down','+1','requieren reproceso')}
+    ${kpi('Defecto principal','Costura','','down','','32% de casos')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Todas</button><button class="chip">Aceptadas</button><button class="chip">Rechazadas</button>
+      <div class="tool-right"><span class="count">5 de 48</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Auditoría</th><th>Orden</th><th>Modelo</th><th class="r">Muestra</th><th class="r">Defectos</th><th class="r">AQL</th><th>Resultado</th>
+    </tr></thead><tbody>
+      ${CAL.map(c=>`<tr>
+        <td class="cell-code">${c[0]}</td>
+        <td class="cell-code">${c[1]}</td>
+        <td class="cell-strong">${c[2]}</td>
+        <td class="r num">${c[3]}</td>
+        <td class="r num" style="color:${c[4]>5?'var(--crit)':'var(--muted)'}">${c[4]}</td>
+        <td class="r mono">${c[5]}</td>
+        <td><span class="badge ${c[7]}"><span class="d"></span>${c[6]}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+/* ---- Usuarios y accesos ---- */
+const USERS = [
+  ['Daniel Masri','Administrador', 1, 'Todos', 'Hace 2 min','ok'],
+  ['Gabriel Masri','Desarrollo / Coord.', 5, 'Todos', 'Hace 1 h','ok'],
+  ['Laura Hernández','Producción', 20, 'Prod · RC · Inv', 'Hace 3 h','ok'],
+  ['Miguel Torres','Compras', 20, 'Compras · Prov · Telas', 'Ayer','ok'],
+  ['Sofía Ramírez','Ventas', 30, 'Pedidos · Clientes', 'Hace 4 h','ok'],
+  ['Carlos Vega','Calidad', 30, 'Calidad · Prod', '3 días','warn'],
+];
+function vUsuarios() {
+  return `
+  <div class="page-head">
+    <div><h1>Usuarios y accesos</h1><div class="sub">RBAC granular · 23 usuarios · 9 roles</div></div>
+    <div class="actions"><button class="btn ghost">${IC.info}Roles</button><button class="btn primary" data-add="usuarios">${IC.plus}Nuevo usuario</button></div>
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Activos</button><button class="chip">Todos</button>
+      <div class="tool-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Buscar usuario…"></div>
+      <div class="tool-right"><span class="count">6 de 23</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Usuario</th><th>Rol</th><th class="r">Nivel</th><th>Módulos con acceso</th><th>Último acceso</th><th>Estado</th>
+    </tr></thead><tbody>
+      ${USERS.map(u=>`<tr>
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">${u[0].split(' ').map(w=>w[0]).slice(0,2).join('')}</span><div class="cell-strong">${u[0]}</div></div></td>
+        <td>${u[1]}</td>
+        <td class="r num">${u[2]}</td>
+        <td class="cell-sub">${u[3]}</td>
+        <td class="num">${u[4]}</td>
+        <td><span class="badge ${u[5]}"><span class="d"></span>${u[5]==='warn'?'Inactivo':'Activo'}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+function vPlaceholder(clave) {
+  return `
+  <div class="page-head"><div><h1>${TITULOS[clave]}</h1><div class="sub">Módulo del sistema CONTROL v2</div></div></div>
+  <div class="placeholder">
+    <div>
+      <div class="ph-ico">${(NAV_LEAVES.find(l=>l.clave===clave)||{}).icono||IC.resumen}</div>
+      <h2>${TITULOS[clave]}</h2>
+      <p>Módulo pendiente en este prototipo. En el rediseño real mantiene el mismo patrón denso: barra de filtros, tabla-first y cajón de detalle. Ya están prototipados Resumen, Pedidos, Órdenes (OP) + avance, Modelos, Producción, Ruta Crítica, Inventario PT, Telas, Compras, Proveedores, Costos, Indicadores, Calidad y Usuarios.</p>
+    </div>
+  </div>`;
+}
+
+const VISTAS = {
+  resumen: vResumen, modelos: vModelos, ordenes: vOrdenes, produccion: vProduccion,
+  pedidos: vPedidos, rc: vRc, inventarios: vInventarios, telas: vTelas, compras: vCompras,
+  proveedores: vProveedores, costos: vCostos, indicadores: vIndicadores, calidad: vCalidad, usuarios: vUsuarios,
+};
+/* Qué tabla abre cajón de detalle en cada módulo */
+const CAJONES = {
+  modelos: ['#tablaModelos', i => drawerModelo(i)],
+  proveedores: ['#tablaProv', i => drawerProveedor(i)],
+};
+
+/* ============================================================
+   Navegación / render
+   ============================================================ */
+const viewEl = document.getElementById('view');
+const crumbsEl = document.getElementById('crumbs');
+const contentEl = document.getElementById('content');
+
+function ir(clave) {
+  vistaActual = clave;
+  renderNav();
+  cerrarCajon();
+  const fn = VISTAS[clave] || (()=>vPlaceholder(clave));
+  viewEl.innerHTML = fn();
+  crumbsEl.innerHTML = `<b>CONTROL</b><span class="sep">${IC.chevron}</span>${TITULOS[clave]}`;
+  contentEl.scrollTop = 0;
+  const cajon = CAJONES[clave];
+  if (cajon) wireRows(cajon[0], tr => abrirCajon(cajon[1](+tr.dataset.row)));
+  if (clave === 'pedidos') wirePedidos();
+  if (clave === 'ordenes') wireOrdenes();
+}
+
+function wireRows(sel, handler) {
+  document.querySelectorAll(sel + ' tbody tr').forEach(tr => {
+    tr.onclick = () => {
+      document.querySelectorAll(sel + ' tbody tr').forEach(x => x.classList.remove('sel'));
+      tr.classList.add('sel');
+      handler(tr);
+    };
+  });
+}
+
+/* ---- Cajón ---- */
+const scrim = document.getElementById('scrim');
+const drawer = document.getElementById('drawer');
+function abrirCajon(html) {
+  drawer.innerHTML = html;
+  drawer.classList.add('show');
+  scrim.classList.add('show');
+  const c = drawer.querySelector('#closeDrawer');
+  if (c) c.onclick = cerrarCajon;
+}
+function cerrarCajon() {
+  drawer.classList.remove('show');
+  scrim.classList.remove('show');
+  document.querySelectorAll('.data tbody tr.sel').forEach(x => x.classList.remove('sel'));
+}
+scrim.onclick = cerrarCajon;
+
+/* ---- Riel colapsable ---- */
+const app = document.getElementById('app');
+document.getElementById('railToggle').onclick = () => app.classList.toggle('rail-collapsed');
+
+/* ---- Tema ---- */
+const themeBtn = document.getElementById('themeToggle');
+function temaVigente() {
+  const attr = document.documentElement.getAttribute('data-theme');
+  if (attr) return attr;
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function pintarBotonTema() { themeBtn.innerHTML = temaVigente()==='dark' ? IC.sun : IC.moon; }
+themeBtn.onclick = () => {
+  const nuevo = temaVigente()==='dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', nuevo);
+  pintarBotonTema();
+};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', pintarBotonTema);
+
+/* ---- Command palette ---- */
+const cmdkScrim = document.getElementById('cmdkScrim');
+const cmdkInput = document.getElementById('cmdkInput');
+const cmdkList = document.getElementById('cmdkList');
+const COMANDOS = NAV_LEAVES.map(l => ({clave:l.clave, titulo:l.titulo, icono:l.icono||IC.resumen, grupo:l.grupo||'General'}));
+const ORD_BUSCA = OP.map(o=>({op:o.op, modelo:o.modelo, cliente:o.cli}));
+
+function renderCmdk(q='') {
+  q = q.toLowerCase().trim();
+  const mods = COMANDOS.filter(c => !q || c.titulo.toLowerCase().includes(q));
+  const ords = q ? ORD_BUSCA.filter(o => o.op.toLowerCase().includes(q) || o.modelo.toLowerCase().includes(q) || o.cliente.toLowerCase().includes(q)) : [];
+  let html = '';
+  if (ords.length) {
+    html += `<div class="cmdk-sec">Órdenes</div>` + ords.map(o=>`
+      <div class="cmdk-row" data-go="ordenes">${IC.ordenes}<span><b>${o.op}</b> · ${o.modelo}</span><span class="r">${o.cliente}</span></div>`).join('');
+  }
+  html += `<div class="cmdk-sec">Ir a módulo</div>` + (mods.length?mods:COMANDOS).map(c=>`
+    <div class="cmdk-row" data-go="${c.clave}">${c.icono}<span>${c.titulo}</span><span class="r">${c.grupo}</span></div>`).join('');
+  cmdkList.innerHTML = html;
+  cmdkList.querySelectorAll('[data-go]').forEach(r => r.onclick = () => { ir(r.dataset.go); cerrarCmdk(); });
+  const first = cmdkList.querySelector('.cmdk-row'); if (first) first.classList.add('hl');
+}
+function abrirCmdk() { cmdkScrim.classList.add('show'); cmdkInput.value=''; renderCmdk(); setTimeout(()=>cmdkInput.focus(),30); }
+function cerrarCmdk() { cmdkScrim.classList.remove('show'); }
+document.getElementById('openCmdk').onclick = abrirCmdk;
+cmdkInput.oninput = () => renderCmdk(cmdkInput.value);
+cmdkScrim.onclick = (e) => { if (e.target===cmdkScrim) cerrarCmdk(); };
+cmdkInput.onkeydown = (e) => {
+  if (e.key==='Enter') { const hl = cmdkList.querySelector('.cmdk-row.hl'); if (hl){ ir(hl.dataset.go); cerrarCmdk(); } }
+};
+addEventListener('keydown', (e) => {
+  if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k') { e.preventDefault(); cmdkScrim.classList.contains('show')?cerrarCmdk():abrirCmdk(); }
+  if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='b') { e.preventDefault(); app.classList.toggle('rail-collapsed'); }
+  if (e.key==='Escape') { cerrarCmdk(); cerrarCajon(); }
+});
+
+/* ---- Toast demo en botones primarios ---- */
+const toast = document.getElementById('toast');
+let toastT;
+function mostrarToast(msg) {
+  toast.innerHTML = IC.check + `<span>${msg}</span>`;
+  toast.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(()=>toast.classList.remove('show'), 2200);
+}
+/* ============================================================
+   Alta de registros (formularios funcionales)
+   ============================================================ */
+const CLIENTES = ['Liverpool','Coppel','Suburbia','Shasa','Sears','Del Sol','Woolworth'];
+const ROLES = ['Administrador','Producción','Compras','Ventas','Calidad','Almacén','Diseño'];
+const TEMPORADAS = ['PV26','OI26','PV27'];
+const ALMACENES = ['Almacén PT Central','Almacén PT Norte','Almacén PT Sur'];
+const TELA_MAP = { alg:'Algodón peinado 30/1', felpa:'Felpa francesa 320g', mezcl:'Mezclilla stretch 8oz', lycra:'Lycra suplex 240g', franela:'Franela lavada 180g' };
+
+function hoyStr() {
+  const d = new Date();
+  const m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()}`;
+}
+function siguienteNum(arr, idx) {
+  return arr.reduce((mx,r)=>{ const n = parseInt(String(r[idx]).replace(/\D/g,''),10)||0; return n>mx?n:mx; }, 0) + 1;
+}
+const folio = (prefix, arr, idx=0) => prefix + siguienteNum(arr, idx);
+const badgeEstado = (e) => ({Activo:'ok',Confirmado:'ok','En producción':'info',Cerrado:'neutral',Borrador:'warn'}[e] || 'neutral');
+const nums = (s) => parseInt(s,10) || 0;
+const dec = (s) => parseFloat(s) || 0;
+const opModelos = () => MODELOS.map(m => m[1]);
+const opProv = () => PROV.map(p => p[1]);
+const opOrdenes = () => OP.map(o => `${o.op} · ${o.modelo}`);
+
+const FORMS = {
+  modelos: {
+    titulo: 'Nuevo modelo', vista: 'modelos', exito: 'Modelo creado',
+    campos: [
+      { k:'nombre', l:'Nombre del modelo', t:'text', ph:'Playera cuello redondo', req:true, col:2 },
+      { k:'temporada', l:'Temporada', t:'select', op:TEMPORADAS },
+      { k:'tela', l:'Tela principal', t:'select', op:[['alg','Algodón peinado 30/1'],['felpa','Felpa francesa 320g'],['mezcl','Mezclilla stretch 8oz'],['lycra','Lycra suplex 240g'],['franela','Franela lavada 180g']] },
+      { k:'tallas', l:'Rango de tallas', t:'text', ph:'S–XL' },
+      { k:'costo', l:'Costo estimado ($)', t:'number', ph:'0.00' },
+      { k:'estado', l:'Estado', t:'select', op:['Borrador','Activo'], col:2 },
+    ],
+    crear: (v) => MODELOS.unshift([ folio('MJD-', MODELOS), v.nombre, v.temporada, v.tela, TELA_MAP[v.tela], ['#0e7c47','#111827','#ffffff'], v.tallas||'S–XL', 0, v.estado, badgeEstado(v.estado), dec(v.costo) ]),
+  },
+  pedidos: {
+    titulo: 'Nuevo pedido interno', vista: 'pedidos', exito: 'Pedido interno creado',
+    campos: [
+      { k:'cliente', l:'Cliente', t:'select', op:CLIENTES, req:true },
+      { k:'empresa', l:'Empresa', t:'select', op:['FR Moda','Marilyn Fitness'] },
+      { k:'modelo', l:'Primer modelo (código)', t:'text', ph:'62190' },
+      { k:'cant', l:'Cantidad', t:'number', ph:'0', req:true },
+      { k:'precio', l:'Precio unitario ($)', t:'number', ph:'0.00' },
+      { k:'estatus', l:'Estatus', t:'select', op:['Vigente','En producción'] },
+    ],
+    crear: (v) => {
+      const num = siguienteNum(PEDIDOS_MES.map(p => [p.folio]), 0);
+      PEDIDOS_MES.unshift({
+        folio: num + '-F', cliente: v.cliente, empresa: (v.empresa==='Marilyn Fitness'?'MF':'FR'),
+        vig: hoyStr() + ' → ' + hoyStr(), estatus: v.estatus || 'Vigente',
+        modelos: [{ modelo: v.modelo || String(60000 + PEDIDOS_MES.length), cant: nums(v.cant), precio: dec(v.precio), fecha: hoyStr(), ord: nextOrdPed(), corte: 0 }],
+      });
+    },
+  },
+  ordenes: {
+    titulo: 'Nueva orden de producción', vista: 'ordenes', exito: 'Orden creada',
+    campos: [
+      { k:'modelo', l:'Modelo (código)', t:'text', ph:'62190', req:true, col:2 },
+      { k:'cliente', l:'Cliente', t:'select', op:CLIENTES },
+      { k:'empresa', l:'Empresa', t:'select', op:['FR Moda','Marilyn Fitness'] },
+      { k:'ref', l:'Pedido del cliente', t:'text', ph:'620000' },
+      { k:'piezas', l:'Cantidad ordenada', t:'number', ph:'0', req:true },
+      { k:'mes', l:'Mes de entrega', t:'select', op:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'] },
+      { k:'precio', l:'Precio de venta ($)', t:'number', ph:'0.00', col:2 },
+    ],
+    crear: (v) => {
+      OP.unshift({ emp:(v.empresa==='Marilyn Fitness'?'MF':'FR'), op:nextOpNum(), modelo:v.modelo, ref:v.ref||'—', ord:nums(v.piezas), corte:0, maq:'', nmaq:0, est:'', ped:String(1500+PEDIDOS_MES.length), oc:'', mes:v.mes||'julio', cli:v.cliente, pVta:dec(v.precio)||148, tela:'Felpa' });
+      opSel = 0;
+    },
+  },
+  produccion: {
+    titulo: 'Registrar corte', vista: 'produccion', exito: 'Corte registrado',
+    campos: [
+      { k:'orden', l:'Orden', t:'select', op:()=>OP.map(o=>o.op), req:true },
+      { k:'modelo', l:'Modelo', t:'select', op:opModelos },
+      { k:'cortado', l:'Piezas cortadas', t:'number', ph:'0', req:true },
+      { k:'maquilero', l:'Maquilero destino', t:'text', ph:'Confecciones León' },
+    ],
+    crear: (v) => PROD.unshift([ v.orden, v.modelo, nums(v.cortado), 0, 0, v.maquilero||'—', 'warn', 'Corte' ]),
+  },
+  rc: {
+    titulo: 'Programar Ruta Crítica', vista: 'rc', exito: 'Ruta programada',
+    campos: [
+      { k:'orden', l:'Orden', t:'select', op:()=>OP.map(o=>o.op), req:true },
+      { k:'modelo', l:'Modelo', t:'select', op:opModelos },
+      { k:'cliente', l:'Cliente', t:'select', op:CLIENTES },
+      { k:'compromiso', l:'Entrega comprometida', t:'text', ph:'12 jul' },
+    ],
+    crear: (v) => RC.unshift([ v.orden, v.modelo, v.cliente, [['Pedido','done'],['Corte','active'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']], 'Corte', v.compromiso||hoyStr(), '+4 d', 'ok' ]),
+  },
+  inventarios: {
+    titulo: 'Movimiento de inventario PT', vista: 'inventarios', exito: 'Movimiento registrado',
+    campos: [
+      { k:'modelo', l:'Modelo', t:'select', op:opModelos, req:true, col:2 },
+      { k:'almacen', l:'Almacén', t:'select', op:ALMACENES },
+      { k:'tipo', l:'Tipo', t:'select', op:['Entrada','Salida','Ajuste'] },
+      { k:'cantidad', l:'Cantidad (pzas)', t:'number', ph:'0', req:true, col:2 },
+    ],
+    crear: (v) => { const c = nums(v.cantidad); INV.unshift([ 'MJD-'+(1000+MODELOS.findIndex(m=>m[1]===v.modelo)+42), v.modelo, v.almacen, c, 0, c ]); },
+  },
+  telas: {
+    titulo: 'Nuevo material', vista: 'telas', exito: 'Material creado',
+    campos: [
+      { k:'nombre', l:'Nombre del material', t:'text', ph:'Algodón peinado 30/1', req:true, col:2 },
+      { k:'tipo', l:'Tipo', t:'select', op:[['tela','Tela'],['avio','Avío'],['servicio','Servicio']] },
+      { k:'proveedor', l:'Proveedor', t:'select', op:opProv },
+      { k:'existencia', l:'Existencia', t:'number', ph:'0' },
+      { k:'unidad', l:'Unidad', t:'select', op:['kg','m','pza','cono','aplic'] },
+      { k:'costo', l:'Costo unitario ($)', t:'number', ph:'0.00', col:2 },
+    ],
+    crear: (v) => { const pref = {tela:'TEL',avio:'AVI',servicio:'SER'}[v.tipo]; MAT.unshift([ pref+'-'+String(siguienteNum(MAT,0)).padStart(4,'0'), v.nombre, v.tipo, v.proveedor, dec(v.existencia), v.unidad||'pza', dec(v.costo) ]); },
+  },
+  compras: {
+    titulo: 'Nueva orden de compra', vista: 'compras', exito: 'OC creada',
+    campos: [
+      { k:'proveedor', l:'Proveedor', t:'select', op:opProv, req:true },
+      { k:'material', l:'Material', t:'text', ph:'Algodón peinado 30/1', req:true },
+      { k:'cantidad', l:'Cantidad', t:'number', ph:'0', req:true },
+      { k:'contraOrden', l:'Contra orden (opcional)', t:'select', op:()=>['—', ...OP.map(o=>o.op)] },
+    ],
+    crear: (v) => OC.unshift([ folio('OC-', OC), v.proveedor, v.material, nums(v.cantidad), 0, 'Pendiente', 'info', v.contraOrden||'—' ]),
+  },
+  proveedores: {
+    titulo: 'Nuevo proveedor', vista: 'proveedores', exito: 'Proveedor creado',
+    campos: [
+      { k:'nombre', l:'Razón social', t:'text', ph:'Hilaturas del Norte', req:true, col:2 },
+      { k:'tipo', l:'Tipo', t:'select', op:['Tela','Avío','Maquila (M)','Maquila (A)','Servicio'] },
+      { k:'contacto', l:'Contacto', t:'text', ph:'Ing. Laura Méndez' },
+      { k:'telefono', l:'Teléfono', t:'text', ph:'81 8123 4500' },
+      { k:'surte', l:'Qué surte', t:'text', ph:'Algodón, jersey' },
+    ],
+    crear: (v) => PROV.unshift([ 'PRV-0'+siguienteNum(PROV,0), v.nombre, v.tipo, v.contacto||'—', v.telefono||'—', v.surte||'—', 0, 'ok' ]),
+  },
+  calidad: {
+    titulo: 'Nueva auditoría AQL', vista: 'calidad', exito: 'Auditoría registrada',
+    campos: [
+      { k:'orden', l:'Orden', t:'select', op:()=>OP.map(o=>o.op), req:true },
+      { k:'modelo', l:'Modelo', t:'select', op:opModelos },
+      { k:'muestra', l:'Tamaño de muestra', t:'number', ph:'0', req:true },
+      { k:'defectos', l:'Defectos encontrados', t:'number', ph:'0', req:true },
+      { k:'aql', l:'Nivel AQL', t:'select', op:['1.0','1.5','2.5','4.0'], col:2 },
+    ],
+    crear: (v) => { const d = nums(v.defectos); const rz = d>5; CAL.unshift([ folio('AQL-', CAL), v.orden, v.modelo, nums(v.muestra), d, v.aql||'2.5', rz?'Rechazada':'Aceptada', rz?'crit':'ok' ]); },
+  },
+  usuarios: {
+    titulo: 'Nuevo usuario', vista: 'usuarios', exito: 'Usuario creado',
+    campos: [
+      { k:'nombre', l:'Nombre completo', t:'text', ph:'Laura Hernández', req:true, col:2 },
+      { k:'rol', l:'Rol', t:'select', op:ROLES },
+      { k:'nivel', l:'Nivel (1–100)', t:'number', ph:'20' },
+      { k:'modulos', l:'Módulos con acceso', t:'text', ph:'Prod · RC · Inv', col:2 },
+    ],
+    crear: (v) => USERS.unshift([ v.nombre, v.rol, nums(v.nivel)||20, v.modulos||'—', 'Recién creado', 'ok' ]),
+  },
+};
+
+/* ---- Modal ---- */
+const modalScrim = document.getElementById('modalScrim');
+const modalForm = document.getElementById('modalForm');
+const modalBody = document.getElementById('modalBody');
+const modalTitle = document.getElementById('modalTitle');
+
+function renderCampo(c) {
+  const opts = typeof c.op === 'function' ? c.op() : c.op;
+  let ctrl;
+  if (c.t === 'select') {
+    ctrl = `<select name="${c.k}" ${c.req?'required':''}>` + (opts||[]).map(o => {
+      const [val,lab] = Array.isArray(o) ? o : [o,o];
+      return `<option value="${val}">${lab}</option>`;
+    }).join('') + `</select>`;
+  } else if (c.t === 'number') {
+    ctrl = `<input name="${c.k}" type="number" step="any" min="0" inputmode="decimal" placeholder="${c.ph||''}" ${c.req?'required':''}>`;
+  } else {
+    ctrl = `<input name="${c.k}" type="text" placeholder="${c.ph||''}" ${c.req?'required':''}>`;
+  }
+  return `<label class="ff ${c.col===2?'col2':''}"><span class="ffk">${c.l}${c.req?' *':''}</span>${ctrl}</label>`;
+}
+function abrirForm(key) {
+  const f = FORMS[key]; if (!f) return;
+  cerrarCajon(); cerrarCmdk();
+  modalForm.dataset.key = key;
+  modalTitle.textContent = f.titulo;
+  modalBody.innerHTML = f.campos.map(renderCampo).join('');
+  modalScrim.classList.add('show');
+  setTimeout(() => { const el = modalBody.querySelector('input,select'); if (el) el.focus(); }, 40);
+}
+function cerrarForm() { modalScrim.classList.remove('show'); }
+function resaltarNueva() {
+  const tr = document.querySelector('#view .data tbody tr');
+  if (tr) { tr.classList.add('just-added'); setTimeout(() => tr.classList.remove('just-added'), 2100); }
+}
+modalForm.onsubmit = (e) => {
+  e.preventDefault();
+  if (modalForm.dataset.key && modalForm.dataset.key.startsWith('precio:')) { guardarPrecio(modalForm.dataset.key.split(':')[1]); return; }
+  const f = FORMS[modalForm.dataset.key]; if (!f) return;
+  const v = {}; new FormData(modalForm).forEach((val,k) => v[k] = String(val).trim());
+  f.crear(v);
+  cerrarForm();
+  ir(f.vista);
+  resaltarNueva();
+  mostrarToast(f.exito || 'Registro creado');
+};
+document.getElementById('modalClose').onclick = cerrarForm;
+document.getElementById('modalCancel').onclick = cerrarForm;
+modalScrim.onclick = (e) => { if (e.target === modalScrim) cerrarForm(); };
+
+/* ---- Clic global: alta o toast demo ---- */
+document.addEventListener('click', (e) => {
+  const add = e.target.closest('[data-add]');
+  if (add) { abrirForm(add.dataset.add); return; }
+  const b = e.target.closest('.btn.primary');
+  if (b && !b.hasAttribute('onclick') && !e.target.closest('.modal, .cmdk, .proc')) mostrarToast(b.textContent.trim() + ' — demo');
+});
+procScrim.onclick = (e) => { if (e.target === procScrim) cerrarProceso(); };
+addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (procScrim.classList.contains('show')) cerrarProceso();
+  else cerrarForm();
+});
+
+/* ---- Init ---- */
+renderNav();
+pintarBotonTema();
+ir('resumen');
+</script>
