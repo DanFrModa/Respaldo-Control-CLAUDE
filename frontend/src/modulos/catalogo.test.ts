@@ -47,13 +47,14 @@ describe('catalogo de modulos del menu', () => {
     // → 88 entradas.
     // F7-E5: +1 sub-vista de Indicadores (inventarios cíclicos, `indicadores.ciclicos-*`); las
     // pantallas de conteo/exactitud son detalle (rutas en App, NO en el menú) = 75 sub-vistas → 89.
+    // F8-E2: +1 módulo Desarrollo (`desarrollo.ver`, entre Modelos y Pedidos) = 15 planeados → 90.
     const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
-    expect(planeados).toHaveLength(14);
-    expect(MODULOS_MENU).toHaveLength(89);
+    expect(planeados).toHaveLength(15);
+    expect(MODULOS_MENU).toHaveLength(90);
     const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(89);
+    expect(new Set(claves).size).toBe(90);
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(89);
+    expect(new Set(rutas).size).toBe(90);
   });
 
   it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {

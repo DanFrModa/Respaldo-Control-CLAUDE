@@ -148,6 +148,17 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     permisos: ['modelos.ver'],
     subVista: true,
   },
+  // Desarrollo (Módulo 15, F8-E2): la capa PREVIA al pedido — proyectos por Cliente+Departamento y
+  // sus desarrollos (un modelo con dos números). Va entre Modelos y Pedidos (el flujo natural
+  // desarrollo → pedido). Lo gobierna `desarrollo.ver`.
+  {
+    clave: 'desarrollo',
+    titulo: 'Desarrollo',
+    descripcion: 'Proyectos de desarrollo por cliente y departamento, y sus desarrollos por modelo',
+    ruta: '/desarrollo',
+    icono: 'portapapeles',
+    permisos: ['desarrollo.ver'],
+  },
   {
     clave: 'pedidos',
     titulo: 'Pedidos',
