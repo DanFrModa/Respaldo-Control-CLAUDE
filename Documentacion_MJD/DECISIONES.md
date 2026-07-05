@@ -124,6 +124,20 @@
 - **Encaje en el plan:** módulo nuevo **15 (Desarrollo y Cotización)**; **fase F8 nueva** entre F7 (usa su motor de costeo) y Finanzas (que se renumera a **F9**; Go-live pasa a **F10** — mismo criterio secuencial que cuando se insertó Finanzas); requisitos derivados **R16–R20**; el impreso "Lista de precios" de R9 (pendiente sin módulo en `HOJA-DE-RUTA.md` §4) queda asignado aquí. **Sin ETL de Access**: proyectos/negociación hoy viven en Excel; la fase arranca en cero (como el EDR, D2 #11). Detalle e insumo original: [PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md](PROPUESTA-Desarrollo-Cotizacion-y-Listas-de-Precios.md).
 - **Fecha:** 2026-07-04.
 
+### Decisiones de negocio de F8 (arranque de fase — respuestas a las preguntas de la ficha) — 2026-07-04
+
+Preguntas de [`docs/hoja-de-ruta/F8-etapas.md`](../docs/hoja-de-ruta/F8-etapas.md) resueltas por Daniel al arrancar la fase (vía Gabriel):
+- **(a) Factores del cliente:** por cliente, con **override opcional por departamento** (ej. Damas Básicos con menor margen que Dama Moda); además el snapshot de factores se **copia y es editable en cada lista** de precios.
+- **(b) Fórmula del precio de lista:** **cascada** (margen primero: `costo ÷ (1−margen)`, luego `÷ (1−(descuentos+regalías+costoVentas))`) con **redondeo al alza** (D2). Daniel subirá su Excel con las fórmulas para reconciliar la composición exacta en E4.
+- **(c) Arranque:** **de cero** (no se capturan las listas viejas del Excel). En la misma plática Daniel pidió poder **adjuntar archivos de apoyo (Excel/PDF) a la orden de producción** (= **R6**, confirmado para **F8-E6**) para subir los archivos viejos.
+- **(d) Moneda de insumos:** **todo en MXN**; si un proveedor cotiza en USD, va **solo como referencia** (texto en `condiciones`) y el costo se fija en pesos. Sin motor de tipo de cambio en esta fase.
+- **(e) Precio al pedido:** **sí** — al ligar el desarrollo a su orden, el precio acordado se propone en el renglón del pedido como **default editable** (nunca candado). *(La automatización "OC-PDF del cliente → pedido → OP" es Etapa 2 futura = **R8**.)*
+- **(f) Desarrollos sobre modelos existentes:** **ambos** (ligar un modelo existente o crear uno nuevo).
+- **(g) Promedio de medidas por talla para el precosto:** **promedio simple** (una sola medida promedio; el precosto es estimación). La **compra** sí usa las medidas exactas por talla de cada orden.
+- **(h) Quién apaga/archiva y mueve estados:** apagar desarrollos / archivar proyectos = `desarrollo.administrar`; mover estados de lista = `listas.negociar` (dueño + gerente comercial).
+
+**Refinamiento del reparto de permisos (F8-E1, confirmado por Gabriel 2026-07-04):** `desarrollo.ver` y `listas.ver` quedan **amplios** (cascadean hasta Secretarial); `desarrollo.administrar`, `desarrollo.precostear` y `listas.administrar` se **cortan en Logística hacia abajo** (mismo precedente que `precostos.consultar` de F7); `listas.aprobar` (dueño) y `listas.negociar` (dueño + gerente comercial) quedan restringidos según (h).
+
 ### Decisiones de diseño F3-E1 (motor kardex / Producción) — 2026-06-17
 
 Tomadas al congelar el esquema único de F3 (una sola migración). Detalle técnico en

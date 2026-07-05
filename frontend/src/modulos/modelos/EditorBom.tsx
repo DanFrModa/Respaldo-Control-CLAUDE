@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
 import { CopiarBomDialogo } from './CopiarBomDialogo';
+import { EditorMedidasAvio } from './EditorMedidasAvio';
 
 /** Tope alto: trae los catálogos activos para los selectores de componentes (ordenados por nombre). */
 const QUERY_CATALOGO = {
@@ -135,6 +136,9 @@ export function EditorBom({
   const idsTela = new Set(telas.map((r) => r.id));
   const idsAvio = new Set(avios.map((r) => r.id));
   const idsBordado = new Set(bordados.map((r) => r.id));
+  // Avíos YA guardados en el BOM: solo ellos pueden tener medidas por talla (R18); el endpoint
+  // exige el renglón. Los recién agregados (aún sin guardar) muestran un aviso.
+  const idsAviosGuardados = new Set(ficha.avios.map((a) => a.idAvio));
 
   function agregarTela(id: number): void {
     const tela = catalogoTelas.data?.datos.find((t) => t.id === id);
@@ -327,6 +331,19 @@ export function EditorBom({
           alAgregar={agregarAvio}
           alGuardar={guardarSeccionAvios}
           unidadAyuda="Consumo de avío por prenda."
+          renderExtra={(r) =>
+            idsAviosGuardados.has(r.id) ? (
+              <EditorMedidasAvio
+                idModelo={ficha.id}
+                idAvio={r.id}
+                puedeAdministrar={puedeAdministrar}
+              />
+            ) : (
+              <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
+                Guarda la receta para capturar medidas por talla de este avío.
+              </p>
+            )
+          }
         />
       ) : (
         <SeccionBordados
@@ -386,6 +403,7 @@ function SeccionComponentes({
   alAgregar,
   alGuardar,
   unidadAyuda,
+  renderExtra,
 }: {
   titulo: string;
   renglones: RenglonComponente[];
@@ -399,6 +417,8 @@ function SeccionComponentes({
   alAgregar: (id: number) => void;
   alGuardar: () => void;
   unidadAyuda: string;
+  /** Contenido extra por renglón (p. ej. medidas por talla del avío, R18). Opcional. */
+  renderExtra?: (r: RenglonComponente) => React.ReactNode;
 }): React.JSX.Element {
   const disponibles = catalogo.filter((o) => !idsUsados.has(o.id));
 
@@ -507,6 +527,7 @@ function SeccionComponentes({
                   </label>
                 </fieldset>
               </div>
+              {renderExtra ? renderExtra(r) : null}
             </li>
           ))}
         </ul>

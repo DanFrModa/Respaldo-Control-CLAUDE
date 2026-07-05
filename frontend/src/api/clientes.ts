@@ -15,6 +15,9 @@ import type {
   ClienteCampoCrear,
   ClienteCampoEditar,
   ClienteCrear,
+  ClienteDepartamento,
+  ClienteDepartamentoCrear,
+  ClienteDepartamentoEditar,
   ClienteEditar,
   ClientesPagina,
   ClientesQuery,
@@ -311,5 +314,176 @@ export function useReactivarCampoCliente(): UseMutationResult<ClienteCampo, Erro
   return useMutation({
     mutationFn: reactivarCampo,
     onSuccess: (_resultado, variables) => invalidarCampos(queryClient, variables.idCliente),
+  });
+}
+
+// ── Departamentos del cliente (D13/R16) ─────────────────────────────────────────
+
+/** Clave de cache de los departamentos de UN cliente. */
+function claveDepartamentos(idCliente: number): readonly unknown[] {
+  return [...CLAVE_CLIENTES, 'departamentos', idCliente];
+}
+
+/** Lista los departamentos de un cliente (`GET /api/clientes/{idCliente}/departamentos`). */
+async function listarDepartamentos(idCliente: number): Promise<ClienteDepartamento[]> {
+  const { data, error } = await api.GET('/api/clientes/{idCliente}/departamentos', {
+    params: { path: { idCliente }, query: { incluirInactivos: 'true' } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data.datos;
+}
+
+/**
+ * Lista los departamentos de un cliente, incluidos los desactivados (el editor los muestra
+ * para poder reactivarlos). Deshabilitada si no hay id.
+ */
+export function useDepartamentosCliente(
+  idCliente: number | undefined,
+): UseQueryResult<ClienteDepartamento[], ErrorDeApi> {
+  return useQuery({
+    queryKey: claveDepartamentos(idCliente ?? 0),
+    queryFn: () => listarDepartamentos(idCliente as number),
+    enabled: idCliente !== undefined,
+  });
+}
+
+/** Refresca los departamentos del cliente (no van embebidos en la lista de clientes). */
+function invalidarDepartamentos(
+  queryClient: ReturnType<typeof useQueryClient>,
+  idCliente: number,
+): void {
+  void queryClient.invalidateQueries({ queryKey: claveDepartamentos(idCliente) });
+}
+
+/** Argumentos de la mutacion de alta de un departamento. */
+export interface ArgsAgregarDepartamento {
+  idCliente: number;
+  cuerpo: ClienteDepartamentoCrear;
+}
+
+/** Agrega un departamento (`POST /api/clientes/{idCliente}/departamentos`). */
+async function agregarDepartamento({
+  idCliente,
+  cuerpo,
+}: ArgsAgregarDepartamento): Promise<ClienteDepartamento> {
+  const { data, error } = await api.POST('/api/clientes/{idCliente}/departamentos', {
+    params: { path: { idCliente } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Agrega un departamento e invalida los departamentos del cliente. */
+export function useAgregarDepartamentoCliente(): UseMutationResult<
+  ClienteDepartamento,
+  ErrorDeApi,
+  ArgsAgregarDepartamento
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: agregarDepartamento,
+    onSuccess: (_resultado, variables) => invalidarDepartamentos(queryClient, variables.idCliente),
+  });
+}
+
+/** Argumentos de la mutacion de edicion de un departamento. */
+export interface ArgsActualizarDepartamento {
+  idCliente: number;
+  id: number;
+  cuerpo: ClienteDepartamentoEditar;
+}
+
+/** Actualiza un departamento (`PATCH /api/clientes/{idCliente}/departamentos/{id}`). */
+async function actualizarDepartamento({
+  idCliente,
+  id,
+  cuerpo,
+}: ArgsActualizarDepartamento): Promise<ClienteDepartamento> {
+  const { data, error } = await api.PATCH('/api/clientes/{idCliente}/departamentos/{id}', {
+    params: { path: { idCliente, id } },
+    body: cuerpo,
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Edita un departamento e invalida los departamentos del cliente. */
+export function useActualizarDepartamentoCliente(): UseMutationResult<
+  ClienteDepartamento,
+  ErrorDeApi,
+  ArgsActualizarDepartamento
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: actualizarDepartamento,
+    onSuccess: (_resultado, variables) => invalidarDepartamentos(queryClient, variables.idCliente),
+  });
+}
+
+/** Argumentos de las mutaciones que solo ubican el departamento. */
+export interface ArgsDepartamento {
+  idCliente: number;
+  id: number;
+}
+
+/** Desactiva un departamento (borrado SUAVE, `DELETE .../departamentos/{id}`). */
+async function desactivarDepartamento({
+  idCliente,
+  id,
+}: ArgsDepartamento): Promise<ClienteDepartamento> {
+  const { data, error } = await api.DELETE('/api/clientes/{idCliente}/departamentos/{id}', {
+    params: { path: { idCliente, id } },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Desactiva un departamento e invalida los departamentos del cliente. */
+export function useDesactivarDepartamentoCliente(): UseMutationResult<
+  ClienteDepartamento,
+  ErrorDeApi,
+  ArgsDepartamento
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: desactivarDepartamento,
+    onSuccess: (_resultado, variables) => invalidarDepartamentos(queryClient, variables.idCliente),
+  });
+}
+
+/** Reactiva un departamento desactivado: PATCH con `{ activo: true }`. */
+async function reactivarDepartamento({
+  idCliente,
+  id,
+}: ArgsDepartamento): Promise<ClienteDepartamento> {
+  const { data, error } = await api.PATCH('/api/clientes/{idCliente}/departamentos/{id}', {
+    params: { path: { idCliente, id } },
+    body: { activo: true },
+  });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Reactiva un departamento desactivado e invalida los departamentos del cliente. */
+export function useReactivarDepartamentoCliente(): UseMutationResult<
+  ClienteDepartamento,
+  ErrorDeApi,
+  ArgsDepartamento
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: reactivarDepartamento,
+    onSuccess: (_resultado, variables) => invalidarDepartamentos(queryClient, variables.idCliente),
   });
 }

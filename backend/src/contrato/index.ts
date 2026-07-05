@@ -540,6 +540,72 @@ export {
   type TiposProcesoPagina,
 } from './esquemas/tipo-proceso.js';
 
+// ── Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1; D13/R16–R20) ──
+export {
+  esquemaConceptoCostoCrear,
+  esquemaConceptoCostoEditar,
+  esquemaConceptoCostoSalida,
+  esquemaConceptosCostoQuery,
+  esquemaConceptosCostoPagina,
+  type DatosConceptoCostoCrear,
+  type DatosConceptoCostoEditar,
+  type ConceptoCostoSalida,
+  type ConceptosCostoQuery,
+  type ConceptosCostoPagina,
+} from './esquemas/concepto-costo.js';
+
+export {
+  esquemaEstadoListaCrear,
+  esquemaEstadoListaEditar,
+  esquemaEstadoListaSalida,
+  esquemaEstadosListaQuery,
+  esquemaEstadosListaPagina,
+  type DatosEstadoListaCrear,
+  type DatosEstadoListaEditar,
+  type EstadoListaSalida,
+  type EstadosListaQuery,
+  type EstadosListaPagina,
+} from './esquemas/estado-lista.js';
+
+export {
+  esquemaClienteDepartamentoCrear,
+  esquemaClienteDepartamentoEditar,
+  esquemaClienteDepartamentoSalida,
+  esquemaClienteDepartamentosLista,
+  type DatosClienteDepartamentoCrear,
+  type DatosClienteDepartamentoEditar,
+  type ClienteDepartamentoSalida,
+  type ClienteDepartamentosLista,
+} from './esquemas/cliente-departamento.js';
+
+export {
+  esquemaTelaProveedorColorEntrada,
+  esquemaTelaProveedorCrear,
+  esquemaTelaProveedorEditar,
+  esquemaTelaProveedorPatchCuerpo,
+  esquemaTelaProveedorColorSalida,
+  esquemaTelaProveedorSalida,
+  esquemaTelaProveedoresLista,
+  type DatosTelaProveedorColorEntrada,
+  type DatosTelaProveedorCrear,
+  type DatosTelaProveedorEditar,
+  type DatosTelaProveedorPatchCuerpo,
+  type TelaProveedorColorSalida,
+  type TelaProveedorSalida,
+  type TelaProveedoresLista,
+} from './esquemas/tela-proveedor.js';
+
+export {
+  esquemaModeloAvioTallaEntrada,
+  esquemaMedidasAvioGuardar,
+  esquemaModeloAvioTallaSalida,
+  esquemaModeloAvioMedidasSalida,
+  type DatosModeloAvioTallaEntrada,
+  type DatosMedidasAvioGuardar,
+  type ModeloAvioTallaSalida,
+  type ModeloAvioMedidasSalida,
+} from './esquemas/modelo-avio-talla.js';
+
 export {
   DIRECCIONES_MOVIMIENTO,
   ETIQUETAS_DIRECCION_MOVIMIENTO,

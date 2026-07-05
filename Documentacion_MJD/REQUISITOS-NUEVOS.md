@@ -115,6 +115,7 @@ flowchart LR
 - **Qué resuelve:** poder **adjuntar archivos** de cualquier tipo (imágenes, PDF, Excel, fotos de muestra, contramuestras, etc.) ligados a una orden de producción.
 - **Cómo funciona (propuesta):** repositorio de adjuntos por orden (y quizá por modelo), con metadatos (tipo, fecha, quién subió). Almacenamiento configurable (no rutas fijas, ver MEJORAS A5).
 - **Nota del dueño:** la **ficha técnica (R5)** y los **archivos generales (R6)** probablemente sean **cosas independientes** — una es estructurada, el otro es un repositorio libre.
+- **Estado / cuándo (2026-07-04):** Daniel lo **re-priorizó** al arrancar F8 — quiere subir Excel/PDF de apoyo a las órdenes ahora que Desarrollo/Cotización arranca **sin ETL** (para no perder los archivos viejos). **Programación: F8-E6 — CONFIRMADO por Gabriel (2026-07-04)**; se construye junto con la vista 360 de la orden. Reutiliza el motor de archivos + Cloudflare R2 ya existente (el mismo de las fotos de modelos/bordados).
 
 ---
 
@@ -263,6 +264,7 @@ al sistema, de punta a punta:
 - **Cómo funciona (idea):** importar el pedido del cliente (archivo/portal/EDI) → mapear a modelos y cantidades → crear el pedido y sus órdenes.
 - **Relación:** se apoya en los **campos de referencia por cliente (D7)** y en el modelo **Pedido / Pedido Real** ([02 — Pedidos](02-Pedidos.md)).
 - **Nota:** **explícitamente Etapa 2** (no en el primer desarrollo).
+- **Estado / cuándo (2026-07-04):** Daniel lo **re-confirmó** al arrancar F8 ("subir el PDF de la OC del cliente y que se traduzca solo a pedido → OP con los parámetros que dé por orden"). Sigue **para una fase futura (Etapa 2), post-F8** — no entra en el primer desarrollo. Requerirá lectura/extracción del PDF (probablemente asistida por IA) + el enganche pedido→OP que F8 deja listo.
 
 ---
 

@@ -72,15 +72,25 @@ describe('catálogo de permisos', () => {
       'compras.cancelar',
       'compras.recibir',
       'compras.ver',
+      // Desarrollo/Cotización (Módulo 15, F8-E1): conceptos de costo (R19), catálogo config admin-only.
+      'concepto-costo.administrar',
+      'concepto-costo.ver',
       // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
       'costos.capturar',
       'costos.ver',
+      // Desarrollo/Cotización (Módulo 15, F8-E1/E3): proyectos, desarrollos y precosteo persistido (R16/R17).
+      'desarrollo.administrar',
+      'desarrollo.precostear',
+      'desarrollo.ver',
       // Estado de Resultados (Módulo 6, F7-E2): consultar + capturar/generar/conciliar (nivel ≤30).
       'edr.capturar',
       'edr.ver',
       'empresas.administrar',
       // EsMa (F3-E4): validar cargos propuestos desde los recibos (nuevo de v2).
       'esma.cargo-validar',
+      // Desarrollo/Cotización (Módulo 15, F8-E1): estados de lista (R20), catálogo config admin-only.
+      'estado-lista.administrar',
+      'estado-lista.ver',
       'etiquetas-marca.administrar',
       'etiquetas-marca.ver',
       // Indicadores (Módulo Indicadores, F7-E3): tableros directivos (RC/calidad/WIP) — nuevo de v2.
@@ -94,6 +104,11 @@ describe('catálogo de permisos', () => {
       // Inventario de telas por kardex (Módulo 4, F4-E1, D5): ver/mover (nuevos de v2).
       'inventario-telas.mover',
       'inventario-telas.ver',
+      // Listas de precios por cliente (Módulo 15, F8-E4/E5, R20): ver/administrar/aprobar/negociar.
+      'listas.administrar',
+      'listas.aprobar',
+      'listas.negociar',
+      'listas.ver',
       // Modelos (Módulo 2, F1-E4): catálogo + receta/BOM + fotos.
       'modelos.administrar',
       'modelos.ver',
