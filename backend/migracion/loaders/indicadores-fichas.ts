@@ -11,7 +11,7 @@
  *
  * ⭐ Revisor histórico (D11): `verificarFichaOrden` sella `revisorId = sesion.id`. Para PRESERVAR el
  * revisor viejo (`IP_InfConf.IdUsuarios`) —igual que la RC preserva `capturadoPor`— se corre con una
- * sesión cuyo `id` es ese usuario viejo (texto, sin FK — ADR-0005; F9 remapeará usuarios). Si el viejo
+ * sesión cuyo `id` es ese usuario viejo (texto, sin FK — ADR-0005; F10 remapeará usuarios). Si el viejo
  * no trae usuario (0/vacío), cae a la sesión de sistema `etl-sistema`. La `fecha` = `FechaRevision`.
  *
  * `IP_InfConf.Observ` (texto libre) NO se migra: el modelo `FichaVerificacion` no tiene campo de
@@ -42,7 +42,7 @@ export async function cargarFichas(
   reporte.nota(
     'Fichas confiables: `IP_InfConf.Observ` (texto libre) NO se migra — `FichaVerificacion` no tiene ' +
       'campo de observación (checklist por reactivo booleano). El revisor viejo (IdUsuarios) sí se ' +
-      'preserva como `revisorId` (texto sin FK, F9 remapea).',
+      'preserva como `revisorId` (texto sin FK, F10 remapea).',
   );
 
   // Reactivos activos del checklist (clave = nombre de la columna vieja). Una sola query.

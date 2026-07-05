@@ -4,7 +4,7 @@
  * Migra el histórico real del inventario de TELAS (Entradas/Salidas + sus detalles) a la BD de v2
  * como movimientos del KARDEX único (D3), VÍA el MODO MIGRACIÓN de la capa de dominio
  * (`dominio/inventarios/migracion.ts`, A1: el motor de kardex es el único que escribe). Es
- * IDEMPOTENTE (por `MapeoMigracion` + `Movimiento.origenId`) y re-ejecutable (se re-corre en F9).
+ * IDEMPOTENTE (por `MapeoMigracion` + `Movimiento.origenId`) y re-ejecutable (se re-corre en F10).
  *
  * Clasifica las Entradas/Salidas del viejo en (a) pares de traspaso, (b) entradas de compra directas
  * (SIN RecepcionCompra), (c) salidas a orden y (d) salidas sin clasificar (ajuste-salida), y

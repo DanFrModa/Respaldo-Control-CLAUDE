@@ -11,7 +11,7 @@
  *     ProcesoDefRol); LISTA las 14 huérfanas y los tipos sin rol. FactorTela: declarada no migrada (E3).
  *  2. Plantillas de ruta (CP_Tiempos) — una por artículo, con encadenamiento propio.
  *  3. Roles por usuario (Usuarios.IdRC_TipoUsuarios → UsuarioRol) — los usuarios v2 inexistentes
- *     (no migrados aún: eso es F9) se LISTAN como pendientes.
+ *     (no migrados aún: eso es F10) se LISTAN como pendientes.
  *  4. Rutas vivas históricas (RC + RC_IP3/RC_IP4 checklist) → RutaOrden.
  *  5. Estado RC legado de las órdenes (Ordenes.{FechaInicioRC,…,RC_Viva}) — re-confirma lo de F2-E5.
  *  6. Colchón de costura (Propiedades.ColchonCostura → ConfiguracionEmpresa de la empresa favorita).

@@ -2,7 +2,7 @@
  * Reporte de CUADRE de la RUTA CRÍTICA (F5-E7, Pieza B), espejo de `cuadre-f4.ts`/`cuadre-fase.ts`
  * (§7 — un dato tirado en silencio NO puede cerrar en verde). Cuenta v1 (CSV) vs v2 (BD) por entidad y
  * LISTA las inconsistencias de origen que el ETL no "arregla": las 14 asignaciones HUÉRFANAS de
- * `RC_ProcUsua`, los usuarios con tipo sin usuario v2 (pendientes F9) y los `RC_TipoUsuarios` sin Rol,
+ * `RC_ProcUsua`, los usuarios con tipo sin usuario v2 (pendientes F10) y los `RC_TipoUsuarios` sin Rol,
  * y declara `RC_TipoTelas.FactorTela` como columna NO migrada a propósito (ADR-0012/E3).
  *
  * Objetivo: correr el ETL DOS veces seguidas = MISMOS números (idempotente). Este cuadre es de SOLO
@@ -39,7 +39,7 @@ export interface ListasCuadreF5 {
   usuariosConTipo: number;
   /** # de esos usuarios cuyo usuario v2 EXISTE hoy (se les pudo/podrá asignar el rol). */
   usuariosCasadosV2: number;
-  /** # de esos usuarios PENDIENTES hasta la migración de usuarios (F9). */
+  /** # de esos usuarios PENDIENTES hasta la migración de usuarios (F10). */
   usuariosPendientesF9: number;
   /** # de usuarios ACTIVOS del viejo SIN tipo RC. */
   activosSinTipo: number;
@@ -163,12 +163,12 @@ async function calcularConteos(cliente: PrismaClient): Promise<RenglonCuadreF5[]
       entidad: 'Roles por usuario (Usuarios → UsuarioRol)',
       v1: 23,
       v2: v2UsuarioRol,
-      nota: 'v1 = 23 usuarios con IdRC_TipoUsuarios. v2 = UsuarioRol total (incluye los de seed/admin). Los usuarios v2 inexistentes quedan PENDIENTES hasta F9 (listados).',
+      nota: 'v1 = 23 usuarios con IdRC_TipoUsuarios. v2 = UsuarioRol total (incluye los de seed/admin). Los usuarios v2 inexistentes quedan PENDIENTES hasta F10 (listados).',
     },
   ];
 }
 
-/** Bloque (2): listas cualitativas (huérfanas, tipos sin rol, usuarios pendientes F9). */
+/** Bloque (2): listas cualitativas (huérfanas, tipos sin rol, usuarios pendientes F10). */
 async function calcularListas(cliente: PrismaClient): Promise<ListasCuadreF5> {
   const { porIdViejo } = await construirPuenteProcesos(cliente);
 
@@ -197,7 +197,7 @@ async function calcularListas(cliente: PrismaClient): Promise<ListasCuadreF5> {
     }
   }
 
-  // Usuarios con tipo: cuántos casan a un usuario v2 EXISTENTE vs pendientes F9; activos sin tipo.
+  // Usuarios con tipo: cuántos casan a un usuario v2 EXISTENTE vs pendientes F10; activos sin tipo.
   const usuariosV2 = await cliente.usuario.findMany({ select: { username: true } });
   const loginsV2 = new Set(usuariosV2.map((u) => u.username.trim().toLowerCase()));
   let usuariosConTipo = 0;
@@ -266,13 +266,13 @@ export function formatearCuadreF5(c: CuadreF5): string {
   for (const d of L.detalleTiposSinRol.slice(0, 20)) p.push(`    - ${d}`);
 
   p.push('');
-  p.push('── Roles por usuario (dependencia cruzada con F9) ──');
+  p.push('── Roles por usuario (dependencia cruzada con F10) ──');
   p.push(
     `  Usuarios del viejo con tipo RC                  : ${String(L.usuariosConTipo)} (esperado 23)`,
   );
   p.push(`    casan a un usuario v2 EXISTENTE (asignables)  : ${String(L.usuariosCasadosV2)}`);
   p.push(
-    `    PENDIENTES hasta migración de usuarios (F9)    : ${String(L.usuariosPendientesF9)} — re-correr el ETL tras F9 los materializa`,
+    `    PENDIENTES hasta migración de usuarios (F10)    : ${String(L.usuariosPendientesF9)} — re-correr el ETL tras F10 los materializa`,
   );
   p.push(`  Usuarios ACTIVOS del viejo SIN tipo RC          : ${String(L.activosSinTipo)}`);
 

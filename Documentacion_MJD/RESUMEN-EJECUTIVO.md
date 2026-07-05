@@ -96,9 +96,12 @@ Detalle en [REQUISITOS-NUEVOS.md](REQUISITOS-NUEVOS.md).
 **Gestión documental:**
 - **R5** Fichas técnicas por orden · **R6** Repositorio de archivos por orden.
 
-**Finanzas (CxC/CxP + CFDI — decisión D12, módulo 14, fase F8):**
+**Finanzas (CxC/CxP + CFDI — decisión D12, módulo 14, fase F9):**
 - **R10** Cuenta corriente unificada de terceros (generaliza EsMa) · **R11** Importar CFDI de proveedores (→CxP) · **R12** Importar CFDI de ventas (→CxC) · **R13** Info fiscal para el contador.
 - **R14** *(futuro)* Timbrado nativo vía PAC · **R15** Catálogo de proveedores enriquecido (va en F1).
+
+**Desarrollo y cotización por cliente (decisión D13, módulo 15, fase F8 — 2026-07-04):**
+- **R16** Proyectos de desarrollo por Cliente+Departamento (con tema) · **R17** Precio de insumo amarrado a proveedor+producto+precio (telas por proveedor y por color) · **R18** Medidas por talla en ciertos avíos · **R19** Conceptos de costo extensibles · **R20** Listas de precios por cliente con aprobación del dueño y negociación por versiones.
 
 **Otros:**
 - **R9** Definir formatos de documentos impresos.

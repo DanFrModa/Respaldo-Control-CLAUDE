@@ -24,7 +24,7 @@
 
 - **D4 Tallas ilimitadas:** columnas `T1..T8` del viejo → tabla `Talla` + tabla pivot `CurvaTalla`.
 - **D5 Telas unificadas:** `Telas` y `TelasDis` del viejo eran la misma entidad desdoblada. En v2 hay UNA tabla `Tela`. La llave de unificación es el nombre normalizado (ADR-0009). Las `TelasDis` sin match en `Telas` se crean como `Tela` propia y se reportan.
-- **D7 Clientes con campos extra:** el campo `Monarch` (referencia del cliente) se generaliza a `ClienteCampo` (N campos configurables por cliente). El valor real se migra en F2/F9; aquí solo la DEFINICIÓN.
+- **D7 Clientes con campos extra:** el campo `Monarch` (referencia del cliente) se generaliza a `ClienteCampo` (N campos configurables por cliente). El valor real se migra en F2/F10; aquí solo la DEFINICIÓN.
 - **Fusión de terceros (R15):** los 4 catálogos del viejo (`Proveedores/Cortadores/Maquileros/Estampadores`) se fusionan en UNA tabla `Proveedor` con N roles. Los homónimos se fusionan y se reportan al cuadre.
 - **Temporadas:** la fuente `Temporadas.csv` está VACÍA. Los modelos tienen `IdTemporadas=0` → se cargan sin temporada (decisión del dueño). Reportado como incidencia en el cuadre E7.
 - **Catálogos globales (A9/ADR-0007):** todos los catálogos de F1 son GLOBALES (sin `idEmpresa`).

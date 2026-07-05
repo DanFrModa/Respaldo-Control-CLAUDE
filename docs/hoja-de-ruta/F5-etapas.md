@@ -377,9 +377,9 @@
 > `"ordenes"`/`"clientes"`/`"modelos"`); habría tronado contra la BD real (lo tapaba que vive en un
 > `*.int.test.ts`, solo CI). **Corregido y re-verificado**; el reviewer aprobó el resto. **Ajustes a la
 > ficha (realidad de los CSV):** el checklist histórico son **9 ítems** (IP3 6 + IP4 3 columnas
-> reales), no 12. **Dependencia cruzada con F9:** los 137 usuarios del viejo no están migrados a v2
-> todavía (eso es F9); el ETL no crea usuarios — casa por login contra usuarios v2 existentes y **lista
-> los pendientes "hasta F9"** (idempotente → re-correr tras F9 los materializa). **Deja abierto:** D8
+> reales), no 12. **Dependencia cruzada con F10:** los 137 usuarios del viejo no están migrados a v2
+> todavía (eso es F10); el ETL no crea usuarios — casa por login contra usuarios v2 existentes y **lista
+> los pendientes "hasta F10"** (idempotente → re-correr tras F10 los materializa). **Deja abierto:** D8
 > (auditoría como proceso de la RC → F6; los procesos #16/#20/#23 quedan con `tipoEvento='auditoria'`),
 > D11 (tableros KPI → F7 sobre `RutaOrden`) y notificaciones push/correo → F7 (el badge de E5 es el
 > mínimo viable). Pendiente operativo: fechas propias de FR para el calendario (decisión (a), no

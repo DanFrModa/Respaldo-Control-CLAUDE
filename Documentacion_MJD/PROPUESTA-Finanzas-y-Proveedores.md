@@ -2,10 +2,12 @@
 
 > **✅ ESTADO: INTEGRADO (2026-06-13).** Esta propuesta ya se incorporó a los documentos
 > oficiales. Su contenido vive ahora en: **D12** (`DECISIONES.md`), **R10–R15**
-> (`REQUISITOS-NUEVOS.md`), **módulo 14** y la **fase F8 (Finanzas)** (`PLANMAESTRO.md` §5/§6),
-> la **fase F8** + la etapa **F1-E1B** (proveedor enriquecido, R15) en `HOJA-DE-RUTA.md` y
-> `docs/hoja-de-ruta/` (ficha `F8-etapas.md`), y el contexto en `CLAUDE.md`. **Numeración
-> resuelta por Gabriel:** la fase de Finanzas es **F8** y **Migración + Go-live pasó a F9**.
+> (`REQUISITOS-NUEVOS.md`), **módulo 14** y la **fase F9 (Finanzas)** (`PLANMAESTRO.md` §5/§6),
+> la **fase F9** + la etapa **F1-E1B** (proveedor enriquecido, R15) en `HOJA-DE-RUTA.md` y
+> `docs/hoja-de-ruta/` (ficha `F9-etapas.md`), y el contexto en `CLAUDE.md`. **Numeración
+> resuelta por Gabriel:** al integrarse, la fase de Finanzas fue **F8** y **Migración + Go-live
+> pasó a F9**; el **2026-07-04** (D13), al insertarse la fase **F8 · Desarrollo, Cotización y
+> Listas de Precios**, **Finanzas pasó a F9** y **Go-live a F10**.
 > Este archivo queda como **insumo histórico** (la plática con Daniel que originó la decisión);
 > la versión viva y normativa son esos documentos. *(Nota: en el cuerpo de abajo, las
 > referencias a "F8" para el Go-live son de la numeración tentativa previa a la decisión.)*

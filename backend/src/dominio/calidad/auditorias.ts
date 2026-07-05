@@ -1206,7 +1206,7 @@ export async function cancelarAuditoria(
  *    defecto SUMANDO fallas (defensa del `@@unique(idAuditoria, idDefecto)`: el viejo trae pares
  *    duplicados — p. ej. la auditoría 488). NO se pre-cargan favoritos (se migra lo que el viejo tenía).
  *  • `elaboroPorId`/`auditorPorId` NO tienen FK física (ADR-0005): se preserva el id de usuario VIEJO
- *    como texto (el loader los pasa); F9 migrará los usuarios y podrá remapearlos. `0`/vacío → null.
+ *    como texto (el loader los pasa); F10 migrará los usuarios y podrá remapearlos. `0`/vacío → null.
  *
  * Lo que CONSERVA (sigue siendo del dominio): A2 (encabezado + detalle + bitácora en UNA tx), A7
  * (bitácora `operacion:'migracion'` con el snapshot viejo), A9 (`idEmpresa` EXPLÍCITO — el loader lo

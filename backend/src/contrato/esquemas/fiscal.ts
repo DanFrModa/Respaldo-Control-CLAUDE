@@ -1,6 +1,6 @@
 /**
  * Validadores fiscales reutilizables (F1-E1B, R15 — proveedores; reutilizables por
- * Finanzas/CFDI en F8). Son funciones PURAS sin dependencias para poder probarlas
+ * Finanzas/CFDI en F9). Son funciones PURAS sin dependencias para poder probarlas
  * sueltas y compartirlas entre el contrato Zod del front y el back.
  *
  * Doc de negocio: `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §4

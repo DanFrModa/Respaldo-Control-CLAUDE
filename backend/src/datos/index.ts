@@ -56,7 +56,7 @@ export interface OpcionesClientePrisma {
 
 /**
  * Crea un cliente Prisma conectado a la URL indicada (driver adapter pg de Prisma 7).
- * Úsalo SOLO fuera de la app (tests, seed, migración F1-E6/F8); la app usa el singleton
+ * Úsalo SOLO fuera de la app (tests, seed, migración F1-E6/F10); la app usa el singleton
  * {@link prisma}. `opciones.transactionOptions` (opcional) sube los tiempos de transacción
  * para tolerar latencia remota; `opciones.poolMax` sube el pool de `pg` para sostener la
  * concurrencia del ETL. Si se omiten, el cliente se comporta EXACTAMENTE como antes.
