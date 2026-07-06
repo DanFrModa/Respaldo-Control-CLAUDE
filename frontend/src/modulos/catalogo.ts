@@ -159,6 +159,19 @@ export const MODULOS_MENU: readonly ModuloMenu[] = [
     icono: 'portapapeles',
     permisos: ['desarrollo.ver'],
   },
+  // Sub-vista de Desarrollo (Módulo 15, F8-E4): listas de precios por Cliente+Departamento —
+  // se generan desde los precostos congelados + factores del cliente y el dueño aprueba/teclea el
+  // precio renglón por renglón. Cuelga del módulo Desarrollo con su propio permiso `listas.ver`.
+  {
+    clave: 'listas-precios',
+    titulo: 'Listas de precios',
+    descripcion:
+      'Listas de precios por cliente y departamento, con factores y aprobación del dueño (PDF/Excel)',
+    ruta: '/listas-precios',
+    icono: 'archivo',
+    permisos: ['listas.ver'],
+    subVista: true,
+  },
   {
     clave: 'pedidos',
     titulo: 'Pedidos',

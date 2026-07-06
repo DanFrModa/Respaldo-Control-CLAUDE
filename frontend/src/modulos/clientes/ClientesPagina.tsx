@@ -1,4 +1,13 @@
-import { Building2, Contact, ListChecks, Mail, MapPin, Phone, UserRound } from 'lucide-react';
+import {
+  Building2,
+  Contact,
+  ListChecks,
+  Mail,
+  MapPin,
+  Percent,
+  Phone,
+  UserRound,
+} from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -14,6 +23,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { DialogoCliente } from './DialogoCliente';
 import { EditorCamposCliente } from './EditorCamposCliente';
 import { EditorDepartamentosCliente } from './EditorDepartamentosCliente';
+import { EditorFactoresCliente } from './EditorFactoresCliente';
 
 /** Renglones por pagina del listado. */
 const POR_PAGINA = 10;
@@ -218,6 +228,12 @@ function DetalleCliente({
   cliente: Cliente;
   puedeAdministrar: boolean;
 }): React.JSX.Element {
+  const { tienePermiso } = useSesion();
+  // Los factores de lista viven en el módulo de listas: se ven con `listas.ver` y se editan con
+  // `listas.administrar` (permisos distintos de los del cliente).
+  const puedeVerFactores = tienePermiso('listas.ver');
+  const puedeAdministrarFactores = tienePermiso('listas.administrar');
+
   const hayContacto =
     hayTexto(cliente.contacto) ||
     hayTexto(cliente.telefono) ||
@@ -258,6 +274,15 @@ function DetalleCliente({
           deshabilitado={!puedeAdministrar || !cliente.activo}
         />
       </SeccionDetalle>
+
+      {puedeVerFactores ? (
+        <SeccionDetalle titulo="Factores de lista de precios (D13/R20a)" icono={Percent}>
+          <EditorFactoresCliente
+            idCliente={cliente.id}
+            deshabilitado={!puedeAdministrarFactores || !cliente.activo}
+          />
+        </SeccionDetalle>
+      ) : null}
 
       <Historial creadoEn={cliente.creadoEn} modificadoEn={cliente.modificadoEn} />
     </>

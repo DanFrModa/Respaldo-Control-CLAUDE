@@ -578,6 +578,16 @@ export {
   type ClienteDepartamentosLista,
 } from './esquemas/cliente-departamento.js';
 
+// ── Factores del cliente para la lista de precios (Módulo 15, F8-E4; D13/R20a) ──
+export {
+  esquemaClienteFactoresGuardar,
+  esquemaClienteFactoresSalida,
+  esquemaClienteFactoresLista,
+  type DatosClienteFactoresGuardar,
+  type ClienteFactoresSalida,
+  type ClienteFactoresLista,
+} from './esquemas/cliente-factores.js';
+
 export {
   esquemaTelaProveedorColorEntrada,
   esquemaTelaProveedorCrear,
@@ -657,6 +667,32 @@ export {
   type PrecostoResumen,
   type PrecostosDesarrolloLista,
 } from './esquemas/precosto.js';
+
+// ── Lista de precios por Cliente+Departamento (Módulo 15, F8-E4; D13/R20a) ──
+export {
+  esquemaListaPreciosCrear,
+  esquemaListaFactoresEditar,
+  esquemaAjustarPrecioLinea,
+  esquemaListaPreciosLineaSalida,
+  esquemaListaPreciosDetalle,
+  esquemaListaPreciosResumen,
+  esquemaListasPreciosLista,
+  esquemaListasPreciosQuery,
+  esquemaCandidatoLista,
+  esquemaCandidatosLista,
+  esquemaCandidatosQuery,
+  type DatosListaPreciosCrear,
+  type DatosListaFactoresEditar,
+  type DatosAjustarPrecioLinea,
+  type ListaPreciosLineaSalida,
+  type ListaPreciosDetalle,
+  type ListaPreciosResumen,
+  type ListasPreciosLista,
+  type ListasPreciosQuery,
+  type CandidatoLista,
+  type CandidatosLista,
+  type CandidatosQuery,
+} from './esquemas/lista-precios.js';
 
 export {
   DIRECCIONES_MOVIMIENTO,
