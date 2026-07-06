@@ -155,6 +155,17 @@ Resumen (KPIs + órdenes por vencer + cortes/semana + bandeja RC), Modelos (tabl
 
 Además: **todos los botones de "alta"** abren un **formulario funcional** que agrega la fila a su tabla (con folios autogenerados, fechas "hoy", selects poblados desde los datos, validación) — para que Daniel sienta la app "casi 100% funcional".
 
+### 4.6 Notas de salida — envío de AVÍOS a maquileros (diseñada 6-jul-2026) ✅
+Remisión de materiales al maquilero, **ligada al inventario de avíos**. Calca el modelo real de F4/R4 (`NotaSalida` + `NotaSalidaLinea` en `schema.prisma`; dominio `backend/src/dominio/notas/notas-salida.ts`), que **ya soporta** lo que pidió Daniel:
+- **Una nota → varios renglones → cada renglón lleva SU orden** (`NotaSalidaLinea.idOrden`, por línea): una nota puede llevar avíos de **una o varias órdenes**. Consultar "qué notas mandé de la OP X" es directo (cada línea cita su orden). Desde el detalle de la OP, el botón **"Notas salida"** filtra la lista a esa orden (chip removible).
+- **Avío por renglón** tomado del catálogo/inventario; al **confirmar** se descuenta el kardex de avíos (`salida-por-nota`, bajo advisory lock); estados **borrador → confirmada → cancelada** (cancelar = movimiento inverso auditado, D3). "Capturado por" en cada nota (A7).
+- **Constructor multi-renglón** (panel deslizante estilo `proc`): maquilero (combobox typeahead — homónimos), empresa, almacén origen, fechas; renglones con avío + orden + cantidad + **existencia disponible** (avisa en rojo si excede). Totales vivos (# órdenes · # renglones). Lista con chips de "órdenes surtidas"; cajón de detalle **agrupado por orden**.
+- **Ligado a la receta de la orden (decisión Daniel, 6-jul):** el modelo ya sabe qué avíos lleva la orden (BOM `ModeloAvio` / explosión MRP). El constructor **PROPONE, NO LIMITA**: botón **"Traer avíos de la orden"** carga los avíos de la receta con cantidad sugerida (piezas × consumo por pieza), y cada renglón marca **✓ "en la receta de la orden"** / **⚠ "fuera de la receta — se enviará igual"**. Se puede enviar un avío que la orden no define (ej. un cierre a una orden sin cierre) **sin bloqueo** — solo avisa.
+
+**Decisiones de Daniel (6-jul-2026), confirmadas:**
+1. Una nota = **un maquilero**; todas sus órdenes de la **misma empresa** (folio por empresa, A9); **un solo almacén origen** por nota (decisión (g) de F4).
+2. **Telas: NO van en esta nota.** Como la tela sale de **otro almacén** (almacén de telas), Daniel prefiere manejarla con **su propia nota de salida** relacionada al almacén de telas → estas notas quedan **solo-avíos**. *(El modelo real sí permite renglones de tela que referencian una salida-a-orden ya registrada sin re-descontar, decisión (e); se optó por separarlas por almacén. La nota de telas queda pendiente de diseñar — ver §7.)*
+
 ---
 
 ## 5. Cómo está hecho el prototipo (para modificarlo)
@@ -188,7 +199,8 @@ Ruta sugerida (por fases, con el proceso normal coder+reviewer → PR a `prueba`
 ## 7. Pendientes / decisiones abiertas
 
 - **Combobox de proveedores:** ¿permitir texto libre (proveedor nuevo) o **forzar selección de lista**? (preguntado, sin cerrar).
-- Pantallas aún **no diseñadas** (hoy placeholder): Pre-costeos, Cotizaciones/Listas de precios, Notas de salida, Avíos (separado de Telas), Clientes (catálogo/ventas), CxC/CxP, EDR, Catálogos base. Daniel las irá mostrando una por una (screenshot + explicación) para diseñarlas con el mismo criterio.
+- Pantallas aún **no diseñadas** (hoy placeholder): Pre-costeos, Cotizaciones/Listas de precios, Avíos (separado de Telas), Clientes (catálogo/ventas), CxC/CxP, EDR, Catálogos base. Daniel las irá mostrando una por una (screenshot + explicación) para diseñarlas con el mismo criterio.
+- **Nota de salida de TELAS:** pendiente de diseñar. Sale del **almacén de telas** (otro almacén), así que va en su **propia nota** relacionada a ese almacén, separada de la de avíos (decisión Daniel, 6-jul). Puede reusar la "salida de tela a orden" que ya existe en Inventario (F4) como documento de respaldo.
 - Confirmar si se conserva **Inter** o se adopta el stack de sistema en el real.
 - La pantalla vieja de Órdenes tenía además: Composición/Composición forzada, Precio de venta editable, "Maquila real", EXP/Copiar, RC (Clave/Tipo tela/Programar/Concentrado). Evaluar cuáles entran.
 

@@ -636,6 +636,50 @@
   .proc-summary-title { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; margin: 18px 0 2px; }
 
   /* ---------- Modal de formulario ---------- */
+  /* ---- Notas de salida ---- */
+  .op-chips { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+  .op-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border-radius: 6px; font-family: var(--ff-mono); font-size: 11.5px; font-weight: 600; background: var(--brand-soft); color: var(--brand-soft-fg); }
+  .op-chip.more { background: var(--hover); color: var(--muted); }
+  .nota-enc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; }
+  .nota-enc .col-span { grid-column: 1 / -1; }
+  .nota-enc select, .nota-enc input { height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: inherit; outline: none; }
+  .nota-enc select:focus, .nota-enc input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+  .nota-lines { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 10px; }
+  .nota-lrow { display: grid; grid-template-columns: 1.4fr 1.9fr 148px 1.1fr 32px; gap: 10px; align-items: start; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 11px; }
+  .nota-lrow.over { border-color: color-mix(in srgb, var(--crit) 42%, var(--border)); background: color-mix(in srgb, var(--crit) 4%, var(--panel)); }
+  .lblrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
+  .ln-cantwrap { display: flex; align-items: center; gap: 6px; }
+  .ln-cant { flex: 1; min-width: 0; height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: var(--ff-mono); text-align: right; outline: none; }
+  .ln-cant:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+  .ln-un { font-size: 11.5px; color: var(--muted); min-width: 28px; }
+  .ln-exist { font-size: 11.5px; color: var(--muted); align-self: start; margin-top: 20px; line-height: 1.3; }
+  .ln-exist b { color: var(--text); font-family: var(--ff-mono); }
+  .ln-del { align-self: start; margin-top: 20px; height: 34px; width: 32px; border: 1px solid var(--border); background: var(--panel); border-radius: 8px; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+  .ln-del svg { width: 15px; height: 15px; }
+  .ln-del:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, var(--border)); }
+  .nota-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--panel); }
+  .nota-tot { font-size: 12.5px; color: var(--muted); }
+  .nota-tot b { color: var(--text); font-family: var(--ff-mono); }
+  .btn.sm { height: 30px; padding: 0 12px; font-size: 12px; }
+  .nota-helper { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); background: var(--brand-soft); border: 1px solid color-mix(in srgb, var(--brand) 20%, transparent); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; }
+  .nota-helper > span { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 220px; }
+  .nota-helper > span svg { width: 14px; height: 14px; flex: none; color: var(--brand); }
+  .nota-helper select { height: 30px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12px; font-family: inherit; padding: 0 8px; outline: none; max-width: 200px; }
+  .nota-helper select:focus { border-color: var(--brand); }
+  .ln-receta { font-size: 10.5px; font-weight: 600; margin-top: 2px; display: none; }
+  .ln-receta.in { color: var(--ok); display: block; }
+  .ln-receta.out { color: var(--warn); display: block; }
+  .nsl-group + .nsl-group { margin-top: 10px; }
+  .nsl-ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px 8px 0 0; font-size: 12px; color: var(--muted); }
+  .nsl-ghead b { color: var(--text); font-family: var(--ff-mono); }
+  .nsl-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 11px; border: 1px solid var(--border); border-top: 0; font-size: 12.5px; }
+  .nsl-line:last-child { border-radius: 0 0 8px 8px; }
+  .nsl-line .nsl-qty { font-family: var(--ff-mono); font-weight: 600; white-space: nowrap; }
+  .nsl-line .cell-sub { margin-top: 1px; }
+  .filtro-orden { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--brand-soft); color: var(--brand-soft-fg); border: 1px solid color-mix(in srgb, var(--brand) 26%, transparent); border-radius: 9px; font-size: 12.5px; margin-bottom: 14px; }
+  .filtro-orden b { font-family: var(--ff-mono); }
+  .filtro-orden button { margin-left: 2px; border: 0; background: color-mix(in srgb, var(--brand) 16%, transparent); color: inherit; width: 20px; height: 20px; border-radius: 5px; cursor: pointer; display: grid; place-items: center; font-size: 13px; }
+
   .modal-scrim { position: fixed; inset: 0; background: rgba(6,18,12,.5); backdrop-filter: blur(2px); z-index: 95; display: none; align-items: flex-start; justify-content: center; padding: 7vh 16px 16px; }
   .modal-scrim.show { display: flex; }
   .modal { width: min(560px, 95vw); background: var(--panel); border: 1px solid var(--border-strong); border-radius: 16px; box-shadow: var(--shadow-lg); overflow: hidden; display: flex; flex-direction: column; max-height: 86vh; }
@@ -766,6 +810,9 @@
     </div>
   </form>
 </div>
+
+<!-- Constructor de nota de salida -->
+<div class="proc-scrim" id="notaScrim"><div class="proc" id="notaPanel"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -1259,6 +1306,7 @@ function vOrdenes() {
 function accionOP(ic, l) { return `<button class="opd-act" onclick="opAccion('${l}')">${IC[ic]}<span>${l}</span></button>`; }
 function opAccion(l) {
   const nav = { 'Modelo':'modelos', 'O.C.':'compras', 'Ruta crítica':'rc', 'Consumo tela':'telas' };
+  if (l === 'Notas salida') { notasFiltroOrden = (OP[opSel] || {}).op || ''; _keepFiltroNota = true; ir('notas-salida'); return; }
   if (nav[l]) { ir(nav[l]); return; }
   mostrarToast(l + ' — demo');
 }
@@ -1950,6 +1998,368 @@ function vCompras() {
   </div>`;
 }
 
+/* ---- Notas de salida (envío de AVÍOS a maquileros, ligado al inventario) ----
+   Modelo real (F4/R4): una NOTA (folio por empresa, maquilero, almacén origen)
+   con RENGLONES; cada renglón lleva su ORDEN (idOrden por línea) + avío + cant.
+   → una nota puede llevar varios avíos de varias órdenes. Al CONFIRMAR se
+   descuenta el kardex de avíos (salida-por-nota); borrador→confirmada→cancelada
+   (cancelación = movimiento inverso, D3). Consulta por OP = notas que citan la
+   orden. Auditoría "capturado por" en cada nota (A7). */
+const ALMACENES_NOTA = ['Almacén de avíos', 'Bodega habilitación', 'Almacén general'];
+const AVIOS_CAT = [
+  { sku:'AVI-0318', nom:'Etiqueta tejida MJD',        un:'pza',  exist:18000 },
+  { sku:'AVI-0330', nom:'Etiqueta de composición',    un:'pza',  exist:9200 },
+  { sku:'AVI-0341', nom:'Bolsa polietileno 30×40',    un:'pza',  exist:12000 },
+  { sku:'AVI-0301', nom:'Hilo poliéster Tex 40',      un:'cono', exist:4200 },
+  { sku:'AVI-0325', nom:'Resorte 3 cm',               un:'m',    exist:5600 },
+  { sku:'AVI-0375', nom:'Elástico 5 cm',              un:'m',    exist:2100 },
+  { sku:'AVI-0362', nom:'Botón 4 hoyos 18L',          un:'pza',  exist:26000 },
+  { sku:'AVI-0350', nom:'Cierre #5 metálico 18 cm',   un:'pza',  exist:3400 },
+  { sku:'AVI-0388', nom:'Cordón grueso 8 mm',         un:'m',    exist:1500 },
+];
+const avioBy = (nom) => AVIOS_CAT.find(a => a.nom === nom);
+const AVIO_NOMS = AVIOS_CAT.map(a => a.nom);
+const OP_OPCIONES = OP.map(o => `${o.op} · ${o.modelo}`);
+const soloOP = (s) => (s || '').split(' · ')[0].trim();
+const modeloDeOP = (op) => (OP.find(o => o.op === op) || {}).modelo || '—';
+const cantDeOP = (op) => (OP.find(o => o.op === op) || {}).ord || 0;
+/* Receta de avíos por modelo (del BOM del modelo / explosión de la orden).
+   porPza = consumo por pieza → cantidad sugerida = piezas de la orden × porPza.
+   Sirve para PROPONER, no para LIMITAR: se puede enviar un avío fuera de receta. */
+const MODELO_AVIOS = {
+  '62182': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Etiqueta de composición',porPza:1}, {avio:'Hilo poliéster Tex 40',porPza:0.02}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
+  '62180': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Etiqueta de composición',porPza:1}, {avio:'Resorte 3 cm',porPza:0.45}, {avio:'Hilo poliéster Tex 40',porPza:0.02} ],
+  '62181': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Botón 4 hoyos 18L',porPza:2}, {avio:'Hilo poliéster Tex 40',porPza:0.02}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
+  '62406': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Cierre #5 metálico 18 cm',porPza:1}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
+};
+const RECETA_DEFAULT = [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Etiqueta de composición',porPza:1}, {avio:'Hilo poliéster Tex 40',porPza:0.02} ];
+const recetaDeOP = (ordFull) => MODELO_AVIOS[modeloDeOP(soloOP(ordFull))];
+
+const NOTAS = [
+  { folio:'2416', emp:'FR', maq:'Confecciones León', alm:'Almacén de avíos',
+    fEmi:'2 jul 2026', fEnv:'3 jul 2026', est:'confirmada', by:'Daniel Masri', obs:'Va junto con el corte de la semana.',
+    lineas:[
+      { ord:'5424', avio:'Etiqueta tejida MJD',     cant:1726, un:'pza' },
+      { ord:'5424', avio:'Etiqueta de composición', cant:1726, un:'pza' },
+      { ord:'5420', avio:'Resorte 3 cm',            cant:820,  un:'m'   },
+      { ord:'5421', avio:'Botón 4 hoyos 18L',       cant:4340, un:'pza' },
+    ] },
+  { folio:'2415', emp:'FR', maq:'Rima Textil', alm:'Bodega habilitación',
+    fEmi:'1 jul 2026', fEnv:'', est:'confirmada', by:'Gabriel Ruiz', obs:'',
+    lineas:[
+      { ord:'5382', avio:'Hilo poliéster Tex 40', cant:60, un:'cono' },
+      { ord:'5381', avio:'Hilo poliéster Tex 40', cant:48, un:'cono' },
+      { ord:'5380', avio:'Hilo poliéster Tex 40', cant:44, un:'cono' },
+    ] },
+  { folio:'2414', emp:'MF', maq:'Óscar Hernández', alm:'Almacén de avíos',
+    fEmi:'30 jun 2026', fEnv:'', est:'borrador', by:'Daniel Masri', obs:'',
+    lineas:[
+      { ord:'5095', avio:'Cierre #5 metálico 18 cm', cant:538, un:'pza' },
+      { ord:'5095', avio:'Bolsa polietileno 30×40',  cant:538, un:'pza' },
+    ] },
+  { folio:'2412', emp:'FR', maq:'Óscar Jiménez', alm:'Almacén de avíos',
+    fEmi:'27 jun 2026', fEnv:'28 jun 2026', est:'cancelada', by:'Daniel Masri', obs:'Se canceló: se mandó el avío equivocado.',
+    lineas:[
+      { ord:'5427', avio:'Elástico 5 cm', cant:600, un:'m' },
+    ] },
+];
+let NOTAS_VIEW = [];
+let notasFiltroOrden = '';
+let _keepFiltroNota = false;
+
+const notaOrdenes = (n) => [...new Set(n.lineas.map(l => l.ord))];
+const notaBadge = (e) => ({ borrador:['warn','Borrador'], confirmada:['ok','Confirmada'], cancelada:['crit','Cancelada'] }[e] || ['neutral', e]);
+const empNom = (e) => e === 'MF' ? 'Marilyn Fitness' : 'FR Moda';
+const nextFolioNota = () => String(Math.max(0, ...NOTAS.map(n => parseInt(n.folio, 10) || 0)) + 1);
+function opChips(ords) {
+  const show = ords.slice(0, 3).map(o => `<span class="op-chip">${o}</span>`).join('');
+  const more = ords.length > 3 ? `<span class="op-chip more">+${ords.length - 3}</span>` : '';
+  return `<span class="op-chips">${show}${more}</span>`;
+}
+
+function vNotasSalida() {
+  NOTAS_VIEW = notasFiltroOrden ? NOTAS.filter(n => notaOrdenes(n).includes(notasFiltroOrden)) : NOTAS.slice();
+  const borradores = NOTAS.filter(n => n.est === 'borrador').length;
+  const ordSurtidas = new Set(NOTAS.filter(n => n.est !== 'cancelada').flatMap(n => notaOrdenes(n))).size;
+  const aviosDist = new Set(NOTAS.filter(n => n.est !== 'cancelada').flatMap(n => n.lineas.map(l => l.avio))).size;
+  const banner = notasFiltroOrden
+    ? `<div class="filtro-orden">${IC.filter}<span>Notas de salida de la orden <b>${notasFiltroOrden}</b> · modelo ${modeloDeOP(notasFiltroOrden)}</span><button onclick="quitarFiltroOrdenNota()" title="Quitar filtro">✕</button></div>`
+    : '';
+  return `
+  <div class="page-head">
+    <div><h1>Notas de salida</h1><div class="sub">Envío de avíos a maquileros · descuenta el inventario · por orden de producción</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="nuevaNota()">${IC.plus}Nueva nota</button></div>
+  </div>
+  ${banner}
+  <div class="kpis">
+    ${kpi('Notas de salida', String(NOTAS.length), '', 'up', '+3', 'este mes')}
+    ${kpi('Borradores', String(borradores), '', borradores ? 'down' : 'up', borradores ? 'por confirmar' : 'al día', 'sin descontar')}
+    ${kpi('Órdenes surtidas', String(ordSurtidas), '', 'up', '', 'con avíos enviados')}
+    ${kpi('Avíos distintos', String(aviosDist), 'SKU', 'up', '', 'enviados a maquila')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Todas</button><button class="chip">Borradores</button><button class="chip">Confirmadas</button><button class="chip">Canceladas</button>
+      <div class="tool-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input placeholder="Buscar nota, maquilero, orden…"></div>
+      <div class="tool-right"><span class="count">${NOTAS_VIEW.length} de ${NOTAS.length}</span></div>
+    </div>
+    <div class="table-wrap"><table class="data" id="tablaNotas"><thead><tr>
+      <th>Nota</th><th>Maquilero</th><th>Empresa</th><th>Órdenes surtidas</th><th class="r">Renglones</th><th>Estatus</th>
+    </tr></thead><tbody>
+      ${NOTAS_VIEW.map((n, i) => { const [bc, bl] = notaBadge(n.est); const ords = notaOrdenes(n); return `<tr data-row="${i}">
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">NS</span><div><div class="cell-strong">NS-${n.folio}</div><div class="cell-code">${n.fEmi}</div></div></div></td>
+        <td class="cell-strong">${n.maq}</td>
+        <td><span class="badge neutral"><span class="d"></span>${empNom(n.emp)}</span></td>
+        <td>${opChips(ords)}</td>
+        <td class="r num">${n.lineas.length}</td>
+        <td><span class="badge ${bc}"><span class="d"></span>${bl}</span></td>
+      </tr>`; }).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
+function drawerNotaSalida(i) {
+  const n = NOTAS_VIEW[i]; if (!n) return '';
+  const [bc, bl] = notaBadge(n.est);
+  const ords = notaOrdenes(n);
+  const grupos = ords.map(o => {
+    const ls = n.lineas.filter(l => l.ord === o);
+    return `
+    <div class="nsl-group">
+      <div class="nsl-ghead"><span>Orden <b>${o}</b> · modelo ${modeloDeOP(o)}</span><span>${ls.length} avío${ls.length > 1 ? 's' : ''}</span></div>
+      ${ls.map(l => { const a = avioBy(l.avio); return `<div class="nsl-line"><div><div class="cell-strong">${l.avio}</div><div class="cell-sub cell-code">${a ? a.sku : 'avío'}</div></div><span class="nsl-qty">${l.cant.toLocaleString('es-MX')} ${l.un}</span></div>`; }).join('')}
+    </div>`;
+  }).join('');
+  const pieBtns = n.est === 'borrador'
+    ? `<button class="btn ghost">${IC.edit}Editar</button><button class="btn primary" style="margin-left:auto" onclick="confirmarNotaDemo(${i})">${IC.check}Confirmar y descontar</button>`
+    : n.est === 'confirmada'
+      ? `<button class="btn ghost" style="color:var(--crit)" onclick="cancelarNotaDemo(${i})">Cancelar nota</button><button class="btn primary" style="margin-left:auto">${IC.printer}Imprimir nota</button>`
+      : `<button class="btn ghost" style="margin-left:auto">${IC.printer}Imprimir nota</button>`;
+  return `
+  <div class="drawer-head">
+    <span class="dt-hero" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">NS</span>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:8px"><h2 style="font-size:16px">Nota NS-${n.folio}</h2><span class="badge ${bc}"><span class="d"></span>${bl}</span></div>
+      <div class="cell-code" style="margin-top:2px">${n.maq} · ${empNom(n.emp)}</div>
+    </div>
+    <button class="icon-btn" id="closeDrawer" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="drawer-body">
+    <div class="dsec">
+      <h4>Encabezado</h4>
+      <div class="fields">
+        <div class="field"><div class="k">Maquilero</div><div class="v">${n.maq}</div></div>
+        <div class="field"><div class="k">Empresa</div><div class="v">${empNom(n.emp)}</div></div>
+        <div class="field"><div class="k">Almacén origen (avíos)</div><div class="v">${n.alm}</div></div>
+        <div class="field"><div class="k">Fecha de elaboración</div><div class="v">${n.fEmi}</div></div>
+        <div class="field"><div class="k">Fecha de envío</div><div class="v">${n.fEnv || '<span style="color:var(--faint)">pendiente</span>'}</div></div>
+        <div class="field"><div class="k">Renglones</div><div class="v num">${n.lineas.length} en ${ords.length} orden${ords.length > 1 ? 'es' : ''}</div></div>
+      </div>
+      ${n.obs ? `<div style="margin-top:10px;font-size:12.5px;color:var(--muted)"><b style="color:var(--text)">Observaciones:</b> ${n.obs}</div>` : ''}
+    </div>
+    <div class="dsec">
+      <h4>Avíos enviados — por orden</h4>
+      ${grupos}
+    </div>
+    ${n.est === 'cancelada' ? `<div class="audit-hint" style="color:var(--crit)">${IC.info}<span>Nota cancelada — los avíos se reingresaron al inventario con el movimiento inverso.</span></div>`
+      : `<div class="audit-hint">${IC.lock}<span>${n.est === 'confirmada' ? 'Confirmada' : 'Capturada'} por <b>${n.by}</b> · ${n.fEmi}${n.est === 'confirmada' ? ' · avíos descontados del inventario' : ''}</span></div>`}
+  </div>
+  <div class="drawer-foot">
+    ${pieBtns}
+  </div>`;
+}
+
+function confirmarNotaDemo(i) {
+  const n = NOTAS_VIEW[i]; if (!n) return;
+  n.est = 'confirmada'; n.by = USUARIO_ACTUAL; n.fEnv = n.fEnv || hoyStr();
+  ir('notas-salida');
+  mostrarToast('Nota confirmada · avíos descontados del inventario');
+}
+function cancelarNotaDemo(i) {
+  const n = NOTAS_VIEW[i]; if (!n) return;
+  n.est = 'cancelada';
+  ir('notas-salida');
+  mostrarToast('Nota cancelada · movimiento inverso registrado');
+}
+function quitarFiltroOrdenNota() { notasFiltroOrden = ''; ir('notas-salida'); }
+
+/* ---- Constructor de nota de salida (multi-renglón) ---- */
+const notaScrim = document.getElementById('notaScrim');
+const notaPanel = document.getElementById('notaPanel');
+let notaDraft = null;
+
+function wireComboCb(wrap, onPick) {
+  const input = wrap.querySelector('.combo-input'), list = wrap.querySelector('.combo-list');
+  const opts = JSON.parse(wrap.dataset.opts);
+  const pinta = () => {
+    const q = norm(input.value);
+    const f = q ? opts.filter(o => norm(o).includes(q)) : opts;
+    list.innerHTML = f.length ? f.map(o => `<div class="combo-opt">${o}</div>`).join('') : '<div class="combo-empty">Sin coincidencias</div>';
+    list.querySelectorAll('.combo-opt').forEach(el => el.onmousedown = (ev) => { ev.preventDefault(); input.value = el.textContent; list.classList.remove('show'); onPick && onPick(); });
+  };
+  input.onfocus = () => { pinta(); list.classList.add('show'); };
+  input.oninput = () => { pinta(); list.classList.add('show'); onPick && onPick(); };
+  input.onblur = () => setTimeout(() => list.classList.remove('show'), 130);
+}
+
+function nuevaNota() {
+  cerrarCajon(); cerrarCmdk();
+  notaDraft = { maq:'', emp:'FR', alm:ALMACENES_NOTA[0], fEmi:hoyStr(), fEnv:'', obs:'', lineas:[ {ord:'',avio:'',cant:''} ] };
+  renderNotaBuilder();
+  notaScrim.classList.add('show');
+  setTimeout(() => { const el = notaPanel.querySelector('#nMaq'); if (el) el.focus(); }, 60);
+}
+function cerrarNota() { notaScrim.classList.remove('show'); }
+
+function renderNotaBuilder() {
+  const d = notaDraft;
+  notaPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">NS</span>
+    <div style="flex:1;min-width:0">
+      <h2>Nueva nota de salida</h2>
+      <div class="ph-meta"><span>Envío de avíos a un maquilero</span><span>Folio <b>NS-${nextFolioNota()}</b></span></div>
+    </div>
+    <button class="icon-btn" onclick="cerrarNota()" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="proc-body">
+    <div class="nota-enc">
+      <label class="ff"><span class="ffk">Maquilero *</span>${comboHTML('nMaq', MAQUILEROS, 'Escribe el maquilero…')}</label>
+      <label class="ff"><span class="ffk">Empresa</span><select id="nEmp"><option value="FR" ${d.emp==='FR'?'selected':''}>FR Moda</option><option value="MF" ${d.emp==='MF'?'selected':''}>Marilyn Fitness</option></select></label>
+      <label class="ff"><span class="ffk">Almacén origen (avíos)</span><select id="nAlm">${ALMACENES_NOTA.map(a=>`<option ${d.alm===a?'selected':''}>${a}</option>`).join('')}</select></label>
+      <label class="ff"><span class="ffk">Fecha de elaboración</span><input id="nFEmi" type="text" value="${d.fEmi}"></label>
+      <label class="ff"><span class="ffk">Fecha de envío</span><input id="nFEnv" type="text" placeholder="opcional" value="${d.fEnv}"></label>
+      <label class="ff"><span class="ffk">Observaciones</span><input id="nObs" type="text" placeholder="Opcional…" value="${d.obs}"></label>
+    </div>
+    <div class="proc-summary-title">Renglones — un avío por línea, cada uno con su orden</div>
+    <div class="nota-helper">
+      <span>${IC.info} La receta del modelo ya dice qué avíos lleva la orden. Tráelos ya cargados con su cantidad sugerida:</span>
+      <select id="notaTraerSel">${OP_OPCIONES.map(o=>`<option>${o}</option>`).join('')}</select>
+      <button class="btn ghost sm" onclick="notaTraerAvios()">${IC.download}Traer avíos de la orden</button>
+    </div>
+    <div class="nota-lines" id="notaLines">
+      ${d.lineas.map((l, idx) => `
+      <div class="nota-lrow">
+        <label class="ff"><span class="ffk lblrow">Orden (OP)</span>${comboHTML('nOrd'+idx, OP_OPCIONES, 'Orden…')}</label>
+        <label class="ff"><span class="ffk lblrow">Avío</span>${comboHTML('nAvio'+idx, AVIO_NOMS, 'Escribe el avío…')}<span class="ln-receta"></span></label>
+        <label class="ff"><span class="ffk lblrow">Cantidad</span><div class="ln-cantwrap"><input class="ln-cant" type="number" step="any" min="0" inputmode="decimal" placeholder="0"><span class="ln-un"></span></div></label>
+        <div class="ln-exist"></div>
+        <button class="ln-del" title="Quitar renglón" onclick="notaDelLinea(${idx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </div>`).join('')}
+    </div>
+    <button class="btn ghost sm" onclick="notaAddLinea()">${IC.plus}Agregar renglón</button>
+    <div class="audit-hint" style="margin-top:16px">${IC.lock}<span>Al <b>confirmar</b> se descuentan los avíos del inventario y queda registrado que lo capturó <b>${USUARIO_ACTUAL}</b> el ${hoyStr()}. En borrador no se descuenta nada.</span></div>
+  </div>
+  <div class="nota-foot">
+    <div class="nota-tot" id="notaTot"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost" onclick="cerrarNota()">Cancelar</button>
+      <button class="btn" onclick="guardarNota(false)">Guardar borrador</button>
+      <button class="btn primary" onclick="guardarNota(true)">${IC.check}Confirmar y descontar</button>
+    </div>
+  </div>`;
+  // repoblar valores de los renglones (los combos no aceptan value inicial)
+  const rows = notaPanel.querySelectorAll('#notaLines .nota-lrow');
+  d.lineas.forEach((l, idx) => {
+    const r = rows[idx]; if (!r) return;
+    const ins = r.querySelectorAll('.combo-input');
+    if (ins[0]) ins[0].value = l.ord || '';
+    if (ins[1]) ins[1].value = l.avio || '';
+    const c = r.querySelector('.ln-cant'); if (c) c.value = l.cant || '';
+  });
+  notaPanel.querySelectorAll('.combo').forEach(w => wireComboCb(w, notaRecalcUI));
+  notaPanel.querySelector('#notaLines').addEventListener('input', notaRecalcUI);
+  notaRecalcUI();
+}
+
+function notaRecalcUI() {
+  const rows = [...notaPanel.querySelectorAll('#notaLines .nota-lrow')];
+  const ordSet = new Set();
+  rows.forEach(r => {
+    const ins = r.querySelectorAll('.combo-input');
+    const ord = soloOP(ins[0] ? ins[0].value : '');
+    const avioNom = (ins[1] ? ins[1].value : '').trim();
+    const a = avioBy(avioNom);
+    const cant = parseFloat(r.querySelector('.ln-cant') ? r.querySelector('.ln-cant').value : '') || 0;
+    const unEl = r.querySelector('.ln-un'), exEl = r.querySelector('.ln-exist');
+    if (unEl) unEl.textContent = a ? a.un : '';
+    if (exEl) {
+      if (!a) exEl.innerHTML = '<span style="color:var(--faint)">—</span>';
+      else if (cant > a.exist) exEl.innerHTML = `<span style="color:var(--crit);font-weight:600">Excede · hay ${a.exist.toLocaleString('es-MX')} ${a.un}</span>`;
+      else exEl.innerHTML = `Existencia <b>${a.exist.toLocaleString('es-MX')}</b> ${a.un}`;
+    }
+    r.classList.toggle('over', !!a && cant > a.exist);
+    const receta = recetaDeOP(ins[0] ? ins[0].value : '');
+    const flag = r.querySelector('.ln-receta');
+    if (flag) {
+      if (!ord || !avioNom || !receta) { flag.className = 'ln-receta'; flag.textContent = ''; }
+      else if (receta.some(x => x.avio === avioNom)) { flag.className = 'ln-receta in'; flag.textContent = '✓ en la receta de la orden'; }
+      else { flag.className = 'ln-receta out'; flag.textContent = '⚠ fuera de la receta — se enviará igual'; }
+    }
+    if (ord) ordSet.add(ord);
+  });
+  const tot = notaPanel.querySelector('#notaTot');
+  if (tot) tot.innerHTML = `<b>${ordSet.size}</b> ${ordSet.size === 1 ? 'orden' : 'órdenes'} · <b>${rows.length}</b> ${rows.length === 1 ? 'renglón' : 'renglones'}`;
+}
+
+function syncNotaFromDOM() {
+  const p = notaPanel;
+  if (!p.querySelector('#nMaq')) return;
+  notaDraft.maq = p.querySelector('#nMaq').value.trim();
+  notaDraft.emp = p.querySelector('#nEmp').value;
+  notaDraft.alm = p.querySelector('#nAlm').value;
+  notaDraft.fEmi = p.querySelector('#nFEmi').value.trim();
+  notaDraft.fEnv = p.querySelector('#nFEnv').value.trim();
+  notaDraft.obs = p.querySelector('#nObs').value.trim();
+  notaDraft.lineas = [...p.querySelectorAll('#notaLines .nota-lrow')].map(r => {
+    const ins = r.querySelectorAll('.combo-input');
+    return { ord: ins[0] ? ins[0].value : '', avio: (ins[1] ? ins[1].value : '').trim(), cant: r.querySelector('.ln-cant') ? r.querySelector('.ln-cant').value : '' };
+  });
+}
+function notaAddLinea() { syncNotaFromDOM(); notaDraft.lineas.push({ ord:'', avio:'', cant:'' }); renderNotaBuilder(); }
+function notaTraerAvios() {
+  syncNotaFromDOM();
+  const sel = notaPanel.querySelector('#notaTraerSel');
+  const ordFull = sel ? sel.value : '';
+  const op = soloOP(ordFull);
+  if (!op) { mostrarToast('Elige una orden'); return; }
+  const receta = recetaDeOP(ordFull) || RECETA_DEFAULT;
+  const piezas = cantDeOP(op);
+  notaDraft.lineas = notaDraft.lineas.filter(l => l.avio || soloOP(l.ord) || l.cant);
+  receta.forEach(x => {
+    const q = Math.max(1, Math.round(piezas * x.porPza));
+    notaDraft.lineas.push({ ord: ordFull, avio: x.avio, cant: String(q) });
+  });
+  if (!notaDraft.lineas.length) notaDraft.lineas.push({ ord:'', avio:'', cant:'' });
+  renderNotaBuilder();
+  mostrarToast(`${receta.length} avíos de la orden ${op} agregados desde su receta`);
+}
+function notaDelLinea(i) {
+  syncNotaFromDOM();
+  notaDraft.lineas.splice(i, 1);
+  if (!notaDraft.lineas.length) notaDraft.lineas.push({ ord:'', avio:'', cant:'' });
+  renderNotaBuilder();
+}
+function guardarNota(confirmar) {
+  syncNotaFromDOM();
+  if (!notaDraft.maq) { mostrarToast('Falta el maquilero'); return; }
+  const lns = notaDraft.lineas.filter(l => l.avio && soloOP(l.ord) && (parseFloat(l.cant) || 0) > 0);
+  if (!lns.length) { mostrarToast('Agrega al menos un avío con orden y cantidad'); return; }
+  NOTAS.unshift({
+    folio: nextFolioNota(), emp: notaDraft.emp, maq: notaDraft.maq, alm: notaDraft.alm,
+    fEmi: notaDraft.fEmi || hoyStr(), fEnv: notaDraft.fEnv, est: confirmar ? 'confirmada' : 'borrador',
+    by: USUARIO_ACTUAL, obs: notaDraft.obs,
+    lineas: lns.map(l => { const a = avioBy(l.avio); return { ord: soloOP(l.ord), avio: l.avio, cant: parseFloat(l.cant) || 0, un: a ? a.un : 'pza' }; }),
+  });
+  cerrarNota();
+  notasFiltroOrden = '';
+  ir('notas-salida');
+  resaltarNueva();
+  mostrarToast(confirmar ? 'Nota confirmada · avíos descontados del inventario' : 'Borrador guardado');
+}
+notaScrim.onclick = (e) => { if (e.target === notaScrim) cerrarNota(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && notaScrim.classList.contains('show')) cerrarNota(); });
+
 /* ---- Proveedores ---- */
 const PROV = [
   ['PRV-0102','Hilaturas del Norte','Tela','Ing. Laura Méndez','81 8123 4500', 'Algodón, jersey', 128400, 'ok'],
@@ -2190,11 +2600,13 @@ const VISTAS = {
   resumen: vResumen, modelos: vModelos, ordenes: vOrdenes, produccion: vProduccion,
   pedidos: vPedidos, rc: vRc, inventarios: vInventarios, telas: vTelas, compras: vCompras,
   proveedores: vProveedores, costos: vCostos, indicadores: vIndicadores, calidad: vCalidad, usuarios: vUsuarios,
+  'notas-salida': vNotasSalida,
 };
 /* Qué tabla abre cajón de detalle en cada módulo */
 const CAJONES = {
   modelos: ['#tablaModelos', i => drawerModelo(i)],
   proveedores: ['#tablaProv', i => drawerProveedor(i)],
+  'notas-salida': ['#tablaNotas', i => drawerNotaSalida(i)],
 };
 
 /* ============================================================
@@ -2206,6 +2618,8 @@ const contentEl = document.getElementById('content');
 
 function ir(clave) {
   vistaActual = clave;
+  if (!(clave === 'notas-salida' && _keepFiltroNota)) notasFiltroOrden = '';
+  _keepFiltroNota = false;
   renderNav();
   cerrarCajon();
   const fn = VISTAS[clave] || (()=>vPlaceholder(clave));
