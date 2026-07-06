@@ -638,6 +638,26 @@ export {
   type ProyectosPagina,
 } from './esquemas/proyecto.js';
 
+// ── Precosto persistido por desarrollo (Módulo 15, F8-E3; D13/R17–R19) ──
+export {
+  esquemaEstadoPrecosto,
+  esquemaOrigenPrecostoLinea,
+  esquemaPrecostoLineaManualCrear,
+  esquemaPrecostoLineaEditar,
+  esquemaPrecostoLineaSalida,
+  esquemaPrecostoSalida,
+  esquemaPrecostoResumen,
+  esquemaPrecostosDesarrolloLista,
+  type EstadoPrecostoClave,
+  type OrigenPrecostoLineaClave,
+  type DatosPrecostoLineaManualCrear,
+  type DatosPrecostoLineaEditar,
+  type PrecostoLineaSalida,
+  type PrecostoSalida,
+  type PrecostoResumen,
+  type PrecostosDesarrolloLista,
+} from './esquemas/precosto.js';
+
 export {
   DIRECCIONES_MOVIMIENTO,
   ETIQUETAS_DIRECCION_MOVIMIENTO,

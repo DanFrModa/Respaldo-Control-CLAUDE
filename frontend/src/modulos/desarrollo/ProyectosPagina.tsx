@@ -43,6 +43,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoApagarDesarrollo } from './DialogoApagarDesarrollo';
 import { DialogoDesarrollo } from './DialogoDesarrollo';
+import { DialogoPrecosto } from './DialogoPrecosto';
 import { DialogoProyecto } from './DialogoProyecto';
 
 /** Renglones por página del listado. */
@@ -317,6 +318,7 @@ function DetalleProyecto({
 
   const [agregarAbierto, setAgregarAbierto] = useState(false);
   const [aApagar, setAApagar] = useState<Desarrollo | null>(null);
+  const [aPrecostear, setAPrecostear] = useState<Desarrollo | null>(null);
   const [mostrarApagados, setMostrarApagados] = useState(false);
 
   const detalle = consulta.data;
@@ -394,7 +396,7 @@ function DetalleProyecto({
                   <TableHead>Modelo (nuestro nº)</TableHead>
                   <TableHead>Nº del cliente</TableHead>
                   <TableHead>Estado</TableHead>
-                  {puedeAdministrar ? <TableHead className="text-right">Acciones</TableHead> : null}
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -412,18 +414,28 @@ function DetalleProyecto({
                     <TableCell>
                       <BadgeEstado estado={d.estado} />
                     </TableCell>
-                    {puedeAdministrar ? (
-                      <TableCell className="text-right">
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setAApagar(d)}
-                          data-testid="apagar-desarrollo"
+                          onClick={() => setAPrecostear(d)}
+                          data-testid="precostear-desarrollo"
                         >
-                          Apagar
+                          Precosto
                         </Button>
-                      </TableCell>
-                    ) : null}
+                        {puedeAdministrar ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAApagar(d)}
+                            data-testid="apagar-desarrollo"
+                          >
+                            Apagar
+                          </Button>
+                        ) : null}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -493,6 +505,15 @@ function DetalleProyecto({
           }
         }}
         desarrollo={aApagar ?? undefined}
+      />
+      <DialogoPrecosto
+        abierto={aPrecostear !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) {
+            setAPrecostear(null);
+          }
+        }}
+        desarrollo={aPrecostear ?? undefined}
       />
     </>
   );
