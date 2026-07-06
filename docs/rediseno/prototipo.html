@@ -682,6 +682,11 @@
   .surtido-stats .st b { display: block; font-size: 19px; font-family: var(--ff-mono); font-weight: 700; }
   .surtido-stats .st span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .surtido-extra { margin-top: 14px; }
+  .surt-cell { width: 40px; text-align: center; }
+  .surt-chk, #surtChkAll { accent-color: var(--brand); width: 15px; height: 15px; cursor: pointer; }
+  .surt-table tbody tr.surt-sel { background: var(--brand-soft); }
+  .surt-table tbody tr.surt-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
+  .surt-n { font-variant-numeric: tabular-nums; }
   .nsl-group + .nsl-group { margin-top: 10px; }
   .nsl-ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px 8px 0 0; font-size: 12px; color: var(--muted); }
   .nsl-ghead b { color: var(--text); font-family: var(--ff-mono); }
@@ -2434,6 +2439,7 @@ function renderSurtido() {
     const [ec, el] = f.extra ? ['info', 'Extra'] : f.falta <= 0 ? ['ok', 'Completo'] : f.env > 0 ? ['warn', 'Parcial'] : ['neutral', 'Pendiente'];
     const barCol = f.falta <= 0 ? 'var(--ok)' : f.env > 0 ? 'var(--warn)' : 'var(--border-strong)';
     return `<tr${f.extra ? ' style="background:var(--info-soft)"' : ''}>
+      <td class="surt-cell">${!f.extra && f.falta > 0 ? `<input type="checkbox" class="surt-chk" data-avio="${f.avio}">` : ''}</td>
       <td><div class="cellflex"><span class="thumb" style="background:#2f9c66;color:#04140c">AV</span><div><div class="cell-strong">${f.avio}</div><div class="cell-code">${f.sku}${f.extra ? ' · fuera de receta' : ''}</div></div></div></td>
       <td class="r num">${f.extra ? '<span style="color:var(--faint)">—</span>' : f.req.toLocaleString('es-MX') + ' <span class="cell-sub">' + f.un + '</span>'}</td>
       <td class="r num">${f.env.toLocaleString('es-MX')} <span class="cell-sub">${f.un}</span></td>
@@ -2461,9 +2467,9 @@ function renderSurtido() {
         <div class="st"><b style="color:var(--muted)">${pendientes}</b><span>Pendientes</span></div>
       </div>
     </div>
-    <div class="proc-summary-title">Avíos de la orden (de la receta del modelo) · enviado vs. falta por mandar</div>
-    <div class="table-wrap"><table class="data"><thead><tr>
-      <th>Avío</th><th class="r">Requerido</th><th class="r">Enviado</th><th class="r">Falta</th><th>Avance</th><th>Estado</th>
+    <div class="proc-summary-title">Avíos de la orden · marca los que quieras surtir y pásalos a una nota</div>
+    <div class="table-wrap"><table class="data surt-table"><thead><tr>
+      <th class="surt-cell"><input type="checkbox" id="surtChkAll" title="Seleccionar todos los pendientes"></th><th>Avío</th><th class="r">Requerido</th><th class="r">Enviado</th><th class="r">Falta</th><th>Avance</th><th>Estado</th>
     </tr></thead><tbody>
       ${filas.map(fila).join('')}
     </tbody></table></div>
@@ -2473,9 +2479,37 @@ function renderSurtido() {
     <div class="nota-tot">${faltaTotal > 0 ? `Faltan por enviar <b>${faltaTotal.toLocaleString('es-MX')}</b> pzas en <b>${faltanAvios}</b> avío(s)` : `<span style="color:var(--ok);font-weight:600">Orden surtida por completo ✓</span>`}</div>
     <div style="display:flex;gap:8px">
       <button class="btn ghost" onclick="verNotasDeOrden('${op}')">${IC.notas}Ver notas de esta orden</button>
-      <button class="btn primary" onclick="nuevaNotaDesdeSurtido('${op}')"${faltaTotal <= 0 ? ' disabled style="opacity:.5;cursor:default"' : ''}>${IC.plus}Surtir lo que falta</button>
+      <button class="btn primary" id="surtBtn" onclick="surtirSeleccionados()" disabled style="opacity:.5">${IC.plus}Pasar a nota de salida<span class="surt-n"></span></button>
     </div>
   </div>`;
+  surtidoPanel.querySelectorAll('.surt-chk').forEach(c => c.onchange = surtRefresh);
+  const chkAll = surtidoPanel.querySelector('#surtChkAll');
+  if (chkAll) chkAll.onchange = () => { surtidoPanel.querySelectorAll('.surt-chk').forEach(c => c.checked = chkAll.checked); surtRefresh(); };
+  surtRefresh();
+}
+function surtRefresh() {
+  const chks = [...surtidoPanel.querySelectorAll('.surt-chk')];
+  const checked = chks.filter(c => c.checked);
+  chks.forEach(c => { const tr = c.closest('tr'); if (tr) tr.classList.toggle('surt-sel', c.checked); });
+  const btn = surtidoPanel.querySelector('#surtBtn');
+  if (btn) { btn.disabled = !checked.length; btn.style.opacity = checked.length ? '' : '.5'; const n = btn.querySelector('.surt-n'); if (n) n.textContent = checked.length ? ` (${checked.length})` : ''; }
+  const all = surtidoPanel.querySelector('#surtChkAll');
+  if (all) { all.checked = chks.length > 0 && checked.length === chks.length; all.indeterminate = checked.length > 0 && checked.length < chks.length; }
+}
+function surtirSeleccionados() {
+  const op = surtidoOP;
+  const chks = [...surtidoPanel.querySelectorAll('.surt-chk:checked')];
+  if (!chks.length) { mostrarToast('Marca al menos un avío para surtir'); return; }
+  const set = new Set(chks.map(c => c.dataset.avio));
+  const o = OP.find(x => x.op === op) || {};
+  const ordFull = `${op} · ${modeloDeOP(op)}`;
+  const lineas = surtidoDeOrden(op).filas.filter(f => set.has(f.avio) && f.falta > 0).map(f => ({ ord: ordFull, avio: f.avio, cant: String(f.falta) }));
+  if (!lineas.length) { mostrarToast('Nada por surtir en lo seleccionado'); return; }
+  cerrarSurtido(); cerrarCajon(); cerrarCmdk();
+  notaDraft = { maq: o.maq || '', emp: o.emp || 'FR', alm: ALMACENES_NOTA[0], fEmi: hoyStr(), fEnv: '', obs: '', lineas };
+  renderNotaBuilder();
+  notaScrim.classList.add('show');
+  const m = notaPanel.querySelector('#nMaq'); if (m) m.value = notaDraft.maq;
 }
 function verNotasDeOrden(op) { cerrarSurtido(); notasFiltroOrden = op; _keepFiltroNota = true; ir('notas-salida'); }
 function nuevaNotaDesdeSurtido(op) {
