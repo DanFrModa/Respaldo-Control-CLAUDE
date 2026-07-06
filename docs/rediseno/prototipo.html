@@ -721,7 +721,8 @@
   .pc-in.mono { font-family: var(--ff-mono); text-align: right; }
   .pc-line { display: grid; gap: 10px; align-items: center; margin-bottom: 8px; }
   .pc-proc-row { grid-template-columns: 1fr 130px 34px; }
-  .pc-avio-row, .pc-tela-row { grid-template-columns: 1fr 110px 96px 34px; }
+  .pc-tela-row { grid-template-columns: 1fr 110px 96px 34px; }
+  .pc-avio-row { grid-template-columns: 1.25fr 1.15fr 76px 80px 34px; }
   .pc-tela-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
   .pc-avio-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
   .pc-empty { font-size: 12px; color: var(--faint); padding: 6px 2px; }
@@ -2928,13 +2929,33 @@ const TELAS_PC = [
 ];
 const telaPCBy = (n) => TELAS_PC.find(t => t.nom === n);
 const PROCESOS_PC = ['Estampado serigrafía', 'Estampado DTF', 'Bordado', 'Sublimado', 'Lavado', 'Teñido', 'Plisado'];
+/* Cada avío puede ser surtido por VARIOS proveedores, cada uno con su precio
+   (backend: AvioProveedor). `precio` = precio de referencia (Avio.precioReferencia),
+   fallback cuando no hay proveedor amarrado. En el precosteo el avío puede quedar
+   SIN proveedor (ModeloAvio.idAvioProveedor NULL → costea "al más barato"); el
+   proveedor real se define en la compra. */
 const AVIOS_PC = [
-  { nom: 'Etiqueta tejida MJD', precio: 1.20 }, { nom: 'Etiqueta de composición', precio: 0.45 },
-  { nom: 'Hilo poliéster Tex 40', precio: 0.30 }, { nom: 'Resorte 3 cm', precio: 4.80 },
-  { nom: 'Botón 4 hoyos 18L', precio: 0.60 }, { nom: 'Cierre #5 metálico 18 cm', precio: 6.50 },
-  { nom: 'Bolsa polietileno 30×40', precio: 0.80 }, { nom: 'Elástico 5 cm', precio: 5.20 },
+  { nom: 'Etiqueta tejida MJD', precio: 1.20, provs: [{ prov: 'Etiquetas Sol', precio: 1.20 }, { prov: 'Etiquetas del Norte', precio: 1.35 }] },
+  { nom: 'Etiqueta de composición', precio: 0.45, provs: [{ prov: 'Etiquetas Sol', precio: 0.45 }] },
+  { nom: 'Etiqueta de lavado', precio: 0.50, provs: [] },
+  { nom: 'Hilo poliéster Tex 40', precio: 0.30, provs: [{ prov: 'Hilos Reyna', precio: 0.30 }, { prov: 'Hilos del Bajío', precio: 0.28 }] },
+  { nom: 'Resorte 3 cm', precio: 4.80, provs: [{ prov: 'Elásticos GTO', precio: 4.80 }, { prov: 'Elásticos MX', precio: 5.10 }] },
+  { nom: 'Botón 4 hoyos 18L', precio: 0.60, provs: [{ prov: 'Botones del Centro', precio: 0.60 }] },
+  { nom: 'Cierre #5 metálico 18 cm', precio: 6.50, provs: [{ prov: 'Cierres YKK', precio: 6.50 }, { prov: 'Cierres Express', precio: 6.20 }] },
+  { nom: 'Bolsa polietileno 30×40', precio: 0.80, provs: [{ prov: 'Plásticos MX', precio: 0.80 }] },
+  { nom: 'Elástico 5 cm', precio: 5.20, provs: [{ prov: 'Elásticos GTO', precio: 5.20 }] },
 ];
 const avioPCBy = (n) => AVIOS_PC.find(a => a.nom === n);
+function precioAvioPC(nom, prov) {
+  const a = avioPCBy(nom); if (!a) return 0;
+  if (prov) { const p = (a.provs || []).find(x => x.prov === prov); if (p) return p.precio; }
+  if ((a.provs || []).length) return Math.min(...a.provs.map(x => x.precio));
+  return a.precio || 0;
+}
+const provOpts = (nom, sel) => {
+  const a = avioPCBy(nom); const provs = a ? (a.provs || []) : [];
+  return `<option value=""${!sel ? ' selected' : ''}>— sin definir (más barato) —</option>` + provs.map(p => `<option value="${p.prov}"${sel === p.prov ? ' selected' : ''}>${p.prov} · $${p.precio.toFixed(2)}</option>`).join('');
+};
 const EST_MODELO = { borrador: ['neutral', 'Borrador'], proceso: ['warn', 'En proceso'], completo: ['info', 'Completo'], aprobado: ['ok', 'Aprobado'] };
 const estModeloBadge = (e) => EST_MODELO[e] || ['neutral', e];
 const nFotos = (m) => (m.fotos || 0) + ((m.fotosArr && m.fotosArr.length) || 0);
@@ -2959,7 +2980,7 @@ let PROYECTOS = [
 
 function costoModelo(m) {
   const tela = (m.telas || []).reduce((a, t) => a + (t.nom && telaPCBy(t.nom) ? telaPCBy(t.nom).precio * (t.consumo || 0) : 0), 0);
-  const avios = (m.avios || []).reduce((a, x) => a + (avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0), 0);
+  const avios = (m.avios || []).reduce((a, x) => a + precioAvioPC(x.nom, x.prov) * (x.consumo || 0), 0);
   const procs = (m.procesos || []).reduce((a, x) => a + (x.precio || 0), 0);
   const maq = m.maquila || 0;
   const costo = tela + avios + procs + maq;
@@ -3108,8 +3129,9 @@ function pcSync() {
   m.maquila = parseFloat(p.querySelector('#pcMaquila').value) || 0;
   m.margen = parseFloat(p.querySelector('#pcMargen').value) || 0;
   m.procesos = [...p.querySelectorAll('.pc-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
-  m.avios = [...p.querySelectorAll('.pc-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
+  m.avios = [...p.querySelectorAll('.pc-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, prov: r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
 }
+function pcAvioReRender(i) { pcSync(); if (pcEdit.m.avios[i]) pcEdit.m.avios[i].prov = ''; renderModeloEditor(); }
 function pcRecalc() {
   pcSync();
   const c = costoModelo(pcEdit.m);
@@ -3117,8 +3139,8 @@ function pcRecalc() {
   set('#pcCTela', money(c.tela)); set('#pcCAvios', money(c.avios)); set('#pcCProc', money(c.procs)); set('#pcCMaq', money(c.maq));
   set('#pcCTotal', money(c.costo)); set('#pcCPrecio', money(c.precio));
   pcPanel.querySelectorAll('.pc-avio-row').forEach(r => {
-    const nom = r.querySelector('.pc-avio-nom').value, cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0;
-    const sub = r.querySelector('.pc-avio-sub'); if (sub) sub.textContent = money((avioPCBy(nom) ? avioPCBy(nom).precio : 0) * cons);
+    const nom = r.querySelector('.pc-avio-nom').value, prov = r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0;
+    const sub = r.querySelector('.pc-avio-sub'); if (sub) sub.textContent = money(precioAvioPC(nom, prov) * cons);
   });
   const tsub = pcPanel.querySelector('#pcTelaSub'); if (tsub) tsub.textContent = money(c.tela);
   pcPanel.querySelectorAll('.pc-tela-row').forEach(r => {
@@ -3130,7 +3152,7 @@ function pcAddTela() { pcSync(); pcEdit.m.telas.push({ nom: '', consumo: 0 }); r
 function pcDelTela(i) { pcSync(); pcEdit.m.telas.splice(i, 1); renderModeloEditor(); }
 function pcAddProceso() { pcSync(); pcEdit.m.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderModeloEditor(); }
 function pcDelProceso(i) { pcSync(); pcEdit.m.procesos.splice(i, 1); renderModeloEditor(); }
-function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, consumo: 1 }); renderModeloEditor(); }
+function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, prov: '', consumo: 1 }); renderModeloEditor(); }
 function pcDelAvio(i) { pcSync(); pcEdit.m.avios.splice(i, 1); renderModeloEditor(); }
 function pcSubirPDF() { pcPanel.querySelector('#pcPdfInput').click(); }
 function pcQuitarPDF(i) { pcSync(); pcEdit.m.pdfs.splice(i, 1); renderModeloEditor(); }
@@ -3206,9 +3228,10 @@ function renderModeloEditor() {
       <h4>Avíos <span class="hint">habilitación por prenda</span></h4>
       <div id="pcAvios">
         ${(m.avios || []).map((x, i) => `<div class="pc-line pc-avio-row">
-          <select class="pc-in pc-avio-nom">${opt(AVIOS_PC.map(a => a.nom), x.nom)}</select>
+          <select class="pc-in pc-avio-nom" onchange="event.stopPropagation();pcAvioReRender(${i})">${opt(AVIOS_PC.map(a => a.nom), x.nom)}</select>
+          <select class="pc-in pc-avio-prov">${provOpts(x.nom, x.prov)}</select>
           <input class="pc-in mono pc-avio-cons" type="number" step="any" min="0" value="${x.consumo || ''}" placeholder="1">
-          <span class="pc-avio-sub mono">${money((avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0))}</span>
+          <span class="pc-avio-sub mono">${money(precioAvioPC(x.nom, x.prov) * (x.consumo || 0))}</span>
           <button class="pc-line-del" onclick="pcDelAvio(${i})" title="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>`).join('') || '<div class="pc-empty">Sin avíos todavía.</div>'}
       </div>
@@ -3275,37 +3298,42 @@ const kpiMoney = (n) => n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : '$' + Math
 
 /* ---- Avíos (inventario, separado de telas) ---- */
 const AVIOS_INV = [
-  ['AVI-0318', 'Etiqueta tejida MJD', 'Etiquetas Sol', 18000, 'pza', 1.20, 'ok'],
-  ['AVI-0330', 'Etiqueta de composición', 'Etiquetas Sol', 9200, 'pza', 0.45, 'ok'],
-  ['AVI-0301', 'Hilo poliéster Tex 40', 'Hilos Reyna', 4200, 'cono', 38.00, 'ok'],
-  ['AVI-0325', 'Resorte 3 cm', 'Elásticos GTO', 5600, 'm', 4.80, 'warn'],
-  ['AVI-0362', 'Botón 4 hoyos 18L', 'Botones del Centro', 26000, 'pza', 0.60, 'ok'],
-  ['AVI-0350', 'Cierre #5 metálico 18 cm', 'Cierres YKK', 3400, 'pza', 6.50, 'warn'],
-  ['AVI-0341', 'Bolsa polietileno 30×40', 'Plásticos MX', 12000, 'pza', 0.80, 'ok'],
+  ['AVI-0318', 'Etiqueta tejida MJD', 18000, 'pza', 'ok'],
+  ['AVI-0330', 'Etiqueta de composición', 9200, 'pza', 'ok'],
+  ['AVI-0345', 'Etiqueta de lavado', 0, 'pza', 'warn'],
+  ['AVI-0301', 'Hilo poliéster Tex 40', 4200, 'cono', 'ok'],
+  ['AVI-0325', 'Resorte 3 cm', 5600, 'm', 'warn'],
+  ['AVI-0362', 'Botón 4 hoyos 18L', 26000, 'pza', 'ok'],
+  ['AVI-0350', 'Cierre #5 metálico 18 cm', 3400, 'pza', 'warn'],
+  ['AVI-0341', 'Bolsa polietileno 30×40', 12000, 'pza', 'ok'],
 ];
+let avExpand = new Set();
+function toggleAvExp(i) { if (avExpand.has(i)) avExpand.delete(i); else avExpand.add(i); ir('avios'); }
 function vAvios() {
-  const valor = AVIOS_INV.reduce((a, m) => a + m[3] * m[5], 0);
+  const sinProv = AVIOS_INV.filter(m => !((avioPCBy(m[1]) || {}).provs || []).length).length;
   return `
-  <div class="page-head"><div><h1>Avíos</h1><div class="sub">Habilitación · inventario valorizado · multi-almacén (R4)</div></div>
+  <div class="page-head"><div><h1>Avíos</h1><div class="sub">Catálogo · cada avío puede tener varios proveedores con su precio (R1) · el proveedor se amarra en la compra</div></div>
   <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="mostrarToast('Nuevo avío — demo')">${IC.plus}Nuevo avío</button></div></div>
   <div class="kpis">
     ${kpi('Avíos (SKU)', String(AVIOS_INV.length), '', 'up', '+11', '')}
-    ${kpi('Valor inventario', kpiMoney(valor), '', 'up', '+4%', '')}
-    ${kpi('Bajo mínimo', '2', '', 'down', '+1', 'sugerir compra')}
-    ${kpi('Genéricos', '5', '', 'up', '', 'se netean en MRP')}
+    ${kpi('Multi-proveedor', String(AVIOS_INV.filter(m => (((avioPCBy(m[1]) || {}).provs) || []).length > 1).length), '', 'up', '', 'con opción')}
+    ${kpi('Sin proveedor', String(sinProv), '', sinProv ? 'down' : 'up', '', 'se define en compra')}
+    ${kpi('Bajo mínimo', '3', '', 'down', '+1', 'sugerir compra')}
   </div>
   <div class="card">
-    <div class="toolbar"><button class="chip active">Todos</button><button class="chip">Bajo mínimo</button><button class="chip">Genéricos</button>
+    <div class="toolbar"><button class="chip active">Todos</button><button class="chip">Bajo mínimo</button><button class="chip">Sin proveedor</button>
     <div class="tool-search">${lupa()}<input placeholder="Buscar avío…"></div><div class="tool-right"><span class="count">${AVIOS_INV.length} de 318</span></div></div>
-    <div class="table-wrap"><table class="data"><thead><tr><th>Avío</th><th>Proveedor</th><th class="r">Existencia</th><th class="r">Costo unit.</th><th class="r">Valor</th><th>Estado</th></tr></thead><tbody>
-      ${AVIOS_INV.map(m => `<tr>
-        <td><div class="cellflex"><span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]}</div><div class="cell-code">${m[0]}</div></div></div></td>
-        <td>${m[2]}</td>
-        <td class="r num">${m[3].toLocaleString('es-MX')} <span class="cell-sub">${m[4]}</span></td>
-        <td class="r mono">$${m[5].toFixed(2)}</td>
-        <td class="r mono">${money(m[3] * m[5]).replace('.00', '')}</td>
-        <td><span class="badge ${m[6]}"><span class="d"></span>${m[6] === 'ok' ? 'OK' : 'Bajo mín.'}</span></td>
-      </tr>`).join('')}
+    <div class="table-wrap"><table class="data"><thead><tr><th>Avío</th><th>Proveedores</th><th class="r">Existencia</th><th class="r">Precio ref.</th><th>Estado</th></tr></thead><tbody>
+      ${AVIOS_INV.map((m, i) => { const a = avioPCBy(m[1]) || {}; const provs = a.provs || []; const exp = avExpand.has(i); const barato = provs.length ? Math.min(...provs.map(p => p.precio)) : null; return `<tr>
+        <td><div class="cellflex">
+          <button class="lp-exp ${exp ? 'open' : ''}" onclick="toggleAvExp(${i})" title="Ver proveedores">${IC.chevron}</button>
+          <span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]}</div><div class="cell-code">${m[0]}</div></div>
+        </div></td>
+        <td>${provs.length ? `<span class="badge info"><span class="d"></span>${provs.length} proveedor${provs.length > 1 ? 'es' : ''}</span>` : `<span class="badge warn"><span class="d"></span>Sin proveedor</span>`}</td>
+        <td class="r num">${m[2].toLocaleString('es-MX')} <span class="cell-sub">${m[3]}</span></td>
+        <td class="r mono">${a.precio != null ? '$' + a.precio.toFixed(2) : '—'}</td>
+        <td><span class="badge ${m[4]}"><span class="d"></span>${m[4] === 'ok' ? 'OK' : 'Bajo mín.'}</span></td>
+      </tr>${exp ? `<tr class="lp-detrow"><td colspan="5">${provs.length ? `<div class="dg">${provs.map(p => `<div class="dg-row"><span>${p.prov}${p.precio === barato && provs.length > 1 ? ' <span class="lp-ver" style="color:var(--ok);background:var(--ok-soft)">más barato</span>' : ''}</span><b class="mono">$${p.precio.toFixed(2)}</b></div>`).join('')}</div>` : `<div class="pc-empty" style="padding:10px 2px">Sin proveedor asignado — el avío se costea al <b>precio de referencia</b> ($${(a.precio || 0).toFixed(2)}) y el proveedor real se define en la <b>compra</b> (MRP/OC).</div>`}</td></tr>` : ''}`; }).join('')}
     </tbody></table></div></div>`;
 }
 
@@ -3390,7 +3418,7 @@ function desgloseHTML(dt) {
   const row = (k, v) => `<div class="dg-row"><span>${k}</span><b class="mono">${v}</b></div>`;
   return `<div class="dg">
     ${(dt.telas || []).map(t => { const tp = telaPCBy(t.nom); return row('Tela — ' + (t.nom || '—') + (t.consumo ? ` (${t.consumo}${tp ? ' ' + tp.un : ''} × $${tp ? tp.precio.toFixed(2) : '0'})` : ''), money((tp ? tp.precio : 0) * (t.consumo || 0))); }).join('')}
-    ${(dt.avios || []).map(a => row('Avío — ' + a.nom + ` (${a.consumo} × $${(avioPCBy(a.nom) ? avioPCBy(a.nom).precio : 0).toFixed(2)})`, money((avioPCBy(a.nom) ? avioPCBy(a.nom).precio : 0) * a.consumo))).join('')}
+    ${(dt.avios || []).map(a => { const pr = precioAvioPC(a.nom, a.prov); return row('Avío — ' + a.nom + ` (${a.consumo} × $${pr.toFixed(2)})` + (a.prov ? ' · ' + a.prov : ' · <i>sin proveedor</i>'), money(pr * a.consumo)); }).join('')}
     ${(dt.procesos || []).map(p => row('Proceso — ' + p.tipo, money(p.precio))).join('')}
     ${row('Maquila (costura)', money(dt.maquila || 0))}
     <div class="dg-row total"><span>Costo total</span><b class="mono">${money(c.costo)}</b></div>
@@ -3537,7 +3565,7 @@ function negSync() {
   negDet.telas = [...p.querySelectorAll('.neg-tela-row')].map(r => ({ nom: r.querySelector('.neg-tela-nom').value, consumo: parseFloat(r.querySelector('.neg-tela-cons').value) || 0 }));
   negDet.maquila = parseFloat(p.querySelector('#negMaquila').value) || 0;
   negDet.procesos = [...p.querySelectorAll('.neg-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
-  negDet.avios = [...p.querySelectorAll('.neg-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
+  negDet.avios = [...p.querySelectorAll('.neg-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, prov: r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
 }
 function negRecalc() {
   negSync();
@@ -3547,15 +3575,16 @@ function negRecalc() {
   const set = (id, v) => { const el = negPanel.querySelector(id); if (el) el.textContent = v; };
   set('#negCosto', money(c.costo)); set('#negNeto', money(neto)); set('#negFootCosto', money(c.costo));
   ['#negMB', '#negFootMB'].forEach(id => { const el = negPanel.querySelector(id); if (el) { el.textContent = mb.toFixed(1) + '%'; el.style.color = col; } });
-  negPanel.querySelectorAll('.neg-avio-row').forEach(r => { const nom = r.querySelector('.pc-avio-nom').value, cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0; const s = r.querySelector('.pc-avio-sub'); if (s) s.textContent = money((avioPCBy(nom) ? avioPCBy(nom).precio : 0) * cons); });
+  negPanel.querySelectorAll('.neg-avio-row').forEach(r => { const nom = r.querySelector('.pc-avio-nom').value, prov = r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0; const s = r.querySelector('.pc-avio-sub'); if (s) s.textContent = money(precioAvioPC(nom, prov) * cons); });
   negPanel.querySelectorAll('.neg-tela-row').forEach(r => { const nom = r.querySelector('.neg-tela-nom').value, cons = parseFloat(r.querySelector('.neg-tela-cons').value) || 0; const s = r.querySelector('.neg-tela-sub'); if (s) s.textContent = money((telaPCBy(nom) ? telaPCBy(nom).precio : 0) * cons); });
 }
 function negAddTela() { negSync(); negDet.telas.push({ nom: '', consumo: 0 }); renderNeg(); }
 function negDelTela(i) { negSync(); negDet.telas.splice(i, 1); renderNeg(); }
 function negAddProc() { negSync(); negDet.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderNeg(); }
 function negDelProc(i) { negSync(); negDet.procesos.splice(i, 1); renderNeg(); }
-function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, consumo: 1 }); renderNeg(); }
+function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, prov: '', consumo: 1 }); renderNeg(); }
 function negDelAvio(i) { negSync(); negDet.avios.splice(i, 1); renderNeg(); }
+function negAvioReRender(i) { negSync(); if (negDet.avios[i]) negDet.avios[i].prov = ''; renderNeg(); }
 function guardarVersion() {
   negSync();
   const L = LISTAS[listaSel]; const ln = L.lineas[negLinea];
@@ -3614,9 +3643,10 @@ function renderNeg() {
       <button class="btn ghost sm" onclick="negAddProc()" style="margin-top:6px">${IC.plus}Agregar proceso</button>
       <div class="proc-summary-title" style="margin-top:14px">Avíos <span style="font-weight:400;color:var(--faint)">— quita/agrega para mover el costo</span></div>
       <div id="negAvios">${(negDet.avios || []).map((x, i) => `<div class="pc-line pc-avio-row neg-avio-row">
-        <select class="pc-in pc-avio-nom">${opt(AVIOS_PC.map(a => a.nom), x.nom)}</select>
+        <select class="pc-in pc-avio-nom" onchange="event.stopPropagation();negAvioReRender(${i})">${opt(AVIOS_PC.map(a => a.nom), x.nom)}</select>
+        <select class="pc-in pc-avio-prov">${provOpts(x.nom, x.prov)}</select>
         <input class="pc-in mono pc-avio-cons" type="number" step="any" min="0" value="${x.consumo || ''}">
-        <span class="pc-avio-sub mono">${money((avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0))}</span>
+        <span class="pc-avio-sub mono">${money(precioAvioPC(x.nom, x.prov) * (x.consumo || 0))}</span>
         <button class="pc-line-del" onclick="negDelAvio(${i})">${icXsvg}</button>
       </div>`).join('') || '<div class="pc-empty">Sin avíos.</div>'}</div>
       <button class="btn ghost sm" onclick="negAddAvio()" style="margin-top:6px">${IC.plus}Agregar avío</button>
