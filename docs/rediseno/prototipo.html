@@ -721,7 +721,8 @@
   .pc-in.mono { font-family: var(--ff-mono); text-align: right; }
   .pc-line { display: grid; gap: 10px; align-items: center; margin-bottom: 8px; }
   .pc-proc-row { grid-template-columns: 1fr 130px 34px; }
-  .pc-avio-row { grid-template-columns: 1fr 110px 96px 34px; }
+  .pc-avio-row, .pc-tela-row { grid-template-columns: 1fr 110px 96px 34px; }
+  .pc-tela-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
   .pc-avio-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
   .pc-empty { font-size: 12px; color: var(--faint); padding: 6px 2px; }
   .pc-line-del { height: 34px; width: 34px; border: 1px solid var(--border); background: var(--panel); border-radius: 8px; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
@@ -2940,24 +2941,24 @@ const nFotos = (m) => (m.fotos || 0) + ((m.fotosArr && m.fotosArr.length) || 0);
 
 let PROYECTOS = [
   { num: 'P-1042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '2 jul 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', tela: { nom: 'Felpa francesa 320g', consumo: 0.42 }, maquila: 25, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
-    { nuestro: '62411', clienteNum: 'CA-KM-115', nombre: 'Short deportivo felpa', estatus: 'proceso', tela: { nom: 'Felpa francesa 320g', consumo: 0.38 }, maquila: 22, margen: 45, procesos: [{ tipo: 'Bordado', precio: 8 }], avios: [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Short.pdf'], fotos: 2 },
-    { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', tela: { nom: '', consumo: 0 }, maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0 },
+    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', telas: [{ nom: 'Felpa francesa 320g', consumo: 0.42 }], maquila: 25, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
+    { nuestro: '62411', clienteNum: 'CA-KM-115', nombre: 'Short deportivo felpa', estatus: 'proceso', telas: [{ nom: 'Felpa francesa 320g', consumo: 0.38 }], maquila: 22, margen: 45, procesos: [{ tipo: 'Bordado', precio: 8 }], avios: [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Short.pdf'], fotos: 2 },
+    { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', telas: [], maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0 },
   ] },
   { num: 'P-1041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '28 jun 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', tela: { nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, maquila: 30, margen: 42, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
-    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', tela: { nom: 'Algodón peinado 30/1', consumo: 0.30 }, maquila: 18, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
+    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquila: 30, margen: 42, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
+    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', telas: [{ nom: 'Algodón peinado 30/1', consumo: 0.30 }], maquila: 18, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
   ] },
   { num: 'P-1039', cliente: 'Liverpool', depto: 'Infantil', temporada: 'OI26', fecha: '20 jun 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62330', clienteNum: 'LV-INF-88', nombre: 'Conjunto felpa bebé', estatus: 'borrador', tela: { nom: 'Felpa francesa 320g', consumo: 0.25 }, maquila: 20, margen: 48, procesos: [], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 4 }], pdfs: ['TechPack_Conjunto.pdf'], fotos: 2 },
+    { nuestro: '62330', clienteNum: 'LV-INF-88', nombre: 'Conjunto felpa bebé', estatus: 'borrador', telas: [{ nom: 'Felpa francesa 320g', consumo: 0.25 }, { nom: 'Franela lavada 180g', consumo: 0.08 }], maquila: 20, margen: 48, procesos: [], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 4 }], pdfs: ['TechPack_Conjunto.pdf'], fotos: 2 },
   ] },
   { num: 'P-1035', cliente: 'Cklass', depto: 'Catálogo', temporada: 'PV27', fecha: '10 jun 2026', estatus: 'cerrado', modelos: [
-    { nuestro: '62124', clienteNum: '154-40', nombre: 'Blusa manga larga', estatus: 'aprobado', tela: { nom: 'Lycra suplex 240g', consumo: 0.32 }, maquila: 24, margen: 50, procesos: [{ tipo: 'Sublimado', precio: 9 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }], pdfs: ['TechPack_Blusa.pdf'], fotos: 3 },
+    { nuestro: '62124', clienteNum: '154-40', nombre: 'Blusa manga larga', estatus: 'aprobado', telas: [{ nom: 'Lycra suplex 240g', consumo: 0.32 }], maquila: 24, margen: 50, procesos: [{ tipo: 'Sublimado', precio: 9 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }], pdfs: ['TechPack_Blusa.pdf'], fotos: 3 },
   ] },
 ];
 
 function costoModelo(m) {
-  const tela = m.tela && m.tela.nom && telaPCBy(m.tela.nom) ? telaPCBy(m.tela.nom).precio * (m.tela.consumo || 0) : 0;
+  const tela = (m.telas || []).reduce((a, t) => a + (t.nom && telaPCBy(t.nom) ? telaPCBy(t.nom).precio * (t.consumo || 0) : 0), 0);
   const avios = (m.avios || []).reduce((a, x) => a + (avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0), 0);
   const procs = (m.procesos || []).reduce((a, x) => a + (x.precio || 0), 0);
   const maq = m.maquila || 0;
@@ -2967,7 +2968,7 @@ function costoModelo(m) {
 }
 function modeloAvance(m) {
   let done = 0; const tot = 4;
-  if (m.tela && m.tela.nom) done++;
+  if ((m.telas || []).some(t => t.nom)) done++;
   if (m.maquila > 0) done++;
   if ((m.avios || []).length) done++;
   if ((m.procesos || []).length || m.estatus === 'aprobado' || m.estatus === 'completo') done++;
@@ -3047,7 +3048,7 @@ function tarjetaModelo(pi, mi, m) {
       <span class="badge ${bc}"><span class="d"></span>${bl}</span>
     </div>
     <div class="pc-card-body">
-      <div class="pc-kv"><span>Tela</span><b>${m.tela && m.tela.nom ? m.tela.nom : '—'}</b></div>
+      <div class="pc-kv"><span>Tela${(m.telas || []).filter(t => t.nom).length > 1 ? 's' : ''}</span><b>${(() => { const ts = (m.telas || []).filter(t => t.nom); return ts.length ? (ts.length > 1 ? ts.length + ' telas' : ts[0].nom) : '—'; })()}</b></div>
       <div class="pc-kv"><span>Costo estimado</span><b class="mono">${c.costo ? money(c.costo) : '—'}</b></div>
       <div class="pc-kv"><span>Precio sugerido</span><b class="mono" style="color:var(--ok)">${c.precio ? money(c.precio) : '—'}</b></div>
     </div>
@@ -3093,7 +3094,7 @@ function guardarProyecto() {
 /* ---- Editor de modelo ---- */
 const pcScrim = document.getElementById('pcScrim');
 const pcPanel = document.getElementById('pcPanel');
-function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', tela: { nom: '', consumo: 0 }, maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
+function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', telas: [{ nom: '', consumo: 0 }], maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
 function editarModelo(pi, mi) { pcEdit = { pIdx: pi, mIdx: mi, m: JSON.parse(JSON.stringify(PROYECTOS[pi].modelos[mi])) }; if (!pcEdit.m.fotosArr) pcEdit.m.fotosArr = []; renderModeloEditor(); pcScrim.classList.add('show'); }
 function cerrarModeloEditor() { pcScrim.classList.remove('show'); }
 function pcSync() {
@@ -3103,8 +3104,7 @@ function pcSync() {
   m.nuestro = p.querySelector('#pcNuestro').value.trim();
   m.clienteNum = p.querySelector('#pcCliente').value.trim();
   m.estatus = p.querySelector('#pcEstatus').value;
-  m.tela.nom = p.querySelector('#pcTela').value;
-  m.tela.consumo = parseFloat(p.querySelector('#pcConsumo').value) || 0;
+  m.telas = [...p.querySelectorAll('.pc-tela-row')].map(r => ({ nom: r.querySelector('.pc-tela-nom').value, consumo: parseFloat(r.querySelector('.pc-tela-cons').value) || 0 }));
   m.maquila = parseFloat(p.querySelector('#pcMaquila').value) || 0;
   m.margen = parseFloat(p.querySelector('#pcMargen').value) || 0;
   m.procesos = [...p.querySelectorAll('.pc-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
@@ -3121,7 +3121,13 @@ function pcRecalc() {
     const sub = r.querySelector('.pc-avio-sub'); if (sub) sub.textContent = money((avioPCBy(nom) ? avioPCBy(nom).precio : 0) * cons);
   });
   const tsub = pcPanel.querySelector('#pcTelaSub'); if (tsub) tsub.textContent = money(c.tela);
+  pcPanel.querySelectorAll('.pc-tela-row').forEach(r => {
+    const nom = r.querySelector('.pc-tela-nom').value, cons = parseFloat(r.querySelector('.pc-tela-cons').value) || 0;
+    const s = r.querySelector('.pc-tela-sub'); if (s) s.textContent = money((telaPCBy(nom) ? telaPCBy(nom).precio : 0) * cons);
+  });
 }
+function pcAddTela() { pcSync(); pcEdit.m.telas.push({ nom: '', consumo: 0 }); renderModeloEditor(); }
+function pcDelTela(i) { pcSync(); pcEdit.m.telas.splice(i, 1); renderModeloEditor(); }
 function pcAddProceso() { pcSync(); pcEdit.m.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderModeloEditor(); }
 function pcDelProceso(i) { pcSync(); pcEdit.m.procesos.splice(i, 1); renderModeloEditor(); }
 function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, consumo: 1 }); renderModeloEditor(); }
@@ -3163,12 +3169,17 @@ function renderModeloEditor() {
     </div>
 
     <div class="pc-sec">
-      <h4>Tela y consumo <span class="hint" id="pcTelaSub">${money(c.tela)}</span></h4>
-      <div class="pc-fields">
-        <label class="col2"><span class="ffk">Tela</span><select class="pc-in" id="pcTela"><option value="">— elige la tela —</option>${TELAS_PC.map(t => `<option${m.tela && m.tela.nom === t.nom ? ' selected' : ''}>${t.nom}</option>`).join('')}</select></label>
-        <label><span class="ffk">Consumo por prenda</span><input class="pc-in mono" id="pcConsumo" type="number" step="any" min="0" value="${m.tela && m.tela.consumo ? m.tela.consumo : ''}" placeholder="0.42"></label>
-        <div class="pc-hint-cell">El precio de la tela se toma del catálogo (por proveedor y color en el real, R16).</div>
+      <h4>Telas <span class="hint" id="pcTelaSub">${money(c.tela)}</span></h4>
+      <div id="pcTelas">
+        ${(m.telas || []).map((t, i) => `<div class="pc-line pc-tela-row">
+          <select class="pc-in pc-tela-nom"><option value="">— elige la tela —</option>${TELAS_PC.map(o => `<option${t.nom === o.nom ? ' selected' : ''}>${o.nom}</option>`).join('')}</select>
+          <input class="pc-in mono pc-tela-cons" type="number" step="any" min="0" value="${t.consumo || ''}" placeholder="0.42">
+          <span class="pc-tela-sub mono">${money((telaPCBy(t.nom) ? telaPCBy(t.nom).precio : 0) * (t.consumo || 0))}</span>
+          <button class="pc-line-del" onclick="pcDelTela(${i})" title="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>`).join('') || '<div class="pc-empty">Sin telas. Un modelo puede llevar varias (D5 — felpa + acompañante).</div>'}
       </div>
+      <button class="btn ghost sm" onclick="pcAddTela()" style="margin-top:8px">${IC.plus}Agregar tela</button>
+      <div class="pc-hint-cell" style="margin-top:8px">El precio de cada tela se toma del catálogo (por proveedor y color en el real, R16). Un modelo puede llevar <b>varias telas</b> (D5).</div>
     </div>
 
     <div class="pc-sec">
@@ -3348,7 +3359,7 @@ function precioLista(costo, f) {
   const precio = otros < 1 ? base / (1 - otros) : base;
   return Math.ceil(precio);
 }
-const det = (tela, cons, maq, procesos, avios) => ({ tela: { nom: tela, consumo: cons }, maquila: maq, procesos, avios });
+const det = (tela, cons, maq, procesos, avios, telas2) => ({ telas: [{ nom: tela, consumo: cons }, ...(telas2 || [])], maquila: maq, procesos, avios });
 let LISTAS = [
   { folio: '2026-042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '3 jul 2026', estado: 'abierta', factores: { margen: 45, descuentos: 8, regalias: 5, costoVentas: 3 }, lineas: [
     { modelo: '62410', nombre: 'Playera Cherry On Top', clienteNum: 'CA-KM-114', version: 1, aprobado: null, aprobadoPor: null, eventos: [],
@@ -3359,7 +3370,7 @@ let LISTAS = [
   { folio: '2026-041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '29 jun 2026', estado: 'en-negociacion', factores: { margen: 45, descuentos: 6, regalias: 8, costoVentas: 3 }, lineas: [
     { modelo: '62058', nombre: 'Bermuda playa stretch', clienteNum: 'A17E210', version: 2, aprobado: 205, aprobadoPor: 'Daniel Masri', eventos: [
       { acuerdo: 'El cliente pidió quitar las bolsas traseras → menos avíos, baja el costo y el precio.', anterior: 224, nuevo: 205, costoAnt: 96.4, costoNue: 89.1, por: 'Daniel Masri', fecha: '1 jul 2026', version: 2 },
-    ], det: det('Mezclilla stretch 8oz', 0.55, 30, [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }]) },
+    ], det: det('Mezclilla stretch 8oz', 0.55, 30, [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], [{ nom: 'Franela lavada 180g', consumo: 0.12 }]) },
     { modelo: '62059', nombre: 'Playera surf estampada', clienteNum: 'A17E190', version: 1, aprobado: 98, aprobadoPor: 'Daniel Masri', eventos: [],
       det: det('Algodón peinado 30/1', 0.30, 18, [{ tipo: 'Estampado DTF', precio: 7 }], [{ nom: 'Etiqueta tejida MJD', consumo: 1 }]) },
   ] },
@@ -3375,10 +3386,10 @@ const listaVigente = (ln, f) => ln.aprobado != null ? ln.aprobado : precioLista(
 const margenBruto = (precio, costo, f) => { const neto = precio * (1 - ((f.descuentos || 0) + (f.regalias || 0) + (f.costoVentas || 0)) / 100); return neto > 0 ? (neto - costo) / neto * 100 : 0; };
 const colorMargen = (m, obj) => m >= obj ? 'var(--ok)' : m >= obj - 8 ? 'var(--warn)' : 'var(--crit)';
 function desgloseHTML(dt) {
-  const c = costoModelo(dt); const tp = telaPCBy(dt.tela.nom);
+  const c = costoModelo(dt);
   const row = (k, v) => `<div class="dg-row"><span>${k}</span><b class="mono">${v}</b></div>`;
   return `<div class="dg">
-    ${row('Tela — ' + (dt.tela.nom || '—') + (dt.tela.consumo ? ` (${dt.tela.consumo}${tp ? ' ' + tp.un : ''} × $${tp ? tp.precio.toFixed(2) : '0'})` : ''), money(c.tela))}
+    ${(dt.telas || []).map(t => { const tp = telaPCBy(t.nom); return row('Tela — ' + (t.nom || '—') + (t.consumo ? ` (${t.consumo}${tp ? ' ' + tp.un : ''} × $${tp ? tp.precio.toFixed(2) : '0'})` : ''), money((tp ? tp.precio : 0) * (t.consumo || 0))); }).join('')}
     ${(dt.avios || []).map(a => row('Avío — ' + a.nom + ` (${a.consumo} × $${(avioPCBy(a.nom) ? avioPCBy(a.nom).precio : 0).toFixed(2)})`, money((avioPCBy(a.nom) ? avioPCBy(a.nom).precio : 0) * a.consumo))).join('')}
     ${(dt.procesos || []).map(p => row('Proceso — ' + p.tipo, money(p.precio))).join('')}
     ${row('Maquila (costura)', money(dt.maquila || 0))}
@@ -3522,9 +3533,8 @@ function cerrarNeg() { negScrim.classList.remove('show'); }
 function negSync() {
   const p = negPanel;
   const obj = p.querySelector('#negObj'); if (obj) negObjetivo = parseFloat(obj.value) || 0;
-  if (!p.querySelector('#negTela')) return;
-  negDet.tela.nom = p.querySelector('#negTela').value;
-  negDet.tela.consumo = parseFloat(p.querySelector('#negConsumo').value) || 0;
+  if (!p.querySelector('#negTelas')) return;
+  negDet.telas = [...p.querySelectorAll('.neg-tela-row')].map(r => ({ nom: r.querySelector('.neg-tela-nom').value, consumo: parseFloat(r.querySelector('.neg-tela-cons').value) || 0 }));
   negDet.maquila = parseFloat(p.querySelector('#negMaquila').value) || 0;
   negDet.procesos = [...p.querySelectorAll('.neg-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
   negDet.avios = [...p.querySelectorAll('.neg-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
@@ -3538,7 +3548,10 @@ function negRecalc() {
   set('#negCosto', money(c.costo)); set('#negNeto', money(neto)); set('#negFootCosto', money(c.costo));
   ['#negMB', '#negFootMB'].forEach(id => { const el = negPanel.querySelector(id); if (el) { el.textContent = mb.toFixed(1) + '%'; el.style.color = col; } });
   negPanel.querySelectorAll('.neg-avio-row').forEach(r => { const nom = r.querySelector('.pc-avio-nom').value, cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0; const s = r.querySelector('.pc-avio-sub'); if (s) s.textContent = money((avioPCBy(nom) ? avioPCBy(nom).precio : 0) * cons); });
+  negPanel.querySelectorAll('.neg-tela-row').forEach(r => { const nom = r.querySelector('.neg-tela-nom').value, cons = parseFloat(r.querySelector('.neg-tela-cons').value) || 0; const s = r.querySelector('.neg-tela-sub'); if (s) s.textContent = money((telaPCBy(nom) ? telaPCBy(nom).precio : 0) * cons); });
 }
+function negAddTela() { negSync(); negDet.telas.push({ nom: '', consumo: 0 }); renderNeg(); }
+function negDelTela(i) { negSync(); negDet.telas.splice(i, 1); renderNeg(); }
 function negAddProc() { negSync(); negDet.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderNeg(); }
 function negDelProc(i) { negSync(); negDet.procesos.splice(i, 1); renderNeg(); }
 function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, consumo: 1 }); renderNeg(); }
@@ -3581,9 +3594,15 @@ function renderNeg() {
     ${cerr ? `<div class="audit-hint" style="margin-top:14px">${IC.lock}<span>Lista cerrada — solo lectura.</span></div>` : `
     <div class="pc-sec" style="margin-top:16px">
       <h4>Elementos del modelo <span class="hint">edítalos en vivo para llegar al costo</span></h4>
-      <div class="pc-fields">
-        <label class="col2"><span class="ffk">Tela</span><select class="pc-in" id="negTela"><option value="">— tela —</option>${TELAS_PC.map(t => `<option${negDet.tela.nom === t.nom ? ' selected' : ''}>${t.nom}</option>`).join('')}</select></label>
-        <label><span class="ffk">Consumo por prenda</span><input class="pc-in mono" id="negConsumo" type="number" step="any" min="0" value="${negDet.tela.consumo || ''}"></label>
+      <div class="proc-summary-title">Telas <span style="font-weight:400;color:var(--faint)">— un modelo puede llevar varias</span></div>
+      <div id="negTelas">${(negDet.telas || []).map((t, i) => `<div class="pc-line pc-avio-row neg-tela-row">
+        <select class="pc-in neg-tela-nom"><option value="">— tela —</option>${TELAS_PC.map(o => `<option${t.nom === o.nom ? ' selected' : ''}>${o.nom}</option>`).join('')}</select>
+        <input class="pc-in mono neg-tela-cons" type="number" step="any" min="0" value="${t.consumo || ''}">
+        <span class="pc-avio-sub mono neg-tela-sub">${money((telaPCBy(t.nom) ? telaPCBy(t.nom).precio : 0) * (t.consumo || 0))}</span>
+        <button class="pc-line-del" onclick="negDelTela(${i})">${icXsvg}</button>
+      </div>`).join('') || '<div class="pc-empty">Sin telas.</div>'}</div>
+      <button class="btn ghost sm" onclick="negAddTela()" style="margin-top:6px">${IC.plus}Agregar tela</button>
+      <div class="pc-fields" style="margin-top:14px">
         <label><span class="ffk">Maquila (costura)</span><input class="pc-in mono" id="negMaquila" type="number" step="any" min="0" value="${negDet.maquila || ''}"></label>
       </div>
       <div class="proc-summary-title" style="margin-top:14px">Procesos</div>
@@ -3623,7 +3642,7 @@ function renderNeg() {
 }
 function generarListaDeProyecto(pi) {
   const p = PROYECTOS[pi]; const f = { ...facCli(p.cliente) };
-  const lineas = p.modelos.map(m => ({ modelo: m.nuestro, nombre: m.nombre || 'Modelo', clienteNum: m.clienteNum, version: 1, aprobado: null, aprobadoPor: null, eventos: [], det: { tela: { nom: (m.tela || {}).nom || '', consumo: (m.tela || {}).consumo || 0 }, maquila: m.maquila || 0, procesos: JSON.parse(JSON.stringify(m.procesos || [])), avios: JSON.parse(JSON.stringify(m.avios || [])) } }));
+  const lineas = p.modelos.map(m => ({ modelo: m.nuestro, nombre: m.nombre || 'Modelo', clienteNum: m.clienteNum, version: 1, aprobado: null, aprobadoPor: null, eventos: [], det: { telas: JSON.parse(JSON.stringify(m.telas || [])), maquila: m.maquila || 0, procesos: JSON.parse(JSON.stringify(m.procesos || [])), avios: JSON.parse(JSON.stringify(m.avios || [])) } }));
   LISTAS.unshift({ folio: nextFolioLista(), cliente: p.cliente, depto: p.depto, temporada: p.temporada, fecha: hoyStr(), estado: 'abierta', factores: f, lineas });
   listaSel = 0; vistaActual = 'listas-precios'; renderNav();
   crumbsEl.innerHTML = `<b>CONTROL</b><span class="sep">${IC.chevron}</span>${TITULOS['listas-precios']}`;
