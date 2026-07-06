@@ -858,6 +858,10 @@
     .ff.col2 { grid-column: span 1; }
   }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  /* Mis pendientes (Ruta Crítica) */
+  .rc-task { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
+  .rc-task:last-child { border-bottom: none; }
+  .rc-task:hover { background: var(--hover); }
 </style>
 
 <div class="app" id="app">
@@ -949,6 +953,9 @@
 
 <!-- Sesión de negociación (lista de precios) -->
 <div class="proc-scrim" id="negScrim"><div class="proc" id="negPanel"></div></div>
+
+<!-- Ruta de la orden (Ruta Crítica hacia atrás) -->
+<div class="proc-scrim" id="rutaScrim"><div class="proc" id="rutaPanel"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -1962,47 +1969,161 @@ function cadenaRC(pasos) {
     return `${lnk}<span class="node" style="background:${col[p[1]]};${glow}"></span>`;
   }).join('') + `</span>`;
 }
-const RC = [
-  ['OP-8841','Playera cuello redondo','Liverpool',[['Pedido','done'],['Corte','late'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Corte','Hoy 18:00','−1 d','crit'],
-  ['OP-8836','Sudadera con gorro','Coppel',[['Pedido','done'],['Corte','done'],['Envío','done'],['Maquila','active'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Maquila (M)','1 jul','0 d','warn'],
-  ['OP-8829','Short deportivo','Suburbia',[['Pedido','done'],['Corte','done'],['Envío','done'],['Estampado','active'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Estampado (A)','3 jul','+1 d','warn'],
-  ['OP-8820','Top halter','Shasa',[['Pedido','done'],['Corte','done'],['Envío','done'],['Maquila','done'],['Recibo','active'],['Calidad','pending'],['Entrega','pending']],'Recibo','2 jul','+2 d','ok'],
-  ['OP-8815','Pants jogger','Sears',[['Pedido','done'],['Corte','done'],['Envío','done'],['Maquila','done'],['Recibo','done'],['Calidad','active'],['Entrega','pending']],'Auditoría AQL','1 jul','+3 d','ok'],
-  ['OP-8850','Top halter','Shasa',[['Pedido','done'],['Corte','active'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']],'Corte','5 jul','+4 d','ok'],
+/* Cada orden lleva su RUTA generada hacia atrás desde la entrega (CPM):
+   por proceso → responsable + fecha compromiso + estado (done/vencido/hoy/proximo).
+   "Mis pendientes" se deriva filtrando por responsable. Hoy = 6 jul 2026. */
+const RUTAS = [
+  { orden:'OP-8841', modelo:'Playera cuello redondo', cliente:'Liverpool', entrega:'13 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'26 jun', e:'done',    d:-10 },
+    { p:'Corte',                r:'Laura Hernández', f:'2 jul',  e:'vencido', d:-4 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'7 jul',  e:'proximo', d:1 },
+    { p:'Maquila (costura)',    r:'Laura Hernández', f:'10 jul', e:'proximo', d:4 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'11 jul', e:'proximo', d:5 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'12 jul', e:'proximo', d:6 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'13 jul', e:'proximo', d:7 },
+  ]},
+  { orden:'OP-8836', modelo:'Sudadera con gorro', cliente:'Coppel', entrega:'12 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'24 jun', e:'done',    d:-12 },
+    { p:'Corte',                r:'Laura Hernández', f:'30 jun', e:'done',    d:-6 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'6 jul',  e:'hoy',     d:0 },
+    { p:'Maquila (costura)',    r:'Laura Hernández', f:'9 jul',  e:'proximo', d:3 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'10 jul', e:'proximo', d:4 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'11 jul', e:'proximo', d:5 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'12 jul', e:'proximo', d:6 },
+  ]},
+  { orden:'OP-8829', modelo:'Short deportivo', cliente:'Suburbia', entrega:'9 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'20 jun', e:'done', d:-16 },
+    { p:'Corte',                r:'Laura Hernández', f:'26 jun', e:'done', d:-10 },
+    { p:'Envío a estampado',    r:'Laura Hernández', f:'30 jun', e:'done', d:-6 },
+    { p:'Recibo de estampado',  r:'Laura Hernández', f:'6 jul',  e:'hoy',  d:0 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'8 jul',  e:'proximo', d:2 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'9 jul',  e:'proximo', d:3 },
+  ]},
+  { orden:'OP-8820', modelo:'Top halter', cliente:'Shasa', entrega:'8 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'18 jun', e:'done', d:-18 },
+    { p:'Corte',                r:'Laura Hernández', f:'24 jun', e:'done', d:-12 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'28 jun', e:'done', d:-8 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'4 jul',  e:'done', d:-2 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'6 jul',  e:'hoy',  d:0 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'8 jul',  e:'proximo', d:2 },
+  ]},
+  { orden:'OP-8815', modelo:'Pants jogger', cliente:'Sears', entrega:'15 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'5 jul',  e:'vencido', d:-1 },
+    { p:'Corte',                r:'Laura Hernández', f:'8 jul',  e:'proximo', d:2 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'9 jul',  e:'proximo', d:3 },
+    { p:'Maquila (costura)',    r:'Laura Hernández', f:'12 jul', e:'proximo', d:6 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'13 jul', e:'proximo', d:7 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'14 jul', e:'proximo', d:8 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'15 jul', e:'proximo', d:9 },
+  ]},
+  { orden:'OP-8850', modelo:'Playera polo', cliente:'C&A', entrega:'16 jul', proc:[
+    { p:'Desarrollo / muestra', r:'Gabriel Masri',   f:'1 jul',  e:'done',    d:-5 },
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'6 jul',  e:'hoy',     d:0 },
+    { p:'Corte',                r:'Laura Hernández', f:'9 jul',  e:'proximo', d:3 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'10 jul', e:'proximo', d:4 },
+    { p:'Maquila (costura)',    r:'Laura Hernández', f:'13 jul', e:'proximo', d:7 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'14 jul', e:'proximo', d:8 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'15 jul', e:'proximo', d:9 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'16 jul', e:'proximo', d:10 },
+  ]},
+  { orden:'OP-8807', modelo:'Vestido niña', cliente:'Liverpool', entrega:'7 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'15 jun', e:'done', d:-21 },
+    { p:'Corte',                r:'Laura Hernández', f:'22 jun', e:'done', d:-14 },
+    { p:'Maquila (costura)',    r:'Laura Hernández', f:'28 jun', e:'done', d:-8 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'2 jul',  e:'done', d:-4 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'4 jul',  e:'done', d:-2 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'5 jul',  e:'vencido', d:-1 },
+  ]},
 ];
-function vRc() {
-  return `
-  <div class="page-head">
-    <div><h1>Ruta Crítica</h1><div class="sub">Workflow / CPM por orden · 47 rutas activas</div></div>
-    <div class="actions"><button class="btn ghost">${IC.printer}Plan PDF</button><button class="btn primary" data-add="rc">${IC.plus}Programar RC</button></div>
-  </div>
-  <div class="kpis">
-    ${kpi('En tiempo','39','','up','+3','de 47 rutas')}
-    ${kpi('En riesgo','6','','down','+2','holgura ≤ 1 día')}
-    ${kpi('Atrasadas','2','','down','+1','requieren acción')}
-    ${kpi('Cumplimiento','96.4','%','down','−1.2','últimos 30 d')}
-  </div>
-  <div class="card">
-    <div class="toolbar">
-      <button class="chip active">Activas</button><button class="chip">En riesgo</button><button class="chip">Atrasadas</button>
-      <div class="tool-right"><span class="count">6 de 47</span></div>
+const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
+let rcPersona = 'Laura Hernández';
+function misPendientes(persona) {
+  const out = [];
+  RUTAS.forEach(R => R.proc.forEach(x => { if (x.r === persona && x.e !== 'done') out.push({ orden: R.orden, modelo: R.modelo, cliente: R.cliente, entrega: R.entrega, ...x }); }));
+  return out;
+}
+const rcBcls = { vencido: 'crit', hoy: 'warn', proximo: 'neutral', done: 'ok' };
+const rcDtxt = (t) => t.e === 'vencido' ? `venció ${t.f} · ${t.d} d` : t.e === 'hoy' ? `para hoy · ${t.f}` : `${t.f} · +${t.d} d`;
+function filaPendiente(t) {
+  return `<div class="rc-task" onclick="abrirRuta('${t.orden}')">
+    <div style="flex:1;min-width:0">
+      <div class="cell-strong">${t.p} <span style="font-weight:400;color:var(--faint);font-size:12px">· ${t.orden}</span></div>
+      <div style="font-size:12px;color:var(--muted)">${t.modelo} · ${t.cliente} · entrega ${t.entrega}</div>
     </div>
-    <div class="table-wrap"><table class="data"><thead><tr>
-      <th>Orden</th><th>Modelo</th><th>Cliente</th><th>Ruta viva</th><th>Etapa actual</th><th>Próx. hito</th><th class="r">Holgura</th><th>Semáforo</th>
-    </tr></thead><tbody>
-      ${RC.map(r=>`<tr>
-        <td class="cell-code">${r[0]}</td>
-        <td class="cell-strong">${r[1]}</td>
-        <td>${r[2]}</td>
-        <td>${cadenaRC(r[3])}</td>
-        <td><span class="badge ${r[7]}"><span class="d"></span>${r[4]}</span></td>
-        <td class="num">${r[5]}</td>
-        <td class="r num" style="color:${r[6].startsWith('−')?'var(--crit)':'var(--muted)'}">${r[6]}</td>
-        <td><span class="badge ${r[7]}"><span class="d"></span>${r[7]==='crit'?'Atrasada':r[7]==='warn'?'En riesgo':'En tiempo'}</span></td>
-      </tr>`).join('')}
-    </tbody></table></div>
+    <span class="badge ${rcBcls[t.e]}" style="white-space:nowrap"><span class="d"></span>${rcDtxt(t)}</span>
+    <button class="btn ghost sm" onclick="event.stopPropagation();rcHecho('${t.orden}','${t.p}')" title="Registrar avance">${IC.check}Hecho</button>
+    <span style="color:var(--faint)" title="Ver la ruta de la orden">${IC.chevron}</span>
   </div>`;
 }
+function vRc() {
+  const P = misPendientes(rcPersona);
+  const venc = P.filter(t => t.e === 'vencido').sort((a, b) => a.d - b.d);
+  const hoy = P.filter(t => t.e === 'hoy');
+  const prox = P.filter(t => t.e === 'proximo').sort((a, b) => a.d - b.d);
+  const proxSem = prox.filter(t => t.d <= 4);
+  const proxDesp = prox.length - proxSem.length;
+  const sec = (titulo, arr, color, sub) => arr.length ? `<div class="card" style="margin-bottom:14px;overflow:hidden">
+    <div class="toolbar" style="box-shadow:inset 3px 0 0 ${color}"><b style="color:${color}">${titulo}</b><span class="count">${arr.length}</span>${sub ? `<span style="color:var(--muted);font-size:12px;margin-left:auto">${sub}</span>` : ''}</div>
+    ${arr.map(filaPendiente).join('')}
+  </div>` : '';
+  return `
+  <div class="page-head">
+    <div><h1>Mis pendientes</h1><div class="sub">Tu guía diaria de Ruta Crítica · hoy <b>6 jul 2026</b> · una orden pasa por varios procesos; aquí ves los que te tocan a ti</div></div>
+    <div class="actions"><button class="btn ghost">${IC.printer}Mi día (PDF)</button><button class="btn primary" data-add="rc">${IC.plus}Programar RC</button></div>
+  </div>
+  <div class="banner">${IC.usuarios}<span>Viendo pendientes de: <select class="minisel" style="margin:0 4px" onchange="rcPersona=this.value;ir('rc')">${RC_PERSONAS.map(p => `<option${p === rcPersona ? ' selected' : ''}>${p}</option>`).join('')}</select> — cada quien ve solo los suyos; como admin puedes revisar los de cualquiera. Una persona puede ser responsable de <b>varios procesos</b>.</span></div>
+  <div class="kpis">
+    ${kpi('Vencidas', String(venc.length), '', venc.length ? 'down' : 'up', venc.length ? '⚠' : 'ok', 'requieren acción ya')}
+    ${kpi('Para hoy', String(hoy.length), '', 'up', 'foco', '6 jul')}
+    ${kpi('Esta semana', String(proxSem.length), '', 'up', '', 'próximos 4 días')}
+    ${kpi('Total a tu cargo', String(P.length), '', 'up', '', 'procesos activos')}
+  </div>
+  ${!P.length ? `<div class="card"><div class="pc-empty" style="padding:34px;text-align:center">Sin pendientes para <b>${rcPersona}</b> 🎉 — nada vencido ni para hoy.</div></div>` : ''}
+  ${sec('⚠ Vencidas', venc, 'var(--crit)', 'atrasadas contra su fecha compromiso')}
+  ${sec('Para hoy', hoy, 'var(--warn)', 'lo que te toca hoy')}
+  ${sec('Próximas · esta semana', proxSem, 'var(--brand)', proxDesp ? `+${proxDesp} programadas más adelante` : '')}`;
+}
+/* Panel deslizante: ruta completa de la orden (generada hacia atrás, CPM) */
+const rutaScrim = document.getElementById('rutaScrim');
+const rutaPanel = document.getElementById('rutaPanel');
+function renderRutaOrden(orden) {
+  const R = RUTAS.find(r => r.orden === orden); if (!R) return;
+  const col = { done: 'var(--ok)', hoy: 'var(--warn)', vencido: 'var(--crit)', proximo: 'var(--border-strong)' };
+  const lbl = { done: 'Hecho', hoy: 'Hoy', vencido: 'Vencido', proximo: 'Programado' };
+  const done = R.proc.filter(x => x.e === 'done').length;
+  rutaPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">RC</span>
+    <div style="flex:1;min-width:0"><h2>Ruta de ${R.orden}</h2>
+      <div class="ph-meta"><span>${R.modelo} · ${R.cliente}</span><span>Entrega comprometida: <b>${R.entrega}</b></span></div>
+    </div>
+    <button class="icon-btn" onclick="cerrarRuta()" title="Cerrar (esc)">${icXsvg}</button>
+  </div>
+  <div class="proc-body">
+    <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>Ruta generada <b>hacia atrás</b> desde la fecha de entrega (CPM): cada proceso tiene su <b>fecha compromiso</b> y su <b>responsable</b>. El semáforo compara la fecha contra hoy. Avance ${done}/${R.proc.length}.</span></div>
+    ${R.proc.map(x => `<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:${x.r === rcPersona ? 'var(--brand-soft)' : 'var(--panel-2)'}">
+      <span style="width:11px;height:11px;border-radius:50%;background:${col[x.e]};flex:none"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${x.p}${x.r === rcPersona ? ' <span class="badge info" style="font-size:10px"><span class="d"></span>tú</span>' : ''}</div>
+        <div style="font-size:12px;color:var(--muted)">Responsable: <b>${x.r}</b></div>
+      </div>
+      <div style="text-align:right;flex:none">
+        <div class="mono" style="font-size:13px">${x.f}</div>
+        <span class="badge ${rcBcls[x.e]}" style="font-size:10px"><span class="d"></span>${lbl[x.e]}</span>
+      </div>
+    </div>`).join('')}
+  </div>`;
+}
+function abrirRuta(orden) { renderRutaOrden(orden); rutaScrim.classList.add('show'); }
+function cerrarRuta() { rutaScrim.classList.remove('show'); }
+function rcHecho(orden, proc) {
+  const R = RUTAS.find(r => r.orden === orden); if (!R) return;
+  const x = R.proc.find(p => p.p === proc); if (x) x.e = 'done';
+  const nxt = R.proc.find(p => p.e === 'proximo'); if (nxt) { nxt.e = 'hoy'; nxt.d = 0; }
+  ir('rc'); mostrarToast('Proceso marcado como hecho · ' + proc);
+}
+rutaScrim.onclick = (e) => { if (e.target === rutaScrim) cerrarRuta(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && rutaScrim.classList.contains('show')) cerrarRuta(); });
 
 /* ---- Inventario PT ---- */
 const INV = [
@@ -4139,7 +4260,15 @@ const FORMS = {
       { k:'cliente', l:'Cliente', t:'select', op:CLIENTES },
       { k:'compromiso', l:'Entrega comprometida', t:'text', ph:'12 jul' },
     ],
-    crear: (v) => RC.unshift([ v.orden, v.modelo, v.cliente, [['Pedido','done'],['Corte','active'],['Envío','pending'],['Maquila','pending'],['Recibo','pending'],['Calidad','pending'],['Entrega','pending']], 'Corte', v.compromiso||hoyStr(), '+4 d', 'ok' ]),
+    crear: (v) => RUTAS.unshift({ orden: v.orden, modelo: v.modelo, cliente: v.cliente, entrega: v.compromiso || hoyStr(), proc: [
+      { p:'Compra de tela',       r:'Miguel Torres',   f:'—', e:'hoy',     d:0 },
+      { p:'Corte',                r:'Laura Hernández', f:'—', e:'proximo', d:2 },
+      { p:'Envío a maquila',      r:'Laura Hernández', f:'—', e:'proximo', d:3 },
+      { p:'Maquila (costura)',    r:'Laura Hernández', f:'—', e:'proximo', d:5 },
+      { p:'Recibo de maquila',    r:'Laura Hernández', f:'—', e:'proximo', d:6 },
+      { p:'Auditoría de calidad', r:'Carlos Vega',     f:'—', e:'proximo', d:7 },
+      { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:v.compromiso||'—', e:'proximo', d:8 },
+    ] }),
   },
   inventarios: {
     titulo: 'Movimiento de inventario PT', vista: 'inventarios', exito: 'Movimiento registrado',
