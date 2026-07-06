@@ -769,6 +769,28 @@
   .neg-precio svg { width: 15px; height: 15px; color: var(--muted); }
   .neg-acuerdo { font-size: 13px; color: var(--text); margin-top: 4px; }
   .neg-meta { font-size: 11.5px; color: var(--faint); margin-top: 3px; }
+  .lp-exp { width: 22px; height: 22px; border: 1px solid var(--border); background: var(--panel); border-radius: 6px; color: var(--muted); cursor: pointer; display: grid; place-items: center; flex: none; }
+  .lp-exp svg { width: 13px; height: 13px; transition: transform .15s; }
+  .lp-exp.open svg { transform: rotate(90deg); }
+  .lp-exp:hover { border-color: var(--brand); color: var(--brand); }
+  .lp-ver { font-size: 10.5px; font-weight: 700; font-family: var(--ff-mono); color: var(--info); background: var(--info-soft); padding: 1px 6px; border-radius: 5px; vertical-align: middle; }
+  .lp-detrow > td { background: var(--panel-2); padding: 0 14px 4px 44px !important; }
+  .dg { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; max-width: 560px; }
+  .dg-row { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; padding: 3px 0; }
+  .dg-row span { color: var(--muted); }
+  .dg-row.total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 7px; font-weight: 700; }
+  .dg-row.total b { color: var(--brand); }
+  .neg-dec { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.1fr; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .neg-dec-cell { display: flex; flex-direction: column; gap: 5px; }
+  .neg-dec-cell .ffk { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .neg-dec-cell .tiny { font-size: 10px; color: var(--faint); font-weight: 500; font-family: var(--ff-mono); }
+  .neg-dec-cell > b { font-size: 20px; font-weight: 700; }
+  .neg-dec-cell.big > b { font-size: 28px; }
+  .neg-obj-in { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border-strong); border-radius: 8px; padding: 0 10px; height: 40px; background: var(--panel); }
+  .neg-obj-in span { color: var(--muted); font-size: 16px; }
+  .neg-obj-in input { border: 0; background: transparent; outline: none; width: 100%; font-family: var(--ff-mono); font-size: 20px; font-weight: 700; color: var(--text); }
+  .neg-formula { font-size: 11px; color: var(--muted); font-family: var(--ff-mono); margin-top: 8px; }
+  .neg-costo-tag { font-size: 10.5px; color: var(--muted); background: var(--hover); padding: 1px 7px; border-radius: 5px; font-family: var(--ff-mono); }
   .nsl-group + .nsl-group { margin-top: 10px; }
   .nsl-ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px 8px 0 0; font-size: 12px; color: var(--muted); }
   .nsl-ghead b { color: var(--text); font-family: var(--ff-mono); }
@@ -3326,24 +3348,43 @@ function precioLista(costo, f) {
   const precio = otros < 1 ? base / (1 - otros) : base;
   return Math.ceil(precio);
 }
+const det = (tela, cons, maq, procesos, avios) => ({ tela: { nom: tela, consumo: cons }, maquila: maq, procesos, avios });
 let LISTAS = [
   { folio: '2026-042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '3 jul 2026', estado: 'abierta', factores: { margen: 45, descuentos: 8, regalias: 5, costoVentas: 3 }, lineas: [
-    { modelo: '62410', nombre: 'Playera Cherry On Top', clienteNum: 'CA-KM-114', costo: 73.69, aprobado: null, aprobadoPor: null, eventos: [] },
-    { modelo: '62411', nombre: 'Short deportivo felpa', clienteNum: 'CA-KM-115', costo: 72.19, aprobado: null, aprobadoPor: null, eventos: [] },
+    { modelo: '62410', nombre: 'Playera Cherry On Top', clienteNum: 'CA-KM-114', version: 1, aprobado: null, aprobadoPor: null, eventos: [],
+      det: det('Felpa francesa 320g', 0.42, 25, [{ tipo: 'Estampado DTF', precio: 6.5 }], [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }]) },
+    { modelo: '62411', nombre: 'Short deportivo felpa', clienteNum: 'CA-KM-115', version: 1, aprobado: null, aprobadoPor: null, eventos: [],
+      det: det('Felpa francesa 320g', 0.38, 22, [{ tipo: 'Bordado', precio: 8 }], [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }]) },
   ] },
   { folio: '2026-041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '29 jun 2026', estado: 'en-negociacion', factores: { margen: 45, descuentos: 6, regalias: 8, costoVentas: 3 }, lineas: [
-    { modelo: '62058', nombre: 'Bermuda playa stretch', clienteNum: 'A17E210', costo: 89.10, aprobado: 205, aprobadoPor: 'Daniel Masri', eventos: [
-      { acuerdo: 'El cliente pidió quitar las bolsas traseras → baja el costo y el precio.', anterior: 224, nuevo: 205, por: 'Daniel Masri', fecha: '1 jul 2026' },
-    ] },
-    { modelo: '62059', nombre: 'Playera surf estampada', clienteNum: 'A17E190', costo: 41.30, aprobado: 98, aprobadoPor: 'Daniel Masri', eventos: [] },
+    { modelo: '62058', nombre: 'Bermuda playa stretch', clienteNum: 'A17E210', version: 2, aprobado: 205, aprobadoPor: 'Daniel Masri', eventos: [
+      { acuerdo: 'El cliente pidió quitar las bolsas traseras → menos avíos, baja el costo y el precio.', anterior: 224, nuevo: 205, costoAnt: 96.4, costoNue: 89.1, por: 'Daniel Masri', fecha: '1 jul 2026', version: 2 },
+    ], det: det('Mezclilla stretch 8oz', 0.55, 30, [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }]) },
+    { modelo: '62059', nombre: 'Playera surf estampada', clienteNum: 'A17E190', version: 1, aprobado: 98, aprobadoPor: 'Daniel Masri', eventos: [],
+      det: det('Algodón peinado 30/1', 0.30, 18, [{ tipo: 'Estampado DTF', precio: 7 }], [{ nom: 'Etiqueta tejida MJD', consumo: 1 }]) },
   ] },
   { folio: '2026-030', cliente: 'Cklass', depto: 'Catálogo', temporada: 'PV27', fecha: '12 jun 2026', estado: 'cerrada', factores: { margen: 50, descuentos: 5, regalias: 3, costoVentas: 2 }, lineas: [
-    { modelo: '62124', nombre: 'Blusa manga larga', clienteNum: '154-40', costo: 61.00, aprobado: 158, aprobadoPor: 'Daniel Masri', eventos: [] },
+    { modelo: '62124', nombre: 'Blusa manga larga', clienteNum: '154-40', version: 1, aprobado: 145, aprobadoPor: 'Daniel Masri', eventos: [],
+      det: det('Lycra suplex 240g', 0.32, 24, [{ tipo: 'Sublimado', precio: 9 }], [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }]) },
   ] },
 ];
-let listaSel = null, negLinea = -1;
+let listaSel = null, negLinea = -1, lpExpand = new Set(), negDet = null, negObjetivo = 0;
 const listaRender = () => { viewEl.innerHTML = vListas(); };
-const listaVigente = (ln, f) => ln.aprobado != null ? ln.aprobado : precioLista(ln.costo, f);
+const costoLinea = (ln) => ln.det ? costoModelo(ln.det).costo : (ln.costo || 0);
+const listaVigente = (ln, f) => ln.aprobado != null ? ln.aprobado : precioLista(costoLinea(ln), f);
+const margenBruto = (precio, costo, f) => { const neto = precio * (1 - ((f.descuentos || 0) + (f.regalias || 0) + (f.costoVentas || 0)) / 100); return neto > 0 ? (neto - costo) / neto * 100 : 0; };
+const colorMargen = (m, obj) => m >= obj ? 'var(--ok)' : m >= obj - 8 ? 'var(--warn)' : 'var(--crit)';
+function desgloseHTML(dt) {
+  const c = costoModelo(dt); const tp = telaPCBy(dt.tela.nom);
+  const row = (k, v) => `<div class="dg-row"><span>${k}</span><b class="mono">${v}</b></div>`;
+  return `<div class="dg">
+    ${row('Tela — ' + (dt.tela.nom || '—') + (dt.tela.consumo ? ` (${dt.tela.consumo}${tp ? ' ' + tp.un : ''} × $${tp ? tp.precio.toFixed(2) : '0'})` : ''), money(c.tela))}
+    ${(dt.avios || []).map(a => row('Avío — ' + a.nom + ` (${a.consumo} × $${(avioPCBy(a.nom) ? avioPCBy(a.nom).precio : 0).toFixed(2)})`, money((avioPCBy(a.nom) ? avioPCBy(a.nom).precio : 0) * a.consumo))).join('')}
+    ${(dt.procesos || []).map(p => row('Proceso — ' + p.tipo, money(p.precio))).join('')}
+    ${row('Maquila (costura)', money(dt.maquila || 0))}
+    <div class="dg-row total"><span>Costo total</span><b class="mono">${money(c.costo)}</b></div>
+  </div>`;
+}
 const nextFolioLista = () => '2026-' + String(Math.max(42, ...LISTAS.map(l => parseInt(String(l.folio).split('-')[1], 10) || 0)) + 1);
 
 function vListas() { return listaSel == null ? vListasLista() : vListaDetalle(listaSel); }
@@ -3366,8 +3407,9 @@ function vListasLista() {
       </tr>`; }).join('')}
     </tbody></table></div></div>`;
 }
-function abrirLista(i) { listaSel = i; listaRender(); contentEl.scrollTop = 0; }
+function abrirLista(i) { listaSel = i; lpExpand = new Set(); listaRender(); contentEl.scrollTop = 0; }
 function cerrarListaVista() { listaSel = null; listaRender(); }
+function toggleLpExp(li) { if (lpExpand.has(li)) lpExpand.delete(li); else lpExpand.add(li); listaRender(); }
 
 function vListaDetalle(i) {
   const L = LISTAS[i]; const f = L.factores; const [bc, bl] = ESTADO_LISTA[L.estado];
@@ -3408,9 +3450,13 @@ function vListaDetalle(i) {
     <div class="table-wrap"><table class="data" id="tablaLP"><thead><tr>
       <th>Modelo</th><th class="r">Costo</th><th class="r">Precio calculado</th><th class="r">Precio aprobado</th><th>Estado</th><th></th>
     </tr></thead><tbody>
-      ${L.lineas.map((ln, li) => { const calc = precioLista(ln.costo, f); const aprob = ln.aprobado != null; return `<tr class="lp-row" data-i="${li}">
-        <td><div class="cellflex"><span class="thumb" style="background:#2f9c66;color:#04140c">${ln.modelo.slice(0, 3)}</span><div><div class="cell-strong">${ln.nombre}</div><div class="cell-code">Nuestro ${ln.modelo}${ln.clienteNum ? ' · ' + ln.clienteNum : ''}</div></div></div></td>
-        <td class="r mono">${money(ln.costo)}</td>
+      ${L.lineas.map((ln, li) => { const co = costoLinea(ln); const calc = precioLista(co, f); const aprob = ln.aprobado != null; const exp = lpExpand.has(li); return `<tr class="lp-row" data-i="${li}">
+        <td><div class="cellflex">
+          <button class="lp-exp ${exp ? 'open' : ''}" onclick="toggleLpExp(${li})" title="Ver desglose de costo">${IC.chevron}</button>
+          <span class="thumb" style="background:#2f9c66;color:#04140c">${ln.modelo.slice(0, 3)}</span>
+          <div><div class="cell-strong">${ln.nombre} ${ln.version > 1 ? `<span class="lp-ver">v${ln.version}</span>` : ''}</div><div class="cell-code">Nuestro ${ln.modelo}${ln.clienteNum ? ' · ' + ln.clienteNum : ''}</div></div>
+        </div></td>
+        <td class="r mono">${money(co)}</td>
         <td class="r mono lp-calc">${money(calc)}</td>
         <td class="r">${edit ? `<input class="pc-in mono lp-aprob" style="width:110px;text-align:right" type="number" step="any" min="0" value="${ln.aprobado != null ? ln.aprobado : calc}">` : `<b class="mono" style="color:var(--ok)">${money(listaVigente(ln, f))}</b>`}</td>
         <td>${aprob ? `<span class="badge ok"><span class="d"></span>Aprobado</span>` : `<span class="badge neutral"><span class="d"></span>Pendiente</span>`}</td>
@@ -3419,7 +3465,7 @@ function vListaDetalle(i) {
           ${L.estado === 'en-negociacion' ? `<button class="btn ghost sm" onclick="abrirNeg(${li})">${IC.refresh}Negociar${ln.eventos.length ? ' (' + ln.eventos.length + ')' : ''}</button>` : ''}
           ${cerr && ln.eventos.length ? `<button class="btn ghost sm" onclick="abrirNeg(${li})">Ver acuerdos (${ln.eventos.length})</button>` : ''}
         </td>
-      </tr>`; }).join('')}
+      </tr>${exp ? `<tr class="lp-detrow"><td colspan="6">${desgloseHTML(ln.det)}</td></tr>` : ''}`; }).join('')}
     </tbody></table></div>
     ${edit ? `<div class="audit-hint" style="margin:12px 14px 4px">${IC.lock}<span>Aprobar/teclear precios y editar factores requiere permiso (<b>solo el dueño</b>, RBAC <code>listas.aprobar</code>). Queda registrado quién y cuándo.</span></div>` : ''}
   </div>`;
@@ -3436,7 +3482,7 @@ function recalcLista() {
   const L = LISTAS[listaSel]; L.factores = readFactores();
   let tp = 0;
   document.querySelectorAll('#tablaLP .lp-row').forEach(tr => {
-    const ln = L.lineas[+tr.dataset.i]; const calc = precioLista(ln.costo, L.factores);
+    const ln = L.lineas[+tr.dataset.i]; const calc = precioLista(costoLinea(ln), L.factores);
     const cEl = tr.querySelector('.lp-calc'); if (cEl) cEl.textContent = money(calc);
     const aEl = tr.querySelector('.lp-aprob'); if (aEl && ln.aprobado == null) aEl.value = calc;
     tp += (ln.aprobado != null ? ln.aprobado : (aEl ? parseFloat(aEl.value) || calc : calc));
@@ -3445,13 +3491,13 @@ function recalcLista() {
 function aprobarLinea(i, li) {
   const tr = document.querySelector(`#tablaLP .lp-row[data-i="${li}"]`);
   const aEl = tr && tr.querySelector('.lp-aprob');
-  LISTAS[i].lineas[li].aprobado = aEl ? (parseFloat(aEl.value) || precioLista(LISTAS[i].lineas[li].costo, LISTAS[i].factores)) : precioLista(LISTAS[i].lineas[li].costo, LISTAS[i].factores);
+  LISTAS[i].lineas[li].aprobado = aEl ? (parseFloat(aEl.value) || precioLista(costoLinea(LISTAS[i].lineas[li]), LISTAS[i].factores)) : precioLista(costoLinea(LISTAS[i].lineas[li]), LISTAS[i].factores);
   LISTAS[i].lineas[li].aprobadoPor = USUARIO_ACTUAL;
   listaRender(); mostrarToast('Precio aprobado · ' + USUARIO_ACTUAL);
 }
 function aprobarTodas(i) {
   LISTAS[i].factores = readFactores();
-  LISTAS[i].lineas.forEach(ln => { if (ln.aprobado == null) { ln.aprobado = precioLista(ln.costo, LISTAS[i].factores); ln.aprobadoPor = USUARIO_ACTUAL; } });
+  LISTAS[i].lineas.forEach(ln => { if (ln.aprobado == null) { ln.aprobado = precioLista(costoLinea(ln), LISTAS[i].factores); ln.aprobadoPor = USUARIO_ACTUAL; } });
   listaRender(); mostrarToast('Todos los precios aprobados al calculado');
 }
 function autorizarLista(i) {
@@ -3464,56 +3510,120 @@ function cerrarListaEstado(i) { LISTAS[i].estado = 'cerrada'; listaRender(); mos
 /* ---- Sesión de negociación (por renglón) ---- */
 const negScrim = document.getElementById('negScrim');
 const negPanel = document.getElementById('negPanel');
-function abrirNeg(li) { negLinea = li; renderNeg(); negScrim.classList.add('show'); }
+const icXsvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+function abrirNeg(li) {
+  negLinea = li;
+  const L = LISTAS[listaSel]; const ln = L.lineas[li];
+  negDet = JSON.parse(JSON.stringify(ln.det));
+  negObjetivo = listaVigente(ln, L.factores);
+  renderNeg(); negScrim.classList.add('show');
+}
 function cerrarNeg() { negScrim.classList.remove('show'); }
+function negSync() {
+  const p = negPanel;
+  const obj = p.querySelector('#negObj'); if (obj) negObjetivo = parseFloat(obj.value) || 0;
+  if (!p.querySelector('#negTela')) return;
+  negDet.tela.nom = p.querySelector('#negTela').value;
+  negDet.tela.consumo = parseFloat(p.querySelector('#negConsumo').value) || 0;
+  negDet.maquila = parseFloat(p.querySelector('#negMaquila').value) || 0;
+  negDet.procesos = [...p.querySelectorAll('.neg-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
+  negDet.avios = [...p.querySelectorAll('.neg-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
+}
+function negRecalc() {
+  negSync();
+  const f = LISTAS[listaSel].factores; const c = costoModelo(negDet);
+  const otros = ((f.descuentos || 0) + (f.regalias || 0) + (f.costoVentas || 0)) / 100;
+  const neto = negObjetivo * (1 - otros); const mb = margenBruto(negObjetivo, c.costo, f); const col = colorMargen(mb, f.margen);
+  const set = (id, v) => { const el = negPanel.querySelector(id); if (el) el.textContent = v; };
+  set('#negCosto', money(c.costo)); set('#negNeto', money(neto)); set('#negFootCosto', money(c.costo));
+  ['#negMB', '#negFootMB'].forEach(id => { const el = negPanel.querySelector(id); if (el) { el.textContent = mb.toFixed(1) + '%'; el.style.color = col; } });
+  negPanel.querySelectorAll('.neg-avio-row').forEach(r => { const nom = r.querySelector('.pc-avio-nom').value, cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0; const s = r.querySelector('.pc-avio-sub'); if (s) s.textContent = money((avioPCBy(nom) ? avioPCBy(nom).precio : 0) * cons); });
+}
+function negAddProc() { negSync(); negDet.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderNeg(); }
+function negDelProc(i) { negSync(); negDet.procesos.splice(i, 1); renderNeg(); }
+function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, consumo: 1 }); renderNeg(); }
+function negDelAvio(i) { negSync(); negDet.avios.splice(i, 1); renderNeg(); }
+function guardarVersion() {
+  negSync();
+  const L = LISTAS[listaSel]; const ln = L.lineas[negLinea];
+  const txt = (negPanel.querySelector('#negAcuerdo') || {}).value ? negPanel.querySelector('#negAcuerdo').value.trim() : '';
+  if (!txt) { mostrarToast('Describe qué se acordó / cambió en esta versión'); return; }
+  if (!negObjetivo) { mostrarToast('Pon el precio objetivo'); return; }
+  const anterior = listaVigente(ln, L.factores); const costoAnt = costoLinea(ln); const costoNue = costoModelo(negDet).costo;
+  ln.det = JSON.parse(JSON.stringify(negDet));
+  ln.aprobado = negObjetivo; ln.aprobadoPor = USUARIO_ACTUAL; ln.version = (ln.version || 1) + 1;
+  ln.eventos.push({ acuerdo: txt, anterior, nuevo: negObjetivo, costoAnt, costoNue, por: USUARIO_ACTUAL, fecha: hoyStr(), version: ln.version });
+  renderNeg(); listaRender();
+  mostrarToast('Versión v' + ln.version + ' guardada · costo y precio actualizados');
+}
 function renderNeg() {
-  const L = LISTAS[listaSel]; const ln = L.lineas[negLinea]; const vig = listaVigente(ln, L.factores);
+  const L = LISTAS[listaSel]; const ln = L.lineas[negLinea]; const f = L.factores;
   const cerr = L.estado === 'cerrada' || L.estado === 'ya-pedida';
+  const c = costoModelo(negDet);
+  const otros = ((f.descuentos || 0) + (f.regalias || 0) + (f.costoVentas || 0)) / 100;
+  const neto = negObjetivo * (1 - otros); const mb = margenBruto(negObjetivo, c.costo, f); const col = colorMargen(mb, f.margen);
+  const opt = (arr, sel) => arr.map(o => `<option${o === sel ? ' selected' : ''}>${o}</option>`).join('');
   negPanel.innerHTML = `
   <div class="proc-head">
     <span class="ph-hero">${ln.modelo.slice(0, 3)}</span>
-    <div style="flex:1;min-width:0"><h2>Negociación — ${ln.nombre}</h2>
-    <div class="ph-meta"><span>${L.cliente} / ${L.depto}</span><span>Lista ${L.folio}</span><span>Precio vigente <b>${money(vig)}</b></span></div></div>
-    <button class="icon-btn" onclick="cerrarNeg()" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <div style="flex:1;min-width:0"><h2>Negociación — ${ln.nombre} ${ln.version > 1 ? `<span class="lp-ver">v${ln.version}</span>` : ''}</h2>
+    <div class="ph-meta"><span>${L.cliente} / ${L.depto}</span><span>Lista ${L.folio}</span></div></div>
+    <button class="icon-btn" onclick="cerrarNeg()" title="Cerrar (esc)">${icXsvg}</button>
   </div>
   <div class="proc-body">
-    ${cerr ? '' : `<div class="pc-sec">
-      <h4>Registrar acuerdo / cambio</h4>
+    <div class="neg-dec">
+      <div class="neg-dec-cell"><span class="ffk">Precio objetivo</span><div class="neg-obj-in"><span>$</span><input id="negObj" type="number" step="any" min="0" value="${negObjetivo}" ${cerr ? 'readonly' : ''}></div></div>
+      <div class="neg-dec-cell"><span class="ffk">Costo (en vivo)</span><b class="mono" id="negCosto">${money(c.costo)}</b></div>
+      <div class="neg-dec-cell"><span class="ffk">Precio neto <span class="tiny">−${(otros * 100).toFixed(0)}%</span></span><b class="mono" id="negNeto">${money(neto)}</b></div>
+      <div class="neg-dec-cell big"><span class="ffk">Margen bruto <span class="tiny">obj. ${f.margen}%</span></span><b class="mono" id="negMB" style="color:${col}">${mb.toFixed(1)}%</b></div>
+    </div>
+    <div class="neg-formula">Precio neto = objetivo − descuentos(${f.descuentos}%) − regalías(${f.regalias}%) − costo ventas(${f.costoVentas}%). Margen bruto = (neto − costo) ÷ neto.</div>
+    ${cerr ? `<div class="audit-hint" style="margin-top:14px">${IC.lock}<span>Lista cerrada — solo lectura.</span></div>` : `
+    <div class="pc-sec" style="margin-top:16px">
+      <h4>Elementos del modelo <span class="hint">edítalos en vivo para llegar al costo</span></h4>
       <div class="pc-fields">
-        <label class="col2"><span class="ffk">Qué se acordó / cambió</span><textarea class="pc-in" id="negAcuerdo" rows="2" placeholder="Ej.: se quitan las bolsas traseras — baja el costo; nuevo precio acordado." style="height:auto;padding:9px 10px;resize:vertical;font-family:inherit"></textarea></label>
-        <label><span class="ffk">Nuevo precio acordado</span><input class="pc-in mono" id="negPrecio" type="number" step="any" min="0" value="${vig}"></label>
-        <div class="pc-hint-cell">Modificar la prenda (avíos/tela) genera una <b>nueva versión del precosto</b>; el acuerdo queda inmutable.</div>
+        <label class="col2"><span class="ffk">Tela</span><select class="pc-in" id="negTela"><option value="">— tela —</option>${TELAS_PC.map(t => `<option${negDet.tela.nom === t.nom ? ' selected' : ''}>${t.nom}</option>`).join('')}</select></label>
+        <label><span class="ffk">Consumo por prenda</span><input class="pc-in mono" id="negConsumo" type="number" step="any" min="0" value="${negDet.tela.consumo || ''}"></label>
+        <label><span class="ffk">Maquila (costura)</span><input class="pc-in mono" id="negMaquila" type="number" step="any" min="0" value="${negDet.maquila || ''}"></label>
       </div>
-      <button class="btn primary sm" onclick="registrarAcuerdo()" style="margin-top:10px">${IC.check}Registrar acuerdo</button>
+      <div class="proc-summary-title" style="margin-top:14px">Procesos</div>
+      <div id="negProcs">${(negDet.procesos || []).map((x, i) => `<div class="pc-line pc-proc-row neg-proc-row">
+        <select class="pc-in pc-proc-tipo">${opt(PROCESOS_PC, x.tipo)}</select>
+        <input class="pc-in mono pc-proc-precio" type="number" step="any" min="0" value="${x.precio || ''}">
+        <button class="pc-line-del" onclick="negDelProc(${i})">${icXsvg}</button>
+      </div>`).join('') || '<div class="pc-empty">Sin procesos.</div>'}</div>
+      <button class="btn ghost sm" onclick="negAddProc()" style="margin-top:6px">${IC.plus}Agregar proceso</button>
+      <div class="proc-summary-title" style="margin-top:14px">Avíos <span style="font-weight:400;color:var(--faint)">— quita/agrega para mover el costo</span></div>
+      <div id="negAvios">${(negDet.avios || []).map((x, i) => `<div class="pc-line pc-avio-row neg-avio-row">
+        <select class="pc-in pc-avio-nom">${opt(AVIOS_PC.map(a => a.nom), x.nom)}</select>
+        <input class="pc-in mono pc-avio-cons" type="number" step="any" min="0" value="${x.consumo || ''}">
+        <span class="pc-avio-sub mono">${money((avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0))}</span>
+        <button class="pc-line-del" onclick="negDelAvio(${i})">${icXsvg}</button>
+      </div>`).join('') || '<div class="pc-empty">Sin avíos.</div>'}</div>
+      <button class="btn ghost sm" onclick="negAddAvio()" style="margin-top:6px">${IC.plus}Agregar avío</button>
+    </div>
+    <div class="pc-sec">
+      <h4>Acuerdo de esta versión</h4>
+      <textarea class="pc-in" id="negAcuerdo" rows="2" placeholder="Ej.: se quitan las bolsas traseras y se cambia el cierre; precio objetivo acordado con el cliente." style="width:100%;height:auto;padding:9px 10px;resize:vertical;font-family:inherit"></textarea>
     </div>`}
-    <div class="proc-summary-title">Historial de la negociación (${ln.eventos.length})</div>
-    ${ln.eventos.length ? `<div class="neg-timeline">
-      ${ln.eventos.slice().reverse().map(ev => `<div class="neg-event">
-        <div class="neg-dot"></div>
-        <div class="neg-body">
-          <div class="neg-precio"><span class="mono" style="text-decoration:line-through;color:var(--muted)">${money(ev.anterior)}</span> ${IC.chevron} <span class="mono" style="color:var(--ok);font-weight:700">${money(ev.nuevo)}</span></div>
-          <div class="neg-acuerdo">${ev.acuerdo}</div>
-          <div class="neg-meta">${ev.por} · ${ev.fecha}</div>
-        </div>
-      </div>`).join('')}
-    </div>` : '<div class="pc-empty" style="padding:16px 2px">Sin acuerdos todavía. El precio vigente es el aprobado.</div>'}
-  </div>`;
-}
-function registrarAcuerdo() {
-  const L = LISTAS[listaSel]; const ln = L.lineas[negLinea];
-  const txt = negPanel.querySelector('#negAcuerdo').value.trim();
-  const nuevo = parseFloat(negPanel.querySelector('#negPrecio').value) || 0;
-  if (!txt) { mostrarToast('Describe qué se acordó'); return; }
-  if (!nuevo) { mostrarToast('Pon el nuevo precio'); return; }
-  const anterior = listaVigente(ln, L.factores);
-  ln.eventos.push({ acuerdo: txt, anterior, nuevo, por: USUARIO_ACTUAL, fecha: hoyStr() });
-  ln.aprobado = nuevo;
-  renderNeg(); listaRender();
-  mostrarToast('Acuerdo registrado · precio actualizado');
+    <div class="proc-summary-title">Versiones / acuerdos (${ln.eventos.length})</div>
+    ${ln.eventos.length ? `<div class="neg-timeline">${ln.eventos.slice().reverse().map(ev => `<div class="neg-event">
+      <div class="neg-dot"></div>
+      <div class="neg-body">
+        <div class="neg-precio"><span class="mono" style="text-decoration:line-through;color:var(--muted)">${money(ev.anterior)}</span> ${IC.chevron} <span class="mono" style="color:var(--ok);font-weight:700">${money(ev.nuevo)}</span> ${ev.version ? `<span class="lp-ver">v${ev.version}</span>` : ''}${ev.costoNue != null ? `<span class="neg-costo-tag">costo ${money(ev.costoAnt)} → ${money(ev.costoNue)}</span>` : ''}</div>
+        <div class="neg-acuerdo">${ev.acuerdo}</div>
+        <div class="neg-meta">${ev.por} · ${ev.fecha}</div>
+      </div></div>`).join('')}</div>` : '<div class="pc-empty" style="padding:14px 2px">Sin versiones todavía.</div>'}
+  </div>
+  ${cerr ? '' : `<div class="nota-foot">
+    <div class="nota-tot">Costo <b id="negFootCosto">${money(c.costo)}</b> · Margen bruto <b id="negFootMB" style="color:${col}">${mb.toFixed(1)}%</b></div>
+    <div style="display:flex;gap:8px"><button class="btn ghost" onclick="cerrarNeg()">Cerrar</button><button class="btn primary" onclick="guardarVersion()">${IC.check}Guardar versión</button></div>
+  </div>`}`;
+  negPanel.oninput = negRecalc; negPanel.onchange = negRecalc;
 }
 function generarListaDeProyecto(pi) {
   const p = PROYECTOS[pi]; const f = { ...facCli(p.cliente) };
-  const lineas = p.modelos.map(m => ({ modelo: m.nuestro, nombre: m.nombre || 'Modelo', clienteNum: m.clienteNum, costo: costoModelo(m).costo, aprobado: null, aprobadoPor: null, eventos: [] }));
+  const lineas = p.modelos.map(m => ({ modelo: m.nuestro, nombre: m.nombre || 'Modelo', clienteNum: m.clienteNum, version: 1, aprobado: null, aprobadoPor: null, eventos: [], det: { tela: { nom: (m.tela || {}).nom || '', consumo: (m.tela || {}).consumo || 0 }, maquila: m.maquila || 0, procesos: JSON.parse(JSON.stringify(m.procesos || [])), avios: JSON.parse(JSON.stringify(m.avios || [])) } }));
   LISTAS.unshift({ folio: nextFolioLista(), cliente: p.cliente, depto: p.depto, temporada: p.temporada, fecha: hoyStr(), estado: 'abierta', factores: f, lineas });
   listaSel = 0; vistaActual = 'listas-precios'; renderNav();
   crumbsEl.innerHTML = `<b>CONTROL</b><span class="sep">${IC.chevron}</span>${TITULOS['listas-precios']}`;
