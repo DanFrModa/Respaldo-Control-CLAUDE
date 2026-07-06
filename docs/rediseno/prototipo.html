@@ -1018,6 +1018,7 @@ const NAV = [
     ]},
     { clave:'g-rc', titulo:'Ruta Crítica', icono:IC.rc, badge:'5', hot:true, hijos:[
       { clave:'rc', titulo:'Mis pendientes' },
+      { clave:'rc-procesos', titulo:'Procesos y responsables' },
     ]},
     { clave:'g-calidad', titulo:'Calidad', icono:IC.calidad, hijos:[
       { clave:'calidad', titulo:'Auditorías' },
@@ -2035,6 +2036,21 @@ const RUTAS = [
     { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'5 jul',  e:'vencido', d:-1 },
   ]},
 ];
+/* Catálogo de procesos de la Ruta Crítica (ProcesoDef de F5): responsable por
+   default + auto-completado por evento del sistema. Configurable: se agregan/
+   quitan procesos y se asignan responsables; por orden/prenda se ajusta. */
+const PROCESOS_CAT = [
+  { n:1, p:'Desarrollo / muestra', area:'Desarrollo', resp:'Gabriel Masri',   auto:false, evento:'Se marca a mano (no hay acción de sistema)' },
+  { n:2, p:'Compra de tela',       area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras / MRP)' },
+  { n:3, p:'Corte',                area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar corte (Avance de producción)' },
+  { n:4, p:'Envío a maquila',      area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Envío a maquila (Avance de producción)' },
+  { n:5, p:'Maquila (costura)',    area:'Producción', resp:'Laura Hernández', auto:false, evento:'Lo confirma el coordinador (el maquilero no usa el sistema)' },
+  { n:6, p:'Recibo de maquila',    area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance de producción)' },
+  { n:7, p:'Estampado / Bordado',  area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de estampado (Avance de producción)' },
+  { n:8, p:'Auditoría de calidad', area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría AQL (Calidad)' },
+  { n:9, p:'Entrega a cliente',    area:'Ventas',     resp:'Sofía Ramírez',   auto:true,  evento:'Entrega a cliente (Avance / Almacén)' },
+];
+const procCat = (nombre) => PROCESOS_CAT.find(x => x.p === nombre) || { p: nombre, auto: true, evento: 'Avance de producción', resp: '—' };
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
 let rcPersona = 'Laura Hernández';
 function misPendientes(persona) {
@@ -2045,13 +2061,21 @@ function misPendientes(persona) {
 const rcBcls = { vencido: 'crit', hoy: 'warn', proximo: 'neutral', done: 'ok' };
 const rcDtxt = (t) => t.e === 'vencido' ? `venció ${t.f} · ${t.d} d` : t.e === 'hoy' ? `para hoy · ${t.f}` : `${t.f} · +${t.d} d`;
 function filaPendiente(t) {
+  const cat = procCat(t.p);
+  const autoTag = cat.auto
+    ? `<span style="font-size:11px;color:var(--muted);white-space:nowrap" title="Se marca SOLA al registrar: ${cat.evento}">⟳ auto</span>`
+    : `<span style="font-size:11px;color:var(--warn);white-space:nowrap" title="${cat.evento}">✋ manual</span>`;
+  const btn = cat.auto
+    ? `<button class="btn ghost sm" onclick="event.stopPropagation();rcHecho('${t.orden}','${t.p}')" title="Se marca sola al registrar ${t.p} en el sistema; aquí se simula">${IC.check}Registrar</button>`
+    : `<button class="btn ghost sm" onclick="event.stopPropagation();rcHecho('${t.orden}','${t.p}')" title="Marcar como hecho a mano">${IC.check}Marcar hecho</button>`;
   return `<div class="rc-task" onclick="abrirRuta('${t.orden}')">
     <div style="flex:1;min-width:0">
       <div class="cell-strong">${t.p} <span style="font-weight:400;color:var(--faint);font-size:12px">· ${t.orden}</span></div>
       <div style="font-size:12px;color:var(--muted)">${t.modelo} · ${t.cliente} · entrega ${t.entrega}</div>
     </div>
     <span class="badge ${rcBcls[t.e]}" style="white-space:nowrap"><span class="d"></span>${rcDtxt(t)}</span>
-    <button class="btn ghost sm" onclick="event.stopPropagation();rcHecho('${t.orden}','${t.p}')" title="Registrar avance">${IC.check}Hecho</button>
+    ${autoTag}
+    ${btn}
     <span style="color:var(--faint)" title="Ver la ruta de la orden">${IC.chevron}</span>
   </div>`;
 }
@@ -2100,18 +2124,19 @@ function renderRutaOrden(orden) {
     <button class="icon-btn" onclick="cerrarRuta()" title="Cerrar (esc)">${icXsvg}</button>
   </div>
   <div class="proc-body">
-    <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>Ruta generada <b>hacia atrás</b> desde la fecha de entrega (CPM): cada proceso tiene su <b>fecha compromiso</b> y su <b>responsable</b>. El semáforo compara la fecha contra hoy. Avance ${done}/${R.proc.length}.</span></div>
-    ${R.proc.map(x => `<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:${x.r === rcPersona ? 'var(--brand-soft)' : 'var(--panel-2)'}">
+    <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>Ruta generada <b>hacia atrás</b> desde la fecha de entrega (CPM): cada proceso tiene su <b>fecha compromiso</b> y su <b>responsable</b>. El semáforo compara la fecha contra hoy. La <b>mayoría se marca sola</b> al registrar su acción en el sistema. Avance ${done}/${R.proc.length}.</span></div>
+    ${R.proc.map(x => { const cat = procCat(x.p); return `<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:${x.r === rcPersona ? 'var(--brand-soft)' : 'var(--panel-2)'}">
       <span style="width:11px;height:11px;border-radius:50%;background:${col[x.e]};flex:none"></span>
       <div style="flex:1;min-width:0">
         <div style="font-weight:600">${x.p}${x.r === rcPersona ? ' <span class="badge info" style="font-size:10px"><span class="d"></span>tú</span>' : ''}</div>
         <div style="font-size:12px;color:var(--muted)">Responsable: <b>${x.r}</b></div>
+        <div style="font-size:11.5px;color:var(--faint);margin-top:2px">${cat.auto ? '⟳ Automático — al registrar: ' + cat.evento : '✋ Manual — ' + cat.evento}</div>
       </div>
       <div style="text-align:right;flex:none">
         <div class="mono" style="font-size:13px">${x.f}</div>
         <span class="badge ${rcBcls[x.e]}" style="font-size:10px"><span class="d"></span>${lbl[x.e]}</span>
       </div>
-    </div>`).join('')}
+    </div>`; }).join('')}
   </div>`;
 }
 function abrirRuta(orden) { renderRutaOrden(orden); rutaScrim.classList.add('show'); }
@@ -2120,10 +2145,39 @@ function rcHecho(orden, proc) {
   const R = RUTAS.find(r => r.orden === orden); if (!R) return;
   const x = R.proc.find(p => p.p === proc); if (x) x.e = 'done';
   const nxt = R.proc.find(p => p.e === 'proximo'); if (nxt) { nxt.e = 'hoy'; nxt.d = 0; }
-  ir('rc'); mostrarToast('Proceso marcado como hecho · ' + proc);
+  const cat = procCat(proc);
+  ir('rc'); mostrarToast(cat.auto ? proc + ' registrado en el sistema → RC marcada automática' : proc + ' marcado como hecho');
 }
 rutaScrim.onclick = (e) => { if (e.target === rutaScrim) cerrarRuta(); };
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && rutaScrim.classList.contains('show')) cerrarRuta(); });
+/* Catálogo de procesos de la Ruta Crítica (ProcesoDef + responsables + auto) */
+function vProcesosRC() {
+  const areaCls = { 'Producción': 'info', 'Compras': 'warn', 'Calidad': 'crit', 'Ventas': 'ok', 'Desarrollo': 'neutral' };
+  return `
+  <div class="page-head">
+    <div><h1>Procesos y responsables</h1><div class="sub">Catálogo de procesos de la Ruta Crítica · responsable por default · auto-completado por evento del sistema</div></div>
+    <div class="actions"><button class="btn primary" onclick="mostrarToast('Nuevo proceso — demo')">${IC.plus}Nuevo proceso</button></div>
+  </div>
+  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se pueden <b>agregar o quitar</b>. Cada proceso tiene un <b>responsable por default</b> (siempre asignable). La <b>mayoría se marcan solos</b> al registrar su acción en el sistema; unos pocos son manuales.</span></div>
+  <div class="card">
+    <div class="toolbar"><b>Secuencia de procesos</b><span class="count">${PROCESOS_CAT.length}</span><span class="tool-right" style="color:var(--muted);font-size:12px">${PROCESOS_CAT.filter(x => x.auto).length} automáticos · ${PROCESOS_CAT.filter(x => !x.auto).length} manuales</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th class="r">#</th><th>Proceso</th><th>Área</th><th>Responsable por default</th><th>¿Cómo se completa?</th><th></th>
+    </tr></thead><tbody>
+      ${PROCESOS_CAT.map(x => `<tr>
+        <td class="r num">${x.n}</td>
+        <td class="cell-strong">${x.p}</td>
+        <td><span class="badge ${areaCls[x.area] || 'neutral'}"><span class="d"></span>${x.area}</span></td>
+        <td>${x.resp}</td>
+        <td>${x.auto
+          ? `<span class="badge ok"><span class="d"></span>⟳ Automático</span> <span style="color:var(--muted);font-size:12px">al registrar: ${x.evento}</span>`
+          : `<span class="badge warn"><span class="d"></span>✋ Manual</span> <span style="color:var(--muted);font-size:12px">${x.evento}</span>`}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn ghost sm" onclick="mostrarToast('Editar proceso — demo')">Editar</button> <button class="btn ghost sm" onclick="mostrarToast('Asignar responsable — demo')">Responsable</button></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="pc-hint-cell" style="margin-top:12px;max-width:940px">En el real (backend <b>F5</b>, ya construido): cada proceso es un <b>ProcesoDef</b> con sus <b>roles responsables</b> (N:M — puede haber más de uno), su <b>antecesor</b> (DAG para el CPM) y su <b>duración</b> (para calcular la fecha hacia atrás). El auto-completado sale del <b>auto-avance por eventos</b> de Producción/Compras/Calidad que ya existe.</div>`;
+}
 
 /* ---- Inventario PT ---- */
 const INV = [
@@ -4039,7 +4093,7 @@ const CAT_AUDITORES = { titulo: 'Auditores', sub: 'Control de calidad · auditor
 
 const VISTAS = {
   resumen: vResumen, modelos: vModelos, ordenes: vOrdenes, produccion: vProduccion,
-  pedidos: vPedidos, rc: vRc, inventarios: vInventarios, telas: vTelas, compras: vCompras,
+  pedidos: vPedidos, rc: vRc, 'rc-procesos': vProcesosRC, inventarios: vInventarios, telas: vTelas, compras: vCompras,
   proveedores: vProveedores, costos: vCostos, indicadores: vIndicadores, calidad: vCalidad, usuarios: vUsuarios,
   'notas-salida': vNotasSalida, precosteos: vPrecosteos,
   avios: vAvios, clientes: vClientes, 'listas-precios': vListas, ventas: vVentas,
