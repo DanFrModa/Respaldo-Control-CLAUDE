@@ -175,6 +175,17 @@ Primera pantalla de la fase F8. Spec de Daniel:
 - **Tech Pack / PDFs**: subir archivos de referencia (input file real — muestra el nombre); **Fotos** ligadas al modelo (telas, avíos, muestras) con thumbnails reales (FileReader → dataURL en el proto; R2 en el real). Estatus por modelo.
 - Mapea a F8 (módulo 15, D13/R16–R20). En el real: telas con precio por proveedor y color (R16), medidas por talla en ciertos avíos, PDFs/fotos en R2, y liga posterior a lista de precios → orden. **SIN ETL** (arranca en cero).
 
+### 4.8 Lista de precios + Negociación (diseñada 6-jul-2026) ✅ — calza con el backend F8 YA construido
+> **Hallazgo (6-jul):** el backend de F8 **ya existe** (`schema.prisma`: `ClienteFactores`, `Proyecto`, `Desarrollo`, `Precosto` versionado, `ListaPrecios`, `ListaPreciosLinea`, `NegociacionEvento`, `EstadoLista`; dominio `backend/src/dominio/desarrollo/`). Por eso el front NO tiene que esperar: se diseñó **1:1 con lo construido**.
+
+Flujo completo (propuesta de Daniel, 6-jul): **desarrollo trabaja el proyecto → avisa a Daniel → Daniel genera la lista → revisa/ajusta variables → aprueba precios → comercial la manda autorizada → sesión de negociación**.
+- **Factores del cliente** (`ClienteFactores`): **margen · descuentos · regalías · costo de ventas**, default por cliente con **override por departamento**. Se ven en la pantalla **Clientes**.
+- **Lista de precios** (`ListaPrecios`): se **genera desde un proyecto** (botón en Pre-costeos) por Cliente+Departamento. Copia los factores como **SNAPSHOT editable** — **solo el dueño** los edita (RBAC `listas.aprobar`, en el proto `PUEDE_PRECIOS`). **Fórmula en cascada (D2):** `precio = costo ÷ (1−margen) ÷ (1−(descuentos+regalías+costoVentas))`, **redondeado al alza**; recalcula al mover factores.
+- **Aprobación modelo por modelo** (`ListaPreciosLinea.precioAprobado`+`aprobadoPor`): el sistema propone el precio calculado; Daniel lo aprueba o teclea otro, línea por línea. Con todo aprobado → **"Autorizar y pasar a negociación"**.
+- **Estados** (`EstadoLista`, catálogo global): **abierta → en-negociación → cerrada → ya-pedida** (las dos últimas `esCierre` = bloquean ediciones).
+- **Sesión de negociación** (`NegociacionEvento`): por renglón, registrar **acuerdos** (texto inmutable) con **precio anterior → nuevo**; el historial es una **línea de tiempo**. Modificar la prenda (quitar bolsas, cambiar avíos/tela) = **nueva versión del `Precosto`** → nuevo costo → nuevo precio. Ejemplo del proto: "se quitan bolsas traseras → $224 → $205".
+- **La lista NO dispara pedidos** (el pedido nace de la OC del cliente, F2).
+
 ---
 
 ## 5. Cómo está hecho el prototipo (para modificarlo)
@@ -208,7 +219,8 @@ Ruta sugerida (por fases, con el proceso normal coder+reviewer → PR a `prueba`
 ## 7. Pendientes / decisiones abiertas
 
 - **Combobox de proveedores:** ¿permitir texto libre (proveedor nuevo) o **forzar selección de lista**? (preguntado, sin cerrar).
-- Pantallas con **base inicial** (prototipadas 6-jul para tener de dónde partir, aún por afinar con Daniel): Cotizaciones/Listas de precios, Avíos, Clientes (catálogo/listas/ventas), CxC/CxP, EDR, Auditores, Catálogos base (colores/tallas/temporadas/tipos de proceso/almacenes). Son bases funcionales con datos de ejemplo; Daniel las irá revisando una por una.
+- **Diseñadas a fondo** (6-jul): Pre-costeo (§4.7) y **Lista de precios + Negociación (§4.8)** — calzadas con el backend F8 ya construido.
+- Pantallas con **base inicial** (prototipadas 6-jul, aún por afinar con Daniel): Avíos, Clientes (con factores), Ventas, CxC/CxP, EDR, Auditores, Catálogos base (colores/tallas/temporadas/tipos de proceso/almacenes). Son bases funcionales con datos de ejemplo; Daniel las irá revisando una por una.
 - **Nota de salida de TELAS:** pendiente de diseñar. Sale del **almacén de telas** (otro almacén), así que va en su **propia nota** relacionada a ese almacén, separada de la de avíos (decisión Daniel, 6-jul). Puede reusar la "salida de tela a orden" que ya existe en Inventario (F4) como documento de respaldo.
 - Confirmar si se conserva **Inter** o se adopta el stack de sistema en el real.
 - La pantalla vieja de Órdenes tenía además: Composición/Composición forzada, Precio de venta editable, "Maquila real", EXP/Copiar, RC (Clave/Tipo tela/Programar/Concentrado). Evaluar cuáles entran.

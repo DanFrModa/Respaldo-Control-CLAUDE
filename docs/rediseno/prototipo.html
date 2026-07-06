@@ -746,6 +746,29 @@
   .pc-pdf-chip svg { width: 16px; height: 16px; color: var(--crit); flex: none; }
   .pc-pdf-chip .x { margin-left: auto; cursor: pointer; color: var(--faint); border: 0; background: transparent; font-size: 14px; }
   .pc-pdf-chip .x:hover { color: var(--crit); }
+  /* ---- Listas de precios / negociación ---- */
+  .lp-factores { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px 16px; margin-bottom: 16px; }
+  .lp-fac-head h4 { font-size: 13px; font-weight: 650; display: flex; align-items: center; gap: 8px; }
+  .lp-lock { font-size: 11px; font-weight: 600; color: var(--brand-soft-fg); background: var(--brand-soft); padding: 2px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; }
+  .lp-lock svg { width: 12px; height: 12px; }
+  .lp-formula { font-size: 11.5px; color: var(--muted); font-family: var(--ff-mono); margin-top: 4px; }
+  .lp-fac-grid { display: grid; grid-template-columns: repeat(4, 160px) 1fr; gap: 12px; align-items: end; margin-top: 12px; }
+  .lp-fac { display: flex; flex-direction: column; gap: 6px; }
+  .lp-fac .ffk { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .lp-fac-in { display: flex; align-items: center; gap: 6px; }
+  .lp-fac-in input { width: 100%; text-align: right; }
+  .lp-fac-in span { color: var(--muted); font-size: 12.5px; }
+  .lp-fac-note { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); align-self: center; }
+  .lp-fac-note svg { width: 14px; height: 14px; flex: none; color: var(--brand); }
+  .neg-timeline { display: flex; flex-direction: column; gap: 0; padding-left: 4px; }
+  .neg-event { display: flex; gap: 12px; padding-bottom: 16px; position: relative; }
+  .neg-event:not(:last-child)::before { content: ''; position: absolute; left: 5px; top: 14px; bottom: 0; width: 2px; background: var(--border); }
+  .neg-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--brand); border: 2px solid var(--panel); box-shadow: 0 0 0 2px var(--brand-soft); flex: none; margin-top: 3px; z-index: 1; }
+  .neg-body { flex: 1; }
+  .neg-precio { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+  .neg-precio svg { width: 15px; height: 15px; color: var(--muted); }
+  .neg-acuerdo { font-size: 13px; color: var(--text); margin-top: 4px; }
+  .neg-meta { font-size: 11.5px; color: var(--faint); margin-top: 3px; }
   .nsl-group + .nsl-group { margin-top: 10px; }
   .nsl-ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px 8px 0 0; font-size: 12px; color: var(--muted); }
   .nsl-ghead b { color: var(--text); font-family: var(--ff-mono); }
@@ -897,6 +920,9 @@
 
 <!-- Editor de modelo (pre-costeo) -->
 <div class="proc-scrim" id="pcScrim"><div class="proc" id="pcPanel"></div></div>
+
+<!-- Sesión de negociación (lista de precios) -->
+<div class="proc-scrim" id="negScrim"><div class="proc" id="negPanel"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -2979,7 +3005,7 @@ function vPrecosteoProyecto(pi) {
       <h1>${p.num} · ${p.cliente} <span style="color:var(--muted);font-weight:500">/ ${p.depto}</span></h1>
       <div class="sub">Temporada ${p.temporada} · ${p.modelos.length} modelos · abierto ${p.fecha}</div>
     </div>
-    <div class="actions"><button class="btn ghost">${IC.printer}Precosteo PDF</button><button class="btn primary" onclick="nuevoModelo(${pi})">${IC.plus}Agregar modelo</button></div>
+    <div class="actions"><button class="btn ghost" onclick="generarListaDeProyecto(${pi})">${IC.costos}Generar lista de precios</button><button class="btn primary" onclick="nuevoModelo(${pi})">${IC.plus}Agregar modelo</button></div>
   </div>
   <div class="pc-grid">
     ${p.modelos.map((m, mi) => tarjetaModelo(pi, mi, m)).join('')}
@@ -3164,8 +3190,9 @@ function renderModeloEditor() {
         <div class="pc-cost-row"><span>Procesos</span><b id="pcCProc">${money(c.procs)}</b></div>
         <div class="pc-cost-row"><span>Maquila</span><b id="pcCMaq">${money(c.maq)}</b></div>
         <div class="pc-cost-row total"><span>Costo total</span><b id="pcCTotal">${money(c.costo)}</b></div>
-        <div class="pc-cost-row precio"><span>Precio sugerido (con margen)</span><b id="pcCPrecio">${money(c.precio)}</b></div>
+        <div class="pc-cost-row precio"><span>Precio de referencia (margen tentativo)</span><b id="pcCPrecio">${money(c.precio)}</b></div>
       </div>
+      <div class="pc-hint-cell" style="margin-top:8px">El <b>precio final</b> se define en la <b>Lista de precios</b>, aplicando los factores del cliente (margen · descuentos · regalías · costo de ventas). Aquí solo se estima el costo.</div>
     </div>
 
     <div class="pc-sec">
@@ -3249,9 +3276,9 @@ function vAvios() {
     </tbody></table></div></div>`;
 }
 
-/* ---- Clientes (catálogo) ---- */
+/* ---- Clientes (catálogo + factores de lista de precios) ---- */
 const CLIENTES_TBL = [
-  ['C&A', 'C&A México', 'KIDS Moda · Baby · Hombre · Dama · Deportivo', 'Ana Torres', '55 5000 1000', 5],
+  ['CA', 'C&A', 'KIDS Moda · Baby · Hombre · Dama · Deportivo', 'Ana Torres', '55 5000 1000', 5],
   ['LV', 'Liverpool', 'Contemporáneo · Infantil · Playa', 'Luis Medina', '55 5200 3000', 3],
   ['CP', 'Coppel', 'Niños · Caballero · Dama', 'Sofía Ramos', '667 700 2000', 4],
   ['HT', 'Hang Ten', 'Surf · Kids', 'Pablo Gil', '55 5900 4000', 2],
@@ -3259,45 +3286,242 @@ const CLIENTES_TBL = [
 ];
 function vClientes() {
   return `
-  <div class="page-head"><div><h1>Clientes</h1><div class="sub">Catálogo · cada cliente con sus departamentos · referencias (D7)</div></div>
+  <div class="page-head"><div><h1>Clientes</h1><div class="sub">Catálogo · departamentos propios · factores de lista de precios (heredan a la lista)</div></div>
   <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="mostrarToast('Nuevo cliente — demo')">${IC.plus}Nuevo cliente</button></div></div>
+  <div class="banner">${IC.info}<span>Cada cliente trae sus <b>factores</b> (margen · descuentos · regalías · costo de ventas) — con posible <b>override por departamento</b>. Al generar una lista de precios se copian como snapshot editable.</span></div>
   <div class="card">
     <div class="toolbar"><button class="chip active">Todos</button><button class="chip">Activos</button>
     <div class="tool-search">${lupa()}<input placeholder="Buscar cliente…"></div><div class="tool-right"><span class="count">${CLIENTES_TBL.length} clientes</span></div></div>
-    <div class="table-wrap"><table class="data"><thead><tr><th>Cliente</th><th>Departamentos</th><th>Contacto</th><th>Teléfono</th><th class="r">Proyectos</th></tr></thead><tbody>
-      ${CLIENTES_TBL.map(c => `<tr style="cursor:pointer" onclick="mostrarToast('Ficha de ${c[1]} — demo')">
-        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">${c[0].slice(0, 2)}</span><div class="cell-strong">${c[1]}</div></div></td>
-        <td><span style="font-size:12.5px;color:var(--muted)">${c[2]}</span></td>
-        <td>${c[3]}</td><td class="mono">${c[4]}</td>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Cliente</th><th>Departamentos</th><th class="r">Margen</th><th class="r">Desc.</th><th class="r">Regalías</th><th class="r">C. ventas</th><th class="r">Proy.</th></tr></thead><tbody>
+      ${CLIENTES_TBL.map(c => { const f = facCli(c[1]); return `<tr style="cursor:pointer" onclick="mostrarToast('Ficha de ${c[1]} con factores por departamento — demo')">
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">${c[0].slice(0, 2)}</span><div><div class="cell-strong">${c[1]}</div><div class="cell-code">${c[3]} · ${c[4]}</div></div></div></td>
+        <td><span style="font-size:12px;color:var(--muted)">${c[2]}</span></td>
+        <td class="r mono">${f.margen}%</td><td class="r mono">${f.descuentos}%</td><td class="r mono">${f.regalias}%</td><td class="r mono">${f.costoVentas}%</td>
         <td class="r num">${c[5]}</td>
-      </tr>`).join('')}
+      </tr>`; }).join('')}
     </tbody></table></div></div>`;
 }
 
-/* ---- Listas de precios (F8) ---- */
-const LISTAS = [
-  ['LP-2026-CA', 'C&A', 'PV26', 1.00, 42, 'Vigente', 'ok'],
-  ['LP-2026-LV', 'Liverpool', 'PV26', 1.05, 18, 'En negociación', 'warn'],
-  ['LP-2026-HT', 'Hang Ten', 'PV26', 0.98, 12, 'Vigente', 'ok'],
-  ['LP-2027-CK', 'Cklass', 'PV27', 1.00, 8, 'Borrador', 'neutral'],
+/* ---- Cotizaciones / Listas de precios + Negociación (F8) ----
+   Factores del cliente (margen/descuentos/regalías/costo ventas) →
+   SNAPSHOT en la lista, editables SOLO por el dueño (PUEDE_PRECIOS).
+   Precio en cascada (D2): base = costo/(1−margen); precio = base/(1−
+   (desc+reg+cv)), al alza. Aprobación modelo por modelo. Estados:
+   abierta → en-negociación → cerrada → ya-pedida. Negociación =
+   eventos con acuerdo inmutable + precio anterior→nuevo (versión). */
+const FACTORES_CLI = {
+  'C&A': { margen: 45, descuentos: 8, regalias: 5, costoVentas: 3 },
+  'Liverpool': { margen: 48, descuentos: 12, regalias: 6, costoVentas: 4 },
+  'Coppel': { margen: 42, descuentos: 10, regalias: 4, costoVentas: 3 },
+  'Hang Ten': { margen: 45, descuentos: 6, regalias: 8, costoVentas: 3 },
+  'Cklass': { margen: 50, descuentos: 5, regalias: 3, costoVentas: 2 },
+  'Shasa': { margen: 46, descuentos: 9, regalias: 5, costoVentas: 3 },
+};
+const facCli = (c) => FACTORES_CLI[c] || { margen: 45, descuentos: 8, regalias: 5, costoVentas: 3 };
+const ESTADO_LISTA = { abierta: ['ok', 'Abierta'], 'en-negociacion': ['warn', 'En negociación'], cerrada: ['neutral', 'Cerrada'], 'ya-pedida': ['info', 'Ya pedida'] };
+function precioLista(costo, f) {
+  if (!costo) return 0;
+  const base = f.margen < 100 ? costo / (1 - f.margen / 100) : costo;
+  const otros = ((f.descuentos || 0) + (f.regalias || 0) + (f.costoVentas || 0)) / 100;
+  const precio = otros < 1 ? base / (1 - otros) : base;
+  return Math.ceil(precio);
+}
+let LISTAS = [
+  { folio: '2026-042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '3 jul 2026', estado: 'abierta', factores: { margen: 45, descuentos: 8, regalias: 5, costoVentas: 3 }, lineas: [
+    { modelo: '62410', nombre: 'Playera Cherry On Top', clienteNum: 'CA-KM-114', costo: 73.69, aprobado: null, aprobadoPor: null, eventos: [] },
+    { modelo: '62411', nombre: 'Short deportivo felpa', clienteNum: 'CA-KM-115', costo: 72.19, aprobado: null, aprobadoPor: null, eventos: [] },
+  ] },
+  { folio: '2026-041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '29 jun 2026', estado: 'en-negociacion', factores: { margen: 45, descuentos: 6, regalias: 8, costoVentas: 3 }, lineas: [
+    { modelo: '62058', nombre: 'Bermuda playa stretch', clienteNum: 'A17E210', costo: 89.10, aprobado: 205, aprobadoPor: 'Daniel Masri', eventos: [
+      { acuerdo: 'El cliente pidió quitar las bolsas traseras → baja el costo y el precio.', anterior: 224, nuevo: 205, por: 'Daniel Masri', fecha: '1 jul 2026' },
+    ] },
+    { modelo: '62059', nombre: 'Playera surf estampada', clienteNum: 'A17E190', costo: 41.30, aprobado: 98, aprobadoPor: 'Daniel Masri', eventos: [] },
+  ] },
+  { folio: '2026-030', cliente: 'Cklass', depto: 'Catálogo', temporada: 'PV27', fecha: '12 jun 2026', estado: 'cerrada', factores: { margen: 50, descuentos: 5, regalias: 3, costoVentas: 2 }, lineas: [
+    { modelo: '62124', nombre: 'Blusa manga larga', clienteNum: '154-40', costo: 61.00, aprobado: 158, aprobadoPor: 'Daniel Masri', eventos: [] },
+  ] },
 ];
-function vListas() {
+let listaSel = null, negLinea = -1;
+const listaRender = () => { viewEl.innerHTML = vListas(); };
+const listaVigente = (ln, f) => ln.aprobado != null ? ln.aprobado : precioLista(ln.costo, f);
+const nextFolioLista = () => '2026-' + String(Math.max(42, ...LISTAS.map(l => parseInt(String(l.folio).split('-')[1], 10) || 0)) + 1);
+
+function vListas() { return listaSel == null ? vListasLista() : vListaDetalle(listaSel); }
+function vListasLista() {
   return `
-  <div class="page-head"><div><h1>Cotizaciones / Listas de precios</h1><div class="sub">Desarrollo (F8) · factores por cliente · aprobación modelo por modelo</div></div>
-  <div class="actions"><button class="btn primary" onclick="mostrarToast('Nueva lista — demo')">${IC.plus}Nueva lista</button></div></div>
-  <div class="banner">${IC.info}<span>La lista toma los <b>precios del pre-costeo</b> y les aplica los <b>factores del cliente</b>; el dueño aprueba <b>modelo por modelo</b> y se negocia por versiones. <b>La lista NO dispara pedidos</b> (el pedido nace de la OC del cliente).</span></div>
+  <div class="page-head"><div><h1>Cotizaciones / Listas de precios</h1><div class="sub">Desarrollo (F8) · factores del cliente · aprobación modelo por modelo · negociación por versiones</div></div>
+  <div class="actions"><button class="btn primary" onclick="mostrarToast('Genera la lista desde un proyecto de Pre-costeos')">${IC.plus}Nueva lista</button></div></div>
+  <div class="banner">${IC.info}<span>La lista toma el <b>costo del pre-costeo</b> y le aplica los <b>factores del cliente</b>; <b>tú</b> apruebas <b>modelo por modelo</b> y comercial la manda ya autorizada. <b>La lista NO dispara pedidos</b> (el pedido nace de la OC del cliente).</span></div>
   <div class="card">
-    <div class="toolbar"><button class="chip active">Todas</button><button class="chip">Vigentes</button><button class="chip">En negociación</button>
+    <div class="toolbar"><button class="chip active">Todas</button><button class="chip">Abiertas</button><button class="chip">En negociación</button><button class="chip">Cerradas</button>
     <div class="tool-search">${lupa()}<input placeholder="Buscar lista, cliente…"></div><div class="tool-right"><span class="count">${LISTAS.length} listas</span></div></div>
-    <div class="table-wrap"><table class="data"><thead><tr><th>Lista</th><th>Cliente</th><th>Temporada</th><th class="r">Factor</th><th class="r">Modelos</th><th>Estado</th></tr></thead><tbody>
-      ${LISTAS.map(l => `<tr style="cursor:pointer" onclick="mostrarToast('Lista ${l[0]} — demo')">
-        <td class="cell-code">${l[0]}</td><td class="cell-strong">${l[1]}</td>
-        <td><span class="badge neutral"><span class="d"></span>${l[2]}</span></td>
-        <td class="r mono">×${l[3].toFixed(2)}</td><td class="r num">${l[4]}</td>
-        <td><span class="badge ${l[6]}"><span class="d"></span>${l[5]}</span></td>
-      </tr>`).join('')}
+    <div class="table-wrap"><table class="data"><thead><tr><th>Lista</th><th>Cliente / Departamento</th><th>Temporada</th><th class="r">Modelos</th><th class="r">Valor</th><th>Estado</th></tr></thead><tbody>
+      ${LISTAS.map((l, i) => { const [bc, bl] = ESTADO_LISTA[l.estado]; const val = l.lineas.reduce((a, ln) => a + listaVigente(ln, l.factores), 0); return `<tr style="cursor:pointer" onclick="abrirLista(${i})">
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">LP</span><div><div class="cell-strong">${l.folio}</div><div class="cell-code">${l.fecha}</div></div></div></td>
+        <td><span class="cell-strong">${l.cliente}</span> <span style="color:var(--muted)">/ ${l.depto}</span></td>
+        <td><span class="badge neutral"><span class="d"></span>${l.temporada}</span></td>
+        <td class="r num">${l.lineas.length}</td>
+        <td class="r mono">${money(val).replace('.00', '')}</td>
+        <td><span class="badge ${bc}"><span class="d"></span>${bl}</span></td>
+      </tr>`; }).join('')}
     </tbody></table></div></div>`;
 }
+function abrirLista(i) { listaSel = i; listaRender(); contentEl.scrollTop = 0; }
+function cerrarListaVista() { listaSel = null; listaRender(); }
+
+function vListaDetalle(i) {
+  const L = LISTAS[i]; const f = L.factores; const [bc, bl] = ESTADO_LISTA[L.estado];
+  const edit = PUEDE_PRECIOS && L.estado === 'abierta';
+  const cerr = L.estado === 'cerrada' || L.estado === 'ya-pedida';
+  const todasAprob = L.lineas.every(ln => ln.aprobado != null);
+  const tc = L.lineas.reduce((a, ln) => a + ln.costo, 0);
+  const tp = L.lineas.reduce((a, ln) => a + listaVigente(ln, f), 0);
+  const factorIn = (id, val, lbl) => `<label class="lp-fac"><span class="ffk">${lbl}</span><div class="lp-fac-in"><input class="pc-in mono" id="${id}" type="number" step="any" min="0" value="${val}" ${edit ? '' : 'readonly'} oninput="recalcLista()"><span>%</span></div></label>`;
+  return `
+  <div class="page-head">
+    <div>
+      <button class="btn ghost sm" onclick="cerrarListaVista()" style="margin-bottom:10px">${IC.chevron} Listas</button>
+      <h1>Lista ${L.folio} · ${L.cliente} <span style="color:var(--muted);font-weight:500">/ ${L.depto}</span> <span class="badge ${bc}" style="vertical-align:middle;margin-left:6px"><span class="d"></span>${bl}</span></h1>
+      <div class="sub">Temporada ${L.temporada} · ${L.lineas.length} modelos · ${L.fecha}</div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost">${IC.printer}Lista PDF</button>
+      ${L.estado === 'abierta' ? `<button class="btn primary" onclick="autorizarLista(${i})" ${todasAprob ? '' : 'disabled style="opacity:.5"'}>${IC.check}Autorizar y pasar a negociación</button>` : ''}
+      ${L.estado === 'en-negociacion' ? `<button class="btn primary" onclick="cerrarListaEstado(${i})">${IC.check}Cerrar lista</button>` : ''}
+    </div>
+  </div>
+  <div class="lp-factores">
+    <div class="lp-fac-head">
+      <div><h4>Factores del cliente ${edit ? '<span class="lp-lock">✎ solo tú los editas</span>' : `<span class="lp-lock">${IC.lock} bloqueados (${bl.toLowerCase()})</span>`}</h4>
+      <div class="lp-formula">Precio = costo ÷ (1 − margen) ÷ (1 − descuentos − regalías − costo ventas), redondeado al alza</div></div>
+    </div>
+    <div class="lp-fac-grid">
+      ${factorIn('lpMargen', f.margen, 'Margen')}
+      ${factorIn('lpDesc', f.descuentos, 'Descuentos')}
+      ${factorIn('lpReg', f.regalias, 'Regalías')}
+      ${factorIn('lpCV', f.costoVentas, 'Costo de ventas')}
+      <div class="lp-fac-note">${IC.info}<span>Vienen predefinidos de <b>${L.cliente}</b>${FACTORES_CLI[L.cliente] ? '' : ' (default)'}; el snapshot es editable aquí antes de autorizar.</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Precios por modelo</h3>${edit ? `<button class="btn ghost sm" onclick="aprobarTodas(${i})">${IC.check}Aprobar todos al calculado</button>` : `<span class="hint" id="lpTot">Costo Σ <b>${money(tc)}</b> · Precio Σ <b style="color:var(--ok)">${money(tp)}</b></span>`}</div>
+    <div class="table-wrap"><table class="data" id="tablaLP"><thead><tr>
+      <th>Modelo</th><th class="r">Costo</th><th class="r">Precio calculado</th><th class="r">Precio aprobado</th><th>Estado</th><th></th>
+    </tr></thead><tbody>
+      ${L.lineas.map((ln, li) => { const calc = precioLista(ln.costo, f); const aprob = ln.aprobado != null; return `<tr class="lp-row" data-i="${li}">
+        <td><div class="cellflex"><span class="thumb" style="background:#2f9c66;color:#04140c">${ln.modelo.slice(0, 3)}</span><div><div class="cell-strong">${ln.nombre}</div><div class="cell-code">Nuestro ${ln.modelo}${ln.clienteNum ? ' · ' + ln.clienteNum : ''}</div></div></div></td>
+        <td class="r mono">${money(ln.costo)}</td>
+        <td class="r mono lp-calc">${money(calc)}</td>
+        <td class="r">${edit ? `<input class="pc-in mono lp-aprob" style="width:110px;text-align:right" type="number" step="any" min="0" value="${ln.aprobado != null ? ln.aprobado : calc}">` : `<b class="mono" style="color:var(--ok)">${money(listaVigente(ln, f))}</b>`}</td>
+        <td>${aprob ? `<span class="badge ok"><span class="d"></span>Aprobado</span>` : `<span class="badge neutral"><span class="d"></span>Pendiente</span>`}</td>
+        <td class="r" style="white-space:nowrap">
+          ${edit ? `<button class="btn ghost sm" onclick="aprobarLinea(${i},${li})">${IC.check}Aprobar</button>` : ''}
+          ${L.estado === 'en-negociacion' ? `<button class="btn ghost sm" onclick="abrirNeg(${li})">${IC.refresh}Negociar${ln.eventos.length ? ' (' + ln.eventos.length + ')' : ''}</button>` : ''}
+          ${cerr && ln.eventos.length ? `<button class="btn ghost sm" onclick="abrirNeg(${li})">Ver acuerdos (${ln.eventos.length})</button>` : ''}
+        </td>
+      </tr>`; }).join('')}
+    </tbody></table></div>
+    ${edit ? `<div class="audit-hint" style="margin:12px 14px 4px">${IC.lock}<span>Aprobar/teclear precios y editar factores requiere permiso (<b>solo el dueño</b>, RBAC <code>listas.aprobar</code>). Queda registrado quién y cuándo.</span></div>` : ''}
+  </div>`;
+}
+function readFactores() {
+  return {
+    margen: parseFloat((document.getElementById('lpMargen') || {}).value) || 0,
+    descuentos: parseFloat((document.getElementById('lpDesc') || {}).value) || 0,
+    regalias: parseFloat((document.getElementById('lpReg') || {}).value) || 0,
+    costoVentas: parseFloat((document.getElementById('lpCV') || {}).value) || 0,
+  };
+}
+function recalcLista() {
+  const L = LISTAS[listaSel]; L.factores = readFactores();
+  let tp = 0;
+  document.querySelectorAll('#tablaLP .lp-row').forEach(tr => {
+    const ln = L.lineas[+tr.dataset.i]; const calc = precioLista(ln.costo, L.factores);
+    const cEl = tr.querySelector('.lp-calc'); if (cEl) cEl.textContent = money(calc);
+    const aEl = tr.querySelector('.lp-aprob'); if (aEl && ln.aprobado == null) aEl.value = calc;
+    tp += (ln.aprobado != null ? ln.aprobado : (aEl ? parseFloat(aEl.value) || calc : calc));
+  });
+}
+function aprobarLinea(i, li) {
+  const tr = document.querySelector(`#tablaLP .lp-row[data-i="${li}"]`);
+  const aEl = tr && tr.querySelector('.lp-aprob');
+  LISTAS[i].lineas[li].aprobado = aEl ? (parseFloat(aEl.value) || precioLista(LISTAS[i].lineas[li].costo, LISTAS[i].factores)) : precioLista(LISTAS[i].lineas[li].costo, LISTAS[i].factores);
+  LISTAS[i].lineas[li].aprobadoPor = USUARIO_ACTUAL;
+  listaRender(); mostrarToast('Precio aprobado · ' + USUARIO_ACTUAL);
+}
+function aprobarTodas(i) {
+  LISTAS[i].factores = readFactores();
+  LISTAS[i].lineas.forEach(ln => { if (ln.aprobado == null) { ln.aprobado = precioLista(ln.costo, LISTAS[i].factores); ln.aprobadoPor = USUARIO_ACTUAL; } });
+  listaRender(); mostrarToast('Todos los precios aprobados al calculado');
+}
+function autorizarLista(i) {
+  if (!LISTAS[i].lineas.every(ln => ln.aprobado != null)) { mostrarToast('Aprueba todos los precios primero'); return; }
+  LISTAS[i].estado = 'en-negociacion'; listaRender();
+  mostrarToast('Lista autorizada · comercial la manda y arranca la negociación');
+}
+function cerrarListaEstado(i) { LISTAS[i].estado = 'cerrada'; listaRender(); mostrarToast('Lista cerrada · se congela'); }
+
+/* ---- Sesión de negociación (por renglón) ---- */
+const negScrim = document.getElementById('negScrim');
+const negPanel = document.getElementById('negPanel');
+function abrirNeg(li) { negLinea = li; renderNeg(); negScrim.classList.add('show'); }
+function cerrarNeg() { negScrim.classList.remove('show'); }
+function renderNeg() {
+  const L = LISTAS[listaSel]; const ln = L.lineas[negLinea]; const vig = listaVigente(ln, L.factores);
+  const cerr = L.estado === 'cerrada' || L.estado === 'ya-pedida';
+  negPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">${ln.modelo.slice(0, 3)}</span>
+    <div style="flex:1;min-width:0"><h2>Negociación — ${ln.nombre}</h2>
+    <div class="ph-meta"><span>${L.cliente} / ${L.depto}</span><span>Lista ${L.folio}</span><span>Precio vigente <b>${money(vig)}</b></span></div></div>
+    <button class="icon-btn" onclick="cerrarNeg()" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="proc-body">
+    ${cerr ? '' : `<div class="pc-sec">
+      <h4>Registrar acuerdo / cambio</h4>
+      <div class="pc-fields">
+        <label class="col2"><span class="ffk">Qué se acordó / cambió</span><textarea class="pc-in" id="negAcuerdo" rows="2" placeholder="Ej.: se quitan las bolsas traseras — baja el costo; nuevo precio acordado." style="height:auto;padding:9px 10px;resize:vertical;font-family:inherit"></textarea></label>
+        <label><span class="ffk">Nuevo precio acordado</span><input class="pc-in mono" id="negPrecio" type="number" step="any" min="0" value="${vig}"></label>
+        <div class="pc-hint-cell">Modificar la prenda (avíos/tela) genera una <b>nueva versión del precosto</b>; el acuerdo queda inmutable.</div>
+      </div>
+      <button class="btn primary sm" onclick="registrarAcuerdo()" style="margin-top:10px">${IC.check}Registrar acuerdo</button>
+    </div>`}
+    <div class="proc-summary-title">Historial de la negociación (${ln.eventos.length})</div>
+    ${ln.eventos.length ? `<div class="neg-timeline">
+      ${ln.eventos.slice().reverse().map(ev => `<div class="neg-event">
+        <div class="neg-dot"></div>
+        <div class="neg-body">
+          <div class="neg-precio"><span class="mono" style="text-decoration:line-through;color:var(--muted)">${money(ev.anterior)}</span> ${IC.chevron} <span class="mono" style="color:var(--ok);font-weight:700">${money(ev.nuevo)}</span></div>
+          <div class="neg-acuerdo">${ev.acuerdo}</div>
+          <div class="neg-meta">${ev.por} · ${ev.fecha}</div>
+        </div>
+      </div>`).join('')}
+    </div>` : '<div class="pc-empty" style="padding:16px 2px">Sin acuerdos todavía. El precio vigente es el aprobado.</div>'}
+  </div>`;
+}
+function registrarAcuerdo() {
+  const L = LISTAS[listaSel]; const ln = L.lineas[negLinea];
+  const txt = negPanel.querySelector('#negAcuerdo').value.trim();
+  const nuevo = parseFloat(negPanel.querySelector('#negPrecio').value) || 0;
+  if (!txt) { mostrarToast('Describe qué se acordó'); return; }
+  if (!nuevo) { mostrarToast('Pon el nuevo precio'); return; }
+  const anterior = listaVigente(ln, L.factores);
+  ln.eventos.push({ acuerdo: txt, anterior, nuevo, por: USUARIO_ACTUAL, fecha: hoyStr() });
+  ln.aprobado = nuevo;
+  renderNeg(); listaRender();
+  mostrarToast('Acuerdo registrado · precio actualizado');
+}
+function generarListaDeProyecto(pi) {
+  const p = PROYECTOS[pi]; const f = { ...facCli(p.cliente) };
+  const lineas = p.modelos.map(m => ({ modelo: m.nuestro, nombre: m.nombre || 'Modelo', clienteNum: m.clienteNum, costo: costoModelo(m).costo, aprobado: null, aprobadoPor: null, eventos: [] }));
+  LISTAS.unshift({ folio: nextFolioLista(), cliente: p.cliente, depto: p.depto, temporada: p.temporada, fecha: hoyStr(), estado: 'abierta', factores: f, lineas });
+  listaSel = 0; vistaActual = 'listas-precios'; renderNav();
+  crumbsEl.innerHTML = `<b>CONTROL</b><span class="sep">${IC.chevron}</span>${TITULOS['listas-precios']}`;
+  listaRender(); contentEl.scrollTop = 0;
+  mostrarToast('Lista de precios generada desde el proyecto');
+}
+negScrim.onclick = (e) => { if (e.target === negScrim) cerrarNeg(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && negScrim.classList.contains('show')) cerrarNeg(); });
 
 /* ---- Ventas ---- */
 const VENTAS = [
@@ -3467,6 +3691,7 @@ function ir(clave) {
   if (!(clave === 'notas-salida' && _keepFiltroNota)) notasFiltroOrden = '';
   _keepFiltroNota = false;
   if (clave !== 'precosteos') pcProyecto = null;
+  if (clave !== 'listas-precios') listaSel = null;
   renderNav();
   cerrarCajon();
   const fn = VISTAS[clave] || (()=>vPlaceholder(clave));
