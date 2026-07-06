@@ -227,6 +227,7 @@ Ruta sugerida (por fases, con el proceso normal coder+reviewer → PR a `prueba`
 ## 7. Pendientes / decisiones abiertas
 
 - **Combobox de proveedores:** ¿permitir texto libre (proveedor nuevo) o **forzar selección de lista**? (preguntado, sin cerrar).
+- **Avío por medida — proveedor vs. promedio (pulido menor, 6-jul):** en el editor de precosteo, el avío por medida (cierre) se costea con el **promedio de medidas** ($6.27) aunque el selector muestre un proveedor con su precio único ($6.20). Es **a propósito** (el precosteo del por-medida siempre usa el promedio, decisión de Daniel), pero el número del proveedor no coincide con el costeado y puede confundir. **Pulido posible:** que en avíos por medida el selector muestre "promedio de medidas" en vez de un precio de proveedor único. No urge; funcionalmente correcto.
 - **Diseñadas a fondo** (6-jul): Pre-costeo (§4.7) y **Lista de precios + Negociación (§4.8)** — calzadas con el backend F8 ya construido.
 - Pantallas con **base inicial** (prototipadas 6-jul, aún por afinar con Daniel): Avíos, Clientes (con factores), Ventas, CxC/CxP, EDR, Auditores, Catálogos base (colores/tallas/temporadas/tipos de proceso/almacenes). Son bases funcionales con datos de ejemplo; Daniel las irá revisando una por una.
 - **Nota de salida de TELAS:** pendiente de diseñar. Sale del **almacén de telas** (otro almacén), así que va en su **propia nota** relacionada a ese almacén, separada de la de avíos (decisión Daniel, 6-jul). Puede reusar la "salida de tela a orden" que ya existe en Inventario (F4) como documento de respaldo.
