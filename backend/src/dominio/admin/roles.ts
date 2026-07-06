@@ -242,9 +242,74 @@ export async function actualizarRol(
 }
 
 /**
+ * Clave del permiso que gobierna la administración de roles y permisos. Es el
+ * candado de seguridad del RBAC: si NINGÚN usuario activo la tiene, nadie puede
+ * volver a tocar permisos (lockout permanente).
+ */
+const CLAVE_ADMIN_ROLES = 'roles.administrar';
+
+/**
+ * Clave CONSTANTE del advisory lock que serializa entre sí TODAS las mutaciones
+ * de permisos (`asignarPermisos` + `eliminarRol`). NO se mezcla el id del rol a
+ * propósito: el guard anti-lockout es una invariante GLOBAL ("¿queda algún
+ * usuario activo que pueda administrar roles?"), así que dos operaciones sobre
+ * roles DISTINTOS también deben serializarse — de lo contrario el conteo bajo
+ * READ COMMITTED sufre write-skew (dos tx que quitan la clave a A y a B, cada una
+ * sin ver el `delete` no-commiteado de la otra, ambas cuentan "aún queda 1" y
+ * ambas commitean → 0 administradores). Forma de UN argumento
+ * `pg_advisory_xact_lock(bigint)`: ocupa un espacio de locks distinto al de dos
+ * enteros del kardex, imposible que colisione. El valor es un discriminador
+ * arbitrario y único de este guard ("ROLES_A" en hex).
+ */
+const CLAVE_LOCK_GUARD_ROLES = 0x524f4c45535f41n;
+
+/**
+ * Serializa las mutaciones de permisos tomando el advisory lock transaccional de
+ * clave constante. Se toma al ENTRAR a la operación, ANTES de contar/mutar; se
+ * libera solo al terminar la transacción (no hay que soltarlo a mano).
+ */
+async function bloquearGuardRoles(tx: Tx): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${CLAVE_LOCK_GUARD_ROLES}::bigint)`;
+}
+
+/**
+ * Guard anti-lockout a nivel USUARIO (no rol): tras retirar `roles.administrar`
+ * del rol `idRolQuePierde`, exige que siga habiendo ≥1 usuario ACTIVO capaz de
+ * administrar roles vía ALGÚN OTRO rol. Un rol admin "huérfano" (con la clave
+ * pero 0 usuarios) NO cuenta: por eso se cuentan usuarios, no roles. Debe
+ * llamarse BAJO el lock ({@link bloquearGuardRoles}) para que el conteo sea
+ * consistente frente a mutaciones concurrentes.
+ */
+async function verificarNoLockout(tx: Tx, idRolQuePierde: number): Promise<void> {
+  const administradoresRestantes = await tx.usuario.count({
+    where: {
+      activo: true,
+      roles: {
+        some: {
+          idRol: { not: idRolQuePierde },
+          rol: { permisos: { some: { permiso: { clave: CLAVE_ADMIN_ROLES } } } },
+        },
+      },
+    },
+  });
+  if (administradoresRestantes === 0) {
+    throw new ErrorConflicto(
+      'No puedes dejar al sistema sin ningún usuario activo que pueda administrar roles y permisos.',
+    );
+  }
+}
+
+/**
  * REEMPLAZA el conjunto de permisos del rol (lo marcado en pantalla es lo que
  * queda). También aplica a roles de sistema: así Daniel afina el mapeo
  * aproximado de niveles→permisos del seed.
+ *
+ * ⚠️ Guard anti-lockout (seguridad RBAC): si el reemplazo RETIRA
+ * `roles.administrar` de este rol y con ello el sistema quedaría sin NINGÚN
+ * usuario activo que pueda administrar permisos, se rechaza (`ErrorConflicto`).
+ * Se toma un advisory lock de clave constante ANTES del conteo para cerrar la
+ * carrera write-skew (ver {@link bloquearGuardRoles}); el guard es a nivel
+ * usuario, así que un rol admin sin usuarios no cuenta.
  */
 export async function asignarPermisos(
   sesion: SesionUsuario,
@@ -256,8 +321,16 @@ export async function asignarPermisos(
   const claves = validarEntrada(z.array(esquemaClavePermiso), clavesPermisos);
 
   return enTransaccion(async (tx) => {
+    await bloquearGuardRoles(tx);
     const actual = await exigirRol(tx, id);
     const idsPermisos = await resolverPermisos(tx, claves);
+
+    // El guard solo dispara si la operación efectivamente RETIRA la clave admin.
+    const teniaAdmin = actual.permisos.some((a) => a.permiso.clave === CLAVE_ADMIN_ROLES);
+    const tendraAdmin = claves.includes(CLAVE_ADMIN_ROLES);
+    if (teniaAdmin && !tendraAdmin) {
+      await verificarNoLockout(tx, id);
+    }
 
     await tx.rolPermiso.deleteMany({ where: { idRol: id } });
     if (idsPermisos.length > 0) {
@@ -282,6 +355,14 @@ export async function asignarPermisos(
  * Elimina un rol que NO sea de sistema y que NO tenga usuarios asignados
  * (con usuarios es `ErrorConflicto`: primero reasigna a esas personas).
  * Los roles son configuración, no datos operativos: aquí el borrado es real.
+ *
+ * ⚠️ Guard anti-lockout SIMÉTRICO al de `asignarPermisos`: si el rol borrado
+ * OTORGABA `roles.administrar` y con ello el sistema quedaría sin NINGÚN usuario
+ * activo capaz de administrar permisos, se rechaza (`ErrorConflicto`). Toma el
+ * MISMO advisory lock de clave constante que `asignarPermisos` para serializar
+ * ambas rutas entre sí (un borrado y una reasignación concurrentes no pueden
+ * sortear el guard). El guard es a nivel usuario (un rol admin huérfano no
+ * cuenta).
  */
 export async function eliminarRol(
   sesion: SesionUsuario,
@@ -291,6 +372,7 @@ export async function eliminarRol(
   verificarPermiso(sesion, 'roles.administrar');
 
   await enTransaccion(async (tx) => {
+    await bloquearGuardRoles(tx);
     const actual = await exigirRol(tx, id);
     if (actual.esSistema) {
       throw new ErrorValidacion(`El rol "${actual.nombre}" es del sistema y no se puede borrar.`);
@@ -299,6 +381,11 @@ export async function eliminarRol(
       throw new ErrorConflicto(
         `El rol "${actual.nombre}" tiene ${String(actual._count.usuarios)} usuario(s) asignado(s); reasígnalos antes de borrarlo.`,
       );
+    }
+    // Si el rol otorgaba la clave admin, verificar que no sea el último camino.
+    const otorgabaAdmin = actual.permisos.some((a) => a.permiso.clave === CLAVE_ADMIN_ROLES);
+    if (otorgabaAdmin) {
+      await verificarNoLockout(tx, id);
     }
 
     await tx.rolPermiso.deleteMany({ where: { idRol: id } });

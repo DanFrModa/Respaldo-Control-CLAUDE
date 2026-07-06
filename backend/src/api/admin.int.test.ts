@@ -320,7 +320,7 @@ describe('API de administración (F1-E1 PIEZA C)', () => {
     });
   });
 
-  describe('roles (solo lectura)', () => {
+  describe('roles', () => {
     it('lista los roles del seed para el selector', async () => {
       const cookie = await cookieAdmin();
       const res = await app.inject({ method: 'GET', url: '/api/roles', headers: { cookie } });
@@ -331,6 +331,153 @@ describe('API de administración (F1-E1 PIEZA C)', () => {
       // F5-E1 agregó roles funcionales (esSistema=false) al selector; los de sistema sí lo son.
       expect(roles.find((r) => r.nombre === 'Administrador')?.esSistema).toBe(true);
       expect(roles.find((r) => r.nombre === 'Basico')?.esSistema).toBe(true);
+    });
+
+    it('crea un rol con permisos, lo edita, reemplaza sus permisos y lo elimina', async () => {
+      const cookie = await cookieAdmin();
+
+      // Alta con set inicial de permisos → 201.
+      const creado = await app.inject({
+        method: 'POST',
+        url: '/api/roles',
+        headers: { cookie },
+        payload: {
+          nombre: 'Almacenista',
+          descripcion: 'Opera almacenes',
+          clavesPermisos: ['almacenes.ver', 'almacenes.administrar'],
+        },
+      });
+      expect(creado.statusCode).toBe(201);
+      const rol = creado.json<{
+        id: number;
+        nombre: string;
+        esSistema: boolean;
+        clavesPermisos: string[];
+      }>();
+      expect(rol.esSistema).toBe(false);
+      expect(rol.clavesPermisos).toEqual(['almacenes.administrar', 'almacenes.ver']);
+
+      // Edición del nombre/descripción → 200.
+      const editado = await app.inject({
+        method: 'PATCH',
+        url: `/api/roles/${String(rol.id)}`,
+        headers: { cookie },
+        payload: { nombre: 'Bodeguero' },
+      });
+      expect(editado.statusCode).toBe(200);
+      expect(editado.json<{ nombre: string }>().nombre).toBe('Bodeguero');
+
+      // Reemplazo total de permisos (PUT) → 200.
+      const permisos = await app.inject({
+        method: 'PUT',
+        url: `/api/roles/${String(rol.id)}/permisos`,
+        headers: { cookie },
+        payload: { clavesPermisos: ['almacenes.ver'] },
+      });
+      expect(permisos.statusCode).toBe(200);
+      expect(permisos.json<{ clavesPermisos: string[] }>().clavesPermisos).toEqual([
+        'almacenes.ver',
+      ]);
+
+      // Borrado real (sin usuarios) → 204.
+      const borrado = await app.inject({
+        method: 'DELETE',
+        url: `/api/roles/${String(rol.id)}`,
+        headers: { cookie },
+      });
+      expect(borrado.statusCode).toBe(204);
+    });
+
+    it('un rol de SISTEMA no se renombra (400) ni se elimina (400)', async () => {
+      const cookie = await cookieAdmin();
+      const administrador = await idRol('Administrador');
+
+      const renombrar = await app.inject({
+        method: 'PATCH',
+        url: `/api/roles/${String(administrador)}`,
+        headers: { cookie },
+        payload: { nombre: 'Otro nombre' },
+      });
+      expect(renombrar.statusCode).toBe(400);
+      expect(renombrar.json()).toMatchObject({ codigo: 'VALIDACION' });
+
+      const eliminar = await app.inject({
+        method: 'DELETE',
+        url: `/api/roles/${String(administrador)}`,
+        headers: { cookie },
+      });
+      expect(eliminar.statusCode).toBe(400);
+      expect(eliminar.json()).toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('rechaza por API quitar la admin al último rol que sostiene a un usuario activo (lockout) → 409', async () => {
+      const cookie = await cookieAdmin();
+      const administrador = await idRol('Administrador');
+
+      // Deja a "Administrador" (el rol del usuario admin del seed) como ÚNICO camino de
+      // administración: se le quita `roles.administrar` a todos los demás roles.
+      const permisoAdmin = await cliente.permiso.findUniqueOrThrow({
+        where: { clave: 'roles.administrar' },
+      });
+      await cliente.rolPermiso.deleteMany({
+        where: { idPermiso: permisoAdmin.id, idRol: { not: administrador } },
+      });
+
+      // Quitárselo a ese rol, vía API, dejaría al sistema sin ningún usuario activo que
+      // administre → el candado RBAC (nivel usuario) lo rechaza.
+      const res = await app.inject({
+        method: 'PUT',
+        url: `/api/roles/${String(administrador)}/permisos`,
+        headers: { cookie },
+        payload: { clavesPermisos: ['usuarios.administrar'] },
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toMatchObject({ codigo: 'CONFLICTO' });
+    });
+
+    it('devuelve el catálogo de permisos agrupado por módulo', async () => {
+      const cookie = await cookieAdmin();
+      const res = await app.inject({ method: 'GET', url: '/api/permisos', headers: { cookie } });
+      expect(res.statusCode).toBe(200);
+      const grupos =
+        res.json<{ modulo: string; etiqueta: string; permisos: { clave: string }[] }[]>();
+      expect(grupos.length).toBeGreaterThan(0);
+      const roles = grupos.find((g) => g.modulo === 'roles');
+      expect(roles?.etiqueta).toBe('Administración de roles');
+      expect(roles?.permisos.some((p) => p.clave === 'roles.administrar')).toBe(true);
+    });
+
+    it('sin roles.administrar recibe 403 en las rutas de mutación y en el catálogo', async () => {
+      const cookie = await cookieAdmin();
+      // Usuario con rol "Basico" (sin permisos).
+      await app.inject({
+        method: 'POST',
+        url: '/api/usuarios',
+        headers: { cookie },
+        payload: {
+          username: 'sinroles',
+          nombre: 'Sin Roles',
+          password: 'Clave.1234!',
+          idsRoles: [await idRol('Basico')],
+        },
+      });
+      const sesion = await login('sinroles', 'Clave.1234!');
+      const cookieBasico = comoHeaderCookie(sesion.cookies);
+
+      const alta = await app.inject({
+        method: 'POST',
+        url: '/api/roles',
+        headers: { cookie: cookieBasico },
+        payload: { nombre: 'X' },
+      });
+      expect(alta.statusCode).toBe(403);
+
+      const catalogo = await app.inject({
+        method: 'GET',
+        url: '/api/permisos',
+        headers: { cookie: cookieBasico },
+      });
+      expect(catalogo.statusCode).toBe(403);
     });
   });
 });

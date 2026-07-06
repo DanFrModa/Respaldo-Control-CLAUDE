@@ -85,6 +85,7 @@ import { RecibosSemanalesPagina } from '@/modulos/produccion/RecibosSemanalesPag
 import { TableroWipPagina } from '@/modulos/produccion/TableroWipPagina';
 import { ProveedoresPagina } from '@/modulos/proveedores/ProveedoresPagina';
 import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
+import { RolesPagina } from '@/modulos/administracion/RolesPagina';
 import { ConceptosCostoPagina } from '@/modulos/conceptos-costo/ConceptosCostoPagina';
 import { EstadosListaPagina } from '@/modulos/estados-lista/EstadosListaPagina';
 import { AltaAuditoriaPagina } from '@/modulos/calidad/AltaAuditoriaPagina';
@@ -279,6 +280,7 @@ const router = createBrowserRouter([
           { path: 'indicadores/ciclicos/:id/exactitud', element: <ExactitudCiclicoPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
+          { path: 'administracion/roles', element: <RolesPagina /> },
           { path: 'administracion/empresas', element: <EmpresasPagina /> },
           // Configuración de la RC por empresa (colchón + calendario + festivos).
           { path: 'administracion/ruta-critica', element: <ConfiguracionRcPagina /> },

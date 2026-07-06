@@ -1,4 +1,12 @@
-import { Building2, ClipboardList, Coins, ListChecks, Users, type LucideIcon } from 'lucide-react';
+import {
+  Building2,
+  ClipboardList,
+  Coins,
+  ListChecks,
+  ShieldCheck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
@@ -9,11 +17,10 @@ import { useSesion } from '@/sesion/useSesion';
 
 /**
  * Portada del modulo Administracion (rediseño "Teal fresco"): lista sus secciones
- * como tarjetas con icono de color. Las CONSTRUIDAS (Usuarios y Empresas, F1-E1)
- * se muestran como tarjeta-enlace SOLO si la sesion tiene su permiso `.administrar`
- * (igual que el sidebar oculta los modulos sin permiso, A4); el resto (roles,
- * bitacora) aun por construir, como "Próximamente". La decision real de acceso la
- * toma el backend en cada ruta (A1).
+ * como tarjetas con icono de color. Cada sección construida se muestra como
+ * tarjeta-enlace SOLO si la sesion tiene su permiso `.administrar` (igual que el
+ * sidebar oculta los modulos sin permiso, A4). La decision real de acceso la toma
+ * el backend en cada ruta (A1). Ya no queda ninguna sección "Próximamente".
  */
 
 /** Una seccion ya construida (pantalla real), con su ruta, icono, tono y permiso. */
@@ -45,6 +52,15 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     icono: Users,
     tono: 'pt',
     permiso: 'usuarios.administrar',
+  },
+  {
+    clave: 'roles',
+    titulo: 'Roles y permisos',
+    descripcion: 'Roles del sistema y los permisos que otorga cada uno.',
+    ruta: '/administracion/roles',
+    icono: ShieldCheck,
+    tono: 'servicios',
+    permiso: 'roles.administrar',
   },
   {
     clave: 'empresas',
@@ -84,10 +100,8 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
   },
 ];
 
-/** Secciones aun por construir (se muestran como "Próximamente"). */
-const SECCIONES_PENDIENTES: readonly SeccionPendiente[] = [
-  { clave: 'roles', titulo: 'Roles y permisos', descripcion: 'Roles del sistema y sus permisos.' },
-];
+/** Secciones aun por construir (se muestran como "Próximamente"). Ya no queda ninguna. */
+const SECCIONES_PENDIENTES: readonly SeccionPendiente[] = [];
 
 export function AdministracionPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
