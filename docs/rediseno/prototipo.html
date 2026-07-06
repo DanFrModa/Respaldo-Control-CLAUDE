@@ -689,6 +689,63 @@
   .surt-n { font-variant-numeric: tabular-nums; }
   .surt-qty { width: 82px; height: 30px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: var(--ff-mono); text-align: right; outline: none; }
   .surt-qty:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+  /* ---- Pre-costeo ---- */
+  .pc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .pc-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color .12s, box-shadow .12s, transform .12s; }
+  .pc-card:hover { border-color: var(--brand); box-shadow: var(--shadow-lg); transform: translateY(-1px); }
+  .pc-card-top { display: flex; align-items: center; gap: 10px; padding: 13px 14px; border-bottom: 1px solid var(--border); }
+  .pc-foto { width: 44px; height: 44px; border-radius: 10px; flex: none; overflow: hidden; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--border); color: var(--faint); }
+  .pc-foto img { width: 100%; height: 100%; object-fit: cover; }
+  .pc-foto svg { width: 20px; height: 20px; }
+  .pc-card-title { font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pc-card-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+  .pc-kv { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+  .pc-kv span { color: var(--muted); }
+  .pc-kv b { font-weight: 600; text-align: right; }
+  .pc-card-foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); background: var(--panel-2); }
+  .pc-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; color: var(--muted); background: var(--hover); padding: 3px 8px; border-radius: 6px; }
+  .pc-chip svg { width: 12px; height: 12px; }
+  .pc-add { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 158px; border: 1.5px dashed var(--border-strong); border-radius: 14px; background: transparent; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600; transition: border-color .12s, color .12s, background .12s; }
+  .pc-add:hover { border-color: var(--brand); color: var(--brand); background: var(--brand-soft); }
+  .pc-add svg { width: 22px; height: 22px; }
+  .pc-sec { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 12px; }
+  .pc-sec > h4 { font-size: 13px; font-weight: 650; margin-bottom: 12px; display: flex; align-items: center; gap: 7px; }
+  .pc-sec > h4 .hint { margin-left: auto; font-size: 11.5px; font-weight: 500; color: var(--muted); font-family: var(--ff-mono); }
+  .pc-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .pc-fields .col2 { grid-column: 1 / -1; }
+  .pc-fields label { display: flex; flex-direction: column; gap: 6px; }
+  .pc-fields .ffk { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+  .pc-hint-cell { align-self: center; font-size: 11.5px; color: var(--faint); }
+  .pc-in { height: 34px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: inherit; outline: none; }
+  .pc-in:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
+  .pc-in.mono { font-family: var(--ff-mono); text-align: right; }
+  .pc-line { display: grid; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .pc-proc-row { grid-template-columns: 1fr 130px 34px; }
+  .pc-avio-row { grid-template-columns: 1fr 110px 96px 34px; }
+  .pc-avio-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
+  .pc-empty { font-size: 12px; color: var(--faint); padding: 6px 2px; }
+  .pc-line-del { height: 34px; width: 34px; border: 1px solid var(--border); background: var(--panel); border-radius: 8px; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+  .pc-line-del:hover { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, var(--border)); }
+  .pc-line-del svg { width: 15px; height: 15px; }
+  .pc-cost { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .pc-cost-row { display: flex; justify-content: space-between; font-size: 12.5px; padding: 4px 0; }
+  .pc-cost-row span { color: var(--muted); }
+  .pc-cost-row b { font-family: var(--ff-mono); }
+  .pc-cost-row.total { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 9px; font-size: 14px; }
+  .pc-cost-row.total b { color: var(--brand); font-weight: 700; }
+  .pc-cost-row.precio b { color: var(--ok); font-weight: 700; }
+  .pc-photos { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pc-photo { width: 80px; height: 80px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); display: grid; place-items: center; color: var(--faint); position: relative; }
+  .pc-photo svg { width: 22px; height: 22px; }
+  .pc-photo-add { border: 1.5px dashed var(--border-strong); cursor: pointer; color: var(--muted); }
+  .pc-photo-add:hover { border-color: var(--brand); color: var(--brand); }
+  .pc-photo-x { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; font-size: 12px; display: grid; place-items: center; }
+  .pc-photo-x:hover { color: var(--crit); border-color: var(--crit); }
+  .pc-pdf-list { display: flex; flex-direction: column; gap: 8px; }
+  .pc-pdf-chip { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; font-size: 12.5px; background: var(--panel-2); }
+  .pc-pdf-chip svg { width: 16px; height: 16px; color: var(--crit); flex: none; }
+  .pc-pdf-chip .x { margin-left: auto; cursor: pointer; color: var(--faint); border: 0; background: transparent; font-size: 14px; }
+  .pc-pdf-chip .x:hover { color: var(--crit); }
   .nsl-group + .nsl-group { margin-top: 10px; }
   .nsl-ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px 8px 0 0; font-size: 12px; color: var(--muted); }
   .nsl-ghead b { color: var(--text); font-family: var(--ff-mono); }
@@ -837,6 +894,9 @@
 
 <!-- Habilitación / surtido de avíos por orden -->
 <div class="proc-scrim" id="surtidoScrim"><div class="proc" id="surtidoPanel"></div></div>
+
+<!-- Editor de modelo (pre-costeo) -->
+<div class="proc-scrim" id="pcScrim"><div class="proc" id="pcPanel"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -2790,11 +2850,603 @@ function vPlaceholder(clave) {
   </div>`;
 }
 
+/* ============================================================
+   Pre-costeo (Desarrollo) — proyectos → modelos → costeo
+   Proyecto = número + UN cliente + UN departamento (propio del
+   cliente) + temporada. Modelo = número nuestro + del cliente,
+   tela+consumo, maquila, procesos (estampado/bordado/otros),
+   avíos+consumo, PDFs (Tech Pack), fotos, estatus. Varios
+   proyectos abiertos a la vez; estatus visible por modelo.
+   ============================================================ */
+const lupa = () => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>`;
+const barra = (pct) => `<span class="bar-mini"><span class="bar-track"><span class="bar-fill" style="width:${pct}%;background:${pct >= 100 ? 'var(--ok)' : pct >= 50 ? 'var(--brand)' : 'var(--warn)'}"></span></span><span class="num" style="color:var(--muted);font-size:11.5px">${pct}%</span></span>`;
+const icPDF = P('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>');
+const icFoto = P('<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>');
+
+const DEPTOS = {
+  'C&A': ['KIDS Moda', 'Baby', 'Hombre', 'Dama', 'Deportivo'],
+  'Liverpool': ['Contemporáneo', 'Infantil', 'Playa'],
+  'Coppel': ['Niños', 'Caballero', 'Dama'],
+  'Cklass': ['Catálogo', 'Temporada'],
+  'Hang Ten': ['Surf', 'Kids'],
+  'Shasa': ['Juvenil', 'Deportivo'],
+};
+const CLIENTES_PC = Object.keys(DEPTOS);
+const TELAS_PC = [
+  { nom: 'Algodón peinado 30/1', precio: 128.00, un: 'kg' }, { nom: 'Felpa francesa 320g', precio: 96.50, un: 'kg' },
+  { nom: 'Mezclilla stretch 8oz', precio: 74.00, un: 'm' }, { nom: 'Lycra suplex 240g', precio: 110.00, un: 'kg' },
+  { nom: 'Franela lavada 180g', precio: 68.00, un: 'm' },
+];
+const telaPCBy = (n) => TELAS_PC.find(t => t.nom === n);
+const PROCESOS_PC = ['Estampado serigrafía', 'Estampado DTF', 'Bordado', 'Sublimado', 'Lavado', 'Teñido', 'Plisado'];
+const AVIOS_PC = [
+  { nom: 'Etiqueta tejida MJD', precio: 1.20 }, { nom: 'Etiqueta de composición', precio: 0.45 },
+  { nom: 'Hilo poliéster Tex 40', precio: 0.30 }, { nom: 'Resorte 3 cm', precio: 4.80 },
+  { nom: 'Botón 4 hoyos 18L', precio: 0.60 }, { nom: 'Cierre #5 metálico 18 cm', precio: 6.50 },
+  { nom: 'Bolsa polietileno 30×40', precio: 0.80 }, { nom: 'Elástico 5 cm', precio: 5.20 },
+];
+const avioPCBy = (n) => AVIOS_PC.find(a => a.nom === n);
+const EST_MODELO = { borrador: ['neutral', 'Borrador'], proceso: ['warn', 'En proceso'], completo: ['info', 'Completo'], aprobado: ['ok', 'Aprobado'] };
+const estModeloBadge = (e) => EST_MODELO[e] || ['neutral', e];
+const nFotos = (m) => (m.fotos || 0) + ((m.fotosArr && m.fotosArr.length) || 0);
+
+let PROYECTOS = [
+  { num: 'P-1042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '2 jul 2026', estatus: 'abierto', modelos: [
+    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', tela: { nom: 'Felpa francesa 320g', consumo: 0.42 }, maquila: 25, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
+    { nuestro: '62411', clienteNum: 'CA-KM-115', nombre: 'Short deportivo felpa', estatus: 'proceso', tela: { nom: 'Felpa francesa 320g', consumo: 0.38 }, maquila: 22, margen: 45, procesos: [{ tipo: 'Bordado', precio: 8 }], avios: [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Short.pdf'], fotos: 2 },
+    { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', tela: { nom: '', consumo: 0 }, maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0 },
+  ] },
+  { num: 'P-1041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '28 jun 2026', estatus: 'abierto', modelos: [
+    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', tela: { nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, maquila: 30, margen: 42, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
+    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', tela: { nom: 'Algodón peinado 30/1', consumo: 0.30 }, maquila: 18, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
+  ] },
+  { num: 'P-1039', cliente: 'Liverpool', depto: 'Infantil', temporada: 'OI26', fecha: '20 jun 2026', estatus: 'abierto', modelos: [
+    { nuestro: '62330', clienteNum: 'LV-INF-88', nombre: 'Conjunto felpa bebé', estatus: 'borrador', tela: { nom: 'Felpa francesa 320g', consumo: 0.25 }, maquila: 20, margen: 48, procesos: [], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 4 }], pdfs: ['TechPack_Conjunto.pdf'], fotos: 2 },
+  ] },
+  { num: 'P-1035', cliente: 'Cklass', depto: 'Catálogo', temporada: 'PV27', fecha: '10 jun 2026', estatus: 'cerrado', modelos: [
+    { nuestro: '62124', clienteNum: '154-40', nombre: 'Blusa manga larga', estatus: 'aprobado', tela: { nom: 'Lycra suplex 240g', consumo: 0.32 }, maquila: 24, margen: 50, procesos: [{ tipo: 'Sublimado', precio: 9 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }], pdfs: ['TechPack_Blusa.pdf'], fotos: 3 },
+  ] },
+];
+
+function costoModelo(m) {
+  const tela = m.tela && m.tela.nom && telaPCBy(m.tela.nom) ? telaPCBy(m.tela.nom).precio * (m.tela.consumo || 0) : 0;
+  const avios = (m.avios || []).reduce((a, x) => a + (avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0), 0);
+  const procs = (m.procesos || []).reduce((a, x) => a + (x.precio || 0), 0);
+  const maq = m.maquila || 0;
+  const costo = tela + avios + procs + maq;
+  const precio = m.margen && m.margen < 100 ? costo / (1 - m.margen / 100) : costo;
+  return { tela, avios, procs, maq, costo, precio };
+}
+function modeloAvance(m) {
+  let done = 0; const tot = 4;
+  if (m.tela && m.tela.nom) done++;
+  if (m.maquila > 0) done++;
+  if ((m.avios || []).length) done++;
+  if ((m.procesos || []).length || m.estatus === 'aprobado' || m.estatus === 'completo') done++;
+  return Math.round(done / tot * 100);
+}
+const proyAvance = (p) => p.modelos.length ? Math.round(p.modelos.reduce((a, m) => a + modeloAvance(m), 0) / p.modelos.length) : 0;
+
+let pcProyecto = null;
+let pcEdit = null;
+const pcRender = () => { viewEl.innerHTML = vPrecosteos(); };
+
+function vPrecosteos() { return pcProyecto == null ? vPrecosteosLista() : vPrecosteoProyecto(pcProyecto); }
+
+function vPrecosteosLista() {
+  const abiertos = PROYECTOS.filter(p => p.estatus === 'abierto').length;
+  const totalMod = PROYECTOS.reduce((a, p) => a + p.modelos.length, 0);
+  const enProceso = PROYECTOS.reduce((a, p) => a + p.modelos.filter(m => m.estatus === 'proceso' || m.estatus === 'borrador').length, 0);
+  const aprobados = PROYECTOS.reduce((a, p) => a + p.modelos.filter(m => m.estatus === 'aprobado').length, 0);
+  return `
+  <div class="page-head">
+    <div><h1>Pre-costeos</h1><div class="sub">Desarrollo · proyectos por cliente + departamento · costeo modelo por modelo</div></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="nuevoProyecto()">${IC.plus}Nuevo proyecto</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Proyectos abiertos', String(abiertos), '', 'up', '+2', 'en desarrollo')}
+    ${kpi('Modelos en desarrollo', String(enProceso), '', 'up', '+5', 'borrador / en proceso')}
+    ${kpi('Modelos aprobados', String(aprobados), '', 'up', '', 'listos para pedido')}
+    ${kpi('Total de modelos', String(totalMod), '', 'up', '', 'todos los proyectos')}
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <button class="chip active">Abiertos</button><button class="chip">Todos</button><button class="chip">Cerrados</button>
+      <div class="tool-search">${lupa()}<input placeholder="Buscar proyecto, cliente, modelo…"></div>
+      <div class="tool-right"><span class="count">${PROYECTOS.length} proyectos</span></div>
+    </div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Proyecto</th><th>Cliente</th><th>Departamento</th><th>Temporada</th><th class="r">Modelos</th><th>Avance</th><th>Estatus</th>
+    </tr></thead><tbody>
+      ${PROYECTOS.map((p, i) => { const av = proyAvance(p); const est = p.estatus === 'abierto' ? ['ok', 'Abierto'] : p.estatus === 'cerrado' ? ['neutral', 'Cerrado'] : ['warn', p.estatus]; return `<tr onclick="abrirProyecto(${i})" style="cursor:pointer">
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">PC</span><div><div class="cell-strong">${p.num}</div><div class="cell-code">${p.fecha}</div></div></div></td>
+        <td class="cell-strong">${p.cliente}</td>
+        <td>${p.depto}</td>
+        <td><span class="badge neutral"><span class="d"></span>${p.temporada}</span></td>
+        <td class="r num">${p.modelos.length}</td>
+        <td>${barra(av)}</td>
+        <td><span class="badge ${est[0]}"><span class="d"></span>${est[1]}</span></td>
+      </tr>`; }).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+function vPrecosteoProyecto(pi) {
+  const p = PROYECTOS[pi];
+  return `
+  <div class="page-head">
+    <div>
+      <button class="btn ghost sm" onclick="cerrarProyecto()" style="margin-bottom:10px">${IC.chevron} Proyectos</button>
+      <h1>${p.num} · ${p.cliente} <span style="color:var(--muted);font-weight:500">/ ${p.depto}</span></h1>
+      <div class="sub">Temporada ${p.temporada} · ${p.modelos.length} modelos · abierto ${p.fecha}</div>
+    </div>
+    <div class="actions"><button class="btn ghost">${IC.printer}Precosteo PDF</button><button class="btn primary" onclick="nuevoModelo(${pi})">${IC.plus}Agregar modelo</button></div>
+  </div>
+  <div class="pc-grid">
+    ${p.modelos.map((m, mi) => tarjetaModelo(pi, mi, m)).join('')}
+    <button class="pc-add" onclick="nuevoModelo(${pi})">${IC.plus}<span>Agregar modelo</span></button>
+  </div>`;
+}
+function tarjetaModelo(pi, mi, m) {
+  const c = costoModelo(m); const [bc, bl] = estModeloBadge(m.estatus); const av = modeloAvance(m); const nf = nFotos(m);
+  const portada = m.fotosArr && m.fotosArr.length ? `<img src="${m.fotosArr[0]}" alt="">` : icFoto;
+  return `<div class="pc-card" onclick="editarModelo(${pi},${mi})">
+    <div class="pc-card-top">
+      <div class="pc-foto">${portada}</div>
+      <div style="flex:1;min-width:0">
+        <div class="pc-card-title">${m.nombre || 'Modelo sin nombre'}</div>
+        <div class="cell-code">Nuestro ${m.nuestro || '—'}${m.clienteNum ? ' · Cliente ' + m.clienteNum : ''}</div>
+      </div>
+      <span class="badge ${bc}"><span class="d"></span>${bl}</span>
+    </div>
+    <div class="pc-card-body">
+      <div class="pc-kv"><span>Tela</span><b>${m.tela && m.tela.nom ? m.tela.nom : '—'}</b></div>
+      <div class="pc-kv"><span>Costo estimado</span><b class="mono">${c.costo ? money(c.costo) : '—'}</b></div>
+      <div class="pc-kv"><span>Precio sugerido</span><b class="mono" style="color:var(--ok)">${c.precio ? money(c.precio) : '—'}</b></div>
+    </div>
+    <div class="pc-card-foot">
+      ${m.pdfs && m.pdfs.length ? `<span class="pc-chip">${icPDF}${m.pdfs.length} PDF</span>` : ''}
+      ${nf ? `<span class="pc-chip">${icFoto}${nf}</span>` : ''}
+      <span style="margin-left:auto;min-width:88px">${barra(av)}</span>
+    </div>
+  </div>`;
+}
+function abrirProyecto(i) { pcProyecto = i; pcRender(); contentEl.scrollTop = 0; }
+function cerrarProyecto() { pcProyecto = null; pcRender(); }
+
+function nuevoProyecto() {
+  cerrarCajon(); cerrarCmdk();
+  modalForm.dataset.key = 'nuevoProyecto';
+  modalTitle.textContent = 'Nuevo proyecto de desarrollo';
+  const num = 'P-' + (Math.max(1000, ...PROYECTOS.map(p => parseInt(String(p.num).replace(/\D/g, ''), 10) || 0)) + 1);
+  modalBody.innerHTML = `
+    <label class="ff col2"><span class="ffk">Número de proyecto</span><input id="npNum" value="${num}" readonly style="font-family:var(--ff-mono)"></label>
+    <label class="ff"><span class="ffk">Cliente *</span><select id="npCli" required>${CLIENTES_PC.map(c => `<option>${c}</option>`).join('')}</select></label>
+    <label class="ff"><span class="ffk">Departamento * <span style="color:var(--faint);font-weight:400">(del cliente)</span></span><select id="npDep" required></select></label>
+    <label class="ff"><span class="ffk">Temporada</span><select id="npTemp">${['PV26', 'OI26', 'PV27', 'OI27'].map(t => `<option>${t}</option>`).join('')}</select></label>`;
+  const cli = modalBody.querySelector('#npCli'), dep = modalBody.querySelector('#npDep');
+  const pintaDep = () => { dep.innerHTML = (DEPTOS[cli.value] || []).map(d => `<option>${d}</option>`).join(''); };
+  cli.onchange = pintaDep; pintaDep();
+  modalScrim.classList.add('show');
+  setTimeout(() => cli.focus(), 40);
+}
+function guardarProyecto() {
+  const num = modalBody.querySelector('#npNum').value;
+  const cliente = modalBody.querySelector('#npCli').value;
+  const depto = modalBody.querySelector('#npDep').value;
+  const temporada = modalBody.querySelector('#npTemp').value;
+  PROYECTOS.unshift({ num, cliente, depto, temporada, fecha: hoyStr(), estatus: 'abierto', modelos: [] });
+  cerrarForm();
+  pcProyecto = 0; vistaActual = 'precosteos'; renderNav();
+  crumbsEl.innerHTML = `<b>CONTROL</b><span class="sep">${IC.chevron}</span>${TITULOS['precosteos']}`;
+  pcRender();
+  mostrarToast('Proyecto creado · ahora agrégale modelos');
+}
+
+/* ---- Editor de modelo ---- */
+const pcScrim = document.getElementById('pcScrim');
+const pcPanel = document.getElementById('pcPanel');
+function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', tela: { nom: '', consumo: 0 }, maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
+function editarModelo(pi, mi) { pcEdit = { pIdx: pi, mIdx: mi, m: JSON.parse(JSON.stringify(PROYECTOS[pi].modelos[mi])) }; if (!pcEdit.m.fotosArr) pcEdit.m.fotosArr = []; renderModeloEditor(); pcScrim.classList.add('show'); }
+function cerrarModeloEditor() { pcScrim.classList.remove('show'); }
+function pcSync() {
+  const p = pcPanel, m = pcEdit.m;
+  if (!p.querySelector('#pcNombre')) return;
+  m.nombre = p.querySelector('#pcNombre').value.trim();
+  m.nuestro = p.querySelector('#pcNuestro').value.trim();
+  m.clienteNum = p.querySelector('#pcCliente').value.trim();
+  m.estatus = p.querySelector('#pcEstatus').value;
+  m.tela.nom = p.querySelector('#pcTela').value;
+  m.tela.consumo = parseFloat(p.querySelector('#pcConsumo').value) || 0;
+  m.maquila = parseFloat(p.querySelector('#pcMaquila').value) || 0;
+  m.margen = parseFloat(p.querySelector('#pcMargen').value) || 0;
+  m.procesos = [...p.querySelectorAll('.pc-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
+  m.avios = [...p.querySelectorAll('.pc-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
+}
+function pcRecalc() {
+  pcSync();
+  const c = costoModelo(pcEdit.m);
+  const set = (id, v) => { const el = pcPanel.querySelector(id); if (el) el.innerHTML = v; };
+  set('#pcCTela', money(c.tela)); set('#pcCAvios', money(c.avios)); set('#pcCProc', money(c.procs)); set('#pcCMaq', money(c.maq));
+  set('#pcCTotal', money(c.costo)); set('#pcCPrecio', money(c.precio));
+  pcPanel.querySelectorAll('.pc-avio-row').forEach(r => {
+    const nom = r.querySelector('.pc-avio-nom').value, cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0;
+    const sub = r.querySelector('.pc-avio-sub'); if (sub) sub.textContent = money((avioPCBy(nom) ? avioPCBy(nom).precio : 0) * cons);
+  });
+  const tsub = pcPanel.querySelector('#pcTelaSub'); if (tsub) tsub.textContent = money(c.tela);
+}
+function pcAddProceso() { pcSync(); pcEdit.m.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderModeloEditor(); }
+function pcDelProceso(i) { pcSync(); pcEdit.m.procesos.splice(i, 1); renderModeloEditor(); }
+function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, consumo: 1 }); renderModeloEditor(); }
+function pcDelAvio(i) { pcSync(); pcEdit.m.avios.splice(i, 1); renderModeloEditor(); }
+function pcSubirPDF() { pcPanel.querySelector('#pcPdfInput').click(); }
+function pcQuitarPDF(i) { pcSync(); pcEdit.m.pdfs.splice(i, 1); renderModeloEditor(); }
+function pcAgregarFoto() { pcPanel.querySelector('#pcFotoInput').click(); }
+function pcQuitarFoto(i) { pcSync(); pcEdit.m.fotosArr.splice(i, 1); renderModeloEditor(); }
+function guardarModelo() {
+  pcSync();
+  const m = pcEdit.m;
+  if (!m.nombre && !m.nuestro) { mostrarToast('Ponle al menos un nombre o número de modelo'); return; }
+  const proj = PROYECTOS[pcEdit.pIdx];
+  if (pcEdit.mIdx === -1) proj.modelos.push(m); else proj.modelos[pcEdit.mIdx] = m;
+  cerrarModeloEditor(); pcRender();
+  mostrarToast(pcEdit.mIdx === -1 ? 'Modelo agregado al proyecto' : 'Modelo actualizado');
+}
+function renderModeloEditor() {
+  const m = pcEdit.m; const c = costoModelo(m); const p = PROYECTOS[pcEdit.pIdx];
+  const opt = (arr, sel) => arr.map(o => `<option${o === sel ? ' selected' : ''}>${o}</option>`).join('');
+  pcPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">${(m.nuestro || 'M').slice(0, 3)}</span>
+    <div style="flex:1;min-width:0">
+      <h2>${pcEdit.mIdx === -1 ? 'Nuevo modelo' : 'Modelo ' + (m.nuestro || '')}</h2>
+      <div class="ph-meta"><span>${p.num} · ${p.cliente} / ${p.depto}</span><span>Costeo de desarrollo</span></div>
+    </div>
+    <button class="icon-btn" onclick="cerrarModeloEditor()" title="Cerrar (esc)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="proc-body">
+    <div class="pc-sec">
+      <h4>Identificación</h4>
+      <div class="pc-fields">
+        <label class="col2"><span class="ffk">Nombre / descripción</span><input class="pc-in" id="pcNombre" value="${m.nombre || ''}" placeholder="Playera Cherry On Top"></label>
+        <label><span class="ffk">Nº de modelo (nuestro)</span><input class="pc-in mono" id="pcNuestro" value="${m.nuestro || ''}" placeholder="62410" style="text-align:left"></label>
+        <label><span class="ffk">Nº de modelo (del cliente)</span><input class="pc-in mono" id="pcCliente" value="${m.clienteNum || ''}" placeholder="CA-KM-114" style="text-align:left"></label>
+        <label><span class="ffk">Estatus</span><select class="pc-in" id="pcEstatus">${['borrador', 'proceso', 'completo', 'aprobado'].map(e => `<option value="${e}"${m.estatus === e ? ' selected' : ''}>${estModeloBadge(e)[1]}</option>`).join('')}</select></label>
+      </div>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Tela y consumo <span class="hint" id="pcTelaSub">${money(c.tela)}</span></h4>
+      <div class="pc-fields">
+        <label class="col2"><span class="ffk">Tela</span><select class="pc-in" id="pcTela"><option value="">— elige la tela —</option>${TELAS_PC.map(t => `<option${m.tela && m.tela.nom === t.nom ? ' selected' : ''}>${t.nom}</option>`).join('')}</select></label>
+        <label><span class="ffk">Consumo por prenda</span><input class="pc-in mono" id="pcConsumo" type="number" step="any" min="0" value="${m.tela && m.tela.consumo ? m.tela.consumo : ''}" placeholder="0.42"></label>
+        <div class="pc-hint-cell">El precio de la tela se toma del catálogo (por proveedor y color en el real, R16).</div>
+      </div>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Maquila y margen</h4>
+      <div class="pc-fields">
+        <label><span class="ffk">Precio de maquila (costura)</span><input class="pc-in mono" id="pcMaquila" type="number" step="any" min="0" value="${m.maquila || ''}" placeholder="25.00"></label>
+        <label><span class="ffk">Margen objetivo (%)</span><input class="pc-in mono" id="pcMargen" type="number" step="any" min="0" max="99" value="${m.margen || ''}" placeholder="45"></label>
+      </div>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Procesos <span class="hint">estampado · bordado · lavado · otros</span></h4>
+      <div id="pcProcs">
+        ${(m.procesos || []).map((x, i) => `<div class="pc-line pc-proc-row">
+          <select class="pc-in pc-proc-tipo">${opt(PROCESOS_PC, x.tipo)}</select>
+          <input class="pc-in mono pc-proc-precio" type="number" step="any" min="0" value="${x.precio || ''}" placeholder="0.00">
+          <button class="pc-line-del" onclick="pcDelProceso(${i})" title="Quitar">${IC.plus ? '' : ''}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>`).join('') || '<div class="pc-empty">Sin procesos. Agrega estampado, bordado, etc.</div>'}
+      </div>
+      <button class="btn ghost sm" onclick="pcAddProceso()" style="margin-top:8px">${IC.plus}Agregar proceso</button>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Avíos <span class="hint">habilitación por prenda</span></h4>
+      <div id="pcAvios">
+        ${(m.avios || []).map((x, i) => `<div class="pc-line pc-avio-row">
+          <select class="pc-in pc-avio-nom">${opt(AVIOS_PC.map(a => a.nom), x.nom)}</select>
+          <input class="pc-in mono pc-avio-cons" type="number" step="any" min="0" value="${x.consumo || ''}" placeholder="1">
+          <span class="pc-avio-sub mono">${money((avioPCBy(x.nom) ? avioPCBy(x.nom).precio : 0) * (x.consumo || 0))}</span>
+          <button class="pc-line-del" onclick="pcDelAvio(${i})" title="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>`).join('') || '<div class="pc-empty">Sin avíos todavía.</div>'}
+      </div>
+      <button class="btn ghost sm" onclick="pcAddAvio()" style="margin-top:8px">${IC.plus}Agregar avío</button>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Costo del modelo</h4>
+      <div class="pc-cost">
+        <div class="pc-cost-row"><span>Tela</span><b id="pcCTela">${money(c.tela)}</b></div>
+        <div class="pc-cost-row"><span>Avíos</span><b id="pcCAvios">${money(c.avios)}</b></div>
+        <div class="pc-cost-row"><span>Procesos</span><b id="pcCProc">${money(c.procs)}</b></div>
+        <div class="pc-cost-row"><span>Maquila</span><b id="pcCMaq">${money(c.maq)}</b></div>
+        <div class="pc-cost-row total"><span>Costo total</span><b id="pcCTotal">${money(c.costo)}</b></div>
+        <div class="pc-cost-row precio"><span>Precio sugerido (con margen)</span><b id="pcCPrecio">${money(c.precio)}</b></div>
+      </div>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Tech Pack y referencias (PDF)</h4>
+      <div class="pc-pdf-list">
+        ${(m.pdfs || []).map((f, i) => `<div class="pc-pdf-chip">${icPDF}<span>${f}</span><button class="x" onclick="pcQuitarPDF(${i})" title="Quitar">✕</button></div>`).join('') || '<div class="pc-empty">Aún no subes el Tech Pack del cliente.</div>'}
+      </div>
+      <input type="file" id="pcPdfInput" accept="application/pdf" hidden multiple>
+      <button class="btn ghost sm" onclick="pcSubirPDF()" style="margin-top:8px">${icPDF}Subir PDF (Tech Pack)</button>
+    </div>
+
+    <div class="pc-sec">
+      <h4>Fotos del modelo <span class="hint">telas · avíos · muestras</span></h4>
+      <div class="pc-photos">
+        ${(m.fotosArr || []).map((src, i) => `<div class="pc-photo" style="position:relative;padding:0"><img src="${src}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:10px"><button class="pc-photo-x" onclick="pcQuitarFoto(${i})" title="Quitar">✕</button></div>`).join('')}
+        ${Array.from({ length: m.fotos || 0 }, () => `<div class="pc-photo">${icFoto}</div>`).join('')}
+        <div class="pc-photo pc-photo-add" onclick="pcAgregarFoto()">${IC.plus}</div>
+      </div>
+      <input type="file" id="pcFotoInput" accept="image/*" hidden multiple>
+    </div>
+  </div>
+  <div class="nota-foot">
+    <div class="nota-tot">Costo <b>${money(c.costo)}</b> · Precio sugerido <b style="color:var(--ok)">${money(c.precio)}</b></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn ghost" onclick="cerrarModeloEditor()">Cancelar</button>
+      <button class="btn primary" onclick="guardarModelo()">${IC.check}Guardar modelo</button>
+    </div>
+  </div>`;
+  pcPanel.oninput = pcRecalc; pcPanel.onchange = pcRecalc;
+  const pdfIn = pcPanel.querySelector('#pcPdfInput');
+  if (pdfIn) pdfIn.onchange = () => { pcSync(); [...pdfIn.files].forEach(f => pcEdit.m.pdfs.push(f.name)); renderModeloEditor(); };
+  const fotoIn = pcPanel.querySelector('#pcFotoInput');
+  if (fotoIn) fotoIn.onchange = () => {
+    pcSync(); const files = [...fotoIn.files]; if (!files.length) return;
+    if (!pcEdit.m.fotosArr) pcEdit.m.fotosArr = []; let left = files.length;
+    files.forEach(f => { const rd = new FileReader(); rd.onload = () => { pcEdit.m.fotosArr.push(rd.result); if (--left === 0) renderModeloEditor(); }; rd.readAsDataURL(f); });
+  };
+  pcRecalc();
+}
+pcScrim.onclick = (e) => { if (e.target === pcScrim) cerrarModeloEditor(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && pcScrim.classList.contains('show')) cerrarModeloEditor(); });
+
+/* ============================================================
+   Pantallas base (primer prototipo, por afinar con Daniel)
+   ============================================================ */
+const kpiMoney = (n) => n >= 1e6 ? '$' + (n / 1e6).toFixed(2) + 'M' : '$' + Math.round(n / 1000) + 'K';
+
+/* ---- Avíos (inventario, separado de telas) ---- */
+const AVIOS_INV = [
+  ['AVI-0318', 'Etiqueta tejida MJD', 'Etiquetas Sol', 18000, 'pza', 1.20, 'ok'],
+  ['AVI-0330', 'Etiqueta de composición', 'Etiquetas Sol', 9200, 'pza', 0.45, 'ok'],
+  ['AVI-0301', 'Hilo poliéster Tex 40', 'Hilos Reyna', 4200, 'cono', 38.00, 'ok'],
+  ['AVI-0325', 'Resorte 3 cm', 'Elásticos GTO', 5600, 'm', 4.80, 'warn'],
+  ['AVI-0362', 'Botón 4 hoyos 18L', 'Botones del Centro', 26000, 'pza', 0.60, 'ok'],
+  ['AVI-0350', 'Cierre #5 metálico 18 cm', 'Cierres YKK', 3400, 'pza', 6.50, 'warn'],
+  ['AVI-0341', 'Bolsa polietileno 30×40', 'Plásticos MX', 12000, 'pza', 0.80, 'ok'],
+];
+function vAvios() {
+  const valor = AVIOS_INV.reduce((a, m) => a + m[3] * m[5], 0);
+  return `
+  <div class="page-head"><div><h1>Avíos</h1><div class="sub">Habilitación · inventario valorizado · multi-almacén (R4)</div></div>
+  <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="mostrarToast('Nuevo avío — demo')">${IC.plus}Nuevo avío</button></div></div>
+  <div class="kpis">
+    ${kpi('Avíos (SKU)', String(AVIOS_INV.length), '', 'up', '+11', '')}
+    ${kpi('Valor inventario', kpiMoney(valor), '', 'up', '+4%', '')}
+    ${kpi('Bajo mínimo', '2', '', 'down', '+1', 'sugerir compra')}
+    ${kpi('Genéricos', '5', '', 'up', '', 'se netean en MRP')}
+  </div>
+  <div class="card">
+    <div class="toolbar"><button class="chip active">Todos</button><button class="chip">Bajo mínimo</button><button class="chip">Genéricos</button>
+    <div class="tool-search">${lupa()}<input placeholder="Buscar avío…"></div><div class="tool-right"><span class="count">${AVIOS_INV.length} de 318</span></div></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Avío</th><th>Proveedor</th><th class="r">Existencia</th><th class="r">Costo unit.</th><th class="r">Valor</th><th>Estado</th></tr></thead><tbody>
+      ${AVIOS_INV.map(m => `<tr>
+        <td><div class="cellflex"><span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]}</div><div class="cell-code">${m[0]}</div></div></div></td>
+        <td>${m[2]}</td>
+        <td class="r num">${m[3].toLocaleString('es-MX')} <span class="cell-sub">${m[4]}</span></td>
+        <td class="r mono">$${m[5].toFixed(2)}</td>
+        <td class="r mono">${money(m[3] * m[5]).replace('.00', '')}</td>
+        <td><span class="badge ${m[6]}"><span class="d"></span>${m[6] === 'ok' ? 'OK' : 'Bajo mín.'}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+/* ---- Clientes (catálogo) ---- */
+const CLIENTES_TBL = [
+  ['C&A', 'C&A México', 'KIDS Moda · Baby · Hombre · Dama · Deportivo', 'Ana Torres', '55 5000 1000', 5],
+  ['LV', 'Liverpool', 'Contemporáneo · Infantil · Playa', 'Luis Medina', '55 5200 3000', 3],
+  ['CP', 'Coppel', 'Niños · Caballero · Dama', 'Sofía Ramos', '667 700 2000', 4],
+  ['HT', 'Hang Ten', 'Surf · Kids', 'Pablo Gil', '55 5900 4000', 2],
+  ['CK', 'Cklass', 'Catálogo · Temporada', 'Marta León', '477 200 5000', 2],
+];
+function vClientes() {
+  return `
+  <div class="page-head"><div><h1>Clientes</h1><div class="sub">Catálogo · cada cliente con sus departamentos · referencias (D7)</div></div>
+  <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="mostrarToast('Nuevo cliente — demo')">${IC.plus}Nuevo cliente</button></div></div>
+  <div class="card">
+    <div class="toolbar"><button class="chip active">Todos</button><button class="chip">Activos</button>
+    <div class="tool-search">${lupa()}<input placeholder="Buscar cliente…"></div><div class="tool-right"><span class="count">${CLIENTES_TBL.length} clientes</span></div></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Cliente</th><th>Departamentos</th><th>Contacto</th><th>Teléfono</th><th class="r">Proyectos</th></tr></thead><tbody>
+      ${CLIENTES_TBL.map(c => `<tr style="cursor:pointer" onclick="mostrarToast('Ficha de ${c[1]} — demo')">
+        <td><div class="cellflex"><span class="thumb" style="background:linear-gradient(150deg,#7bd6a6,#2f9c66);color:#04140c">${c[0].slice(0, 2)}</span><div class="cell-strong">${c[1]}</div></div></td>
+        <td><span style="font-size:12.5px;color:var(--muted)">${c[2]}</span></td>
+        <td>${c[3]}</td><td class="mono">${c[4]}</td>
+        <td class="r num">${c[5]}</td>
+      </tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+/* ---- Listas de precios (F8) ---- */
+const LISTAS = [
+  ['LP-2026-CA', 'C&A', 'PV26', 1.00, 42, 'Vigente', 'ok'],
+  ['LP-2026-LV', 'Liverpool', 'PV26', 1.05, 18, 'En negociación', 'warn'],
+  ['LP-2026-HT', 'Hang Ten', 'PV26', 0.98, 12, 'Vigente', 'ok'],
+  ['LP-2027-CK', 'Cklass', 'PV27', 1.00, 8, 'Borrador', 'neutral'],
+];
+function vListas() {
+  return `
+  <div class="page-head"><div><h1>Cotizaciones / Listas de precios</h1><div class="sub">Desarrollo (F8) · factores por cliente · aprobación modelo por modelo</div></div>
+  <div class="actions"><button class="btn primary" onclick="mostrarToast('Nueva lista — demo')">${IC.plus}Nueva lista</button></div></div>
+  <div class="banner">${IC.info}<span>La lista toma los <b>precios del pre-costeo</b> y les aplica los <b>factores del cliente</b>; el dueño aprueba <b>modelo por modelo</b> y se negocia por versiones. <b>La lista NO dispara pedidos</b> (el pedido nace de la OC del cliente).</span></div>
+  <div class="card">
+    <div class="toolbar"><button class="chip active">Todas</button><button class="chip">Vigentes</button><button class="chip">En negociación</button>
+    <div class="tool-search">${lupa()}<input placeholder="Buscar lista, cliente…"></div><div class="tool-right"><span class="count">${LISTAS.length} listas</span></div></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Lista</th><th>Cliente</th><th>Temporada</th><th class="r">Factor</th><th class="r">Modelos</th><th>Estado</th></tr></thead><tbody>
+      ${LISTAS.map(l => `<tr style="cursor:pointer" onclick="mostrarToast('Lista ${l[0]} — demo')">
+        <td class="cell-code">${l[0]}</td><td class="cell-strong">${l[1]}</td>
+        <td><span class="badge neutral"><span class="d"></span>${l[2]}</span></td>
+        <td class="r mono">×${l[3].toFixed(2)}</td><td class="r num">${l[4]}</td>
+        <td><span class="badge ${l[6]}"><span class="d"></span>${l[5]}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+/* ---- Ventas ---- */
+const VENTAS = [
+  ['F-8842', 'C&A', '62182 · Playera Cherry', 1726, 148.00, 'jul'],
+  ['F-8841', 'Hang Ten', '62058 · Bermuda playa', 1476, 165.00, 'jul'],
+  ['F-8838', 'Liverpool', '62330 · Conjunto bebé', 900, 132.00, 'jul'],
+  ['F-8835', 'Cklass', '62124 · Blusa manga larga', 520, 158.00, 'jun'],
+  ['F-8830', 'Coppel', '62171 · Playera básica', 2704, 92.00, 'jun'],
+];
+function vVentas() {
+  const total = VENTAS.reduce((a, v) => a + v[3] * v[4], 0);
+  const uds = VENTAS.reduce((a, v) => a + v[3], 0);
+  return `
+  <div class="page-head"><div><h1>Ventas</h1><div class="sub">Facturación por modelo · base del EDR</div></div>
+  <div class="actions"><button class="btn ghost">${IC.download}Exportar</button></div></div>
+  <div class="kpis">
+    ${kpi('Ventas del mes', kpiMoney(total), '', 'up', '+9%', '')}
+    ${kpi('Unidades', uds.toLocaleString('es-MX'), '', 'up', '+6%', '')}
+    ${kpi('Ticket promedio', '$' + Math.round(total / uds), '', 'up', '', 'por pieza')}
+    ${kpi('Facturas', String(VENTAS.length), '', 'up', '', 'este corte')}
+  </div>
+  <div class="card">
+    <div class="toolbar"><button class="chip active">Julio</button><button class="chip">Junio</button><button class="chip">Todas</button>
+    <div class="tool-search">${lupa()}<input placeholder="Buscar factura, modelo…"></div><div class="tool-right"><span class="count">${VENTAS.length} facturas</span></div></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Factura</th><th>Cliente</th><th>Modelo</th><th class="r">Cantidad</th><th class="r">Precio</th><th class="r">Importe</th><th>Mes</th></tr></thead><tbody>
+      ${VENTAS.map(v => `<tr>
+        <td class="cell-code">${v[0]}</td><td class="cell-strong">${v[1]}</td><td>${v[2]}</td>
+        <td class="r num">${v[3].toLocaleString('es-MX')}</td><td class="r mono">$${v[4].toFixed(2)}</td>
+        <td class="r mono">${money(v[3] * v[4]).replace('.00', '')}</td><td>${v[5]}</td>
+      </tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+
+/* ---- Cuentas por cobrar / pagar (Finanzas — cuenta corriente, D12) ---- */
+const CXC = [
+  ['C&A', 900000, 240000, 100000, 0], ['Liverpool', 300000, 120000, 0, 0],
+  ['Coppel', 400000, 180000, 60000, 40000], ['Hang Ten', 150000, 0, 0, 0], ['Cklass', 120000, 40000, 0, 0],
+];
+const CXP = [
+  ['Hilaturas del Norte', 88000, 40400, 0, 0], ['Textiles Aztlán', 44100, 20000, 0, 0],
+  ['Estampados Rico', 12600, 6000, 0, 0], ['Confecciones León', 30000, 0, 0, 0], ['Hilos Reyna', 6200, 3000, 0, 0],
+];
+function vCuenta(titulo, sub, rows, quien, colBal) {
+  const saldo = (r) => r[1] + r[2] + r[3] + r[4];
+  const total = rows.reduce((a, r) => a + saldo(r), 0);
+  const vencido = rows.reduce((a, r) => a + r[2] + r[3] + r[4], 0);
+  const alDia = total ? Math.round((total - vencido) / total * 100) : 0;
+  const cel = (v, c) => v > 0 ? `<td class="r mono" style="color:${c}">${money(v).replace('.00', '')}</td>` : `<td class="r mono" style="color:var(--faint)">—</td>`;
+  return `
+  <div class="page-head"><div><h1>${titulo}</h1><div class="sub">${sub}</div></div>
+  <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="mostrarToast('Registrar movimiento — demo')">${IC.plus}Movimiento</button></div></div>
+  <div class="kpis">
+    ${kpi('Cartera total', kpiMoney(total), '', 'up', '', 'saldo vivo')}
+    ${kpi('Vencido', kpiMoney(vencido), '', 'down', '', '+30 días')}
+    ${kpi('Al corriente', String(alDia), '%', alDia >= 80 ? 'up' : 'down', '', '')}
+    ${kpi(quien, String(rows.length), '', 'up', '', 'con saldo')}
+  </div>
+  <div class="card">
+    <div class="toolbar"><button class="chip active">Con saldo</button><button class="chip">Todos</button>
+    <div class="tool-search">${lupa()}<input placeholder="Buscar…"></div><div class="tool-right"><span class="count">${rows.length} ${quien.toLowerCase()}</span></div></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>${colBal}</th><th class="r">Saldo</th><th class="r">Corriente</th><th class="r">1–30 d</th><th class="r">31–60 d</th><th class="r">+60 d</th></tr></thead><tbody>
+      ${rows.map(r => `<tr>
+        <td class="cell-strong">${r[0]}</td>
+        <td class="r mono" style="font-weight:700">${money(saldo(r)).replace('.00', '')}</td>
+        ${cel(r[1], 'var(--text)')}${cel(r[2], 'var(--warn)')}${cel(r[3], 'var(--warn)')}${cel(r[4], 'var(--crit)')}
+      </tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+const vCxc = () => vCuenta('Cuentas por cobrar', 'Finanzas · cuenta corriente de clientes (D12) · saldo = Σ cargos − Σ pagos', CXC, 'Clientes', 'Cliente');
+const vCxp = () => vCuenta('Cuentas por pagar', 'Finanzas · cuenta corriente de proveedores (D12) · generaliza EsMa', CXP, 'Proveedores', 'Proveedor');
+
+/* ---- EDR (estado de resultados) ---- */
+const EDR = [
+  ['C&A', 2400000, 1560000], ['Liverpool', 820000, 540000], ['Hang Ten', 460000, 300000], ['Cklass', 380000, 240000],
+];
+function vEdr() {
+  const tv = EDR.reduce((a, r) => a + r[1], 0), tc = EDR.reduce((a, r) => a + r[2], 0), tu = tv - tc;
+  return `
+  <div class="page-head"><div><h1>EDR · Estado de resultados</h1><div class="sub">Derivado de la facturación real por modelo (F7) · corte por cliente y empresa</div></div>
+  <div class="actions"><button class="btn ghost">${IC.download}Exportar Excel</button><button class="btn ghost">${IC.printer}PDF</button></div></div>
+  <div class="kpis">
+    ${kpi('Ventas', kpiMoney(tv), '', 'up', '+9%', 'del periodo')}
+    ${kpi('Costo de ventas', kpiMoney(tc), '', 'down', '', '')}
+    ${kpi('Utilidad bruta', kpiMoney(tu), '', 'up', '+12%', '')}
+    ${kpi('Margen', String(Math.round(tu / tv * 100)), '%', 'up', '+2', 'bruto')}
+  </div>
+  <div class="card">
+    <div class="card-head"><h3>Resultado por cliente</h3><span class="hint">ventas − costo = utilidad</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Cliente</th><th class="r">Ventas</th><th class="r">Costo</th><th class="r">Utilidad</th><th class="r">Margen</th><th>Aporte</th></tr></thead><tbody>
+      ${EDR.map(r => { const u = r[1] - r[2]; const mg = Math.round(u / r[1] * 100); const ap = Math.round(u / tu * 100); return `<tr>
+        <td class="cell-strong">${r[0]}</td>
+        <td class="r mono">${money(r[1]).replace('.00', '')}</td>
+        <td class="r mono">${money(r[2]).replace('.00', '')}</td>
+        <td class="r mono" style="color:var(--ok);font-weight:700">${money(u).replace('.00', '')}</td>
+        <td class="r mono">${mg}%</td>
+        <td>${barra(ap)}</td>
+      </tr>`; }).join('')}
+      <tr style="border-top:2px solid var(--border-strong);font-weight:700">
+        <td class="cell-strong">Total</td><td class="r mono">${money(tv).replace('.00', '')}</td><td class="r mono">${money(tc).replace('.00', '')}</td>
+        <td class="r mono" style="color:var(--ok)">${money(tu).replace('.00', '')}</td><td class="r mono">${Math.round(tu / tv * 100)}%</td><td></td>
+      </tr>
+    </tbody></table></div></div>`;
+}
+
+/* ---- Catálogos base (helper genérico) ---- */
+function vCat(cfg) {
+  return `
+  <div class="page-head"><div><h1>${cfg.titulo}</h1><div class="sub">${cfg.sub}</div></div>
+  <div class="actions"><button class="btn primary" onclick="mostrarToast('${cfg.add || 'Nuevo'} — demo')">${IC.plus}${cfg.add || 'Nuevo'}</button></div></div>
+  <div class="card">
+    <div class="toolbar"><button class="chip active">Todos</button>
+    <div class="tool-search">${lupa()}<input placeholder="Buscar…"></div><div class="tool-right"><span class="count">${cfg.rows.length} registros</span></div></div>
+    <div class="table-wrap"><table class="data"><thead><tr>${cfg.cols.map(c => `<th${c.r ? ' class="r"' : ''}>${c.h}</th>`).join('')}</tr></thead><tbody>
+      ${cfg.rows.map(r => `<tr>${cfg.cols.map((c, i) => `<td${c.r ? ' class="r num"' : ''}>${c.render ? c.render(r[i], r) : r[i]}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div></div>`;
+}
+const swatchCell = (hex, nom) => `<span style="display:inline-flex;align-items:center;gap:8px"><i style="width:15px;height:15px;border-radius:4px;background:${hex};border:1px solid var(--border);display:inline-block"></i>${nom}</span>`;
+const badgeCell = (t, cls) => `<span class="badge ${cls}"><span class="d"></span>${t}</span>`;
+const CAT_COLORES = { titulo: 'Colores', sub: 'Catálogo base · global (A9)', add: 'Nuevo color', cols: [
+  { h: 'Color', render: (v, r) => swatchCell(r[2], v) }, { h: 'Código' }, { h: 'Hex' }, { h: 'Pantone' } ], rows: [
+  ['Rojo A', 'ROJ-A', '#dc2626', '18-1662 TCX'], ['Azul marino', 'AZM', '#1e3a8a', '19-4027 TCX'], ['Negro', 'NEG', '#111827', '19-0303 TCX'],
+  ['Blanco', 'BLA', '#f4f4f5', '11-0601 TCX'], ['Verde pino', 'VER', '#0e7c47', '18-6330 TCX'], ['Rosa', 'ROS', '#db2777', '17-2031 TCX'] ] };
+const CAT_TALLAS = { titulo: 'Tallas', sub: 'Catálogo base · curvas ilimitadas (D4)', add: 'Nueva talla', cols: [
+  { h: 'Talla' }, { h: 'Curva' }, { h: 'Orden', r: true } ], rows: [
+  ['XCH', 'Dama', 1], ['CH', 'Dama', 2], ['M', 'Dama', 3], ['G', 'Dama', 4], ['XG', 'Dama', 5], ['2', 'Infantil', 1], ['4', 'Infantil', 2], ['6', 'Infantil', 3] ] };
+const CAT_TEMPORADAS = { titulo: 'Temporadas', sub: 'Catálogo base', add: 'Nueva temporada', cols: [
+  { h: 'Temporada' }, { h: 'Año', r: true }, { h: 'Estado', render: (v, r) => badgeCell(v, r[3]) } ], rows: [
+  ['PV26', 2026, 'Vigente', 'ok'], ['OI26', 2026, 'Vigente', 'ok'], ['PV27', 2027, 'En captura', 'warn'], ['OI25', 2025, 'Cerrada', 'neutral'] ] };
+const CAT_TIPOSPROC = { titulo: 'Tipos de proceso', sub: 'Catálogo base · costura (M) y aplicación (A) — motor de producción', add: 'Nuevo tipo', cols: [
+  { h: 'Proceso' }, { h: 'Categoría', render: (v, r) => badgeCell(v, r[3]) }, { h: 'Genera entrada a PT' } ], rows: [
+  ['Costura', 'Maquila (M)', 'Sí', 'info'], ['Estampado serigrafía', 'Aplicación (A)', 'No', 'warn'], ['Bordado', 'Aplicación (A)', 'No', 'warn'],
+  ['DTF', 'Aplicación (A)', 'No', 'warn'], ['Lavado', 'Aplicación (A)', 'No', 'warn'] ] };
+const CAT_ALMACENES = { titulo: 'Almacenes', sub: 'Catálogo base · multi-almacén (kardex D3)', add: 'Nuevo almacén', cols: [
+  { h: 'Almacén' }, { h: 'Tipo', render: (v, r) => badgeCell(v, r[3]) }, { h: 'Empresa' } ], rows: [
+  ['Almacén PT Central', 'Producto terminado', 'FR Moda', 'ok'], ['Almacén de avíos', 'Avíos', 'FR Moda', 'info'],
+  ['Bodega de telas', 'Telas', 'FR Moda', 'info'], ['Bodega habilitación', 'Avíos', 'FR Moda', 'info'], ['Almacén PT Norte', 'Producto terminado', 'Marilyn Fitness', 'ok'] ] };
+const CAT_AUDITORES = { titulo: 'Auditores', sub: 'Control de calidad · auditores AQL', add: 'Nuevo auditor', cols: [
+  { h: 'Auditor' }, { h: 'Rol', render: (v, r) => badgeCell(v, r[3]) }, { h: 'Nivel AQL' }, { h: 'Auditorías', r: true } ], rows: [
+  ['Laura Hernández', 'Sr. Auditor', '2.5', 42, 'ok'], ['Miguel Ríos', 'Auditor', '2.5', 28, 'info'], ['Ana Gómez', 'Auditor', '4.0', 15, 'info'] ] };
+
 const VISTAS = {
   resumen: vResumen, modelos: vModelos, ordenes: vOrdenes, produccion: vProduccion,
   pedidos: vPedidos, rc: vRc, inventarios: vInventarios, telas: vTelas, compras: vCompras,
   proveedores: vProveedores, costos: vCostos, indicadores: vIndicadores, calidad: vCalidad, usuarios: vUsuarios,
-  'notas-salida': vNotasSalida,
+  'notas-salida': vNotasSalida, precosteos: vPrecosteos,
+  avios: vAvios, clientes: vClientes, 'listas-precios': vListas, ventas: vVentas,
+  cxc: vCxc, cxp: vCxp, edr: vEdr,
+  colores: () => vCat(CAT_COLORES), tallas: () => vCat(CAT_TALLAS), temporadas: () => vCat(CAT_TEMPORADAS),
+  'tipos-proceso': () => vCat(CAT_TIPOSPROC), almacenes: () => vCat(CAT_ALMACENES), auditores: () => vCat(CAT_AUDITORES),
 };
 /* Qué tabla abre cajón de detalle en cada módulo */
 const CAJONES = {
@@ -2814,6 +3466,7 @@ function ir(clave) {
   vistaActual = clave;
   if (!(clave === 'notas-salida' && _keepFiltroNota)) notasFiltroOrden = '';
   _keepFiltroNota = false;
+  if (clave !== 'precosteos') pcProyecto = null;
   renderNav();
   cerrarCajon();
   const fn = VISTAS[clave] || (()=>vPlaceholder(clave));
@@ -3113,6 +3766,7 @@ function resaltarNueva() {
 modalForm.onsubmit = (e) => {
   e.preventDefault();
   if (modalForm.dataset.key && modalForm.dataset.key.startsWith('precio:')) { guardarPrecio(modalForm.dataset.key.split(':')[1]); return; }
+  if (modalForm.dataset.key === 'nuevoProyecto') { guardarProyecto(); return; }
   const f = FORMS[modalForm.dataset.key]; if (!f) return;
   const v = {}; new FormData(modalForm).forEach((val,k) => v[k] = String(val).trim());
   f.crear(v);

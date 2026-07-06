@@ -167,6 +167,14 @@ Remisión de materiales al maquilero, **ligada al inventario de avíos**. Calca 
 1. Una nota = **un maquilero**; todas sus órdenes de la **misma empresa** (folio por empresa, A9); **un solo almacén origen** por nota (decisión (g) de F4).
 2. **Telas: NO van en esta nota.** Como la tela sale de **otro almacén** (almacén de telas), Daniel prefiere manejarla con **su propia nota de salida** relacionada al almacén de telas → estas notas quedan **solo-avíos**. *(El modelo real sí permite renglones de tela que referencian una salida-a-orden ya registrada sin re-descontar, decisión (e); se optó por separarlas por almacén. La nota de telas queda pendiente de diseñar — ver §7.)*
 
+### 4.7 Pre-costeo (Desarrollo) — proyectos → modelos → costeo (diseñada 6-jul-2026) ✅
+Primera pantalla de la fase F8. Spec de Daniel:
+- **Proyecto** identificado por número (`P-1042`), apunta a **UN cliente + UN departamento** (cada cliente tiene sus **propios** departamentos: C&A → KIDS Moda / Baby / Hombre…). Se pueden tener **varios proyectos abiertos** a la vez. Lista con KPIs + tabla (proyecto, cliente, depto, temporada, # modelos, avance, estatus). "Nuevo proyecto" = modal con cliente→departamento **dependiente**.
+- **Modelo por modelo** dentro del proyecto (grid de tarjetas con **estatus** Borrador/En proceso/Completo/Aprobado, costo, precio sugerido, chips de PDF/fotos y % de avance). Se construye poco a poco.
+- **Editor de modelo** (panel deslizante): números **nuestro + del cliente**, tela + **consumo por prenda**, **maquila**, **procesos** (estampado/bordado/lavado/otros — lista N), **avíos** + consumo, con **costeo en vivo** (tela + avíos + procesos + maquila = costo; **precio sugerido** por margen). 
+- **Tech Pack / PDFs**: subir archivos de referencia (input file real — muestra el nombre); **Fotos** ligadas al modelo (telas, avíos, muestras) con thumbnails reales (FileReader → dataURL en el proto; R2 en el real). Estatus por modelo.
+- Mapea a F8 (módulo 15, D13/R16–R20). En el real: telas con precio por proveedor y color (R16), medidas por talla en ciertos avíos, PDFs/fotos en R2, y liga posterior a lista de precios → orden. **SIN ETL** (arranca en cero).
+
 ---
 
 ## 5. Cómo está hecho el prototipo (para modificarlo)
@@ -200,7 +208,7 @@ Ruta sugerida (por fases, con el proceso normal coder+reviewer → PR a `prueba`
 ## 7. Pendientes / decisiones abiertas
 
 - **Combobox de proveedores:** ¿permitir texto libre (proveedor nuevo) o **forzar selección de lista**? (preguntado, sin cerrar).
-- Pantallas aún **no diseñadas** (hoy placeholder): Pre-costeos, Cotizaciones/Listas de precios, Avíos (separado de Telas), Clientes (catálogo/ventas), CxC/CxP, EDR, Catálogos base. Daniel las irá mostrando una por una (screenshot + explicación) para diseñarlas con el mismo criterio.
+- Pantallas con **base inicial** (prototipadas 6-jul para tener de dónde partir, aún por afinar con Daniel): Cotizaciones/Listas de precios, Avíos, Clientes (catálogo/listas/ventas), CxC/CxP, EDR, Auditores, Catálogos base (colores/tallas/temporadas/tipos de proceso/almacenes). Son bases funcionales con datos de ejemplo; Daniel las irá revisando una por una.
 - **Nota de salida de TELAS:** pendiente de diseñar. Sale del **almacén de telas** (otro almacén), así que va en su **propia nota** relacionada a ese almacén, separada de la de avíos (decisión Daniel, 6-jul). Puede reusar la "salida de tela a orden" que ya existe en Inventario (F4) como documento de respaldo.
 - Confirmar si se conserva **Inter** o se adopta el stack de sistema en el real.
 - La pantalla vieja de Órdenes tenía además: Composición/Composición forzada, Precio de venta editable, "Maquila real", EXP/Copiar, RC (Clave/Tipo tela/Programar/Concentrado). Evaluar cuáles entran.
