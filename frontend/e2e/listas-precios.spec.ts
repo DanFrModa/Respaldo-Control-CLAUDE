@@ -94,7 +94,15 @@ test.describe('Listas de precios (F8-E4)', () => {
     const candidato = dialogoLista.getByTestId('fila-candidato').filter({ hasText: codigoModelo });
     await expect(candidato).toBeVisible();
     await candidato.getByRole('checkbox').check();
-    await page.getByTestId('confirmar-crear-lista').click();
+
+    // Captura el id de la lista de la respuesta del POST (no del DOM): el body es la lista completa.
+    const [crearResp] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/listas-precios') && r.request().method() === 'POST' && r.ok(),
+      ),
+      page.getByTestId('confirmar-crear-lista').click(),
+    ]);
+    const listaId = ((await crearResp.json()) as { id: number }).id;
     await expect(page.getByText(/Lista #\d+ creada\./)).toBeVisible();
 
     // Selecciona la lista recién creada (por el nombre del cliente, único por corrida).
@@ -113,11 +121,11 @@ test.describe('Listas de precios (F8-E4)', () => {
     // aprobado (evita strict mode: $100.00 aparece también en la celda del calculado).
     await expect(renglon.getByTestId('precio-aprobado')).toHaveText('$100.00');
 
-    // ── El PDF sale (abre una pestaña al endpoint del impreso) ───────────────────
-    const [popup] = await Promise.all([
-      page.waitForEvent('popup'),
-      detalleLista.getByTestId('descargar-lista-pdf').click(),
-    ]);
-    await expect(popup).toHaveURL(/\/listas-precios\/\d+\/pdf/);
+    // ── El PDF sale (R9): el endpoint responde 200 con application/pdf ───────────
+    // Se verifica con una request autenticada (comparte cookies de sesión), no vía popup:
+    // en Chromium headless de CI no hay visor de PDF, así que el tab nunca navega a la URL.
+    const pdf = await page.request.get(`/api/listas-precios/${String(listaId)}/pdf`);
+    expect(pdf.ok()).toBeTruthy();
+    expect(pdf.headers()['content-type']).toContain('application/pdf');
   });
 });
