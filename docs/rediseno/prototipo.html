@@ -687,6 +687,8 @@
   .surt-table tbody tr.surt-sel { background: var(--brand-soft); }
   .surt-table tbody tr.surt-sel td:first-child { box-shadow: inset 3px 0 0 var(--brand); }
   .surt-n { font-variant-numeric: tabular-nums; }
+  .surt-qty { width: 82px; height: 30px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--border-strong); background: var(--panel); color: var(--text); font-size: 12.5px; font-family: var(--ff-mono); text-align: right; outline: none; }
+  .surt-qty:focus { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 16%, transparent); }
   .nsl-group + .nsl-group { margin-top: 10px; }
   .nsl-ghead { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 11px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px 8px 0 0; font-size: 12px; color: var(--muted); }
   .nsl-ghead b { color: var(--text); font-family: var(--ff-mono); }
@@ -2081,6 +2083,11 @@ const NOTAS = [
       { ord:'5095', avio:'Cierre #5 metálico 18 cm', cant:538, un:'pza' },
       { ord:'5095', avio:'Bolsa polietileno 30×40',  cant:538, un:'pza' },
     ] },
+  { folio:'2413', emp:'FR', maq:'Confecciones León', alm:'Almacén de avíos',
+    fEmi:'28 jun 2026', fEnv:'28 jun 2026', est:'confirmada', by:'Daniel Masri', obs:'Reposición: se maltrataron etiquetas en la maquila.',
+    lineas:[
+      { ord:'5424', avio:'Etiqueta tejida MJD', cant:200, un:'pza' },
+    ] },
   { folio:'2412', emp:'FR', maq:'Óscar Jiménez', alm:'Almacén de avíos',
     fEmi:'27 jun 2026', fEnv:'28 jun 2026', est:'cancelada', by:'Daniel Masri', obs:'Se canceló: se mandó el avío equivocado.',
     lineas:[
@@ -2435,16 +2442,20 @@ function renderSurtido() {
   const faltaTotal = req.reduce((a, f) => a + f.falta, 0);
   const faltanAvios = req.filter(f => f.falta > 0).length;
   const fila = (f) => {
-    const pctf = f.extra ? 100 : (f.req ? Math.min(100, Math.round(f.env / f.req * 100)) : 0);
-    const [ec, el] = f.extra ? ['info', 'Extra'] : f.falta <= 0 ? ['ok', 'Completo'] : f.env > 0 ? ['warn', 'Parcial'] : ['neutral', 'Pendiente'];
-    const barCol = f.falta <= 0 ? 'var(--ok)' : f.env > 0 ? 'var(--warn)' : 'var(--border-strong)';
+    const pctReal = f.req ? Math.round(f.env / f.req * 100) : (f.env > 0 ? 100 : 0);
+    const over = !f.extra && f.env > f.req;
+    const [ec, el] = f.extra ? ['info', 'Extra'] : over ? ['info', 'Sobre-surtido'] : f.falta <= 0 ? ['ok', 'Completo'] : f.env > 0 ? ['warn', 'Parcial'] : ['neutral', 'Pendiente'];
+    const barW = Math.min(100, pctReal);
+    const barCol = over ? 'var(--info)' : f.falta <= 0 ? 'var(--ok)' : f.env > 0 ? 'var(--warn)' : 'var(--border-strong)';
+    const def = f.extra ? 0 : f.falta;
     return `<tr${f.extra ? ' style="background:var(--info-soft)"' : ''}>
-      <td class="surt-cell">${!f.extra && f.falta > 0 ? `<input type="checkbox" class="surt-chk" data-avio="${f.avio}">` : ''}</td>
+      <td class="surt-cell"><input type="checkbox" class="surt-chk" data-avio="${f.avio}"></td>
       <td><div class="cellflex"><span class="thumb" style="background:#2f9c66;color:#04140c">AV</span><div><div class="cell-strong">${f.avio}</div><div class="cell-code">${f.sku}${f.extra ? ' · fuera de receta' : ''}</div></div></div></td>
       <td class="r num">${f.extra ? '<span style="color:var(--faint)">—</span>' : f.req.toLocaleString('es-MX') + ' <span class="cell-sub">' + f.un + '</span>'}</td>
       <td class="r num">${f.env.toLocaleString('es-MX')} <span class="cell-sub">${f.un}</span></td>
       <td class="r num" style="${!f.extra && f.falta > 0 ? 'color:var(--warn);font-weight:700' : ''}">${f.extra ? '<span style="color:var(--faint)">—</span>' : (f.falta > 0 ? f.falta.toLocaleString('es-MX') : '<span style="color:var(--ok)">0</span>')}</td>
-      <td><span class="bar-mini"><span class="bar-track"><span class="bar-fill" style="width:${pctf}%;background:${barCol}"></span></span><span class="num" style="color:var(--muted);font-size:11.5px">${pctf}%</span></span></td>
+      <td class="r"><input type="number" class="surt-qty" data-avio="${f.avio}" min="0" step="any" value="${def > 0 ? def : ''}" placeholder="0"></td>
+      <td><span class="bar-mini"><span class="bar-track"><span class="bar-fill" style="width:${barW}%;background:${barCol}"></span></span><span class="num" style="color:${over ? 'var(--info)' : 'var(--muted)'};font-size:11.5px;font-weight:${over ? 600 : 400}">${pctReal}%</span></span></td>
       <td><span class="badge ${ec}"><span class="d"></span>${el}</span></td>
     </tr>`;
   };
@@ -2467,12 +2478,13 @@ function renderSurtido() {
         <div class="st"><b style="color:var(--muted)">${pendientes}</b><span>Pendientes</span></div>
       </div>
     </div>
-    <div class="proc-summary-title">Avíos de la orden · marca los que quieras surtir y pásalos a una nota</div>
+    <div class="proc-summary-title">Avíos de la orden · pon cuánto surtir de cada uno y pásalos a una nota</div>
     <div class="table-wrap"><table class="data surt-table"><thead><tr>
-      <th class="surt-cell"><input type="checkbox" id="surtChkAll" title="Seleccionar todos los pendientes"></th><th>Avío</th><th class="r">Requerido</th><th class="r">Enviado</th><th class="r">Falta</th><th>Avance</th><th>Estado</th>
+      <th class="surt-cell"><input type="checkbox" id="surtChkAll" title="Seleccionar todos"></th><th>Avío</th><th class="r">Requerido</th><th class="r">Enviado</th><th class="r">Falta</th><th class="r">A surtir</th><th>Avance</th><th>Estado</th>
     </tr></thead><tbody>
       ${filas.map(fila).join('')}
     </tbody></table></div>
+    <div class="audit-hint" style="margin-top:12px">${IC.refresh}<span>¿Se extravió o se dañó un avío ya enviado? <b>Re-envíalo</b>: escribe la cantidad en "A surtir" aunque esté completo. El enviado puede pasar del 100% (queda como <b>Sobre-surtido</b>).</span></div>
     ${filas.some(f => f.extra) ? `<div class="surtido-extra audit-hint">${IC.info}<span>Los renglones <b>Extra</b> son avíos que se enviaron a esta orden aunque no están en su receta.</span></div>` : ''}
   </div>
   <div class="nota-foot">
@@ -2483,28 +2495,40 @@ function renderSurtido() {
     </div>
   </div>`;
   surtidoPanel.querySelectorAll('.surt-chk').forEach(c => c.onchange = surtRefresh);
+  surtidoPanel.querySelectorAll('.surt-qty').forEach(inp => inp.oninput = () => {
+    const tr = inp.closest('tr'); const chk = tr && tr.querySelector('.surt-chk');
+    if (chk && (parseFloat(inp.value) || 0) > 0) chk.checked = true;
+    surtRefresh();
+  });
   const chkAll = surtidoPanel.querySelector('#surtChkAll');
   if (chkAll) chkAll.onchange = () => { surtidoPanel.querySelectorAll('.surt-chk').forEach(c => c.checked = chkAll.checked); surtRefresh(); };
   surtRefresh();
 }
+function surtLineas() {
+  const op = surtidoOP;
+  const ordFull = `${op} · ${modeloDeOP(op)}`;
+  const out = [];
+  surtidoPanel.querySelectorAll('.surt-table tbody tr').forEach(tr => {
+    const chk = tr.querySelector('.surt-chk'), qtyEl = tr.querySelector('.surt-qty');
+    const qty = qtyEl ? (parseFloat(qtyEl.value) || 0) : 0;
+    if (chk && chk.checked && qty > 0) out.push({ ord: ordFull, avio: chk.dataset.avio, cant: String(qty) });
+  });
+  return out;
+}
 function surtRefresh() {
   const chks = [...surtidoPanel.querySelectorAll('.surt-chk')];
-  const checked = chks.filter(c => c.checked);
   chks.forEach(c => { const tr = c.closest('tr'); if (tr) tr.classList.toggle('surt-sel', c.checked); });
+  const n = surtLineas().length;
   const btn = surtidoPanel.querySelector('#surtBtn');
-  if (btn) { btn.disabled = !checked.length; btn.style.opacity = checked.length ? '' : '.5'; const n = btn.querySelector('.surt-n'); if (n) n.textContent = checked.length ? ` (${checked.length})` : ''; }
+  if (btn) { btn.disabled = !n; btn.style.opacity = n ? '' : '.5'; const s = btn.querySelector('.surt-n'); if (s) s.textContent = n ? ` (${n})` : ''; }
+  const checked = chks.filter(c => c.checked).length;
   const all = surtidoPanel.querySelector('#surtChkAll');
-  if (all) { all.checked = chks.length > 0 && checked.length === chks.length; all.indeterminate = checked.length > 0 && checked.length < chks.length; }
+  if (all) { all.checked = chks.length > 0 && checked === chks.length; all.indeterminate = checked > 0 && checked < chks.length; }
 }
 function surtirSeleccionados() {
-  const op = surtidoOP;
-  const chks = [...surtidoPanel.querySelectorAll('.surt-chk:checked')];
-  if (!chks.length) { mostrarToast('Marca al menos un avío para surtir'); return; }
-  const set = new Set(chks.map(c => c.dataset.avio));
-  const o = OP.find(x => x.op === op) || {};
-  const ordFull = `${op} · ${modeloDeOP(op)}`;
-  const lineas = surtidoDeOrden(op).filas.filter(f => set.has(f.avio) && f.falta > 0).map(f => ({ ord: ordFull, avio: f.avio, cant: String(f.falta) }));
-  if (!lineas.length) { mostrarToast('Nada por surtir en lo seleccionado'); return; }
+  const lineas = surtLineas();
+  if (!lineas.length) { mostrarToast('Marca un avío y pon cuánto surtir'); return; }
+  const o = OP.find(x => x.op === surtidoOP) || {};
   cerrarSurtido(); cerrarCajon(); cerrarCmdk();
   notaDraft = { maq: o.maq || '', emp: o.emp || 'FR', alm: ALMACENES_NOTA[0], fEmi: hoyStr(), fEnv: '', obs: '', lineas };
   renderNotaBuilder();
