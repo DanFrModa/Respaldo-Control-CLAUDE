@@ -239,4 +239,8 @@ Ruta sugerida (por fases, con el proceso normal coder+reviewer → PR a `prueba`
 
 ## 8. Enlace al prototipo vivo
 
-Durante la sesión el prototipo se publicó como artifact (privado del usuario). La copia **fiel y versionada** vive aquí: [`docs/rediseno/prototipo.html`](./prototipo.html). Es la fuente de verdad del diseño para quien retome.
+**Artifact publicado de Daniel (donde le pica él mismo):** `https://claude.ai/code/artifact/fe60f4cb-cf13-424a-81df-65b1891df45a` (privado del usuario; solo se lee/actualiza con su sesión de claude.ai — desde un entorno remoto sin login da HTTP 403).
+
+La copia **fiel y versionada** (fuente de verdad del diseño) vive en el repo: [`docs/rediseno/prototipo.html`](./prototipo.html).
+
+> **⚠️ FLUJO OBLIGATORIO al tocar el prototipo (regla Daniel, 6-jul):** cada cambio se hace en `docs/rediseno/prototipo.html` (repo) **Y** se **redespliega al artifact** con el mismo URL de arriba, para que Daniel vea la versión al día en su link. Editar el repo sin redesplegar deja el artifact atrasado (pasó el 6-jul con los cambios de "cierres por medida" y "corte"). El repo va a git; el artifact es la vista viva de Daniel — **los dos deben quedar sincronizados en el mismo paso.**
