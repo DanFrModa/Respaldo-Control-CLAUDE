@@ -109,8 +109,9 @@ test.describe('Listas de precios (F8-E4)', () => {
     await renglon.getByTestId('aprobar-renglon').click();
     await expect(page.getByText(`Renglón "${codigoModelo}" aprobado.`)).toBeVisible();
     await expect(renglon).toHaveAttribute('data-aprobado', 'true');
-    // Con costo 50 y margen 50% el precio calculado/aprobado es $100.00.
-    await expect(renglon.getByText('$100.00')).toBeVisible();
+    // Con costo 50 y margen 50% el precio calculado/aprobado es $100.00. Se apunta al badge del
+    // aprobado (evita strict mode: $100.00 aparece también en la celda del calculado).
+    await expect(renglon.getByTestId('precio-aprobado')).toHaveText('$100.00');
 
     // ── El PDF sale (abre una pestaña al endpoint del impreso) ───────────────────
     const [popup] = await Promise.all([

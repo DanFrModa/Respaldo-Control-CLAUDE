@@ -391,7 +391,7 @@ function FilaRenglon({
       </TableCell>
       <TableCell className="text-right">
         {linea.aprobado ? (
-          <Badge variant="default">
+          <Badge variant="default" data-testid="precio-aprobado">
             {verImportes ? formatearMoneda(linea.precioAprobado) : 'Aprobado'}
           </Badge>
         ) : (
