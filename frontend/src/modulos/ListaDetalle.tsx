@@ -74,6 +74,12 @@ export interface PropsListaDetalle<T> {
   filtros?: React.ReactNode;
   incluirInactivos: boolean;
   alAlternarInactivos: () => void;
+  /**
+   * Oculta el botón "Mostrar/Ocultar desactivados": para entidades SIN borrado
+   * suave (p. ej. Roles, que se borran de verdad), donde el toggle no aplica.
+   * Por defecto se muestra.
+   */
+  ocultarToggleInactivos?: boolean | undefined;
   /** Texto del estado vacio (cuando no hay coincidencias). */
   textoVacio: string;
   paginacion?: PaginacionListaDetalle | undefined;
@@ -141,6 +147,7 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     filtros,
     incluirInactivos,
     alAlternarInactivos,
+    ocultarToggleInactivos = false,
     textoVacio,
     paginacion,
     seleccionInicialId,
@@ -267,17 +274,19 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
               />
             </div>
             {filtros}
-            <Button
-              type="button"
-              variant={incluirInactivos ? 'secondary' : 'outline'}
-              size="sm"
-              className="w-full"
-              onClick={alAlternarInactivos}
-              aria-pressed={incluirInactivos}
-              data-testid="mostrar-desactivados"
-            >
-              {incluirInactivos ? 'Ocultar desactivados' : 'Mostrar desactivados'}
-            </Button>
+            {ocultarToggleInactivos ? null : (
+              <Button
+                type="button"
+                variant={incluirInactivos ? 'secondary' : 'outline'}
+                size="sm"
+                className="w-full"
+                onClick={alAlternarInactivos}
+                aria-pressed={incluirInactivos}
+                data-testid="mostrar-desactivados"
+              >
+                {incluirInactivos ? 'Ocultar desactivados' : 'Mostrar desactivados'}
+              </Button>
+            )}
           </div>
 
           {/* Renglones / estados */}

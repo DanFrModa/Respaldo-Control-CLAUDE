@@ -64,7 +64,22 @@ export {
   type ConfiguracionEmpresaSalida,
 } from './esquemas/empresa.js';
 
-export { esquemaRolSalida, type RolSalida } from './esquemas/rol.js';
+export {
+  esquemaRolSalida,
+  esquemaCrearRolBody,
+  esquemaActualizarRolBody,
+  esquemaAsignarPermisosBody,
+  esquemaPermisoCatalogoSalida,
+  esquemaModuloPermisosSalida,
+  esquemaCatalogoPermisosSalida,
+  type RolSalida,
+  type CrearRolBody,
+  type ActualizarRolBody,
+  type AsignarPermisosBody,
+  type PermisoCatalogoSalida,
+  type ModuloPermisosSalida,
+  type CatalogoPermisosSalida,
+} from './esquemas/rol.js';
 
 // ── Catálogos (F1-E1): maestros globales (ADR-0007) ──────────────────────────
 export {
