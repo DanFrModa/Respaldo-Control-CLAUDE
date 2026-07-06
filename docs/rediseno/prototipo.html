@@ -782,6 +782,8 @@
   .dg-row span { color: var(--muted); }
   .dg-row.total { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 7px; font-weight: 700; }
   .dg-row.total b { color: var(--brand); }
+  .dg-x { border: 0; background: transparent; color: var(--faint); cursor: pointer; font-size: 13px; padding: 0 2px; line-height: 1; }
+  .dg-x:hover { color: var(--crit); }
   .neg-dec { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1.1fr; gap: 12px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
   .neg-dec-cell { display: flex; flex-direction: column; gap: 5px; }
   .neg-dec-cell .ffk { font-size: 11px; color: var(--muted); font-weight: 600; }
@@ -2721,9 +2723,13 @@ function drawerProveedor(i) {
       <div class="field"><div class="k">Saldo actual</div><div class="v mono" style="font-size:16px">$${p[6].toLocaleString('es-MX')}</div></div>
       <div class="field"><div class="k">Vencido</div><div class="v mono" style="color:${p[7]==='warn'?'var(--crit)':'var(--muted)'}">$${p[7]==='warn'?'18,600':'0'}</div></div>
     </div></div>
-    <div class="dsec"><h4>Surte</h4><div class="bom">
-      <div class="bom-row"><span class="bom-tag" style="background:#4f6bed">TE</span><div class="grow"><b>${p[5]}</b><div class="cell-sub">3 materiales activos</div></div><span class="qty">›</span></div>
-    </div></div>
+    <div class="dsec"><h4>Avíos que surte <span style="font-weight:400;color:var(--faint);font-size:11.5px">· vínculo con su precio</span></h4>
+      <div class="bom">
+        ${aviosDeProv(p[1]).map(a => { const pr = (a.provs.find(x => x.prov === p[1]) || {}).precio; return `<div class="bom-row"><span class="bom-tag" style="background:#0891b2">AV</span><div class="grow"><b>${a.nom}</b><div class="cell-sub mono">$${(pr || 0).toFixed(2)} · su precio</div></div><button class="dg-x" onclick="quitarAvioDeProv('${a.nom}','${p[1]}')" title="Quitar">✕</button></div>`; }).join('') || '<div class="pc-empty" style="padding:6px 2px">Aún no surte avíos.</div>'}
+      </div>
+      <button class="btn ghost sm" onclick="addAvioToProv('${p[1]}')" style="margin-top:8px">${IC.plus}Asignar avío que surte</button>
+      <div class="pc-hint-cell" style="margin-top:8px">Si te ofrece un avío que ya tienes dado de alta, lo asignas aquí con su precio. Categoría general: <b>${p[5]}</b>.</div>
+    </div>
   </div>
   <div class="drawer-foot"><button class="btn ghost">${IC.printer}Estado de cuenta</button><button class="btn primary" style="margin-left:auto">${IC.edit}Editar</button></div>`;
 }
@@ -2956,6 +2962,50 @@ const provOpts = (nom, sel) => {
   const a = avioPCBy(nom); const provs = a ? (a.provs || []) : [];
   return `<option value=""${!sel ? ' selected' : ''}>— sin definir (más barato) —</option>` + provs.map(p => `<option value="${p.prov}"${sel === p.prov ? ' selected' : ''}>${p.prov} · $${p.precio.toFixed(2)}</option>`).join('');
 };
+/* ---- Administración del vínculo avío ↔ proveedor (AvioProveedor) ---- */
+const PROVEEDORES_AVIO = ['Etiquetas Sol', 'Etiquetas del Norte', 'Hilos Reyna', 'Hilos del Bajío', 'Elásticos GTO', 'Elásticos MX', 'Botones del Centro', 'Cierres YKK', 'Cierres Express', 'Plásticos MX', 'Avíos del Bajío', 'Mercería Central'];
+const aviosDeProv = (nom) => AVIOS_PC.filter(a => (a.provs || []).some(p => p.prov === nom));
+let _apCtx = {};
+function addProvToAvio(i) {
+  _apCtx = { tipo: 'avioProv', avioIdx: i };
+  const a = AVIOS_PC[i]; const ya = new Set((a.provs || []).map(p => p.prov));
+  const disp = PROVEEDORES_AVIO.filter(p => !ya.has(p));
+  cerrarCajon(); modalForm.dataset.key = 'avioProv'; modalTitle.textContent = 'Agregar proveedor — ' + a.nom;
+  modalBody.innerHTML = `
+    <label class="ff col2"><span class="ffk">Proveedor</span><select id="apSel">${disp.length ? disp.map(p => `<option>${p}</option>`).join('') : '<option value="">— ya están todos —</option>'}</select></label>
+    <label class="ff col2"><span class="ffk">Precio (por unidad de consumo)</span><input id="apPrecio" type="number" step="any" min="0" placeholder="0.00"></label>
+    <div class="ff col2 audit-hint">${IC.info}<span>Se crea el vínculo avío↔proveedor (<b>AvioProveedor</b>) con su precio.</span></div>`;
+  modalScrim.classList.add('show'); setTimeout(() => { const el = modalBody.querySelector('#apPrecio'); if (el) el.focus(); }, 40);
+}
+function addAvioToProv(nombre) {
+  _apCtx = { tipo: 'provAvio', prov: nombre };
+  const disp = AVIOS_PC.filter(a => !(a.provs || []).some(p => p.prov === nombre));
+  cerrarCajon(); modalForm.dataset.key = 'provAvio'; modalTitle.textContent = 'Asignar avío que surte — ' + nombre;
+  modalBody.innerHTML = `
+    <label class="ff col2"><span class="ffk">Avío</span><select id="apSel">${disp.length ? disp.map(a => `<option>${a.nom}</option>`).join('') : '<option value="">— ya surte todos —</option>'}</select></label>
+    <label class="ff col2"><span class="ffk">Precio al que lo surte</span><input id="apPrecio" type="number" step="any" min="0" placeholder="0.00"></label>
+    <div class="ff col2 audit-hint">${IC.info}<span>Justo para cuando un proveedor te ofrece un avío que <b>ya tienes dado de alta</b>.</span></div>`;
+  modalScrim.classList.add('show'); setTimeout(() => { const el = modalBody.querySelector('#apPrecio'); if (el) el.focus(); }, 40);
+}
+function guardarAvioProv() {
+  const precio = parseFloat(modalBody.querySelector('#apPrecio').value) || 0;
+  const sel = modalBody.querySelector('#apSel').value;
+  if (!sel) { mostrarToast('Elige una opción'); return; }
+  if (_apCtx.tipo === 'avioProv') {
+    AVIOS_PC[_apCtx.avioIdx].provs.push({ prov: sel, precio });
+    cerrarForm(); avExpand.add(_apCtx.avioIdx); ir('avios'); mostrarToast('Proveedor agregado · $' + precio.toFixed(2));
+  } else {
+    const a = avioPCBy(sel); if (a) a.provs.push({ prov: _apCtx.prov, precio });
+    cerrarForm(); const idx = PROV.findIndex(p => p[1] === _apCtx.prov); if (idx >= 0) { ir('proveedores'); abrirCajon(drawerProveedor(idx)); }
+    mostrarToast(sel + ' asignado a ' + _apCtx.prov);
+  }
+}
+function quitarProvDeAvio(i, pi) { AVIOS_PC[i].provs.splice(pi, 1); avExpand.add(i); ir('avios'); mostrarToast('Proveedor desvinculado'); }
+function quitarAvioDeProv(avioNom, prov) {
+  const a = avioPCBy(avioNom); if (a) a.provs = a.provs.filter(p => p.prov !== prov);
+  const idx = PROV.findIndex(p => p[1] === prov); if (idx >= 0) abrirCajon(drawerProveedor(idx));
+  mostrarToast('Avío desvinculado');
+}
 const EST_MODELO = { borrador: ['neutral', 'Borrador'], proceso: ['warn', 'En proceso'], completo: ['info', 'Completo'], aprobado: ['ok', 'Aprobado'] };
 const estModeloBadge = (e) => EST_MODELO[e] || ['neutral', e];
 const nFotos = (m) => (m.fotos || 0) + ((m.fotosArr && m.fotosArr.length) || 0);
@@ -3333,7 +3383,7 @@ function vAvios() {
         <td class="r num">${m[2].toLocaleString('es-MX')} <span class="cell-sub">${m[3]}</span></td>
         <td class="r mono">${a.precio != null ? '$' + a.precio.toFixed(2) : '—'}</td>
         <td><span class="badge ${m[4]}"><span class="d"></span>${m[4] === 'ok' ? 'OK' : 'Bajo mín.'}</span></td>
-      </tr>${exp ? `<tr class="lp-detrow"><td colspan="5">${provs.length ? `<div class="dg">${provs.map(p => `<div class="dg-row"><span>${p.prov}${p.precio === barato && provs.length > 1 ? ' <span class="lp-ver" style="color:var(--ok);background:var(--ok-soft)">más barato</span>' : ''}</span><b class="mono">$${p.precio.toFixed(2)}</b></div>`).join('')}</div>` : `<div class="pc-empty" style="padding:10px 2px">Sin proveedor asignado — el avío se costea al <b>precio de referencia</b> ($${(a.precio || 0).toFixed(2)}) y el proveedor real se define en la <b>compra</b> (MRP/OC).</div>`}</td></tr>` : ''}`; }).join('')}
+      </tr>${exp ? `<tr class="lp-detrow"><td colspan="5"><div class="dg" style="max-width:660px">${provs.map((p, pi) => `<div class="dg-row"><span>${p.prov}${p.precio === barato && provs.length > 1 ? ' <span class="lp-ver" style="color:var(--ok);background:var(--ok-soft)">más barato</span>' : ''}</span><span style="display:flex;align-items:center;gap:14px"><b class="mono">$${p.precio.toFixed(2)}</b><button class="dg-x" onclick="quitarProvDeAvio(${i},${pi})" title="Quitar proveedor">✕</button></span></div>`).join('') || `<div class="pc-empty" style="padding:8px 2px">Sin proveedor asignado — se costea al <b>precio de referencia</b> ($${(a.precio || 0).toFixed(2)}); el proveedor real se define en la <b>compra</b> (MRP/OC).</div>`}<button class="btn ghost sm" onclick="addProvToAvio(${i})" style="margin-top:8px">${IC.plus}Agregar proveedor</button></div></td></tr>` : ''}`; }).join('')}
     </tbody></table></div></div>`;
 }
 
@@ -4151,6 +4201,7 @@ modalForm.onsubmit = (e) => {
   e.preventDefault();
   if (modalForm.dataset.key && modalForm.dataset.key.startsWith('precio:')) { guardarPrecio(modalForm.dataset.key.split(':')[1]); return; }
   if (modalForm.dataset.key === 'nuevoProyecto') { guardarProyecto(); return; }
+  if (modalForm.dataset.key === 'avioProv' || modalForm.dataset.key === 'provAvio') { guardarAvioProv(); return; }
   const f = FORMS[modalForm.dataset.key]; if (!f) return;
   const v = {}; new FormData(modalForm).forEach((val,k) => v[k] = String(val).trim());
   f.crear(v);
