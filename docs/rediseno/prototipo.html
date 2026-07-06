@@ -2948,6 +2948,7 @@ const provOptsTela = (nom, sel) => {
   const t = telaPCBy(nom); const provs = t ? (t.provs || []) : [];
   return `<option value=""${!sel ? ' selected' : ''}>— sin definir (más barato) —</option>` + provs.map(p => `<option value="${p.prov}"${sel === p.prov ? ' selected' : ''}>${p.prov} · $${p.precio.toFixed(2)}</option>`).join('');
 };
+const provDefTela = (nom) => { const t = telaPCBy(nom); const ps = t ? (t.provs || []) : []; return ps.length ? ps.reduce((m, x) => x.precio < m.precio ? x : m).prov : ''; };
 const badgeGen = (g) => g ? '<span class="badge info" style="font-size:10px" title="Se compra para stock y se netea en el MRP"><span class="d"></span>Genérico · stock</span>' : '<span class="badge neutral" style="font-size:10px" title="Se compra por orden de producción"><span class="d"></span>Por orden</span>';
 const PROCESOS_PC = ['Estampado serigrafía', 'Estampado DTF', 'Bordado', 'Sublimado', 'Lavado', 'Teñido', 'Plisado'];
 /* Cada avío puede ser surtido por VARIOS proveedores, cada uno con su precio
@@ -2977,6 +2978,7 @@ const provOpts = (nom, sel) => {
   const a = avioPCBy(nom); const provs = a ? (a.provs || []) : [];
   return `<option value=""${!sel ? ' selected' : ''}>— sin definir (más barato) —</option>` + provs.map(p => `<option value="${p.prov}"${sel === p.prov ? ' selected' : ''}>${p.prov} · $${p.precio.toFixed(2)}</option>`).join('');
 };
+const provDefAvio = (nom) => { const a = avioPCBy(nom); const ps = a ? (a.provs || []) : []; return ps.length ? ps.reduce((m, x) => x.precio < m.precio ? x : m).prov : ''; };
 /* ---- Administración del vínculo avío ↔ proveedor (AvioProveedor) ---- */
 const PROVEEDORES_AVIO = ['Etiquetas Sol', 'Etiquetas del Norte', 'Hilos Reyna', 'Hilos del Bajío', 'Elásticos GTO', 'Elásticos MX', 'Botones del Centro', 'Cierres YKK', 'Cierres Express', 'Plásticos MX', 'Avíos del Bajío', 'Mercería Central'];
 const aviosDeProv = (nom) => AVIOS_PC.filter(a => (a.provs || []).some(p => p.prov === nom));
@@ -3196,7 +3198,7 @@ function pcSync() {
   m.procesos = [...p.querySelectorAll('.pc-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
   m.avios = [...p.querySelectorAll('.pc-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, prov: r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
 }
-function pcAvioReRender(i) { pcSync(); if (pcEdit.m.avios[i]) pcEdit.m.avios[i].prov = ''; renderModeloEditor(); }
+function pcAvioReRender(i) { pcSync(); if (pcEdit.m.avios[i]) pcEdit.m.avios[i].prov = provDefAvio(pcEdit.m.avios[i].nom); renderModeloEditor(); }
 function pcRecalc() {
   pcSync();
   const c = costoModelo(pcEdit.m);
@@ -3215,10 +3217,10 @@ function pcRecalc() {
 }
 function pcAddTela() { pcSync(); pcEdit.m.telas.push({ nom: '', prov: '', consumo: 0 }); renderModeloEditor(); }
 function pcDelTela(i) { pcSync(); pcEdit.m.telas.splice(i, 1); renderModeloEditor(); }
-function pcTelaReRender(i) { pcSync(); if (pcEdit.m.telas[i]) pcEdit.m.telas[i].prov = ''; renderModeloEditor(); }
+function pcTelaReRender(i) { pcSync(); if (pcEdit.m.telas[i]) pcEdit.m.telas[i].prov = provDefTela(pcEdit.m.telas[i].nom); renderModeloEditor(); }
 function pcAddProceso() { pcSync(); pcEdit.m.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderModeloEditor(); }
 function pcDelProceso(i) { pcSync(); pcEdit.m.procesos.splice(i, 1); renderModeloEditor(); }
-function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, prov: '', consumo: 1 }); renderModeloEditor(); }
+function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, prov: provDefAvio(AVIOS_PC[0].nom), consumo: 1 }); renderModeloEditor(); }
 function pcDelAvio(i) { pcSync(); pcEdit.m.avios.splice(i, 1); renderModeloEditor(); }
 function pcSubirPDF() { pcPanel.querySelector('#pcPdfInput').click(); }
 function pcQuitarPDF(i) { pcSync(); pcEdit.m.pdfs.splice(i, 1); renderModeloEditor(); }
@@ -3648,12 +3650,12 @@ function negRecalc() {
 }
 function negAddTela() { negSync(); negDet.telas.push({ nom: '', prov: '', consumo: 0 }); renderNeg(); }
 function negDelTela(i) { negSync(); negDet.telas.splice(i, 1); renderNeg(); }
-function negTelaReRender(i) { negSync(); if (negDet.telas[i]) negDet.telas[i].prov = ''; renderNeg(); }
+function negTelaReRender(i) { negSync(); if (negDet.telas[i]) negDet.telas[i].prov = provDefTela(negDet.telas[i].nom); renderNeg(); }
 function negAddProc() { negSync(); negDet.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderNeg(); }
 function negDelProc(i) { negSync(); negDet.procesos.splice(i, 1); renderNeg(); }
-function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, prov: '', consumo: 1 }); renderNeg(); }
+function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, prov: provDefAvio(AVIOS_PC[0].nom), consumo: 1 }); renderNeg(); }
 function negDelAvio(i) { negSync(); negDet.avios.splice(i, 1); renderNeg(); }
-function negAvioReRender(i) { negSync(); if (negDet.avios[i]) negDet.avios[i].prov = ''; renderNeg(); }
+function negAvioReRender(i) { negSync(); if (negDet.avios[i]) negDet.avios[i].prov = provDefAvio(negDet.avios[i].nom); renderNeg(); }
 function guardarVersion() {
   negSync();
   const L = LISTAS[listaSel]; const ln = L.lineas[negLinea];
@@ -4249,6 +4251,16 @@ addEventListener('keydown', (e) => {
 });
 
 /* ---- Init ---- */
+/* Pre-elige el proveedor por defecto (el más barato) en los datos de ejemplo — decisión Daniel:
+   pinnear el proveedor asumido en el precosteo (cambiable en la compra). */
+PROYECTOS.forEach(p => p.modelos.forEach(m => {
+  (m.avios || []).forEach(x => { if (!x.prov) x.prov = provDefAvio(x.nom); });
+  (m.telas || []).forEach(t => { if (!t.prov) t.prov = provDefTela(t.nom); });
+}));
+LISTAS.forEach(L => L.lineas.forEach(ln => { if (ln.det) {
+  (ln.det.avios || []).forEach(x => { if (!x.prov) x.prov = provDefAvio(x.nom); });
+  (ln.det.telas || []).forEach(t => { if (!t.prov) t.prov = provDefTela(t.nom); });
+} }));
 renderNav();
 pintarBotonTema();
 ir('resumen');
