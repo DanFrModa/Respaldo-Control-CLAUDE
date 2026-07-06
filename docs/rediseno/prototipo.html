@@ -2151,7 +2151,7 @@ const AVIOS_CAT = [
   { sku:'AVI-0325', nom:'Resorte 3 cm',               un:'m',    exist:5600 },
   { sku:'AVI-0375', nom:'Elástico 5 cm',              un:'m',    exist:2100 },
   { sku:'AVI-0362', nom:'Botón 4 hoyos 18L',          un:'pza',  exist:26000 },
-  { sku:'AVI-0350', nom:'Cierre #5 metálico 18 cm',   un:'pza',  exist:3400 },
+  { sku:'AVI-0350', nom:'Cierre #5 metálico',   un:'pza',  exist:3400 },
   { sku:'AVI-0388', nom:'Cordón grueso 8 mm',         un:'m',    exist:1500 },
 ];
 const avioBy = (nom) => AVIOS_CAT.find(a => a.nom === nom);
@@ -2167,7 +2167,7 @@ const MODELO_AVIOS = {
   '62182': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Etiqueta de composición',porPza:1}, {avio:'Hilo poliéster Tex 40',porPza:0.02}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
   '62180': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Etiqueta de composición',porPza:1}, {avio:'Resorte 3 cm',porPza:0.45}, {avio:'Hilo poliéster Tex 40',porPza:0.02} ],
   '62181': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Botón 4 hoyos 18L',porPza:2}, {avio:'Hilo poliéster Tex 40',porPza:0.02}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
-  '62406': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Cierre #5 metálico 18 cm',porPza:1}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
+  '62406': [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Cierre #5 metálico',porPza:1}, {avio:'Bolsa polietileno 30×40',porPza:1} ],
 };
 const RECETA_DEFAULT = [ {avio:'Etiqueta tejida MJD',porPza:1}, {avio:'Etiqueta de composición',porPza:1}, {avio:'Hilo poliéster Tex 40',porPza:0.02} ];
 const recetaDeOP = (ordFull) => MODELO_AVIOS[modeloDeOP(soloOP(ordFull))];
@@ -2192,7 +2192,7 @@ const NOTAS = [
   { folio:'2414', emp:'MF', maq:'Óscar Hernández', alm:'Almacén de avíos',
     fEmi:'30 jun 2026', fEnv:'', est:'borrador', by:'Daniel Masri', obs:'',
     lineas:[
-      { ord:'5095', avio:'Cierre #5 metálico 18 cm', cant:538, un:'pza' },
+      { ord:'5095', avio:'Cierre #5 metálico', cant:538, un:'pza' },
       { ord:'5095', avio:'Bolsa polietileno 30×40',  cant:538, un:'pza' },
     ] },
   { folio:'2413', emp:'FR', maq:'Confecciones León', alm:'Almacén de avíos',
@@ -2976,17 +2976,19 @@ const AVIOS_PC = [
   { nom: 'Hilo poliéster Tex 40', precio: 0.30, generico: true, provs: [{ prov: 'Hilos Reyna', precio: 0.30 }, { prov: 'Hilos del Bajío', precio: 0.28 }] },
   { nom: 'Resorte 3 cm', precio: 4.80, generico: true, provs: [{ prov: 'Elásticos GTO', precio: 4.80 }, { prov: 'Elásticos MX', precio: 5.10 }] },
   { nom: 'Botón 4 hoyos 18L', precio: 0.60, generico: true, provs: [{ prov: 'Botones del Centro', precio: 0.60 }] },
-  { nom: 'Cierre #5 metálico 18 cm', precio: 6.50, generico: false, provs: [{ prov: 'Cierres YKK', precio: 6.50 }, { prov: 'Cierres Express', precio: 6.20 }] },
+  { nom: 'Cierre #5 metálico', precio: 6.27, generico: false, porMedida: true, medidas: [{ medida: '15 cm', precio: 5.80 }, { medida: '18 cm', precio: 6.20 }, { medida: '22 cm', precio: 6.80 }], provs: [{ prov: 'Cierres YKK', precio: 6.50 }, { prov: 'Cierres Express', precio: 6.20 }] },
   { nom: 'Bolsa polietileno 30×40', precio: 0.80, generico: true, provs: [{ prov: 'Plásticos MX', precio: 0.80 }] },
   { nom: 'Elástico 5 cm', precio: 5.20, generico: true, provs: [{ prov: 'Elásticos GTO', precio: 5.20 }] },
 ];
 const avioPCBy = (n) => AVIOS_PC.find(a => a.nom === n);
 function precioAvioPC(nom, prov) {
   const a = avioPCBy(nom); if (!a) return 0;
+  if ((a.medidas || []).length) return a.medidas.reduce((s, m) => s + m.precio, 0) / a.medidas.length; // por medida → PROMEDIO simple para el precosteo (R18, decisión g); la compra es por medida
   if (prov) { const p = (a.provs || []).find(x => x.prov === prov); if (p) return p.precio; }
   if ((a.provs || []).length) return Math.min(...a.provs.map(x => x.precio));
   return a.precio || 0;
 }
+const avioPorMedida = (nom) => { const a = avioPCBy(nom); return !!(a && (a.medidas || []).length); };
 const provOpts = (nom, sel) => {
   const a = avioPCBy(nom); const provs = a ? (a.provs || []) : [];
   return `<option value=""${!sel ? ' selected' : ''}>— sin definir (más barato) —</option>` + provs.map(p => `<option value="${p.prov}"${sel === p.prov ? ' selected' : ''}>${p.prov} · $${p.precio.toFixed(2)}</option>`).join('');
@@ -3047,7 +3049,7 @@ let PROYECTOS = [
     { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', telas: [], maquila: 0, margen: 45, procesos: [], avios: [], pdfs: [], fotos: 0 },
   ] },
   { num: 'P-1041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '28 jun 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquila: 30, margen: 42, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
+    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquila: 30, margen: 42, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
     { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', telas: [{ nom: 'Algodón peinado 30/1', consumo: 0.30 }], maquila: 18, margen: 45, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
   ] },
   { num: 'P-1039', cliente: 'Liverpool', depto: 'Infantil', temporada: 'OI26', fecha: '20 jun 2026', estatus: 'abierto', modelos: [
@@ -3388,7 +3390,7 @@ const AVIOS_INV = [
   ['AVI-0301', 'Hilo poliéster Tex 40', 4200, 'cono', 'ok'],
   ['AVI-0325', 'Resorte 3 cm', 5600, 'm', 'warn'],
   ['AVI-0362', 'Botón 4 hoyos 18L', 26000, 'pza', 'ok'],
-  ['AVI-0350', 'Cierre #5 metálico 18 cm', 3400, 'pza', 'warn'],
+  ['AVI-0350', 'Cierre #5 metálico', 3400, 'pza', 'warn'],
   ['AVI-0341', 'Bolsa polietileno 30×40', 12000, 'pza', 'ok'],
 ];
 let avExpand = new Set();
@@ -3411,13 +3413,13 @@ function vAvios() {
       ${AVIOS_INV.map((m, i) => { const a = avioPCBy(m[1]) || {}; const provs = a.provs || []; const exp = avExpand.has(i); const barato = provs.length ? Math.min(...provs.map(p => p.precio)) : null; return `<tr>
         <td><div class="cellflex">
           <button class="lp-exp ${exp ? 'open' : ''}" onclick="toggleAvExp(${i})" title="Ver proveedores">${IC.chevron}</button>
-          <span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]} ${badgeGen(a.generico)}</div><div class="cell-code">${m[0]}</div></div>
+          <span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]} ${badgeGen(a.generico)}${avioPorMedida(m[1]) ? ' <span class="badge warn" style="font-size:10px" title="Se costea con precio PROMEDIO; se compra por medida×talla"><span class="d"></span>Por medida</span>' : ''}</div><div class="cell-code">${m[0]}</div></div>
         </div></td>
         <td>${provs.length ? `<span class="badge info"><span class="d"></span>${provs.length} proveedor${provs.length > 1 ? 'es' : ''}</span>` : `<span class="badge warn"><span class="d"></span>Sin proveedor</span>`}</td>
         <td class="r num">${m[2].toLocaleString('es-MX')} <span class="cell-sub">${m[3]}</span></td>
         <td class="r mono">${a.precio != null ? '$' + a.precio.toFixed(2) : '—'}</td>
         <td><span class="badge ${m[4]}"><span class="d"></span>${m[4] === 'ok' ? 'OK' : 'Bajo mín.'}</span></td>
-      </tr>${exp ? `<tr class="lp-detrow"><td colspan="5"><div class="dg" style="max-width:660px">${provs.map((p, pi) => `<div class="dg-row"><span>${p.prov}${p.precio === barato && provs.length > 1 ? ' <span class="lp-ver" style="color:var(--ok);background:var(--ok-soft)">más barato</span>' : ''}</span><span style="display:flex;align-items:center;gap:14px"><b class="mono">$${p.precio.toFixed(2)}</b><button class="dg-x" onclick="quitarProvDeAvio(${i},${pi})" title="Quitar proveedor">✕</button></span></div>`).join('') || `<div class="pc-empty" style="padding:8px 2px">Sin proveedor asignado — se costea al <b>precio de referencia</b> ($${(a.precio || 0).toFixed(2)}); el proveedor real se define en la <b>compra</b> (MRP/OC).</div>`}<button class="btn ghost sm" onclick="addProvToAvio(${i})" style="margin-top:8px">${IC.plus}Agregar proveedor</button></div></td></tr>` : ''}`; }).join('')}
+      </tr>${exp ? `<tr class="lp-detrow"><td colspan="5">${(a.medidas || []).length ? `<div style="margin-bottom:12px"><div style="font-size:11.5px;color:var(--muted);margin-bottom:5px">Medidas del avío <span style="color:var(--faint)">— se costea el promedio; la compra es por medida×talla</span>:</div><div class="dg" style="max-width:660px">${a.medidas.map(md => `<div class="dg-row"><span>${md.medida}</span><b class="mono">$${md.precio.toFixed(2)}</b></div>`).join('')}<div class="dg-row total"><span>Promedio (precosteo)</span><b class="mono">$${(a.precio || 0).toFixed(2)}</b></div></div></div>` : ''}<div class="dg" style="max-width:660px">${provs.map((p, pi) => `<div class="dg-row"><span>${p.prov}${p.precio === barato && provs.length > 1 ? ' <span class="lp-ver" style="color:var(--ok);background:var(--ok-soft)">más barato</span>' : ''}</span><span style="display:flex;align-items:center;gap:14px"><b class="mono">$${p.precio.toFixed(2)}</b><button class="dg-x" onclick="quitarProvDeAvio(${i},${pi})" title="Quitar proveedor">✕</button></span></div>`).join('') || `<div class="pc-empty" style="padding:8px 2px">Sin proveedor asignado — se costea al <b>precio de referencia</b> ($${(a.precio || 0).toFixed(2)}); el proveedor real se define en la <b>compra</b> (MRP/OC).</div>`}<button class="btn ghost sm" onclick="addProvToAvio(${i})" style="margin-top:8px">${IC.plus}Agregar proveedor</button></div></td></tr>` : ''}`; }).join('')}
     </tbody></table></div></div>`;
 }
 
@@ -3482,7 +3484,7 @@ let LISTAS = [
   { folio: '2026-041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '29 jun 2026', estado: 'en-negociacion', factores: { margen: 45, descuentos: 6, regalias: 8, costoVentas: 3 }, lineas: [
     { modelo: '62058', nombre: 'Bermuda playa stretch', clienteNum: 'A17E210', version: 2, aprobado: 205, aprobadoPor: 'Daniel Masri', eventos: [
       { acuerdo: 'El cliente pidió quitar las bolsas traseras → menos avíos, baja el costo y el precio.', anterior: 224, nuevo: 205, costoAnt: 96.4, costoNue: 89.1, por: 'Daniel Masri', fecha: '1 jul 2026', version: 2 },
-    ], det: det('Mezclilla stretch 8oz', 0.55, 30, [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico 18 cm', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], [{ nom: 'Franela lavada 180g', consumo: 0.12 }]) },
+    ], det: det('Mezclilla stretch 8oz', 0.55, 30, [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], [{ nom: 'Franela lavada 180g', consumo: 0.12 }]) },
     { modelo: '62059', nombre: 'Playera surf estampada', clienteNum: 'A17E190', version: 1, aprobado: 98, aprobadoPor: 'Daniel Masri', eventos: [],
       det: det('Algodón peinado 30/1', 0.30, 18, [{ tipo: 'Estampado DTF', precio: 7 }], [{ nom: 'Etiqueta tejida MJD', consumo: 1 }]) },
   ] },
