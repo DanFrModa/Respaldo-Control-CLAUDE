@@ -62,6 +62,8 @@ test.describe('Inicio de sesión', () => {
       'Inventarios',
       // Desarrollo (F8-E2): módulo nuevo entre Modelos y Pedidos.
       'Desarrollo',
+      // Listas de precios (F8-E4): sub-vista de Desarrollo con su permiso `listas.ver`.
+      'Listas de precios',
       'Ruta Crítica',
       // Sub-vista del concentrado (F5-E7): aparece como enlace del menú con su permiso.
       'Concentrado planeado vs real',
