@@ -156,7 +156,9 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(formRonda.getByTestId('ronda-version').locator('option')).toHaveCount(2);
     await formRonda.getByTestId('ronda-version').selectOption({ index: 1 });
     await formRonda.getByTestId('ronda-acuerdo').fill('Se sube la maquila (nueva versión)');
-    await formRonda.getByTestId('confirmar-ronda').click();
+    // `confirmar-ronda` vive en el DialogFooter (hermano del contenedor form-nueva-ronda), no dentro de
+    // él → se busca a nivel page (es único en pantalla mientras el diálogo de ronda está abierto).
+    await page.getByTestId('confirmar-ronda').click();
     await expect(page.getByText(`Ronda registrada para "${codigoModelo}".`)).toBeVisible();
 
     // El evento queda en el historial y el comparador muestra el cambio.
