@@ -127,5 +127,79 @@ test.describe('Listas de precios (F8-E4)', () => {
     const pdf = await page.request.get(`/api/listas-precios/${String(listaId)}/pdf`);
     expect(pdf.ok()).toBeTruthy();
     expect(pdf.headers()['content-type']).toContain('application/pdf');
+
+    // ── F8-E5: NEGOCIACIÓN — nueva ronda (re-costeo) sobre el renglón ────────────
+    await renglon.getByTestId('abrir-negociacion').click();
+    const panel = page.getByTestId('panel-negociacion');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId('negociacion-vacia')).toBeVisible();
+
+    // Nueva ronda → abre el editor de precosto → genera v2 → maquila 80 → congela.
+    await panel.getByTestId('abrir-nueva-ronda').click();
+    const formRonda = page.getByTestId('form-nueva-ronda');
+    await formRonda.getByTestId('abrir-editor-precosto').click();
+
+    const editor = page.getByTestId('dialogo-precosto');
+    await editor.getByTestId('generar-precosto').click();
+    await expect(page.getByText(/Precosto v2 generado\./)).toBeVisible();
+    await editor.getByTestId('grupo-maquila').getByTestId('editar-linea').click();
+    await editor.getByTestId('editar-linea-precio').fill('80');
+    await editor.getByTestId('guardar-linea').click();
+    await editor.getByTestId('congelar-precosto').click();
+    await editor.getByTestId('confirmar-precosto').click();
+    await expect(page.getByText(/Precosto v2 congelado\./)).toBeVisible();
+    await page.keyboard.press('Escape'); // cierra el editor (dialog superior)
+
+    // Elige la v2 congelada + escribe el acuerdo + confirma la ronda. La opción trae el costo en el
+    // texto ("v2 · $80.00"), así que se elige por índice: la única versión elegible es la v2 recién
+    // congelada (la v1, que el renglón ya usa, queda excluida) → índice 1 tras el placeholder.
+    await expect(formRonda.getByTestId('ronda-version').locator('option')).toHaveCount(2);
+    await formRonda.getByTestId('ronda-version').selectOption({ index: 1 });
+    await formRonda.getByTestId('ronda-acuerdo').fill('Se sube la maquila (nueva versión)');
+    // `confirmar-ronda` vive en el DialogFooter (hermano del contenedor form-nueva-ronda), no dentro de
+    // él → se busca a nivel page (es único en pantalla mientras el diálogo de ronda está abierto).
+    await page.getByTestId('confirmar-ronda').click();
+    await expect(page.getByText(`Ronda registrada para "${codigoModelo}".`)).toBeVisible();
+
+    // El evento queda en el historial y el comparador muestra el cambio.
+    await expect(panel.getByTestId('fila-evento-negociacion')).toHaveCount(1);
+    await panel.getByTestId('comparar-evento').click();
+    await expect(page.getByTestId('comparador-versiones')).toBeVisible();
+    // v1 costo 50 → v2 costo 80 ⇒ delta +$30.00.
+    await expect(page.getByTestId('comparador-delta')).toHaveText('$30.00');
+
+    // Cierra el panel: el renglón trae el precio NUEVO (calculado 160) y el aprobado RESETEADO.
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
+    await expect(renglon).toHaveAttribute('data-aprobado', 'false');
+
+    // ── F8-E5: ESTADOS — cerrar la lista bloquea la negociación; reabrir la desbloquea ──
+    const selectorEstado = page.getByTestId('selector-estado-lista');
+    await selectorEstado
+      .getByTestId('nuevo-estado-lista')
+      .selectOption({ label: 'Cerrada (cierre)' });
+    await selectorEstado.getByTestId('confirmar-estado-lista').click();
+    await expect(page.getByText(/Estado cambiado a "Cerrada"\./)).toBeVisible();
+
+    // Con la lista cerrada, un acuerdo se rechaza (guard esCierre en el backend).
+    await renglon.getByTestId('abrir-negociacion').click();
+    await page.getByTestId('abrir-acuerdo').click();
+    await page.getByTestId('acuerdo-texto').fill('Intento con lista cerrada');
+    await page.getByTestId('confirmar-acuerdo').click();
+    await expect(page.getByText(/lista está cerrada/i)).toBeVisible();
+    await page.keyboard.press('Escape'); // cierra el diálogo de acuerdo (dialog superior)
+    await page.keyboard.press('Escape'); // cierra el panel de negociación
+    await expect(page.getByTestId('panel-negociacion')).toHaveCount(0);
+
+    // Reabrir (auditado) y verificar que el acuerdo ya procede.
+    await selectorEstado.getByTestId('nuevo-estado-lista').selectOption({ label: 'Abierta' });
+    await selectorEstado.getByTestId('confirmar-estado-lista').click();
+    await expect(page.getByText(/Estado cambiado a "Abierta"\./)).toBeVisible();
+
+    await renglon.getByTestId('abrir-negociacion').click();
+    await page.getByTestId('abrir-acuerdo').click();
+    await page.getByTestId('acuerdo-texto').fill('Acuerdo tras reabrir');
+    await page.getByTestId('confirmar-acuerdo').click();
+    await expect(page.getByText(`Acuerdo registrado para "${codigoModelo}".`)).toBeVisible();
   });
 });

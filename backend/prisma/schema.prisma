@@ -5250,7 +5250,9 @@ model ListaPreciosLinea {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@unique([idLista, idDesarrollo])
-  @@index([idDesarrollo])
+  // F8-E5: un desarrollo vive en A LO MÁS UNA lista (defensa en profundidad a nivel BD; E4 ya lo
+  // enforza en dominio bajo advisory lock). El @@unique global reemplaza al índice simple de E4.
+  @@unique([idDesarrollo])
   @@index([idPrecosto])
   @@map("lista_precios_linea")
 }

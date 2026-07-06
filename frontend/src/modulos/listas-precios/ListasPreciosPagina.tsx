@@ -4,6 +4,7 @@ import {
   CheckIcon,
   FileDown,
   FileText,
+  MessagesSquareIcon,
   Percent,
   PencilIcon,
   ScrollText,
@@ -54,6 +55,8 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCrearLista } from './DialogoCrearLista';
 import { DialogoEditarFactoresLista } from './DialogoEditarFactoresLista';
+import { DialogoNegociacionRenglon } from './DialogoNegociacionRenglon';
+import { SelectorEstadoLista } from './SelectorEstadoLista';
 
 /** Tope alto para los selectores de filtro. */
 const QUERY_CATALOGO = {
@@ -226,6 +229,7 @@ function DetalleLista({
   const verImportes = tienePermiso('consultas.ver-importes');
   const puedeAprobar = tienePermiso('listas.aprobar');
   const puedeAdministrar = tienePermiso('listas.administrar');
+  const puedeNegociar = tienePermiso('listas.negociar');
 
   const consulta = useListaPrecios(idLista);
   const [editarFactoresAbierto, setEditarFactoresAbierto] = useState(false);
@@ -265,6 +269,11 @@ function DetalleLista({
             </CampoDetalle>
           ) : null}
         </RejillaCampos>
+        {puedeNegociar ? (
+          <div className="mt-3 border-t pt-3">
+            <SelectorEstadoLista lista={lista} />
+          </div>
+        ) : null}
       </SeccionDetalle>
 
       {verImportes ? (
@@ -326,7 +335,7 @@ function DetalleLista({
                 <TableHead className="text-right">Costo</TableHead>
                 <TableHead className="text-right">Calculado</TableHead>
                 <TableHead className="text-right">Aprobado</TableHead>
-                {puedeAprobar ? <TableHead className="text-right">Acciones</TableHead> : null}
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -336,6 +345,7 @@ function DetalleLista({
                   linea={linea}
                   verImportes={verImportes}
                   puedeAprobar={puedeAprobar}
+                  puedeNegociar={puedeNegociar}
                 />
               ))}
             </TableBody>
@@ -354,18 +364,21 @@ function DetalleLista({
   );
 }
 
-/** Un renglón de la tabla de aprobación (modelo, precios, botón Aprobar y teclear). */
+/** Un renglón de la tabla de aprobación (modelo, precios, aprobar/teclear y negociación). */
 function FilaRenglon({
   linea,
   verImportes,
   puedeAprobar,
+  puedeNegociar,
 }: {
   linea: ListaLinea;
   verImportes: boolean;
   puedeAprobar: boolean;
+  puedeNegociar: boolean;
 }): React.JSX.Element {
   const aprobar = useAprobarLinea();
   const [tecleoAbierto, setTecleoAbierto] = useState(false);
+  const [negociacionAbierta, setNegociacionAbierta] = useState(false);
 
   function alAprobar(): void {
     aprobar.mutate(linea.id, {
@@ -398,36 +411,57 @@ function FilaRenglon({
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      {puedeAprobar ? (
-        <TableCell className="text-right">
-          <div className="flex justify-end gap-1">
-            <Button
-              type="button"
-              size="sm"
-              onClick={alAprobar}
-              disabled={aprobar.isPending}
-              data-testid="aprobar-renglon"
-            >
-              <CheckIcon aria-hidden />
-              Aprobar
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setTecleoAbierto(true)}
-              data-testid="teclear-precio"
-            >
-              Teclear
-            </Button>
-          </div>
-          <DialogoAjustarPrecio
-            abierto={tecleoAbierto}
-            alCambiarAbierto={setTecleoAbierto}
-            linea={linea}
-          />
-        </TableCell>
-      ) : null}
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          {puedeAprobar ? (
+            <>
+              <Button
+                type="button"
+                size="sm"
+                onClick={alAprobar}
+                disabled={aprobar.isPending}
+                data-testid="aprobar-renglon"
+              >
+                <CheckIcon aria-hidden />
+                Aprobar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setTecleoAbierto(true)}
+                data-testid="teclear-precio"
+              >
+                Teclear
+              </Button>
+            </>
+          ) : null}
+          {/* La negociación (historial + comparador) la ve cualquiera con `listas.ver`; las acciones
+              de negociar dentro del panel se gobiernan por `listas.negociar`. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setNegociacionAbierta(true)}
+            data-testid="abrir-negociacion"
+          >
+            <MessagesSquareIcon aria-hidden />
+            Negociación
+          </Button>
+        </div>
+        <DialogoAjustarPrecio
+          abierto={tecleoAbierto}
+          alCambiarAbierto={setTecleoAbierto}
+          linea={linea}
+        />
+        <DialogoNegociacionRenglon
+          abierto={negociacionAbierta}
+          alCambiarAbierto={setNegociacionAbierta}
+          linea={linea}
+          verImportes={verImportes}
+          puedeNegociar={puedeNegociar}
+        />
+      </TableCell>
     </TableRow>
   );
 }

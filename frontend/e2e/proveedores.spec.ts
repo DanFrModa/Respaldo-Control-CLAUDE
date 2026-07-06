@@ -235,8 +235,10 @@ test.describe('Proveedor enriquecido (R15)', () => {
       buffer: Buffer.from('%PDF-1.4 contenido de prueba'),
     });
 
-    // El adjunto aparece listado; luego se quita.
-    await expect(page.getByText('constancia.pdf')).toBeVisible();
+    // El adjunto aparece listado; luego se quita. Se apunta al link del adjunto dentro del diálogo
+    // (no a `getByText('constancia.pdf')`, que además casa con el toast "Adjunto ... subido." → strict
+    // mode intermitente según si el toast sigue visible).
+    await expect(dialogoEdicion.getByTestId('descargar-adjunto')).toBeVisible();
     const fila = dialogoEdicion.getByTestId('fila-adjunto').filter({ hasText: 'constancia.pdf' });
     await expect(fila).toBeVisible();
     await fila.getByTestId('quitar-adjunto').click();

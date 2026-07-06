@@ -57,19 +57,27 @@ export type EntradaAjustarPrecio = z.input<typeof esquemaAjustarPrecioLinea>;
 /** Parámetros del listado = el querystring del contrato (reutilizado por la ruta REST). */
 export type FiltrosListas = ListasPreciosQuery;
 
-/** Namespace del `pg_advisory_xact_lock` que serializa el recálculo de factores por lista. */
-const NAMESPACE_LOCK_LISTA = 20_542;
+/**
+ * Namespace del `pg_advisory_xact_lock` que serializa TODA mutación de UNA lista: recálculo de
+ * factores (E4), aprobación/tecleo de un renglón (E4), rondas/acuerdos y cambio de estado (E5). Al
+ * ser el MISMO namespace por `idLista`, `cambiarEstadoLista` (E5) se serializa contra las demás →
+ * el guard de `esCierre` es race-free (cierra el TOCTOU: nadie cierra la lista entre que se lee el
+ * estado y se muta). Se exporta para que `negociacion.ts` tome el MISMO lock.
+ */
+export const NAMESPACE_LOCK_LISTA = 20_542;
 
 /**
- * Namespace del `pg_advisory_xact_lock` que serializa la CREACIÓN de listas por EMPRESA. Sostiene la
- * invariante "un desarrollo vive en A LO MÁS UNA lista": sin él, dos `crearLista` concurrentes con el
- * mismo desarrollo (READ COMMITTED) leerían ambos `listaLineas = 0` y ambos insertarían (el
- * `@@unique([idLista, idDesarrollo])` sólo impide el duplicado DENTRO de una lista, no entre listas).
- * Crear listas es infrecuente, así que serializar por empresa es aceptable.
+ * Namespace del `pg_advisory_xact_lock` que serializa la CREACIÓN de listas por EMPRESA. Sin él, dos
+ * `crearLista` concurrentes con el mismo desarrollo (READ COMMITTED) leerían ambos `listaLineas = 0` y
+ * ambos intentarían insertar el renglón.
  *
- * TODO(E5): cuando E5 toque la migración de estas tablas, blindar la invariante a nivel BD con
- * `@@unique([idDesarrollo])` en `lista_precios_linea` (un desarrollo en a lo más una lista) — defensa
- * en profundidad que vuelve el lock una optimización, no la única barrera.
+ * La invariante "un desarrollo vive en A LO MÁS UNA lista" YA está blindada a nivel BD: E5 agregó
+ * `@@unique([idDesarrollo])` en `lista_precios_linea` (migración `20260706120000_f8_e5_negociacion`),
+ * que la garantiza incluso ENTRE listas (el `@@unique([idLista, idDesarrollo])` heredado solo cubría el
+ * duplicado DENTRO de una misma lista). Con ese candado a nivel BD, este lock es una OPTIMIZACIÓN de UX
+ * —serializa la creación para devolver un `ErrorConflicto` claro con TODOS los desarrollos en conflicto,
+ * en vez de un 500 opaco por la violación del unique—, no la única barrera. Crear listas es infrecuente,
+ * así que serializar por empresa es aceptable.
  */
 const NAMESPACE_LOCK_CREAR_LISTA = 20_543;
 
@@ -151,36 +159,96 @@ function aListaSalida(lista: ListaConDetalle, verImportes: boolean): ListaPrecio
 
 // ── Helpers de existencia / locks ─────────────────────────────────────────────────────
 
-/** Lista de la EMPRESA ACTIVA (A9), o `ErrorNoEncontrado`. */
+/** Lista de la EMPRESA ACTIVA (A9) con su estado (código + `esCierre`), o `ErrorNoEncontrado`. */
 async function exigirLista(
   tx: Tx,
   id: number,
   idEmpresa: number,
-): Promise<{ id: number; idEstadoLista: number }> {
+): Promise<{ id: number; idEstadoLista: number; codigoEstado: string; esCierre: boolean }> {
   const lista = await tx.listaPrecios.findFirst({
     where: { id, idEmpresa },
-    select: { id: true, idEstadoLista: true },
+    select: {
+      id: true,
+      idEstadoLista: true,
+      estadoLista: { select: { codigo: true, esCierre: true } },
+    },
   });
   if (lista === null) {
     throw new ErrorNoEncontrado('Lista de precios', id);
   }
-  return lista;
+  return {
+    id: lista.id,
+    idEstadoLista: lista.idEstadoLista,
+    codigoEstado: lista.estadoLista.codigo,
+    esCierre: lista.estadoLista.esCierre,
+  };
 }
 
-/** Renglón cuya lista es de la empresa activa (A9), con el id de su lista y el precio calculado. */
-async function exigirLineaDeEmpresa(
+/**
+ * Toma el advisory lock por lista (NAMESPACE_LOCK_LISTA) y devuelve el renglón (A9) CON el estado de
+ * su lista (`esCierre`), leído BAJO el lock — race-free vs `cambiarEstadoLista` (cierra el TOCTOU).
+ * El `idLista` de un renglón es INMUTABLE (los renglones no migran de lista), así que leerlo sin lock
+ * y luego bloquear por él es seguro. Se exporta para que `negociacion.ts` reutilice el mismo patrón.
+ */
+export async function exigirLineaBloqueandoLista(
   tx: Tx,
   idLinea: number,
   idEmpresa: number,
-): Promise<{ id: number; idLista: number; precioCalculado: Prisma.Decimal }> {
+): Promise<{
+  id: number;
+  idLista: number;
+  idDesarrollo: number;
+  idPrecosto: number;
+  precioCalculado: Prisma.Decimal;
+  precioAprobado: Prisma.Decimal | null;
+  esCierre: boolean;
+}> {
+  const base = await tx.listaPreciosLinea.findFirst({
+    where: { id: idLinea, lista: { idEmpresa } },
+    select: { idLista: true },
+  });
+  if (base === null) {
+    throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
+  }
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_LISTA}::int, ${base.idLista}::int)`;
+  // Re-lectura BAJO el lock: el estado (esCierre) ya no puede cambiar hasta el commit.
   const linea = await tx.listaPreciosLinea.findFirst({
     where: { id: idLinea, lista: { idEmpresa } },
-    select: { id: true, idLista: true, precioCalculado: true },
+    select: {
+      id: true,
+      idLista: true,
+      idDesarrollo: true,
+      idPrecosto: true,
+      precioCalculado: true,
+      precioAprobado: true,
+      lista: { select: { estadoLista: { select: { esCierre: true } } } },
+    },
   });
   if (linea === null) {
     throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
   }
-  return linea;
+  return {
+    id: linea.id,
+    idLista: linea.idLista,
+    idDesarrollo: linea.idDesarrollo,
+    idPrecosto: linea.idPrecosto,
+    precioCalculado: linea.precioCalculado,
+    precioAprobado: linea.precioAprobado,
+    esCierre: linea.lista.estadoLista.esCierre,
+  };
+}
+
+/**
+ * Guard de negociación/edición: una lista en estado de CIERRE (cerrada/ya-pedida) no admite rondas,
+ * acuerdos ni ediciones de renglón (reabrir = cambiar de estado, auditado). Se lee `esCierre` BAJO el
+ * advisory lock por lista, así que es race-free (D3: la lista congelada no se toca por sorpresa).
+ */
+export function exigirListaNoCerrada(esCierre: boolean): void {
+  if (esCierre) {
+    throw new ErrorConflicto(
+      'La lista está cerrada; reábrela (cambia su estado) para negociar o editar sus renglones.',
+    );
+  }
 }
 
 // ── Crear lista ─────────────────────────────────────────────────────────────────────
@@ -369,10 +437,10 @@ export async function editarFactoresLista(
 
   await enTransaccion(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(${NAMESPACE_LOCK_LISTA}::int, ${idLista}::int)`;
-    await exigirLista(tx, idLista, sesion.idEmpresaActiva);
-    // TODO(E5): antes de habilitar transiciones de estado, E5 DEBE agregar aquí el guard de `esCierre`
-    // (no editar factores/recalcular sobre una lista en estado de cierre). En E4 la lista siempre está
-    // `abierta`, así que hoy es inalcanzable.
+    const lista = await exigirLista(tx, idLista, sesion.idEmpresaActiva);
+    // E5: no se editan factores/recalculan precios sobre una lista en estado de CIERRE. El `esCierre`
+    // se leyó BAJO el mismo advisory lock que `cambiarEstadoLista` toma → race-free.
+    exigirListaNoCerrada(lista.esCierre);
 
     await tx.listaPrecios.update({
       where: { id: idLista },
@@ -427,9 +495,10 @@ export async function aprobarLinea(
   verificarPermiso(sesion, 'listas.aprobar');
 
   const idLista = await enTransaccion(async (tx) => {
-    const linea = await exigirLineaDeEmpresa(tx, idLinea, sesion.idEmpresaActiva);
-    // TODO(E5): antes de habilitar transiciones de estado, E5 DEBE agregar aquí el guard de `esCierre`
-    // (no aprobar sobre una lista en estado de cierre). En E4 la lista siempre está `abierta`.
+    // Toma el advisory lock por lista ANTES de leer el estado (race-free vs `cambiarEstadoLista`).
+    const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    // E5: no se aprueba sobre una lista en estado de CIERRE.
+    exigirListaNoCerrada(linea.esCierre);
     if (num(linea.precioCalculado) <= 0) {
       throw new ErrorConflicto(
         'No se puede aprobar un precio calculado de 0; ajusta el precosto (para que tenga costo) o teclea un precio.',
@@ -472,9 +541,10 @@ export async function ajustarPrecioLinea(
   const datos: DatosAjustarPrecioLinea = validarEntrada(esquemaAjustarPrecioLinea, entrada);
 
   const idLista = await enTransaccion(async (tx) => {
-    const linea = await exigirLineaDeEmpresa(tx, idLinea, sesion.idEmpresaActiva);
-    // TODO(E5): antes de habilitar transiciones de estado, E5 DEBE agregar aquí el guard de `esCierre`
-    // (no teclear precio sobre una lista en estado de cierre). En E4 la lista siempre está `abierta`.
+    // Toma el advisory lock por lista ANTES de leer el estado (race-free vs `cambiarEstadoLista`).
+    const linea = await exigirLineaBloqueandoLista(tx, idLinea, sesion.idEmpresaActiva);
+    // E5: no se teclea precio sobre una lista en estado de CIERRE.
+    exigirListaNoCerrada(linea.esCierre);
     await tx.listaPreciosLinea.update({
       where: { id: idLinea },
       data: {
