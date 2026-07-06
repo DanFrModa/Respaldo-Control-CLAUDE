@@ -27,26 +27,12 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { num, numOrNull, redondear2 } from './decimales.js';
 import { calcularPrecioSugerido, type ParametrosPrecioSugerido } from './precio-sugerido.js';
 import { resolverPrecioAvio, resolverPrecioTela } from './resolucion-precios.js';
 
 /** Cliente de LECTURA. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
-
-/** Redondeo monetario a 2 decimales (evita artefactos de float en las sumas). */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/** Nº de un `Decimal` opcional (null → 0). Patrón ceronulo. */
-function num(d: Prisma.Decimal | null | undefined): number {
-  return d == null ? 0 : d.toNumber();
-}
-
-/** Nº de un `Decimal` opcional CONSERVANDO el null (para la cascada de resolución de precios, F8). */
-function numOrNull(d: Prisma.Decimal | null | undefined): number | null {
-  return d == null ? null : d.toNumber();
-}
 
 /**
  * Parámetros de precio (utilidad/regalías) de la empresa activa (A9). Si la config no los trae, cae a

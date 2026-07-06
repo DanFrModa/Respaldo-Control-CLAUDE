@@ -23,6 +23,9 @@ import { rutasEstadosLista } from './api/desarrollo/estados-lista.rutas.js';
 // con dos números; estado DERIVADO). La capa previa a la cotización.
 import { rutasProyectos } from './api/desarrollo/proyectos.rutas.js';
 import { rutasDesarrollos } from './api/desarrollo/desarrollos.rutas.js';
+// Desarrollo (Módulo 15, F8-E3): precosto PERSISTIDO por desarrollo (versionable por congelado
+// inmutable), calculado desde el BOM con los precios amarrados de E1.
+import { rutasPrecostos } from './api/desarrollo/precostos.rutas.js';
 import { rutasTelaProveedores } from './api/telas/tela-proveedores.rutas.js';
 import { rutasClienteDepartamentos } from './api/clientes/cliente-departamentos.rutas.js';
 import { rutasInventarioAvios } from './api/inventarios/avios.rutas.js';
@@ -309,6 +312,9 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // motivo). RBAC desarrollo.ver/.administrar (ya sembrados en E1).
   await app.register(rutasProyectos, { prefix: '/api' });
   await app.register(rutasDesarrollos, { prefix: '/api' });
+  // Desarrollo (Módulo 15, F8-E3): precosto persistido por desarrollo (RBAC desarrollo.ver/.precostear,
+  // ya sembrados en E1). Importes ocultos sin consultas.ver-importes.
+  await app.register(rutasPrecostos, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

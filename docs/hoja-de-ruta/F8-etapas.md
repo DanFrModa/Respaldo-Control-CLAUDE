@@ -160,7 +160,7 @@
 
 ---
 
-## F8-E3 · Motor de precosteo por desarrollo: persistido, amarrado y versionable (R17/R18/R19) ⭐ — ⬜ pendiente
+## F8-E3 · Motor de precosteo por desarrollo: persistido, amarrado y versionable (R17/R18/R19) ⭐ — ✅ (pend. verif. de Gabriel en `prueba`)
 
 **Objetivo:** El corazón de la fase: convertir el precosteo al vuelo de F7 en un **precosto PERSISTIDO por desarrollo**, calculado desde el BOM con los **precios amarrados** (E1), el **promedio de las medidas por talla** (R18) y **N conceptos de costo** (R19), y **versionable por congelado inmutable** (la base del re-costeo de negociación de E5). Es el motor central → **2 reviewers** (como el kardex F3-E1 y el recibo F3-E4).
 
@@ -203,6 +203,18 @@
 - `backend/src/dominio/costos/pre-costo.ts` (`calcularPreCosto`, `incluirReceta` — la referencia de QUÉ leer del BOM) y `precio-sugerido.ts` (helper puro, el estilo a seguir)
 - Patrón snapshot: `RequerimientoOrden` (schema ~3116) y `CostoOrden` `*Calc` (~4221)
 - docs/modulos/costos-indicadores.md (si existe; cómo quedó F7) · docs/hoja-de-ruta/F7-etapas.md E1
+
+**✅ Nota de cierre (2026-07-05 — pend. verif. de Gabriel en `prueba`):**
+- **1 coder + 2 reviewers independientes** (motor central, como pedía la ficha). **Reviewer #1** (dominio/correctness): CAMBIOS REQUERIDOS. **Reviewer #2** (API/frontend/tests): APROBADO CON OBSERVACIONES. **Los dos hallaron por separado el mismo bloqueante** (B1). **TODOS** los hallazgos —bloqueante y no-bloqueantes— se corrigieron en la misma ronda (regla nueva de Gabriel *"un defecto conocido no es menor"*, ahora en `CLAUDE.md` §7.3). Gates locales finales verdes (corridos por el lead tras 2 caídas de infraestructura del coder): backend `typecheck`/`lint`/`format:check`/`test:unit` (**750**) + `openapi` sin drift; frontend `typecheck`/`lint`/`format:check`/`test` (**504**) + `build` + `gen:api` sin drift. Integración (17 casos) y e2e corren en CI.
+- **SIN migración, SIN permisos, SIN seed nuevos:** las tablas `Precosto`/`PrecostoLinea` y el permiso `desarrollo.precostear` ya nacieron en E1. La etapa fue dominio → API → frontend + tests. (El deploy de la fase a `prueba` sigue requiriendo `SEED_ON_START=true` por E1.)
+- **Dominio** (`backend/src/dominio/desarrollo/precostos.ts`): `generarPrecosto` lee el BOM (`paraPreCosto:true`, como F7) y arma renglones por concepto con los **precios amarrados de E1** (`resolverPrecioTela`/`resolverPrecioAvio`, cascada); avío `consumoPorTalla` = **promedio simple** de las medidas por talla (decisión g), con fallback a `consumoPorPrenda` si no hay tallas capturadas (sin división por cero); maquila desde `Modelo.maquilaBase` editable; **regalía FUERA del costo** (D2). `recalcularDesdeBom` refresca solo los renglones BOM sin pisar los manuales. `congelarVersion` persiste `costoTotal` y marca inmutable (D3). **A lo más UN borrador por desarrollo** y **TODA mutación** serializada por `pg_advisory_xact_lock(idDesarrollo)` (helpers `bloquearDesarrollo`/`bloquearDesarrolloDePrecosto`, con scope de empresa A9) → `exigirBorrador` se evalúa BAJO el lock (cierra el write-skew que si no violaría la inmutabilidad D3). Estado del desarrollo → `cotizado` al congelar v1 (deriva del helper de E2, no se setea a mano).
+- **API** (`api/desarrollo/precostos.rutas.ts`): 8 endpoints; lecturas exigen `desarrollo.ver`, **mutaciones exigen `desarrollo.precostear` AND `desarrollo.ver`** (mutar implica poder leer → evita el 403-tras-commit); importes (`precioUnit`/`importe`/`costoTotal`) en `null` sin `consultas.ver-importes` (ocultación **server-side**; el `consumo` siempre visible).
+- **Refactor de F7 sin regresión:** se extrajeron `redondear2`/`num`/`numOrNull` a `dominio/costos/decimales.ts`, compartidos por `pre-costo.ts` (F7) y E3 — F7 quedó idéntico (750 unit verdes + no-regresión de E1).
+- **Frontend** (`DialogoPrecosto.tsx` en el detalle del desarrollo): renglones agrupados por concepto, editar/agregar/quitar manuales, recalcular con confirmación, congelar, historial de versiones (solo lectura). **Traza de tela FIEL** (guarda `idTelaProveedor` solo si el precio salió del amarre; null si cayó a sugerido/color-referencia — como ya hacía el avío). El `<select>` de conceptos manuales **excluye los fijos** (Tela/Avíos/Maquila/Bordado salen del BOM). `verImportes` **derivado del permiso real** (no de inferir `costoTotal===null`); sin él, los controles de precio no permiten sobrescribir a ciegas.
+- **Correcciones de la review (todas aplicadas, no archivadas):** B1 (renglón manual bajo concepto fijo → rechazado en dominio + filtrado en front); traza de tela fiel; guarda de transparencia; **403-tras-mutación cerrado** (la mutación exige `ver`); **write-skew/D3 cerrado** (lock en las 6 operaciones); + cobertura de tests (cross-empresa A9, congelado inmutable en las 5 mutaciones, `consumoPorTalla` sin tallas, manual-bajo-fijo, traza fiel).
+- **Punto a confirmar con Daniel (no bloquea):** el renglón manual (estampado/otros) se captura **a mano** (precio + consumo opcional), sin fuente de catálogo de precio — coherente con "conceptos abiertos" (R19), pero conviene que Daniel lo confirme.
+- **Nota de proceso:** el coder tuvo 2 caídas de infraestructura (error de API + stall del watchdog), no de lógica; el trabajo aterrizó completo en disco y el **lead corrió los gates locales**. Recordatorio: integración/e2e son gate de **CI**, no local (regla Docker).
+- **Pendiente:** verificación de Gabriel en `prueba` (checklist de "Verificación de Gabriel" de arriba) tras el deploy con `SEED_ON_START=true`.
 
 ---
 
