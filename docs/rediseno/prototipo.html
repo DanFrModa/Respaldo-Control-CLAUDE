@@ -721,8 +721,7 @@
   .pc-in.mono { font-family: var(--ff-mono); text-align: right; }
   .pc-line { display: grid; gap: 10px; align-items: center; margin-bottom: 8px; }
   .pc-proc-row { grid-template-columns: 1fr 130px 34px; }
-  .pc-tela-row { grid-template-columns: 1fr 110px 96px 34px; }
-  .pc-avio-row { grid-template-columns: 1.25fr 1.15fr 76px 80px 34px; }
+  .pc-tela-row, .pc-avio-row { grid-template-columns: 1.25fr 1.15fr 76px 80px 34px; }
   .pc-tela-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
   .pc-avio-sub { font-family: var(--ff-mono); font-size: 12px; color: var(--muted); text-align: right; }
   .pc-empty { font-size: 12px; color: var(--faint); padding: 6px 2px; }
@@ -2928,12 +2927,28 @@ const DEPTOS = {
   'Shasa': ['Juvenil', 'Deportivo'],
 };
 const CLIENTES_PC = Object.keys(DEPTOS);
+/* Telas: `generico` (extensión propuesta — hoy solo avíos lo tienen en el backend)
+   y `provs` (varios proveedores con precio — TelaProveedor, espejo de AvioProveedor). */
 const TELAS_PC = [
-  { nom: 'Algodón peinado 30/1', precio: 128.00, un: 'kg' }, { nom: 'Felpa francesa 320g', precio: 96.50, un: 'kg' },
-  { nom: 'Mezclilla stretch 8oz', precio: 74.00, un: 'm' }, { nom: 'Lycra suplex 240g', precio: 110.00, un: 'kg' },
-  { nom: 'Franela lavada 180g', precio: 68.00, un: 'm' },
+  { nom: 'Algodón peinado 30/1', precio: 128.00, un: 'kg', generico: true, provs: [{ prov: 'Hilaturas del Norte', precio: 128.00 }, { prov: 'Textiles del Bajío', precio: 124.00 }] },
+  { nom: 'Felpa 240 gr 50/50', precio: 88.00, un: 'kg', generico: true, provs: [{ prov: 'Textiles Aztlán', precio: 88.00 }, { prov: 'Telas MX', precio: 85.00 }] },
+  { nom: 'Felpa francesa 320g', precio: 96.50, un: 'kg', generico: false, provs: [{ prov: 'Textiles Aztlán', precio: 96.50 }] },
+  { nom: 'Mezclilla stretch 8oz', precio: 74.00, un: 'm', generico: false, provs: [{ prov: 'Denim MX', precio: 74.00 }] },
+  { nom: 'Lycra suplex 240g', precio: 110.00, un: 'kg', generico: true, provs: [{ prov: 'Textiles Lycra', precio: 110.00 }] },
+  { nom: 'Franela lavada 180g', precio: 68.00, un: 'm', generico: true, provs: [{ prov: 'Textiles Aztlán', precio: 68.00 }] },
 ];
 const telaPCBy = (n) => TELAS_PC.find(t => t.nom === n);
+function precioTelaPC(nom, prov) {
+  const t = telaPCBy(nom); if (!t) return 0;
+  if (prov) { const p = (t.provs || []).find(x => x.prov === prov); if (p) return p.precio; }
+  if ((t.provs || []).length) return Math.min(...t.provs.map(x => x.precio));
+  return t.precio || 0;
+}
+const provOptsTela = (nom, sel) => {
+  const t = telaPCBy(nom); const provs = t ? (t.provs || []) : [];
+  return `<option value=""${!sel ? ' selected' : ''}>— sin definir (más barato) —</option>` + provs.map(p => `<option value="${p.prov}"${sel === p.prov ? ' selected' : ''}>${p.prov} · $${p.precio.toFixed(2)}</option>`).join('');
+};
+const badgeGen = (g) => g ? '<span class="badge info" style="font-size:10px" title="Se compra para stock y se netea en el MRP"><span class="d"></span>Genérico · stock</span>' : '<span class="badge neutral" style="font-size:10px" title="Se compra por orden de producción"><span class="d"></span>Por orden</span>';
 const PROCESOS_PC = ['Estampado serigrafía', 'Estampado DTF', 'Bordado', 'Sublimado', 'Lavado', 'Teñido', 'Plisado'];
 /* Cada avío puede ser surtido por VARIOS proveedores, cada uno con su precio
    (backend: AvioProveedor). `precio` = precio de referencia (Avio.precioReferencia),
@@ -2941,15 +2956,15 @@ const PROCESOS_PC = ['Estampado serigrafía', 'Estampado DTF', 'Bordado', 'Subli
    SIN proveedor (ModeloAvio.idAvioProveedor NULL → costea "al más barato"); el
    proveedor real se define en la compra. */
 const AVIOS_PC = [
-  { nom: 'Etiqueta tejida MJD', precio: 1.20, provs: [{ prov: 'Etiquetas Sol', precio: 1.20 }, { prov: 'Etiquetas del Norte', precio: 1.35 }] },
-  { nom: 'Etiqueta de composición', precio: 0.45, provs: [{ prov: 'Etiquetas Sol', precio: 0.45 }] },
-  { nom: 'Etiqueta de lavado', precio: 0.50, provs: [] },
-  { nom: 'Hilo poliéster Tex 40', precio: 0.30, provs: [{ prov: 'Hilos Reyna', precio: 0.30 }, { prov: 'Hilos del Bajío', precio: 0.28 }] },
-  { nom: 'Resorte 3 cm', precio: 4.80, provs: [{ prov: 'Elásticos GTO', precio: 4.80 }, { prov: 'Elásticos MX', precio: 5.10 }] },
-  { nom: 'Botón 4 hoyos 18L', precio: 0.60, provs: [{ prov: 'Botones del Centro', precio: 0.60 }] },
-  { nom: 'Cierre #5 metálico 18 cm', precio: 6.50, provs: [{ prov: 'Cierres YKK', precio: 6.50 }, { prov: 'Cierres Express', precio: 6.20 }] },
-  { nom: 'Bolsa polietileno 30×40', precio: 0.80, provs: [{ prov: 'Plásticos MX', precio: 0.80 }] },
-  { nom: 'Elástico 5 cm', precio: 5.20, provs: [{ prov: 'Elásticos GTO', precio: 5.20 }] },
+  { nom: 'Etiqueta tejida MJD', precio: 1.20, generico: false, provs: [{ prov: 'Etiquetas Sol', precio: 1.20 }, { prov: 'Etiquetas del Norte', precio: 1.35 }] },
+  { nom: 'Etiqueta de composición', precio: 0.45, generico: true, provs: [{ prov: 'Etiquetas Sol', precio: 0.45 }] },
+  { nom: 'Etiqueta de lavado', precio: 0.50, generico: false, provs: [] },
+  { nom: 'Hilo poliéster Tex 40', precio: 0.30, generico: true, provs: [{ prov: 'Hilos Reyna', precio: 0.30 }, { prov: 'Hilos del Bajío', precio: 0.28 }] },
+  { nom: 'Resorte 3 cm', precio: 4.80, generico: true, provs: [{ prov: 'Elásticos GTO', precio: 4.80 }, { prov: 'Elásticos MX', precio: 5.10 }] },
+  { nom: 'Botón 4 hoyos 18L', precio: 0.60, generico: true, provs: [{ prov: 'Botones del Centro', precio: 0.60 }] },
+  { nom: 'Cierre #5 metálico 18 cm', precio: 6.50, generico: false, provs: [{ prov: 'Cierres YKK', precio: 6.50 }, { prov: 'Cierres Express', precio: 6.20 }] },
+  { nom: 'Bolsa polietileno 30×40', precio: 0.80, generico: true, provs: [{ prov: 'Plásticos MX', precio: 0.80 }] },
+  { nom: 'Elástico 5 cm', precio: 5.20, generico: true, provs: [{ prov: 'Elásticos GTO', precio: 5.20 }] },
 ];
 const avioPCBy = (n) => AVIOS_PC.find(a => a.nom === n);
 function precioAvioPC(nom, prov) {
@@ -3029,7 +3044,7 @@ let PROYECTOS = [
 ];
 
 function costoModelo(m) {
-  const tela = (m.telas || []).reduce((a, t) => a + (t.nom && telaPCBy(t.nom) ? telaPCBy(t.nom).precio * (t.consumo || 0) : 0), 0);
+  const tela = (m.telas || []).reduce((a, t) => a + precioTelaPC(t.nom, t.prov) * (t.consumo || 0), 0);
   const avios = (m.avios || []).reduce((a, x) => a + precioAvioPC(x.nom, x.prov) * (x.consumo || 0), 0);
   const procs = (m.procesos || []).reduce((a, x) => a + (x.precio || 0), 0);
   const maq = m.maquila || 0;
@@ -3175,7 +3190,7 @@ function pcSync() {
   m.nuestro = p.querySelector('#pcNuestro').value.trim();
   m.clienteNum = p.querySelector('#pcCliente').value.trim();
   m.estatus = p.querySelector('#pcEstatus').value;
-  m.telas = [...p.querySelectorAll('.pc-tela-row')].map(r => ({ nom: r.querySelector('.pc-tela-nom').value, consumo: parseFloat(r.querySelector('.pc-tela-cons').value) || 0 }));
+  m.telas = [...p.querySelectorAll('.pc-tela-row')].map(r => ({ nom: r.querySelector('.pc-tela-nom').value, prov: r.querySelector('.pc-tela-prov') ? r.querySelector('.pc-tela-prov').value : '', consumo: parseFloat(r.querySelector('.pc-tela-cons').value) || 0 }));
   m.maquila = parseFloat(p.querySelector('#pcMaquila').value) || 0;
   m.margen = parseFloat(p.querySelector('#pcMargen').value) || 0;
   m.procesos = [...p.querySelectorAll('.pc-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
@@ -3194,12 +3209,13 @@ function pcRecalc() {
   });
   const tsub = pcPanel.querySelector('#pcTelaSub'); if (tsub) tsub.textContent = money(c.tela);
   pcPanel.querySelectorAll('.pc-tela-row').forEach(r => {
-    const nom = r.querySelector('.pc-tela-nom').value, cons = parseFloat(r.querySelector('.pc-tela-cons').value) || 0;
-    const s = r.querySelector('.pc-tela-sub'); if (s) s.textContent = money((telaPCBy(nom) ? telaPCBy(nom).precio : 0) * cons);
+    const nom = r.querySelector('.pc-tela-nom').value, prov = r.querySelector('.pc-tela-prov') ? r.querySelector('.pc-tela-prov').value : '', cons = parseFloat(r.querySelector('.pc-tela-cons').value) || 0;
+    const s = r.querySelector('.pc-tela-sub'); if (s) s.textContent = money(precioTelaPC(nom, prov) * cons);
   });
 }
-function pcAddTela() { pcSync(); pcEdit.m.telas.push({ nom: '', consumo: 0 }); renderModeloEditor(); }
+function pcAddTela() { pcSync(); pcEdit.m.telas.push({ nom: '', prov: '', consumo: 0 }); renderModeloEditor(); }
 function pcDelTela(i) { pcSync(); pcEdit.m.telas.splice(i, 1); renderModeloEditor(); }
+function pcTelaReRender(i) { pcSync(); if (pcEdit.m.telas[i]) pcEdit.m.telas[i].prov = ''; renderModeloEditor(); }
 function pcAddProceso() { pcSync(); pcEdit.m.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderModeloEditor(); }
 function pcDelProceso(i) { pcSync(); pcEdit.m.procesos.splice(i, 1); renderModeloEditor(); }
 function pcAddAvio() { pcSync(); pcEdit.m.avios.push({ nom: AVIOS_PC[0].nom, prov: '', consumo: 1 }); renderModeloEditor(); }
@@ -3244,14 +3260,15 @@ function renderModeloEditor() {
       <h4>Telas <span class="hint" id="pcTelaSub">${money(c.tela)}</span></h4>
       <div id="pcTelas">
         ${(m.telas || []).map((t, i) => `<div class="pc-line pc-tela-row">
-          <select class="pc-in pc-tela-nom"><option value="">— elige la tela —</option>${TELAS_PC.map(o => `<option${t.nom === o.nom ? ' selected' : ''}>${o.nom}</option>`).join('')}</select>
+          <select class="pc-in pc-tela-nom" onchange="event.stopPropagation();pcTelaReRender(${i})"><option value="">— elige la tela —</option>${TELAS_PC.map(o => `<option${t.nom === o.nom ? ' selected' : ''}>${o.nom}</option>`).join('')}</select>
+          <select class="pc-in pc-tela-prov">${provOptsTela(t.nom, t.prov)}</select>
           <input class="pc-in mono pc-tela-cons" type="number" step="any" min="0" value="${t.consumo || ''}" placeholder="0.42">
-          <span class="pc-tela-sub mono">${money((telaPCBy(t.nom) ? telaPCBy(t.nom).precio : 0) * (t.consumo || 0))}</span>
+          <span class="pc-tela-sub mono">${money(precioTelaPC(t.nom, t.prov) * (t.consumo || 0))}</span>
           <button class="pc-line-del" onclick="pcDelTela(${i})" title="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>`).join('') || '<div class="pc-empty">Sin telas. Un modelo puede llevar varias (D5 — felpa + acompañante).</div>'}
       </div>
       <button class="btn ghost sm" onclick="pcAddTela()" style="margin-top:8px">${IC.plus}Agregar tela</button>
-      <div class="pc-hint-cell" style="margin-top:8px">El precio de cada tela se toma del catálogo (por proveedor y color en el real, R16). Un modelo puede llevar <b>varias telas</b> (D5).</div>
+      <div class="pc-hint-cell" style="margin-top:8px">Elige el <b>proveedor asumido</b> para el costeo (o "sin definir" = al más barato). En la <b>compra</b> se puede cambiar el proveedor y el precio. Un modelo puede llevar <b>varias telas</b> (D5).</div>
     </div>
 
     <div class="pc-sec">
@@ -3286,6 +3303,7 @@ function renderModeloEditor() {
         </div>`).join('') || '<div class="pc-empty">Sin avíos todavía.</div>'}
       </div>
       <button class="btn ghost sm" onclick="pcAddAvio()" style="margin-top:8px">${IC.plus}Agregar avío</button>
+      <div class="pc-hint-cell" style="margin-top:8px">El <b>proveedor</b> es el asumido para el costeo; en la <b>compra</b> se puede cambiar (proveedor y precio). Déjalo "sin definir" solo si aún no lo sabes.</div>
     </div>
 
     <div class="pc-sec">
@@ -3367,8 +3385,8 @@ function vAvios() {
   <div class="kpis">
     ${kpi('Avíos (SKU)', String(AVIOS_INV.length), '', 'up', '+11', '')}
     ${kpi('Multi-proveedor', String(AVIOS_INV.filter(m => (((avioPCBy(m[1]) || {}).provs) || []).length > 1).length), '', 'up', '', 'con opción')}
+    ${kpi('Genéricos', String(AVIOS_INV.filter(m => ((avioPCBy(m[1]) || {}).generico)).length), '', 'up', '', 'stock · se netean en MRP')}
     ${kpi('Sin proveedor', String(sinProv), '', sinProv ? 'down' : 'up', '', 'se define en compra')}
-    ${kpi('Bajo mínimo', '3', '', 'down', '+1', 'sugerir compra')}
   </div>
   <div class="card">
     <div class="toolbar"><button class="chip active">Todos</button><button class="chip">Bajo mínimo</button><button class="chip">Sin proveedor</button>
@@ -3377,7 +3395,7 @@ function vAvios() {
       ${AVIOS_INV.map((m, i) => { const a = avioPCBy(m[1]) || {}; const provs = a.provs || []; const exp = avExpand.has(i); const barato = provs.length ? Math.min(...provs.map(p => p.precio)) : null; return `<tr>
         <td><div class="cellflex">
           <button class="lp-exp ${exp ? 'open' : ''}" onclick="toggleAvExp(${i})" title="Ver proveedores">${IC.chevron}</button>
-          <span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]}</div><div class="cell-code">${m[0]}</div></div>
+          <span class="thumb" style="background:#0891b2">AV</span><div><div class="cell-strong">${m[1]} ${badgeGen(a.generico)}</div><div class="cell-code">${m[0]}</div></div>
         </div></td>
         <td>${provs.length ? `<span class="badge info"><span class="d"></span>${provs.length} proveedor${provs.length > 1 ? 'es' : ''}</span>` : `<span class="badge warn"><span class="d"></span>Sin proveedor</span>`}</td>
         <td class="r num">${m[2].toLocaleString('es-MX')} <span class="cell-sub">${m[3]}</span></td>
@@ -3467,7 +3485,7 @@ function desgloseHTML(dt) {
   const c = costoModelo(dt);
   const row = (k, v) => `<div class="dg-row"><span>${k}</span><b class="mono">${v}</b></div>`;
   return `<div class="dg">
-    ${(dt.telas || []).map(t => { const tp = telaPCBy(t.nom); return row('Tela — ' + (t.nom || '—') + (t.consumo ? ` (${t.consumo}${tp ? ' ' + tp.un : ''} × $${tp ? tp.precio.toFixed(2) : '0'})` : ''), money((tp ? tp.precio : 0) * (t.consumo || 0))); }).join('')}
+    ${(dt.telas || []).map(t => { const tp = telaPCBy(t.nom); const pr = precioTelaPC(t.nom, t.prov); return row('Tela — ' + (t.nom || '—') + (t.consumo ? ` (${t.consumo}${tp ? ' ' + tp.un : ''} × $${pr.toFixed(2)})` : '') + (t.prov ? ' · ' + t.prov : (tp ? ' · <i>sin proveedor</i>' : '')), money(pr * (t.consumo || 0))); }).join('')}
     ${(dt.avios || []).map(a => { const pr = precioAvioPC(a.nom, a.prov); return row('Avío — ' + a.nom + ` (${a.consumo} × $${pr.toFixed(2)})` + (a.prov ? ' · ' + a.prov : ' · <i>sin proveedor</i>'), money(pr * a.consumo)); }).join('')}
     ${(dt.procesos || []).map(p => row('Proceso — ' + p.tipo, money(p.precio))).join('')}
     ${row('Maquila (costura)', money(dt.maquila || 0))}
@@ -3612,7 +3630,7 @@ function negSync() {
   const p = negPanel;
   const obj = p.querySelector('#negObj'); if (obj) negObjetivo = parseFloat(obj.value) || 0;
   if (!p.querySelector('#negTelas')) return;
-  negDet.telas = [...p.querySelectorAll('.neg-tela-row')].map(r => ({ nom: r.querySelector('.neg-tela-nom').value, consumo: parseFloat(r.querySelector('.neg-tela-cons').value) || 0 }));
+  negDet.telas = [...p.querySelectorAll('.neg-tela-row')].map(r => ({ nom: r.querySelector('.neg-tela-nom').value, prov: r.querySelector('.neg-tela-prov') ? r.querySelector('.neg-tela-prov').value : '', consumo: parseFloat(r.querySelector('.neg-tela-cons').value) || 0 }));
   negDet.maquila = parseFloat(p.querySelector('#negMaquila').value) || 0;
   negDet.procesos = [...p.querySelectorAll('.neg-proc-row')].map(r => ({ tipo: r.querySelector('.pc-proc-tipo').value, precio: parseFloat(r.querySelector('.pc-proc-precio').value) || 0 }));
   negDet.avios = [...p.querySelectorAll('.neg-avio-row')].map(r => ({ nom: r.querySelector('.pc-avio-nom').value, prov: r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', consumo: parseFloat(r.querySelector('.pc-avio-cons').value) || 0 }));
@@ -3626,10 +3644,11 @@ function negRecalc() {
   set('#negCosto', money(c.costo)); set('#negNeto', money(neto)); set('#negFootCosto', money(c.costo));
   ['#negMB', '#negFootMB'].forEach(id => { const el = negPanel.querySelector(id); if (el) { el.textContent = mb.toFixed(1) + '%'; el.style.color = col; } });
   negPanel.querySelectorAll('.neg-avio-row').forEach(r => { const nom = r.querySelector('.pc-avio-nom').value, prov = r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0; const s = r.querySelector('.pc-avio-sub'); if (s) s.textContent = money(precioAvioPC(nom, prov) * cons); });
-  negPanel.querySelectorAll('.neg-tela-row').forEach(r => { const nom = r.querySelector('.neg-tela-nom').value, cons = parseFloat(r.querySelector('.neg-tela-cons').value) || 0; const s = r.querySelector('.neg-tela-sub'); if (s) s.textContent = money((telaPCBy(nom) ? telaPCBy(nom).precio : 0) * cons); });
+  negPanel.querySelectorAll('.neg-tela-row').forEach(r => { const nom = r.querySelector('.neg-tela-nom').value, prov = r.querySelector('.neg-tela-prov') ? r.querySelector('.neg-tela-prov').value : '', cons = parseFloat(r.querySelector('.neg-tela-cons').value) || 0; const s = r.querySelector('.neg-tela-sub'); if (s) s.textContent = money(precioTelaPC(nom, prov) * cons); });
 }
-function negAddTela() { negSync(); negDet.telas.push({ nom: '', consumo: 0 }); renderNeg(); }
+function negAddTela() { negSync(); negDet.telas.push({ nom: '', prov: '', consumo: 0 }); renderNeg(); }
 function negDelTela(i) { negSync(); negDet.telas.splice(i, 1); renderNeg(); }
+function negTelaReRender(i) { negSync(); if (negDet.telas[i]) negDet.telas[i].prov = ''; renderNeg(); }
 function negAddProc() { negSync(); negDet.procesos.push({ tipo: PROCESOS_PC[0], precio: 0 }); renderNeg(); }
 function negDelProc(i) { negSync(); negDet.procesos.splice(i, 1); renderNeg(); }
 function negAddAvio() { negSync(); negDet.avios.push({ nom: AVIOS_PC[0].nom, prov: '', consumo: 1 }); renderNeg(); }
@@ -3675,9 +3694,10 @@ function renderNeg() {
       <h4>Elementos del modelo <span class="hint">edítalos en vivo para llegar al costo</span></h4>
       <div class="proc-summary-title">Telas <span style="font-weight:400;color:var(--faint)">— un modelo puede llevar varias</span></div>
       <div id="negTelas">${(negDet.telas || []).map((t, i) => `<div class="pc-line pc-avio-row neg-tela-row">
-        <select class="pc-in neg-tela-nom"><option value="">— tela —</option>${TELAS_PC.map(o => `<option${t.nom === o.nom ? ' selected' : ''}>${o.nom}</option>`).join('')}</select>
+        <select class="pc-in neg-tela-nom" onchange="event.stopPropagation();negTelaReRender(${i})"><option value="">— tela —</option>${TELAS_PC.map(o => `<option${t.nom === o.nom ? ' selected' : ''}>${o.nom}</option>`).join('')}</select>
+        <select class="pc-in neg-tela-prov">${provOptsTela(t.nom, t.prov)}</select>
         <input class="pc-in mono neg-tela-cons" type="number" step="any" min="0" value="${t.consumo || ''}">
-        <span class="pc-avio-sub mono neg-tela-sub">${money((telaPCBy(t.nom) ? telaPCBy(t.nom).precio : 0) * (t.consumo || 0))}</span>
+        <span class="pc-avio-sub mono neg-tela-sub">${money(precioTelaPC(t.nom, t.prov) * (t.consumo || 0))}</span>
         <button class="pc-line-del" onclick="negDelTela(${i})">${icXsvg}</button>
       </div>`).join('') || '<div class="pc-empty">Sin telas.</div>'}</div>
       <button class="btn ghost sm" onclick="negAddTela()" style="margin-top:6px">${IC.plus}Agregar tela</button>
