@@ -8,6 +8,8 @@
  *  • LEER (listado/detalle/candidatos)        → `listas.ver`.
  *  • CREAR / editar factores                  → `listas.administrar` + `listas.ver`.
  *  • APROBAR / teclear precio de un renglón    → `listas.aprobar` + `listas.ver`.
+ *  • NEGOCIAR (rondas/acuerdos/cambiar estado) → `listas.negociar` + `listas.ver` (F8-E5).
+ *  • Historial de eventos de un renglón        → `listas.ver` (F8-E5).
  *  • PDF / Excel                              → `listas.ver` + `consultas.ver-importes` (el impreso ES
  *    la exportación de precios; sin ver-importes no tiene sentido → 403).
  * Se registra en `app.ts`.
@@ -26,6 +28,12 @@ import {
   esquemaListasPreciosLista,
   esquemaListasPreciosQuery,
 } from '../../contrato/esquemas/lista-precios.js';
+import {
+  esquemaAcuerdoRegistrar,
+  esquemaCambiarEstadoLista,
+  esquemaNegociacionEventos,
+  esquemaRondaRegistrar,
+} from '../../contrato/esquemas/negociacion.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
@@ -37,6 +45,12 @@ import {
   listarListas,
   obtenerLista,
 } from '../../dominio/desarrollo/listas-precios.js';
+import {
+  cambiarEstadoLista,
+  listarEventosDeLinea,
+  registrarAcuerdo,
+  registrarRonda,
+} from '../../dominio/desarrollo/negociacion.js';
 import { impresoListaPrecios } from '../../dominio/desarrollo/impresos/impreso-lista-precios.js';
 import { excelListaPrecios } from '../../dominio/desarrollo/impresos/excel-lista-precios.js';
 
@@ -211,6 +225,84 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return ajustarPrecioLinea(sesion, request.params.idLinea, request.body);
+    },
+  });
+
+  // ── Negociación por versiones (F8-E5) ─────────────────────────────────────────────
+
+  // Registrar una RONDA sobre un renglón (re-apunta a una versión congelada nueva + evento).
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/lineas/:idLinea/rondas',
+    preHandler: [app.conPermiso('listas.negociar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Registrar una ronda de negociación (re-costeo) sobre un renglón',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaRondaRegistrar,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return registrarRonda(sesion, request.params.idLinea, request.body);
+    },
+  });
+
+  // Registrar un ACUERDO sin re-costeo sobre un renglón (sólo evento).
+  app.route({
+    method: 'POST',
+    url: '/listas-precios/lineas/:idLinea/acuerdos',
+    preHandler: [app.conPermiso('listas.negociar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Registrar un acuerdo (sin re-costeo) sobre un renglón',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      body: esquemaAcuerdoRegistrar,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return registrarAcuerdo(sesion, request.params.idLinea, request.body);
+    },
+  });
+
+  // Historial de eventos de negociación de un renglón (cronológico).
+  app.route({
+    method: 'GET',
+    url: '/listas-precios/lineas/:idLinea/eventos',
+    preHandler: app.conPermiso('listas.ver'),
+    schema: {
+      tags: ['listas'],
+      summary: 'Historial de negociación de un renglón (rondas y acuerdos)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      response: { 200: esquemaNegociacionEventos, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await listarEventosDeLinea(sesion, request.params.idLinea);
+      return { datos };
+    },
+  });
+
+  // Cambiar el estado de la lista (incluida la reapertura de una lista cerrada, auditada).
+  app.route({
+    method: 'PATCH',
+    url: '/listas-precios/:id/estado',
+    preHandler: [app.conPermiso('listas.negociar'), app.conPermiso('listas.ver')],
+    schema: {
+      tags: ['listas'],
+      summary: 'Cambiar el estado de una lista de precios (negociación / cierre / reapertura)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaCambiarEstadoLista,
+      response: { 200: esquemaListaPreciosDetalle, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return cambiarEstadoLista(sesion, request.params.id, request.body);
     },
   });
 

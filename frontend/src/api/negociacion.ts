@@ -1,0 +1,156 @@
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+
+import { api } from './cliente';
+import { ErrorDeApi } from './errores';
+import { CLAVE_LISTAS, type ListaDetalle } from './listas-precios';
+import { CLAVE_PRECOSTOS } from './precostos';
+import { CLAVE_PROYECTOS } from './proyectos';
+import type { paths } from './esquema.gen';
+
+/**
+ * Capa de datos de la NEGOCIACIÓN por versiones (F8-E5). Mismo ESTÁNDAR: cliente TIPADO del OpenAPI,
+ * normalización (`data`/`ErrorDeApi`) y hooks de TanStack Query. CERO lógica de negocio (A1): el
+ * backend re-apunta el renglón a la versión nueva, recalcula el precio, resetea el aprobado, registra
+ * el evento inmutable, aplica el guard `esCierre` y oculta importes.
+ *
+ * Las mutaciones (ronda/acuerdo/estado) invalidan (a) la cache de LISTAS (listado + detalle), (b) la de
+ * EVENTOS del renglón, (c) la de PRECOSTOS (la ronda re-apunta a otra versión) y (d) la de PROYECTOS
+ * (el estado derivado del desarrollo depende de la lista).
+ */
+
+// ── Alias de tipos del contrato ────────────────────────────────────────────────
+/** Un evento de negociación de un renglón. */
+export type NegociacionEvento =
+  paths['/api/listas-precios/lineas/{idLinea}/eventos']['get']['responses']['200']['content']['application/json']['datos'][number];
+/** Cuerpo de una ronda. */
+export type RondaCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/rondas']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de un acuerdo. */
+export type AcuerdoCuerpo =
+  paths['/api/listas-precios/lineas/{idLinea}/acuerdos']['post']['requestBody']['content']['application/json'];
+/** Cuerpo del cambio de estado. */
+export type CambiarEstadoCuerpo =
+  paths['/api/listas-precios/{id}/estado']['patch']['requestBody']['content']['application/json'];
+
+/** Clave raíz de la cache de eventos de negociación. */
+export const CLAVE_EVENTOS = ['negociacion-eventos'] as const;
+
+function claveEventos(idLinea: number): readonly unknown[] {
+  return [...CLAVE_EVENTOS, idLinea];
+}
+
+// ── Funciones del API ──────────────────────────────────────────────────────────
+
+async function listarEventos(idLinea: number): Promise<NegociacionEvento[]> {
+  const { data, error } = await api.GET('/api/listas-precios/lineas/{idLinea}/eventos', {
+    params: { path: { idLinea } },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data.datos;
+}
+
+async function registrarRonda(idLinea: number, cuerpo: RondaCuerpo): Promise<ListaDetalle> {
+  const { data, error } = await api.POST('/api/listas-precios/lineas/{idLinea}/rondas', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function registrarAcuerdo(idLinea: number, cuerpo: AcuerdoCuerpo): Promise<ListaDetalle> {
+  const { data, error } = await api.POST('/api/listas-precios/lineas/{idLinea}/acuerdos', {
+    params: { path: { idLinea } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+async function cambiarEstado(id: number, cuerpo: CambiarEstadoCuerpo): Promise<ListaDetalle> {
+  const { data, error } = await api.PATCH('/api/listas-precios/{id}/estado', {
+    params: { path: { id } },
+    body: cuerpo,
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+// ── Hooks ───────────────────────────────────────────────────────────────────
+
+/** Historial de eventos de negociación de un renglón; deshabilitada si no hay renglón. */
+export function useEventosLinea(
+  idLinea: number | null,
+): UseQueryResult<NegociacionEvento[], ErrorDeApi> {
+  return useQuery({
+    queryKey: claveEventos(idLinea ?? 0),
+    queryFn: () => listarEventos(idLinea as number),
+    enabled: idLinea !== null,
+  });
+}
+
+/** Invalida listas + eventos + precostos + proyectos (todo lo que una ronda/acuerdo/estado mueve). */
+function useInvalidar(): () => void {
+  const queryClient = useQueryClient();
+  return () => {
+    void queryClient.invalidateQueries({ queryKey: CLAVE_LISTAS });
+    void queryClient.invalidateQueries({ queryKey: CLAVE_EVENTOS });
+    void queryClient.invalidateQueries({ queryKey: CLAVE_PRECOSTOS });
+    void queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS });
+  };
+}
+
+/** Argumentos de una ronda. */
+export interface ArgsRonda {
+  idLinea: number;
+  cuerpo: RondaCuerpo;
+}
+
+/** Registra una ronda de negociación (re-costeo). */
+export function useRegistrarRonda(): UseMutationResult<ListaDetalle, ErrorDeApi, ArgsRonda> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsRonda) => registrarRonda(idLinea, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
+/** Argumentos de un acuerdo. */
+export interface ArgsAcuerdo {
+  idLinea: number;
+  cuerpo: AcuerdoCuerpo;
+}
+
+/** Registra un acuerdo sin re-costeo. */
+export function useRegistrarAcuerdo(): UseMutationResult<ListaDetalle, ErrorDeApi, ArgsAcuerdo> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ idLinea, cuerpo }: ArgsAcuerdo) => registrarAcuerdo(idLinea, cuerpo),
+    onSuccess: invalidar,
+  });
+}
+
+/** Argumentos del cambio de estado. */
+export interface ArgsCambiarEstado {
+  id: number;
+  cuerpo: CambiarEstadoCuerpo;
+}
+
+/** Cambia el estado de una lista (incluida la reapertura). */
+export function useCambiarEstadoLista(): UseMutationResult<
+  ListaDetalle,
+  ErrorDeApi,
+  ArgsCambiarEstado
+> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ id, cuerpo }: ArgsCambiarEstado) => cambiarEstado(id, cuerpo),
+    onSuccess: invalidar,
+  });
+}

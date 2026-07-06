@@ -138,6 +138,8 @@ Preguntas de [`docs/hoja-de-ruta/F8-etapas.md`](../docs/hoja-de-ruta/F8-etapas.m
 
 **Refinamiento del reparto de permisos (F8-E1, confirmado por Gabriel 2026-07-04):** `desarrollo.ver` y `listas.ver` quedan **amplios** (cascadean hasta Secretarial); `desarrollo.administrar`, `desarrollo.precostear` y `listas.administrar` se **cortan en Logística hacia abajo** (mismo precedente que `precostos.consultar` de F7); `listas.aprobar` (dueño) y `listas.negociar` (dueño + gerente comercial) quedan restringidos según (h).
 
+**Diseño de la negociación por versiones (F8-E5, 2026-07-06 — a confirmar con Daniel, no bloquea):** una **ronda** de negociación re-costea el modelo (se congela una versión nueva del precosto) y el renglón de la lista **re-apunta** a esa versión, recalculando el precio con los factores snapshot; al hacerlo **se resetea `precioAprobado`** → el precio nuevo lo **re-aprueba el dueño** con `listas.aprobar`. Esto separa al **negociador** (gerente comercial, `listas.negociar`, registra rondas/acuerdos y el precio acordado) del **aprobador** (dueño, `listas.aprobar`, fija el precio de venta), coherente con el reparto (h)/seed. El **precio acordado** de la ronda queda en la bitácora inmutable del renglón (`NegociacionEvento`), nunca fija por sí solo el aprobado. Cambiar el estado de la lista (incl. **reabrir** una cerrada) es `listas.negociar` y queda auditado; un estado de cierre bloquea nuevas rondas/ediciones de renglón.
+
 ### Decisiones de diseño F3-E1 (motor kardex / Producción) — 2026-06-17
 
 Tomadas al congelar el esquema único de F3 (una sola migración). Detalle técnico en

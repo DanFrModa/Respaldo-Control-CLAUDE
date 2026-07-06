@@ -1,4 +1,10 @@
-import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
@@ -28,7 +34,25 @@ export type DesarrolloEditar =
 export type DesarrolloApagar =
   paths['/api/desarrollos/{id}/apagar']['post']['requestBody']['content']['application/json'];
 
+/** Clave raíz de la cache de un desarrollo suelto (por id). */
+export const CLAVE_DESARROLLO = ['desarrollo'] as const;
+
 // ── Funciones del API ──────────────────────────────────────────────────────────
+
+async function obtener(id: number): Promise<Desarrollo> {
+  const { data, error } = await api.GET('/api/desarrollos/{id}', { params: { path: { id } } });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
+/** Obtiene un desarrollo por id (para reusar el editor de precosto en la negociación). */
+export function useDesarrollo(id: number | null): UseQueryResult<Desarrollo, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_DESARROLLO, id],
+    queryFn: () => obtener(id as number),
+    enabled: id !== null,
+  });
+}
 
 async function crear(idProyecto: number, cuerpo: DesarrolloCrear): Promise<Desarrollo> {
   const { data, error } = await api.POST('/api/proyectos/{idProyecto}/desarrollos', {

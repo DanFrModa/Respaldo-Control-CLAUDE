@@ -709,6 +709,20 @@ export {
   type CandidatosQuery,
 } from './esquemas/lista-precios.js';
 
+// ── Negociación por versiones de la lista (Módulo 15, F8-E5; D13/R20b) ──
+export {
+  esquemaRondaRegistrar,
+  esquemaAcuerdoRegistrar,
+  esquemaCambiarEstadoLista,
+  esquemaNegociacionEventoSalida,
+  esquemaNegociacionEventos,
+  type DatosRondaRegistrar,
+  type DatosAcuerdoRegistrar,
+  type DatosCambiarEstadoLista,
+  type NegociacionEventoSalida,
+  type NegociacionEventos,
+} from './esquemas/negociacion.js';
+
 export {
   DIRECCIONES_MOVIMIENTO,
   ETIQUETAS_DIRECCION_MOVIMIENTO,
