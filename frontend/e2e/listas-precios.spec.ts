@@ -150,8 +150,11 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(page.getByText(/Precosto v2 congelado\./)).toBeVisible();
     await page.keyboard.press('Escape'); // cierra el editor (dialog superior)
 
-    // Elige la v2 congelada + escribe el acuerdo + confirma la ronda.
-    await formRonda.getByTestId('ronda-version').selectOption({ label: 'v2' });
+    // Elige la v2 congelada + escribe el acuerdo + confirma la ronda. La opción trae el costo en el
+    // texto ("v2 · $80.00"), así que se elige por índice: la única versión elegible es la v2 recién
+    // congelada (la v1, que el renglón ya usa, queda excluida) → índice 1 tras el placeholder.
+    await expect(formRonda.getByTestId('ronda-version').locator('option')).toHaveCount(2);
+    await formRonda.getByTestId('ronda-version').selectOption({ index: 1 });
     await formRonda.getByTestId('ronda-acuerdo').fill('Se sube la maquila (nueva versión)');
     await formRonda.getByTestId('confirmar-ronda').click();
     await expect(page.getByText(`Ronda registrada para "${codigoModelo}".`)).toBeVisible();
@@ -170,7 +173,9 @@ test.describe('Listas de precios (F8-E4)', () => {
 
     // ── F8-E5: ESTADOS — cerrar la lista bloquea la negociación; reabrir la desbloquea ──
     const selectorEstado = page.getByTestId('selector-estado-lista');
-    await selectorEstado.getByTestId('nuevo-estado-lista').selectOption({ label: 'Cerrada' });
+    await selectorEstado
+      .getByTestId('nuevo-estado-lista')
+      .selectOption({ label: 'Cerrada (cierre)' });
     await selectorEstado.getByTestId('confirmar-estado-lista').click();
     await expect(page.getByText(/Estado cambiado a "Cerrada"\./)).toBeVisible();
 

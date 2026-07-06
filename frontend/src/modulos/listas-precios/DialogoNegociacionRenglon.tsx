@@ -402,7 +402,14 @@ function DialogoNuevaRonda({
 
       <DialogoPrecosto
         abierto={editorAbierto}
-        alCambiarAbierto={setEditorAbierto}
+        alCambiarAbierto={(v) => {
+          setEditorAbierto(v);
+          // Al cerrar el editor, refresca el historial para que la versión recién congelada
+          // aparezca de inmediato en el selector de la ronda (no depende de la invalidación cruzada).
+          if (!v) {
+            void historial.refetch();
+          }
+        }}
         desarrollo={desarrollo.data}
       />
     </Dialog>
