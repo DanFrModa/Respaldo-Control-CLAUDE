@@ -460,6 +460,9 @@ model Archivo {
   /// Adjunto de orden de producción que apunta a este archivo (F8-E6, R6), si lo hay. Inversa de
   /// `OrdenArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA sola orden — Cascade en ambos).
   ordenArchivo     OrdenArchivo?
+  /// Adjunto de pedido interno que apunta a este archivo (rediseño R3, B3), si lo hay. Inversa de
+  /// `PedidoArchivo.archivo`; 0 o 1 (un archivo se adjunta a UN solo pedido — Cascade en ambos).
+  pedidoArchivo    PedidoArchivo?
 
   @@map("archivos")
 }
@@ -618,6 +621,8 @@ model Proveedor {
   auditorias              Auditoria[]
   /// Precios de telas que surte este proveedor (F8-E1, D13/R17 — espejo de AvioProveedor). Restrict.
   telaProveedores         TelaProveedor[]
+  /// Eventos de precio de orden donde es el proveedor con quien se NEGOCIÓ (rediseño R2). Restrict.
+  ordenPrecioEventos      OrdenPrecioEvento[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1415,11 +1420,27 @@ model Genero {
 /// vive en el modelo (D4). NO lleva `idEtiquetaMarca` (se difiere a F7/Costos).
 model Modelo {
   id          Int      @id @default(autoincrement())
-  /// Código/clave de negocio del modelo. Único global (ADR-0007).
+  /// Código/clave de negocio del modelo. Único global (ADR-0007). Con el rediseño R3 (B4) este
+  /// código es el nº de DESARROLLO; el nº de PRODUCCIÓN es `numeroProduccion` (bases distintas).
   codigo      String   @unique
   descripcion String?
   /// Costo de maquila base que heredan las órdenes (doc 01-Modelos §4).
   maquilaBase Decimal? @map("maquila_base") @db.Decimal(12, 2)
+
+  /// Nº INTERNO de producción (rediseño R3, B4 — aclaración Daniel 7-jul: Desarrollo y Producción
+  /// son bases distintas). Se MINTEA por la secuencia atómica `numero_produccion_seq` (A3) la
+  /// PRIMERA vez que el modelo sale a producción (`salidaAProduccion`) y se REUSA entre sus OPs.
+  /// Distinto del folio de la OP y del nº de desarrollo (`codigo`). Null = nunca ha salido.
+  numeroProduccion Int? @unique @map("numero_produccion")
+
+  /// # de OPERACIONES de la prenda (rediseño R4, B7): deriva la DIFICULTAD contra la tabla
+  /// `RangoDificultad` (regla `porDificultad` del CPM). Se CAPTURA en el editor de desarrollo
+  /// (R5); null = sin capturar → la duración cae al tiempo estándar del proceso (fallback).
+  numOperaciones Int? @map("num_operaciones")
+
+  /// Secuencia del estampado/bordado respecto a la costura (rediseño R4, B10 — por MODELO;
+  /// la captura en el editor de desarrollo llega en R5). Ver el enum `SecuenciaEstampado`.
+  secuenciaEstampado SecuenciaEstampado @default(antes) @map("secuencia_estampado")
 
   /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
   idTemporada    Int?          @map("id_temporada")
@@ -1717,6 +1738,11 @@ model Pedido {
   /// Pedido cancelado — cancelación SUAVE, sigue consultable (viejo: `PedCancelado`).
   pedCancelado    Boolean @default(false) @map("ped_cancelado")
 
+  /// OC ORIGINAL del cliente (rediseño R3, B3 — petición Daniel 7-jul §4.1): el nº de orden de
+  /// compra del cliente, captura VIVA y editable. Al crear cada OP se copia como SNAPSHOT a
+  /// `Orden.ocCliente` (editar este campo NO re-escribe las órdenes ya nacidas).
+  ocCliente String? @map("oc_cliente")
+
   /// SNAPSHOT MIGRADO de SOLO LECTURA (viejo: `Pedidos.IdOrdCompra` "Orden de compra
   /// ligada", presente en 233 de 1,529 pedidos). SIN FK hasta que OrdCompra exista en F4
   /// (entonces se promueve a relación real). Lo puebla el ETL de E5; NINGÚN endpoint de F2
@@ -1725,6 +1751,9 @@ model Pedido {
 
   lineas PedidoLinea[]
   reales PedidoReal[]
+  /// Adjuntos de apoyo del pedido en R2 (rediseño R3, B3 — el documento original de la OC del
+  /// cliente, Excel/PDF/imágenes). Cascade: son del pedido.
+  archivos PedidoArchivo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1734,6 +1763,28 @@ model Pedido {
   @@unique([idEmpresa, folio])
   @@index([idCliente])
   @@map("pedidos")
+}
+
+/// Puente pedido ↔ archivo R2 (rediseño R3, B3). Liga un `Archivo` (motor de archivos de F0) a un
+/// PEDIDO interno como adjunto de apoyo — típicamente el documento ORIGINAL de la OC del cliente.
+/// Espejo exacto de `OrdenArchivo`. `onDelete`:
+///  • Cascade hacia `Pedido`: los adjuntos son del pedido.
+///  • Cascade hacia `Archivo`: al quitar el adjunto se borra también su `Archivo` (el objeto físico
+///    en R2 lo borra el dominio best-effort tras el commit — ver `dominio/pedidos/adjuntos-pedido.ts`).
+model PedidoArchivo {
+  id        Int    @id @default(autoincrement())
+  idPedido  Int    @map("id_pedido")
+  idArchivo String @map("id_archivo")
+
+  pedido  Pedido  @relation(fields: [idPedido], references: [id], onDelete: Cascade)
+  archivo Archivo @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idPedido])
+  @@map("pedido_archivo")
 }
 
 /// Renglón de un pedido interno (F2-E1 — ex `PedidosDet`, doc 02-Pedidos §2). Un modelo
@@ -1748,6 +1799,12 @@ model PedidoLinea {
   pedido   Pedido @relation(fields: [idPedido], references: [id], onDelete: Cascade)
   idModelo Int    @map("id_modelo")
   modelo   Modelo @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+
+  /// Desarrollo del que sale el renglón (rediseño R3, B4): el constructor elige el modelo DE
+  /// DESARROLLO (F8) y deja aquí la traza directa renglón→desarrollo; `salidaAProduccion` la usa
+  /// para ligar la OP (`DesarrolloOrden`). Nullable: renglones legado/F2 sin desarrollo. Restrict.
+  idDesarrollo Int?        @map("id_desarrollo")
+  desarrollo   Desarrollo? @relation(fields: [idDesarrollo], references: [id], onDelete: Restrict)
 
   /// Cantidad pedida (viejo: `CantPed`).
   cantidadPedida Int     @map("cantidad_pedida")
@@ -1774,6 +1831,7 @@ model PedidoLinea {
 
   @@index([idPedido])
   @@index([idModelo])
+  @@index([idDesarrollo])
   @@map("pedido_linea")
 }
 
@@ -1927,6 +1985,11 @@ model Orden {
   /// conserva para trazabilidad; el despivote a `OrdenLineaTalla` (matriz real) lo hace el ETL.
   tallasV1 String? @map("tallas_v1")
 
+  /// SNAPSHOT de la OC original del cliente (rediseño R3, B3 — petición Daniel 7-jul §4.1): se
+  /// copia de `Pedido.ocCliente` AL CREAR la orden y ya NO se re-escribe (queda amarrado a la OP
+  /// aunque el pedido interno se reorganice). Ningún endpoint lo edita.
+  ocCliente String? @map("oc_cliente")
+
   /// Costo de maquila de la orden (viejo: `MaquilaOrd`). DATO conservado de v1; su motor (costeo)
   /// llega en F3/F6 — sin lógica en F2.
   maquilaOrd    Decimal? @map("maquila_ord") @db.Decimal(12, 2)
@@ -2000,6 +2063,10 @@ model Orden {
   /// Aplicación elegida para la programación de v2 (FK a DuracionPorAplicacion). Restrict, nullable.
   idDuracionAplicacion Int?                   @map("id_duracion_aplicacion")
   duracionAplicacion   DuracionPorAplicacion? @relation(fields: [idDuracionAplicacion], references: [id], onDelete: Restrict)
+  /// Elección de secuencia de estampado de ESTA orden (rediseño R4, B10): solo aplica cuando el
+  /// modelo es `flexible` (antes|despues; `flexible` no es un valor válido aquí — lo valida el
+  /// dominio). Null = hereda la secuencia del modelo / aún sin decidir.
+  secEstampadoElegido  SecuenciaEstampado?    @map("sec_estampado_elegido")
   /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
   rutaProcesos         RutaOrden[]
 
@@ -2037,6 +2104,8 @@ model Orden {
   desarrolloOrden      DesarrolloOrden?
   /// Adjuntos de apoyo (Excel/PDF/imágenes) de esta orden en R2 (F8-E6, R6). Cascade: son de la orden.
   archivos             OrdenArchivo[]
+  /// Historial INMUTABLE de cambios de precio maquila/aplicación (rediseño R2, §4.4.3). Cascade.
+  precioEventos        OrdenPrecioEvento[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2072,6 +2141,47 @@ model OrdenArchivo {
   @@unique([idArchivo])
   @@index([idOrden])
   @@map("orden_archivo")
+}
+
+/// Qué precio de la orden cambió un evento: maquila (costura) o aplicación (estampado/bordado).
+enum CampoPrecioOrden {
+  maquila
+  aplicacion
+
+  @@map("campo_precio_orden")
+}
+
+/// Evento de cambio de PRECIO de la orden (rediseño R2, requisito de Daniel §4.4.3) — historial
+/// INMUTABLE estilo `NegociacionEvento` (D3/A7: solo se INSERTA, jamás update/delete). Registra
+/// quién capturó el precio real de maquila/aplicación, cuándo, con qué proveedor se negoció y el
+/// valor anterior→nuevo. La edición vive en `dominio/produccion/precios-orden.ts` (permiso
+/// `ordenes.precio-maquila`); la lectura de montos reales exige `ordenes.ver-precio-real-maquila`.
+/// Cascade hacia `Orden` (el historial es de la orden); Restrict hacia `Proveedor`.
+model OrdenPrecioEvento {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Cuál precio cambió (`maquilaOrd` o `aplicacionOrd`).
+  campo          CampoPrecioOrden
+  /// Valor que tenía el precio ANTES del cambio (null si no había precio real capturado).
+  precioAnterior Decimal?         @map("precio_anterior") @db.Decimal(12, 2)
+  /// Precio real negociado que quedó vigente con este evento.
+  precioNuevo    Decimal          @map("precio_nuevo") @db.Decimal(12, 2)
+
+  /// Proveedor con quien se NEGOCIÓ el precio (maquilero/estampador), opcional. Restrict.
+  idProveedor Int?       @map("id_proveedor")
+  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Nota libre de la negociación (opcional). Inmutable.
+  nota        String?    @db.Text
+
+  /// Quién capturó (id de `Usuario`, sin FK física — patrón de auditoría del proyecto).
+  capturadoPorId String?  @map("capturado_por_id")
+  capturadoEn    DateTime @default(now()) @map("capturado_en")
+
+  @@index([idOrden])
+  @@index([idProveedor])
+  @@map("orden_precio_evento")
 }
 
 /// Renglón de la matriz de una orden = un COLOR (F2-E2 — ex `OrdenesDet`, doc 03-Produccion).
@@ -3443,15 +3553,33 @@ enum TipoEventoProceso {
 
 /// Cómo se calcula la DURACIÓN estimada de un proceso (F5-E1). TIPADO SIMPLE: `fija`
 /// (días fijos), `porCantidad` (escala con las piezas — ex `CP_Procesos.Variable`),
-/// `porTipoTela` o `porAplicacion`. El cálculo concreto (la fórmula y los parámetros
-/// por proceso) lo definirá el motor de E2+; aquí solo se clasifica.
+/// `porTipoTela`, `porAplicacion` o `porDificultad` (rediseño R4, B7: los días salen
+/// del RANGO de # de operaciones del modelo — tabla `RangoDificultad`; pensado para la
+/// costura/maquila). El cálculo concreto vive en `calcularDuracion`.
 enum TipoDuracionProceso {
   fija
   porCantidad
   porTipoTela
   porAplicacion
+  porDificultad
 
   @@map("tipo_duracion_proceso")
+}
+
+/// SECUENCIA del estampado/bordado respecto a la costura (rediseño R4, B10 — decisión
+/// Daniel 6-jul): `antes` = la confección SIEMPRE espera al estampado (dependencia
+/// `reciboEstampado → envioCostura` en la ruta); `despues` = se estampa la prenda ya
+/// cosida (sin esa dependencia); `flexible` = se decide EN PRODUCCIÓN por orden, según
+/// la carga (la orden guarda su elección en `Orden.secEstampadoElegido` y la ruta se
+/// reprograma en vivo). El default del catálogo es `antes` (hoy el taller estampa los
+/// paneles cortados antes de coser: la rama de estampado del catálogo cuelga entre el
+/// corte y la confección).
+enum SecuenciaEstampado {
+  antes
+  despues
+  flexible
+
+  @@map("secuencia_estampado")
 }
 
 /// Definición de un PROCESO de la Ruta Crítica (catálogo configurable y GLOBAL — sin
@@ -3736,6 +3864,35 @@ model DuracionPorTipoTela {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@map("duracion_tipo_tela")
+}
+
+/// RANGO de DIFICULTAD por # de operaciones (rediseño R4, B7 — spec §4.9): la dificultad de una
+/// prenda NO se teclea, se DERIVA del `Modelo.numOperaciones` (capturado en el desarrollo, R5)
+/// contra esta tabla CONFIGURABLE (Daniel define cuántos niveles, sus rangos, nombres y días).
+/// `opsHasta` null = rango abierto ("33+"). Alimenta la regla `porDificultad` de
+/// `calcularDuracion` (impacta sobre todo la costura/maquila). Los rangos ACTIVOS no se solapan
+/// (validación server-side en el dominio). Catálogo GLOBAL, borrado SUAVE, auditoría A7.
+model RangoDificultad {
+  id          Int     @id @default(autoincrement())
+  /// Límite inferior del rango de operaciones (inclusive).
+  opsDesde    Int     @map("ops_desde")
+  /// Límite superior (inclusive), o null = abierto hacia arriba ("33+").
+  opsHasta    Int?    @map("ops_hasta")
+  /// Nombre de la dificultad (p. ej. "Muy sencillo", "Complejo").
+  nombre      String
+  /// Días de costura que aporta este rango (la duración del proceso `porDificultad`).
+  diasCostura Int     @map("dias_costura")
+  /// Posición de despliegue en la tabla (lo gestiona el dominio).
+  orden       Int     @default(0)
+  activo      Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([opsDesde])
+  @@map("rango_dificultad")
 }
 
 /// Duración (días de espera) POR APLICACIÓN/estampado (ex `RC_Aplicaciones`, 9). El origen NO trae
@@ -5056,6 +5213,8 @@ model Desarrollo {
   precostos    Precosto[]
   ordenLigadas DesarrolloOrden[]
   listaLineas  ListaPreciosLinea[]
+  /// Renglones de pedido interno que salen de este desarrollo (rediseño R3, B4). Restrict.
+  pedidoLineas PedidoLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")

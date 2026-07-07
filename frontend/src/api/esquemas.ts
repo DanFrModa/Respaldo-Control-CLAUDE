@@ -663,6 +663,7 @@ export const TIPOS_DURACION_PROCESO = [
   'porCantidad',
   'porTipoTela',
   'porAplicacion',
+  'porDificultad',
 ] as const;
 /** Clave de tipo de duración. */
 export type TipoDuracionProcesoClave = (typeof TIPOS_DURACION_PROCESO)[number];
@@ -672,6 +673,7 @@ export const ETIQUETAS_TIPO_DURACION_PROCESO: Record<TipoDuracionProcesoClave, s
   porCantidad: 'Escala con la cantidad de piezas',
   porTipoTela: 'Según el tipo de tela',
   porAplicacion: 'Según la aplicación',
+  porDificultad: 'Por dificultad (# de operaciones del modelo)',
 };
 
 /**

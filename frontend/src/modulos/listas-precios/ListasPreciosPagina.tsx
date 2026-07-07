@@ -77,7 +77,7 @@ const QUERY_ESTADOS = {
 } as const;
 
 /**
- * Módulo "Listas de precios" (F8-E4) — lista + detalle (teal). La lista muestra las listas por
+ * Módulo "Listas de precios" (F8-E4) — lista + detalle. La lista muestra las listas por
  * Cliente+Departamento con filtros; el detalle es la VISTA DE APROBACIÓN del dueño (renglón por
  * renglón: precio calculado → Aprobar / teclear otro), pensada también para móvil. `listas.ver`
  * gobierna el acceso; `listas.administrar` crea/edita factores; `listas.aprobar` aprueba/teclea (el

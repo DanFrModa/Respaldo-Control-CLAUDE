@@ -32,6 +32,7 @@ import {
   registrarCorte,
   registrarEnvioMaquila,
 } from './etapas.js';
+import { registrarReciboMaquila } from './recibos.js';
 
 let cliente: PrismaClient;
 let empresa: Empresa;
@@ -502,13 +503,78 @@ describe('Historial de etapas de la orden (F3-E2)', () => {
     expect(envioHist?.cancelado).toBe(true);
     expect(envioHist?.motivoCancelacion).toBe('se reasignó');
     expect(envioHist?.canceladoPorId).not.toBeNull();
-    expect(envioHist?.precioPactado).toBe(8);
+    // R2 §4.4.3: sin `ordenes.ver-precio-real-maquila` el precio pactado va REDACTADO (es el
+    // precio real de maquila de la etapa); con el permiso, sale el monto.
+    expect(envioHist?.precioPactado).toBeNull();
+    const conPermiso = await listarEtapasOrden(
+      sesion([...PERM_TODOS, 'ordenes.ver-precio-real-maquila']),
+      idOrden,
+      bd(),
+    );
+    expect(conPermiso.etapas.find((e) => e.id === envio.id)?.precioPactado).toBe(8);
   });
 
   it('historial de una orden de otra empresa → 404', async () => {
     await expect(listarEtapasOrden(sesion(), 999_999, bd())).rejects.toBeInstanceOf(
       ErrorNoEncontrado,
     );
+  });
+
+  it('con incluirRecibos suma los RECIBOS y cada etapa trae creadoPorNombre (R2, §4.4.4)', async () => {
+    // El usuario de la sesión de prueba existe en BD → su nombre se resuelve en el historial.
+    await cliente.usuario.create({
+      data: {
+        id: 'usuario-prueba',
+        username: 'prueba',
+        nombre: 'Usuario de Prueba',
+        email: 'prueba@control.local',
+      },
+    });
+
+    await registrarCorte(
+      sesion(),
+      {
+        idOrden,
+        idCortador: cortador.id,
+        fecha: '2026-06-18',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-19',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    // Recibo de ESTAMPADO (no mete a PT → no exige almacén): el caso mínimo del historial.
+    await registrarReciboMaquila(
+      sesion(['produccion.recibo', 'produccion.wip-ver']),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-20',
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    // Sin la bandera: corte + envío (comportamiento F3-E2 intacto para las pantallas viejas).
+    const sinRecibos = await listarEtapasOrden(sesion(), idOrden, bd());
+    expect(sinRecibos.etapas).toHaveLength(2);
+    expect(sinRecibos.etapas.every((e) => e.tipo !== 'recibo_maquila')).toBe(true);
+
+    // Con la bandera: también el recibo, y TODAS las etapas con su "capturado por".
+    const conRecibos = await listarEtapasOrden(sesion(), idOrden, bd(), { incluirRecibos: true });
+    expect(conRecibos.etapas).toHaveLength(3);
+    expect(conRecibos.etapas.some((e) => e.tipo === 'recibo_maquila')).toBe(true);
+    expect(conRecibos.etapas.every((e) => e.creadoPorNombre === 'Usuario de Prueba')).toBe(true);
   });
 });
 

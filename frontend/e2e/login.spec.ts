@@ -43,36 +43,54 @@ test.describe('Inicio de sesión', () => {
     await expect(page.getByText('La contraseña es obligatoria')).toBeVisible();
   });
 
-  test('el admin entra y ve el layout con todos sus módulos', async ({ page }) => {
+  test('el admin entra y ve el riel con los grupos aprobados del rediseño', async ({ page }) => {
     await entrarComoAdmin(page);
 
     // Entró a la app (inicio).
     await expect(page).toHaveURL(/\/$|\/$/);
     await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
 
-    // El admin (todos los permisos) ve el menú completo. NO se fija un número exacto de links: cada
-    // fase suma módulos/sub-vistas y un `toHaveCount` exacto se rompería en cada etapa. Se valida un
-    // PISO razonable y la presencia de módulos representativos de varias áreas.
+    // El admin (todos los permisos) ve el menú del rediseño R1: GRUPOS con
+    // desplegables de 2 niveles (estructura aprobada por Daniel, 4-jul-2026).
     const navegacion = page.getByRole('navigation', { name: 'Módulos' }).first();
-    const links = navegacion.getByRole('link');
-    expect(await links.count()).toBeGreaterThanOrEqual(20);
-    for (const modulo of [
-      'Catálogos',
-      'Producción',
+
+    // Los 6 rótulos de grupo (Resumen va suelto, sin rótulo).
+    for (const grupo of [
+      'Operación',
       'Inventarios',
-      // Desarrollo (F8-E2): módulo nuevo entre Modelos y Pedidos.
-      'Desarrollo',
-      // Listas de precios (F8-E4): sub-vista de Desarrollo con su permiso `listas.ver`.
-      'Listas de precios',
-      'Ruta Crítica',
-      // Sub-vista del concentrado (F5-E7): aparece como enlace del menú con su permiso.
-      'Concentrado planeado vs real',
-      // Calidad (F6-E1): módulo + sub-vista de defectos.
-      'Calidad',
-      'Administración',
+      'Comercial',
+      'Finanzas',
+      'Análisis',
+      'Sistema',
     ]) {
-      await expect(links.filter({ hasText: modulo }).first()).toBeVisible();
+      await expect(navegacion.getByText(grupo, { exact: true })).toBeVisible();
     }
+
+    // Hojas directas visibles sin desplegar nada.
+    for (const hoja of ['Resumen', 'Pedidos', 'Proveedores', 'Cuentas por cobrar']) {
+      await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
+    }
+
+    // Los PADRES son botones que despliegan (no navegan): al abrir "Producción"
+    // aparecen su hijo aprobado principal y los legados re-colgados.
+    const padres = navegacion.getByRole('button', { expanded: false });
+    expect(await padres.count()).toBeGreaterThanOrEqual(10);
+    await navegacion.getByRole('button', { name: 'Producción' }).click();
+    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
+    await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toBeVisible();
+    // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4); el
+    // concentrado vive en ANÁLISIS y la configuración bajo SISTEMA · Procesos y responsables.
+    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
+    await expect(
+      navegacion.getByRole('link', { name: 'Concentrado planeado vs real' }),
+    ).toBeVisible();
+    await navegacion.getByTestId('nav-padre-g-rc-config').click();
+    await expect(
+      navegacion.getByRole('link', { name: 'Procesos y responsables', exact: true }),
+    ).toBeVisible();
+
+    // El badge de alertas RC del encabezado está montado (dato real del backend).
+    await expect(page.getByTestId('badge-alertas-rc')).toBeVisible();
     // La empresa activa aparece en el encabezado.
     await expect(page.getByTestId('empresa-activa')).toHaveText(CREDENCIALES_ADMIN.empresa);
   });

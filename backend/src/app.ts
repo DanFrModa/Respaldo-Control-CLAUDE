@@ -14,6 +14,8 @@ import { registrarManejadorErrores } from './api/errores.js';
 import { rutasModelos } from './api/modelos/modelos.rutas.js';
 import { rutasMedidasAvioTalla } from './api/modelos/medidas-avio-talla.rutas.js';
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
+import { rutasAdjuntosPedido } from './api/pedidos/adjuntos-pedido.rutas.js';
+import { rutasSalidaProduccion } from './api/pedidos/salida-produccion.rutas.js';
 // Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1) — catálogos de configuración +
 // sub-recursos de Tela/Cliente/Modelo. Los módulos de Proyecto/Precosto/Lista/Negociación llegan
 // en E2–E6 (su modelo de datos ya nace en la migración de E1).
@@ -167,6 +169,13 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // (crear desde pedido, listar, editar, seguimiento). Folio por empresa (A3/A9). Importes
   // ocultados server-side sin `pedidos.importes`.
   await app.register(rutasPedidos, { prefix: '/api' });
+  // Pedidos — ADJUNTOS en R2 (rediseño R3, B3): el documento original de la OC del cliente
+  // (Excel/PDF/imágenes) ligado al pedido vía presigned. Permisos `pedidos.ver` / `pedidos.administrar`.
+  await app.register(rutasAdjuntosPedido, { prefix: '/api' });
+  // Pedidos — FLUJO NUEVO (rediseño R3, B4/B6): consulta por mes (pantalla nueva), candidatos de
+  // desarrollo del constructor y "Generar OP" (salida a producción). Rutas estáticas con prioridad
+  // sobre `/pedidos/:id` (find-my-way).
+  await app.register(rutasSalidaProduccion, { prefix: '/api' });
   // Órdenes de producción (Módulo ÓRDENES, F2-E2) — alta desde un renglón de pedido, encabezado,
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.

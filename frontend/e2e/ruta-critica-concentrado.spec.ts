@@ -4,7 +4,7 @@ import { entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CONCENTRADO "planeado vs real" de la Ruta Crítica (F5-E7) contra el stack real, en el
- * estándar teal. Es una consulta gerencial de SOLO LECTURA (reemplaza `RC_ConcentradoDif`): se
+ * estándar visual. Es una consulta gerencial de SOLO LECTURA (reemplaza `RC_ConcentradoDif`): se
  * verifica que se llega desde la portada-hub, que el tablero carga (vacío o con datos, sin que la
  * BD de e2e tenga que tener órdenes con RC viva), que el filtro de cliente responde y que el botón
  * de export a Excel ofrece el binario. El segundo test lo verifica en viewport MÓVIL.
@@ -19,10 +19,13 @@ test.describe('Ruta Crítica — concentrado planeado vs real (F5-E7)', () => {
   }) => {
     await entrarComoAdmin(page);
 
-    // Desde la portada-hub de la Ruta Crítica hay una tarjeta del concentrado.
-    await page.goto('/ruta-critica');
-    await expect(page.getByRole('heading', { name: 'Ruta Crítica' })).toBeVisible();
-    await page.getByTestId('ruta-critica-rc-concentrado').click();
+    // R4: el hub /ruta-critica se retiró (redirige a Mis pendientes); el concentrado vive en el
+    // grupo ANÁLISIS del menú, junto a "Análisis RC".
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Concentrado planeado vs real' })
+      .click();
 
     await expect(page.getByRole('heading', { name: 'Concentrado planeado vs real' })).toBeVisible();
 

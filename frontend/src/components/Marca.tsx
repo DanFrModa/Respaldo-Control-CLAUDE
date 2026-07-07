@@ -7,25 +7,29 @@ type TamanoMarca = 'sm' | 'md' | 'lg';
 
 const CUADRO: Record<TamanoMarca, string> = {
   sm: 'size-7 rounded-lg',
-  md: 'size-9 rounded-xl',
+  md: 'size-8 rounded-lg',
   lg: 'size-12 rounded-2xl',
 };
 
 const ICONO: Record<TamanoMarca, string> = {
   sm: 'size-4',
-  md: 'size-5',
+  md: 'size-4.5',
   lg: 'size-7',
 };
 
 const WORDMARK: Record<TamanoMarca, string> = {
   sm: 'text-sm',
-  md: 'text-base',
+  md: 'text-sm',
   lg: 'text-xl',
 };
 
 /**
- * Marca de la aplicacion: cuadro con degradado teal + icono textil, junto al
+ * Marca de la aplicacion (rediseño R1): cuadro con degradado del verde de marca
+ * (brillante → pino, como el logo del prototipo) + icono textil, junto al
  * wordmark "Control v2" y (opcional) el subtitulo "FR Moda".
+ *
+ * `enRiel`: variante para el RIEL OSCURO del cascaron — el wordmark usa los
+ * tokens `rail-*` (blanco verdoso + atenuado) en vez de los del panel claro.
  *
  * Accesibilidad: cuando la marca va dentro de un encabezado (`<h1>` del login,
  * p. ej.), el subtitulo NO debe colarse en el nombre accesible del heading. Por
@@ -35,9 +39,9 @@ const WORDMARK: Record<TamanoMarca, string> = {
  *
  * Modos del texto (cuadro del logo SIEMPRE visible):
  *   - `soloIcono`: NO renderiza el wordmark (lo desmonta). Para usos donde el
- *     texto no debe existir nunca (no aplica al sidebar colapsable animado).
+ *     texto no debe existir nunca (no aplica al riel colapsable animado).
  *   - `colapsado`: el wordmark SIGUE montado pero se anima a ancho/opacidad 0
- *     (se "desvanece" sin remontarse). Pensado para el sidebar colapsable: al
+ *     (se "desvanece" sin remontarse). Pensado para el riel colapsable: al
  *     alternar, el cuadro se queda quieto y solo las palabras entran/salen suave,
  *     sin parpadeo. `soloIcono` tiene prioridad si ambos vienen en true.
  */
@@ -46,18 +50,21 @@ export function Marca({
   colapsado = false,
   tamano = 'md',
   conSubtitulo = true,
+  enRiel = false,
   className,
 }: {
   /** Muestra solo el cuadro del icono (desmonta el wordmark). */
   soloIcono?: boolean;
   /**
-   * Sidebar colapsable: mantiene el wordmark montado pero animado a ancho 0
+   * Riel colapsable: mantiene el wordmark montado pero animado a ancho 0
    * (se desvanece sin remontar). Ignorado si `soloIcono` es true.
    */
   colapsado?: boolean;
   tamano?: TamanoMarca;
   /** Muestra "FR Moda" bajo el wordmark (ignorado si `soloIcono`). */
   conSubtitulo?: boolean;
+  /** Colores del riel oscuro (tokens `rail-*`) para el wordmark. */
+  enRiel?: boolean;
   className?: string;
 }): React.JSX.Element {
   return (
@@ -68,7 +75,8 @@ export function Marca({
       <span
         aria-hidden
         className={cn(
-          'flex shrink-0 items-center justify-center bg-gradient-to-br from-teal-500 to-teal-700 text-white shadow-sm dark:from-teal-400 dark:to-teal-600',
+          // Degradado del logo del proto: brand-bright → brand, texto oscuro.
+          'flex shrink-0 items-center justify-center bg-gradient-to-br from-primary-bright to-primary text-primary-foreground shadow-sm',
           CUADRO[tamano],
         )}
       >
@@ -83,11 +91,23 @@ export function Marca({
             colapsado ? 'ml-0 max-w-0 opacity-0' : 'ml-2.5 max-w-[12rem] opacity-100',
           )}
         >
-          <span className={cn('font-heading font-semibold tracking-tight', WORDMARK[tamano])}>
-            Control <span className="text-primary">v2</span>
+          <span
+            className={cn(
+              'font-heading font-semibold tracking-tight',
+              WORDMARK[tamano],
+              enRiel && 'text-rail-fg-strong',
+            )}
+          >
+            Control <span className={enRiel ? 'text-rail-active-fg' : 'text-primary'}>v2</span>
           </span>
           {conSubtitulo ? (
-            <span aria-hidden className="truncate text-xs text-muted-foreground">
+            <span
+              aria-hidden
+              className={cn(
+                'truncate text-xs tracking-wider uppercase',
+                enRiel ? 'text-rail-fg/70' : 'text-muted-foreground',
+              )}
+            >
               FR Moda
             </span>
           ) : null}

@@ -377,6 +377,47 @@ export {
   type PedidoRealesLista,
 } from './esquemas/pedido.js';
 
+// ── Adjuntos del pedido interno (rediseño R3, B3) ──
+export {
+  esquemaPedidoAdjuntoCrear,
+  esquemaPedidoAdjuntoSubida,
+  esquemaPedidoAdjuntoSalida,
+  esquemaPedidoAdjuntosLista,
+  type DatosPedidoAdjuntoCrear,
+  type PedidoAdjuntoSubida,
+  type PedidoAdjuntoSalida,
+  type PedidoAdjuntosLista,
+} from './esquemas/adjunto-pedido.js';
+
+// ── Salida a producción + candidatos de desarrollo (rediseño R3, B4/B6) ──
+export {
+  esquemaSalidaProduccionCuerpo,
+  esquemaSalidaProduccionSalida,
+  esquemaCandidatosDesarrolloQuery,
+  esquemaCandidatoDesarrollo,
+  esquemaCandidatosDesarrolloSalida,
+  type DatosSalidaProduccion,
+  type SalidaProduccionSalida,
+  type CandidatosDesarrolloQuery,
+  type CandidatoDesarrollo,
+  type CandidatosDesarrolloSalida,
+} from './esquemas/salida-produccion.js';
+
+// ── Consulta de pedidos por mes (rediseño R3, B6 — proto §4.1) ──
+export {
+  esquemaPedidosPorMesQuery,
+  esquemaEstatusPedidoMes,
+  esquemaPedidoMesRenglon,
+  esquemaPedidoMesFila,
+  esquemaPedidosPorMesTotales,
+  esquemaPedidosPorMesSalida,
+  type PedidosPorMesQuery,
+  type PedidoMesRenglon,
+  type PedidoMesFila,
+  type PedidosPorMesTotales,
+  type PedidosPorMesSalida,
+} from './esquemas/pedidos-mes.js';
+
 // ── Órdenes de producción (Módulo ÓRDENES, F2-E2; doc 03-Produccion) ──────────
 export {
   esquemaOrdenTallaEntrada,
@@ -449,6 +490,32 @@ export {
   type OrdenesBuscarSalida,
   type OrdenesBuscarQuery,
 } from './esquemas/orden-consulta.js';
+
+// ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3; brecha B1) ──
+export {
+  esquemaCampoPrecioOrden,
+  esquemaOrdenPreciosPatchCuerpo,
+  esquemaOrdenPrecioUltimoEvento,
+  esquemaOrdenPreciosSalida,
+  esquemaOrdenPrecioEventoSalida,
+  esquemaOrdenPrecioEventosLista,
+  type CampoPrecioOrdenApi,
+  type DatosOrdenPreciosPatch,
+  type OrdenPrecioUltimoEvento,
+  type OrdenPreciosSalida,
+  type OrdenPrecioEventoSalida,
+  type OrdenPrecioEventosLista,
+} from './esquemas/orden-precios.js';
+
+// ── Centro de comando de Órdenes (rediseño R2, §4.2; brecha B2) ───────────────
+export {
+  esquemaOrdenCentroFila,
+  esquemaOrdenesCentroPagina,
+  esquemaOrdenesCentroQuery,
+  type OrdenCentroFila,
+  type OrdenesCentroPagina,
+  type OrdenesCentroQuery,
+} from './esquemas/orden-centro.js';
 
 // ── Órdenes de COMPRA (Módulo 3, F4-E2; doc 03-Produccion §OC) ────────────────
 export {
@@ -856,6 +923,7 @@ export {
   esquemaEtapaCancelarCuerpo,
   esquemaEtapaSalida,
   esquemaEtapasOrdenLista,
+  esquemaEtapasOrdenQuery,
   esquemaPendientesOrden,
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
@@ -865,6 +933,7 @@ export {
   type DatosEtapaLineaEntrada,
   type EtapaSalida,
   type EtapasOrdenLista,
+  type EtapasOrdenQuery,
   type PendientesOrden,
   type CorteSemanalQuery,
   type CorteSemanalLista,
@@ -1271,6 +1340,9 @@ export {
   esquemaDuracionAplicacionCrear,
   esquemaDuracionAplicacionPatchCuerpo,
   esquemaDuracionAplicacionSalida,
+  esquemaRangoDificultadCrear,
+  esquemaRangoDificultadPatchCuerpo,
+  esquemaRangoDificultadSalida,
   esquemaCalendarioActualizar,
   esquemaCalendarioSalida,
   esquemaFestivosQuery,
@@ -1298,6 +1370,9 @@ export {
   type DatosDuracionAplicacionCrear,
   type DatosDuracionAplicacionPatchCuerpo,
   type DuracionAplicacionSalida,
+  type DatosRangoDificultadCrear,
+  type DatosRangoDificultadPatchCuerpo,
+  type RangoDificultadSalida,
   type DatosCalendarioActualizar,
   type CalendarioSalida,
   type FestivosQuery,
@@ -1318,6 +1393,7 @@ export {
   esquemaCapturarProceso,
   esquemaMarcarChecklist,
   esquemaEstadoSemaforo,
+  esquemaSecuenciaEstampadoCuerpo,
   esquemaRutaChecklistSalida,
   esquemaRutaProcesoSalida,
   esquemaRutaOrdenSalida,
@@ -1325,20 +1401,33 @@ export {
   type DatosAjustarRuta as DatosAjustarRutaContrato,
   type DatosCapturarProceso,
   type DatosMarcarChecklist,
+  type DatosSecuenciaEstampado,
   type RutaOrdenSalida,
 } from './esquemas/ruta-critica-programacion.js';
 
-// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5) ──
+// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5; R4) ──
 export {
   esquemaBandejaRcQuery,
   esquemaBandejaChecklistSalida,
   esquemaBandejaTareaSalida,
   esquemaBandejaRcPagina,
   esquemaAlertasRcConteo,
+  esquemaUrgenciaPendiente,
+  esquemaTipoEventoRc,
+  esquemaResumenPendientesQuery,
+  esquemaResumenProcesoPendiente,
+  esquemaResumenPendientes,
+  esquemaResponsableRc,
+  esquemaResponsablesRc,
   type BandejaRcQuery,
   type BandejaTareaSalida,
   type BandejaRcPagina,
   type AlertasRcConteo,
+  type UrgenciaPendiente,
+  type TipoEventoRcContrato,
+  type ResumenPendientesQuery,
+  type ResumenPendientes,
+  type ResponsableRc,
 } from './esquemas/ruta-critica-bandeja.js';
 
 // ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ──

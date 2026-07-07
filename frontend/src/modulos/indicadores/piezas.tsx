@@ -9,7 +9,7 @@
 import { Info } from 'lucide-react';
 
 /**
- * Leyenda teal discreta para las tarjetas cuyo dato es HISTÓRICO ACUMULADO e IGNORA los filtros
+ * Leyenda discreta para las tarjetas cuyo dato es HISTÓRICO ACUMULADO e IGNORA los filtros
  * Año/Mes del tablero (las que corren sobre vistas pre-agregadas sin periodo).
  */
 export function BadgeHistorico(): React.JSX.Element {

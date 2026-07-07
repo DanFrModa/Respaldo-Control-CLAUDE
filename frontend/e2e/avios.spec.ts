@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Avíos (F1-E3, R1) contra el stack real, en la estructura LISTA + DETALLE
@@ -45,13 +45,13 @@ test.describe('CRUD de Avíos', () => {
     await crearProveedor(page, prov1);
     await crearProveedor(page, prov2);
 
-    // Navega Catálogos -> Avíos (descubrible por clic, no solo por URL).
+    // Navega Inventarios · Avíos -> Catálogo de avíos (descubrible por clic, no solo por URL).
+    await abrirDesplegableMenu(page, 'Avíos');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('link', { name: 'Catálogo de avíos' })
       .click();
-    await page.getByTestId('catalogo-avios').click();
     await expect(page.getByRole('heading', { name: 'Avíos' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-avio');

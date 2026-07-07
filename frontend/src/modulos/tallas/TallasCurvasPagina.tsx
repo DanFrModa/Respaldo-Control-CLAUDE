@@ -76,7 +76,7 @@ export function TallasCurvasPagina(): React.JSX.Element {
   );
 }
 
-/** Boton de una pestaña (segmentado teal). */
+/** Boton de una pestaña (segmentado). */
 function BotonPestana({
   activa,
   onClick,

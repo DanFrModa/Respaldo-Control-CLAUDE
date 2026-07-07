@@ -97,14 +97,21 @@ import type { Orden, OrdenLinea, OrdenLineaTalla, Prisma } from '../../datos/ind
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
+import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
+import {
+  EVENTOS_OUTBOX,
+  registrarEventoOutbox,
+  VERSION_ORDEN_CREADA,
+  type EventoOrdenCreada,
+} from '../../comun/eventos-dominio.js';
 import {
   armarPagina,
   esquemaPaginacion,
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -208,6 +215,8 @@ interface OrigenPedidoLinea {
   idModelo: number;
   idCliente: number;
   idEmpresa: number;
+  /** OC original del cliente en el pedido: se copia como SNAPSHOT a la orden (R3, B3). */
+  ocCliente: string | null;
 }
 
 /**
@@ -237,6 +246,7 @@ async function resolverOrigenPedido(
           pedCancelado: true,
           noProducir: true,
           folio: true,
+          ocCliente: true,
         },
       },
     },
@@ -267,6 +277,7 @@ async function resolverOrigenPedido(
     idModelo: linea.idModelo,
     idCliente: linea.pedido.idCliente,
     idEmpresa: linea.pedido.idEmpresa,
+    ocCliente: linea.pedido.ocCliente,
   };
 }
 
@@ -437,8 +448,14 @@ async function reemplazarTallas(
 
 // ── Proyección a la salida (total derivado por suma) ────────────────────────────────
 
-/** Proyecta una orden (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
+/**
+ * Proyecta una orden (con detalle) a la forma JSON del contrato. El total se DERIVA por suma.
+ * `ocultarPrecios` (rediseño R2, §4.4.3): desde que los precios de la orden se capturan en vivo
+ * (`precios-orden.ts`), `maquilaOrd`/`aplicacionOrd` son el PRECIO REAL negociado — sin el permiso
+ * `ordenes.ver-precio-real-maquila` van null también aquí (paridad con el acceso 36 del viejo;
+ * antes eran dato inerte del ETL y se exponían con solo `ordenes.ver`).
+ */
+function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSalida {
   let totalPiezas = 0;
   const lineas = orden.lineas.map((l) => {
     let totalLinea = 0;
@@ -482,9 +499,11 @@ function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
     noCostear: orden.noCostear,
     fechaCompletada: orden.fechaCompletada === null ? null : orden.fechaCompletada.toISOString(),
     motivoCancelada: orden.motivoCancelada,
+    ocCliente: orden.ocCliente,
     tallasV1: orden.tallasV1,
-    maquilaOrd: orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
-    aplicacionOrd: orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
+    maquilaOrd: ocultarPrecios || orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
+    aplicacionOrd:
+      ocultarPrecios || orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
     pagada: orden.pagada,
     enRiesgo: orden.enRiesgo,
     siRC: orden.siRC,
@@ -537,6 +556,13 @@ function aTexto(valor: string | null | undefined): string | null | undefined {
  * atómica `"orden"` de la empresa del pedido (A3/A9). EXIGE el renglón de pedido y rechaza pedidos
  * cancelados/no-producir o modelos descontinuados. Permite N órdenes por renglón (resurtidos). Si
  * `lineas` viene, crea la matriz en la misma tx (deriva estado='completa'). Auditoría + bitácora.
+ *
+ * Rediseño R3: copia el SNAPSHOT `Pedido.ocCliente` → `Orden.ocCliente` (B3: la OC del cliente
+ * queda amarrada a CADA OP que nace del pedido) y publica el evento outbox `orden-creada` (B5:
+ * la RC se PROGRAMA SOLA; el consumidor de `rcAutomatica.ts` la genera en segundo plano). El
+ * evento se publica AQUÍ —el punto ÚNICO de nacimiento por captura— para que tanto la salida a
+ * producción del constructor como el alta directa de /captura la disparen sin duplicar lógica;
+ * el modo migración usa `crearOrdenMigrada` (migracion.ts), que NO pasa por aquí y NO encola.
  */
 export async function crearOrden(
   sesion: SesionUsuario,
@@ -578,6 +604,7 @@ export async function crearOrden(
         compForzada: datos.compForzada ?? false,
         obsMaquila: aTexto(datos.obsMaquila) ?? null,
         noCostear: datos.noCostear ?? false,
+        ocCliente: origen.ocCliente,
         ...datosCreacion(sesion),
       },
     });
@@ -604,8 +631,23 @@ export async function crearOrden(
       },
     });
 
+    // Evento outbox `orden-creada` (R3, B5): en la MISMA tx (o quedan orden Y evento, o ninguno).
+    const payload: EventoOrdenCreada = { idEmpresa: origen.idEmpresa, idOrden: orden.id };
+    await registrarEventoOutbox(
+      tx,
+      EVENTOS_OUTBOX.ordenCreada,
+      VERSION_ORDEN_CREADA,
+      origen.idEmpresa,
+      payload,
+    );
+
     return orden.id;
   }, bd);
+
+  // Publica el outbox tras el commit (best-effort; el barrido periódico recupera). Si se compone
+  // bajo una `bd.tx` externa, publicar filas aún no commiteadas es un no-op inofensivo (el relay
+  // no las ve hasta el commit; el barrido las recoge después).
+  dispararPublicacion();
 
   return obtenerOrden(sesion, idOrden, bd);
 }
@@ -845,8 +887,9 @@ export async function guardarReferenciasOrden(
  * Valida que cada `idClienteCampo` exista, esté ACTIVO y pertenezca al CLIENTE de la orden (D7).
  * Rechaza un campo de otro cliente con `ErrorValidacion`. Además exige que un campo no se repita
  * en el set (el `@@unique([idOrden, idClienteCampo])` lo respaldaría, pero damos error claro).
+ * Exportada para que `salidaAProduccion` (R3, B4) capture referencias en SU transacción.
  */
-async function validarReferencias(
+export async function validarReferencias(
   tx: Tx,
   idCliente: number,
   referencias: DatosOrdenReferenciaEntrada[],
@@ -878,8 +921,11 @@ async function validarReferencias(
   }
 }
 
-/** Sincroniza las referencias al set deseado (diff mínimo por `idClienteCampo`), conserva auditoría. */
-async function sincronizarReferencias(
+/**
+ * Sincroniza las referencias al set deseado (diff mínimo por `idClienteCampo`), conserva auditoría.
+ * Exportada para que `salidaAProduccion` (R3, B4) capture referencias en SU transacción.
+ */
+export async function sincronizarReferencias(
   tx: Tx,
   sesion: SesionUsuario,
   idOrden: number,
@@ -961,7 +1007,7 @@ export async function obtenerOrden(
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', id);
   }
-  return aOrdenSalida(orden);
+  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'));
 }
 
 /**
@@ -1003,7 +1049,8 @@ export async function listarOrdenes(
     }),
   ]);
 
-  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle));
+  const ocultarPrecios = !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
+  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios));
   return armarPagina(salida, total, filtros);
 }
 

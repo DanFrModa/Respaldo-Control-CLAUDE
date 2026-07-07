@@ -230,6 +230,31 @@ export type PedidoLineaEntrada = NonNullable<PedidoCrear['lineas']>[number];
 export type PedidoCopiar =
   paths['/api/pedidos/{id}/copiar']['post']['requestBody']['content']['application/json'];
 
+// ── Pedidos por mes + constructor + salida a produccion (rediseño R3, B4/B6) ──
+
+/** Respuesta de la consulta de pedidos por mes (`GET /api/pedidos/por-mes`). */
+export type PedidosPorMes =
+  paths['/api/pedidos/por-mes']['get']['responses']['200']['content']['application/json'];
+/** Fila agrupada (pedido `-F` + renglones) de la consulta por mes. */
+export type PedidoMesFila = PedidosPorMes['datos'][number];
+/** Renglon/modelo de un pedido en la consulta por mes. */
+export type PedidoMesRenglon = PedidoMesFila['renglones'][number];
+/** Parametros de la consulta por mes (querystring). */
+export type PedidosPorMesQuery = NonNullable<
+  paths['/api/pedidos/por-mes']['get']['parameters']['query']
+>;
+/** Respuesta del selector de desarrollos (`GET /api/pedidos/candidatos-desarrollo`). */
+export type CandidatosDesarrollo =
+  paths['/api/pedidos/candidatos-desarrollo']['get']['responses']['200']['content']['application/json'];
+/** Un desarrollo candidato para un renglon del pedido. */
+export type CandidatoDesarrollo = CandidatosDesarrollo['datos'][number];
+/** Cuerpo de generar la OP (`POST /api/pedidos/lineas/{idLinea}/salida-produccion`). */
+export type SalidaProduccionCuerpo =
+  paths['/api/pedidos/lineas/{idLinea}/salida-produccion']['post']['requestBody']['content']['application/json'];
+/** Resultado de la salida a produccion (OP + nº de produccion + liga). */
+export type SalidaProduccion =
+  paths['/api/pedidos/lineas/{idLinea}/salida-produccion']['post']['responses']['201']['content']['application/json'];
+
 /** Lista de pedidos reales de un pedido (`GET /api/pedidos/{id}/reales`). */
 export type PedidoRealesLista =
   paths['/api/pedidos/{id}/reales']['get']['responses']['200']['content']['application/json'];
@@ -329,6 +354,34 @@ export type OrdenesBuscar =
   paths['/api/ordenes/buscar']['get']['responses']['200']['content']['application/json'];
 /** Un hit ligero del buscador global. */
 export type OrdenHit = OrdenesBuscar['datos'][number];
+
+// ── Centro de comando de Órdenes (rediseño R2, §4.2) ──────────────────────────
+
+/** Página del centro de comando (`GET /api/ordenes/centro`): las 13 columnas del proto. */
+export type OrdenesCentroPagina =
+  paths['/api/ordenes/centro']['get']['responses']['200']['content']['application/json'];
+/** Una fila del centro de comando (agregada en servidor). */
+export type OrdenCentro = OrdenesCentroPagina['datos'][number];
+/** Parámetros del centro de comando (querystring). */
+export type OrdenesCentroQuery = NonNullable<
+  paths['/api/ordenes/centro']['get']['parameters']['query']
+>;
+
+// ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3) ─────────────
+
+/** Resumen de precios de la orden (`GET /api/ordenes/{id}/precios`). */
+export type OrdenPrecios =
+  paths['/api/ordenes/{id}/precios']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo de captura del precio real (`PATCH /api/ordenes/{id}/precios`). */
+export type OrdenPreciosPatch =
+  paths['/api/ordenes/{id}/precios']['patch']['requestBody']['content']['application/json'];
+/** Cuál precio de la orden se captura (maquila | aplicacion). */
+export type CampoPrecioOrden = OrdenPreciosPatch['campo'];
+/** Historial de eventos de precio (`GET /api/ordenes/{id}/precios/eventos`). */
+export type OrdenPrecioEventos =
+  paths['/api/ordenes/{id}/precios/eventos']['get']['responses']['200']['content']['application/json'];
+/** Un evento inmutable del historial de precios. */
+export type OrdenPrecioEvento = OrdenPrecioEventos['eventos'][number];
 
 // ── Órdenes de compra (Módulo 4 · Compras, F4-E2) ─────────────────────────────
 
@@ -604,6 +657,16 @@ export type DuracionAplicacionRcCrear =
 export type DuracionAplicacionRcEditar =
   paths['/api/ruta-critica/reglas-duracion/aplicacion/{id}']['patch']['requestBody']['content']['application/json'];
 
+/** Rango de dificultad por # de operaciones (R4, B7 — tabla configurable). */
+export type RangoDificultadRc =
+  paths['/api/ruta-critica/reglas-duracion/dificultad']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de rango de dificultad. */
+export type RangoDificultadRcCrear =
+  paths['/api/ruta-critica/reglas-duracion/dificultad']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de rango de dificultad. */
+export type RangoDificultadRcEditar =
+  paths['/api/ruta-critica/reglas-duracion/dificultad/{id}']['patch']['requestBody']['content']['application/json'];
+
 /** Calendario laboral de una empresa. */
 export type CalendarioRc =
   paths['/api/ruta-critica/calendario/{idEmpresa}']['get']['responses']['200']['content']['application/json'];
@@ -664,6 +727,20 @@ export type BandejaRcQuery = NonNullable<
 /** Conteo de alertas (atrasados / en riesgo) para el badge del header. */
 export type AlertasRcConteo =
   paths['/api/ruta-critica/alertas/conteo']['get']['responses']['200']['content']['application/json'];
+
+/** Urgencia de un pendiente (R4): vencida / hoy / semana / despues / sinFecha. */
+export type UrgenciaPendienteRc = TareaRc['urgencia'];
+/** Resumen de "Mis pendientes" (R4): KPIs + grupos por proceso (agregado en servidor). */
+export type ResumenPendientesRc =
+  paths['/api/ruta-critica/bandeja/resumen']['get']['responses']['200']['content']['application/json'];
+/** Un grupo por proceso del resumen de pendientes. */
+export type ResumenProcesoPendienteRc = ResumenPendientesRc['porProceso'][number];
+/** Un usuario del selector "Viendo pendientes de:" (R4, supervisión). */
+export type ResponsableRc =
+  paths['/api/ruta-critica/bandeja/responsables']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo para elegir la secuencia de estampado de una orden flexible (R4, B10). */
+export type SecuenciaEstampadoCuerpo =
+  paths['/api/ruta-critica/ordenes/{id}/secuencia-estampado']['post']['requestBody']['content']['application/json'];
 
 // ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ────────────
 

@@ -83,7 +83,7 @@ function BadgeEstado({ estado }: { estado: EstadoDesarrollo }): React.JSX.Elemen
 
 /**
  * Pantalla de Desarrollo (F8-E2) — proyectos por Cliente+Departamento sobre el motor LISTA +
- * DETALLE (teal). La lista tiene búsqueda (folio o nombre), filtros por cliente/departamento/
+ * DETALLE. La lista tiene búsqueda (folio o nombre), filtros por cliente/departamento/
  * temporada, toggle de archivados y paginación de servidor; el detalle muestra el encabezado, los
  * conteos y la tabla de DESARROLLOS con su estado DERIVADO, más agregar/apagar/reactivar.
  *

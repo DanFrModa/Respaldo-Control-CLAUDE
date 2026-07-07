@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Almacenes contra el stack real, en la estructura LISTA +
@@ -20,16 +20,13 @@ test.describe('CRUD de Almacenes', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catalogos -> Almacenes (descubrible por clic, no solo por URL).
+    // Navega Sistema · Catálogos base -> Almacenes (descubrible por clic, no solo por URL).
+    await abrirDesplegableMenu(page, 'Catálogos base');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', {
-        name: 'Catálogos',
-        exact: true,
-      })
+      .getByRole('link', { name: 'Almacenes', exact: true })
       .click();
-    await page.getByRole('link', { name: /Almacenes/ }).click();
     await expect(page.getByRole('heading', { name: 'Almacenes' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-almacen');

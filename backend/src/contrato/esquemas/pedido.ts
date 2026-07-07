@@ -57,6 +57,15 @@ export const esquemaPedidoLineaEntrada = z.object({
     .describe(
       'Precio pactado por prenda — snapshot del pedido (viejo: Precio). Opcional: un usuario sin `pedidos.importes` NO lo manda; el dominio conserva el precio almacenado (renglón existente) o usa 0 (renglón nuevo).',
     ),
+  idDesarrollo: z
+    .number({ error: 'El id del desarrollo debe ser un número' })
+    .int({ error: 'El id del desarrollo debe ser entero' })
+    .positive({ error: 'El id del desarrollo debe ser positivo' })
+    .nullable()
+    .optional()
+    .describe(
+      'Desarrollo (F8) del que sale el renglón (rediseño R3, B4): el constructor elige el modelo DE DESARROLLO. El dominio valida que el desarrollo sea de ese modelo y del cliente del pedido. `null` lo desliga; omitido = no tocar (edición) / sin desarrollo (alta).',
+    ),
 });
 
 /** Datos validados de un renglón de pedido. */
@@ -96,6 +105,14 @@ export const esquemaPedidoCrear = z.object({
   ...camposFechasPedido,
   entregadoTienda: z.boolean().default(false).describe('Marca de entregado a tienda.'),
   noProducir: z.boolean().default(false).describe('Marcado para no producir.'),
+  ocCliente: z
+    .string()
+    .trim()
+    .max(100, { error: 'La OC del cliente no puede tener más de 100 caracteres' })
+    .optional()
+    .describe(
+      'OC ORIGINAL del cliente (rediseño R3, B3): su nº de orden de compra. Captura viva; al crear cada OP se copia como snapshot a la orden.',
+    ),
   lineas: z
     .array(esquemaPedidoLineaEntrada)
     .default([])
@@ -126,6 +143,15 @@ export const esquemaPedidoEditar = z.object({
   ...camposFechasPedidoEditar,
   entregadoTienda: z.boolean().optional().describe('Marca de entregado a tienda.'),
   noProducir: z.boolean().optional().describe('Marcado para no producir.'),
+  ocCliente: z
+    .string()
+    .trim()
+    .max(100, { error: 'La OC del cliente no puede tener más de 100 caracteres' })
+    .nullable()
+    .optional()
+    .describe(
+      'OC del cliente (`null` la vacía; omitida = no tocar). Editar aquí NO re-escribe el snapshot de las órdenes ya nacidas (R3, B3).',
+    ),
   lineas: z
     .array(esquemaPedidoLineaEntrada)
     .optional()
@@ -194,6 +220,18 @@ export const esquemaPedidoLineaSalida = z
       .int()
       .nullable()
       .describe('Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo).'),
+    idDesarrollo: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2).'),
+    numeroProduccion: z
+      .number()
+      .int()
+      .nullable()
+      .describe(
+        'Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción.',
+      ),
   })
   .describe('Renglón de un pedido interno.');
 
@@ -218,6 +256,10 @@ export const esquemaPedidoSalida = z
     entregadoTienda: z.boolean().describe('Marca de entregado a tienda.'),
     noProducir: z.boolean().describe('Marcado para no producir.'),
     pedCancelado: z.boolean().describe('Cancelación suave: el pedido sigue consultable.'),
+    ocCliente: z
+      .string()
+      .nullable()
+      .describe('OC original del cliente (R3, B3 — captura viva del pedido), o null.'),
     idOrdCompraV1: z
       .number()
       .int()

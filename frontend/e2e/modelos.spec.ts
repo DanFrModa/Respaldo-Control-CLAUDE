@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, en la estructura LISTA + DETALLE
@@ -67,13 +67,14 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await crearAvio(page, avio);
     await crearBordado(page, bordado);
 
-    // ── Navega a Modelos (descubrible por el menú) ──────────────────────────────
+    // ── Navega a Modelos (Operación · Desarrollo, desplegable del rediseño) ────
+    await abrirDesplegableMenu(page, 'Desarrollo');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
       .getByRole('link', {
-        // exact: el menú también tiene "Galería de modelos" (sub-vista F1-E5), que haría
-        // match parcial con "Modelos" y violaría el strict mode de Playwright.
+        // exact: el desplegable también tiene "Galería de modelos" (sub-vista F1-E5), que
+        // haría match parcial con "Modelos" y violaría el strict mode de Playwright.
         name: 'Modelos',
         exact: true,
       })

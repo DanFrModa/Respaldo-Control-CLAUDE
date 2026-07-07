@@ -20,13 +20,12 @@ test.describe('CRUD de Proveedores', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catalogos -> Proveedores (descubrible por clic, no solo por URL).
+    // Navega Comercial -> Proveedores (acceso directo del menú nuevo).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('link', { name: 'Proveedores', exact: true })
       .click();
-    await page.getByTestId('catalogo-proveedores').click();
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-proveedor');

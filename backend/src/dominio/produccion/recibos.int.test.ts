@@ -541,6 +541,60 @@ describe('Cancelación de recibos (F3-E4)', () => {
     const movs = await cliente.movimiento.count({ where: { idEmpresa: empresa.id } });
     expect(movs).toBe(0);
   });
+
+  it('la respuesta de la CANCELACION redacta precioPactado sin ver-precio-real; la captura no (R2 §4.4.3)', async () => {
+    await cortarBase();
+    await enviar(procesoEstampado, estampador, 10);
+
+    // CAPTURA: quien lo tecleo lo ve en la respuesta aunque no tenga el permiso de ver reales.
+    const reciboA = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-20',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    expect(reciboA.precioPactado).toBe(8);
+
+    // CANCELACION sin `ordenes.ver-precio-real-maquila`: la respuesta va redactada (null)...
+    const canceladoSinPermiso = await cancelarReciboMaquila(
+      sesion(),
+      reciboA.id,
+      { motivo: 'reproceso' },
+      bd(),
+    );
+    expect(canceladoSinPermiso.cancelado).toBe(true);
+    expect(canceladoSinPermiso.precioPactado).toBeNull();
+    // ...pero la BD lo CONSERVA intacto (es redaccion de salida, no borrado — D3).
+    const enBd = await cliente.etapaMovimiento.findUniqueOrThrow({ where: { id: reciboA.id } });
+    expect(enBd.precioPactado?.toNumber()).toBe(8);
+
+    // CANCELACION con el permiso: la respuesta si trae el monto.
+    const reciboB = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoEstampado.id,
+        idMaquilero: estampador.id,
+        fecha: '2026-06-21',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 5 }] }],
+      },
+      bd(),
+    );
+    const canceladoConPermiso = await cancelarReciboMaquila(
+      sesion([...PERM_TODOS, 'ordenes.ver-precio-real-maquila']),
+      reciboB.id,
+      { motivo: 'reproceso' },
+      bd(),
+    );
+    expect(canceladoConPermiso.precioPactado).toBe(8);
+  });
 });
 
 describe('Cola de validación EsMa y recibos semanales (F3-E4)', () => {

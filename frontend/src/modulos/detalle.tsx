@@ -4,7 +4,7 @@ import { formatearFechaHora } from '@/lib/formato';
 import { cn } from '@/lib/utils';
 
 /**
- * Piezas de presentacion del panel de DETALLE (rediseño "Teal fresco"). El motor
+ * Piezas de presentacion del panel de DETALLE (rediseño R1: verde y denso). El motor
  * `ListaDetalle` arma el armazon (hero + acciones); cada pantalla compone el cuerpo
  * con estas piezas para que todos los detalles se vean y lean igual:
  *
@@ -71,10 +71,10 @@ export function CampoDetalle({
   anchoCompleto?: boolean;
 }): React.JSX.Element {
   return (
-    <div className={cn('flex items-start gap-3', anchoCompleto && 'sm:col-span-2')}>
+    <div className={cn('flex items-start gap-2.5', anchoCompleto && 'sm:col-span-2')}>
       <span
         aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
       >
         <Icono className="size-4" aria-hidden />
       </span>

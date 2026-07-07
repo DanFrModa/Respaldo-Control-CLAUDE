@@ -9,6 +9,7 @@ import {
   crearOrden,
   guardarMatrizOrden,
   listarOrdenes,
+  obtenerOrden,
 } from './ordenes.js';
 
 /**
@@ -56,6 +57,7 @@ function bdParaCrear(): ContextoBd {
     noCostear: false,
     fechaCompletada: new Date('2026-06-16T00:00:00Z'),
     motivoCancelada: null,
+    ocCliente: null,
     tallasV1: null,
     maquilaOrd: null,
     aplicacionOrd: null,
@@ -94,6 +96,7 @@ function bdParaCrear(): ContextoBd {
             pedCancelado: false,
             noProducir: false,
             folio: 100n,
+            ocCliente: null,
           },
         }),
       ),
@@ -104,6 +107,8 @@ function bdParaCrear(): ContextoBd {
       findFirst: vi.fn(() => Promise.resolve(ordenDetallada)),
     },
     bitacora: { create: vi.fn(() => Promise.resolve({})) },
+    // El alta escribe el evento outbox `orden-creada` en la MISMA tx (R3, B5).
+    eventoOutbox: { create: vi.fn(() => Promise.resolve({ id: 1 })) },
     // `siguienteFolio` usa $queryRaw con tagged template → devuelve la fila con el folio.
     $queryRaw: vi.fn(() => Promise.resolve([{ valor: 7n }])),
   } as unknown as Tx;
@@ -184,5 +189,39 @@ describe('dominio Órdenes (F2-E2) — total derivado por suma (D4)', () => {
     expect(salida.lineas).toHaveLength(1);
     expect(salida.lineas[0]?.totalPiezas).toBe(15); // 10 + 5
     expect(salida.totalPiezas).toBe(15); // total de la orden = Σ de todas las tallas
+  });
+});
+
+describe('dominio Órdenes (R2) — redacción de precios en la salida (§4.4.3)', () => {
+  /**
+   * Desde R2 `maquilaOrd`/`aplicacionOrd` son el PRECIO REAL negociado: sin el permiso
+   * `ordenes.ver-precio-real-maquila` van null en la salida (antes eran dato inerte del ETL).
+   */
+  function bdConPrecios(): ContextoBd {
+    const bd = bdParaCrear();
+    const tx = bd.tx as unknown as {
+      orden: { findFirst: ReturnType<typeof vi.fn<() => Promise<Record<string, unknown>>>> };
+    };
+    // Envuelve el stub original y le pone precios reales capturados.
+    const original = tx.orden.findFirst.getMockImplementation();
+    tx.orden.findFirst.mockImplementation(async () => ({
+      ...(await original?.()),
+      maquilaOrd: { toNumber: () => 27.5 },
+      aplicacionOrd: { toNumber: () => 6 },
+    }));
+    return bd;
+  }
+
+  it('sin ver-precio-real-maquila la salida oculta maquilaOrd/aplicacionOrd', async () => {
+    const salida = await obtenerOrden(sesionSoloVer(), 1, bdConPrecios());
+    expect(salida.maquilaOrd).toBeNull();
+    expect(salida.aplicacionOrd).toBeNull();
+  });
+
+  it('con ver-precio-real-maquila la salida sí trae los montos', async () => {
+    const sesion = sesionDePrueba({ permisos: ['ordenes.ver', 'ordenes.ver-precio-real-maquila'] });
+    const salida = await obtenerOrden(sesion, 1, bdConPrecios());
+    expect(salida.maquilaOrd).toBe(27.5);
+    expect(salida.aplicacionOrd).toBe(6);
   });
 });

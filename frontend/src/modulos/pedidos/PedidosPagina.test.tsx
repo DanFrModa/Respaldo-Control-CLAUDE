@@ -61,6 +61,8 @@ function renglon(id: number, codigo: string, cantidad: number, precio: number | 
     importe: precio === null ? null : cantidad * precio,
     entregadoParcialV1: null,
     cantFaltanteV1: null,
+    idDesarrollo: null,
+    numeroProduccion: null,
   };
 }
 
@@ -86,6 +88,7 @@ function pedido(
     entregadoTienda: false,
     noProducir: false,
     pedCancelado: opciones.cancelado ?? false,
+    ocCliente: null,
     idOrdCompraV1: null,
     totalPiezas: 10,
     totalImporte: precio === null ? null : 10 * precio,

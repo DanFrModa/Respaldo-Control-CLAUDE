@@ -3,20 +3,21 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del MOTOR de la Ruta Crítica por orden (F5-E5) contra el stack real, en el estándar teal. El
- * primer test arma el ciclo COMPLETO de extremo a extremo:
+ * E2E del MOTOR de la Ruta Crítica por orden (F5-E5; pantalla R4 "Mis pendientes") contra el stack
+ * real, en el estándar visual. El primer test arma el ciclo COMPLETO de extremo a extremo:
  *   catálogo RC (familia/artículo/tela/aplicación vía API) + plantilla con 2 procesos (cada uno con
  *   duración > 0, sin encadenamiento entre sí) → cliente + modelo + pedido + orden con matriz (UI) →
- *   PROGRAMAR RC desde el detalle de la orden → ambos procesos quedan ACTIVOS en la Bandeja →
- *   capturar uno con "Hoy" lo saca de la bandeja → capturar el otro la vacía de esa orden.
+ *   PROGRAMAR RC desde el detalle de la orden → ambos procesos quedan como PENDIENTES en Mis
+ *   pendientes (a la que se llega por el MENÚ: hoja directa "Ruta Crítica", R4) → "Marcar hecho"
+ *   (los procesos del test son manuales) saca uno y luego el otro.
  * (El encadenamiento real "la pelota pasa al siguiente" lo cubre un test de integración del backend.)
- * El segundo test verifica la Bandeja en viewport MÓVIL (cards con botones grandes).
+ * El segundo test verifica Mis pendientes en viewport MÓVIL.
  *
  * El catálogo RC (familia/artículo/tela/aplicación) NO tiene UI de alta en esta etapa: se siembra por
  * API reutilizando la cookie de sesión del admin (`page.request`). Sufijos únicos por corrida.
  */
 test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
-  test('programar una orden → ambos procesos activos en la bandeja → capturar uno y luego el otro la vacía', async ({
+  test('programar una orden → ambos procesos pendientes en Mis pendientes → marcar hecho uno y luego el otro', async ({
     page,
   }) => {
     const sufijo = Date.now().toString().slice(-6);
@@ -92,7 +93,10 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
-    await page.goto('/pedidos');
+    // Pedido por la edición F2 (/pedidos/administrar) SIN fecha de entrega: así la RC AUTOMÁTICA
+    // del alta (R3, B5) se OMITE (sin fecha no se puede planear) y ESTE test programa a MANO con
+    // su plantilla/artículo propios, como antes.
+    await page.goto('/pedidos/administrar');
     await page.getByTestId('nuevo-pedido').click();
     const dialogoPedido = page.getByRole('dialog');
     await dialogoPedido.getByLabel('Cliente').selectOption({ label: cliente });
@@ -103,26 +107,33 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('guardar-pedido').click();
     await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();
 
-    await page.goto('/produccion/ordenes');
-    await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
-    await page.getByTestId('nuevo-orden').click();
-    const dialogoAlta = page.getByRole('dialog');
-    await dialogoAlta.getByTestId('orden-buscar-pedido').fill(cliente);
-    await dialogoAlta.getByTestId('orden-pedido-opcion').first().click();
-    await dialogoAlta.getByTestId('orden-renglon-opcion').first().click();
-    await page.getByTestId('confirmar-nueva-orden').click();
-    await expect(page.getByText(/Orden \d+ creada\./)).toBeVisible();
+    // R3: la OP nace del pedido con "Generar OP" (ahí NACE su matriz de 20 pzas).
+    await page.goto('/pedidos');
+    await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
+    const grupo = page.getByTestId('pedidos-grupo').filter({ hasText: cliente }).first();
+    await expect(grupo).toBeVisible();
+    await grupo.getByTestId('pedidos-generar-op').first().click();
+    const panelOp = page.getByTestId('panel-generar-op');
+    const matrizOp = panelOp.getByTestId('matriz-op');
+    await matrizOp.getByTestId('matriz-op-agregar-talla').selectOption({ index: 1 });
+    await matrizOp.getByTestId('matriz-op-agregar-color').selectOption({ index: 1 });
+    await matrizOp.getByTestId('matriz-op-celda').first().fill('20');
+    await page.getByTestId('confirmar-generar-op').click();
+    const toastOp = page.getByText(/OP \d+ creada/).first();
+    await expect(toastOp).toBeVisible();
+    const folioOrden = /OP (\d+) creada/.exec((await toastOp.textContent()) ?? '')?.[1] ?? '';
+    expect(folioOrden).not.toBe('');
 
+    // La captura completa (edición) vive en /captura: ahí está el botón de programar la RC.
+    await page.goto('/produccion/ordenes/captura');
+    await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
+    await page.getByTestId('buscar-orden').fill(folioOrden);
+    await page
+      .getByTestId('fila-orden')
+      .filter({ hasText: `Orden ${folioOrden}` })
+      .first()
+      .click();
     const detalle = page.getByTestId('detalle-orden');
-    const matriz = detalle.getByTestId('matriz-orden');
-    await matriz.getByTestId('matriz-orden-agregar-color').selectOption({ index: 1 });
-    const agregarTalla = matriz.getByTestId('matriz-orden-agregar-talla');
-    if (await agregarTalla.isEnabled()) {
-      await agregarTalla.selectOption({ index: 1 });
-    }
-    await matriz.getByTestId('matriz-orden-celda').first().fill('20');
-    await detalle.getByTestId('guardar-matriz').click();
-    await expect(page.getByText('Matriz guardada.')).toBeVisible();
 
     // ── 5) Programar la RC desde el detalle de la orden ─────────────────────────
     await detalle.getByTestId('orden-programar-rc').click();
@@ -142,35 +153,56 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await expect(page.getByRole('heading', { name: 'Ruta Crítica de la orden' })).toBeVisible();
     await expect(page.getByTestId('imprimir-plan-rc')).toBeVisible();
 
-    // ── 6) Ambos procesos (raíces independientes, duración > 0) aparecen ACTIVOS en la Bandeja ──
-    await page.goto('/ruta-critica/bandeja');
-    await expect(page.getByRole('heading', { name: 'Bandeja de tareas' })).toBeVisible();
-    await page.getByTestId('bandeja-buscar-cliente').fill(cliente);
-    const tarea1 = page.getByTestId('bandeja-tarea').filter({ hasText: proc1Nombre });
-    await expect(tarea1).toBeVisible();
+    // ── 6) Ambos procesos (raíces independientes, duración > 0) aparecen en MIS PENDIENTES.
+    //    Se llega por el MENÚ: "Ruta Crítica" es HOJA DIRECTA (R4, sin desplegable).
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Ruta Crítica', exact: true })
+      .click();
+    await expect(page).toHaveURL(/\/ruta-critica\/pendientes$/);
+    await expect(page.getByRole('heading', { name: 'Mis pendientes' })).toBeVisible();
+    // AISLA las filas de ESTA corrida: el admin ve TODO y la página trae 100 tareas por consulta —
+    // con la BD del CI llena de órdenes de otros specs, la fila podía quedar FUERA de la página
+    // (el flaky de la 1ª corrida). El filtro por cliente es SERVER-SIDE (parámetro de la bandeja).
+    await page.getByTestId('pendientes-buscar-cliente').fill(cliente);
+    const fila1 = page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre });
+    await expect(fila1).toBeVisible();
+    // Los procesos del test no tienen evento de sistema → tag "✋ manual" + botón "Marcar hecho".
+    await expect(fila1.getByTestId('pendientes-tag-evento')).toHaveText('✋ manual');
 
-    // ── 7) Capturar uno con "Hoy" lo saca de la bandeja; el otro (ya activo) sigue ahí ──────────
-    await tarea1.getByTestId('bandeja-completar-hoy').click();
-    await expect(page.getByText(/completado\./)).toBeVisible();
-    // El proceso 1 desaparece de la bandeja; el 2 (raíz independiente, ya estaba activo) sigue.
-    await expect(page.getByTestId('bandeja-tarea').filter({ hasText: proc1Nombre })).toHaveCount(0);
-    const tarea2 = page.getByTestId('bandeja-tarea').filter({ hasText: proc2Nombre });
-    await expect(tarea2).toBeVisible();
+    // ── 7) "Marcar hecho" saca al primero; el otro (raíz independiente) sigue ahí ──────────────
+    await fila1.getByTestId('pendientes-marcar-hecho').click();
+    await expect(page.getByText(/marcado como hecho\./)).toBeVisible();
+    await expect(page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre })).toHaveCount(
+      0,
+    );
+    const fila2 = page.getByTestId('pendientes-fila').filter({ hasText: proc2Nombre });
+    await expect(fila2).toBeVisible();
 
-    // ── 8) Capturar el último: la RC queda al día (esa orden sale de la bandeja) ─
-    await tarea2.getByTestId('bandeja-completar-hoy').click();
-    await expect(page.getByText(/completado\./)).toBeVisible();
-    await expect(page.getByTestId('bandeja-tarea').filter({ hasText: proc2Nombre })).toHaveCount(0);
+    // ── 8) Marcar el último: la orden queda al día (sale de Mis pendientes) ─────
+    await fila2.getByTestId('pendientes-marcar-hecho').click();
+    await expect(page.getByText(/marcado como hecho\./)).toBeVisible();
+    await expect(page.getByTestId('pendientes-fila').filter({ hasText: proc2Nombre })).toHaveCount(
+      0,
+    );
+
+    // ── 9) Clic en un renglón abre el panel "Ruta de la orden" (R4). El panel se prueba con la
+    //    ruta de ESTA orden desde el centro de órdenes: aquí basta verificar el deep-link viejo.
+    await page.goto('/ruta-critica/bandeja'); // la URL vieja REDIRIGE a Mis pendientes
+    await expect(page).toHaveURL(/\/ruta-critica\/pendientes$/);
   });
 
-  test('la Bandeja funciona en viewport móvil (cards con botones grandes)', async ({ page }) => {
+  test('Mis pendientes funciona en viewport móvil (KPIs + lista sin desbordes)', async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrarComoAdmin(page);
 
-    await page.goto('/ruta-critica/bandeja');
-    await expect(page.getByRole('heading', { name: 'Bandeja de tareas' })).toBeVisible();
-    // En móvil se ve la lista (con o sin tareas) sin que la tabla se desborde; el buscador responde.
-    await expect(page.getByTestId('bandeja-buscar-cliente')).toBeVisible();
+    await page.goto('/ruta-critica/pendientes');
+    await expect(page.getByRole('heading', { name: 'Mis pendientes' })).toBeVisible();
+    // En móvil se ven los KPIs y la lista (con o sin pendientes) sin que la vista se desborde.
+    await expect(page.getByTestId('kpi-total')).toBeVisible();
   });
 });
 

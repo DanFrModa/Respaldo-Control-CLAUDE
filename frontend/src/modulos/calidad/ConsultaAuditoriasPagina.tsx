@@ -40,7 +40,7 @@ import { DialogoModificarAuditoria } from './DialogoModificarAuditoria';
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
 
-/** Badge del resultado (aprobado=teal / reprobado=rojo / sin calificar=gris). */
+/** Badge del resultado (aprobado=verde / reprobado=rojo / sin calificar=gris). */
 export function ResultadoBadge({
   resultado,
 }: {

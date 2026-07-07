@@ -122,9 +122,10 @@ function aOrdenLigera(fila: FilaLigera, totalPiezas: number): OrdenLigeraSalida 
 /**
  * Suma de piezas (Σ de `OrdenLineaTalla.cantidad`) POR orden, para un conjunto de ids, en UNA sola
  * consulta agregada (no trae la matriz a memoria). Devuelve un mapa `idOrden -> total`; las órdenes
- * sin matriz (incompletas) no aparecen en el mapa y se proyectan con total 0.
+ * sin matriz (incompletas) no aparecen en el mapa y se proyectan con total 0. Exportada: el centro
+ * de comando (R2) la reusa para la columna "Cant. ordenada".
  */
-async function totalesPorOrden(
+export async function totalesPorOrden(
   cliente: ReturnType<typeof clienteLectura>,
   idsOrden: number[],
 ): Promise<Map<number, number>> {

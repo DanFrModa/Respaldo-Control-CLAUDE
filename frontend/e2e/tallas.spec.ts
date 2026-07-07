@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de Tallas y curvas (F1-E2, PIEZA B — D4) contra el stack real, en la estructura
@@ -21,13 +21,13 @@ test.describe('Tallas y curvas (D4)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos → Tallas (descubrible por clic).
+    // Navega Sistema · Catálogos base → Tallas (descubrible por clic).
+    await abrirDesplegableMenu(page, 'Catálogos base');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('link', { name: 'Tallas', exact: true })
       .click();
-    await page.getByTestId('catalogo-tallas').click();
     await expect(page.getByRole('heading', { name: 'Tallas' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-talla');

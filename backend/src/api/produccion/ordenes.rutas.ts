@@ -12,6 +12,9 @@
  * (encabezado), `PUT /ordenes/:id/matriz` (colores × tallas), `POST /ordenes/:id/copiar-matriz`,
  * `POST /ordenes/:id/cancelar` (motivo obligatorio), `PUT /ordenes/:id/referencias` (D7),
  * `POST /ordenes/:id/comentarios`. NO hay rutas de UPC (decisión Gabriel 16-jun-2026).
+ * Rediseño R2 (§4.4.3): `GET /ordenes/:id/precios` (resumen, `ordenes.ver`; montos reales solo con
+ * `ordenes.ver-precio-real-maquila`), `PATCH /ordenes/:id/precios` (capturar precio real,
+ * `ordenes.precio-maquila`) y `GET /ordenes/:id/precios/eventos` (historial inmutable).
  *
  * CERO lógica de negocio o acceso a datos aquí; los errores de dominio los traduce el error
  * handler global (`src/api/errores.ts`).
@@ -31,6 +34,9 @@ import {
   esquemaOrdenCrear,
   esquemaOrdenMatrizCuerpo,
   esquemaOrdenPatchCuerpo,
+  esquemaOrdenPrecioEventosLista,
+  esquemaOrdenPreciosPatchCuerpo,
+  esquemaOrdenPreciosSalida,
   esquemaOrdenReferenciasCuerpo,
   esquemaOrdenSalida,
   esquemaOrdenesPagina,
@@ -48,6 +54,11 @@ import {
   listarOrdenes,
   obtenerOrden,
 } from '../../dominio/produccion/ordenes.js';
+import {
+  actualizarPreciosOrden,
+  listarEventosPrecioOrden,
+  obtenerPreciosOrden,
+} from '../../dominio/produccion/precios-orden.js';
 
 /** Parámetro de ruta `:id` (orden). */
 const esquemaParamId = z.object({
@@ -228,6 +239,62 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return guardarReferenciasOrden(sesion, request.params.id, request.body);
+    },
+  });
+
+  // ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3) ──────────
+  // Resumen para el panel (los montos reales van null sin `ordenes.ver-precio-real-maquila`).
+  app.route({
+    method: 'GET',
+    url: '/ordenes/:id/precios',
+    preHandler: app.conPermiso('ordenes.ver'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Resumen de precios de la orden (venta/maquila/aplicación) con su rastro',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaOrdenPreciosSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return obtenerPreciosOrden(sesion, request.params.id);
+    },
+  });
+
+  // Capturar el precio REAL negociado (permiso LEGADO `ordenes.precio-maquila`, acceso 4 del viejo).
+  app.route({
+    method: 'PATCH',
+    url: '/ordenes/:id/precios',
+    preHandler: app.conPermiso('ordenes.precio-maquila'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Capturar el precio real de maquila/aplicación (deja rastro inmutable)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaOrdenPreciosPatchCuerpo,
+      response: { 200: esquemaOrdenPreciosSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return actualizarPreciosOrden(sesion, request.params.id, request.body);
+    },
+  });
+
+  // Historial completo (con montos): permiso LEGADO `ordenes.ver-precio-real-maquila` (acceso 36).
+  app.route({
+    method: 'GET',
+    url: '/ordenes/:id/precios/eventos',
+    preHandler: app.conPermiso('ordenes.ver-precio-real-maquila'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Historial inmutable de cambios de precio de la orden',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaOrdenPrecioEventosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return listarEventosPrecioOrden(sesion, request.params.id);
     },
   });
 

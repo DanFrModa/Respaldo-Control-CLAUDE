@@ -60,7 +60,7 @@ import {
   type LineaMovimientoPt,
 } from '../../comun/kardex.js';
 import { ORIGEN } from '../../comun/origenes.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -309,10 +309,17 @@ const incluirRecibo = {
 
 type ReciboConDetalle = Prisma.EtapaMovimientoGetPayload<{ include: typeof incluirRecibo }>;
 
-/** Proyecta un recibo (con detalle) a la forma JSON del contrato. Los totales se DERIVAN por suma. */
+/**
+ * Proyecta un recibo (con detalle) a la forma JSON del contrato. Los totales se DERIVAN por suma.
+ * `ocultarPrecio` (rediseño R2, §4.4.3 — triage del lead): la respuesta de la CANCELACIÓN redacta
+ * `precioPactado` sin `ordenes.ver-precio-real-maquila` (el cancelador NO tecleó ese precio); la
+ * de CAPTURA lo conserva (quien capturó acaba de teclearlo — mismo criterio que el PATCH de
+ * precios de la orden).
+ */
 async function aReciboSalida(
   recibo: ReciboConDetalle,
   bd: ContextoBd | undefined,
+  ocultarPrecio = false,
 ): Promise<ReciboSalida> {
   // PRIMER movimiento de kardex generado por el recibo (si lo hubo), trazado por origen recibo. Un
   // recibo de costura con primeras Y segundas genera DOS movimientos de entrada (uno por almacén);
@@ -373,7 +380,8 @@ async function aReciboSalida(
     idAlmacenSegundas: recibo.idAlmacenSegundas,
     almacenSegundas: recibo.almacenSegundas?.nombre ?? null,
     fecha: recibo.fecha.toISOString().slice(0, 10),
-    precioPactado: recibo.precioPactado === null ? null : recibo.precioPactado.toNumber(),
+    precioPactado:
+      ocultarPrecio || recibo.precioPactado === null ? null : recibo.precioPactado.toNumber(),
     observaciones: recibo.observaciones,
     cancelado: recibo.canceladoEn !== null,
     canceladoEn: recibo.canceladoEn === null ? null : recibo.canceladoEn.toISOString(),
@@ -812,14 +820,23 @@ export async function cancelarReciboMaquila(
   }, bd);
 
   dispararPublicacion();
-  return obtenerRecibo(sesion, idRecibo, bd);
+  // Triage del lead (R2 §4.4.3): el cancelador NO tecleó el precio pactado — sin el permiso de
+  // ver precios reales, la respuesta lo redacta (la de captura sí lo devuelve a quien lo tecleó).
+  return obtenerRecibo(sesion, idRecibo, bd, {
+    ocultarPrecio: !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'),
+  });
 }
 
-/** Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9). */
+/**
+ * Obtiene un recibo (con su matriz) de la empresa activa, o lanza `ErrorNoEncontrado` (A9).
+ * `opciones.ocultarPrecio`: el llamador decide si redactar `precioPactado` (lo usa la cancelación
+ * para quien no puede ver precios reales; la captura y el impreso lo conservan).
+ */
 export async function obtenerRecibo(
   sesion: SesionUsuario,
   idRecibo: number,
   bd?: ContextoBd,
+  opciones: { ocultarPrecio?: boolean } = {},
 ): Promise<ReciboSalida> {
   verificarPermiso(sesion, 'produccion.wip-ver');
   const recibo = await clienteLectura(bd).etapaMovimiento.findFirst({
@@ -833,7 +850,7 @@ export async function obtenerRecibo(
   if (recibo === null) {
     throw new ErrorNoEncontrado('EtapaMovimiento', idRecibo);
   }
-  return aReciboSalida(recibo, bd);
+  return aReciboSalida(recibo, bd, opciones.ocultarPrecio ?? false);
 }
 
 /** Re-lee el recibo para emitir su evento post-commit (best-effort). */

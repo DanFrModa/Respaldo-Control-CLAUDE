@@ -35,6 +35,9 @@ import {
   esquemaPlantillaCrear,
   esquemaPlantillaPatchCuerpo,
   esquemaPlantillaSalida,
+  esquemaRangoDificultadCrear,
+  esquemaRangoDificultadPatchCuerpo,
+  esquemaRangoDificultadSalida,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -60,12 +63,17 @@ import {
   desactivarDuracionAplicacion,
   desactivarDuracionTela,
   desactivarFactorCantidad,
+  actualizarRangoDificultad,
+  crearRangoDificultad,
+  desactivarRangoDificultad,
   listarDuracionesAplicacion,
   listarDuracionesTela,
   listarFactoresCantidad,
+  listarRangosDificultad,
   type DuracionAplicacionDto,
   type DuracionTelaDto,
   type FactorCantidadDto,
+  type RangoDificultadDto,
 } from '../../dominio/ruta-critica/reglasDuracion.js';
 import {
   actualizarFestivo,
@@ -150,6 +158,23 @@ function aFactorSalida(f: FactorCantidadDto): z.infer<typeof esquemaFactorCantid
     creadoPorId: f.creadoPorId,
     modificadoEn: f.modificadoEn.toISOString(),
     modificadoPorId: f.modificadoPorId,
+  };
+}
+
+function aRangoDificultadSalida(
+  r: RangoDificultadDto,
+): z.infer<typeof esquemaRangoDificultadSalida> {
+  return {
+    id: r.id,
+    opsDesde: r.opsDesde,
+    opsHasta: r.opsHasta,
+    nombre: r.nombre,
+    diasCostura: r.diasCostura,
+    activo: r.activo,
+    creadoEn: r.creadoEn.toISOString(),
+    creadoPorId: r.creadoPorId,
+    modificadoEn: r.modificadoEn.toISOString(),
+    modificadoPorId: r.modificadoPorId,
   };
 }
 
@@ -682,6 +707,77 @@ export const rutasPlantillasRc: FastifyPluginCallbackZod = (app, _opciones, done
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return aAplicacionSalida(await desactivarDuracionAplicacion(sesion, request.params.id));
+    },
+  });
+
+  // ── Reglas de duración: rangos de DIFICULTAD por # de operaciones (R4, B7) ────
+  app.route({
+    method: 'GET',
+    url: '/ruta-critica/reglas-duracion/dificultad',
+    preHandler: app.conPermiso('rc.catalogo-ver'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Listar los rangos de dificultad por # de operaciones (tabla configurable)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaListarRcQuery,
+      response: { 200: z.array(esquemaRangoDificultadSalida), ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const filas = await listarRangosDificultad(sesion, request.query.incluirInactivos);
+      return filas.map(aRangoDificultadSalida);
+    },
+  });
+  app.route({
+    method: 'POST',
+    url: '/ruta-critica/reglas-duracion/dificultad',
+    preHandler: app.conPermiso('rc.catalogo-administrar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Crear un rango de dificultad (valida que no se solape con los activos)',
+      security: SEGURIDAD_SESION,
+      body: esquemaRangoDificultadCrear,
+      response: { 201: esquemaRangoDificultadSalida, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const fila = await crearRangoDificultad(sesion, request.body);
+      return reply.code(201).send(aRangoDificultadSalida(fila));
+    },
+  });
+  app.route({
+    method: 'PATCH',
+    url: '/ruta-critica/reglas-duracion/dificultad/:id',
+    preHandler: app.conPermiso('rc.catalogo-administrar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Actualizar un rango de dificultad',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaRangoDificultadPatchCuerpo,
+      response: { 200: esquemaRangoDificultadSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return aRangoDificultadSalida(
+        await actualizarRangoDificultad(sesion, request.params.id, request.body),
+      );
+    },
+  });
+  app.route({
+    method: 'DELETE',
+    url: '/ruta-critica/reglas-duracion/dificultad/:id',
+    preHandler: app.conPermiso('rc.catalogo-administrar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary: 'Desactivar un rango de dificultad (borrado suave)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaRangoDificultadSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return aRangoDificultadSalida(await desactivarRangoDificultad(sesion, request.params.id));
     },
   });
 

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Defectos (F6-E1) contra el stack real. Cubre el ciclo completo:
@@ -16,13 +16,13 @@ test.describe('CRUD de Defectos (Calidad, F6-E1)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega al módulo Calidad → sub-vista Defectos.
+    // Navega Operación · Calidad → Catálogo de defectos (desplegable del rediseño).
+    await abrirDesplegableMenu(page, 'Calidad');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Calidad', exact: true })
+      .getByRole('link', { name: 'Catálogo de defectos' })
       .click();
-    await page.getByTestId('calidad-defectos').click();
     await expect(page.getByRole('heading', { name: 'Catálogo de defectos' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-defecto');

@@ -12,11 +12,9 @@ import { entrarComoAdmin } from './ayudas';
 test.describe('EsMa — estado de cuenta (F6-E5)', () => {
   test('la portada muestra las tarjetas de la experiencia de usuario', async ({ page }) => {
     await entrarComoAdmin(page);
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'EsMa', exact: true })
-      .click();
+    // R1: EsMa es un desplegable (Finanzas · EsMa (maquileros)); su PORTADA-hub
+    // ya no cuelga del menú y se visita por URL directa (la ruta sigue viva).
+    await page.goto('/esma');
 
     await expect(page.getByRole('heading', { name: 'EsMa' })).toBeVisible();
     await expect(page.getByTestId('esma-estado-cuenta')).toBeVisible();

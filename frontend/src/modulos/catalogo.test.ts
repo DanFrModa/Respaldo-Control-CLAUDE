@@ -4,8 +4,11 @@ import type { ClavePermiso } from '@/api/tipos';
 
 import {
   buscarModuloPorClave,
+  esEntradaVisible,
   esModuloVisible,
+  filtrarGruposVisibles,
   filtrarModulosVisibles,
+  GRUPOS_MENU,
   MODULOS_MENU,
 } from './catalogo';
 
@@ -14,160 +17,218 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
   return new Set(claves);
 }
 
-describe('catalogo de modulos del menu', () => {
-  it('define los 13 modulos del plan §5 (mas sub-vistas) con rutas y claves unicas', () => {
-    // 13 módulos del plan + 19 sub-vistas (galería de modelos, F1-E5; órdenes, F2-E3; consulta de
-    // órdenes + incompletas + pedidos por mes, F2-E4; tipos de proceso, F3-E1; captura de corte +
-    // envío a maquila + corte semanal, F3-E2; movimientos + traspasos + existencias + kardex de
-    // inventario PT, F3-E3; recibo + recibos semanales + validación de cargos EsMa, F3-E4; entrega a
-    // cliente + tablero WIP + existencias en poder del maquilero, F3-E5).
-    // 13 módulos del plan + 29 sub-vistas (recepción de compras, F4-E3) + 2 sub-vistas de F4-E4
-    // (explosión de materiales y "qué tengo / qué falta") + 3 sub-vistas de F4-E5 (notas de salida:
-    // captura, consulta de notas y notas por orden) + 2 sub-vistas de F5-E1 (Ruta Crítica: procesos
-    // y dependencias) + 3 sub-vistas de F5-E2 (plantillas de ruta, reglas de duración y
-    // configuración de RC por empresa) + 1 sub-vista de F5-E5 (bandeja de tareas) + 1 sub-vista de
-    // F5-E7 (concentrado planeado vs real) = 41 sub-vistas.
-    // F6-E1: +3 sub-vistas de Calidad (defectos, tipos de producto, planes AQL) + 1 sub-vista de
-    // Administración (bitácora) = 45 sub-vistas → 58 entradas. F6-E2: +1 sub-vista de Calidad
-    // (auditorías de calidad, `calidad.generar-auditorias`) = 46 sub-vistas → 59 entradas. F6-E3:
-    // +2 sub-vistas de Calidad (consulta de auditorías e historial por maquilero, `calidad.ver`) =
-    // 48 sub-vistas → 61 entradas. F6-E4: +4 sub-vistas de EsMa (conciliación y pagos con
-    // `esma.ver-pagos`; abonos y descuentos con `esma.modificar`) = 52 sub-vistas → 65 entradas.
-    // F6-E5: +5 sub-vistas de EsMa (estado de cuenta, saldos, desglosado, pagos y recibos semanales,
-    // todas con `esma.ver-pagos`) = 57 sub-vistas → 70 entradas.
-    // F7-E1: +5 sub-vistas de Costos (pre-costo y lista de precios con `precostos.consultar`; costeo
-    // de orden, lista de costos y márgenes con `costos.ver`) = 62 sub-vistas → 75 entradas. El módulo
-    // Costos deja de ser "autenticado": ahora lo gobiernan `precostos.consultar`/`costos.ver`.
-    // F7-E2: +1 módulo EDR (`edr.ver`) → 14 planeados, +4 sub-vistas del EDR (gestión del mes con
-    // `edr.capturar`; conciliación, por mes y por año con `edr.ver`) = 66 sub-vistas → 80 entradas.
-    // F7-E3: el módulo Indicadores deja de ser "autenticado" (ahora `indicadores.ver`) y suma 3
-    // sub-vistas (RC, calidad y WIP, todas con `indicadores.ver`) = 69 sub-vistas → 83 entradas.
-    // F7-E4: el módulo Indicadores amplía sus permisos (captura operativa) y suma 5 sub-vistas
-    // (captura/tablero/catálogos de productividad, fichas confiables y muestrarios) = 74 sub-vistas
-    // → 88 entradas.
-    // F7-E5: +1 sub-vista de Indicadores (inventarios cíclicos, `indicadores.ciclicos-*`); las
-    // pantallas de conteo/exactitud son detalle (rutas en App, NO en el menú) = 75 sub-vistas → 89.
-    // F8-E2: +1 módulo Desarrollo (`desarrollo.ver`, entre Modelos y Pedidos) = 15 planeados → 90.
-    // F8-E4: +1 sub-vista de Desarrollo (listas de precios, `listas.ver`) = 76 sub-vistas → 91.
-    const planeados = MODULOS_MENU.filter((m) => m.subVista !== true);
-    expect(planeados).toHaveLength(15);
-    expect(MODULOS_MENU).toHaveLength(91);
-    const claves = MODULOS_MENU.map((m) => m.clave);
-    expect(new Set(claves).size).toBe(91);
+describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
+  it('tiene los 7 grupos aprobados por Daniel, en orden', () => {
+    // Estructura aprobada 4-jul-2026 (spec §3.1): Resumen suelto + 6 grupos.
+    expect(GRUPOS_MENU.map((g) => g.titulo)).toEqual([
+      null, // Resumen (sin rotulo)
+      'Operación',
+      'Inventarios',
+      'Comercial',
+      'Finanzas',
+      'Análisis',
+      'Sistema',
+    ]);
+  });
+
+  it('define 100 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+    // R1 dejó 99 hojas y 15 padres; R4 quita la hoja rc-bandeja (redirige a Mis pendientes) y el
+    // padre Ruta Crítica (vuelve HOJA DIRECTA a /ruta-critica/pendientes), y agrega la hoja
+    // rc-procesos-responsables con su padre SISTEMA «Procesos y responsables» (g-rc-config):
+    // 99 − 1 + 2 = 100 hojas; 15 − 1 + 1 = 15 padres.
+    expect(MODULOS_MENU).toHaveLength(100);
+    const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
+    expect(padres).toHaveLength(15);
+    // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
+    for (const padre of padres) {
+      expect(padre.hijos.length).toBeGreaterThan(0);
+    }
+    const claves = [...MODULOS_MENU.map((m) => m.clave), ...padres.map((p) => p.clave)];
+    expect(new Set(claves).size).toBe(claves.length);
+  });
+
+  it('las rutas son unicas salvo /listas-precios (duplicado DELIBERADO en Clientes)', () => {
     const rutas = MODULOS_MENU.map((m) => m.ruta);
-    expect(new Set(rutas).size).toBe(91);
+    const repetidas = rutas.filter((ruta, i) => rutas.indexOf(ruta) !== i);
+    expect(repetidas).toEqual(['/listas-precios']);
   });
 
-  it('marca la galeria de modelos como sub-vista (no es un modulo del plan)', () => {
-    const galeria = MODULOS_MENU.find((m) => m.clave === 'galeria-modelos');
-    expect(galeria).toBeDefined();
-    expect(galeria?.subVista).toBe(true);
-    expect(galeria?.permisos).toEqual(['modelos.ver']);
+  it('los hijos aprobados van PRIMERO en cada desplegable (el principal al frente)', () => {
+    const primerHijo = (clave: string): string | undefined => {
+      const padre = GRUPOS_MENU.flatMap((g) => g.entradas).find((e) => e.clave === clave);
+      return padre?.hijos?.[0]?.clave;
+    };
+    expect(primerHijo('g-desarrollo')).toBe('modelos');
+    expect(primerHijo('produccion')).toBe('ordenes');
+    expect(primerHijo('g-rc-config')).toBe('rc-procesos-responsables');
+    expect(primerHijo('calidad')).toBe('calidad-consulta-auditorias');
+    expect(primerHijo('inventarios')).toBe('inventario-existencias');
+    expect(primerHijo('catalogos')).toBe('colores');
   });
 
-  it('marca las ordenes de produccion como sub-vista con su propio permiso', () => {
-    const ordenes = MODULOS_MENU.find((m) => m.clave === 'ordenes');
-    expect(ordenes).toBeDefined();
-    expect(ordenes?.subVista).toBe(true);
-    expect(ordenes?.permisos).toEqual(['ordenes.ver']);
-    expect(ordenes?.ruta).toBe('/produccion/ordenes');
-  });
-
-  it('marca la Ruta Critica como el modulo destacado', () => {
-    const destacados = MODULOS_MENU.filter((m) => m.destacado);
+  it('marca la Ruta Critica como la entrada destacada', () => {
+    const entradas = GRUPOS_MENU.flatMap((g) => g.entradas);
+    const destacados = entradas.filter((e) => e.destacado);
     expect(destacados).toHaveLength(1);
     expect(destacados[0]?.clave).toBe('ruta-critica');
   });
 
-  it('muestra los modulos "autenticado" con cualquier sesion (incluso sin permisos)', () => {
-    const visibles = filtrarModulosVisibles(permisos());
-    // Administracion (permisos admin), Modelos y Galería de modelos (modelos.ver), Pedidos
-    // (pedidos.ver, F2-E1) y Órdenes (ordenes.ver, F2-E3) NO son "autenticado"; Calidad
-    // (calidad.ver, F6-E1), Costos (precostos.consultar/costos.ver, F7-E1) e Indicadores
-    // (indicadores.ver, F7-E3) tampoco; el resto sí -> 7 visibles sin permisos.
-    expect(visibles.map((m) => m.clave)).not.toContain('administracion');
-    expect(visibles.map((m) => m.clave)).not.toContain('modelos');
-    expect(visibles.map((m) => m.clave)).not.toContain('galeria-modelos');
-    expect(visibles.map((m) => m.clave)).not.toContain('codigos-barra');
-    expect(visibles.map((m) => m.clave)).not.toContain('pedidos');
-    expect(visibles.map((m) => m.clave)).not.toContain('ordenes');
-    expect(visibles.map((m) => m.clave)).not.toContain('calidad');
-    expect(visibles.map((m) => m.clave)).not.toContain('costos');
-    expect(visibles.map((m) => m.clave)).not.toContain('indicadores');
-    expect(visibles).toHaveLength(7);
-  });
-
-  it('oculta Administracion sin un permiso administrativo', () => {
-    const admin = MODULOS_MENU.find((m) => m.clave === 'administracion');
-    expect(admin).toBeDefined();
-    if (!admin) return; // estrecha el tipo a ModuloMenu (sin `!`)
-    expect(esModuloVisible(admin, permisos())).toBe(false);
-  });
-
-  it('muestra Administracion con cualquiera de sus permisos (basta uno)', () => {
-    const admin = MODULOS_MENU.find((m) => m.clave === 'administracion');
-    expect(admin).toBeDefined();
-    if (!admin) return; // estrecha el tipo a ModuloMenu (sin `!`)
-    expect(esModuloVisible(admin, permisos('almacenes.administrar'))).toBe(true);
-    expect(esModuloVisible(admin, permisos('usuarios.administrar'))).toBe(true);
-  });
-
-  it('un usuario con todos los permisos ve los 13 modulos + las 19 sub-vistas', () => {
-    const todos = permisos(
-      'usuarios.administrar',
-      'roles.administrar',
-      'empresas.administrar',
-      'almacenes.administrar',
-      // Modelos (F1-E4) y su Galería (F1-E5) requieren `modelos.ver`; Pedidos (F2-E1) requiere
-      // `pedidos.ver`; Órdenes (F2-E3) y las consultas/incompletas/tablero (F2-E4) requieren
-      // `ordenes.ver`; Tipos de proceso (F3-E1) requiere `tipos-proceso.ver`; corte/envío/corte
-      // semanal (F3-E2) requieren `produccion.*`; inventario PT (F3-E3) requiere `inventario-pt.*`;
-      // recibo + recibos semanales (F3-E4) requieren `produccion.recibo`/`.wip-ver`; la validación
-      // de cargos EsMa (F3-E4) requiere `esma.cargo-validar`; la entrega a cliente (F3-E5) requiere
-      // `produccion.entrega` (el tablero WIP y existencias del maquilero usan `produccion.wip-ver`).
-      'modelos.ver',
-      'pedidos.ver',
-      'ordenes.ver',
-      'tipos-proceso.ver',
-      'produccion.corte',
-      'produccion.envio',
-      'produccion.recibo',
-      'produccion.entrega',
-      'produccion.wip-ver',
-      'inventario-pt.ver',
-      'inventario-pt.mover',
-      // Inventario de telas/avíos (F4-E1): sus 6 sub-vistas requieren `inventario-telas/avios.*`.
-      'inventario-telas.ver',
-      'inventario-telas.mover',
-      'inventario-avios.ver',
-      'inventario-avios.mover',
-      'esma.cargo-validar',
-    );
-    // 13 módulos del plan + 25 sub-vistas (las 19 previas + las 6 de inventario de telas/avíos de
-    // F4-E1) + la Configuración de RC por empresa (F5-E2, gobernada por `empresas.administrar`,
-    // que sí está en este set) = 39. Las sub-vistas de RC `rc.catalogo-ver` (procesos/dependencias
-    // de F5-E1 y plantillas/reglas de F5-E2) NO entran: ese permiso no está en este set.
-    // F6-E1: Calidad y sus 3 sub-vistas requieren `calidad.ver` (no en este set); bitácora
-    // requiere `admin.ver-bitacora` (no en este set) → el total baja de 39 a 38 (calidad
-    // ya no es "autenticado").
-    // F7-E1: el módulo Costos requiere `precostos.consultar`/`costos.ver` (no en este set) y sus 5
-    // sub-vistas también → Costos ya no cuenta (antes era "autenticado") → 38 baja a 37.
-    // F7-E3: el módulo Indicadores requiere `indicadores.ver` (no en este set) y sus 3 sub-vistas
-    // también → Indicadores ya no cuenta (antes era "autenticado") → 37 baja a 36.
-    expect(filtrarModulosVisibles(todos)).toHaveLength(36);
-  });
-
-  it('marca consulta/incompletas/pedidos-por-mes como sub-vistas con permiso ordenes.ver (F2-E4)', () => {
-    for (const clave of ['consulta-ordenes', 'ordenes-incompletas', 'pedidos-por-mes']) {
-      const entrada = MODULOS_MENU.find((m) => m.clave === clave);
-      expect(entrada).toBeDefined();
-      expect(entrada?.subVista).toBe(true);
-      expect(entrada?.permisos).toEqual(['ordenes.ver']);
+  it('las hojas sin pantalla llevan su nota de "Proximamente" y ruta de un segmento', () => {
+    // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta.
+    for (const [clave, nota] of [
+      ['ventas', 'Llega en R9'],
+      ['auditores', 'Llega en R9'],
+      ['cxc', 'Llega con Finanzas (F9)'],
+      ['cxp', 'Llega con Finanzas (F9)'],
+      ['analisis-rc', 'Llega en R7'],
+    ] as const) {
+      const hoja = MODULOS_MENU.find((m) => m.clave === clave);
+      expect(hoja, clave).toBeDefined();
+      expect(hoja?.proximamente).toBe(nota);
+      expect(hoja?.ruta.slice(1).includes('/'), clave).toBe(false);
     }
   });
 
-  it('busca un modulo por su clave de ruta', () => {
-    expect(buscarModuloPorClave('ruta-critica')?.titulo).toBe('Ruta Crítica');
+  it('muestra las hojas "autenticado" con cualquier sesion (incluso sin permisos)', () => {
+    const visibles = filtrarModulosVisibles(permisos());
+    // Sin permisos solo quedan las hojas de uso general: el resumen, los catálogos que heredaron
+    // el gate del hub Catálogos (bordados + galería, telas, avíos, clientes, proveedores, colores,
+    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las 5 «Próximamente».
+    expect(visibles.map((m) => m.clave).sort()).toEqual(
+      [
+        'almacenes',
+        'analisis-rc',
+        'auditores',
+        'bordados',
+        'catalogo-avios',
+        'catalogo-telas',
+        'clientes-catalogo',
+        'colores',
+        'cxc',
+        'cxp',
+        'documental',
+        'etiquetas-marca',
+        'galeria-bordados',
+        'proveedores',
+        'resumen',
+        'tallas',
+        'temporadas',
+        'ventas',
+      ].sort(),
+    );
+  });
+
+  it('filtrarGruposVisibles poda hijos sin permiso y elimina padres/grupos vacios', () => {
+    const grupos = filtrarGruposVisibles(permisos());
+    const porClave = new Map(grupos.map((g) => [g.clave, g]));
+
+    // FINANZAS: quedan CxC/CxP pero EsMa (todas sus hojas con permiso) desaparece.
+    expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc', 'cxp']);
+    // OPERACIÓN: Ruta Crítica y Pedidos desaparecen (sin permisos); Desarrollo queda solo con
+    // sus hojas "autenticado" (bordados y su galería); Calidad solo con Auditores.
+    const operacion = porClave.get('operacion');
+    expect(operacion?.entradas.map((e) => e.clave)).toEqual([
+      'g-desarrollo',
+      'produccion',
+      'calidad',
+    ]);
+    const desarrollo = operacion?.entradas.find((e) => e.clave === 'g-desarrollo');
+    expect(desarrollo?.hijos?.map((h) => h.clave)).toEqual(['bordados', 'galeria-bordados']);
+    // SISTEMA: Catálogos base pierde "Tipos de proceso" (permiso propio); Administración y
+    // Procesos y responsables desaparecen.
+    const sistema = porClave.get('sistema');
+    expect(sistema?.entradas.map((e) => e.clave)).toEqual(['catalogos']);
+    const catalogos = sistema?.entradas.find((e) => e.clave === 'catalogos');
+    expect(catalogos?.hijos?.map((h) => h.clave)).not.toContain('tipos-proceso');
+  });
+
+  it('un padre es visible si ALGUNA hoja hija es visible (basta una)', () => {
+    const administracion = GRUPOS_MENU.flatMap((g) => g.entradas).find(
+      (e) => e.clave === 'administracion',
+    );
+    expect(administracion).toBeDefined();
+    if (!administracion) return; // estrecha el tipo (sin `!`)
+    expect(esEntradaVisible(administracion, permisos())).toBe(false);
+    // Con solo la bitácora, "Usuarios y accesos" aparece (con esa única hoja).
+    expect(esEntradaVisible(administracion, permisos('admin.ver-bitacora'))).toBe(true);
+    expect(esEntradaVisible(administracion, permisos('usuarios.administrar'))).toBe(true);
+  });
+
+  it('cada hoja conserva el permiso de su entrada equivalente anterior', () => {
+    const casos: ReadonlyArray<[string, readonly ClavePermiso[] | 'autenticado']> = [
+      ['modelos', ['modelos.ver']],
+      ['galeria-modelos', ['modelos.ver']],
+      ['desarrollo', ['desarrollo.ver']],
+      ['listas-precios', ['listas.ver']],
+      ['clientes-listas-precios', ['listas.ver']],
+      ['pedidos', ['pedidos.ver']],
+      ['ordenes', ['ordenes.ver']],
+      ['notas-salida', ['notas.ver']],
+      ['tipos-proceso', ['tipos-proceso.ver']],
+      // R4: Ruta Crítica es hoja directa a Mis pendientes con el gate de la bandeja anterior.
+      ['ruta-critica', ['rc.ruta-ver']],
+      ['rc-concentrado', ['rc.ruta-ver']],
+      ['rc-procesos-responsables', ['rc.catalogo-ver']],
+      ['rc-procesos', ['rc.catalogo-ver']],
+      ['calidad-consulta-auditorias', ['calidad.ver']],
+      ['bitacora', ['admin.ver-bitacora']],
+      ['config-ruta-critica', ['empresas.administrar']],
+      ['inventario-existencias', ['inventario-pt.ver']],
+      ['edr-por-mes', ['edr.ver']],
+      // Los catálogos que vivían bajo el hub Catálogos conservan su gate "autenticado".
+      ['clientes-catalogo', 'autenticado'],
+      ['proveedores', 'autenticado'],
+      ['catalogo-telas', 'autenticado'],
+      ['colores', 'autenticado'],
+    ];
+    for (const [clave, esperado] of casos) {
+      const hoja = MODULOS_MENU.find((m) => m.clave === clave);
+      expect(hoja, clave).toBeDefined();
+      expect(hoja?.permisos, clave).toEqual(esperado);
+    }
+  });
+
+  it('los hubs siguen encontrando sus sub-vistas por prefijo de ruta (compatibilidad)', () => {
+    // `InventariosPagina` lista tarjetas filtrando el menú plano; las sub-vistas RC ya no tienen
+    // hub (R4: /ruta-critica redirige a Mis pendientes) pero siguen siendo hojas del menú (⌘K).
+    const inventarios = MODULOS_MENU.filter(
+      (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
+    );
+    expect(inventarios).toHaveLength(10);
+    const rutaCritica = MODULOS_MENU.filter(
+      (m) => m.subVista === true && m.ruta.startsWith('/ruta-critica/'),
+    );
+    // R4: rc-bandeja desapareció (Mis pendientes es la hoja directa, no subVista).
+    expect(rutaCritica.map((m) => m.clave).sort()).toEqual(
+      [
+        'rc-concentrado',
+        'rc-dependencias',
+        'rc-plantillas',
+        'rc-procesos',
+        'rc-reglas-duracion',
+      ].sort(),
+    );
+  });
+
+  it('busca por clave: hojas, padres (rutas legadas /produccion y /compras) e inexistentes', () => {
+    expect(buscarModuloPorClave('rc-procesos-responsables')?.titulo).toBe(
+      'Procesos y responsables',
+    );
+    // Los padres se encuentran porque /produccion y /compras siguen cayendo en la página
+    // comodín (no tienen pantalla propia) y esta debe poder presentarlos.
+    const produccion = buscarModuloPorClave('produccion');
+    expect(produccion?.titulo).toBe('Producción');
+    expect(produccion?.hijos).toBeDefined();
+    expect(buscarModuloPorClave('compras')?.titulo).toBe('Compras / MRP');
+    expect(buscarModuloPorClave('documental')?.hijos).toBeUndefined();
     expect(buscarModuloPorClave('inexistente')).toBeUndefined();
+  });
+
+  it('esModuloVisible respeta el gate por permisos de una hoja (A4)', () => {
+    const bitacora = MODULOS_MENU.find((m) => m.clave === 'bitacora');
+    expect(bitacora).toBeDefined();
+    if (!bitacora) return;
+    expect(esModuloVisible(bitacora, permisos())).toBe(false);
+    expect(esModuloVisible(bitacora, permisos('admin.ver-bitacora'))).toBe(true);
   });
 });

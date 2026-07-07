@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Clientes (F1-E2, D7) contra el stack real, en la estructura LISTA +
@@ -18,13 +18,13 @@ test.describe('CRUD de Clientes', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos -> Clientes (descubrible por clic, no solo por URL).
+    // Navega Comercial · Clientes -> Catálogo (descubrible por clic, no solo por URL).
+    await abrirDesplegableMenu(page, 'Clientes');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('link', { name: 'Catálogo', exact: true })
       .click();
-    await page.getByTestId('catalogo-clientes').click();
     await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-cliente');
