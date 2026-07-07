@@ -48,6 +48,9 @@ const archivosStub: ServicioArchivos = {
   urlDescarga() {
     throw new Error('archivosStub.urlDescarga no debe llamarse en este test');
   },
+  eliminarObjeto() {
+    throw new Error('archivosStub.eliminarObjeto no debe llamarse en este test');
+  },
 };
 /** Contexto de BD del testcontainer (mismo `cliente` que usan los loaders), para inyectar a los servicios. */
 const bd = () => ({ cliente });

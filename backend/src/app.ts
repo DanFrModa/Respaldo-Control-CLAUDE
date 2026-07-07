@@ -29,6 +29,9 @@ import { rutasPrecostos } from './api/desarrollo/precostos.rutas.js';
 // Desarrollo (Módulo 15, F8-E4): listas de precios por Cliente+Departamento (factores + aprobación
 // del dueño + PDF/Excel) y los factores del cliente (sub-recurso del cliente).
 import { rutasListasPrecios } from './api/desarrollo/listas-precios.rutas.js';
+// Desarrollo (Módulo 15, F8-E6): enganche Desarrollo↔Producción — ligar orden↔desarrollo, sugerencia
+// de liga + precio, vista 360 desde la orden y tablero de desarrollos por estado.
+import { rutasLigaOrden } from './api/desarrollo/liga-orden.rutas.js';
 import { rutasClienteFactores } from './api/clientes/cliente-factores.rutas.js';
 import { rutasTelaProveedores } from './api/telas/tela-proveedores.rutas.js';
 import { rutasClienteDepartamentos } from './api/clientes/cliente-departamentos.rutas.js';
@@ -57,6 +60,7 @@ import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
 import { rutasImpresosOrden } from './api/produccion/impresos.rutas.js';
 import { rutasOrdenes } from './api/produccion/ordenes.rutas.js';
+import { rutasAdjuntosOrden } from './api/produccion/adjuntos-orden.rutas.js';
 import { rutasRecibosProduccion } from './api/produccion/recibos.rutas.js';
 import { rutasTiposProceso } from './api/produccion/tipos-proceso.rutas.js';
 import { rutasWip } from './api/produccion/wip.rutas.js';
@@ -167,6 +171,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.
   await app.register(rutasOrdenes, { prefix: '/api' });
+  // Órdenes — ADJUNTOS de apoyo en R2 (F8-E6, R6): sube/lista/borra archivos (Excel/PDF/imágenes)
+  // ligados a una orden vía presigned. Permisos `ordenes.ver` (listar/descargar) / `ordenes.administrar`
+  // (subir/eliminar); el DELETE borra también el objeto físico de R2 (best-effort). Sin permisos nuevos.
+  await app.register(rutasAdjuntosOrden, { prefix: '/api' });
   // Órdenes — CONSULTAS/TABLEROS/BÚSQUEDA (F2-E4 PIEZA B): consulta ligera, incompletas con
   // semáforo, tablero "pedidos por mes" y buscador global. Solo lectura (`ordenes.ver`). Sus paths
   // estáticos se registran ANTES de nada que choque con `/ordenes/:id` (Fastify los prioriza).
@@ -324,6 +332,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // E1); importes ocultos sin consultas.ver-importes.
   await app.register(rutasClienteFactores, { prefix: '/api' });
   await app.register(rutasListasPrecios, { prefix: '/api' });
+  // Desarrollo (Módulo 15, F8-E6): enganche Desarrollo↔Producción (ligar/quitar orden↔desarrollo,
+  // sugerencia de liga + precio propuesto, vista 360 y tablero por estado). RBAC desarrollo.ver/
+  // .administrar (ya sembrados en E1); importes ocultos sin consultas.ver-importes.
+  await app.register(rutasLigaOrden, { prefix: '/api' });
   // Administración (F1-E1 PIEZA C) — rutas REST sobre los servicios de dominio de F0.
   await app.register(rutasUsuarios, { prefix: '/api' });
   await app.register(rutasEmpresas, { prefix: '/api' });

@@ -111,8 +111,11 @@ const incluirProyectoDetalle = {
 type ProyectoLista = Prisma.ProyectoGetPayload<{ include: typeof incluirProyectoLista }>;
 type ProyectoDetalle = Prisma.ProyectoGetPayload<{ include: typeof incluirProyectoDetalle }>;
 
-/** Agrega los conteos de desarrollos por estado derivado. `total` incluye los apagados. */
-function conteosDesarrollos(
+/**
+ * Agrega los conteos de desarrollos por estado derivado. `total` incluye los apagados. Se exporta para
+ * que el TABLERO del enganche (F8-E6) reutilice la MISMA agregación server-side (no duplica el switch).
+ */
+export function conteosDesarrollos(
   desarrollos: {
     apagado: boolean;
     precostos: { estado: string }[];

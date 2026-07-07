@@ -4,9 +4,11 @@ import {
   Factory,
   Grid3x3,
   MessageSquare,
+  Paperclip,
   Route,
   Tags,
   UserRound,
+  Workflow,
   XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -22,6 +24,7 @@ import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetall
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { AdjuntosOrden } from './AdjuntosOrden';
 import { DialogoCancelarOrden } from './DialogoCancelarOrden';
 import { DialogoCopiarMatriz } from './DialogoCopiarMatriz';
 import { DialogoNuevaOrden } from './DialogoNuevaOrden';
@@ -30,6 +33,7 @@ import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelComentarios } from './PanelComentarios';
 import { PanelMatriz } from './PanelMatriz';
 import { PanelReferencias } from './PanelReferencias';
+import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
@@ -89,6 +93,11 @@ export function OrdenesPagina(): React.JSX.Element {
   const puedeCancelar = tienePermiso('ordenes.cancelar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
+  // Enganche Desarrollo↔orden (F8-E6): ver el expediente/sugerencia (desarrollo.ver), ligar/quitar
+  // (desarrollo.administrar) y ver importes (consultas.ver-importes). El backend re-decide (A1).
+  const puedeVerDesarrollo = tienePermiso('desarrollo.ver');
+  const puedeAdministrarDesarrollo = tienePermiso('desarrollo.administrar');
+  const verImportes = tienePermiso('consultas.ver-importes');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -205,6 +214,9 @@ export function OrdenesPagina(): React.JSX.Element {
             puedeAdministrar={puedeAdministrar}
             puedeRutaVer={puedeRutaVer}
             puedeProgramar={puedeProgramar}
+            puedeVerDesarrollo={puedeVerDesarrollo}
+            puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
+            verImportes={verImportes}
             alCopiarMatriz={() => setACopiarMatriz(o)}
             alVerRuta={() => void navigate(`/ruta-critica/ordenes/${o.id}`)}
             alProgramarRuta={() => void navigate(`/ruta-critica/ordenes/${o.id}/programar`)}
@@ -247,6 +259,9 @@ function DetalleOrden({
   puedeAdministrar,
   puedeRutaVer,
   puedeProgramar,
+  puedeVerDesarrollo,
+  puedeAdministrarDesarrollo,
+  verImportes,
   alCopiarMatriz,
   alVerRuta,
   alProgramarRuta,
@@ -255,6 +270,9 @@ function DetalleOrden({
   puedeAdministrar: boolean;
   puedeRutaVer: boolean;
   puedeProgramar: boolean;
+  puedeVerDesarrollo: boolean;
+  puedeAdministrarDesarrollo: boolean;
+  verImportes: boolean;
   alCopiarMatriz: () => void;
   alVerRuta: () => void;
   alProgramarRuta: () => void;
@@ -324,8 +342,25 @@ function DetalleOrden({
         <PanelReferencias orden={orden} puedeAdministrar={puedeAdministrar} />
       </SeccionDetalle>
 
+      {/* Enganche Desarrollo↔Producción (F8-E6): sugerencia+ligar o vista 360 del expediente. Solo
+          para quien puede ver Desarrollo; el backend re-decide (A1). */}
+      {puedeVerDesarrollo ? (
+        <SeccionDetalle titulo="Desarrollo" icono={Workflow}>
+          <SeccionDesarrolloOrden
+            orden={orden}
+            puedeAdministrar={puedeAdministrarDesarrollo}
+            verImportes={verImportes}
+          />
+        </SeccionDetalle>
+      ) : null}
+
       <SeccionDetalle titulo="Comentarios" icono={MessageSquare}>
         <PanelComentarios orden={orden} puedeAdministrar={puedeAdministrar} />
+      </SeccionDetalle>
+
+      {/* Adjuntos de apoyo de la orden en R2 (F8-E6, R6). Subir/eliminar con ordenes.administrar. */}
+      <SeccionDetalle titulo="Adjuntos" icono={Paperclip}>
+        <AdjuntosOrden idOrden={orden.id} puedeAdministrar={puedeAdministrar} />
       </SeccionDetalle>
 
       <Historial creadoEn={orden.creadoEn} modificadoEn={orden.modificadoEn} />

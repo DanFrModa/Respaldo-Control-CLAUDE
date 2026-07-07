@@ -171,6 +171,24 @@ export function ExplosionMaterialesPagina(): React.JSX.Element {
               </p>
             ) : null}
 
+            {/* Avisos del enganche (F8-E6): tela amarrada multi-color con precios distintos (se usó el
+                precio base), avío por talla (R18) sin medida capturada, etc. Nada truena en silencio. */}
+            {(datos?.avisos ?? []).length > 0 ? (
+              <div
+                className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800"
+                data-testid="exp-avisos"
+              >
+                <p className="font-medium">Avisos de la explosión:</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  {(datos?.avisos ?? []).map((aviso, i) => (
+                    <li key={i} data-testid="exp-aviso">
+                      {aviso}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             {generar.isError ? (
               <p className="mb-3 text-sm text-destructive" data-testid="exp-error-generar">
                 {generar.error.message}

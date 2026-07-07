@@ -70,6 +70,12 @@ vi.mock('@/api/pedidos', () => ({
   usePedidos: () => ({ data: { datos: [] }, isPending: false, isError: false, error: null }),
   usePedido: () => ({ data: undefined, isPending: false, isError: false, error: null }),
 }));
+// Sección "Adjuntos" del detalle (F8-E6): se renderiza siempre; se mockea para no tocar la red.
+vi.mock('@/api/adjuntos-orden', () => ({
+  useAdjuntosOrden: () => ({ data: [], isPending: false, isError: false }),
+  useSubirAdjuntoOrden: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarAdjuntoOrden: () => ({ mutate: vi.fn(), isPending: false }),
+}));
 
 /** Una orden de ejemplo. */
 function orden(

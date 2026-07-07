@@ -67,6 +67,32 @@ MRP por orden (R3), tablero "qué tengo / qué falta" (R7) y notas de salida est
   "Generar OC" en un clic), tablero "qué tengo / qué falta" (semáforo, móvil), captura/consulta de
   notas. Impresos PDF (R9): OC, recepción/estatus, explosión y nota de salida.
 
+## Enganche con Desarrollo (F8-E6)
+
+El MRP dejó de tratar la explosión como un cálculo "a ciegas": ahora **hereda los amarres de precio
+de Desarrollo** (módulo 15, ver [`desarrollo-cotizacion.md`](desarrollo-cotizacion.md)). Los cambios en
+`mrp.ts` (`explosionarOrden`):
+
+- **Telas del amarre.** Si el BOM tiene la tela amarrada (`ModeloTela.idTelaProveedor` con su
+  `TelaProveedor`), el MRP **hereda el proveedor** y resuelve el precio con la cascada compartida
+  `resolverPrecioTela` (**amarre-color → amarre → color-referencia → sugerido**, `dominio/costos/
+  resolucion-precios.ts`). **Sin amarre → NULL** (comportamiento previo a F8: proveedor/lote se deciden
+  al comprar, D5; captura manual). Así las telas **dejan de capturarse a mano** en la explosión cuando
+  vienen del amarre.
+- **Prioriza el amarre de avío.** Los avíos anteponen el amarre `ModeloAvio.idAvioProveedor`
+  (`resolverPrecioAvio`, precio ÷ `factorConversion`); **sin amarre usable, caen al "más barato" de F4**
+  (fallback intacto → NO-REGRESIÓN; ese fallback sí filtra `activo`).
+- **Avíos por medida × talla (R18).** El consumo de avío por talla se compra por la **medida × la curva**
+  de la orden (piezas agrupadas por talla), no por un consumo plano por prenda.
+- **`avisos: string[]` en la salida.** Los casos ambiguos **no truenan en silencio**: **proveedor
+  amarrado INACTIVO** (se mantiene la sugerencia —Desarrollo lo eligió a propósito y la OC no valida
+  `activo`— pero se avisa), **tela amarrada multi-color con precios de tela distintos** (se usa el precio
+  BASE del amarre y se avisa) y **talla sin medida capturada** (se usa el consumo por prenda y se avisa).
+  El frontend de la explosión pinta estos avisos en un callout.
+
+Sin migración, sin permisos nuevos (reusa `compras.*`). La liga orden↔desarrollo que habilita todo esto
+la administra el módulo 15 (`DesarrolloOrden`); el MRP solo la consume por el `idModelo`/BOM de la orden.
+
 ## Migración del histórico (F4-E6)
 
 ETL idempotente, por lotes, CP850, vía dominio modo-migración (`backend/migracion/`):
