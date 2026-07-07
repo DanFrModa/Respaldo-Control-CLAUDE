@@ -1,5 +1,5 @@
 /**
- * Tonos explicativos y sus utilidades de clase (rediseño "Teal fresco"). Vive
+ * Tonos explicativos y sus utilidades de clase (rediseño R1 verde). Vive
  * aparte de los componentes visuales (`components/dominio/visuales.tsx`) para no
  * mezclar exportaciones de funciones con las de componentes (regla fast-refresh).
  *
@@ -12,7 +12,7 @@
  *   - Telas      → indigo
  *   - Avios      → cian
  *   - Servicios  → rosa
- *   - PT         → teal (la marca)
+ *   - PT         → esmeralda (el verde de marca del rediseño)
  *   - neutro     → gris (sin clasificar / generico)
  */
 
@@ -24,7 +24,7 @@ export const CLASES_BADGE_TONO: Record<Tono, string> = {
   telas: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300',
   avios: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-400/15 dark:text-cyan-300',
   servicios: 'bg-pink-100 text-pink-700 dark:bg-pink-400/15 dark:text-pink-300',
-  pt: 'bg-teal-100 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300',
+  pt: 'bg-primary-soft text-primary-soft-foreground',
   neutro: 'bg-slate-100 text-slate-600 dark:bg-slate-400/15 dark:text-slate-300',
 };
 
@@ -33,7 +33,7 @@ const CLASES_AVATAR_TONO: Record<Tono, string> = {
   telas: 'bg-gradient-to-br from-indigo-400 to-indigo-600 text-white',
   avios: 'bg-gradient-to-br from-cyan-400 to-cyan-600 text-white',
   servicios: 'bg-gradient-to-br from-pink-400 to-pink-600 text-white',
-  pt: 'bg-gradient-to-br from-teal-400 to-teal-600 text-white',
+  pt: 'bg-gradient-to-br from-emerald-500 to-emerald-700 text-white',
   neutro:
     'bg-gradient-to-br from-slate-300 to-slate-500 text-white dark:from-slate-500 dark:to-slate-700',
 };

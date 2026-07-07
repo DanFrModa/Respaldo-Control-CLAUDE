@@ -36,7 +36,7 @@ Escrito: **7-jul-2026** · **Verificado contra `prueba` = commit `1195ce5`** (me
 
 | Fase | Nombre | Estado | Nota |
 |---|---|---|---|
-| R1 | Piel y esqueleto (tokens verdes + shell + densidad) | ⬜ | rama `tarea/rediseno-r1` lista |
+| R1 | Piel y esqueleto (tokens verdes + shell + densidad) | ✅ 7-jul-2026 | Corrida nocturna; coder+reviewer Fable 5, APROBADO; nota de cierre abajo |
 | R2 | Órdenes (centro de comando ⭐) + Avance de producción | ⬜ | — |
 | R3 | Pedidos por mes + constructor + salida a producción | ⬜ | — |
 | R4 | Ruta Crítica operativa (Mis pendientes + Procesos y responsables) | ⬜ | — |
@@ -46,7 +46,21 @@ Escrito: **7-jul-2026** · **Verificado contra `prueba` = commit `1195ce5`** (me
 | R8 | Importador de pedido del cliente (motor backend NUEVO) | ⬜ | — |
 | R9 | Resto de módulos + barrido final de fidelidad | ⬜ | — |
 
-**Siguiente paso:** arrancar R1 en `tarea/rediseno-r1` (necesita OK de Gabriel).
+**Siguiente paso:** R2 (Órdenes centro de comando + Avance de producción) sobre la misma rama/PR, per §3.6.
+
+### Nota de cierre R1 (7-jul-2026, corrida nocturna)
+
+**Entregado:** tokens del proto EXACTOS en `index.css` (claro+oscuro cotejados hex por hex por el reviewer; riel `--rail-*` solo en `:root` = idéntico en ambos temas; semánticos ok/warn/crit/info+soft; radius 9px; base 13px; utilidades `num`/`mono` con `tabular-nums`); Inter RETIRADO (stack de sistema; deps: −@fontsource-variable/inter, +cmdk); shell nuevo en `CascaronSistema` (riel oscuro 216↔62px con Ctrl/⌘+B persistido; topbar 52px con paleta de comandos Ctrl/⌘+K `PaletaComandos` filtrada por permisos + `BuscadorGlobal` F2-E4 conservado, chip de empresa, badge RC real vía `contarAlertas`, tema, usuario); menú reestructurado a los 7 grupos EXACTOS de Daniel (`catalogo.ts` → `GRUPOS_MENU`, 99 hojas/15 padres, desplegables 2 niveles, padre solo despliega); **gates de permisos verificados ruta por ruta por el reviewer: CERO cambios**; ninguna ruta borrada (`App.tsx` 0 diff); nacen `TablaDensa`/`ChipEstado`(+`BadgePunto`/`Semaforo`)/`CajonDetalle`/`KpiTiles` con tests y uso real (Bitácora, Inicio); `ListaDetalle`/`detalle` densificados; primitivos ui/* re-vestidos vía tokens (solo `table.tsx` requirió cambio estructural); 0 teal residual; 12 specs e2e re-ruteados al menú nuevo + `login.spec` reescrito (grupos con `exact`, badge RC, empresa). Verificación (coder Y reviewer por separado): typecheck ✓ · lint ✓ (7 warnings react-refresh pre-existentes) · format:check ✓ · test 549/549 ✓ · build ✓.
+
+**Desviaciones interinas del menú (para que Gabriel/Daniel las vean; todas con reversión/absorción planeada):**
+- (a) **"Ruta Crítica" quedó como desplegable** (Bandeja de tareas primero + Concentrado/Plantillas/Dependencias/Reglas) en vez de hoja directa como dice la estructura aprobada — "Mis pendientes" no existe hasta R4 y esas 4 pantallas vivas no tienen otro hogar; **en R4 vuelve a hoja directa** y su config se va a "Procesos y responsables" (SISTEMA). Única desviación que toca un renglón explícito de Daniel (condición del reviewer: quedar visible aquí).
+- (b) **EsMa** cuelga de FINANZAS como desplegable interino (10 vistas, Estado de cuenta primero) hasta que F9 lo generalice.
+- (c) **Inventario PT / Telas / Compras-MRP / Indicadores / EDR / Usuarios y accesos** son padres desplegables interinos con las sub-vistas legadas colgadas (se absorben en R2–R9); Bordados+Galerías → Desarrollo▾; Etiquetas de marca → Catálogos base▾; Documental → Producción▾.
+- (d) "Listas de precios" aparece 2× (Desarrollo▾ y Clientes▾) — deliberado, así lo trae el proto.
+- (e) Topbar con DOS buscadores (BuscadorGlobal de órdenes + disparador de la paleta ⌘K) — se fusionan en R2 cuando ⌘K gane el buscador global.
+- (f) Hojas sin pantalla aún (Ventas, CxC, CxP, Análisis RC, Auditores) → `Proximamente` con nota de en qué fase llegan.
+
+**Pendientes anotados para fases siguientes (sugerencias del reviewer):** e2e propio de la paleta ⌘K (R2); puntito de alerta RC sobre el icono con riel colapsado (R2+); filas expandibles/agrupadas de TablaDensa (R2/R3). Anti-regresión documentada: el `text-red-200` del badge del riel es deliberado (el riel es oscuro fijo; los tokens `--crit*` cambian con el tema y darían ilegible en claro) — no "corregirlo" a token.
 
 ---
 
@@ -105,6 +119,7 @@ Se construyen una vez (R1–R2) en `frontend/src/components/dominio/` y se reús
 4. **Si una fase no logra CI verde** tras intentos razonables: revertir SUS commits (el PR se queda verde con las fases completas), documentarlo en §2 con el diagnóstico, y continuar con lo que no dependa de ella (o detenerse dejando reporte claro).
 5. **Límites que NO cambian:** NUNCA hacer merge del PR (eso es de Gabriel), NUNCA push directo a `prueba` ni `main`, NUNCA Docker local. Las preguntas abiertas usan los defaults de §6 sin esperar respuesta.
 5b. **PROHIBIDO TRABARSE Y PROHIBIDO PREGUNTARLE A GABRIEL (regla suya, 7-jul):** él está dormido — cualquier pregunta congela TODO. Ante CUALQUIER fallo, duda o decisión: diagnostica → decide tú (con los defaults del §6, la jerarquía del §1.6 y el criterio del reviewer) → actúa → documenta la decisión en la nota de cierre. Si algo se atora de verdad (dependencia rota, test imposible, etc.): aplica el punto 4 (revertir esa pieza, documentar, seguir con lo demás). NUNCA termines el turno esperando respuesta del usuario; termina solo cuando ya no haya nada más que puedas avanzar, dejando el reporte del punto 6.
+5c. **MODELO ÚNICO: FABLE 5 (regla de Gabriel, 7-jul, confirmada en vivo al arrancar la corrida):** TODO agente de esta corrida — lead, coders y reviewers, de TODAS las fases — corre con **Fable 5 (`claude-fable-5`), sin excepción**. Gabriel lo dijo textual: *"siempre con Fable 5; prefiero que no hagas nada a que lo hagas con otro modelo"*. Si por cualquier razón Fable 5 no estuviera disponible para lanzar un agente, NO se sustituye por otro modelo: se detiene la corrida en ese punto y se deja el reporte del punto 6. Esta regla NO admite interpretación ni "ahorro de tokens" con modelos menores (Gabriel también confirmó: **sin tope de costo — hasta donde alcance**).
 6. **Al parar (por término o bloqueo):** dejar en la descripción del PR el resumen por fase (qué entregó, CI, pendientes) y §2 al día — es lo primero que Gabriel lee al despertar. Recordatorio para su deploy: si alguna fase agregó permisos/seed, `prueba` necesita `SEED_ON_START=true`.
 
 ---

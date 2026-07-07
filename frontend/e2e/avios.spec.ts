@@ -45,13 +45,17 @@ test.describe('CRUD de Avíos', () => {
     await crearProveedor(page, prov1);
     await crearProveedor(page, prov2);
 
-    // Navega Catálogos -> Avíos (descubrible por clic, no solo por URL).
+    // Navega Inventarios · Avíos -> Catálogo de avíos (descubrible por clic, no solo por URL).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('button', { name: 'Avíos', exact: true })
       .click();
-    await page.getByTestId('catalogo-avios').click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Catálogo de avíos' })
+      .click();
     await expect(page.getByRole('heading', { name: 'Avíos' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-avio');

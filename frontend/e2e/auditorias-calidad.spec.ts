@@ -21,13 +21,17 @@ test.describe('Auditorías de calidad (F6-E2)', () => {
   test('la pantalla de alta carga desde el menú y wirea el selector de orden', async ({ page }) => {
     await entrarComoAdmin(page);
 
-    // Navega al módulo Calidad → sub-vista Auditorías de calidad.
+    // Navega Operación · Calidad → Alta de auditoría (desplegable del rediseño).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Calidad', exact: true })
+      .getByRole('button', { name: 'Calidad', exact: true })
       .click();
-    await page.getByTestId('calidad-auditorias').click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Alta de auditoría' })
+      .click();
 
     await expect(page.getByRole('heading', { name: 'Alta de auditoría' })).toBeVisible();
     // El selector de orden está presente (la auditoría arranca eligiendo una orden).

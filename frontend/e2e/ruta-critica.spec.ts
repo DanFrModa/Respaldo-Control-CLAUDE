@@ -4,7 +4,7 @@ import { entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del catálogo configurable de la Ruta Crítica (F5-E1) contra el stack real, en la estructura
- * LISTA + DETALLE (tema teal). Cubre:
+ * LISTA + DETALLE. Cubre:
  *  1. Crear un proceso y asignarle DOS roles responsables desde el detalle.
  *  2. El RECHAZO DE CICLOS: con dos procesos A→B, intentar B→A y ver el error claro en español.
  * Usa códigos únicos por corrida para no chocar con el seed ni con datos previos.

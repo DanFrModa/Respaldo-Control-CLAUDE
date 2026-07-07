@@ -3,7 +3,7 @@ import { expect, test, type APIRequestContext } from '@playwright/test';
 import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del MOTOR de la Ruta Crítica por orden (F5-E5) contra el stack real, en el estándar teal. El
+ * E2E del MOTOR de la Ruta Crítica por orden (F5-E5) contra el stack real, en el estándar visual. El
  * primer test arma el ciclo COMPLETO de extremo a extremo:
  *   catálogo RC (familia/artículo/tela/aplicación vía API) + plantilla con 2 procesos (cada uno con
  *   duración > 0, sin encadenamiento entre sí) → cliente + modelo + pedido + orden con matriz (UI) →

@@ -4,16 +4,37 @@ import { useState } from 'react';
 import { useBitacora } from '@/api/bitacora';
 import { ETIQUETAS_ACCION_BITACORA } from '@/api/esquemas';
 import type { BitacoraQuery } from '@/api/tipos';
-
-/** Tipo de accion para el filtro de la bitacora (solo las claves literales). */
-type AccionFiltro = NonNullable<BitacoraQuery['accion']>;
-import { Badge } from '@/components/ui/badge';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 
+/** Tipo de accion para el filtro de la bitacora (solo las claves literales). */
+type AccionFiltro = NonNullable<BitacoraQuery['accion']>;
+
+/** Un renglon de la bitacora (lo que entrega el API paginado). */
+type RegistroBitacora = NonNullable<ReturnType<typeof useBitacora>['data']>['datos'][number];
+
 const POR_PAGINA = 20;
+
+/** Tono semantico del chip por accion (crear=ok, modificar=info, bajas=crit). */
+const TONO_ACCION: Record<string, TonoEstado> = {
+  CREAR: 'ok',
+  MODIFICAR: 'info',
+  DESACTIVAR: 'crit',
+  CANCELAR: 'crit',
+  OTRO: 'neutro',
+};
 
 /** Formatea una fecha ISO como dd/mm/yyyy hh:mm. */
 function formatearFecha(iso: string): string {
@@ -28,9 +49,10 @@ function formatearFecha(iso: string): string {
 }
 
 /**
- * Pantalla de Bitacora — SOLO LECTURA (sin acciones de escritura). Tabla paginada
- * en servidor con filtros por entidad, idEntidad, idUsuario, accion, desde/hasta.
- * El campo `datos` JSON se muestra como texto expandible. Requiere `admin.ver-bitacora`.
+ * Pantalla de Bitacora — SOLO LECTURA (sin acciones de escritura), re-vestida al
+ * rediseño R1: `TablaDensa` (tabla-first) + `CajonDetalle` para el JSON de cada
+ * registro (antes un `<pre>` inline). Tabla paginada en servidor con filtros por
+ * entidad, idEntidad, idUsuario, accion, desde/hasta. Requiere `admin.ver-bitacora`.
  */
 export function BitacoraPagina(): React.JSX.Element {
   const [entidad, setEntidad] = useState('');
@@ -40,7 +62,8 @@ export function BitacoraPagina(): React.JSX.Element {
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [pagina, setPagina] = useState(1);
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  // Registro cuyo detalle (JSON de datos) esta abierto en el cajon lateral.
+  const [detalle, setDetalle] = useState<RegistroBitacora | null>(null);
 
   const query: BitacoraQuery = {
     pagina,
@@ -63,30 +86,23 @@ export function BitacoraPagina(): React.JSX.Element {
     setPagina(1);
   }
 
-  function toggleExpandido(id: string): void {
-    setExpandidos((prev) => {
-      const nuevo = new Set(prev);
-      if (nuevo.has(id)) {
-        nuevo.delete(id);
-      } else {
-        nuevo.add(id);
-      }
-      return nuevo;
-    });
-  }
-
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto w-full max-w-7xl p-4 lg:p-6">
+      <div className="mx-auto w-full max-w-7xl p-4 lg:p-5">
         {/* Encabezado */}
         <div className="flex items-center gap-3">
-          <ClipboardList className="size-6 text-teal-600" aria-hidden />
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+          >
+            <ClipboardList className="size-4.5" aria-hidden />
+          </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Bitácora</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            <h1 className="text-lg font-semibold tracking-tight">Bitácora</h1>
+            <p className="text-xs text-muted-foreground">
               Auditoría de cambios del sistema (solo lectura, A7).
             </p>
           </div>
@@ -162,102 +178,105 @@ export function BitacoraPagina(): React.JSX.Element {
           />
         </div>
 
-        {/* Tabla */}
-        <div className="mt-4 overflow-x-auto rounded-xl border">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50">
+        {/* Tabla densa (R1) */}
+        <div className="mt-4 overflow-hidden rounded-lg border">
+          <TablaDensa>
+            <TablaDensaEncabezado>
               <tr>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Entidad</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">
-                  Id registro
-                </th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Acción</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Usuario</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Fecha</th>
-                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Datos</th>
+                <TablaDensaHead>Entidad</TablaDensaHead>
+                <TablaDensaHead>Id registro</TablaDensaHead>
+                <TablaDensaHead>Acción</TablaDensaHead>
+                <TablaDensaHead>Usuario</TablaDensaHead>
+                <TablaDensaHead>Fecha</TablaDensaHead>
+                <TablaDensaHead>Datos</TablaDensaHead>
               </tr>
-            </thead>
-            <tbody>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
               {consulta.isPending ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-t">
+                  <TablaDensaFila key={i}>
                     {Array.from({ length: 6 }).map((__, j) => (
-                      <td key={j} className="px-3 py-2">
+                      <TablaDensaCelda key={j}>
                         <Skeleton className="h-4 w-full" />
-                      </td>
+                      </TablaDensaCelda>
                     ))}
-                  </tr>
+                  </TablaDensaFila>
                 ))
               ) : consulta.isError ? (
-                <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-destructive">
+                <TablaDensaFila>
+                  <TablaDensaCelda colSpan={6} className="py-6 text-center text-destructive">
                     {consulta.error.message}
-                  </td>
-                </tr>
+                  </TablaDensaCelda>
+                </TablaDensaFila>
               ) : datos?.datos.length === 0 ? (
-                <tr>
-                  <td
+                <TablaDensaFila>
+                  <TablaDensaCelda
                     colSpan={6}
-                    className="px-3 py-6 text-center text-muted-foreground"
+                    className="py-6 text-center text-muted-foreground"
                     data-testid="bitacora-vacia"
                   >
                     No hay registros en la bitácora con los filtros actuales.
-                  </td>
-                </tr>
+                  </TablaDensaCelda>
+                </TablaDensaFila>
               ) : (
                 (datos?.datos ?? []).map((registro) => (
-                  <tr key={registro.id} className="border-t hover:bg-muted/30">
-                    <td className="px-3 py-2 font-mono text-xs">{registro.entidad}</td>
-                    <td className="px-3 py-2 font-mono text-xs">{registro.idEntidad}</td>
-                    <td className="px-3 py-2">
-                      <Badge
-                        variant={
-                          registro.accion === 'CREAR'
-                            ? 'default'
-                            : registro.accion === 'DESACTIVAR' || registro.accion === 'CANCELAR'
-                              ? 'destructive'
-                              : 'secondary'
-                        }
-                      >
+                  <TablaDensaFila key={registro.id} seleccionada={detalle?.id === registro.id}>
+                    <TablaDensaCelda className="mono text-xs">{registro.entidad}</TablaDensaCelda>
+                    <TablaDensaCelda className="mono text-xs">{registro.idEntidad}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <ChipEstado tono={TONO_ACCION[registro.accion] ?? 'neutro'}>
                         {ETIQUETAS_ACCION_BITACORA[registro.accion] ?? registro.accion}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                      </ChipEstado>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">
                       {registro.nombreUsuario ?? registro.idUsuario ?? '(sistema)'}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="num text-muted-foreground">
                       {formatearFecha(registro.fecha)}
-                    </td>
-                    <td className="px-3 py-2">
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
                       {registro.datos !== null ? (
-                        <div>
-                          <button
-                            type="button"
-                            className="text-xs text-primary underline-offset-2 hover:underline"
-                            onClick={() => toggleExpandido(registro.id)}
-                          >
-                            {expandidos.has(registro.id) ? 'Ocultar' : 'Ver datos'}
-                          </button>
-                          {expandidos.has(registro.id) && (
-                            <pre className="mt-1 max-w-xs overflow-x-auto rounded bg-muted p-1 text-xs">
-                              {JSON.stringify(registro.datos, null, 2)}
-                            </pre>
-                          )}
-                        </div>
+                        <button
+                          type="button"
+                          className="cursor-pointer text-xs font-medium text-primary underline-offset-2 hover:underline"
+                          onClick={() => setDetalle(registro)}
+                        >
+                          Ver datos
+                        </button>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
-                    </td>
-                  </tr>
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
                 ))
               )}
-            </tbody>
-          </table>
+            </TablaDensaCuerpo>
+          </TablaDensa>
         </div>
+
+        {/* Cajon lateral con el JSON del registro elegido. */}
+        <CajonDetalle
+          abierto={detalle !== null}
+          alCambiarAbierto={(abierto) => {
+            if (!abierto) setDetalle(null);
+          }}
+          titulo={detalle === null ? '' : `${detalle.entidad} · ${detalle.idEntidad}`}
+          subtitulo={
+            detalle === null
+              ? undefined
+              : `${ETIQUETAS_ACCION_BITACORA[detalle.accion] ?? detalle.accion} · ${
+                  detalle.nombreUsuario ?? detalle.idUsuario ?? '(sistema)'
+                } · ${formatearFecha(detalle.fecha)}`
+          }
+        >
+          <pre className="mono overflow-x-auto rounded-lg bg-muted p-3 text-xs">
+            {detalle === null ? '' : JSON.stringify(detalle.datos, null, 2)}
+          </pre>
+        </CajonDetalle>
 
         {/* Paginacion */}
         {datos && datos.totalPaginas > 1 && (
-          <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+          <div className="num mt-3 flex items-center justify-between text-sm text-muted-foreground">
             <span>
               Página {datos.pagina} de {datos.totalPaginas} ({datos.total} registro
               {datos.total !== 1 ? 's' : ''})

@@ -22,13 +22,17 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos -> Telas (descubrible por clic, no solo por URL).
+    // Navega Inventarios · Telas -> Catálogo de telas (descubrible por clic, no solo por URL).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('button', { name: 'Telas', exact: true })
       .click();
-    await page.getByTestId('catalogo-telas').click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Catálogo de telas' })
+      .click();
     await expect(page.getByRole('heading', { name: 'Telas' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-tela');

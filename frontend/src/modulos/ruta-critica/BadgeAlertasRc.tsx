@@ -29,11 +29,12 @@ export function BadgeAlertasRc(): React.JSX.Element | null {
   const enRiesgo = conteo?.enRiesgo ?? 0;
   const total = atrasados + enRiesgo;
 
+  // Tokens semanticos del rediseño (R1): critico/atencion separados de la marca.
   const tono =
     atrasados > 0
-      ? 'bg-red-600 text-white'
+      ? 'bg-crit text-white'
       : enRiesgo > 0
-        ? 'bg-amber-500 text-white'
+        ? 'bg-warn text-white'
         : 'bg-muted text-muted-foreground';
 
   return (

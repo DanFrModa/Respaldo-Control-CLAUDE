@@ -67,13 +67,18 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await crearAvio(page, avio);
     await crearBordado(page, bordado);
 
-    // ── Navega a Modelos (descubrible por el menú) ──────────────────────────────
+    // ── Navega a Modelos (Operación · Desarrollo, desplegable del rediseño) ────
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('button', { name: 'Desarrollo' })
+      .click();
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
       .getByRole('link', {
-        // exact: el menú también tiene "Galería de modelos" (sub-vista F1-E5), que haría
-        // match parcial con "Modelos" y violaría el strict mode de Playwright.
+        // exact: el desplegable también tiene "Galería de modelos" (sub-vista F1-E5), que
+        // haría match parcial con "Modelos" y violaría el strict mode de Playwright.
         name: 'Modelos',
         exact: true,
       })

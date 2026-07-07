@@ -20,16 +20,17 @@ test.describe('CRUD de Almacenes', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catalogos -> Almacenes (descubrible por clic, no solo por URL).
+    // Navega Sistema · Catálogos base -> Almacenes (descubrible por clic, no solo por URL).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', {
-        name: 'Catálogos',
-        exact: true,
-      })
+      .getByRole('button', { name: 'Catálogos base' })
       .click();
-    await page.getByRole('link', { name: /Almacenes/ }).click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Almacenes', exact: true })
+      .click();
     await expect(page.getByRole('heading', { name: 'Almacenes' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-almacen');

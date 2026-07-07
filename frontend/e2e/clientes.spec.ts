@@ -18,13 +18,17 @@ test.describe('CRUD de Clientes', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos -> Clientes (descubrible por clic, no solo por URL).
+    // Navega Comercial · Clientes -> Catálogo (descubrible por clic, no solo por URL).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('button', { name: 'Clientes', exact: true })
       .click();
-    await page.getByTestId('catalogo-clientes').click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Catálogo', exact: true })
+      .click();
     await expect(page.getByRole('heading', { name: 'Clientes' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-cliente');

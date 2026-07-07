@@ -25,7 +25,7 @@ const POR_PAGINA = 10;
 
 /**
  * Pantalla de PROCESOS de la Ruta Crítica (Módulo 8, F5-E1) — CRUD del catálogo configurable sobre
- * el motor LISTA + DETALLE (estándar teal). En el detalle se editan, además del proceso, sus ROLES
+ * el motor LISTA + DETALLE (estándar visual). En el detalle se editan, además del proceso, sus ROLES
  * RESPONSABLES (multi-select N:M) y su CHECKLIST. Las DEPENDENCIAS (DAG) tienen su propia pantalla.
  *
  * `rc.catalogo-ver` gobierna el acceso a la pantalla; `rc.catalogo-administrar` las escrituras.

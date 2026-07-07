@@ -21,13 +21,17 @@ test.describe('Tallas y curvas (D4)', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catálogos → Tallas (descubrible por clic).
+    // Navega Sistema · Catálogos base → Tallas (descubrible por clic).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('button', { name: 'Catálogos base' })
       .click();
-    await page.getByTestId('catalogo-tallas').click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Tallas', exact: true })
+      .click();
     await expect(page.getByRole('heading', { name: 'Tallas' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-talla');

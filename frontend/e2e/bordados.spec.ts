@@ -21,13 +21,17 @@ test.describe('CRUD de Bordados', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Catalogos -> Bordados (descubrible por clic).
+    // Navega Operación · Desarrollo -> Bordados (descubrible por clic).
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Catálogos', exact: true })
+      .getByRole('button', { name: 'Desarrollo' })
       .click();
-    await page.getByTestId('catalogo-bordados').click();
+    await page
+      .getByRole('navigation', { name: 'Módulos' })
+      .first()
+      .getByRole('link', { name: 'Bordados', exact: true })
+      .click();
     await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-bordado');

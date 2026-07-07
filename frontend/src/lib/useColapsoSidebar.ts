@@ -36,6 +36,11 @@ export interface UsoColapsoSidebar {
   colapsado: boolean;
   /** Alterna entre expandido y colapsado, persistiendo el cambio. */
   alternar: () => void;
+  /**
+   * Fuerza la expansion (persistida): la usa el riel colapsado cuando el
+   * usuario abre un desplegable (los hijos no caben en 62px).
+   */
+  expandir: () => void;
 }
 
 /** Hook del colapso del sidebar de escritorio (persistido). */
@@ -50,5 +55,10 @@ export function useColapsoSidebar(): UsoColapsoSidebar {
     });
   }, []);
 
-  return { colapsado, alternar };
+  const expandir = useCallback(() => {
+    guardarColapso(false);
+    setColapsado(false);
+  }, []);
+
+  return { colapsado, alternar, expandir };
 }

@@ -245,7 +245,7 @@ export function DialogoDefecto({
                 <input
                   id="defecto-favorito"
                   type="checkbox"
-                  className="size-4 accent-teal-600"
+                  className="size-4 accent-primary"
                   checked={favorito}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     formulario.setValue('favorito', e.target.checked)
@@ -261,7 +261,7 @@ export function DialogoDefecto({
                 <input
                   id="defecto-aplica-general"
                   type="checkbox"
-                  className="size-4 accent-teal-600"
+                  className="size-4 accent-primary"
                   checked={aplicaGeneral}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     formulario.setValue('aplicaGeneral', e.target.checked)
@@ -288,7 +288,7 @@ export function DialogoDefecto({
                           <input
                             id={`tipo-${tipo.id}`}
                             type="checkbox"
-                            className="size-4 accent-teal-600"
+                            className="size-4 accent-primary"
                             checked={tiposSeleccionados.includes(tipo.id)}
                             onChange={() => toggleTipo(tipo.id)}
                             disabled={guardando}

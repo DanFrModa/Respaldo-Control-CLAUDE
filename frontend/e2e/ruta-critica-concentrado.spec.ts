@@ -4,7 +4,7 @@ import { entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CONCENTRADO "planeado vs real" de la Ruta Crítica (F5-E7) contra el stack real, en el
- * estándar teal. Es una consulta gerencial de SOLO LECTURA (reemplaza `RC_ConcentradoDif`): se
+ * estándar visual. Es una consulta gerencial de SOLO LECTURA (reemplaza `RC_ConcentradoDif`): se
  * verifica que se llega desde la portada-hub, que el tablero carga (vacío o con datos, sin que la
  * BD de e2e tenga que tener órdenes con RC viva), que el filtro de cliente responde y que el botón
  * de export a Excel ofrece el binario. El segundo test lo verifica en viewport MÓVIL.
