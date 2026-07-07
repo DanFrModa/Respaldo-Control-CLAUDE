@@ -723,6 +723,40 @@ export {
   type NegociacionEventos,
 } from './esquemas/negociacion.js';
 
+// ── Adjuntos de la orden de producción (R6, F8-E6) ──
+export {
+  esquemaOrdenAdjuntoCrear,
+  esquemaOrdenAdjuntoSubida,
+  esquemaOrdenAdjuntoSalida,
+  esquemaOrdenAdjuntosLista,
+  type DatosOrdenAdjuntoCrear,
+  type OrdenAdjuntoSubida,
+  type OrdenAdjuntoSalida,
+  type OrdenAdjuntosLista,
+} from './esquemas/adjunto-orden.js';
+
+// ── Enganche Desarrollo ↔ Producción (Módulo 15, F8-E6; D13/R16) ──
+export {
+  esquemaLigarOrdenCuerpo,
+  esquemaLigaOrdenSalida,
+  esquemaLigaEstadoSalida,
+  esquemaCandidatoLigaSalida,
+  esquemaSugerenciaLigaSalida,
+  esquemaExpedientePrecosto,
+  esquemaExpedienteLista,
+  esquemaExpedienteOrdenSalida,
+  esquemaTableroDesarrollosQuery,
+  esquemaTableroDesarrollosSalida,
+  type DatosLigarOrden,
+  type LigaOrdenSalida,
+  type LigaEstadoSalida,
+  type CandidatoLigaSalida,
+  type SugerenciaLigaSalida,
+  type ExpedienteOrdenSalida,
+  type TableroDesarrollosQuery,
+  type TableroDesarrollosSalida,
+} from './esquemas/liga-orden.js';
+
 export {
   DIRECCIONES_MOVIMIENTO,
   ETIQUETAS_DIRECCION_MOVIMIENTO,

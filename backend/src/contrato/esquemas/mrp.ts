@@ -90,6 +90,13 @@ export const esquemaExplosionSalida = z
       .boolean()
       .describe('¿El BOM cambió desde el snapshot anterior (hay renglones con diff ≠ sin-cambio)?'),
     regenerado: z.boolean().describe('¿Se regeneró sobre un snapshot previo (true) o es nuevo?'),
+    avisos: z
+      .array(z.string())
+      .describe(
+        'Avisos de la explosión (F8-E6, enganche): tela amarrada multi-color con precios de tela ' +
+          'distintos (se usó el precio base) o avío por talla (R18) sin medida capturada para alguna ' +
+          'talla (se usó el consumo por prenda). Vacío = nada que advertir. Nada truena en silencio.',
+      ),
   })
   .describe('Explosión de materiales de una orden (R3).');
 

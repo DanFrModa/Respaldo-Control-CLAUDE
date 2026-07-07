@@ -384,3 +384,326 @@ describe('Estatus de materiales (R7) — cruce requerido / en-oc / recibido', ()
     expect(libre?.requerido).toBe(0);
   });
 });
+
+// ── F8-E6: enganche del MRP a los AMARRES de Desarrollo (R17/R18) ─────────────────────────────────
+
+/** Aplana la explosión y busca el renglón de una tela / un avío. */
+const renglonTela = (ex: Awaited<ReturnType<typeof explosionarOrden>>, idTela: number) =>
+  ex.grupos.flatMap((g) => g.renglones).find((r) => r.idTela === idTela);
+const renglonAvio = (ex: Awaited<ReturnType<typeof explosionarOrden>>, idAvio: number) =>
+  ex.grupos.flatMap((g) => g.renglones).find((r) => r.idAvio === idAvio);
+
+describe('MRP F8-E6 — NO-REGRESIÓN F4 (sin amarres ni consumo por talla)', () => {
+  it('un modelo sin amarres y sin consumo por talla explota IDÉNTICO a F4', async () => {
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    // Sin nada que advertir.
+    expect(ex.avisos).toEqual([]);
+    // Tela sin amarre → sin proveedor/precio sugerido (captura manual, como antes de F8).
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.cantidadRequerida).toBeCloseTo(45); // 1.5 × 30
+    expect(felpa?.idProveedorSugerido).toBeNull();
+    expect(felpa?.precioSugerido).toBeNull();
+    // Avío sin amarre → "más barato" de F4 ($2, provBarato), requerido por prenda × totalPiezas.
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.cantidadRequerida).toBeCloseTo(180); // 6 × 30
+    expect(boton?.idProveedorSugerido).toBe(provBarato.id);
+    expect(boton?.precioSugerido).toBeCloseTo(2);
+  });
+});
+
+describe('MRP F8-E6 — TELA amarrada a proveedor (R17)', () => {
+  it('hereda proveedor+precio del amarre (sin precio por color)', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provBarato.id);
+    expect(felpa?.precioSugerido).toBeCloseTo(10);
+    expect(ex.avisos).toEqual([]);
+    // Con proveedor, la tela ahora SÍ genera OC (antes se omitía por proveedor null).
+    const gen = await generarOCDesdeExplosion(sesion(), idOrden, { idsRequerimiento: [] }, bd());
+    const ocFelpa = gen.ordenesCompra.find((o) => o.idProveedor === provBarato.id);
+    expect(ocFelpa).toBeDefined();
+  });
+
+  it('orden de UN color usa el precio por color del amarre (amarre-color)', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: {
+        idTela: telaFelpa.id,
+        idProveedor: provBarato.id,
+        precio: 10,
+        manejaPrecioPorColor: true,
+        colores: { create: [{ idColor: colorRojo.id, precio: 12 }] },
+      },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd()); // la orden es sólo Rojo
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.precioSugerido).toBeCloseTo(12); // precio del color Rojo
+    expect(ex.avisos).toEqual([]);
+  });
+
+  it('orden MULTI-color con precios de tela distintos usa el precio base + AVISO', async () => {
+    const colorAzul = await cliente.color.create({ data: { nombre: 'Azul' } });
+    // Segundo color en la MISMA orden (Rojo ya existe).
+    await cliente.ordenLinea.create({
+      data: {
+        idOrden,
+        idColor: colorAzul.id,
+        tallas: { create: [{ idTalla: tallaCH.id, cantidad: 5 }] },
+      },
+    });
+    const tp = await cliente.telaProveedor.create({
+      data: {
+        idTela: telaFelpa.id,
+        idProveedor: provBarato.id,
+        precio: 10,
+        manejaPrecioPorColor: true,
+        colores: {
+          create: [
+            { idColor: colorRojo.id, precio: 12 },
+            { idColor: colorAzul.id, precio: 15 },
+          ],
+        },
+      },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.precioSugerido).toBeCloseTo(10); // precio BASE (no por color)
+    expect(ex.avisos.some((a) => a.includes('varios colores'))).toBe(true);
+  });
+
+  it('proveedor amarrado INACTIVO: mantiene la sugerencia + AVISO', async () => {
+    const provInactivo = await cliente.proveedor.create({
+      data: { nombre: 'Baja', activo: false },
+    });
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provInactivo.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provInactivo.id); // se mantiene
+    expect(felpa?.precioSugerido).toBeCloseTo(10);
+    expect(ex.avisos.some((a) => a.includes('INACTIVO'))).toBe(true);
+  });
+});
+
+describe('MRP F8-E6 — AVÍO amarrado a proveedor (R17)', () => {
+  it('el amarre gana al "más barato" de F4', async () => {
+    // provCaro ($3) es el amarre, aunque provBarato ($2) sería el más barato.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { idAvioProveedor: provCaro.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provCaro.id);
+    expect(boton?.precioSugerido).toBeCloseTo(3);
+  });
+
+  it('amarre sin precio usable cae al "más barato" (fallback F4)', async () => {
+    // provSinPrecio amarrado pero sin AvioProveedor con precio → fallback al más barato ($2).
+    const provSinPrecio = await cliente.proveedor.create({ data: { nombre: 'Sin Precio' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioBoton.id, idProveedor: provSinPrecio.id, precio: null },
+    });
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { idAvioProveedor: provSinPrecio.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provBarato.id); // fallback
+    expect(boton?.precioSugerido).toBeCloseTo(2);
+  });
+
+  it('proveedor amarrado INACTIVO: mantiene la sugerencia + AVISO (no truena en silencio)', async () => {
+    const provInactivo = await cliente.proveedor.create({
+      data: { nombre: 'Baja', activo: false },
+    });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioBoton.id, idProveedor: provInactivo.id, precio: 9 },
+    });
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { idAvioProveedor: provInactivo.id },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.idProveedorSugerido).toBe(provInactivo.id); // se mantiene (Desarrollo lo eligió)
+    expect(boton?.precioSugerido).toBeCloseTo(9);
+    expect(ex.avisos.some((a) => a.includes('INACTIVO'))).toBe(true);
+  });
+});
+
+describe('MRP F8-E6 — normalización del factor de avío (R1, FIX 3: amarre = más barato)', () => {
+  it('el fallback "más barato" usa el Avio.factorConversion cuando el proveedor no fija el suyo', async () => {
+    // avío con factor 2 y un proveedor SIN factor propio: precio 10 ÷ 2 = 5 por unidad de consumo.
+    const avioZip = await cliente.avio.create({
+      data: { clave: 'ZIP-01', descripcion: 'Cierre', unidad: 'pza', factorConversion: 2 },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 10 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const zip = renglonAvio(ex, avioZip.id);
+    // Antes de F8-E6 el fallback ignoraba el factor del avío (habría dado 10); ahora 10 ÷ 2 = 5.
+    expect(zip?.precioSugerido).toBeCloseTo(5);
+  });
+
+  it('el amarre y el "más barato" normalizan IDÉNTICO (mismo proveedor)', async () => {
+    const avioZip = await cliente.avio.create({
+      data: { clave: 'ZIP-02', descripcion: 'Cierre', unidad: 'pza', factorConversion: 4 },
+    });
+    const prov = await cliente.proveedor.create({ data: { nombre: 'Cierres2' } });
+    await cliente.avioProveedor.create({
+      data: { idAvio: avioZip.id, idProveedor: prov.id, precio: 20 },
+    });
+    await cliente.modeloAvio.create({
+      data: { idModelo: modelo.id, idAvio: avioZip.id, consumoPorPrenda: 1 },
+    });
+    // Sin amarre (más barato).
+    const exSin = await explosionarOrden(sesion(), idOrden, bd());
+    const zipSin = renglonAvio(exSin, avioZip.id);
+    // Con amarre al MISMO proveedor.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioZip.id } },
+      data: { idAvioProveedor: prov.id },
+    });
+    const exCon = await explosionarOrden(sesion(), idOrden, bd());
+    const zipCon = renglonAvio(exCon, avioZip.id);
+    expect(zipSin?.precioSugerido).toBeCloseTo(5); // 20 ÷ 4
+    expect(zipCon?.precioSugerido).toBeCloseTo(zipSin!.precioSugerido!);
+  });
+});
+
+describe('MRP F8-E6 — diff incluye proveedor/precio del amarre (FIX 6)', () => {
+  it('cambiar el PRECIO del amarre (misma cantidad) marca el renglón como cambiado', async () => {
+    const tp = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tp.id },
+    });
+    await explosionarOrden(sesion(), idOrden, bd()); // snapshot 1: felpa @ $10
+    await cliente.telaProveedor.update({ where: { id: tp.id }, data: { precio: 15 } });
+    const ex2 = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex2, telaFelpa.id);
+    expect(felpa?.precioSugerido).toBeCloseTo(15);
+    expect(felpa?.diff).toBe('cantidad-cambiada'); // cambió el PRECIO, misma cantidad
+    expect(ex2.huboCambios).toBe(true);
+  });
+
+  it('cambiar el PROVEEDOR del amarre (mismo precio) marca el renglón como cambiado', async () => {
+    const tpA = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provBarato.id, precio: 10 },
+    });
+    const tpB = await cliente.telaProveedor.create({
+      data: { idTela: telaFelpa.id, idProveedor: provCaro.id, precio: 10 },
+    });
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tpA.id },
+    });
+    await explosionarOrden(sesion(), idOrden, bd());
+    await cliente.modeloTela.update({
+      where: { idModelo_idTela: { idModelo: modelo.id, idTela: telaFelpa.id } },
+      data: { idTelaProveedor: tpB.id },
+    });
+    const ex2 = await explosionarOrden(sesion(), idOrden, bd());
+    const felpa = renglonTela(ex2, telaFelpa.id);
+    expect(felpa?.idProveedorSugerido).toBe(provCaro.id);
+    expect(felpa?.diff).toBe('cantidad-cambiada'); // mismo precio, distinto proveedor
+  });
+});
+
+describe('MRP F8-E6 — consumo de avío por TALLA (R18)', () => {
+  it('requerido = Σ(medida de la talla × piezas de esa talla)', async () => {
+    // Orden: CH 10 + M 20. Medidas: CH 5, M 7 → 5×10 + 7×20 = 190.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 5 },
+        { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaM.id, consumo: 7 },
+      ],
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.cantidadRequerida).toBeCloseTo(190);
+    expect(ex.avisos).toEqual([]);
+  });
+
+  it('talla sin medida capturada cae al consumo por prenda + AVISO', async () => {
+    // Solo CH tiene medida (5). M (sin medida) usa consumoPorPrenda (6). 5×10 + 6×20 = 170 + AVISO.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioBoton.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.create({
+      data: { idModelo: modelo.id, idAvio: avioBoton.id, idTalla: tallaCH.id, consumo: 5 },
+    });
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const boton = renglonAvio(ex, avioBoton.id);
+    expect(boton?.cantidadRequerida).toBeCloseTo(170);
+    expect(ex.avisos.some((a) => a.includes('sin medida por talla'))).toBe(true);
+  });
+
+  it('avío GENÉRICO por talla: Σ(medida×piezas) y luego neteo contra el stock (D3)', async () => {
+    // hilo es GENÉRICO. Por talla: CH 3, M 4 → 3×10 + 4×20 = 110 requerido. Con 50 en stock → 60 a compra.
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modelo.id, idAvio: avioHilo.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modelo.id, idAvio: avioHilo.id, idTalla: tallaCH.id, consumo: 3 },
+        { idModelo: modelo.id, idAvio: avioHilo.id, idTalla: tallaM.id, consumo: 4 },
+      ],
+    });
+    await ajustarInventarioAvio(
+      sesion(),
+      {
+        idAlmacen: almacen.id,
+        fecha: '2026-06-21',
+        idTipoMov: (
+          await cliente.tipoMovimientoInventario.findUniqueOrThrow({
+            where: { codigo: 'ajuste-entrada' },
+          })
+        ).id,
+        lineas: [{ idAvio: avioHilo.id, cantidad: 50 }],
+        motivo: 'conteo inicial',
+      },
+      bd(),
+    );
+    const ex = await explosionarOrden(sesion(), idOrden, bd());
+    const hilo = renglonAvio(ex, avioHilo.id);
+    expect(hilo?.cantidadRequerida).toBeCloseTo(110);
+    expect(hilo?.existenciaStock).toBeCloseTo(50);
+    expect(hilo?.cantidadAComprar).toBeCloseTo(60);
+    expect(hilo?.estadoGenerico).toBe('faltante-parcial');
+  });
+});

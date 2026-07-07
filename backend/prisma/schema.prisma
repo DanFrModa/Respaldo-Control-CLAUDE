@@ -457,6 +457,9 @@ model Archivo {
   /// Foto de modelo que apunta a este archivo (F1-E4), si la hay. Inversa de
   /// `ModeloFoto.archivo`; 0 o 1 (un archivo es UNA foto de UN modelo — Cascade en ambos).
   modeloFoto       ModeloFoto?
+  /// Adjunto de orden de producción que apunta a este archivo (F8-E6, R6), si lo hay. Inversa de
+  /// `OrdenArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA sola orden — Cascade en ambos).
+  ordenArchivo     OrdenArchivo?
 
   @@map("archivos")
 }
@@ -2032,6 +2035,8 @@ model Orden {
   inventarioCiclicoDet InventarioCiclicoDet[]
   /// Liga desarrollo↔orden (F8-E6): a lo más un desarrollo por orden. Cascade.
   desarrolloOrden      DesarrolloOrden?
+  /// Adjuntos de apoyo (Excel/PDF/imágenes) de esta orden en R2 (F8-E6, R6). Cascade: son de la orden.
+  archivos             OrdenArchivo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2045,6 +2050,28 @@ model Orden {
   @@index([idMaquilero])
   @@index([estado])
   @@map("ordenes")
+}
+
+/// Puente orden ↔ archivo R2 (F8-E6, R6). Liga un `Archivo` (registro del motor de archivos de F0)
+/// a una ORDEN de producción como adjunto de apoyo (Excel/PDF/imágenes). Espejo de `ProveedorArchivo`
+/// (sin `tipo`: los adjuntos de orden no llevan clasificación documental). `onDelete`:
+///  • Cascade hacia `Orden`: los adjuntos son de la orden.
+///  • Cascade hacia `Archivo`: al quitar el adjunto se borra también su `Archivo` (el objeto físico
+///    en R2 lo borra el dominio best-effort, ya no queda huérfano — ver `comun/archivos.ts`).
+model OrdenArchivo {
+  id        Int    @id @default(autoincrement())
+  idOrden   Int    @map("id_orden")
+  idArchivo String @map("id_archivo")
+
+  orden   Orden   @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+  archivo Archivo @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idOrden])
+  @@map("orden_archivo")
 }
 
 /// Renglón de la matriz de una orden = un COLOR (F2-E2 — ex `OrdenesDet`, doc 03-Produccion).

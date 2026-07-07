@@ -57,8 +57,12 @@ import {
 
 // ── Include + proyección de eventos ───────────────────────────────────────────────────
 
-/** `include` para leer un evento con la versión resuelta del precosto anterior/nuevo. */
-const incluirEvento = {
+/**
+ * `include` para leer un evento con la versión resuelta del precosto anterior/nuevo. Se exporta para
+ * que la vista 360 del enganche (F8-E6) reutilice el MISMO proyector sin acoplarse al permiso
+ * `listas.ver` que exige `listarEventosDeLinea`.
+ */
+export const incluirEvento = {
   precostoAnterior: { select: { version: true } },
   precostoNuevo: { select: { version: true } },
 } satisfies Prisma.NegociacionEventoInclude;
@@ -66,7 +70,10 @@ const incluirEvento = {
 type EventoConVersiones = Prisma.NegociacionEventoGetPayload<{ include: typeof incluirEvento }>;
 
 /** Proyecta un evento a la salida del contrato (importes en null sin `consultas.ver-importes`). */
-function aEventoSalida(evento: EventoConVersiones, verImportes: boolean): NegociacionEventoSalida {
+export function aEventoSalida(
+  evento: EventoConVersiones,
+  verImportes: boolean,
+): NegociacionEventoSalida {
   return {
     id: evento.id,
     idListaLinea: evento.idListaLinea,

@@ -22,7 +22,12 @@
  */
 import { randomUUID } from 'node:crypto';
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { z } from 'zod';
 
@@ -206,6 +211,17 @@ export interface ServicioArchivos {
     key: string,
     opciones?: { nombreDescarga?: string; expiraEnSegundos?: number },
   ): Promise<string>;
+
+  /**
+   * Borra el OBJETO físico de R2 por su key (`DeleteObjectCommand`). Se usa al eliminar un adjunto
+   * para no dejar el objeto huérfano en el bucket (salda la deuda técnica de §8: antes solo se
+   * borraba el registro `Archivo` y el objeto quedaba en R2).
+   *
+   * El llamador la invoca en modo BEST-EFFORT (fuera de la transacción de BD): si R2 falla NO debe
+   * revertir el borrado del registro; a lo sumo el objeto queda huérfano (el estado anterior). R2
+   * es idempotente en DELETE (borrar una key inexistente responde 204, no error).
+   */
+  eliminarObjeto(key: string): Promise<void>;
 }
 
 /** Construye el servicio con dependencias explícitas (producción y tests usan la misma vía). */
@@ -271,6 +287,13 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
         }),
         { expiresIn: opciones?.expiraEnSegundos ?? EXPIRACION_DESCARGA_SEGUNDOS },
       );
+    },
+
+    async eliminarObjeto(key) {
+      if (key.trim() === '') {
+        throw new ErrorValidacion('La key del archivo es obligatoria.');
+      }
+      await deps.cliente.send(new DeleteObjectCommand({ Bucket: deps.bucket, Key: key }));
     },
   };
 }

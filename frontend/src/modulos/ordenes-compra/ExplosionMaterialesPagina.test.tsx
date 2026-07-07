@@ -31,6 +31,7 @@ function explosionDePrueba() {
     totalPiezas: 30,
     huboCambios: false,
     regenerado: false,
+    avisos: [],
     grupos: [
       {
         idProveedor: 11,
@@ -193,5 +194,23 @@ describe('ExplosionMaterialesPagina (F4-E4, R3)', () => {
     });
     await usuario.click(screen.getByTestId('exp-orden-opcion'));
     expect(screen.getByTestId('exp-aviso-cambios')).toBeInTheDocument();
+  });
+
+  it('muestra los avisos del enganche (F8-E6) cuando la explosión los reporta', async () => {
+    useExplosionMock.mockReturnValue({
+      data: {
+        ...explosionDePrueba(),
+        avisos: ['Tela "Felpa" amarrada multi-color con precios distintos: se usó el precio base.'],
+      },
+      isPending: false,
+      isError: false,
+    });
+    const usuario = userEvent.setup();
+    renderConProveedores(<ExplosionMaterialesPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+    await usuario.click(screen.getByTestId('exp-orden-opcion'));
+    expect(screen.getByTestId('exp-avisos')).toBeInTheDocument();
+    expect(screen.getByTestId('exp-aviso')).toHaveTextContent('amarrada multi-color');
   });
 });

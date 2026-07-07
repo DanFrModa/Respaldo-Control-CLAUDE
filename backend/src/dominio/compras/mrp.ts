@@ -37,9 +37,15 @@
  *    convertido a costo por unidad de consumo (precio ÷ factor) con el motor `comun/conversion.ts`.
  *  • R3/Make-to-Order — el requerido es SIEMPRE por orden; nunca por stock/reorden.
  *
- * PROVEEDOR SUGERIDO de TELAS: en v2 NO hay liga directa tela→proveedor (el proveedor se decide al
- * comprar el lote, D5); por eso las telas salen con `idProveedorSugerido` NULL y caen en el grupo
- * "Sin proveedor sugerido" (el usuario elige proveedor al generar/editar la OC). Documentado aquí.
+ * PROVEEDOR SUGERIDO de TELAS (F8-E6, "enganche"): si Desarrollo AMARRÓ un proveedor a la tela del BOM
+ * (`ModeloTela.idTelaProveedor`), el MRP lo hereda y resuelve su precio con la cascada compartida
+ * `resolverPrecioTela` (amarre-color → amarre → color-referencia → sugerido). Si NO hay amarre, la tela
+ * sigue como antes de F8: `idProveedorSugerido` NULL → grupo "Sin proveedor sugerido" (el proveedor del
+ * lote se decide al comprar, D5) y captura manual. Los avíos anteponen el amarre `ModeloAvio.
+ * idAvioProveedor` (`resolverPrecioAvio`); sin amarre, caen al "más barato" de F4 (fallback intacto →
+ * NO-REGRESIÓN). El consumo de avíos por talla (R18) se compra por medida×curva. Documentado en cada
+ * helper; los casos ambiguos (tela multi-color con precios distintos, talla sin medida) NO truenan en
+ * silencio: van a `avisos` en la salida.
  */
 import type {
   ExplosionSalida,
@@ -67,6 +73,8 @@ import {
   type ContextoBd,
   type Tx,
 } from '../../comun/transaccion.js';
+import { num, numOrNull } from '../costos/decimales.js';
+import { resolverPrecioAvio, resolverPrecioTela } from '../costos/resolucion-precios.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 
@@ -91,38 +99,12 @@ interface RequerimientoCalculado {
   precioSugerido: number | null;
 }
 
-/** Orden cargada con lo que la explosión necesita (BOM del modelo + matriz de la orden). */
-type OrdenParaExplosion = Prisma.OrdenGetPayload<{
-  select: {
-    id: true;
-    folio: true;
-    idEmpresa: true;
-    idModelo: true;
-    modelo: {
-      select: {
-        codigo: true;
-        telas: {
-          select: {
-            idTela: true;
-            consumoPorPrenda: true;
-            paraProduccion: true;
-            tela: { select: { nombre: true; unidadMedida: true } };
-          };
-        };
-        avios: {
-          select: {
-            idAvio: true;
-            consumoPorPrenda: true;
-            paraProduccion: true;
-            avio: { select: { clave: true; descripcion: true; unidad: true; esGenerico: true } };
-          };
-        };
-      };
-    };
-    lineas: { select: { tallas: { select: { cantidad: true } } } };
-  };
-}>;
-
+/**
+ * Selección de la orden para la explosión (BOM del modelo + matriz). Desde F8-E6 trae también los
+ * AMARRES de precio de Desarrollo (`ModeloTela.idTelaProveedor` con su `TelaProveedor` + colores;
+ * `ModeloAvio.idAvioProveedor` + los `AvioProveedor` del avío) y, en la matriz, el `idColor` del
+ * renglón y el `idTalla`/etiqueta de cada cantidad (para el precio-por-color y el consumo por talla R18).
+ */
 const seleccionOrdenExplosion = {
   id: true,
   folio: true,
@@ -136,21 +118,59 @@ const seleccionOrdenExplosion = {
           idTela: true,
           consumoPorPrenda: true,
           paraProduccion: true,
-          tela: { select: { nombre: true, unidadMedida: true } },
+          idTelaProveedor: true,
+          telaProveedor: {
+            select: {
+              idProveedor: true,
+              precio: true,
+              manejaPrecioPorColor: true,
+              proveedor: { select: { nombre: true, activo: true } },
+              colores: { select: { idColor: true, precio: true } },
+            },
+          },
+          tela: { select: { nombre: true, unidadMedida: true, precioSugerido: true } },
         },
       },
       avios: {
         select: {
           idAvio: true,
           consumoPorPrenda: true,
+          consumoPorTalla: true,
           paraProduccion: true,
-          avio: { select: { clave: true, descripcion: true, unidad: true, esGenerico: true } },
+          idAvioProveedor: true,
+          tallas: { select: { idTalla: true, consumo: true } },
+          avio: {
+            select: {
+              clave: true,
+              descripcion: true,
+              unidad: true,
+              esGenerico: true,
+              precioReferencia: true,
+              factorConversion: true,
+              proveedores: {
+                select: {
+                  idProveedor: true,
+                  precio: true,
+                  factorConversion: true,
+                  proveedor: { select: { nombre: true, activo: true } },
+                },
+              },
+            },
+          },
         },
       },
     },
   },
-  lineas: { select: { tallas: { select: { cantidad: true } } } },
+  lineas: {
+    select: {
+      idColor: true,
+      tallas: { select: { idTalla: true, cantidad: true, talla: { select: { etiqueta: true } } } },
+    },
+  },
 } satisfies Prisma.OrdenSelect;
+
+/** Orden cargada con lo que la explosión necesita (BOM del modelo + matriz + amarres, F8-E6). */
+type OrdenParaExplosion = Prisma.OrdenGetPayload<{ select: typeof seleccionOrdenExplosion }>;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -181,11 +201,199 @@ function totalPiezasOrden(orden: OrdenParaExplosion): number {
   return total;
 }
 
+/** Piezas de la orden AGRUPADAS por talla (para el consumo por talla, R18). Guarda la etiqueta para los avisos. */
+function piezasPorTallaOrden(
+  orden: OrdenParaExplosion,
+): Map<number, { piezas: number; etiqueta: string }> {
+  const mapa = new Map<number, { piezas: number; etiqueta: string }>();
+  for (const linea of orden.lineas) {
+    for (const t of linea.tallas) {
+      const previo = mapa.get(t.idTalla);
+      if (previo === undefined) {
+        mapa.set(t.idTalla, { piezas: t.cantidad, etiqueta: t.talla.etiqueta });
+      } else {
+        previo.piezas += t.cantidad;
+      }
+    }
+  }
+  return mapa;
+}
+
+/** Ids de color DISTINTOS presentes en la matriz de la orden (para el precio-por-color de tela). */
+function coloresDeOrden(orden: OrdenParaExplosion): number[] {
+  return [...new Set(orden.lineas.map((l) => l.idColor))];
+}
+
+/** Proveedor + precio sugerido resuelto (idProveedor/nombre/precio por unidad de consumo, o nulls). */
+interface ProveedorPrecio {
+  idProveedor: number | null;
+  proveedor: string | null;
+  precio: number | null;
+}
+
+const SIN_PROVEEDOR: ProveedorPrecio = { idProveedor: null, proveedor: null, precio: null };
+
+/**
+ * Resuelve proveedor/precio de una TELA del BOM heredando el AMARRE de Desarrollo (F8-E6). Sin amarre →
+ * NULL (como antes de F8: captura manual, D5). Con amarre → `idProveedorSugerido` = el proveedor elegido
+ * (aunque el precio termine saliendo del sugerido genérico: a ese proveedor se le compra) y el precio se
+ * resuelve con la cascada `resolverPrecioTela`. Precio-por-color: las telas del MRP se consumen por
+ * MODELO completo (sin desglose por color en v2), así que sólo se resuelve por color cuando la orden es de
+ * UN color; si tiene varios colores con precios de tela DISTINTOS, usa el precio BASE del amarre y DEJA UN
+ * AVISO (no truena en silencio). Empuja avisos al arreglo compartido.
+ *
+ * NOTA (cascada, decisión F8-E6): AQUÍ la cascada OMITE el paso `color-referencia` (`TelaColor.precio`
+ * sin proveedor) a propósito — la tela del MRP se consume por MODELO completo (no hay color por renglón
+ * de requerimiento), así que el precio-por-color solo aplica DENTRO del amarre. Sin amarre → NULL.
+ *
+ * Proveedor amarrado INACTIVO: se mantiene la sugerencia (Desarrollo lo eligió a propósito y la OC es
+ * editable), pero se DEJA UN AVISO — `generarOCDesdeExplosion`/`crearOC` no validan `activo`, así que sin
+ * este aviso la OC se crearía a un proveedor de baja en silencio.
+ */
+function resolverProveedorPrecioTela(
+  mt: OrdenParaExplosion['modelo']['telas'][number],
+  colores: number[],
+  avisos: string[],
+): ProveedorPrecio {
+  const tp = mt.telaProveedor;
+  if (mt.idTelaProveedor === null || tp === null) {
+    return SIN_PROVEEDOR; // sin amarre → como hoy (NULL / captura manual)
+  }
+
+  // Proveedor amarrado dado de baja: se conserva la sugerencia, pero no en silencio (aviso a la OC).
+  if (!tp.proveedor.activo) {
+    avisos.push(
+      `Tela "${mt.tela.nombre}": el proveedor amarrado "${tp.proveedor.nombre}" está INACTIVO; ` +
+        `se mantiene la sugerencia, revísalo antes de generar la OC.`,
+    );
+  }
+
+  // Precio del COLOR en contexto: sólo si el proveedor cotiza por color Y la orden es de UN color.
+  let precioColor: number | null = null;
+  if (tp.manejaPrecioPorColor) {
+    const precioPorColor = new Map(tp.colores.map((c) => [c.idColor, numOrNull(c.precio)]));
+    if (colores.length === 1) {
+      precioColor = precioPorColor.get(colores[0]!) ?? null;
+    } else {
+      // Multi-color: usa el precio BASE. Si los colores de la orden tienen precios de tela DISTINTOS,
+      // avisa (el base pierde ese detalle; la tela se compra por modelo completo, no por color).
+      const distintos = new Set(
+        colores.map((id) => precioPorColor.get(id)).filter((p): p is number => p != null),
+      );
+      if (distintos.size >= 2) {
+        avisos.push(
+          `Tela "${mt.tela.nombre}": la orden tiene varios colores con precios de tela distintos ` +
+            `en "${tp.proveedor.nombre}"; se usó el precio base del proveedor. Revisa el precio de la OC.`,
+        );
+      }
+    }
+  }
+
+  const resuelto = resolverPrecioTela({
+    precioSugerido: numOrNull(mt.tela.precioSugerido),
+    amarre: {
+      precio: numOrNull(tp.precio),
+      manejaPrecioPorColor: tp.manejaPrecioPorColor,
+      precioColor,
+    },
+  });
+  return { idProveedor: tp.idProveedor, proveedor: tp.proveedor.nombre, precio: resuelto.precio };
+}
+
+/**
+ * Resuelve proveedor/precio de un AVÍO heredando el AMARRE de Desarrollo (`ModeloAvio.idAvioProveedor`,
+ * F8-E6) con `resolverPrecioAvio`. Devuelve el proveedor amarrado SÓLO si tiene un precio usable (origen
+ * `amarre`); si no hay amarre, o el amarrado no tiene precio, devuelve `null` para que el llamador caiga
+ * al "más barato" de F4 (`proveedorSugeridoAvio`, fallback INTACTO → no-regresión). El precio se normaliza
+ * a unidad de consumo (÷ factor, R1) dentro de `resolverPrecioAvio`, sin duplicar la aritmética.
+ *
+ * Proveedor amarrado INACTIVO: si el amarre SÍ resuelve (tiene precio), se mantiene la sugerencia pero se
+ * DEJA UN AVISO (misma razón que en tela: la OC no valida `activo`). Si el amarrado no tiene precio, cae al
+ * fallback F4 —que sí filtra activos— y no hace falta avisar (el amarrado inactivo no se usa).
+ */
+function resolverProveedorPrecioAvioAmarrado(
+  ma: OrdenParaExplosion['modelo']['avios'][number],
+  avisos: string[],
+): ProveedorPrecio | null {
+  if (ma.idAvioProveedor === null) return null;
+  const fila = ma.avio.proveedores.find((p) => p.idProveedor === ma.idAvioProveedor);
+  if (fila === undefined) return null;
+  // Sólo la fila amarrada + sin `precioReferencia`: así el fallback "más barato"/referencia de
+  // `resolverPrecioAvio` NO elige a otro (esa red la teje `proveedorSugeridoAvio`, idéntico a F4).
+  const resuelto = resolverPrecioAvio({
+    precioReferencia: null,
+    factorConversionAvio: numOrNull(ma.avio.factorConversion),
+    idAvioProveedor: ma.idAvioProveedor,
+    proveedores: [
+      {
+        idProveedor: fila.idProveedor,
+        precio: numOrNull(fila.precio),
+        factorConversion: numOrNull(fila.factorConversion),
+      },
+    ],
+  });
+  if (resuelto.origen === 'amarre' && resuelto.idProveedor !== null) {
+    if (!fila.proveedor.activo) {
+      avisos.push(
+        `Avío "${ma.avio.clave} — ${ma.avio.descripcion}": el proveedor amarrado ` +
+          `"${fila.proveedor.nombre}" está INACTIVO; se mantiene la sugerencia, revísalo antes de la OC.`,
+      );
+    }
+    return {
+      idProveedor: fila.idProveedor,
+      proveedor: fila.proveedor.nombre,
+      precio: resuelto.precio,
+    };
+  }
+  return null; // amarre sin precio usable → fallback F4 (más barato)
+}
+
+/**
+ * Cantidad requerida de un AVÍO (R18). Si NO se consume por talla → `consumoPorPrenda × totalPiezas`
+ * (EXACTAMENTE como antes de F8). Si SÍ → Σ(medida de la talla × piezas de esa talla en la orden); las
+ * tallas presentes en la orden SIN medida capturada caen a `consumoPorPrenda × piezas` + AVISO.
+ */
+function requeridoAvio(
+  ma: OrdenParaExplosion['modelo']['avios'][number],
+  totalPiezas: number,
+  piezasPorTalla: Map<number, { piezas: number; etiqueta: string }>,
+  avisos: string[],
+): number {
+  if (!ma.consumoPorTalla) {
+    return num(ma.consumoPorPrenda) * totalPiezas;
+  }
+  const medidaPorTalla = new Map(ma.tallas.map((t) => [t.idTalla, num(t.consumo)]));
+  const consumoPorPrenda = num(ma.consumoPorPrenda);
+  let requerido = 0;
+  const sinMedida: string[] = [];
+  for (const [idTalla, { piezas, etiqueta }] of piezasPorTalla) {
+    const medida = medidaPorTalla.get(idTalla);
+    if (medida !== undefined) {
+      requerido += medida * piezas;
+    } else {
+      requerido += consumoPorPrenda * piezas;
+      sinMedida.push(etiqueta);
+    }
+  }
+  if (sinMedida.length > 0) {
+    avisos.push(
+      `Avío "${ma.avio.clave} — ${ma.avio.descripcion}": sin medida por talla (R18) para ` +
+        `${sinMedida.join(', ')}; se usó el consumo por prenda.`,
+    );
+  }
+  return requerido;
+}
+
 /**
  * Resuelve el proveedor/precio SUGERIDO de un avío (R1): el `AvioProveedor` con precio MÁS BARATO
  * (por unidad de consumo = precio ÷ factor). En EMPATE de precio gana el `idProveedor` MENOR
  * (desempate DETERMINISTA, no el orden de la BD). Los que no traen precio se ignoran. Devuelve el id
  * del proveedor, su nombre y el precio por unidad de consumo, o nulls si ninguno tiene precio.
+ *
+ * NORMALIZACIÓN del factor (F8-E6, alineado con el amarre): `resolverFactor(proveedor, avío)` — cae al
+ * `Avio.factorConversion` cuando el proveedor no fija el suyo, EXACTAMENTE como `resolverPrecioAvio`
+ * (cascada F8-E1). Antes de F8 se pasaba `null` como fallback (se ignoraba el factor del avío), lo que
+ * hacía que el MISMO proveedor diera precios distintos según el camino (amarre vs. más barato). Ya no.
  */
 async function proveedorSugeridoAvio(
   tx: Tx,
@@ -198,6 +406,7 @@ async function proveedorSugeridoAvio(
       precio: true,
       factorConversion: true,
       proveedor: { select: { nombre: true } },
+      avio: { select: { factorConversion: true } },
     },
   });
   let mejor: { idProveedor: number; proveedor: string; precio: number } | null = null;
@@ -205,8 +414,8 @@ async function proveedorSugeridoAvio(
     if (op.precio === null) continue;
     // Precio por unidad de consumo (R1): precio por presentación ÷ factor (proveedor → avío → 1).
     const factor = resolverFactor(
-      op.factorConversion === null ? null : Number(op.factorConversion),
-      null,
+      numOrNull(op.factorConversion),
+      numOrNull(op.avio.factorConversion),
     );
     const precioConsumo = precioAUnidadConsumo(Number(op.precio), factor);
     // Más barato gana; en empate de precio, el idProveedor MENOR (determinista, no orden de BD).
@@ -229,23 +438,30 @@ async function proveedorSugeridoAvio(
 /**
  * Calcula los requerimientos de una orden (función de cálculo R3; las lecturas de avíos
  * genéricos/proveedores las hace contra `tx`). Para cada renglón del BOM `paraProduccion`:
- *   requerido = consumoPorPrenda × totalPiezas.
+ *   • TELA: requerido = consumoPorPrenda × totalPiezas. Proveedor/precio del AMARRE de Desarrollo
+ *     (F8-E6, `resolverProveedorPrecioTela`); sin amarre → NULL (captura manual, D5).
+ *   • AVÍO: requerido = consumoPorPrenda × totalPiezas, o Σ(medida×piezas) si se consume por talla
+ *     (R18, `requeridoAvio`). Proveedor/precio: AMARRE `ModeloAvio.idAvioProveedor` primero; sin
+ *     amarre (o amarrado sin precio) → "más barato" de F4 (`proveedorSugeridoAvio`, fallback intacto).
  * AVÍOS genéricos (decisión (d)): netea contra el stock REAL (Σ kardex, D3) → solo el faltante va a
- * compra. Telas y avíos NO genéricos van completos a compra. Proveedor sugerido: avíos del
- * `AvioProveedor` más barato (R1); telas NULL (sin liga directa tela→proveedor, D5).
+ * compra. Telas y avíos NO genéricos van completos a compra. Los casos ambiguos van a `avisos`.
  */
 async function calcularRequerimientos(
   tx: Tx,
   orden: OrdenParaExplosion,
   totalPiezas: number,
   existenciaGenerico: (idAvio: number) => Promise<number>,
+  avisos: string[],
 ): Promise<RequerimientoCalculado[]> {
   const resultado: RequerimientoCalculado[] = [];
+  const colores = coloresDeOrden(orden);
+  const piezasPorTalla = piezasPorTallaOrden(orden);
 
   // ── TELAS del BOM (paraProduccion) ──
   for (const mt of orden.modelo.telas) {
     if (!mt.paraProduccion) continue;
-    const requerida = Number(mt.consumoPorPrenda) * totalPiezas;
+    const requerida = num(mt.consumoPorPrenda) * totalPiezas;
+    const sugerido = resolverProveedorPrecioTela(mt, colores, avisos);
     resultado.push({
       tipo: 'tela',
       idTela: mt.idTela,
@@ -256,16 +472,16 @@ async function calcularRequerimientos(
       esGenerico: false,
       existenciaStock: 0,
       cantidadAComprar: requerida, // telas siempre van completas a compra (no se netean)
-      idProveedorSugerido: null, // sin liga directa tela→proveedor en v2 (D5)
-      proveedorSugerido: null,
-      precioSugerido: null,
+      idProveedorSugerido: sugerido.idProveedor,
+      proveedorSugerido: sugerido.proveedor,
+      precioSugerido: sugerido.precio,
     });
   }
 
   // ── AVÍOS del BOM (paraProduccion) ──
   for (const ma of orden.modelo.avios) {
     if (!ma.paraProduccion) continue;
-    const requerida = Number(ma.consumoPorPrenda) * totalPiezas;
+    const requerida = requeridoAvio(ma, totalPiezas, piezasPorTalla, avisos);
     const esGenerico = ma.avio.esGenerico;
 
     let existencia = 0;
@@ -277,7 +493,10 @@ async function calcularRequerimientos(
       aComprar = Math.max(0, requerida - existencia);
     }
 
-    const sugerido = await proveedorSugeridoAvio(tx, ma.idAvio);
+    // Amarre de Desarrollo primero (F8-E6); si no resuelve, "más barato" de F4 (fallback intacto).
+    const sugerido =
+      resolverProveedorPrecioAvioAmarrado(ma, avisos) ??
+      (await proveedorSugeridoAvio(tx, ma.idAvio));
     resultado.push({
       tipo: 'avio',
       idTela: null,
@@ -403,18 +622,35 @@ export async function explosionarOrden(
     const existenciaGenerico = (idAvio: number): Promise<number> =>
       existenciaAvioTotalEmpresa(tx, idEmpresa, idAvio);
 
-    const calculados = await calcularRequerimientos(tx, orden, totalPiezas, existenciaGenerico);
+    // Avisos de la explosión (F8-E6): tela multi-color con precios distintos, avío por talla sin
+    // medida… Nada truena en silencio; se acumulan aquí y viajan en la salida.
+    const avisos: string[] = [];
+    const calculados = await calcularRequerimientos(
+      tx,
+      orden,
+      totalPiezas,
+      existenciaGenerico,
+      avisos,
+    );
 
-    // Snapshot anterior (para el diff). Se relee por clave material.
+    // Snapshot anterior (para el diff). Se relee por clave material — se traen también proveedor/precio
+    // sugeridos: desde F8-E6 el amarre puede cambiar de proveedor/precio SIN mover la cantidad, y ese
+    // cambio SÍ es relevante para la UI (los valores ya se persisten bien; solo faltaba la etiqueta).
     const previos = await tx.requerimientoOrden.findMany({
       where: { idOrden },
-      select: { idTela: true, idAvio: true, cantidadRequerida: true },
+      select: {
+        idTela: true,
+        idAvio: true,
+        cantidadRequerida: true,
+        idProveedorSugerido: true,
+        precioSugerido: true,
+      },
     });
     const previoPorClave = new Map(previos.map((p) => [claveRequerimiento(p), p]));
     const clavesNuevas = new Set(calculados.map(claveRequerimiento));
     const regenerado = previos.length > 0;
 
-    // Diff por renglón (en memoria, comparando viejo vs nuevo).
+    // Diff por renglón (en memoria, comparando viejo vs nuevo): cantidad, proveedor o precio sugerido.
     const diffPorClave = new Map<string, DiffRequerimiento>();
     for (const c of calculados) {
       const clave = claveRequerimiento(c);
@@ -422,7 +658,15 @@ export async function explosionarOrden(
       if (prev === undefined) {
         diffPorClave.set(clave, regenerado ? 'nuevo' : 'sin-cambio');
       } else {
-        const cambio = Math.abs(Number(prev.cantidadRequerida) - c.cantidadRequerida) > TOLERANCIA;
+        const cambioCantidad =
+          Math.abs(Number(prev.cantidadRequerida) - c.cantidadRequerida) > TOLERANCIA;
+        const cambioProveedor = (prev.idProveedorSugerido ?? null) !== c.idProveedorSugerido;
+        const precioPrev = prev.precioSugerido === null ? null : Number(prev.precioSugerido);
+        const cambioPrecio =
+          precioPrev === null || c.precioSugerido === null
+            ? precioPrev !== c.precioSugerido
+            : Math.abs(precioPrev - c.precioSugerido) > TOLERANCIA;
+        const cambio = cambioCantidad || cambioProveedor || cambioPrecio;
         diffPorClave.set(clave, cambio ? 'cantidad-cambiada' : 'sin-cambio');
       }
     }
@@ -505,6 +749,7 @@ export async function explosionarOrden(
       grupos: agruparPorProveedor(todos),
       huboCambios,
       regenerado,
+      avisos,
     };
   }, bd);
 }
