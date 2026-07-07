@@ -960,6 +960,9 @@
 <!-- Ruta de la orden (Ruta Crítica hacia atrás) -->
 <div class="proc-scrim" id="rutaScrim"><div class="proc" id="rutaPanel"></div></div>
 
+<!-- Nuevo pedido interno (folio auto → OP por modelo con matriz color×talla) -->
+<div class="proc-scrim" id="pedScrim"><div class="proc" id="pedPanel"></div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1127,7 +1130,7 @@ function vResumen() {
     </div>
     <div class="actions">
       <button class="btn ghost">${IC.download}Exportar</button>
-      <button class="btn primary" data-add="ordenes">${IC.plus}Nueva orden</button>
+      <button class="btn primary" onclick="abrirNuevoPedido()">${IC.plus}Nueva orden</button>
     </div>
   </div>
 
@@ -1331,7 +1334,7 @@ function drawerModelo(i) {
   <div class="drawer-foot">
     <button class="btn ghost">${IC.printer}Ficha PDF</button>
     <button class="btn" style="margin-left:auto">${IC.edit}Editar</button>
-    <button class="btn primary" data-add="ordenes">${IC.plus}Crear orden</button>
+    <button class="btn primary" onclick="abrirNuevoPedido()">${IC.plus}Crear orden</button>
   </div>`;
 }
 
@@ -1396,7 +1399,7 @@ function vOrdenes() {
     <div class="actions">
       <button class="btn ghost">${IC.refresh}Actualizar</button>
       <button class="btn ghost">${IC.indicadores}Concentrado</button>
-      <button class="btn primary" data-add="ordenes">${IC.plus}Nueva orden</button>
+      <button class="btn primary" onclick="abrirNuevoPedido()">${IC.plus}Nueva orden</button>
     </div>
   </div>
 
@@ -1841,6 +1844,104 @@ const corteBadge = (c, cant) => c>=cant ? ['ok','Cortado'] : c===0 ? ['neutral',
 const nextOrdPed = () => { let mx=0; PEDIDOS_MES.forEach(p=>p.modelos.forEach(m=>{ const n=parseInt(m.ord,10)||0; if(n>mx)mx=n; })); return String(mx+1); };
 const money = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
 
+/* ===== Constructor de PEDIDO INTERNO → genera una OP por modelo (con matriz color×talla) ===== */
+const pedScrim = document.getElementById('pedScrim');
+const pedPanel = document.getElementById('pedPanel');
+const TALLAS_PED = ['XCH', 'CH', 'M', 'G', 'XG'];
+const COLORES_PED = ['Rojo A', 'Azul marino', 'Negro', 'Blanco', 'Verde pino', 'Rosa'];
+let pedBuilder = null;
+const nuevoModeloPed = () => ({ codigo: '', precio: 0, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] });
+const pedTotalModelo = (m) => (m.colores || []).reduce((s, c) => s + c.q.reduce((a, b) => a + (+b || 0), 0), 0);
+const nextFolioPed = () => { let mx = 0; PEDIDOS_MES.forEach(p => { const n = parseInt(String(p.folio).split('-')[0], 10) || 0; if (n > mx) mx = n; }); return (mx + 1) + '-F'; };
+function abrirNuevoPedido() { pedBuilder = { cliente: CLIENTES[0], empresa: 'FR Moda', fecha: '', modelos: [nuevoModeloPed()] }; renderPedBuilder(); pedScrim.classList.add('show'); }
+function cerrarPed() { pedScrim.classList.remove('show'); }
+function pedSync() {
+  const p = pedPanel; if (!p.querySelector('#pedCliente')) return;
+  pedBuilder.cliente = p.querySelector('#pedCliente').value;
+  pedBuilder.empresa = p.querySelector('#pedEmpresa').value;
+  pedBuilder.fecha = p.querySelector('#pedFecha').value;
+  [...p.querySelectorAll('.ped-mod')].forEach((row, mi) => {
+    const m = pedBuilder.modelos[mi]; if (!m) return;
+    m.codigo = row.querySelector('.ped-cod').value;
+    m.precio = parseFloat(row.querySelector('.ped-precio').value) || 0;
+    [...row.querySelectorAll('.ped-color-sel')].forEach((sel, ci) => { if (m.colores[ci]) m.colores[ci].n = sel.value; });
+    [...row.querySelectorAll('.ped-cel')].forEach(cel => { const ci = +cel.dataset.c, ti = +cel.dataset.t; if (m.colores[ci]) m.colores[ci].q[ti] = parseInt(cel.value) || 0; });
+  });
+}
+function pedRecalc() {
+  pedSync();
+  pedPanel.querySelectorAll('.ped-mod').forEach((row, mi) => { const st = row.querySelector('.ped-subt'); if (st) st.textContent = pedTotalModelo(pedBuilder.modelos[mi]).toLocaleString('es-MX') + ' pz'; row.querySelectorAll('.ped-rowtot').forEach((el, ci) => { if (pedBuilder.modelos[mi].colores[ci]) el.textContent = pedBuilder.modelos[mi].colores[ci].q.reduce((a, b) => a + (+b || 0), 0); }); });
+  const ft = pedPanel.querySelector('#pedFootTot'); if (ft) { const tp = pedBuilder.modelos.reduce((s, m) => s + pedTotalModelo(m), 0); const ti = pedBuilder.modelos.reduce((s, m) => s + pedTotalModelo(m) * m.precio, 0); ft.innerHTML = `${pedBuilder.modelos.length} modelo${pedBuilder.modelos.length > 1 ? 's' : ''} · ${tp.toLocaleString('es-MX')} pz · ${money(ti)}`; }
+}
+function pedAddModelo() { pedSync(); pedBuilder.modelos.push(nuevoModeloPed()); renderPedBuilder(); }
+function pedDelModelo(i) { pedSync(); pedBuilder.modelos.splice(i, 1); renderPedBuilder(); }
+function pedAddColor(mi) { pedSync(); pedBuilder.modelos[mi].colores.push({ n: COLORES_PED[0], q: pedBuilder.modelos[mi].tallas.map(() => 0) }); renderPedBuilder(); }
+function pedDelColor(mi, ci) { pedSync(); pedBuilder.modelos[mi].colores.splice(ci, 1); renderPedBuilder(); }
+function crearPedidoInterno() {
+  pedSync();
+  const validos = pedBuilder.modelos.filter(m => m.codigo && pedTotalModelo(m) > 0);
+  if (!validos.length) { mostrarToast('Agrega al menos un modelo con número y cantidades en la matriz'); return; }
+  const folio = nextFolioPed();
+  const emp = pedBuilder.empresa === 'Marilyn Fitness' ? 'MF' : 'FR';
+  let ordN = parseInt(nextOrdPed(), 10) || 5500;
+  const modelos = validos.map(m => {
+    const ord = String(ordN++); const cant = pedTotalModelo(m);
+    generarRutaRC(ord, m.codigo, pedBuilder.cliente, pedBuilder.fecha || 'julio');
+    return { modelo: m.codigo, cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord, corte: 0, matriz: { tallas: m.tallas, colores: JSON.parse(JSON.stringify(m.colores)) } };
+  });
+  PEDIDOS_MES.unshift({ folio, cliente: pedBuilder.cliente, empresa: emp, vig: (pedBuilder.fecha || 'jul') + ' → ' + (pedBuilder.fecha || 'jul'), estatus: 'Vigente', modelos });
+  cerrarPed(); ir('pedidos');
+  mostrarToast('Pedido ' + folio + ' creado · ' + modelos.length + ' OP' + (modelos.length > 1 ? 's' : '') + ' generada' + (modelos.length > 1 ? 's' : '') + ' con matriz color×talla + su Ruta Crítica');
+}
+function renderPedBuilder() {
+  const b = pedBuilder;
+  pedPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">PI</span>
+    <div style="flex:1;min-width:0"><h2>Nuevo pedido interno</h2>
+      <div class="ph-meta"><span>Folio automático al crear</span><span>cada modelo → una OP con su matriz color×talla</span></div>
+    </div>
+    <button class="icon-btn" onclick="cerrarPed()" title="Cerrar (esc)">${icXsvg}</button>
+  </div>
+  <div class="proc-body">
+    <div class="pc-sec">
+      <h4>Encabezado del pedido</h4>
+      <div class="pc-fields">
+        <label><span class="ffk">Cliente</span><select class="pc-in" id="pedCliente">${CLIENTES.map(c => `<option${b.cliente === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label><span class="ffk">Empresa</span><select class="pc-in" id="pedEmpresa">${['FR Moda', 'Marilyn Fitness'].map(e => `<option${b.empresa === e ? ' selected' : ''}>${e}</option>`).join('')}</select></label>
+        <label><span class="ffk">Fecha de entrega</span><input class="pc-in" id="pedFecha" value="${b.fecha}" placeholder="15 jul"></label>
+      </div>
+      <div class="pc-hint-cell" style="margin-top:8px">La OP <b>nace de este pedido</b>: cada modelo genera su propia orden de producción con su <b>matriz color×talla</b> (D4). El nº de modelo lo <b>liga a su desarrollo/pre-costeo</b> (Etapa 2) y de ahí hereda BOM, telas, avíos y costo.</div>
+    </div>
+    ${b.modelos.map((m, mi) => `<div class="pc-sec ped-mod">
+      <h4>Modelo ${mi + 1} <span class="hint ped-subt">${pedTotalModelo(m).toLocaleString('es-MX')} pz</span></h4>
+      <div class="pc-fields">
+        <label><span class="ffk">Nº de modelo (nuestro)</span><input class="pc-in mono ped-cod" value="${m.codigo}" placeholder="62190"></label>
+        <label><span class="ffk">Precio de venta ($)</span><input class="pc-in mono ped-precio" type="number" step="any" min="0" value="${m.precio || ''}" placeholder="148.00"></label>
+        <label style="align-self:flex-end">${b.modelos.length > 1 ? `<button class="btn ghost sm" onclick="pedDelModelo(${mi})">${icXsvg}Quitar modelo</button>` : ''}</label>
+      </div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted);margin-bottom:5px">Matriz color × talla <span style="color:var(--faint)">(la cantidad del modelo = suma de la matriz → alimenta la OP)</span></div>
+      <div class="table-wrap"><table class="data" style="font-size:12.5px"><thead><tr><th>Color</th>${m.tallas.map(t => `<th class="r">${t}</th>`).join('')}<th class="r">Total</th><th></th></tr></thead><tbody>
+        ${m.colores.map((c, ci) => `<tr>
+          <td><select class="pc-in ped-color-sel" style="height:30px;padding:2px 6px;min-width:118px">${COLORES_PED.map(x => `<option${c.n === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
+          ${c.q.map((q, ti) => `<td class="r"><input class="pc-in mono ped-cel" data-c="${ci}" data-t="${ti}" type="number" min="0" value="${q || ''}" style="width:54px;text-align:right;padding:3px 5px" placeholder="0"></td>`).join('')}
+          <td class="r num"><b class="ped-rowtot">${c.q.reduce((a, b2) => a + (+b2 || 0), 0)}</b></td>
+          <td class="r">${m.colores.length > 1 ? `<button class="dg-x" onclick="pedDelColor(${mi},${ci})" title="Quitar color">✕</button>` : ''}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+      <button class="btn ghost sm" onclick="pedAddColor(${mi})" style="margin-top:7px">${IC.plus}Agregar color</button>
+    </div>`).join('')}
+    <button class="btn ghost" onclick="pedAddModelo()">${IC.plus}Agregar modelo</button>
+  </div>
+  <div class="nota-foot">
+    <div class="nota-tot" id="pedFootTot">${b.modelos.length} modelos</div>
+    <div style="display:flex;gap:8px"><button class="btn ghost" onclick="cerrarPed()">Cancelar</button><button class="btn primary" onclick="crearPedidoInterno()">${IC.check}Crear pedido y generar OPs</button></div>
+  </div>`;
+  pedPanel.oninput = pedRecalc; pedPanel.onchange = pedRecalc;
+  pedRecalc();
+}
+pedScrim.onclick = (e) => { if (e.target === pedScrim) cerrarPed(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && pedScrim.classList.contains('show')) cerrarPed(); });
 function vPedidos() {
   let totPed=0, totImp=0, totCorte=0, totOrd=0;
   PEDIDOS_MES.forEach(p => p.modelos.forEach(m => { totPed+=m.cant; totImp+=m.cant*m.precio; totCorte+=m.corte; totOrd++; }));
@@ -1848,7 +1949,7 @@ function vPedidos() {
   return `
   <div class="page-head">
     <div><h1>Pedidos</h1><div class="sub">Pedidos internos por mes · cada pedido agrupa varias órdenes de producción (van juntos en insumos y entrega)</div></div>
-    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" data-add="pedidos">${IC.plus}Nuevo pedido</button></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="abrirNuevoPedido()">${IC.plus}Nuevo pedido</button></div>
   </div>
 
   <div class="monthbar">
