@@ -2061,6 +2061,15 @@ const RUTAS = [
     { p:'Auditoría de calidad', r:'Carlos Vega',     f:'18 jul', e:'proximo', d:12 },
     { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'22 jul', e:'proximo', d:16 },
   ]},
+  { orden:'OP-8863', modelo:'Chamarra acolchada', cliente:'Coppel', entrega:'11 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'2 jul',  e:'done', d:-4 },
+    { p:'Corte',                r:'Laura Hernández', f:'7 jul',  e:'proximo', d:1 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'8 jul',  e:'proximo', d:2 },
+    { p:'Maquila (costura)',    r:'Laura Hernández', f:'9 jul',  e:'proximo', d:3 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'10 jul', e:'proximo', d:4 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'10 jul', e:'proximo', d:4 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'11 jul', e:'proximo', d:5 },
+  ]},
 ];
 /* Catálogo de procesos de la Ruta Crítica (ProcesoDef de F5): responsable por
    default + auto-completado por evento del sistema + TIEMPO por operación + variables
@@ -2154,6 +2163,13 @@ function procDelAntes(i, ai) {
 }
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
 let rcPersona = 'Laura Hernández';
+let rcAgrupar = 'urgencia';
+function gruposPorProceso(P) {
+  const m = {};
+  P.forEach(t => (m[t.p] = m[t.p] || []).push(t));
+  return Object.entries(m).map(([proc, items]) => ({ proc, items: items.sort((a, b) => a.d - b.d), venc: items.filter(i => i.e === 'vencido').length, hoy: items.filter(i => i.e === 'hoy').length }))
+    .sort((a, b) => (b.venc - a.venc) || (b.hoy - a.hoy) || b.items.length - a.items.length);
+}
 function misPendientes(persona) {
   const out = [];
   RUTAS.forEach(R => R.proc.forEach(x => { if (x.r === persona && x.e !== 'done') out.push({ orden: R.orden, modelo: R.modelo, cliente: R.cliente, entrega: R.entrega, ...x }); }));
@@ -2204,9 +2220,12 @@ function vRc() {
     ${kpi('Total a tu cargo', String(P.length), '', 'up', '', 'procesos activos')}
   </div>
   ${!P.length ? `<div class="card"><div class="pc-empty" style="padding:34px;text-align:center">Sin pendientes para <b>${rcPersona}</b> 🎉 — nada vencido ni para hoy.</div></div>` : ''}
-  ${sec('⚠ Vencidas', venc, 'var(--crit)', 'atrasadas contra su fecha compromiso')}
+  ${P.length ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="color:var(--muted);font-size:13px">Agrupar por:</span><button class="chip ${rcAgrupar === 'urgencia' ? 'active' : ''}" onclick="rcAgrupar='urgencia';ir('rc')">Urgencia</button><button class="chip ${rcAgrupar === 'proceso' ? 'active' : ''}" onclick="rcAgrupar='proceso';ir('rc')">Proceso</button><span style="color:var(--faint);font-size:12px;margin-left:4px">${rcAgrupar === 'proceso' ? 'enfócate en un proceso a la vez' : 'lo más urgente primero'}</span></div>` : ''}
+  ${!P.length ? '' : rcAgrupar === 'proceso'
+    ? gruposPorProceso(P).map(g => sec(g.proc, g.items, g.venc ? 'var(--crit)' : g.hoy ? 'var(--warn)' : 'var(--brand)', `${g.venc ? g.venc + ' vencido' + (g.venc > 1 ? 's' : '') + ' · ' : ''}${g.hoy ? g.hoy + ' para hoy · ' : ''}${g.items.length} pendiente${g.items.length > 1 ? 's' : ''}`)).join('')
+    : `${sec('⚠ Vencidas', venc, 'var(--crit)', 'atrasadas contra su fecha compromiso')}
   ${sec('Para hoy', hoy, 'var(--warn)', 'lo que te toca hoy')}
-  ${sec('Próximas · esta semana', proxSem, 'var(--brand)', proxDesp ? `+${proxDesp} programadas más adelante` : '')}`;
+  ${sec('Próximas · esta semana', proxSem, 'var(--brand)', proxDesp ? `+${proxDesp} programadas más adelante` : '')}`}`;
 }
 /* Panel deslizante: ruta completa de la orden (generada hacia atrás, CPM) */
 const rutaScrim = document.getElementById('rutaScrim');
@@ -2293,6 +2312,16 @@ function cuellos() {
   RUTAS.forEach(R => R.proc.forEach(p => { if (p.e === 'vencido' || p.e === 'hoy') { (m[p.p] = m[p.p] || { vencido: 0, hoy: 0 })[p.e]++; } }));
   return Object.entries(m).map(([proc, c]) => ({ proc, vencido: c.vencido, hoy: c.hoy, total: c.vencido + c.hoy })).sort((a, b) => b.total - a.total || b.vencido - a.vencido);
 }
+/* Entrega al cliente (on-time delivery), ciclo, y helpers de riesgo/predicción */
+const ENTREGAS = { entregadas: 34, aTiempo: 29, tendSemanas: [78, 82, 84, 85] };
+const CICLO = { prom: 27, tend: -2 };
+const spark = (arr) => `<span style="display:inline-flex;align-items:flex-end;gap:3px;height:26px">${arr.map(v => `<span style="width:9px;background:var(--brand);border-radius:2px;height:${Math.max(4, Math.round(v / 100 * 26))}px" title="${v}%"></span>`).join('')}</span>`;
+const colchonOrden = (R) => { const e = R.proc[R.proc.length - 1]; const pend = R.proc.filter(p => p.e !== 'done').length; return (e ? e.d : 0) - pend; };
+function riesgoPorCliente() {
+  const m = {};
+  RUTAS.forEach(R => { const s = estadoOrden(R).est; if (s === 'entregada') return; const c = m[R.cliente] = m[R.cliente] || { activas: 0, riesgo: 0, atrasada: 0 }; c.activas++; if (s === 'riesgo') c.riesgo++; if (s === 'atrasada') c.atrasada++; });
+  return Object.entries(m).map(([cliente, c]) => ({ cliente, ...c, criticas: c.riesgo + c.atrasada })).sort((a, b) => b.criticas - a.criticas || b.atrasada - a.atrasada || b.activas - a.activas);
+}
 function vAnalisisRC() {
   const ords = RUTAS.map(R => ({ R, ...estadoOrden(R) }));
   const activos = ords.filter(o => o.est !== 'entregada');
@@ -2302,6 +2331,9 @@ function vAnalisisRC() {
   const perfs = RC_PERSONAS.map(perfUsuario).sort((a, b) => b.score - a.score);
   const conBono = perfs.filter(p => p.bono).length;
   const cue = cuellos();
+  const entrOK = ENTREGAS.entregadas ? Math.round(ENTREGAS.aTiempo / ENTREGAS.entregadas * 100) : 0;
+  const alertas = activos.filter(o => o.est === 'atiempo' && colchonOrden(o.R) < 3).map(o => ({ ...o, colchon: colchonOrden(o.R) })).sort((a, b) => a.colchon - b.colchon);
+  const clientes = riesgoPorCliente();
   const estBadge = { atrasada: ['crit', 'Atrasada'], riesgo: ['warn', 'En riesgo'], atiempo: ['ok', 'A tiempo'], entregada: ['neutral', 'Entregada'] };
   return `
   <div class="page-head">
@@ -2314,6 +2346,22 @@ function vAnalisisRC() {
     ${kpi('En riesgo', String(nRiesgo), '', 'down', 'hoy', 'se juegan la fecha')}
     ${kpi('Atrasadas', String(nAtras), '', 'down', '⚠', 'acción urgente')}
     ${kpi('Cumplimiento', String(cumpl), '%', cumpl >= 80 ? 'up' : 'down', '', 'órdenes a tiempo')}
+  </div>
+  <div class="card" style="margin-bottom:14px">
+    <div class="toolbar"><b>Entrega al cliente y tiempo de ciclo</b><span style="margin-left:auto;color:var(--muted);font-size:12px">el resultado que de verdad importa</span></div>
+    <div style="display:flex;flex-wrap:wrap;gap:34px;padding:15px 16px">
+      <div>
+        <div style="font-size:12px;color:var(--muted)">Entregas a tiempo (on-time delivery)</div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:30px;font-weight:700" class="mono">${entrOK}%</span><span style="color:var(--ok);font-size:13px">▲ +${ENTREGAS.tendSemanas[3] - ENTREGAS.tendSemanas[0]} pts (3 sem)</span></div>
+        <div style="font-size:12px;color:var(--faint);margin-bottom:6px">${ENTREGAS.aTiempo} de ${ENTREGAS.entregadas} órdenes entregadas este mes</div>
+        ${spark(ENTREGAS.tendSemanas)}
+      </div>
+      <div style="border-left:1px solid var(--border);padding-left:34px">
+        <div style="font-size:12px;color:var(--muted)">Tiempo de ciclo promedio (OP → entrega)</div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:30px;font-weight:700" class="mono">${CICLO.prom}</span><span style="color:var(--muted)">días</span><span style="color:${CICLO.tend < 0 ? 'var(--ok)' : 'var(--crit)'};font-size:13px">${CICLO.tend < 0 ? '▼' : '▲'} ${Math.abs(CICLO.tend)} d vs mes pasado</span></div>
+        <div style="font-size:12px;color:var(--faint)">menos días = entregamos más rápido</div>
+      </div>
+    </div>
   </div>
   <div class="card" style="margin-bottom:14px;overflow:hidden">
     <div class="toolbar" style="box-shadow:inset 3px 0 0 var(--crit)"><b style="color:var(--crit)">⚠ Órdenes que requieren atención</b><span class="count">${atender.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">ordenadas por urgencia · clic para ver la ruta</span></div>
@@ -2330,12 +2378,40 @@ function vAnalisisRC() {
     </tbody></table></div>
   </div>
   <div class="card" style="margin-bottom:14px;overflow:hidden">
+    <div class="toolbar" style="box-shadow:inset 3px 0 0 var(--warn)"><b style="color:var(--warn)">🔮 Alertas predictivas — van a atrasarse</b><span class="count">${alertas.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">hoy se ven bien, pero el colchón no alcanza</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Orden</th><th>Modelo</th><th>Cliente</th><th class="r">Procesos restantes</th><th class="r">Colchón proyectado</th><th>Entrega</th>
+    </tr></thead><tbody>
+      ${alertas.map(o => { const pend = o.R.proc.filter(p => p.e !== 'done').length; return `<tr style="cursor:pointer" onclick="abrirRuta('${o.R.orden}')">
+        <td class="cell-code">${o.R.orden}</td><td class="cell-strong">${o.R.modelo}</td><td>${o.R.cliente}</td>
+        <td class="r num">${pend}</td>
+        <td class="r num" style="color:${o.colchon < 0 ? 'var(--crit)' : 'var(--warn)'}">${o.colchon < 0 ? o.colchon + ' d' : '+' + o.colchon + ' d'}</td>
+        <td>${o.R.entrega}</td>
+      </tr>`; }).join('') || '<tr><td colspan="6" class="pc-empty" style="padding:16px">Ninguna orden en riesgo de atrasarse por proyección 🎉</td></tr>'}
+    </tbody></table></div>
+    <div class="pc-hint-cell" style="margin-top:10px;max-width:920px">El <b>colchón proyectado</b> = días hasta la entrega − trabajo que falta. Negativo = <b>no alcanza el tiempo</b> aunque hoy no esté atrasada. En el real lo calcula el <b>CPM (forward pass)</b> con los tiempos reales de los procesos pendientes.</div>
+  </div>
+  <div class="card" style="margin-bottom:14px;overflow:hidden">
+    <div class="toolbar"><b>Riesgo por cliente</b><span class="count">${clientes.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">a quién avisar / priorizar</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Cliente</th><th class="r">Órdenes activas</th><th class="r">En riesgo</th><th class="r">Atrasadas</th><th>Semáforo</th>
+    </tr></thead><tbody>
+      ${clientes.map(c => `<tr>
+        <td class="cell-strong">${c.cliente}</td>
+        <td class="r num">${c.activas}</td>
+        <td class="r num" style="color:${c.riesgo ? 'var(--warn)' : 'var(--muted)'}">${c.riesgo}</td>
+        <td class="r num" style="color:${c.atrasada ? 'var(--crit)' : 'var(--muted)'}">${c.atrasada}</td>
+        <td><span class="badge ${c.atrasada ? 'crit' : c.riesgo ? 'warn' : 'ok'}"><span class="d"></span>${c.atrasada ? 'Con atrasos' : c.riesgo ? 'En riesgo' : 'OK'}</span></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+  </div>
+  <div class="card" style="margin-bottom:14px;overflow:hidden">
     <div class="toolbar"><b>Desempeño del equipo (RC)</b><span class="count">${perfs.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">${conBono} con bono esta semana</span><button class="btn primary sm" style="margin-left:10px" onclick="mostrarToast('Evaluación semanal generada — demo')">${IC.check}Generar evaluación semanal</button></div>
     <div class="table-wrap"><table class="data"><thead><tr>
       <th>Persona</th><th>Área</th><th class="r">A cargo</th><th class="r">Vencidos</th><th class="r">% en tiempo</th><th class="r">Reacción</th><th>Tendencia</th><th class="r">Calificación</th><th>Bono</th>
     </tr></thead><tbody>
       ${perfs.map(p => { const [bc, bl] = califBadge(p.score); return `<tr>
-        <td class="cell-strong">${p.u}</td><td>${p.area}</td>
+        <td class="cell-strong">${p.u}${p.activos >= 15 ? ' <span class="badge warn" style="font-size:10px" title="Trae mucha carga; su calificación se lee con contexto"><span class="d"></span>sobrecarga</span>' : ''}</td><td>${p.area}</td>
         <td class="r num">${p.activos}</td>
         <td class="r num" style="color:${p.vencidos ? 'var(--crit)' : 'var(--muted)'}">${p.vencidos}</td>
         <td class="r num">${p.onTime}%</td>
@@ -2345,7 +2421,7 @@ function vAnalisisRC() {
         <td>${p.bono ? '<span class="badge ok"><span class="d"></span>Bono ✓</span>' : '<span style="color:var(--faint);font-size:12px">—</span>'}</td>
       </tr>`; }).join('')}
     </tbody></table></div>
-    <div class="pc-hint-cell" style="margin-top:10px;max-width:940px">La <b>calificación</b> = % de procesos entregados en tiempo, penalizado por los vencidos que trae hoy. <b>Bono semanal</b> = calificación ≥ 90 y <b>0 vencidos</b>. La <b>reacción</b> = tiempo promedio en atender un proceso desde que cae en su cancha. Umbrales del bono configurables.</div>
+    <div class="pc-hint-cell" style="margin-top:10px;max-width:940px">La <b>calificación</b> = % de procesos entregados en tiempo, penalizado por los vencidos que trae hoy. <b>Bono semanal</b> = calificación ≥ 90 y <b>0 vencidos</b>. La <b>reacción</b> = tiempo promedio en atender un proceso desde que cae en su cancha. <b>Carga vs desempeño:</b> a quien trae mucha carga se le marca <b>sobrecarga</b> — un score bajo con carga alta puede ser sobrecarga y no descuido (para que el bono sea justo). Umbrales configurables.</div>
   </div>
   <div class="card" style="overflow:hidden">
     <div class="toolbar"><b>Cuellos de botella por proceso</b><span class="count">${cue.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">dónde se atoran más las órdenes (sistémico, no de personas)</span></div>
