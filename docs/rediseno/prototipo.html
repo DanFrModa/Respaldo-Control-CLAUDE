@@ -2044,7 +2044,6 @@ const RUTAS = [
 const DIF_LBL = ['Sencillo 1/6', 'Sencillo+ 2/6', 'Medio 3/6', 'Medio+ 4/6', 'Difícil 5/6', 'Difícil+ 6/6'];
 const PROCESOS_CAT = [
   { n:1,  p:'Revisión de orden de producción', area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Liberar la OP (Producción)',              t:[1,1,1,1,1,1] },
-  { n:2,  p:'Ficha de desarrollo',             area:'Desarrollo', resp:'Gabriel Masri',   auto:false, evento:'Se captura a mano (Desarrollo)',          t:[3,3,3,3,3,3] },
   { n:3,  p:'Programación',                    area:'Producción', resp:'Laura Hernández', auto:false, evento:'Se programa a mano',                      t:[1,1,1,1,1,1] },
   { n:4,  p:'Autorización de fit',             area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar autorización de fit',           t:[15,15,15,15,15,15] },
   { n:5,  p:'Autorización de arte',            area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar arte autorizado',               t:[2,2,2,2,2,2], condicional:'Solo si la prenda lleva estampado o bordado' },
@@ -2052,7 +2051,7 @@ const PROCESOS_CAT = [
   { n:7,  p:'Autorización tono de tela',       area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar tono autorizado',               t:[15,15,15,15,15,15] },
   { n:8,  p:'Autorización de avíos',           area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar avíos autorizados',             t:[12,12,12,12,12,12] },
   { n:9,  p:'Surtido de avíos',                area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Nota de salida de avíos',                 t:[12,12,12,12,12,12] },
-  { n:10, p:'Recepción de tela',               area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras)',         t:[20,20,20,20,20,20], depende:'Tipo de tela', dependeEj:'Punto 12 d · Plano 20 d · Importada 30 d' },
+  { n:10, p:'Recepción de tela',               area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras)',         t:[20,20,20,20,20,20], depende:'Velocidad de recepción', dependeEj:'Local 5 d · Nacional 12 d · Importada 30 d', dependeNota:'Depende de qué tan rápido llega la tela (no del material). Catálogo pendiente de Daniel.' },
   { n:11, p:'Auditoría de corte',              area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría de corte',            t:[3,3,3,3,3,3] },
   { n:12, p:'Corte',                           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar corte (Avance de producción)',  t:[3,3,3,3,3,3] },
   { n:13, p:'Envío a procesos (estampado/bordado)', area:'Producción', resp:'Laura Hernández', auto:true, evento:'Envío a estampado (Avance)',        t:[1,1,1,1,1,1], condicional:'Solo si la prenda lleva estampado o bordado' },
@@ -2192,7 +2191,7 @@ function vProcesosRC() {
     </tr></thead><tbody>
       ${PROCESOS_CAT.map((x, i) => { const exp = procExpand.has(i); return `<tr>
         <td><button class="lp-exp ${exp ? 'open' : ''}" onclick="toggleProcExp(${i})" title="Ver detalle">${IC.chevron}</button></td>
-        <td class="r num">${x.n}</td>
+        <td class="r num">${i + 1}</td>
         <td class="cell-strong">${x.p}${x.condicional ? ` <span class="badge neutral" style="font-size:10px" title="${x.condicional}"><span class="d"></span>condicional</span>` : ''}</td>
         <td><span class="badge ${areaCls[x.area] || 'neutral'}"><span class="d"></span>${x.area}</span></td>
         <td>${x.resp}</td>
@@ -2200,11 +2199,11 @@ function vProcesosRC() {
         <td>${x.auto
           ? `<span class="badge ok"><span class="d"></span>⟳ Auto</span> <span style="color:var(--muted);font-size:12px">al: ${x.evento}</span>`
           : `<span class="badge warn"><span class="d"></span>✋ Manual</span> <span style="color:var(--muted);font-size:12px">${x.evento}</span>`}</td>
-      </tr>${exp ? `<tr class="lp-detrow"><td colspan="7"><div style="padding:6px 2px 10px;display:flex;flex-wrap:wrap;gap:26px">
-        <div>
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">${x.depende ? 'Tiempo según catálogo de <b>' + x.depende + '</b>' : 'Tiempo por dificultad de la prenda (días)'}</div>
+      </tr>${exp ? `<tr class="lp-detrow"><td colspan="7"><div style="padding:6px 2px 10px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
+        <div style="flex:0 0 480px;max-width:480px">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">${x.depende ? 'Tiempo según la <b>' + x.depende + '</b>' : 'Tiempo por dificultad de la prenda (días)'}</div>
           ${x.depende
-            ? `<div class="dg" style="max-width:440px"><div class="dg-row"><span>Depende del <b>tipo de tela</b></span><b class="mono">${x.dependeEj}</b></div></div>`
+            ? `<div class="dg" style="max-width:460px"><div class="dg-row"><span>Depende de la <b>${x.depende}</b></span><b class="mono">${x.dependeEj}</b></div></div>${x.dependeNota ? `<div style="font-size:11.5px;color:var(--faint);margin-top:5px;max-width:460px">${x.dependeNota}</div>` : ''}`
             : `<div style="display:flex;gap:6px;flex-wrap:wrap">${x.t.map((d, di) => `<div style="text-align:center;border:1px solid var(--border);border-radius:8px;padding:5px 10px;background:${tRange(x.t).vary ? 'var(--brand-soft)' : 'var(--panel-2)'}"><div style="font-size:10px;color:var(--faint)">${DIF_LBL[di]}</div><div class="mono" style="font-weight:700;font-size:14px">${d} d</div></div>`).join('')}</div>`}
         </div>
         <div style="min-width:240px">
