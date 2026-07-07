@@ -68,6 +68,7 @@ import { RecepcionComprasPagina } from '@/modulos/ordenes-compra/RecepcionCompra
 import { ConsultaNotasPagina } from '@/modulos/notas-salida/ConsultaNotasPagina';
 import { NotasPorOrdenPagina } from '@/modulos/notas-salida/NotasPorOrdenPagina';
 import { NotasSalidaPagina } from '@/modulos/notas-salida/NotasSalidaPagina';
+import { CentroOrdenesPagina } from '@/modulos/ordenes/CentroOrdenesPagina';
 import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
@@ -167,7 +168,10 @@ const router = createBrowserRouter([
           // Listas de precios (Módulo 15, F8-E4): lista + detalle con la vista de aprobación del dueño.
           { path: 'listas-precios', element: <ListasPreciosPagina /> },
           { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
-          { path: 'produccion/ordenes', element: <OrdenesPagina /> },
+          // Rediseño R2: el CENTRO DE COMANDO es la pantalla principal de órdenes; la captura/
+          // edición completa (F2-E3) se conserva en /captura (se llega con el mosaico "Modificar").
+          { path: 'produccion/ordenes', element: <CentroOrdenesPagina /> },
+          { path: 'produccion/ordenes/captura', element: <OrdenesPagina /> },
           { path: 'produccion/corte', element: <CapturaCortePagina /> },
           { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
           { path: 'produccion/recibos', element: <ReciboMaquilaPagina /> },

@@ -104,7 +104,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
-import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
+import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
   clienteLectura,
@@ -437,8 +437,14 @@ async function reemplazarTallas(
 
 // ── Proyección a la salida (total derivado por suma) ────────────────────────────────
 
-/** Proyecta una orden (con detalle) a la forma JSON del contrato. El total se DERIVA por suma. */
-function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
+/**
+ * Proyecta una orden (con detalle) a la forma JSON del contrato. El total se DERIVA por suma.
+ * `ocultarPrecios` (rediseño R2, §4.4.3): desde que los precios de la orden se capturan en vivo
+ * (`precios-orden.ts`), `maquilaOrd`/`aplicacionOrd` son el PRECIO REAL negociado — sin el permiso
+ * `ordenes.ver-precio-real-maquila` van null también aquí (paridad con el acceso 36 del viejo;
+ * antes eran dato inerte del ETL y se exponían con solo `ordenes.ver`).
+ */
+function aOrdenSalida(orden: OrdenConDetalle, ocultarPrecios = false): OrdenSalida {
   let totalPiezas = 0;
   const lineas = orden.lineas.map((l) => {
     let totalLinea = 0;
@@ -483,8 +489,9 @@ function aOrdenSalida(orden: OrdenConDetalle): OrdenSalida {
     fechaCompletada: orden.fechaCompletada === null ? null : orden.fechaCompletada.toISOString(),
     motivoCancelada: orden.motivoCancelada,
     tallasV1: orden.tallasV1,
-    maquilaOrd: orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
-    aplicacionOrd: orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
+    maquilaOrd: ocultarPrecios || orden.maquilaOrd === null ? null : orden.maquilaOrd.toNumber(),
+    aplicacionOrd:
+      ocultarPrecios || orden.aplicacionOrd === null ? null : orden.aplicacionOrd.toNumber(),
     pagada: orden.pagada,
     enRiesgo: orden.enRiesgo,
     siRC: orden.siRC,
@@ -961,7 +968,7 @@ export async function obtenerOrden(
   if (orden === null) {
     throw new ErrorNoEncontrado('Orden', id);
   }
-  return aOrdenSalida(orden);
+  return aOrdenSalida(orden, !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila'));
 }
 
 /**
@@ -1003,7 +1010,8 @@ export async function listarOrdenes(
     }),
   ]);
 
-  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle));
+  const ocultarPrecios = !tienePermiso(sesion, 'ordenes.ver-precio-real-maquila');
+  const salida = datos.map((o) => aOrdenSalida(o as OrdenConDetalle, ocultarPrecios));
   return armarPagina(salida, total, filtros);
 }
 

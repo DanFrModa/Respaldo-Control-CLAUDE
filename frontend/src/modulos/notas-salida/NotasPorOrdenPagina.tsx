@@ -1,5 +1,6 @@
 import { Factory, Printer, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 import { imprimirNota, useNotasSalida } from '@/api/notas-salida';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
@@ -13,6 +14,15 @@ import { EstatusNotaBadge, descripcionMaterialNota, fechaCortaNota } from './pie
 /** Notas por página de la orden elegida. */
 const POR_PAGINA = 10;
 
+/** Lee `state.idOrden` del deep-link (mosaico "Notas salida" del centro de comando, R2). */
+function leerIdOrdenDeepLink(state: unknown): number | null {
+  if (typeof state !== 'object' || state === null || !('idOrden' in state)) {
+    return null;
+  }
+  const id = state.idOrden;
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
+
 /**
  * NOTAS POR ORDEN DE PRODUCCIÓN (F4-E5): se elige una orden de producción y se listan las notas de
  * salida que envían material a ella (vía sus renglones, filtro `idOrden`). Reemplaza
@@ -21,10 +31,22 @@ const POR_PAGINA = 10;
  * front solo presenta (A1). Se lee bien en móvil (regla 10).
  */
 export function NotasPorOrdenPagina(): React.JSX.Element {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [idOrden, setIdOrden] = useState<number | null>(null);
+  // Deep-link del centro de comando (R2): llega con la orden ya elegida.
+  const [idOrden, setIdOrden] = useState<number | null>(leerIdOrdenDeepLink(location.state));
   const [pagina, setPagina] = useState(1);
+
+  const idDeepLink = leerIdOrdenDeepLink(location.state);
+  useEffect(() => {
+    if (idDeepLink !== null) {
+      setIdOrden(idDeepLink);
+      // Consume el state para que un refresh/volver no lo re-aplique (patrón ModelosPagina).
+      void navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [idDeepLink, location.pathname, navigate]);
 
   // Órdenes de producción no canceladas para elegir.
   const ordenes = useConsultaOrdenes({

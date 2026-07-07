@@ -618,6 +618,8 @@ model Proveedor {
   auditorias              Auditoria[]
   /// Precios de telas que surte este proveedor (F8-E1, D13/R17 — espejo de AvioProveedor). Restrict.
   telaProveedores         TelaProveedor[]
+  /// Eventos de precio de orden donde es el proveedor con quien se NEGOCIÓ (rediseño R2). Restrict.
+  ordenPrecioEventos      OrdenPrecioEvento[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2037,6 +2039,8 @@ model Orden {
   desarrolloOrden      DesarrolloOrden?
   /// Adjuntos de apoyo (Excel/PDF/imágenes) de esta orden en R2 (F8-E6, R6). Cascade: son de la orden.
   archivos             OrdenArchivo[]
+  /// Historial INMUTABLE de cambios de precio maquila/aplicación (rediseño R2, §4.4.3). Cascade.
+  precioEventos        OrdenPrecioEvento[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -2072,6 +2076,47 @@ model OrdenArchivo {
   @@unique([idArchivo])
   @@index([idOrden])
   @@map("orden_archivo")
+}
+
+/// Qué precio de la orden cambió un evento: maquila (costura) o aplicación (estampado/bordado).
+enum CampoPrecioOrden {
+  maquila
+  aplicacion
+
+  @@map("campo_precio_orden")
+}
+
+/// Evento de cambio de PRECIO de la orden (rediseño R2, requisito de Daniel §4.4.3) — historial
+/// INMUTABLE estilo `NegociacionEvento` (D3/A7: solo se INSERTA, jamás update/delete). Registra
+/// quién capturó el precio real de maquila/aplicación, cuándo, con qué proveedor se negoció y el
+/// valor anterior→nuevo. La edición vive en `dominio/produccion/precios-orden.ts` (permiso
+/// `ordenes.precio-maquila`); la lectura de montos reales exige `ordenes.ver-precio-real-maquila`.
+/// Cascade hacia `Orden` (el historial es de la orden); Restrict hacia `Proveedor`.
+model OrdenPrecioEvento {
+  id      Int   @id @default(autoincrement())
+  idOrden Int   @map("id_orden")
+  orden   Orden @relation(fields: [idOrden], references: [id], onDelete: Cascade)
+
+  /// Cuál precio cambió (`maquilaOrd` o `aplicacionOrd`).
+  campo          CampoPrecioOrden
+  /// Valor que tenía el precio ANTES del cambio (null si no había precio real capturado).
+  precioAnterior Decimal?         @map("precio_anterior") @db.Decimal(12, 2)
+  /// Precio real negociado que quedó vigente con este evento.
+  precioNuevo    Decimal          @map("precio_nuevo") @db.Decimal(12, 2)
+
+  /// Proveedor con quien se NEGOCIÓ el precio (maquilero/estampador), opcional. Restrict.
+  idProveedor Int?       @map("id_proveedor")
+  proveedor   Proveedor? @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+  /// Nota libre de la negociación (opcional). Inmutable.
+  nota        String?    @db.Text
+
+  /// Quién capturó (id de `Usuario`, sin FK física — patrón de auditoría del proyecto).
+  capturadoPorId String?  @map("capturado_por_id")
+  capturadoEn    DateTime @default(now()) @map("capturado_en")
+
+  @@index([idOrden])
+  @@index([idProveedor])
+  @@map("orden_precio_evento")
 }
 
 /// Renglón de la matriz de una orden = un COLOR (F2-E2 — ex `OrdenesDet`, doc 03-Produccion).

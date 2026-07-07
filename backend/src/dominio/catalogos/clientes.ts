@@ -43,6 +43,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { idsPorNombreSinAcentos } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -373,15 +374,20 @@ export async function listarClientes(
 ): Promise<Pagina<ClienteConCampos>> {
   verificarPermiso(sesion, 'clientes.ver');
   const filtros = validarEntrada(esquemaListarClientes, parametros);
+  const cliente = clienteLectura(bd);
+
+  // Búsqueda por nombre SIN acentos ni mayúsculas (R2 §4.4.1: "oscar" encuentra a "Óscar"):
+  // pre-filtro de ids vía unaccent (comun/busqueda.ts), compuesto con el resto del where.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorNombreSinAcentos(cliente, 'cliente', filtros.busqueda);
 
   const where: Prisma.ClienteWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.cliente.count({ where }),
     cliente.cliente.findMany({

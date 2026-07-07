@@ -276,7 +276,8 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'ordenes',
             titulo: 'Órdenes (OP)',
-            descripcion: 'Captura de órdenes de producción con matriz color × talla',
+            descripcion:
+              'Centro de comando de órdenes: filtros ágiles, avance de producción y precios (R2)',
             ruta: '/produccion/ordenes',
             icono: 'fabrica',
             permisos: ['ordenes.ver'],

@@ -170,7 +170,12 @@ export const esquemaEtapaSalida = z
     tercero: z.string().nullable().describe('Nombre del cortador/maquilero.'),
     fecha: z.string().describe('Fecha de la etapa (YYYY-MM-DD).'),
     fechaCompromiso: z.string().nullable().describe('Fecha compromiso (YYYY-MM-DD) o null.'),
-    precioPactado: z.number().nullable().describe('Precio pactado o null.'),
+    precioPactado: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa).',
+      ),
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('Si la etapa está cancelada (suave).'),
     canceladoEn: z.iso.datetime().nullable().describe('Cuándo se canceló (ISO) o null.'),
@@ -180,6 +185,10 @@ export const esquemaEtapaSalida = z
     totalPiezas: z.number().int().describe('Total de piezas de la etapa (derivado).'),
     creadoEn: z.iso.datetime().describe('Fecha de captura (ISO).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que la capturó.'),
+    creadoPorNombre: z
+      .string()
+      .nullable()
+      .describe('Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha").'),
   })
   .describe('Etapa de producción (corte/envío) con su matriz color×talla.');
 
@@ -203,6 +212,23 @@ export const esquemaEtapasOrdenLista = z
 
 /** Forma del historial de etapas de una orden tal como lo devuelve la API. */
 export type EtapasOrdenLista = z.infer<typeof esquemaEtapasOrdenLista>;
+
+/**
+ * Filtros del historial de etapas (rediseño R2 — Avance de producción): `incluirRecibos` suma los
+ * RECIBOS de maquila (F3-E4) a la lista, para que el stepper de 5 etapas pinte también los
+ * movimientos de recibo. Default `false` (comportamiento F3-E2 intacto para las pantallas viejas).
+ */
+export const esquemaEtapasOrdenQuery = z
+  .object({
+    incluirRecibos: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye los recibos de maquila en el historial (Avance de producción, R2).'),
+  })
+  .describe('Filtros del historial de etapas de una orden.');
+
+/** Parámetros del historial ya coaccionados. */
+export type EtapasOrdenQuery = z.infer<typeof esquemaEtapasOrdenQuery>;
 
 // ── Pendientes por orden (derivados, sin acumuladores) ──────────────────────────────────────────
 

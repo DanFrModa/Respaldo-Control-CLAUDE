@@ -1,5 +1,8 @@
+import { Factory } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { useBuscarOrdenes } from '@/api/ordenes-consulta';
 import {
   CommandDialog,
   CommandEmpty,
@@ -8,18 +11,20 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
+import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
 import { esModuloVisible, filtrarGruposVisibles, ICONOS_MODULO } from './catalogo';
 
 /**
- * PALETA DE COMANDOS global (Ctrl/⌘+K, rediseño R1): encuentra y abre CUALQUIER
- * pantalla del menu — hojas de primer nivel y sub-vistas colgadas de un padre —
- * respetando los permisos de la sesion (A4). En R1 busca modulos/paginas; las
- * ordenes se buscan con el buscador de ordenes del encabezado (F2-E4).
+ * PALETA DE COMANDOS global (Ctrl/⌘+K, rediseño R1→R2): encuentra y abre CUALQUIER pantalla del
+ * menú (hojas y sub-vistas, respetando permisos A4) y además busca DATOS: las ÓRDENES por folio,
+ * modelo, cliente o referencia del cliente (D7) — la paleta ABSORBIÓ el buscador global de la
+ * topbar (F2-E4): un solo lugar para "ir a" (desviación (e) de R1, resuelta en R2). Solo quien
+ * tiene `ordenes.ver` ve el grupo de órdenes; el backend re-decide (A1).
  *
- * Controlada por el cascaron (estado `abierta`); al elegir, navega y cierra.
+ * Controlada por el cascarón (estado `abierta`); al elegir, navega y cierra.
  */
 export function PaletaComandos({
   abierta,
@@ -29,24 +34,75 @@ export function PaletaComandos({
   alCambiarAbierta: (abierta: boolean) => void;
 }): React.JSX.Element {
   const navigate = useNavigate();
-  const { permisos } = useSesion();
+  const { permisos, tienePermiso } = useSesion();
   const grupos = filtrarGruposVisibles(permisos);
+
+  // Búsqueda de DATOS (órdenes): mismo backend del viejo buscador global (tope 20 hits).
+  const [texto, setTexto] = useState('');
+  const consultaTexto = useDebounce(texto.trim(), 250);
+  const puedeVerOrdenes = tienePermiso('ordenes.ver');
+  const ordenes = useBuscarOrdenes(puedeVerOrdenes && abierta ? consultaTexto : '');
+  const hits = ordenes.data?.datos ?? [];
 
   function abrir(ruta: string): void {
     alCambiarAbierta(false);
+    setTexto('');
     void navigate(ruta);
+  }
+
+  function abrirOrden(id: number): void {
+    alCambiarAbierta(false);
+    setTexto('');
+    void navigate('/produccion/ordenes', { state: { idOrden: id } });
   }
 
   return (
     <CommandDialog
       open={abierta}
-      onOpenChange={alCambiarAbierta}
-      title="Buscar pantalla"
-      description="Escribe el nombre de una pantalla o módulo para abrirla"
+      onOpenChange={(abiertaNueva) => {
+        alCambiarAbierta(abiertaNueva);
+        if (!abiertaNueva) {
+          setTexto('');
+        }
+      }}
+      title="Buscar"
+      description="Escribe una pantalla, un módulo o una orden (folio, modelo, cliente o referencia)"
     >
-      <CommandInput placeholder="Buscar pantalla o módulo…" data-testid="paleta-input" />
+      <CommandInput
+        placeholder="Buscar pantalla, módulo u orden…"
+        value={texto}
+        onValueChange={setTexto}
+        data-testid="paleta-input"
+      />
       <CommandList data-testid="paleta-resultados">
         <CommandEmpty>Sin coincidencias.</CommandEmpty>
+
+        {/* ── Órdenes (datos, D7): la paleta absorbió el buscador global ── */}
+        {puedeVerOrdenes && hits.length > 0 ? (
+          <CommandGroup heading="Órdenes">
+            {hits.map((hit) => (
+              <CommandItem
+                key={`orden-${hit.id}`}
+                value={`orden-${hit.id}`}
+                // El texto actual va en las keywords: el hit YA pasó el filtro del servidor y
+                // cmdk no debe descartarlo por no parecerse al valor.
+                keywords={[consultaTexto, String(hit.folio), hit.codigoModelo, hit.cliente]}
+                onSelect={() => abrirOrden(hit.id)}
+                data-testid="paleta-orden"
+              >
+                <Factory aria-hidden />
+                <span className="truncate">
+                  <span className="font-medium">Orden {hit.folio}</span>
+                  <span className="text-muted-foreground"> · {hit.codigoModelo}</span>
+                </span>
+                <span className="ml-auto shrink-0 truncate text-xs text-muted-foreground">
+                  {hit.cliente}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        ) : null}
+
         {grupos.map((grupo) => (
           <CommandGroup key={grupo.clave} heading={grupo.titulo ?? 'General'}>
             {grupo.entradas.flatMap((entrada) => {

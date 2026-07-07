@@ -450,6 +450,32 @@ export {
   type OrdenesBuscarQuery,
 } from './esquemas/orden-consulta.js';
 
+// ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3; brecha B1) ──
+export {
+  esquemaCampoPrecioOrden,
+  esquemaOrdenPreciosPatchCuerpo,
+  esquemaOrdenPrecioUltimoEvento,
+  esquemaOrdenPreciosSalida,
+  esquemaOrdenPrecioEventoSalida,
+  esquemaOrdenPrecioEventosLista,
+  type CampoPrecioOrdenApi,
+  type DatosOrdenPreciosPatch,
+  type OrdenPrecioUltimoEvento,
+  type OrdenPreciosSalida,
+  type OrdenPrecioEventoSalida,
+  type OrdenPrecioEventosLista,
+} from './esquemas/orden-precios.js';
+
+// ── Centro de comando de Órdenes (rediseño R2, §4.2; brecha B2) ───────────────
+export {
+  esquemaOrdenCentroFila,
+  esquemaOrdenesCentroPagina,
+  esquemaOrdenesCentroQuery,
+  type OrdenCentroFila,
+  type OrdenesCentroPagina,
+  type OrdenesCentroQuery,
+} from './esquemas/orden-centro.js';
+
 // ── Órdenes de COMPRA (Módulo 3, F4-E2; doc 03-Produccion §OC) ────────────────
 export {
   esquemaCompraLineaTallaEntrada,
@@ -856,6 +882,7 @@ export {
   esquemaEtapaCancelarCuerpo,
   esquemaEtapaSalida,
   esquemaEtapasOrdenLista,
+  esquemaEtapasOrdenQuery,
   esquemaPendientesOrden,
   esquemaCorteSemanalQuery,
   esquemaCorteSemanalLista,
@@ -865,6 +892,7 @@ export {
   type DatosEtapaLineaEntrada,
   type EtapaSalida,
   type EtapasOrdenLista,
+  type EtapasOrdenQuery,
   type PendientesOrden,
   type CorteSemanalQuery,
   type CorteSemanalLista,

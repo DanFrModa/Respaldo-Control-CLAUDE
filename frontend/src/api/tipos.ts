@@ -330,6 +330,34 @@ export type OrdenesBuscar =
 /** Un hit ligero del buscador global. */
 export type OrdenHit = OrdenesBuscar['datos'][number];
 
+// ── Centro de comando de Órdenes (rediseño R2, §4.2) ──────────────────────────
+
+/** Página del centro de comando (`GET /api/ordenes/centro`): las 13 columnas del proto. */
+export type OrdenesCentroPagina =
+  paths['/api/ordenes/centro']['get']['responses']['200']['content']['application/json'];
+/** Una fila del centro de comando (agregada en servidor). */
+export type OrdenCentro = OrdenesCentroPagina['datos'][number];
+/** Parámetros del centro de comando (querystring). */
+export type OrdenesCentroQuery = NonNullable<
+  paths['/api/ordenes/centro']['get']['parameters']['query']
+>;
+
+// ── Precios de la orden con rastro inmutable (rediseño R2, §4.4.3) ─────────────
+
+/** Resumen de precios de la orden (`GET /api/ordenes/{id}/precios`). */
+export type OrdenPrecios =
+  paths['/api/ordenes/{id}/precios']['get']['responses']['200']['content']['application/json'];
+/** Cuerpo de captura del precio real (`PATCH /api/ordenes/{id}/precios`). */
+export type OrdenPreciosPatch =
+  paths['/api/ordenes/{id}/precios']['patch']['requestBody']['content']['application/json'];
+/** Cuál precio de la orden se captura (maquila | aplicacion). */
+export type CampoPrecioOrden = OrdenPreciosPatch['campo'];
+/** Historial de eventos de precio (`GET /api/ordenes/{id}/precios/eventos`). */
+export type OrdenPrecioEventos =
+  paths['/api/ordenes/{id}/precios/eventos']['get']['responses']['200']['content']['application/json'];
+/** Un evento inmutable del historial de precios. */
+export type OrdenPrecioEvento = OrdenPrecioEventos['eventos'][number];
+
 // ── Órdenes de compra (Módulo 4 · Compras, F4-E2) ─────────────────────────────
 
 /** Página de órdenes de compra (`GET /api/ordenes-compra`). */

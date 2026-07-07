@@ -45,6 +45,7 @@ import {
   rangoPrisma,
   type Pagina,
 } from '../../comun/paginacion.js';
+import { idsPorNombreSinAcentos } from '../../comun/busqueda.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
 import {
@@ -588,17 +589,22 @@ export async function listarProveedores(
 ): Promise<Pagina<ProveedorConRoles>> {
   verificarPermiso(sesion, 'proveedores.ver');
   const filtros = validarEntrada(esquemaListarProveedores, parametros);
+  const cliente = clienteLectura(bd);
+
+  // Busqueda por nombre SIN acentos ni mayusculas (R2 §4.4.1: "oscar" encuentra a "Oscar"):
+  // pre-filtro de ids via unaccent (comun/busqueda.ts), compuesto con el resto del where.
+  const idsBusqueda =
+    filtros.busqueda === undefined || filtros.busqueda === ''
+      ? undefined
+      : await idsPorNombreSinAcentos(cliente, 'proveedor', filtros.busqueda);
 
   const where: Prisma.ProveedorWhereInput = {
     ...(filtros.incluirInactivos ? {} : { activo: true }),
     ...(filtros.tipo === undefined ? {} : { tipo: filtros.tipo }),
     ...(filtros.rol === undefined ? {} : { roles: { some: { idRolProveedor: filtros.rol } } }),
-    ...(filtros.busqueda === undefined || filtros.busqueda === ''
-      ? {}
-      : { nombre: { contains: filtros.busqueda, mode: 'insensitive' } }),
+    ...(idsBusqueda === undefined ? {} : { id: { in: idsBusqueda } }),
   };
 
-  const cliente = clienteLectura(bd);
   const [total, datos] = await Promise.all([
     cliente.proveedor.count({ where }),
     cliente.proveedor.findMany({

@@ -37,7 +37,7 @@ Escrito: **7-jul-2026** · **Verificado contra `prueba` = commit `1195ce5`** (me
 | Fase | Nombre | Estado | Nota |
 |---|---|---|---|
 | R1 | Piel y esqueleto (tokens verdes + shell + densidad) | ✅ 7-jul-2026 | Corrida nocturna; coder+reviewer Fable 5, APROBADO; nota de cierre abajo |
-| R2 | Órdenes (centro de comando ⭐) + Avance de producción | ⬜ | — |
+| R2 | Órdenes (centro de comando ⭐) + Avance de producción | ✅ 7-jul-2026 | Corrida nocturna; coder + 2 reviewers Fable 5 (fase completa + backend crítico), doble APROBADO; nota abajo |
 | R3 | Pedidos por mes + constructor + salida a producción | ⬜ | — |
 | R4 | Ruta Crítica operativa (Mis pendientes + Procesos y responsables) | ⬜ | — |
 | R5 | Desarrollo: re-vestir F8 + campos faltantes del precosteo | ⬜ | — |
@@ -46,7 +46,7 @@ Escrito: **7-jul-2026** · **Verificado contra `prueba` = commit `1195ce5`** (me
 | R8 | Importador de pedido del cliente (motor backend NUEVO) | ⬜ | — |
 | R9 | Resto de módulos + barrido final de fidelidad | ⬜ | — |
 
-**Siguiente paso:** R2 (Órdenes centro de comando + Avance de producción) sobre la misma rama/PR, per §3.6.
+**Siguiente paso:** R3 (Pedidos por mes + constructor + salida a producción) sobre la misma rama/PR, per §3.6.
 
 ### Nota de cierre R1 (7-jul-2026, corrida nocturna)
 
@@ -61,6 +61,18 @@ Escrito: **7-jul-2026** · **Verificado contra `prueba` = commit `1195ce5`** (me
 - (f) Hojas sin pantalla aún (Ventas, CxC, CxP, Análisis RC, Auditores) → `Proximamente` con nota de en qué fase llegan.
 
 **Pendientes anotados para fases siguientes (sugerencias del reviewer):** e2e propio de la paleta ⌘K (R2); puntito de alerta RC sobre el icono con riel colapsado (R2+); filas expandibles/agrupadas de TablaDensa (R2/R3). Anti-regresión documentada: el `text-red-200` del badge del riel es deliberado (el riel es oscuro fijo; los tokens `--crit*` cambian con el tema y darían ilegible en claro) — no "corregirlo" a token.
+
+### Nota de cierre R2 (7-jul-2026, corrida nocturna)
+
+**Entregado — backend (B1+B2 y extensiones):** `OrdenPrecioEvento` + enum `CampoPrecioOrden` (historial INMUTABLE de precios estilo `NegociacionEvento`; migración aditiva a mano `20260707120000_r2_orden_precio_evento`, validada con `migrate diff`); dominio `produccion/precios-orden.ts` (`actualizarPreciosOrden` en tx A2 **bajo `pg_advisory_xact_lock` namespace 0x50 por empresa+orden** — evita la carrera A→B,A→C sobre el encadenado; con int test CONCURRENTE — `obtenerPreciosOrden` con `distinct ['campo']` — `listarEventosPrecioOrden`); endpoints `GET/PATCH /ordenes/:id/precios` + `GET .../precios/eventos` con los permisos YA sembrados (`ordenes.precio-maquila` / `ordenes.ver-precio-real-maquila`) — CERO permisos/seed nuevos. **B2**: `GET /ordenes/centro` (dominio `centro-comando.ts`): las 13 columnas agregadas EN SERVIDOR por lote (queries fijos por página, sin N+1; orderBy determinista; A9 aplicado; tope porPagina ≤100 respetado); filtros server-side (búsqueda folio/modelo/referencia D7, cliente, maquilero asignado∪enviado, estampador, empresa, OC-tela con/sin, mes multi-año). Extensión F3: `etapas?incluirRecibos=true` (default intacto) + `creadoPorNombre`. **Cierre de fugas de precios (regla "un defecto conocido no es menor"):** `maquilaOrd`/`aplicacionOrd` REDACTADOS en `OrdenSalida` sin el permiso de ver precios reales (fuga preexistente de F2); `EtapaSalida.precioPactado` y la respuesta de CANCELACIÓN de recibos igual — con criterio uniforme en las 3 superficies: **quien captura sí ve lo que acaba de teclear** (captura conserva, cancelación/lecturas derivan del permiso; plumbing `ocultarPrecio`). **Búsqueda sin acentos (§4.4.1 de Daniel):** migración `20260707140000_r2_unaccent` (`CREATE EXTENSION unaccent`) + helper `comun/busqueda.ts` (SQL parametrizado, whitelist de tabla, escape de LIKE) en proveedores y clientes — "oscar"/"óscar" → los Óscar; "her" → solo Hernández (int tests).
+
+**Entregado — frontend:** `CentroOrdenesPagina` reemplaza `/produccion/ordenes` (la captura F2-E3 vive COMPLETA en `/produccion/ordenes/captura`, mosaico "Modificar"): filtros + tabs Ene–Dic + TablaDensa con las 13 columnas EXACTAS del proto + **panel de detalle persistente con encabezado+mosaicos+matriz color×talla FIJOS arriba sin scroll** (petición de Daniel; matriz con tope max-h-56 + scroll interno para órdenes enormes — a validar con Daniel) + precios real-verde/referencia-gris con "capturado por · fecha · proveedor" + **"Ver historial de precios"** gated + `SeccionDesarrolloOrden` re-vestida + deep-links reales (⌘K/Consulta/Incompletas; móvil abre cajón). `AvanceProduccion` (doble clic / botón): stepper 5 etapas, **cada etapa = lista de movimientos multi-proveedor** (F3 por debajo, sin duplicar lógica), captura con `MatrizColorTalla` CON CANDADO y referencia derivada del WIP (primer movimiento = estado neutro, sin "Sobran" falso), resumen Costura / Estampado-Bordado, "Captura: usuario" + Esc seguro (no tira la captura). Componentes nuevos: `ComboboxBuscable` (typeahead server-side con debounce, sin acentos; SOLO de lista), `MatrizColorTalla`, `StepperEtapas`. **⌘K absorbió el buscador global de órdenes** (BuscadorGlobal retirado — desviación (e) de R1 resuelta) y los filtros Cliente/Maquilero/Estampador del centro son combobox server-side (catálogos reales >100 alcanzables). Puntito de alerta RC en riel colapsado (pendiente R1 saldado). e2e: `ordenes.spec` reescrito (captura + centro + avance con corte real) + `paleta-comandos.spec` nuevo.
+
+**Rondas de review:** 2 reviewers (fase completa + backend crítico). Ronda 1: 1 BLOQUEANTE (carrera del lock — misma categoría que la cicatriz F8-E3) + 6 DEBE + 4 sugerencias + 2 derivados (respuesta de captura redactada al propio capturador — habría puesto el CI rojo — y búsqueda acento-sensible). TODO se arregló (ningún hallazgo archivado). Veredictos finales: **APROBADO ×2**. Verificación: backend typecheck/lint/format/test:unit 792/792/build ✓ · frontend typecheck/lint/format/test 577/577/build ✓ (coder y reviewers por separado).
+
+**Decisiones/diferencias deliberadas vs proto (para el visto de Daniel en `prueba`):** chip de estatus derivado del corte (la "Completa"=entregada llegará del WIP después); sin botón "Concentrado" (no hay pantalla destino); captura de envío en el Avance con los campos del proto (fechaCompromiso/precioPactado siguen en la pantalla F3 "Envío a maquila"); filtro Estampador = proveedores con rol estampado∪bordado; búsqueda de ⌘K cubre órdenes (pedidos: R3). **Impreso PDF del recibo de maquila imprime "Precio pactado" con solo `produccion.wip-ver`: ACEPTADO con razón de diseño (documento operativo del maquilero) y registrado como pregunta de negocio en `HOJA-DE-RUTA.md` §4.** Observación local: 4-5 tests de impresos PDF preexistentes son sensibles a saturación de la máquina local (pasan aislados y en CI) — no se tocaron.
+
+**Deploy a `prueba`:** requiere las **2 migraciones nuevas** (`migrate deploy` las aplica solo). **NO requiere `SEED_ON_START`** (cero permisos/seed nuevos). Checklist sugerido para Gabriel: filtrar por mes y cliente en Órdenes; abrir una orden por ⌘K con "oscar" sin acento en el combobox de maquilero; matriz sticky en una orden grande; capturar un precio de maquila y ver el rastro + "Ver historial"; registrar un corte desde el Avance y ver la RC marcarse sola.
 
 ---
 

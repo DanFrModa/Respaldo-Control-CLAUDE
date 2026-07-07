@@ -22,7 +22,6 @@ import { cn } from '@/lib/utils';
 import { filtrarGruposVisibles } from '@/modulos/catalogo';
 import { NavegacionModulos } from '@/modulos/NavegacionModulos';
 import { PaletaComandos } from '@/modulos/PaletaComandos';
-import { BuscadorGlobal } from '@/modulos/ordenes-consulta/BuscadorGlobal';
 import { BadgeAlertasRc } from '@/modulos/ruta-critica/BadgeAlertasRc';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -194,19 +193,18 @@ export function CascaronSistema(): React.JSX.Element {
               <Marca tamano="sm" conSubtitulo={false} />
             </div>
 
-            {/* Buscador global de ordenes (F2-E4): solo visible con `ordenes.ver`. */}
-            <BuscadorGlobal />
-
-            {/* Disparador de la paleta ⌘K (busca pantallas/modulos). */}
+            {/* Disparador de la paleta ⌘K (R2: absorbió el buscador de órdenes — pantallas Y datos). */}
             <button
               type="button"
               onClick={() => setPaletaAbierta(true)}
               data-testid="abrir-paleta"
-              aria-label="Buscar pantalla o módulo (Ctrl+K)"
-              className="hidden h-8 cursor-text items-center gap-2 rounded-lg border bg-panel-2 px-2.5 text-faint transition-colors hover:border-border-strong md:flex md:w-56"
+              aria-label="Buscar pantalla, módulo u orden (Ctrl+K)"
+              className="hidden h-8 cursor-text items-center gap-2 rounded-lg border bg-panel-2 px-2.5 text-faint transition-colors hover:border-border-strong md:flex md:w-72"
             >
               <Search className="size-3.5 shrink-0" aria-hidden />
-              <span className="flex-1 truncate text-left text-xs">Ir a pantalla…</span>
+              <span className="flex-1 truncate text-left text-xs">
+                Buscar pantalla u orden… (folio, modelo, cliente)
+              </span>
               <kbd className="mono rounded-sm border bg-card px-1.5 py-px text-[11px] text-muted-foreground">
                 Ctrl K
               </kbd>

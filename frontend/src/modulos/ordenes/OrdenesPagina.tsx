@@ -11,10 +11,10 @@ import {
   Workflow,
   XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import { useOrdenes } from '@/api/ordenes';
+import { useOrden, useOrdenes } from '@/api/ordenes';
 import type { EstadoOrden, Orden, OrdenesQuery } from '@/api/tipos';
 import { Avatar } from '@/components/dominio/visuales';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +37,18 @@ import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
+
+/**
+ * Lee `state.idOrden` del deep-link (mosaico "Modificar" del centro de comando, R2). Devuelve el
+ * id si viene un entero positivo válido; si no, `null` (comportamiento por defecto intacto).
+ */
+function leerIdOrdenDeepLink(state: unknown): number | null {
+  if (typeof state !== 'object' || state === null || !('idOrden' in state)) {
+    return null;
+  }
+  const id = state.idOrden;
+  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
+}
 
 /** Formatea una fecha date-only `YYYY-MM-DD` como "13 jun 2026" sin desfase de zona. */
 function fechaCorta(valor: string | null): string {
@@ -89,6 +101,7 @@ function EstadoOrdenBadge({ estado }: { estado: EstadoOrden }): React.JSX.Elemen
 export function OrdenesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const navigate = useNavigate();
+  const location = useLocation();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
   const puedeCancelar = tienePermiso('ordenes.cancelar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
@@ -120,8 +133,20 @@ export function OrdenesPagina(): React.JSX.Element {
   const [altaAbierta, setAltaAbierta] = useState(false);
   const [aCancelar, setACancelar] = useState<Orden | null>(null);
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
-  // Id a enfocar en la lista (deep-link): tras crear, la orden nueva.
-  const [idAEnfocar, setIdAEnfocar] = useState<number | null>(null);
+  // Id a enfocar en la lista (deep-link): tras crear, la orden nueva; o el `state.idOrden` del
+  // mosaico "Modificar" del centro de comando (R2). El state se consume (replace) para que un
+  // refresh no lo re-aplique — mismo patrón que ModelosPagina.
+  const [idAEnfocar, setIdAEnfocar] = useState<number | null>(leerIdOrdenDeepLink(location.state));
+  const idDeepLink = leerIdOrdenDeepLink(location.state);
+  useEffect(() => {
+    if (idDeepLink !== null) {
+      setIdAEnfocar(idDeepLink);
+      void navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [idDeepLink, location.pathname, navigate]);
+  // Si la orden del deep-link no está en la página visible, se inyecta al frente para que
+  // ListaDetalle pueda seleccionarla (mismo truco que ModelosPagina).
+  const fichaDeepLink = useOrden(idAEnfocar ?? undefined);
 
   /** Tras crear, enfoca la orden NUEVA (encabeza la página 1 por orden de folio desc). */
   function alCreada(idNueva: number): void {
@@ -140,6 +165,14 @@ export function OrdenesPagina(): React.JSX.Element {
   }
 
   const datos = consulta.data;
+  const visibles = datos?.datos ?? [];
+  const registros =
+    idAEnfocar !== null &&
+    fichaDeepLink.data !== undefined &&
+    fichaDeepLink.data.id === idAEnfocar &&
+    !visibles.some((o) => o.id === idAEnfocar)
+      ? [fichaDeepLink.data, ...visibles]
+      : visibles;
   const totalPaginas = datos?.totalPaginas ?? 0;
   const paginacion: PaginacionListaDetalle | undefined = datos
     ? {
@@ -159,7 +192,7 @@ export function OrdenesPagina(): React.JSX.Element {
         titulo="Órdenes"
         descripcion="Órdenes de producción con su matriz color × talla."
         icono={Factory}
-        registros={datos?.datos ?? []}
+        registros={registros}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}

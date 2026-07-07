@@ -239,6 +239,18 @@ describe('Catálogo Clientes con campos de referencia (F1-E2 D7 — global ADR-0
       expect(desc.datos.map((c) => c.nombre)).toEqual(['Zeta', 'Alfa']);
     });
 
+    it('la busqueda ignora ACENTOS y mayusculas (R2 §4.4.1)', async () => {
+      const sesion = sesionAdmin();
+      await crearCliente(sesion, { nombre: 'Óscar Jiménez' }, bd());
+      await crearCliente(sesion, { nombre: 'Óscar Hernández' }, bd());
+      await crearCliente(sesion, { nombre: 'Liverpool' }, bd());
+
+      expect((await listarClientes(sesion, { busqueda: 'oscar' }, bd())).total).toBe(2);
+      expect((await listarClientes(sesion, { busqueda: 'óscar' }, bd())).total).toBe(2);
+      const her = await listarClientes(sesion, { busqueda: 'her' }, bd());
+      expect(her.datos.map((c) => c.nombre)).toEqual(['Óscar Hernández']);
+    });
+
     it('pagina en servidor', async () => {
       const sesion = sesionAdmin();
       for (let i = 1; i <= 5; i += 1) {

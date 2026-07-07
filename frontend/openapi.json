@@ -41993,6 +41993,1191 @@
         }
       }
     },
+    "/api/ordenes/{id}/precios": {
+      "get": {
+        "summary": "Resumen de precios de la orden (venta/maquila/aplicación) con su rastro",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de precios de la orden (venta/maquila/aplicación) con su rastro.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la orden."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "precioVenta": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio de venta por prenda (del renglón del pedido), o null si no ve importes."
+                    },
+                    "maquilaReferencia": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null."
+                    },
+                    "maquilaReal": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio REAL de maquila de la orden, o null (sin captura o sin permiso)."
+                    },
+                    "aplicacionReal": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio REAL de aplicación de la orden, o null (sin captura o sin permiso)."
+                    },
+                    "puedeVerReales": {
+                      "type": "boolean",
+                      "description": "Si la sesión tiene `ordenes.ver-precio-real-maquila` (los montos vienen)."
+                    },
+                    "ultimoEventoMaquila": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "capturadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Id del usuario que capturó, o null."
+                            },
+                            "capturadoPor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre de quien capturó, o null."
+                            },
+                            "capturadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Cuándo se capturó (ISO)."
+                            },
+                            "idProveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Proveedor con quien se negoció, o null."
+                            },
+                            "proveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre del proveedor negociado, o null."
+                            }
+                          },
+                          "required": [
+                            "capturadoPorId",
+                            "capturadoPor",
+                            "capturadoEn",
+                            "idProveedor",
+                            "proveedor"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Resumen del último evento de precio de un campo (quién · cuándo · proveedor)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último evento del precio de maquila, o null si nunca se ha capturado."
+                    },
+                    "ultimoEventoAplicacion": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "capturadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Id del usuario que capturó, o null."
+                            },
+                            "capturadoPor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre de quien capturó, o null."
+                            },
+                            "capturadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Cuándo se capturó (ISO)."
+                            },
+                            "idProveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Proveedor con quien se negoció, o null."
+                            },
+                            "proveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre del proveedor negociado, o null."
+                            }
+                          },
+                          "required": [
+                            "capturadoPorId",
+                            "capturadoPor",
+                            "capturadoEn",
+                            "idProveedor",
+                            "proveedor"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Resumen del último evento de precio de un campo (quién · cuándo · proveedor)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último evento del precio de aplicación, o null."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folioOrden",
+                    "precioVenta",
+                    "maquilaReferencia",
+                    "maquilaReal",
+                    "aplicacionReal",
+                    "puedeVerReales",
+                    "ultimoEventoMaquila",
+                    "ultimoEventoAplicacion"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen de precios de la orden (venta/maquila/aplicación) con su rastro."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Capturar el precio real de maquila/aplicación (deja rastro inmutable)",
+        "tags": [
+          "ordenes"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "campo": {
+                    "type": "string",
+                    "enum": [
+                      "maquila",
+                      "aplicacion"
+                    ],
+                    "description": "Precio de la orden: maquila (costura) o aplicación (estampado/bordado)."
+                  },
+                  "precio": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Precio real negociado por prenda."
+                  },
+                  "idProveedor": {
+                    "description": "Proveedor con quien se negoció (maquilero/estampador), opcional.",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nota": {
+                    "description": "Nota libre de la negociación, opcional.",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "campo",
+                  "precio"
+                ],
+                "description": "Captura del precio real de maquila/aplicación de la orden (deja rastro inmutable)."
+              }
+            }
+          },
+          "description": "Captura del precio real de maquila/aplicación de la orden (deja rastro inmutable)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de precios de la orden (venta/maquila/aplicación) con su rastro.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la orden."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "precioVenta": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio de venta por prenda (del renglón del pedido), o null si no ve importes."
+                    },
+                    "maquilaReferencia": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null."
+                    },
+                    "maquilaReal": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio REAL de maquila de la orden, o null (sin captura o sin permiso)."
+                    },
+                    "aplicacionReal": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Precio REAL de aplicación de la orden, o null (sin captura o sin permiso)."
+                    },
+                    "puedeVerReales": {
+                      "type": "boolean",
+                      "description": "Si la sesión tiene `ordenes.ver-precio-real-maquila` (los montos vienen)."
+                    },
+                    "ultimoEventoMaquila": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "capturadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Id del usuario que capturó, o null."
+                            },
+                            "capturadoPor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre de quien capturó, o null."
+                            },
+                            "capturadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Cuándo se capturó (ISO)."
+                            },
+                            "idProveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Proveedor con quien se negoció, o null."
+                            },
+                            "proveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre del proveedor negociado, o null."
+                            }
+                          },
+                          "required": [
+                            "capturadoPorId",
+                            "capturadoPor",
+                            "capturadoEn",
+                            "idProveedor",
+                            "proveedor"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Resumen del último evento de precio de un campo (quién · cuándo · proveedor)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último evento del precio de maquila, o null si nunca se ha capturado."
+                    },
+                    "ultimoEventoAplicacion": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "capturadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Id del usuario que capturó, o null."
+                            },
+                            "capturadoPor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre de quien capturó, o null."
+                            },
+                            "capturadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Cuándo se capturó (ISO)."
+                            },
+                            "idProveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Proveedor con quien se negoció, o null."
+                            },
+                            "proveedor": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Nombre del proveedor negociado, o null."
+                            }
+                          },
+                          "required": [
+                            "capturadoPorId",
+                            "capturadoPor",
+                            "capturadoEn",
+                            "idProveedor",
+                            "proveedor"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Resumen del último evento de precio de un campo (quién · cuándo · proveedor)."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último evento del precio de aplicación, o null."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folioOrden",
+                    "precioVenta",
+                    "maquilaReferencia",
+                    "maquilaReal",
+                    "aplicacionReal",
+                    "puedeVerReales",
+                    "ultimoEventoMaquila",
+                    "ultimoEventoAplicacion"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen de precios de la orden (venta/maquila/aplicación) con su rastro."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/{id}/precios/eventos": {
+      "get": {
+        "summary": "Historial inmutable de cambios de precio de la orden",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Historial inmutable de cambios de precio de la orden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la orden."
+                    },
+                    "folioOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio de la orden."
+                    },
+                    "eventos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del evento."
+                          },
+                          "campo": {
+                            "type": "string",
+                            "enum": [
+                              "maquila",
+                              "aplicacion"
+                            ],
+                            "description": "Precio de la orden: maquila (costura) o aplicación (estampado/bordado)."
+                          },
+                          "precioAnterior": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio vigente ANTES del cambio, o null."
+                          },
+                          "precioNuevo": {
+                            "type": "number",
+                            "description": "Precio real que quedó vigente con este evento."
+                          },
+                          "idProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Proveedor negociado, o null."
+                          },
+                          "proveedor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del proveedor negociado, o null."
+                          },
+                          "nota": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nota de la negociación, o null."
+                          },
+                          "capturadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del usuario que capturó, o null."
+                          },
+                          "capturadoPor": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien capturó, o null."
+                          },
+                          "capturadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Cuándo se capturó (ISO)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "campo",
+                          "precioAnterior",
+                          "precioNuevo",
+                          "idProveedor",
+                          "proveedor",
+                          "nota",
+                          "capturadoPorId",
+                          "capturadoPor",
+                          "capturadoEn"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Evento inmutable del historial de precios de la orden (D3/A7)."
+                      },
+                      "description": "Eventos del historial (más reciente primero)."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "folioOrden",
+                    "eventos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Historial inmutable de cambios de precio de la orden."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ordenes/{id}/comentarios": {
       "post": {
         "summary": "Agregar un comentario a una orden",
@@ -44319,6 +45504,550 @@
                   ],
                   "additionalProperties": false,
                   "description": "Tablero de pedidos por mes (agregado, extensible a avances en F3)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ordenes/centro": {
+      "get": {
+        "summary": "Centro de comando de órdenes (13 columnas agregadas, filtros de servidor)",
+        "tags": [
+          "ordenes"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar (folio OP, código de modelo o pedido del cliente D7)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCliente",
+            "required": false,
+            "description": "Filtra por cliente."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idMaquilero",
+            "required": false,
+            "description": "Filtra por maquilero (asignado o con envío de costura vivo)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idEstampador",
+            "required": false,
+            "description": "Filtra por estampador/bordador (con envío de aplicación vivo)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idEmpresa",
+            "required": false,
+            "description": "Filtra por empresa (A9: distinto de la activa → vacío)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "ocTela",
+            "required": false,
+            "description": "Filtra por estado de la OC de tela (con = ya comprada, sin = falta)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "in": "query",
+            "name": "mesEntrega",
+            "required": false,
+            "description": "Filtra por mes de entrega (1-12, tabs del proto)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirCanceladas",
+            "required": false,
+            "description": "Incluye las órdenes canceladas."
+          },
+          {
+            "schema": {
+              "default": "folio",
+              "type": "string",
+              "enum": [
+                "folio",
+                "fecha",
+                "fechaEntrega",
+                "creadoEn"
+              ]
+            },
+            "in": "query",
+            "name": "ordenarPor",
+            "required": false,
+            "description": "Columna de orden."
+          },
+          {
+            "schema": {
+              "default": "desc",
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            },
+            "in": "query",
+            "name": "direccion",
+            "required": false,
+            "description": "Dirección del orden."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página del centro de comando de órdenes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id interno de la orden (para navegar al detalle)."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "No. OP (folio consecutivo por empresa)."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "capturada",
+                              "completa",
+                              "cancelada"
+                            ],
+                            "description": "Estado DERIVADO de la orden (no editable)."
+                          },
+                          "idEmpresa": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Empresa de la orden (A9)."
+                          },
+                          "empresa": {
+                            "type": "string",
+                            "description": "Nombre de la empresa (FR Moda / Marilyn Fitness)."
+                          },
+                          "idModelo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Modelo a producir."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "pedidoCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Referencia/pedido del CLIENTE (D7, primera referencia de la orden), o null."
+                          },
+                          "cantOrdenada": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas pedidas (Σ de la matriz color×talla)."
+                          },
+                          "cantCortada": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas cortadas (Σ de cortes vivos de F3; 0 = sin cortar)."
+                          },
+                          "idMaquilero": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Maquilero mostrado, o null."
+                          },
+                          "maquilero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Maquilero al que se mandó (primer envío de costura vivo; si no hay envíos, el asignado), o null."
+                          },
+                          "numMaquileros": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Nº de maquileros DISTINTOS con envíos de costura vivos (badge ×2 si >1)."
+                          },
+                          "idEstampador": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Estampador/bordador mostrado, o null."
+                          },
+                          "estampador": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Primer proveedor de APLICACIÓN (estampado/bordado) con envío vivo, o null."
+                          },
+                          "idPedido": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del pedido interno (para navegar), o null."
+                          },
+                          "folioPedido": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio del pedido interno (el `-F`), o null."
+                          },
+                          "idOcTela": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la OC de TELA ligada a la orden (para navegar), o null si falta."
+                          },
+                          "ocTelaFolio": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio de la OC de tela (indicador \"¿ya compramos la tela?\"), o null = falta."
+                          },
+                          "fechaEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de entrega comprometida, o null."
+                          },
+                          "mesEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 12
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Mes de entrega (1-12, del mes de fechaEntrega), o null sin fecha."
+                          },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente de la orden."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "folio",
+                          "estado",
+                          "idEmpresa",
+                          "empresa",
+                          "idModelo",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "pedidoCliente",
+                          "cantOrdenada",
+                          "cantCortada",
+                          "idMaquilero",
+                          "maquilero",
+                          "numMaquileros",
+                          "idEstampador",
+                          "estampador",
+                          "idPedido",
+                          "folioPedido",
+                          "idOcTela",
+                          "ocTelaFolio",
+                          "fechaEntrega",
+                          "mesEntrega",
+                          "idCliente",
+                          "cliente"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Fila del centro de comando de órdenes (13 columnas del proto, agregadas en servidor)."
+                      },
+                      "description": "Órdenes de la página."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de órdenes que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página del centro de comando de órdenes."
                 }
               }
             }
@@ -67680,7 +69409,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio pactado o null."
+                      "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
                     "observaciones": {
                       "anyOf": [
@@ -67817,6 +69546,17 @@
                         }
                       ],
                       "description": "Id del usuario que la capturó."
+                    },
+                    "creadoPorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
                     }
                   },
                   "required": [
@@ -67841,7 +69581,8 @@
                     "lineas",
                     "totalPiezas",
                     "creadoEn",
-                    "creadoPorId"
+                    "creadoPorId",
+                    "creadoPorNombre"
                   ],
                   "additionalProperties": false,
                   "description": "Etapa de producción (corte/envío) con su matriz color×talla."
@@ -68163,7 +69904,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio pactado o null."
+                      "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
                     "observaciones": {
                       "anyOf": [
@@ -68300,6 +70041,17 @@
                         }
                       ],
                       "description": "Id del usuario que la capturó."
+                    },
+                    "creadoPorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
                     }
                   },
                   "required": [
@@ -68324,7 +70076,8 @@
                     "lineas",
                     "totalPiezas",
                     "creadoEn",
-                    "creadoPorId"
+                    "creadoPorId",
+                    "creadoPorNombre"
                   ],
                   "additionalProperties": false,
                   "description": "Etapa de producción (corte/envío) con su matriz color×talla."
@@ -68727,7 +70480,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio pactado o null."
+                      "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
                     "observaciones": {
                       "anyOf": [
@@ -68864,6 +70617,17 @@
                         }
                       ],
                       "description": "Id del usuario que la capturó."
+                    },
+                    "creadoPorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
                     }
                   },
                   "required": [
@@ -68888,7 +70652,8 @@
                     "lineas",
                     "totalPiezas",
                     "creadoEn",
-                    "creadoPorId"
+                    "creadoPorId",
+                    "creadoPorNombre"
                   ],
                   "additionalProperties": false,
                   "description": "Etapa de producción (corte/envío) con su matriz color×talla."
@@ -69210,7 +70975,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio pactado o null."
+                      "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                     },
                     "observaciones": {
                       "anyOf": [
@@ -69347,6 +71112,17 @@
                         }
                       ],
                       "description": "Id del usuario que la capturó."
+                    },
+                    "creadoPorNombre": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
                     }
                   },
                   "required": [
@@ -69371,7 +71147,8 @@
                     "lineas",
                     "totalPiezas",
                     "creadoEn",
-                    "creadoPorId"
+                    "creadoPorId",
+                    "creadoPorNombre"
                   ],
                   "additionalProperties": false,
                   "description": "Etapa de producción (corte/envío) con su matriz color×talla."
@@ -69871,11 +71648,20 @@
     },
     "/api/produccion/ordenes/{id}/etapas": {
       "get": {
-        "summary": "Historial de etapas (cortes y envíos) de una orden, vivas y canceladas",
+        "summary": "Historial de etapas (cortes y envíos; con incluirRecibos también recibos) de una orden",
         "tags": [
           "produccion"
         ],
         "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirRecibos",
+            "required": false,
+            "description": "Incluye los recibos de maquila en el historial (Avance de producción, R2)."
+          },
           {
             "schema": {
               "type": "integer",
@@ -70030,7 +71816,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Precio pactado o null."
+                            "description": "Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa)."
                           },
                           "observaciones": {
                             "anyOf": [
@@ -70167,6 +71953,17 @@
                               }
                             ],
                             "description": "Id del usuario que la capturó."
+                          },
+                          "creadoPorNombre": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quien la capturó (rediseño R2, §4.4.4: \"capturado por · fecha\")."
                           }
                         },
                         "required": [
@@ -70191,7 +71988,8 @@
                           "lineas",
                           "totalPiezas",
                           "creadoEn",
-                          "creadoPorId"
+                          "creadoPorId",
+                          "creadoPorNombre"
                         ],
                         "additionalProperties": false,
                         "description": "Etapa de producción (corte/envío) con su matriz color×talla."
@@ -71279,7 +73077,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio pactado o null."
+                      "description": "Precio pactado, o null. En la respuesta de la CANCELACION va REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3); la de captura lo conserva (quien capturo lo tecleo)."
                     },
                     "observaciones": {
                       "anyOf": [
@@ -71866,7 +73664,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Precio pactado o null."
+                      "description": "Precio pactado, o null. En la respuesta de la CANCELACION va REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3); la de captura lo conserva (quien capturo lo tecleo)."
                     },
                     "observaciones": {
                       "anyOf": [

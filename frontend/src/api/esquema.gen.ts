@@ -17833,6 +17833,492 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ordenes/{id}/precios': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resumen de precios de la orden (venta/maquila/aplicación) con su rastro */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumen de precios de la orden (venta/maquila/aplicación) con su rastro. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Precio de venta por prenda (del renglón del pedido), o null si no ve importes. */
+              precioVenta: number | null;
+              /** @description Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null. */
+              maquilaReferencia: number | null;
+              /** @description Precio REAL de maquila de la orden, o null (sin captura o sin permiso). */
+              maquilaReal: number | null;
+              /** @description Precio REAL de aplicación de la orden, o null (sin captura o sin permiso). */
+              aplicacionReal: number | null;
+              /** @description Si la sesión tiene `ordenes.ver-precio-real-maquila` (los montos vienen). */
+              puedeVerReales: boolean;
+              /** @description Último evento del precio de maquila, o null si nunca se ha capturado. */
+              ultimoEventoMaquila: {
+                /** @description Id del usuario que capturó, o null. */
+                capturadoPorId: string | null;
+                /** @description Nombre de quien capturó, o null. */
+                capturadoPor: string | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                capturadoEn: string;
+                /** @description Proveedor con quien se negoció, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor negociado, o null. */
+                proveedor: string | null;
+              } | null;
+              /** @description Último evento del precio de aplicación, o null. */
+              ultimoEventoAplicacion: {
+                /** @description Id del usuario que capturó, o null. */
+                capturadoPorId: string | null;
+                /** @description Nombre de quien capturó, o null. */
+                capturadoPor: string | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                capturadoEn: string;
+                /** @description Proveedor con quien se negoció, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor negociado, o null. */
+                proveedor: string | null;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Capturar el precio real de maquila/aplicación (deja rastro inmutable) */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Captura del precio real de maquila/aplicación de la orden (deja rastro inmutable). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description Precio de la orden: maquila (costura) o aplicación (estampado/bordado).
+             * @enum {string}
+             */
+            campo: 'maquila' | 'aplicacion';
+            /** @description Precio real negociado por prenda. */
+            precio: number;
+            /** @description Proveedor con quien se negoció (maquilero/estampador), opcional. */
+            idProveedor?: number | null;
+            /** @description Nota libre de la negociación, opcional. */
+            nota?: string | null;
+          };
+        };
+      };
+      responses: {
+        /** @description Resumen de precios de la orden (venta/maquila/aplicación) con su rastro. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Precio de venta por prenda (del renglón del pedido), o null si no ve importes. */
+              precioVenta: number | null;
+              /** @description Precio de maquila de REFERENCIA (heredado del modelo: maquilaBase), o null. */
+              maquilaReferencia: number | null;
+              /** @description Precio REAL de maquila de la orden, o null (sin captura o sin permiso). */
+              maquilaReal: number | null;
+              /** @description Precio REAL de aplicación de la orden, o null (sin captura o sin permiso). */
+              aplicacionReal: number | null;
+              /** @description Si la sesión tiene `ordenes.ver-precio-real-maquila` (los montos vienen). */
+              puedeVerReales: boolean;
+              /** @description Último evento del precio de maquila, o null si nunca se ha capturado. */
+              ultimoEventoMaquila: {
+                /** @description Id del usuario que capturó, o null. */
+                capturadoPorId: string | null;
+                /** @description Nombre de quien capturó, o null. */
+                capturadoPor: string | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                capturadoEn: string;
+                /** @description Proveedor con quien se negoció, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor negociado, o null. */
+                proveedor: string | null;
+              } | null;
+              /** @description Último evento del precio de aplicación, o null. */
+              ultimoEventoAplicacion: {
+                /** @description Id del usuario que capturó, o null. */
+                capturadoPorId: string | null;
+                /** @description Nombre de quien capturó, o null. */
+                capturadoPor: string | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                capturadoEn: string;
+                /** @description Proveedor con quien se negoció, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor negociado, o null. */
+                proveedor: string | null;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/ordenes/{id}/precios/eventos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Historial inmutable de cambios de precio de la orden */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Historial inmutable de cambios de precio de la orden. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id de la orden. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Eventos del historial (más reciente primero). */
+              eventos: {
+                /** @description Id del evento. */
+                id: number;
+                /**
+                 * @description Precio de la orden: maquila (costura) o aplicación (estampado/bordado).
+                 * @enum {string}
+                 */
+                campo: 'maquila' | 'aplicacion';
+                /** @description Precio vigente ANTES del cambio, o null. */
+                precioAnterior: number | null;
+                /** @description Precio real que quedó vigente con este evento. */
+                precioNuevo: number;
+                /** @description Proveedor negociado, o null. */
+                idProveedor: number | null;
+                /** @description Nombre del proveedor negociado, o null. */
+                proveedor: string | null;
+                /** @description Nota de la negociación, o null. */
+                nota: string | null;
+                /** @description Id del usuario que capturó, o null. */
+                capturadoPorId: string | null;
+                /** @description Nombre de quien capturó, o null. */
+                capturadoPor: string | null;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se capturó (ISO).
+                 */
+                capturadoEn: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes/{id}/comentarios': {
     parameters: {
       query?: never;
@@ -18812,6 +19298,178 @@ export interface paths {
               totalOrdenes: number;
               /** @description Total de prendas en todo el rango. */
               totalPiezas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ordenes/centro': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Centro de comando de órdenes (13 columnas agregadas, filtros de servidor) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Texto a buscar (folio OP, código de modelo o pedido del cliente D7). */
+          busqueda?: string;
+          /** @description Filtra por cliente. */
+          idCliente?: number;
+          /** @description Filtra por maquilero (asignado o con envío de costura vivo). */
+          idMaquilero?: number;
+          /** @description Filtra por estampador/bordador (con envío de aplicación vivo). */
+          idEstampador?: number;
+          /** @description Filtra por empresa (A9: distinto de la activa → vacío). */
+          idEmpresa?: number;
+          /** @description Filtra por estado de la OC de tela (con = ya comprada, sin = falta). */
+          ocTela?: 'con' | 'sin';
+          /** @description Filtra por mes de entrega (1-12, tabs del proto). */
+          mesEntrega?: number;
+          /** @description Incluye las órdenes canceladas. */
+          incluirCanceladas?: string;
+          /** @description Columna de orden. */
+          ordenarPor?: 'folio' | 'fecha' | 'fechaEntrega' | 'creadoEn';
+          /** @description Dirección del orden. */
+          direccion?: 'asc' | 'desc';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Página del centro de comando de órdenes. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes de la página. */
+              datos: {
+                /** @description Id interno de la orden (para navegar al detalle). */
+                id: number;
+                /** @description No. OP (folio consecutivo por empresa). */
+                folio: number;
+                /**
+                 * @description Estado DERIVADO de la orden (no editable).
+                 * @enum {string}
+                 */
+                estado: 'capturada' | 'completa' | 'cancelada';
+                /** @description Empresa de la orden (A9). */
+                idEmpresa: number;
+                /** @description Nombre de la empresa (FR Moda / Marilyn Fitness). */
+                empresa: string;
+                /** @description Modelo a producir. */
+                idModelo: number;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Referencia/pedido del CLIENTE (D7, primera referencia de la orden), o null. */
+                pedidoCliente: string | null;
+                /** @description Piezas pedidas (Σ de la matriz color×talla). */
+                cantOrdenada: number;
+                /** @description Piezas cortadas (Σ de cortes vivos de F3; 0 = sin cortar). */
+                cantCortada: number;
+                /** @description Maquilero mostrado, o null. */
+                idMaquilero: number | null;
+                /** @description Maquilero al que se mandó (primer envío de costura vivo; si no hay envíos, el asignado), o null. */
+                maquilero: string | null;
+                /** @description Nº de maquileros DISTINTOS con envíos de costura vivos (badge ×2 si >1). */
+                numMaquileros: number;
+                /** @description Estampador/bordador mostrado, o null. */
+                idEstampador: number | null;
+                /** @description Primer proveedor de APLICACIÓN (estampado/bordado) con envío vivo, o null. */
+                estampador: string | null;
+                /** @description Id del pedido interno (para navegar), o null. */
+                idPedido: number | null;
+                /** @description Folio del pedido interno (el `-F`), o null. */
+                folioPedido: number | null;
+                /** @description Id de la OC de TELA ligada a la orden (para navegar), o null si falta. */
+                idOcTela: number | null;
+                /** @description Folio de la OC de tela (indicador "¿ya compramos la tela?"), o null = falta. */
+                ocTelaFolio: number | null;
+                /** @description Fecha de entrega comprometida, o null. */
+                fechaEntrega: string | null;
+                /** @description Mes de entrega (1-12, del mes de fechaEntrega), o null sin fecha. */
+                mesEntrega: number | null;
+                /** @description Cliente de la orden. */
+                idCliente: number;
+                /** @description Nombre del cliente. */
+                cliente: string;
+              }[];
+              /** @description Total de órdenes que cumplen el filtro. */
+              total: number;
+              /** @description Página devuelta. */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
             };
           };
         };
@@ -28003,7 +28661,7 @@ export interface paths {
               fecha: string;
               /** @description Fecha compromiso (YYYY-MM-DD) o null. */
               fechaCompromiso: string | null;
-              /** @description Precio pactado o null. */
+              /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
               /** @description Observaciones o null. */
               observaciones: string | null;
@@ -28042,6 +28700,8 @@ export interface paths {
               creadoEn: string;
               /** @description Id del usuario que la capturó. */
               creadoPorId: string | null;
+              /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+              creadoPorNombre: string | null;
             };
           };
         };
@@ -28196,7 +28856,7 @@ export interface paths {
               fecha: string;
               /** @description Fecha compromiso (YYYY-MM-DD) o null. */
               fechaCompromiso: string | null;
-              /** @description Precio pactado o null. */
+              /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
               /** @description Observaciones o null. */
               observaciones: string | null;
@@ -28235,6 +28895,8 @@ export interface paths {
               creadoEn: string;
               /** @description Id del usuario que la capturó. */
               creadoPorId: string | null;
+              /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+              creadoPorNombre: string | null;
             };
           };
         };
@@ -28409,7 +29071,7 @@ export interface paths {
               fecha: string;
               /** @description Fecha compromiso (YYYY-MM-DD) o null. */
               fechaCompromiso: string | null;
-              /** @description Precio pactado o null. */
+              /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
               /** @description Observaciones o null. */
               observaciones: string | null;
@@ -28448,6 +29110,8 @@ export interface paths {
               creadoEn: string;
               /** @description Id del usuario que la capturó. */
               creadoPorId: string | null;
+              /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+              creadoPorNombre: string | null;
             };
           };
         };
@@ -28602,7 +29266,7 @@ export interface paths {
               fecha: string;
               /** @description Fecha compromiso (YYYY-MM-DD) o null. */
               fechaCompromiso: string | null;
-              /** @description Precio pactado o null. */
+              /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
               precioPactado: number | null;
               /** @description Observaciones o null. */
               observaciones: string | null;
@@ -28641,6 +29305,8 @@ export interface paths {
               creadoEn: string;
               /** @description Id del usuario que la capturó. */
               creadoPorId: string | null;
+              /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+              creadoPorNombre: string | null;
             };
           };
         };
@@ -28904,10 +29570,13 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Historial de etapas (cortes y envíos) de una orden, vivas y canceladas */
+    /** Historial de etapas (cortes y envíos; con incluirRecibos también recibos) de una orden */
     get: {
       parameters: {
-        query?: never;
+        query?: {
+          /** @description Incluye los recibos de maquila en el historial (Avance de producción, R2). */
+          incluirRecibos?: string;
+        };
         header?: never;
         path: {
           /** @description Id del recurso. */
@@ -28957,7 +29626,7 @@ export interface paths {
                 fecha: string;
                 /** @description Fecha compromiso (YYYY-MM-DD) o null. */
                 fechaCompromiso: string | null;
-                /** @description Precio pactado o null. */
+                /** @description Precio pactado, o null. REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3: es el precio real de maquila de la etapa). */
                 precioPactado: number | null;
                 /** @description Observaciones o null. */
                 observaciones: string | null;
@@ -28996,6 +29665,8 @@ export interface paths {
                 creadoEn: string;
                 /** @description Id del usuario que la capturó. */
                 creadoPorId: string | null;
+                /** @description Nombre de quien la capturó (rediseño R2, §4.4.4: "capturado por · fecha"). */
+                creadoPorNombre: string | null;
               }[];
             };
           };
@@ -29545,7 +30216,7 @@ export interface paths {
               almacenSegundas: string | null;
               /** @description Fecha del recibo (YYYY-MM-DD). */
               fecha: string;
-              /** @description Precio pactado o null. */
+              /** @description Precio pactado, o null. En la respuesta de la CANCELACION va REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3); la de captura lo conserva (quien capturo lo tecleo). */
               precioPactado: number | null;
               /** @description Observaciones o null. */
               observaciones: string | null;
@@ -29753,7 +30424,7 @@ export interface paths {
               almacenSegundas: string | null;
               /** @description Fecha del recibo (YYYY-MM-DD). */
               fecha: string;
-              /** @description Precio pactado o null. */
+              /** @description Precio pactado, o null. En la respuesta de la CANCELACION va REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3); la de captura lo conserva (quien capturo lo tecleo). */
               precioPactado: number | null;
               /** @description Observaciones o null. */
               observaciones: string | null;

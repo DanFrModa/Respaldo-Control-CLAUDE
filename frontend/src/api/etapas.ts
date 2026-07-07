@@ -80,9 +80,12 @@ async function listarPendientes(idOrden: number): Promise<PendientesOrden> {
   return data;
 }
 
-async function listarEtapas(idOrden: number): Promise<EtapasOrden> {
+async function listarEtapas(idOrden: number, incluirRecibos: boolean): Promise<EtapasOrden> {
   const { data, error } = await api.GET('/api/produccion/ordenes/{id}/etapas', {
-    params: { path: { id: idOrden } },
+    params: {
+      path: { id: idOrden },
+      query: { incluirRecibos: incluirRecibos ? 'true' : 'false' },
+    },
   });
   if (!data) {
     throw new ErrorDeApi(error);
@@ -113,14 +116,18 @@ export function usePendientesOrden(
   });
 }
 
-/** Historial de etapas (cortes/envíos, vivos y cancelados) de una orden. `habilitado` corta la query. */
+/**
+ * Historial de etapas (cortes/envíos, vivos y cancelados) de una orden. `habilitado` corta la
+ * query; `incluirRecibos` suma los recibos de maquila (Avance de producción, R2).
+ */
 export function useEtapasOrden(
   idOrden: number | undefined,
   habilitado = true,
+  incluirRecibos = false,
 ): UseQueryResult<EtapasOrden, ErrorDeApi> {
   return useQuery({
-    queryKey: [...CLAVE_ETAPAS, 'etapas', idOrden],
-    queryFn: () => listarEtapas(idOrden as number),
+    queryKey: [...CLAVE_ETAPAS, 'etapas', idOrden, incluirRecibos],
+    queryFn: () => listarEtapas(idOrden as number, incluirRecibos),
     enabled: habilitado && idOrden !== undefined,
     placeholderData: keepPreviousData,
   });

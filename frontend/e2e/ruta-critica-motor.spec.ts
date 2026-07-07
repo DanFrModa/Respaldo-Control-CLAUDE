@@ -103,7 +103,8 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('guardar-pedido').click();
     await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();
 
-    await page.goto('/produccion/ordenes');
+    // R2: la captura completa vive en /captura (el centro de comando ocupa /produccion/ordenes).
+    await page.goto('/produccion/ordenes/captura');
     await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
     await page.getByTestId('nuevo-orden').click();
     const dialogoAlta = page.getByRole('dialog');

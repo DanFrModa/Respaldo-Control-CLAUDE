@@ -11,6 +11,7 @@
  *  • `GET /ordenes/consulta` — listado LIGERO con filtros de servidor (proyección ligera).
  *  • `GET /ordenes/incompletas` — capturadas sin matriz, con `diasAntiguedad` + semáforo derivado.
  *  • `GET /ordenes/tablero/pedidos-por-mes` — agregado por mes (extensible a avances en F3).
+ *  • `GET /ordenes/centro` — centro de comando (rediseño R2: 13 columnas agregadas en servidor).
  *  • `GET /ordenes/buscar` — buscador global ligero para el layout.
  *
  * OJO Fastify (orden de rutas): estos paths ESTÁTICOS (`/ordenes/consulta`, `/ordenes/incompletas`,
@@ -31,6 +32,8 @@ import {
   esquemaIncompletasQuery,
   esquemaOrdenesBuscarQuery,
   esquemaOrdenesBuscarSalida,
+  esquemaOrdenesCentroPagina,
+  esquemaOrdenesCentroQuery,
   esquemaOrdenesIncompletasPagina,
   esquemaOrdenesLigerasPagina,
   esquemaTableroPedidosMes,
@@ -38,6 +41,7 @@ import {
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
+import { centroComandoOrdenes } from '../../dominio/produccion/centro-comando.js';
 import {
   buscarOrdenesGlobal,
   consultarIncompletas,
@@ -115,6 +119,24 @@ export const rutasConsultasOrden: FastifyPluginCallbackZod = (app, _opciones, do
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return tableroPedidosPorMes(sesion, request.query);
+    },
+  });
+
+  // Centro de comando (rediseño R2, §4.2): las 13 columnas del proto agregadas en servidor.
+  app.route({
+    method: 'GET',
+    url: '/ordenes/centro',
+    preHandler: app.conPermiso('ordenes.ver'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Centro de comando de órdenes (13 columnas agregadas, filtros de servidor)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaOrdenesCentroQuery,
+      response: { 200: esquemaOrdenesCentroPagina, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return centroComandoOrdenes(sesion, request.query);
     },
   });
 

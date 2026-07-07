@@ -220,13 +220,25 @@ function PadreNav({
             aria-label={colapsado ? padre.titulo : undefined}
             data-testid={`nav-padre-${padre.clave}`}
             className={cn(
-              'flex w-full cursor-pointer items-center rounded-lg py-1.5 text-left text-sm transition-colors duration-150',
+              'relative flex w-full cursor-pointer items-center rounded-lg py-1.5 text-left text-sm transition-colors duration-150',
               colapsado ? 'justify-center px-2 py-2' : 'gap-2.5 px-2.5',
               activo ? 'text-rail-fg-strong' : 'text-rail-fg',
               'hover:bg-white/5 hover:text-rail-fg-strong',
             )}
           >
             <Icono className={cn('size-4 shrink-0', colapsado && 'mx-auto')} aria-hidden />
+            {/* Riel COLAPSADO: el badge no cabe → puntito de alerta sobre el icono (R2, pendiente
+                (e) de R1). El color sigue la severidad del badge expandido. */}
+            {colapsado && badge !== undefined ? (
+              <span
+                aria-hidden
+                data-testid={`nav-punto-${padre.clave}`}
+                className={cn(
+                  'absolute top-1 right-1.5 size-2 rounded-full ring-2 ring-rail',
+                  badge.critico ? 'bg-crit' : 'bg-warn',
+                )}
+              />
+            ) : null}
             <span
               className={cn(
                 'flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-in-out',

@@ -472,6 +472,27 @@ describe('Catálogo Proveedores enriquecido (F1-E1B, R15 — global ADR-0007)', 
       expect(pagina.datos[0]?.roles).toHaveLength(3);
     });
 
+    it('la busqueda ignora ACENTOS y mayusculas (R2 §4.4.1: "oscar" encuentra a "Oscar")', async () => {
+      const sesion = sesionAdmin();
+      await crearProveedor(sesion, { nombre: 'Óscar Jiménez', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Óscar Hernández', roles: [rolMaquila] }, bd());
+      await crearProveedor(sesion, { nombre: 'Rima Textil', roles: [rolMaquila] }, bd());
+
+      // Sin acento encuentra a los acentuados; con acento también; y el filtro por rol coexiste.
+      const sinAcento = await listarProveedores(sesion, { busqueda: 'oscar' }, bd());
+      expect(sinAcento.datos.map((p) => p.nombre).sort()).toEqual([
+        'Óscar Hernández',
+        'Óscar Jiménez',
+      ]);
+      const conAcento = await listarProveedores(sesion, { busqueda: 'óscar' }, bd());
+      expect(conAcento.total).toBe(2);
+      // "her" → solo Hernández (el requisito literal de Daniel).
+      const her = await listarProveedores(sesion, { busqueda: 'her' }, bd());
+      expect(her.datos.map((p) => p.nombre)).toEqual(['Óscar Hernández']);
+      // Sin coincidencias → página vacía limpia.
+      expect((await listarProveedores(sesion, { busqueda: 'zzz' }, bd())).total).toBe(0);
+    });
+
     it('excluye inactivos por defecto', async () => {
       const sesion = sesionAdmin();
       await crearProveedor(sesion, { nombre: 'Activo', roles: [rolMaquila] }, bd());

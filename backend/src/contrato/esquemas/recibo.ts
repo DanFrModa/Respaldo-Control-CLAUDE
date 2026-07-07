@@ -182,7 +182,12 @@ export const esquemaReciboSalida = z
     idAlmacenSegundas: z.number().int().nullable().describe('Almacén destino de segundas o null.'),
     almacenSegundas: z.string().nullable().describe('Nombre del almacén de segundas o null.'),
     fecha: z.string().describe('Fecha del recibo (YYYY-MM-DD).'),
-    precioPactado: z.number().nullable().describe('Precio pactado o null.'),
+    precioPactado: z
+      .number()
+      .nullable()
+      .describe(
+        'Precio pactado, o null. En la respuesta de la CANCELACION va REDACTADO (null) sin `ordenes.ver-precio-real-maquila` (R2 §4.4.3); la de captura lo conserva (quien capturo lo tecleo).',
+      ),
     observaciones: z.string().nullable().describe('Observaciones o null.'),
     cancelado: z.boolean().describe('Si el recibo está cancelado (suave).'),
     canceladoEn: z.iso.datetime().nullable().describe('Cuándo se canceló (ISO) o null.'),
