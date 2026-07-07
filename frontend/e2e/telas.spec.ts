@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Telas unificadas (F1-E3) contra el stack real, en la estructura LISTA +
@@ -23,11 +23,7 @@ test.describe('CRUD de Telas (unificadas, con colores)', () => {
     await entrarComoAdmin(page);
 
     // Navega Inventarios · Telas -> Catálogo de telas (descubrible por clic, no solo por URL).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('button', { name: 'Telas', exact: true })
-      .click();
+    await abrirDesplegableMenu(page, 'Telas');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()

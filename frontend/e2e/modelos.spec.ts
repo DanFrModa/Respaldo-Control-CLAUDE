@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, en la estructura LISTA + DETALLE
@@ -68,11 +68,7 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await crearBordado(page, bordado);
 
     // ── Navega a Modelos (Operación · Desarrollo, desplegable del rediseño) ────
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('button', { name: 'Desarrollo' })
-      .click();
+    await abrirDesplegableMenu(page, 'Desarrollo');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()

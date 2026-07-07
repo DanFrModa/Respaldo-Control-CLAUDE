@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { CREDENCIALES_ADMIN, entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, CREDENCIALES_ADMIN, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de Administración contra el stack real (frontend + backend + postgres).
@@ -34,11 +34,7 @@ test.describe('Administración — Usuarios y RBAC', () => {
     // ── 1) Como admin: crear el usuario con el rol `Basico` ─────────────────────
     await entrarComoAdmin(page);
 
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('button', { name: 'Usuarios y accesos' })
-      .click();
+    await abrirDesplegableMenu(page, 'Usuarios y accesos');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()

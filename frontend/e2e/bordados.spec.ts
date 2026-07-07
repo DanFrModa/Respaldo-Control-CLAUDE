@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Bordados/estampados (F1-E3) contra el stack real, en la estructura
@@ -22,11 +22,7 @@ test.describe('CRUD de Bordados', () => {
     await entrarComoAdmin(page);
 
     // Navega Operación · Desarrollo -> Bordados (descubrible por clic).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('button', { name: 'Desarrollo' })
-      .click();
+    await abrirDesplegableMenu(page, 'Desarrollo');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()

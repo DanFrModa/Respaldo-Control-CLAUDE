@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Avíos (F1-E3, R1) contra el stack real, en la estructura LISTA + DETALLE
@@ -46,11 +46,7 @@ test.describe('CRUD de Avíos', () => {
     await crearProveedor(page, prov2);
 
     // Navega Inventarios · Avíos -> Catálogo de avíos (descubrible por clic, no solo por URL).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('button', { name: 'Avíos', exact: true })
-      .click();
+    await abrirDesplegableMenu(page, 'Avíos');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()

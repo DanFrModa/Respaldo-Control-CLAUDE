@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de las AUDITORÍAS de calidad (F6-E2) contra el stack real. El flujo transaccional completo
@@ -22,11 +22,7 @@ test.describe('Auditorías de calidad (F6-E2)', () => {
     await entrarComoAdmin(page);
 
     // Navega Operación · Calidad → Alta de auditoría (desplegable del rediseño).
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('button', { name: 'Calidad', exact: true })
-      .click();
+    await abrirDesplegableMenu(page, 'Calidad');
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()

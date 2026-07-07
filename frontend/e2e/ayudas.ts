@@ -21,6 +21,25 @@ export async function entrarComoAdmin(page: Page): Promise<void> {
 }
 
 /**
+ * Abre (si hace falta) un DESPLEGABLE del riel (rediseño R1) para poder clickear a sus hijos.
+ * IDEMPOTENTE a propósito: el botón de un padre TOGGLEA, y el riel auto-abre al padre cuya ruta
+ * está activa (p. ej. tras un `goto` a un hijo suyo, como `/catalogos/bordados` bajo Desarrollo);
+ * un click ciego en ese estado lo CERRARÍA y el hijo desaparecería (causa del timeout de
+ * `modelos.spec` en CI, R1). Por eso solo clickea cuando `aria-expanded` no es `true`, y siempre
+ * termina verificando que quedó abierto.
+ */
+export async function abrirDesplegableMenu(page: Page, nombre: string): Promise<void> {
+  const boton = page
+    .getByRole('navigation', { name: 'Módulos' })
+    .first()
+    .getByRole('button', { name: nombre, exact: true });
+  if ((await boton.getAttribute('aria-expanded')) !== 'true') {
+    await boton.click();
+  }
+  await expect(boton).toHaveAttribute('aria-expanded', 'true');
+}
+
+/**
  * Crea al vuelo un COLOR y una TALLA activos en los catálogos y devuelve sus etiquetas. Lo usan las
  * pruebas que arman una matriz color×talla (órdenes, movimientos/traspasos PT, entrega a cliente):
  * necesitan ≥1 color y ≥1 talla en el catálogo y NO deben depender del orden de la suite (antes
