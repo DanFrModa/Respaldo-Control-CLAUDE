@@ -54,7 +54,9 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
     await page.goto('/desarrollo');
-    await expect(page.getByRole('heading', { name: 'Desarrollo' })).toBeVisible();
+    // `exact`: la lista+detalle auto-selecciona el primer proyecto (si la BD trae alguno) y su
+    // panel trae un <h3>"Desarrollos"</h3> → "Desarrollo" (substring) haría doble match sin exact.
+    await expect(page.getByRole('heading', { name: 'Desarrollo', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
     await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });
@@ -160,7 +162,9 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────
     await page.goto('/pedidos/administrar');
-    await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
+    // `exact`: el matcher por nombre es substring y el panel de detalle trae un <h3>"Pedidos
+    // reales"</h3> que aparece al auto-seleccionar un pedido (async) → sin exact, doble match flaky.
+    await expect(page.getByRole('heading', { name: 'Pedidos', exact: true })).toBeVisible();
     await page.getByTestId('buscar-pedido').fill(cliente);
     await page.getByTestId('fila-pedido').filter({ hasText: cliente }).first().click();
     const detallePedido = page.getByTestId('detalle-pedido');

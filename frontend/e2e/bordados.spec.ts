@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Bordados/estampados (F1-E3) contra el stack real, en la estructura
@@ -21,13 +21,9 @@ test.describe('CRUD de Bordados', () => {
 
     await entrarComoAdmin(page);
 
-    // Navega Operación · Desarrollo -> Bordados (descubrible por clic).
-    await abrirDesplegableMenu(page, 'Desarrollo');
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Bordados', exact: true })
-      .click();
+    // Bordados (receta/BOM de modelos) salió del riel — Desarrollo ahora solo lista Modelos,
+    // Pre-costeos y Cotizaciones: la pantalla sigue viva por URL directa (y por ⌘K).
+    await page.goto('/catalogos/bordados');
     await expect(page.getByRole('heading', { name: 'Bordados y estampados' })).toBeVisible();
 
     const detalle = page.getByTestId('detalle-bordado');

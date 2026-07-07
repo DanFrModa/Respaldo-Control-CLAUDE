@@ -45,7 +45,9 @@ test.describe('Desarrollo (F8-E2)', () => {
 
     // ── Crea un proyecto ────────────────────────────────────────────────────────
     await page.goto('/desarrollo');
-    await expect(page.getByRole('heading', { name: 'Desarrollo' })).toBeVisible();
+    // `exact`: la lista+detalle auto-selecciona el primer proyecto (si la BD trae alguno) y su
+    // panel trae un <h3>"Desarrollos"</h3> → "Desarrollo" (substring) haría doble match sin exact.
+    await expect(page.getByRole('heading', { name: 'Desarrollo', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
     await expect(dialogoProyecto.getByRole('heading', { name: 'Nuevo proyecto' })).toBeVisible();

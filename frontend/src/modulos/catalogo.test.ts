@@ -6,10 +6,14 @@ import {
   buscarModuloPorClave,
   esEntradaVisible,
   esModuloVisible,
+  filtrarCatalogoVisible,
   filtrarGruposVisibles,
   filtrarModulosVisibles,
+  type GrupoMenu,
   GRUPOS_MENU,
+  type ModuloMenu,
   MODULOS_MENU,
+  RIEL_GRUPOS,
 } from './catalogo';
 
 /** Construye un conjunto de permisos a partir de una lista (azucar para los tests). */
@@ -17,7 +21,29 @@ function permisos(...claves: ClavePermiso[]): ReadonlySet<ClavePermiso> {
   return new Set(claves);
 }
 
-describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
+/** TODOS los permisos que usa alguna hoja del catálogo (para "ver el riel completo"). */
+function todosLosPermisos(): ReadonlySet<ClavePermiso> {
+  const set = new Set<ClavePermiso>();
+  for (const modulo of MODULOS_MENU) {
+    if (modulo.permisos !== 'autenticado') {
+      for (const clave of modulo.permisos) {
+        set.add(clave);
+      }
+    }
+  }
+  return set;
+}
+
+/** Aplana las HOJAS de una estructura agrupada (padres → hijos, en orden). */
+function hojasDe(grupos: readonly GrupoMenu[]): string[] {
+  return grupos.flatMap((grupo) =>
+    grupo.entradas.flatMap((entrada) =>
+      entrada.hijos !== undefined ? entrada.hijos.map((h) => h.clave) : [entrada.clave],
+    ),
+  );
+}
+
+describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
   it('tiene los 7 grupos aprobados por Daniel, en orden', () => {
     // Estructura aprobada 4-jul-2026 (spec §3.1): Resumen suelto + 6 grupos.
     expect(GRUPOS_MENU.map((g) => g.titulo)).toEqual([
@@ -32,10 +58,8 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
   });
 
   it('define 100 hojas y 15 padres con claves unicas (padres incluidos)', () => {
-    // R1 dejó 99 hojas y 15 padres; R4 quita la hoja rc-bandeja (redirige a Mis pendientes) y el
-    // padre Ruta Crítica (vuelve HOJA DIRECTA a /ruta-critica/pendientes), y agrega la hoja
-    // rc-procesos-responsables con su padre SISTEMA «Procesos y responsables» (g-rc-config):
-    // 99 − 1 + 2 = 100 hojas; 15 − 1 + 1 = 15 padres.
+    // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
+    // (100 hojas + 15 padres). Lo que cambia es SOLO qué se ve en el riel (ver el otro describe).
     expect(MODULOS_MENU).toHaveLength(100);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
@@ -64,13 +88,6 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
     expect(primerHijo('calidad')).toBe('calidad-consulta-auditorias');
     expect(primerHijo('inventarios')).toBe('inventario-existencias');
     expect(primerHijo('catalogos')).toBe('colores');
-  });
-
-  it('marca la Ruta Critica como la entrada destacada', () => {
-    const entradas = GRUPOS_MENU.flatMap((g) => g.entradas);
-    const destacados = entradas.filter((e) => e.destacado);
-    expect(destacados).toHaveLength(1);
-    expect(destacados[0]?.clave).toBe('ruta-critica');
   });
 
   it('las hojas sin pantalla llevan su nota de "Proximamente" y ruta de un segmento', () => {
@@ -118,43 +135,7 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
     );
   });
 
-  it('filtrarGruposVisibles poda hijos sin permiso y elimina padres/grupos vacios', () => {
-    const grupos = filtrarGruposVisibles(permisos());
-    const porClave = new Map(grupos.map((g) => [g.clave, g]));
-
-    // FINANZAS: quedan CxC/CxP pero EsMa (todas sus hojas con permiso) desaparece.
-    expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc', 'cxp']);
-    // OPERACIÓN: Ruta Crítica y Pedidos desaparecen (sin permisos); Desarrollo queda solo con
-    // sus hojas "autenticado" (bordados y su galería); Calidad solo con Auditores.
-    const operacion = porClave.get('operacion');
-    expect(operacion?.entradas.map((e) => e.clave)).toEqual([
-      'g-desarrollo',
-      'produccion',
-      'calidad',
-    ]);
-    const desarrollo = operacion?.entradas.find((e) => e.clave === 'g-desarrollo');
-    expect(desarrollo?.hijos?.map((h) => h.clave)).toEqual(['bordados', 'galeria-bordados']);
-    // SISTEMA: Catálogos base pierde "Tipos de proceso" (permiso propio); Administración y
-    // Procesos y responsables desaparecen.
-    const sistema = porClave.get('sistema');
-    expect(sistema?.entradas.map((e) => e.clave)).toEqual(['catalogos']);
-    const catalogos = sistema?.entradas.find((e) => e.clave === 'catalogos');
-    expect(catalogos?.hijos?.map((h) => h.clave)).not.toContain('tipos-proceso');
-  });
-
-  it('un padre es visible si ALGUNA hoja hija es visible (basta una)', () => {
-    const administracion = GRUPOS_MENU.flatMap((g) => g.entradas).find(
-      (e) => e.clave === 'administracion',
-    );
-    expect(administracion).toBeDefined();
-    if (!administracion) return; // estrecha el tipo (sin `!`)
-    expect(esEntradaVisible(administracion, permisos())).toBe(false);
-    // Con solo la bitácora, "Usuarios y accesos" aparece (con esa única hoja).
-    expect(esEntradaVisible(administracion, permisos('admin.ver-bitacora'))).toBe(true);
-    expect(esEntradaVisible(administracion, permisos('usuarios.administrar'))).toBe(true);
-  });
-
-  it('cada hoja conserva el permiso de su entrada equivalente anterior', () => {
+  it('cada hoja conserva EXACTAMENTE el permiso de su entrada equivalente (A4, no cambia)', () => {
     const casos: ReadonlyArray<[string, readonly ClavePermiso[] | 'autenticado']> = [
       ['modelos', ['modelos.ver']],
       ['galeria-modelos', ['modelos.ver']],
@@ -165,21 +146,23 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
       ['ordenes', ['ordenes.ver']],
       ['notas-salida', ['notas.ver']],
       ['tipos-proceso', ['tipos-proceso.ver']],
-      // R4: Ruta Crítica es hoja directa a Mis pendientes con el gate de la bandeja anterior.
       ['ruta-critica', ['rc.ruta-ver']],
       ['rc-concentrado', ['rc.ruta-ver']],
       ['rc-procesos-responsables', ['rc.catalogo-ver']],
       ['rc-procesos', ['rc.catalogo-ver']],
       ['calidad-consulta-auditorias', ['calidad.ver']],
+      ['calidad-defectos', ['calidad.ver']],
       ['bitacora', ['admin.ver-bitacora']],
       ['config-ruta-critica', ['empresas.administrar']],
       ['inventario-existencias', ['inventario-pt.ver']],
+      ['inventario-movimientos', ['inventario-pt.mover']],
       ['edr-por-mes', ['edr.ver']],
       // Los catálogos que vivían bajo el hub Catálogos conservan su gate "autenticado".
       ['clientes-catalogo', 'autenticado'],
       ['proveedores', 'autenticado'],
       ['catalogo-telas', 'autenticado'],
       ['colores', 'autenticado'],
+      ['etiquetas-marca', 'autenticado'],
     ];
     for (const [clave, esperado] of casos) {
       const hoja = MODULOS_MENU.find((m) => m.clave === clave);
@@ -189,25 +172,10 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
   });
 
   it('los hubs siguen encontrando sus sub-vistas por prefijo de ruta (compatibilidad)', () => {
-    // `InventariosPagina` lista tarjetas filtrando el menú plano; las sub-vistas RC ya no tienen
-    // hub (R4: /ruta-critica redirige a Mis pendientes) pero siguen siendo hojas del menú (⌘K).
     const inventarios = MODULOS_MENU.filter(
       (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
     );
     expect(inventarios).toHaveLength(10);
-    const rutaCritica = MODULOS_MENU.filter(
-      (m) => m.subVista === true && m.ruta.startsWith('/ruta-critica/'),
-    );
-    // R4: rc-bandeja desapareció (Mis pendientes es la hoja directa, no subVista).
-    expect(rutaCritica.map((m) => m.clave).sort()).toEqual(
-      [
-        'rc-concentrado',
-        'rc-dependencias',
-        'rc-plantillas',
-        'rc-procesos',
-        'rc-reglas-duracion',
-      ].sort(),
-    );
   });
 
   it('busca por clave: hojas, padres (rutas legadas /produccion y /compras) e inexistentes', () => {
@@ -230,5 +198,260 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
     if (!bitacora) return;
     expect(esModuloVisible(bitacora, permisos())).toBe(false);
     expect(esModuloVisible(bitacora, permisos('admin.ver-bitacora'))).toBe(true);
+  });
+
+  it('un padre del catálogo es visible si ALGUNA hoja hija es visible (basta una)', () => {
+    const administracion = GRUPOS_MENU.flatMap((g) => g.entradas).find(
+      (e) => e.clave === 'administracion',
+    );
+    expect(administracion).toBeDefined();
+    if (!administracion) return; // estrecha el tipo (sin `!`)
+    expect(esEntradaVisible(administracion, permisos())).toBe(false);
+    // Con solo la bitácora, el padre aparece (con esa única hoja).
+    expect(esEntradaVisible(administracion, permisos('admin.ver-bitacora'))).toBe(true);
+    expect(esEntradaVisible(administracion, permisos('usuarios.administrar'))).toBe(true);
+  });
+});
+
+describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', () => {
+  // Lo que Daniel aprobó, ni una entrada de más. `padre: true` = desplegable (2 niveles).
+  const RIEL_ESPERADO: ReadonlyArray<{
+    titulo: string | null;
+    entradas: ReadonlyArray<{ clave: string; padre: boolean; hijos?: readonly string[] }>;
+  }> = [
+    { titulo: null, entradas: [{ clave: 'resumen', padre: false }] },
+    {
+      titulo: 'Operación',
+      entradas: [
+        { clave: 'g-desarrollo', padre: true, hijos: ['modelos', 'desarrollo', 'listas-precios'] },
+        { clave: 'pedidos', padre: false },
+        { clave: 'produccion', padre: true, hijos: ['ordenes', 'notas-salida'] },
+        { clave: 'ruta-critica', padre: false },
+        { clave: 'calidad', padre: true, hijos: ['calidad-consulta-auditorias', 'auditores'] },
+      ],
+    },
+    {
+      titulo: 'Inventarios',
+      entradas: [
+        { clave: 'inventarios', padre: false },
+        { clave: 'telas', padre: false },
+        { clave: 'avios', padre: false },
+        { clave: 'compras', padre: false },
+      ],
+    },
+    {
+      titulo: 'Comercial',
+      entradas: [
+        {
+          clave: 'clientes',
+          padre: true,
+          hijos: ['clientes-catalogo', 'clientes-listas-precios', 'ventas'],
+        },
+        { clave: 'proveedores', padre: false },
+      ],
+    },
+    {
+      titulo: 'Finanzas',
+      entradas: [
+        { clave: 'cxc', padre: false },
+        { clave: 'cxp', padre: false },
+        { clave: 'esma', padre: false }, // desviación interina (F9): hoja directa, NO desplegable
+      ],
+    },
+    {
+      titulo: 'Análisis',
+      entradas: [
+        { clave: 'analisis-rc', padre: false },
+        { clave: 'costos', padre: false },
+        { clave: 'edr', padre: false },
+        { clave: 'indicadores', padre: false },
+      ],
+    },
+    {
+      titulo: 'Sistema',
+      entradas: [
+        {
+          clave: 'catalogos',
+          padre: true,
+          hijos: ['colores', 'tallas', 'temporadas', 'tipos-proceso', 'almacenes'],
+        },
+        { clave: 'g-rc-config', padre: false },
+        { clave: 'administracion', padre: false },
+      ],
+    },
+  ];
+
+  it('el riel es EXACTAMENTE la estructura de Daniel (grupos, entradas, hijos)', () => {
+    expect(RIEL_GRUPOS.map((g) => g.titulo)).toEqual(RIEL_ESPERADO.map((g) => g.titulo));
+    RIEL_ESPERADO.forEach((grupoEsperado, i) => {
+      const grupo = RIEL_GRUPOS[i];
+      expect(
+        grupo?.entradas.map((e) => e.clave),
+        grupoEsperado.titulo ?? 'inicio',
+      ).toEqual(grupoEsperado.entradas.map((e) => e.clave));
+      grupoEsperado.entradas.forEach((entradaEsperada, j) => {
+        const entrada = grupo?.entradas[j];
+        // padre ⇔ tiene `hijos`; hoja ⇔ navega (hijos undefined).
+        expect(entrada?.hijos !== undefined, `${entradaEsperada.clave} padre?`).toBe(
+          entradaEsperada.padre,
+        );
+        if (entradaEsperada.hijos !== undefined) {
+          expect(
+            entrada?.hijos?.map((h) => h.clave),
+            entradaEsperada.clave,
+          ).toEqual(entradaEsperada.hijos);
+        }
+      });
+    });
+  });
+
+  it('el riel tiene 5 padres y marca SOLO la Ruta Crítica como destacada', () => {
+    const padres = RIEL_GRUPOS.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
+    expect(padres.map((p) => p.clave)).toEqual([
+      'g-desarrollo',
+      'produccion',
+      'calidad',
+      'clientes',
+      'catalogos',
+    ]);
+    const destacadas = RIEL_GRUPOS.flatMap((g) => g.entradas).filter((e) => e.destacado);
+    expect(destacadas).toHaveLength(1);
+    expect(destacadas[0]?.clave).toBe('ruta-critica');
+  });
+
+  it('las hojas colapsadas navegan a su pantalla principal con el gate correcto', () => {
+    const hojaRiel = (clave: string): ModuloMenu | undefined => {
+      const entrada = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === clave);
+      // `hijos === undefined` estrecha EntradaMenu → ModuloMenu (tiene `ruta`/`permisos`).
+      return entrada !== undefined && entrada.hijos === undefined ? entrada : undefined;
+    };
+    const casos: ReadonlyArray<[string, string, readonly ClavePermiso[]]> = [
+      ['inventarios', '/inventarios/existencias', ['inventario-pt.ver']],
+      ['telas', '/inventarios/telas/existencias', ['inventario-telas.ver']],
+      ['avios', '/inventarios/avios/existencias', ['inventario-avios.ver']],
+      ['compras', '/compras/ordenes', ['compras.ver']],
+      ['costos', '/costos', ['costos.ver', 'precostos.consultar']],
+      ['edr', '/edr', ['edr.ver', 'edr.capturar']],
+      ['esma', '/esma', ['esma.ver-pagos', 'esma.cargo-validar', 'esma.modificar']],
+      ['g-rc-config', '/ruta-critica/procesos-responsables', ['rc.catalogo-ver']],
+      [
+        'administracion',
+        '/administracion',
+        [
+          'usuarios.administrar',
+          'roles.administrar',
+          'empresas.administrar',
+          'almacenes.administrar',
+          // El hub /administracion tiene una tarjeta Bitácora (solo `admin.ver-bitacora`): entra a
+          // la unión para que los roles con solo ese permiso conserven su vía por menú.
+          'admin.ver-bitacora',
+        ],
+      ],
+    ];
+    for (const [clave, ruta, gate] of casos) {
+      const hoja = hojaRiel(clave);
+      expect(hoja, clave).toBeDefined();
+      expect(hoja?.ruta, clave).toBe(ruta);
+      expect(hoja?.permisos, clave).toEqual(gate);
+    }
+  });
+
+  it('cada colapsar-HUB aparece a EXACTAMENTE quien veía el padre (gate ⊇ unión de hijos)', () => {
+    // Invariante clave: si el destino es un HUB que auto-filtra sus tarjetas, el gate de la hoja
+    // directa DEBE ser superconjunto de la unión de permisos de las tarjetas hijas — así la entrada
+    // aparece a TODOS los que veían el padre antes (sin regresión de menú) y el hub muestra solo lo
+    // accesible. Las 4 hojas de Inventarios NO entran aquí: apuntan a una PANTALLA ESPECÍFICA
+    // (Existencias), no a un hub, y gatean por el permiso de esa pantalla a propósito (ver el test
+    // anterior); esa excepción la ratificó el reviewer.
+    const HUBS = ['costos', 'edr', 'indicadores', 'esma', 'g-rc-config', 'administracion'];
+    const hojaRiel = (clave: string): ModuloMenu | undefined => {
+      const entrada = RIEL_GRUPOS.flatMap((g) => g.entradas).find((e) => e.clave === clave);
+      return entrada !== undefined && entrada.hijos === undefined ? entrada : undefined;
+    };
+    for (const clave of HUBS) {
+      const padre = GRUPOS_MENU.flatMap((g) => g.entradas).find((e) => e.clave === clave);
+      expect(padre?.hijos, `${clave} debe ser padre en el catálogo`).toBeDefined();
+      const union = new Set<ClavePermiso>();
+      for (const hijo of padre?.hijos ?? []) {
+        if (hijo.permisos !== 'autenticado') {
+          for (const p of hijo.permisos) union.add(p);
+        }
+      }
+      const hoja = hojaRiel(clave);
+      expect(hoja, clave).toBeDefined();
+      const gate = hoja?.permisos;
+      expect(gate, `${clave}: la hoja colapsada no debe ser 'autenticado'`).not.toBe('autenticado');
+      const gateSet = new Set(gate === undefined || gate === 'autenticado' ? [] : gate);
+      for (const p of union) {
+        expect(
+          gateSet.has(p),
+          `${clave}: el gate del riel debe incluir "${p}" (una tarjeta hija del hub lo exige)`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('lo legado sale del RIEL pero sigue en el CATÁLOGO (⌘K no pierde nada)', () => {
+    const clavesRiel = new Set(hojasDe(RIEL_GRUPOS));
+    const clavesCatalogo = new Set(hojasDe(filtrarCatalogoVisible(todosLosPermisos())));
+    // Muestra representativa de lo que R2–R4 sacó del riel (corte/envíos/recibos/WIP, el
+    // concentrado, galerías, catálogos de referencia, sub-vistas de compras/costos/edr/esma).
+    for (const clave of [
+      'corte',
+      'envios',
+      'recibos',
+      'entregas',
+      'wip',
+      'rc-concentrado',
+      'galeria-modelos',
+      'bordados',
+      'etiquetas-marca',
+      'calidad-defectos',
+      'inventario-movimientos',
+      'catalogo-telas',
+      'ordenes-compra',
+      'costos-margenes',
+      'edr-por-anio',
+      'esma-pagos',
+    ]) {
+      expect(clavesRiel.has(clave), `${clave} NO debe estar en el riel`).toBe(false);
+      expect(clavesCatalogo.has(clave), `${clave} SÍ debe estar en ⌘K`).toBe(true);
+    }
+  });
+
+  it('filtrarGruposVisibles poda por permiso (riel) y elimina padres/grupos vacios', () => {
+    const grupos = filtrarGruposVisibles(permisos());
+    const porClave = new Map(grupos.map((g) => [g.clave, g]));
+
+    // FINANZAS: quedan CxC/CxP (autenticado); EsMa (gate por permisos) desaparece.
+    expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc', 'cxp']);
+    // INVENTARIOS: las 4 hojas colapsadas tienen gate → sin permisos, el grupo entero desaparece.
+    expect(porClave.get('inventarios')).toBeUndefined();
+    // OPERACIÓN: solo Calidad sobrevive (por su hoja "Auditores", autenticado).
+    const operacion = porClave.get('operacion');
+    expect(operacion?.entradas.map((e) => e.clave)).toEqual(['calidad']);
+    const calidad = operacion?.entradas.find((e) => e.clave === 'calidad');
+    expect(calidad?.hijos?.map((h) => h.clave)).toEqual(['auditores']);
+    // SISTEMA: Catálogos base pierde "Tipos de proceso" (permiso propio); las 2 hojas directas
+    // (Procesos y responsables, Usuarios y accesos) desaparecen.
+    const sistema = porClave.get('sistema');
+    expect(sistema?.entradas.map((e) => e.clave)).toEqual(['catalogos']);
+    const catalogos = sistema?.entradas.find((e) => e.clave === 'catalogos');
+    expect(catalogos?.hijos?.map((h) => h.clave)).toEqual([
+      'colores',
+      'tallas',
+      'temporadas',
+      'almacenes',
+    ]);
+  });
+
+  it('con todos los permisos, el riel muestra la estructura completa de Daniel', () => {
+    const grupos = filtrarGruposVisibles(todosLosPermisos());
+    expect(grupos.map((g) => g.titulo)).toEqual(RIEL_ESPERADO.map((g) => g.titulo));
+    grupos.forEach((grupo, i) => {
+      expect(grupo.entradas.map((e) => e.clave)).toEqual(
+        RIEL_ESPERADO[i]?.entradas.map((e) => e.clave),
+      );
+    });
   });
 });

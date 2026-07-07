@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { abrirDesplegableMenu, CREDENCIALES_ADMIN, entrarComoAdmin } from './ayudas';
+import { CREDENCIALES_ADMIN, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de Administración contra el stack real (frontend + backend + postgres).
@@ -34,12 +34,13 @@ test.describe('Administración — Usuarios y RBAC', () => {
     // ── 1) Como admin: crear el usuario con el rol `Basico` ─────────────────────
     await entrarComoAdmin(page);
 
-    await abrirDesplegableMenu(page, 'Usuarios y accesos');
+    // "Usuarios y accesos" es HOJA DIRECTA del riel (Daniel) → abre el Panel de administración.
     await page
       .getByRole('navigation', { name: 'Módulos' })
       .first()
-      .getByRole('link', { name: 'Panel de administración' })
+      .getByRole('link', { name: 'Usuarios y accesos', exact: true })
       .click();
+    await expect(page.getByRole('heading', { name: 'Administración' })).toBeVisible();
     await page.getByTestId('administracion-usuarios').click();
     await expect(page.getByRole('heading', { name: 'Usuarios' })).toBeVisible();
 
@@ -70,13 +71,13 @@ test.describe('Administración — Usuarios y RBAC', () => {
     await page.getByRole('button', { name: 'Entrar' }).click();
     await expect(page.getByRole('heading', { name: /Hola, Usuario Básico E2E/ })).toBeVisible();
 
-    // No es admin: no debería ver "Usuarios y accesos" en el menú (el padre se
-    // oculta cuando ninguna hoja hija es visible, A4).
+    // No es admin: no debería ver "Usuarios y accesos" en el menú (la hoja directa se
+    // oculta cuando sus permisos no se cumplen, A4).
     await expect(
       page
         .getByRole('navigation', { name: 'Módulos' })
         .first()
-        .getByRole('button', { name: 'Usuarios y accesos' }),
+        .getByRole('link', { name: 'Usuarios y accesos', exact: true }),
     ).toHaveCount(0);
 
     // ── 4) La portada de Catálogos no ofrece ningún sub-catálogo ────────────────

@@ -19,13 +19,9 @@ test.describe('Ruta Crítica — concentrado planeado vs real (F5-E7)', () => {
   }) => {
     await entrarComoAdmin(page);
 
-    // R4: el hub /ruta-critica se retiró (redirige a Mis pendientes); el concentrado vive en el
-    // grupo ANÁLISIS del menú, junto a "Análisis RC".
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Concentrado planeado vs real' })
-      .click();
+    // El concentrado planeado-vs-real salió del riel (es análisis gerencial, no operación diaria):
+    // sigue vivo por URL directa y por ⌘K (en ANÁLISIS, junto a "Análisis RC").
+    await page.goto('/ruta-critica/concentrado');
 
     await expect(page.getByRole('heading', { name: 'Concentrado planeado vs real' })).toBeVisible();
 
