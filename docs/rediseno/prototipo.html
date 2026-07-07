@@ -2037,20 +2037,38 @@ const RUTAS = [
   ]},
 ];
 /* Catálogo de procesos de la Ruta Crítica (ProcesoDef de F5): responsable por
-   default + auto-completado por evento del sistema. Configurable: se agregan/
-   quitan procesos y se asignan responsables; por orden/prenda se ajusta. */
+   default + auto-completado por evento del sistema + TIEMPO por operación con
+   variación por DIFICULTAD (1-6) + variables (depende de catálogo / condicional).
+   Configurable: se agregan/quitan procesos y se asignan responsables. Los tiempos
+   alimentan el cálculo de la ruta HACIA ATRÁS (CPM). t = [d1..d6] días por dificultad. */
+const DIF_LBL = ['Sencillo 1/6', 'Sencillo+ 2/6', 'Medio 3/6', 'Medio+ 4/6', 'Difícil 5/6', 'Difícil+ 6/6'];
 const PROCESOS_CAT = [
-  { n:1, p:'Desarrollo / muestra', area:'Desarrollo', resp:'Gabriel Masri',   auto:false, evento:'Se marca a mano (no hay acción de sistema)' },
-  { n:2, p:'Compra de tela',       area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras / MRP)' },
-  { n:3, p:'Corte',                area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar corte (Avance de producción)' },
-  { n:4, p:'Envío a maquila',      area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Envío a maquila (Avance de producción)' },
-  { n:5, p:'Maquila (costura)',    area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance de producción)' },
-  { n:6, p:'Recibo de maquila',    area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance de producción)' },
-  { n:7, p:'Estampado / Bordado',  area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de estampado (Avance de producción)' },
-  { n:8, p:'Auditoría de calidad', area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría AQL (Calidad)' },
-  { n:9, p:'Entrega a cliente',    area:'Ventas',     resp:'Sofía Ramírez',   auto:true,  evento:'Entrega a cliente (Avance / Almacén)' },
+  { n:1,  p:'Revisión de orden de producción', area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Liberar la OP (Producción)',              t:[1,1,1,1,1,1] },
+  { n:2,  p:'Ficha de desarrollo',             area:'Desarrollo', resp:'Gabriel Masri',   auto:false, evento:'Se captura a mano (Desarrollo)',          t:[3,3,3,3,3,3] },
+  { n:3,  p:'Programación',                    area:'Producción', resp:'Laura Hernández', auto:false, evento:'Se programa a mano',                      t:[1,1,1,1,1,1] },
+  { n:4,  p:'Autorización de fit',             area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar autorización de fit',           t:[15,15,15,15,15,15] },
+  { n:5,  p:'Autorización de arte',            area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar arte autorizado',               t:[2,2,2,2,2,2], condicional:'Solo si la prenda lleva estampado o bordado' },
+  { n:6,  p:'Compra de tela',                  area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Crear orden de compra de tela',           t:[2,2,2,2,2,2] },
+  { n:7,  p:'Autorización tono de tela',       area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar tono autorizado',               t:[15,15,15,15,15,15] },
+  { n:8,  p:'Autorización de avíos',           area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar avíos autorizados',             t:[12,12,12,12,12,12] },
+  { n:9,  p:'Surtido de avíos',                area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Nota de salida de avíos',                 t:[12,12,12,12,12,12] },
+  { n:10, p:'Recepción de tela',               area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras)',         t:[20,20,20,20,20,20], depende:'Tipo de tela', dependeEj:'Punto 12 d · Plano 20 d · Importada 30 d' },
+  { n:11, p:'Auditoría de corte',              area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría de corte',            t:[3,3,3,3,3,3] },
+  { n:12, p:'Corte',                           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar corte (Avance de producción)',  t:[3,3,3,3,3,3] },
+  { n:13, p:'Envío a procesos (estampado/bordado)', area:'Producción', resp:'Laura Hernández', auto:true, evento:'Envío a estampado (Avance)',        t:[1,1,1,1,1,1], condicional:'Solo si la prenda lleva estampado o bordado' },
+  { n:14, p:'Recepción de procesos',           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de estampado (Avance)',            t:[5,5,5,5,5,5], condicional:'Solo si la prenda lleva estampado o bordado' },
+  { n:15, p:'Envío a maquila',                 area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Envío a maquila (Avance)',                t:[1,1,1,1,1,1] },
+  { n:16, p:'Maquila (costura)',               area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance)',              t:[5,5,5,5,5,5] },
+  { n:17, p:'Recibo de maquila',               area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance)',              t:[3,3,3,3,3,3] },
+  { n:18, p:'Auditoría de calidad',            area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría AQL',                 t:[2,2,2,2,2,2] },
+  { n:19, p:'Empaque',                         area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar empaque',                       t:[5,6,7,8,9,10] },
+  { n:20, p:'Entrega a cliente (CEDIS)',       area:'Ventas',     resp:'Sofía Ramírez',   auto:true,  evento:'Entrega a cliente (Almacén)',             t:[5,5,5,5,5,5] },
+  { n:21, p:'Aceptación de cliente',           area:'Ventas',     resp:'Sofía Ramírez',   auto:false, evento:'Confirma el cliente',                     t:[3,3,3,3,3,3] },
 ];
-const procCat = (nombre) => PROCESOS_CAT.find(x => x.p === nombre) || { p: nombre, auto: true, evento: 'Avance de producción', resp: '—' };
+const procCat = (nombre) => PROCESOS_CAT.find(x => x.p === nombre) || { p: nombre, auto: true, evento: 'Avance de producción', resp: '—', t:[1,1,1,1,1,1] };
+const tRange = (t) => { const a = t || [1]; return { min: Math.min(...a), max: Math.max(...a), vary: Math.min(...a) !== Math.max(...a) }; };
+let procExpand = new Set();
+function toggleProcExp(i) { if (procExpand.has(i)) procExpand.delete(i); else procExpand.add(i); ir('rc-procesos'); }
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
 let rcPersona = 'Laura Hernández';
 function misPendientes(persona) {
@@ -2153,30 +2171,55 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && rutaScrim.classLi
 /* Catálogo de procesos de la Ruta Crítica (ProcesoDef + responsables + auto) */
 function vProcesosRC() {
   const areaCls = { 'Producción': 'info', 'Compras': 'warn', 'Calidad': 'crit', 'Ventas': 'ok', 'Desarrollo': 'neutral' };
+  const nAuto = PROCESOS_CAT.filter(x => x.auto).length;
+  const tiempoCell = (x) => {
+    if (x.depende) return `<span class="badge info" style="font-size:10px"><span class="d"></span>variable</span> <span style="color:var(--muted);font-size:11px">según ${x.depende}</span>`;
+    const r = tRange(x.t);
+    return r.vary
+      ? `<b class="mono">${r.min}–${r.max}</b> <span style="color:var(--muted);font-size:11px">d · por dif.</span>`
+      : `<b class="mono">${r.min}</b> <span style="color:var(--muted);font-size:11px">d</span>`;
+  };
   return `
   <div class="page-head">
-    <div><h1>Procesos y responsables</h1><div class="sub">Catálogo de procesos de la Ruta Crítica · responsable por default · auto-completado por evento del sistema</div></div>
+    <div><h1>Procesos y responsables</h1><div class="sub">Catálogo de procesos de la Ruta Crítica · responsable · tiempo por operación (varía por dificultad 1-6) · variables · auto-completado</div></div>
     <div class="actions"><button class="btn primary" onclick="mostrarToast('Nuevo proceso — demo')">${IC.plus}Nuevo proceso</button></div>
   </div>
-  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se pueden <b>agregar o quitar</b>. Cada proceso tiene un <b>responsable por default</b> (siempre asignable). La <b>mayoría se marcan solos</b> al registrar su acción en el sistema; unos pocos son manuales.</span></div>
+  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se <b>agregan o quitan</b>. Cada proceso tiene su <b>responsable</b> y su <b>tiempo</b>, que puede variar por la <b>dificultad de la prenda (1-6)</b> o depender de un catálogo (ej. <b>tipo de tela</b>). Los tiempos alimentan la ruta <b>hacia atrás</b>. Casi todos se marcan <b>solos</b>. Abre cada renglón (▸) para el detalle.</span></div>
   <div class="card">
-    <div class="toolbar"><b>Secuencia de procesos</b><span class="count">${PROCESOS_CAT.length}</span><span class="tool-right" style="color:var(--muted);font-size:12px">${PROCESOS_CAT.filter(x => x.auto).length} automáticos · ${PROCESOS_CAT.filter(x => !x.auto).length} manuales</span></div>
+    <div class="toolbar"><b>Secuencia de procesos</b><span class="count">${PROCESOS_CAT.length}</span><span class="tool-right" style="color:var(--muted);font-size:12px">${nAuto} automáticos · ${PROCESOS_CAT.length - nAuto} manuales</span></div>
     <div class="table-wrap"><table class="data"><thead><tr>
-      <th class="r">#</th><th>Proceso</th><th>Área</th><th>Responsable por default</th><th>¿Cómo se completa?</th><th></th>
+      <th></th><th class="r">#</th><th>Proceso</th><th>Área</th><th>Responsable</th><th class="r">Tiempo</th><th>¿Cómo se completa?</th>
     </tr></thead><tbody>
-      ${PROCESOS_CAT.map(x => `<tr>
+      ${PROCESOS_CAT.map((x, i) => { const exp = procExpand.has(i); return `<tr>
+        <td><button class="lp-exp ${exp ? 'open' : ''}" onclick="toggleProcExp(${i})" title="Ver detalle">${IC.chevron}</button></td>
         <td class="r num">${x.n}</td>
-        <td class="cell-strong">${x.p}</td>
+        <td class="cell-strong">${x.p}${x.condicional ? ` <span class="badge neutral" style="font-size:10px" title="${x.condicional}"><span class="d"></span>condicional</span>` : ''}</td>
         <td><span class="badge ${areaCls[x.area] || 'neutral'}"><span class="d"></span>${x.area}</span></td>
         <td>${x.resp}</td>
+        <td class="r">${tiempoCell(x)}</td>
         <td>${x.auto
-          ? `<span class="badge ok"><span class="d"></span>⟳ Automático</span> <span style="color:var(--muted);font-size:12px">al registrar: ${x.evento}</span>`
+          ? `<span class="badge ok"><span class="d"></span>⟳ Auto</span> <span style="color:var(--muted);font-size:12px">al: ${x.evento}</span>`
           : `<span class="badge warn"><span class="d"></span>✋ Manual</span> <span style="color:var(--muted);font-size:12px">${x.evento}</span>`}</td>
-        <td class="r" style="white-space:nowrap"><button class="btn ghost sm" onclick="mostrarToast('Editar proceso — demo')">Editar</button> <button class="btn ghost sm" onclick="mostrarToast('Asignar responsable — demo')">Responsable</button></td>
-      </tr>`).join('')}
+      </tr>${exp ? `<tr class="lp-detrow"><td colspan="7"><div style="padding:6px 2px 10px;display:flex;flex-wrap:wrap;gap:26px">
+        <div>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">${x.depende ? 'Tiempo según catálogo de <b>' + x.depende + '</b>' : 'Tiempo por dificultad de la prenda (días)'}</div>
+          ${x.depende
+            ? `<div class="dg" style="max-width:440px"><div class="dg-row"><span>Depende del <b>tipo de tela</b></span><b class="mono">${x.dependeEj}</b></div></div>`
+            : `<div style="display:flex;gap:6px;flex-wrap:wrap">${x.t.map((d, di) => `<div style="text-align:center;border:1px solid var(--border);border-radius:8px;padding:5px 10px;background:${tRange(x.t).vary ? 'var(--brand-soft)' : 'var(--panel-2)'}"><div style="font-size:10px;color:var(--faint)">${DIF_LBL[di]}</div><div class="mono" style="font-weight:700;font-size:14px">${d} d</div></div>`).join('')}</div>`}
+        </div>
+        <div style="min-width:240px">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Variables / reglas</div>
+          <div style="font-size:12.5px;line-height:1.75">
+            ${x.condicional ? `⚠ <b>Condicional:</b> ${x.condicional}<br>` : '✓ Aplica a todas las prendas<br>'}
+            ${x.depende ? `🔧 <b>Tiempo variable</b> según ${x.depende}<br>` : (tRange(x.t).vary ? '🔧 <b>Tiempo variable</b> por dificultad (1-6)<br>' : '⏱ Tiempo fijo<br>')}
+            ${x.auto ? `⟳ <b>Automático</b> al registrar: ${x.evento}` : `✋ <b>Manual</b> — ${x.evento}`}
+          </div>
+          <div style="margin-top:9px;display:flex;gap:6px"><button class="btn ghost sm" onclick="mostrarToast('Editar tiempos — demo')">Editar tiempos</button><button class="btn ghost sm" onclick="mostrarToast('Asignar responsable — demo')">Responsable</button></div>
+        </div>
+      </div></td></tr>` : ''}`; }).join('')}
     </tbody></table></div>
   </div>
-  <div class="pc-hint-cell" style="margin-top:12px;max-width:940px">En el real (backend <b>F5</b>, ya construido): cada proceso es un <b>ProcesoDef</b> con sus <b>roles responsables</b> (N:M — puede haber más de uno), su <b>antecesor</b> (DAG para el CPM) y su <b>duración</b> (para calcular la fecha hacia atrás). El auto-completado sale del <b>auto-avance por eventos</b> de Producción/Compras/Calidad que ya existe.</div>`;
+  <div class="pc-hint-cell" style="margin-top:12px;max-width:970px">Basado en el catálogo real de Daniel (26 procesos con tiempo por operación y por dificultad 1-6). En el real (backend <b>F5</b>): <b>ProcesoDef</b> (roles N:M, antecesor/DAG, <b>duración por dificultad</b>) + reglas <b>condicionales</b> (¿lleva estampado/bordado?) + duración <b>dependiente de catálogo</b> (tipo de tela). Los tiempos alimentan el <b>CPM backward-pass</b> que ya calcula las fechas. El auto-completado sale del auto-avance por eventos.</div>`;
 }
 
 /* ---- Inventario PT ---- */
