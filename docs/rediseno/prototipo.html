@@ -1813,6 +1813,10 @@ function vProduccion() {
 /* Cada pedido interno (folio consecutivo -F) engloba varios modelos; cada
    modelo = una orden de producción (No. Ord). Van juntos en insumos y entrega. */
 const PEDIDOS_MES = [
+  { folio:'1508-F', cliente:'C&A', empresa:'FR', vig:'07-jul → 22-jul', estatus:'Vigente', modelos:[
+    { modelo:'62410', nombre:'Playera Cherry On Top', desRef:{pi:0,mi:0}, cant:1800, precio:168.00, fecha:'22-jul', ord:'', corte:0 },
+    { modelo:'62411', nombre:'Short deportivo felpa', desRef:{pi:0,mi:1}, cant:1200, precio:154.00, fecha:'22-jul', ord:'', corte:0 },
+  ]},
   { folio:'1502-F', cliente:'IB Coppel', empresa:'FR', vig:'04-jul → 04-jul', estatus:'Vigente', modelos:[
     { modelo:'32138', cant:5201, precio:112.74, fecha:'03-mar', ord:'5489', corte:5366 },
     { modelo:'52138', cant:600,  precio:133.20, fecha:'03-mar', ord:'5490', corte:638  },
@@ -1857,6 +1861,54 @@ const TALLAS_PED = ['XCH', 'CH', 'M', 'G', 'XG'];
 const COLORES_PED = ['Rojo A', 'Azul marino', 'Negro', 'Blanco', 'Verde pino', 'Rosa'];
 let pedBuilder = null, opGen = null;
 const nextFolioPed = () => { let mx = 0; PEDIDOS_MES.forEach(p => { const n = parseInt(String(p.folio).split('-')[0], 10) || 0; if (n > mx) mx = n; }); return (mx + 1) + '-F'; };
+/* --- Liga Desarrollo ↔ Producción (Etapa 2). Son BASES DISTINTAS: el modelo vive
+   primero en Desarrollo (con su nº de desarrollo) y el nº interno de PRODUCCIÓN se
+   asigna hasta que SALE A PRODUCCIÓN (al generar su 1ª OP), momento en que se liga a
+   su ficha de desarrollo y hereda BOM/telas/avíos/dificultad. Aclaración Daniel 7-jul. --- */
+function desModeloByNum(num) {
+  const s = String(num);
+  for (let pi = 0; pi < PROYECTOS.length; pi++) {
+    const mi = PROYECTOS[pi].modelos.findIndex(m => m.nuestro === s);
+    if (mi >= 0) return { pi, mi, m: PROYECTOS[pi].modelos[mi], proy: PROYECTOS[pi] };
+  }
+  return null;
+}
+function abrirDesarrolloDeModelo(num) {
+  const d = desModeloByNum(num);
+  if (!d) { mostrarToast('Modelo ' + num + ' · sin ficha de desarrollo (histórico, anterior al módulo de Desarrollo)'); return; }
+  editarModelo(d.pi, d.mi);
+}
+function devModelOptions(sel) {
+  return `<option value="">— elige modelo de desarrollo —</option>` +
+    PROYECTOS.map(p => `<optgroup label="${p.num} · ${p.cliente} / ${p.depto}">` +
+      p.modelos.map(m => `<option value="${m.nuestro}"${sel === m.nuestro ? ' selected' : ''}>${m.nuestro} · ${m.nombre}</option>`).join('') +
+    `</optgroup>`).join('');
+}
+/* nº interno de PRODUCCIÓN: se mintea al salir a producción (secuencia propia, distinta de la de desarrollo) */
+function nextProdModelo() {
+  let mx = 81390; // mayor nº de producción histórico del demo
+  PROYECTOS.forEach(p => p.modelos.forEach(m => { const n = parseInt(m.prodNum, 10) || 0; if (n > mx) mx = n; }));
+  return String(mx + 1);
+}
+/* Cadena de trazabilidad: Desarrollo → Lista → Pedido → OP (nodos activos = clicables) */
+function trzNode(k, v, active, onclick, title) {
+  const base = 'display:inline-flex;flex-direction:column;gap:1px;padding:5px 12px;border-radius:9px;border:1px solid var(--line);background:var(--card);font-family:inherit;text-align:left;' +
+    (active && onclick ? 'cursor:pointer;' : 'opacity:.5;cursor:default;');
+  return `<button type="button" style="${base}" ${active && onclick ? `onclick="${onclick}"` : 'disabled'} title="${title || ''}">
+    <span style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)">${k}</span>
+    <span class="mono" style="font-size:12.5px;font-weight:600;color:${active ? 'var(--brand)' : 'var(--muted)'}">${v}</span></button>`;
+}
+function cadenaTraza(o) {
+  const arrow = `<span style="color:var(--faint);display:inline-flex;align-items:center" aria-hidden="true">${IC.chevron}</span>`;
+  const desOk = o.desNum && desModeloByNum(o.desNum);
+  const opLabel = o.ord ? '#' + o.ord + (o.prodNum ? ' · mod. ' + o.prodNum : '') : 'por generar';
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 14px">
+    ${trzNode('Desarrollo', desOk ? '#' + o.desNum : '—', !!desOk, `abrirDesarrolloDeModelo('${o.desNum}')`, o.desName || 'Ficha de desarrollo')}
+    ${arrow}${trzNode('Lista de precios', 'cotización', true, `ir('cotizaciones')`, 'Lista de precios del cliente (F8)')}
+    ${arrow}${trzNode('Pedido interno', o.folio || '—', !!o.folio, `ir('pedidos')`, 'Pedido interno')}
+    ${arrow}${trzNode('OP · producción', opLabel, !!o.ord, `ir('pedidos')`, 'Orden de producción · nº interno de producción')}
+  </div>`;
+}
 /* --- Constructor del pedido interno (sin matriz) --- */
 function abrirNuevoPedido() { pedBuilder = { cliente: CLIENTES[0], empresa: 'FR Moda', fecha: '', modelos: [{ codigo: '', cant: 0, precio: 0 }] }; renderPedBuilder(); pedScrim.classList.add('show'); }
 function cerrarPed() { pedScrim.classList.remove('show'); }
@@ -1868,6 +1920,7 @@ function pedSync() {
   [...p.querySelectorAll('.ped-mod')].forEach((row, mi) => {
     const m = pedBuilder.modelos[mi]; if (!m) return;
     m.codigo = row.querySelector('.ped-cod').value;
+    const dd = desModeloByNum(m.codigo); m.nombre = dd ? dd.m.nombre : '';
     m.cant = parseInt(row.querySelector('.ped-cant').value) || 0;
     m.precio = parseFloat(row.querySelector('.ped-precio').value) || 0;
   });
@@ -1875,7 +1928,10 @@ function pedSync() {
 function pedRecalc() {
   pedSync();
   const ft = pedPanel.querySelector('#pedFootTot'); if (ft) { const tp = pedBuilder.modelos.reduce((s, m) => s + m.cant, 0); const ti = pedBuilder.modelos.reduce((s, m) => s + m.cant * m.precio, 0); ft.innerHTML = `${pedBuilder.modelos.length} modelo${pedBuilder.modelos.length > 1 ? 's' : ''} · ${tp.toLocaleString('es-MX')} pz · ${money(ti)}`; }
-  pedPanel.querySelectorAll('.ped-mod').forEach((row, mi) => { const im = row.querySelector('.ped-imp'); if (im) im.textContent = money((pedBuilder.modelos[mi].cant || 0) * (pedBuilder.modelos[mi].precio || 0)); });
+  pedPanel.querySelectorAll('.ped-mod').forEach((row, mi) => {
+    const im = row.querySelector('.ped-imp'); if (im) im.textContent = money((pedBuilder.modelos[mi].cant || 0) * (pedBuilder.modelos[mi].precio || 0));
+    const nm = row.querySelector('.ped-name'); if (nm) { const dd = desModeloByNum(pedBuilder.modelos[mi].codigo); nm.textContent = dd ? (dd.m.nombre + ' · ' + dd.proy.cliente + ' / ' + dd.proy.depto) : (pedBuilder.modelos[mi].codigo ? 'sin ficha de desarrollo' : 'elige el modelo de desarrollo'); }
+  });
 }
 function pedAddModelo() { pedSync(); pedBuilder.modelos.push({ codigo: '', cant: 0, precio: 0 }); renderPedBuilder(); }
 function pedDelModelo(i) { pedSync(); pedBuilder.modelos.splice(i, 1); renderPedBuilder(); }
@@ -1885,7 +1941,7 @@ function crearPedidoInterno() {
   if (!validos.length) { mostrarToast('Agrega al menos un modelo con número y cantidad'); return; }
   const folio = nextFolioPed();
   const emp = pedBuilder.empresa === 'Marilyn Fitness' ? 'MF' : 'FR';
-  const modelos = validos.map(m => ({ modelo: m.codigo, cant: m.cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord: '', corte: 0 }));
+  const modelos = validos.map(m => { const dd = desModeloByNum(m.codigo); return { modelo: m.codigo, nombre: m.nombre || (dd ? dd.m.nombre : ''), desRef: dd ? { pi: dd.pi, mi: dd.mi } : null, cant: m.cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord: '', corte: 0 }; });
   PEDIDOS_MES.unshift({ folio, cliente: pedBuilder.cliente, empresa: emp, vig: (pedBuilder.fecha || 'jul') + ' → ' + (pedBuilder.fecha || 'jul'), estatus: 'Vigente', modelos });
   cerrarPed(); ir('pedidos');
   mostrarToast('Pedido ' + folio + ' creado · genera la OP de cada modelo con el botón "Generar OP"');
@@ -1908,13 +1964,13 @@ function renderPedBuilder() {
         <label><span class="ffk">Empresa</span><select class="pc-in" id="pedEmpresa">${['FR Moda', 'Marilyn Fitness'].map(e => `<option${b.empresa === e ? ' selected' : ''}>${e}</option>`).join('')}</select></label>
         <label><span class="ffk">Fecha de entrega</span><input class="pc-in" id="pedFecha" value="${b.fecha}" placeholder="15 jul"></label>
       </div>
-      <div class="pc-hint-cell" style="margin-top:8px">El pedido lleva los <b>modelos con su cantidad y precio</b>. La <b>matriz color×talla NACE en la OP</b>: al crear el pedido, cada modelo trae un botón <b>"Generar OP"</b> donde se captura. El nº de modelo lo <b>liga a su desarrollo/pre-costeo</b> (Etapa 2).</div>
+      <div class="pc-hint-cell" style="margin-top:8px">El pedido referencia el <b>modelo de desarrollo</b> (su ficha con BOM/telas/avíos/dificultad) con su <b>cantidad y precio</b>. <b>Desarrollo y Producción son bases distintas:</b> el <b>nº interno de producción se asigna al generar la OP</b> (salida a producción), que es cuando queda ligado y hereda su desarrollo. La <b>matriz color×talla NACE en la OP</b>, no aquí.</div>
     </div>
     <div class="pc-sec">
       <h4>Modelos del pedido</h4>
-      <div class="table-wrap"><table class="data"><thead><tr><th>Nº de modelo (nuestro)</th><th class="r">Cantidad</th><th class="r">Precio venta</th><th class="r">Importe</th><th></th></tr></thead><tbody>
+      <div class="table-wrap"><table class="data"><thead><tr><th>Modelo de desarrollo</th><th class="r">Cantidad</th><th class="r">Precio venta</th><th class="r">Importe</th><th></th></tr></thead><tbody>
         ${b.modelos.map((m, mi) => `<tr class="ped-mod">
-          <td><input class="pc-in mono ped-cod" value="${m.codigo}" placeholder="62190" style="min-width:130px"></td>
+          <td><select class="pc-in mono ped-cod" style="min-width:260px">${devModelOptions(m.codigo)}</select><div class="ped-name" style="font-size:11px;color:var(--faint);margin-top:3px">${m.nombre || (m.codigo ? '' : 'elige el modelo de desarrollo')}</div></td>
           <td class="r"><input class="pc-in mono ped-cant" type="number" min="0" value="${m.cant || ''}" placeholder="0" style="width:100px;text-align:right"></td>
           <td class="r"><input class="pc-in mono ped-precio" type="number" step="any" min="0" value="${m.precio || ''}" placeholder="148.00" style="width:100px;text-align:right"></td>
           <td class="r mono ped-imp">${money((m.cant || 0) * (m.precio || 0))}</td>
@@ -1936,7 +1992,7 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && pedScrim.classLis
 /* --- Generar OP desde un modelo del pedido: aquí NACE la matriz color×talla --- */
 function abrirGenerarOP(fi, mi) {
   const m = PEDIDOS_MES[fi].modelos[mi];
-  opGen = { fi, mi, codigo: m.modelo, cliente: PEDIDOS_MES[fi].cliente, cant: m.cant, fecha: m.fecha, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] };
+  opGen = { fi, mi, codigo: m.modelo, nombre: m.nombre || '', cliente: PEDIDOS_MES[fi].cliente, cant: m.cant, fecha: m.fecha, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] };
   renderOpGen(); opScrim.classList.add('show');
 }
 function cerrarOp() { opScrim.classList.remove('show'); }
@@ -1959,23 +2015,33 @@ function confirmarGenerarOP() {
   if (opTotal() === 0) { mostrarToast('Captura las cantidades por color y talla'); return; }
   const ord = String(parseInt(nextOrdPed(), 10) || 5500);
   const m = PEDIDOS_MES[opGen.fi].modelos[opGen.mi];
+  // Salida a producción: el modelo entra al catálogo de producción con su nº interno (se liga al desarrollo)
+  const dev = desModeloByNum(m.modelo);
+  let prodNum;
+  if (dev) { if (!dev.m.prodNum) dev.m.prodNum = nextProdModelo(); prodNum = dev.m.prodNum; }
+  else { prodNum = m.modelo; } // histórico: el código del pedido ya es su nº de producción
+  m.prodNum = prodNum;
   m.ord = ord; m.cant = opTotal(); m.matriz = { tallas: opGen.tallas, colores: JSON.parse(JSON.stringify(opGen.colores)) };
   generarRutaRC(ord, opGen.codigo, opGen.cliente, opGen.fecha || 'julio');
   cerrarOp(); ir('pedidos');
-  mostrarToast('OP ' + ord + ' generada · matriz color×talla capturada + Ruta Crítica programada sola');
+  mostrarToast('OP ' + ord + ' generada · salió a producción como modelo #' + prodNum + (dev ? ' (ligado a desarrollo #' + m.modelo + ')' : '') + ' · matriz + Ruta Crítica programada sola');
 }
 function renderOpGen() {
   const g = opGen;
+  const dev = desModeloByNum(g.codigo);
+  const folio = PEDIDOS_MES[g.fi].folio;
   opPanel.innerHTML = `
   <div class="proc-head">
     <span class="ph-hero">OP</span>
     <div style="flex:1;min-width:0"><h2>Generar OP · Modelo ${g.codigo}</h2>
-      <div class="ph-meta"><span>${g.cliente}</span><span>Pedido interno ${PEDIDOS_MES[g.fi].folio}</span></div>
+      <div class="ph-meta"><span>${g.cliente}</span><span>Pedido interno ${folio}</span>${g.nombre ? `<span>${g.nombre}</span>` : ''}</div>
     </div>
     <button class="icon-btn" onclick="cerrarOp()" title="Cerrar (esc)">${icXsvg}</button>
   </div>
   <div class="proc-body">
-    <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>La <b>matriz color×talla nace aquí</b>, en la OP. Distribuye la cantidad del pedido (<b>${g.cant.toLocaleString('es-MX')} pz</b>) por color y talla. Al generar, la OP hereda el <b>desarrollo</b> del modelo (BOM/telas/avíos) y se le programa su <b>Ruta Crítica</b> sola.</span></div>
+    ${cadenaTraza({ desNum: g.codigo, desName: g.nombre, folio, ord: '' })}
+    <div class="audit-hint" style="margin-bottom:12px">${IC.info}<span><b>Generar la OP es la salida a producción:</b> el modelo entra al <b>catálogo de producción</b> (base distinta a Desarrollo) con su <b>nº interno de producción</b> y queda <b>ligado</b> a su ficha de desarrollo${dev ? ` <b>#${g.codigo}</b>` : ''}, de la que <b>hereda</b> BOM/telas/avíos/dificultad. ${dev ? `<button class="btn ghost sm" style="margin-left:4px;vertical-align:middle" onclick="abrirDesarrolloDeModelo('${g.codigo}')">Ver desarrollo</button>` : '<b>Sin ficha de desarrollo</b> (modelo histórico).'}</span></div>
+    <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>La <b>matriz color×talla nace aquí</b>. Distribuye la cantidad del pedido (<b>${g.cant.toLocaleString('es-MX')} pz</b>) por color y talla; al generar se le programa su <b>Ruta Crítica</b> sola.</span></div>
     <div class="table-wrap"><table class="data"><thead><tr><th>Color</th>${g.tallas.map(t => `<th class="r">${t}</th>`).join('')}<th class="r">Total</th><th></th></tr></thead><tbody>
       ${g.colores.map((c, ci) => `<tr>
         <td><select class="pc-in op-color-sel" style="height:30px;padding:2px 6px;min-width:118px">${COLORES_PED.map(x => `<option${c.n === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
@@ -2044,7 +2110,7 @@ function vPedidos() {
             <td><span class="badge ${badgePed(p.estatus)}"><span class="d"></span>${p.estatus}</span></td>
           </tr>
           ${p.modelos.map((m,j)=>{ const [bc,bt]=corteBadge(m.corte,m.cant); return `<tr class="sub" data-ped="${i}" data-mod="${j}">
-            <td><span class="sub-mod mono">${m.modelo}</span></td>
+            <td><span class="sub-mod mono" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" title="Ver ficha de desarrollo" onclick="event.stopPropagation();abrirDesarrolloDeModelo('${m.modelo}')">${m.modelo}</span>${m.nombre ? `<span style="color:var(--faint);font-size:11px;margin-left:8px">${m.nombre}</span>` : ''}</td>
             <td></td><td></td>
             <td class="cell-code">${m.ord ? m.ord : `<button class="btn ghost sm" onclick="event.stopPropagation();abrirGenerarOP(${i},${j})">${IC.plus}Generar OP</button>`}</td>
             <td class="r num">${m.cant.toLocaleString('es-MX')}</td>
