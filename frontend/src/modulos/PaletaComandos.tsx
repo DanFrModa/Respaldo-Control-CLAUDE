@@ -15,11 +15,13 @@ import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
-import { esModuloVisible, filtrarGruposVisibles, ICONOS_MODULO } from './catalogo';
+import { esModuloVisible, filtrarCatalogoVisible, ICONOS_MODULO } from './catalogo';
 
 /**
  * PALETA DE COMANDOS global (Ctrl/⌘+K, rediseño R1→R2): encuentra y abre CUALQUIER pantalla del
- * menú (hojas y sub-vistas, respetando permisos A4) y además busca DATOS: las ÓRDENES por folio,
+ * CATÁLOGO COMPLETO (hojas y sub-vistas, INCLUSO las que el riel no muestra, respetando permisos
+ * A4) — por eso usa `filtrarCatalogoVisible` y no el riel podado: nada queda inaccesible. Y además
+ * busca DATOS: las ÓRDENES por folio,
  * modelo, cliente o referencia del cliente (D7) — la paleta ABSORBIÓ el buscador global de la
  * topbar (F2-E4): un solo lugar para "ir a" (desviación (e) de R1, resuelta en R2). Solo quien
  * tiene `ordenes.ver` ve el grupo de órdenes; el backend re-decide (A1).
@@ -35,7 +37,7 @@ export function PaletaComandos({
 }): React.JSX.Element {
   const navigate = useNavigate();
   const { permisos, tienePermiso } = useSesion();
-  const grupos = filtrarGruposVisibles(permisos);
+  const grupos = filtrarCatalogoVisible(permisos);
 
   // Búsqueda de DATOS (órdenes): mismo backend del viejo buscador global (tope 20 hits).
   const [texto, setTexto] = useState('');

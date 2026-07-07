@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
+import { entrarComoAdmin } from './ayudas';
 
 /**
  * E2E de las AUDITORÍAS de calidad (F6-E2) contra el stack real. El flujo transaccional completo
@@ -18,16 +18,12 @@ import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
  * `calidad.actualizar-auditorias`).
  */
 test.describe('Auditorías de calidad (F6-E2)', () => {
-  test('la pantalla de alta carga desde el menú y wirea el selector de orden', async ({ page }) => {
+  test('la pantalla de alta carga por ruta y wirea el selector de orden', async ({ page }) => {
     await entrarComoAdmin(page);
 
-    // Navega Operación · Calidad → Alta de auditoría (desplegable del rediseño).
-    await abrirDesplegableMenu(page, 'Calidad');
-    await page
-      .getByRole('navigation', { name: 'Módulos' })
-      .first()
-      .getByRole('link', { name: 'Alta de auditoría' })
-      .click();
+    // "Alta de auditoría" salió del riel (Calidad ahora solo lista Auditorías y Auditores): la
+    // pantalla sigue viva por URL directa (se llega desde "Auditorías" + ⌘K).
+    await page.goto('/calidad/auditorias/nueva');
 
     await expect(page.getByRole('heading', { name: 'Alta de auditoría' })).toBeVisible();
     // El selector de orden está presente (la auditoría arranca eligiendo una orden).

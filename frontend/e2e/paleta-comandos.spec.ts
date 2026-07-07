@@ -18,6 +18,12 @@ test.describe('Paleta de comandos ⌘K', () => {
     await page.getByTestId('abrir-paleta').click();
     await expect(page.getByTestId('paleta-input')).toBeVisible();
 
+    // ⌘K ve el CATÁLOGO COMPLETO, no el riel podado: encuentra pantallas que NO están en el menú
+    // lateral (aquí "Tablero WIP", que salió del riel de Producción). Así nada queda inaccesible.
+    await page.getByTestId('paleta-input').fill('Tablero WIP');
+    await expect(page.getByTestId('paleta-resultados').getByText('Tablero WIP')).toBeVisible();
+    await page.getByTestId('paleta-input').clear();
+
     // Teclear filtra pantallas: "Ruta" → Ruta Crítica (hoja directa a Mis pendientes, R4).
     await page.getByTestId('paleta-input').fill('Ruta Crítica');
     const opcionRc = page

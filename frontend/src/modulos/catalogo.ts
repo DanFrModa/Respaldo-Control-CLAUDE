@@ -29,32 +29,38 @@ import {
 import type { ClavePermiso } from '@/api/tipos';
 
 /**
- * MENÚ PRINCIPAL de CONTROL v2 — rediseño R1 (spec congelada en
- * `docs/rediseno/REDISENO-FRONTEND.md` §3.1, estructura APROBADA por Daniel el
- * 4-jul-2026): grupos (OPERACIÓN, INVENTARIOS, COMERCIAL, FINANZAS, ANÁLISIS,
- * SISTEMA) con desplegables de 2 niveles. Un padre con `hijos` SOLO despliega
- * (no navega); el hijo navega y el hijo principal va primero. Máximo 2 niveles.
+ * MENÚ PRINCIPAL de CONTROL v2 — spec congelada en
+ * `docs/rediseno/REDISENO-FRONTEND.md` §3.1 / `prototipo.html` `const NAV`
+ * (estructura APROBADA por Daniel el 4-jul-2026).
  *
- * Decisiones de mapeo (lead, R1) para NO perder funcionalidad:
- *  - Las sub-vistas legadas que no aparecen en la estructura aprobada se cuelgan
- *    como HIJOS ADICIONALES bajo su padre lógico (después de los hijos
- *    aprobados). El menú se VE como el aprobado (colapsado) y nada se pierde
- *    (expandido); todo se encuentra también con Ctrl/⌘+K.
- *  - FINANZAS gana una 3ª entrada interina «EsMa (maquileros)»: EsMa se
- *    generaliza a Finanzas en F9 y mientras tanto no puede desaparecer.
- *  - El módulo «Catálogos» (/catalogos) desaparece del menú como grupo propio:
- *    telas/avíos → INVENTARIOS, clientes/proveedores → COMERCIAL, y
- *    colores/tallas/temporadas/tipos de proceso/almacenes → SISTEMA · Catálogos
- *    base. Sus RUTAS siguen vivas (los hubs quedan accesibles por URL directa).
- *  - Bordados y su galería (receta/BOM de modelos) cuelgan de Desarrollo;
- *    Etiquetas de marca cuelga de Catálogos base; Documental (aún sin construir)
- *    cuelga de Producción. Conceptos de costo y Estados de lista NO entran al
- *    menú (hoy tampoco están: se llega por el panel de administración).
- *  - Las hojas sin pantalla (Ventas, CxC, CxP, Análisis RC, Auditores) van a la
- *    página «Próximamente» con la nota de en qué fase llegan (`proximamente`).
- *  - Se CONSERVA el gate por permisos por entrada (A4): cada hoja mantiene los
- *    permisos de su entrada equivalente anterior; un padre/grupo se muestra si
- *    alguna hoja hija es visible. La pantalla esconde, el servidor decide (A1).
+ * DOS estructuras separadas (rediseño de fidelidad del menú, sobre R1–R4):
+ *
+ *  1. EL CATÁLOGO COMPLETO (`GRUPOS_MENU`): el registro EXHAUSTIVO de TODAS las
+ *     pantallas (hojas + sub-vistas legadas), cada una con su ruta, su gate de
+ *     permisos (A4) y su descripción. Alimenta ⌘K (`filtrarCatalogoVisible`),
+ *     los hubs de módulo, los títulos de página y la página «Próximamente».
+ *     NADA se pierde: aunque una pantalla no salga en el riel, sigue viva por
+ *     su ruta directa y por ⌘K. Aquí NO se toca ningún permiso.
+ *
+ *  2. EL RIEL (`RIEL_GRUPOS`): la PROYECCIÓN PODADA que ve el menú lateral —
+ *     EXACTAMENTE la estructura de Daniel, ni una entrada de más. Se deriva del
+ *     catálogo referenciando claves (hereda ruta/permisos/icono/descr.), sin
+ *     duplicar datos. Un padre con `hijos` SOLO despliega (no navega); el hijo
+ *     navega y el hijo principal va primero. Máximo 2 niveles. Alimenta el
+ *     sidebar (`filtrarGruposVisibles`) y la portada (`Inicio`).
+ *
+ * Lo secundario (galerías, sub-vistas de F3/F4/F6/F7, catálogos de referencia
+ * que R2–R4 ya reemplazaron) NO es entrada del riel: se alcanza desde su
+ * pantalla padre (mosaicos, tabs, sub-nav) + ⌘K, tal como el prototipo.
+ *
+ * ÚNICA desviación del NAV de Daniel: FINANZAS suma «EsMa (maquileros)» como
+ * hoja interina (EsMa se generaliza a Finanzas en F9 y hasta entonces no puede
+ * orfanarse). El HTML no lo tiene; todo lo demás es fiel 1:1.
+ *
+ * Gate por permisos INTACTO (A4): cada hoja del catálogo conserva EXACTAMENTE
+ * su permiso; un padre/grupo se muestra si alguna hoja hija es visible. La
+ * pantalla esconde, el servidor decide (A1). La definición del riel está al
+ * final del archivo (`ESPEC_RIEL`).
  */
 
 /** Iconos por nombre (string estable); el riel los resuelve a Lucide. */
@@ -1302,18 +1308,230 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
 ];
 
 /**
- * Todas las HOJAS del menú, aplanadas (padres → hijos, en orden). La usan los
- * hubs (p. ej. `InventariosPagina`), el inicio y la paleta ⌘K.
- * Nombre conservado del menú plano anterior por compatibilidad.
+ * Todas las HOJAS del CATÁLOGO COMPLETO, aplanadas (padres → hijos, en orden).
+ * Es el registro EXHAUSTIVO de pantallas: lo usan los hubs (p. ej.
+ * `InventariosPagina`), el inicio, la paleta ⌘K, los títulos y «Próximamente».
+ * NADA se pierde aquí aunque el riel no lo muestre. Nombre conservado del menú
+ * plano anterior por compatibilidad.
  */
 export const MODULOS_MENU: readonly ModuloMenu[] = GRUPOS_MENU.flatMap((grupo) =>
   grupo.entradas.flatMap((entrada) => (entrada.hijos !== undefined ? entrada.hijos : [entrada])),
 );
 
-/** Los PADRES desplegables del menú (para búsquedas por clave). */
+/** Los PADRES desplegables del catálogo completo (para búsquedas por clave). */
 const PADRES_MENU: readonly PadreMenu[] = GRUPOS_MENU.flatMap((grupo) =>
   grupo.entradas.filter((entrada): entrada is PadreMenu => entrada.hijos !== undefined),
 );
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * EL RIEL — estructura EXACTA aprobada por Daniel (REDISENO-FRONTEND.md §3.1 /
+ * prototipo.html `const NAV`). El menú lateral muestra SOLO esto; todo lo demás
+ * del catálogo sigue vivo por ruta directa y por ⌘K (`filtrarCatalogoVisible`).
+ *
+ * Es una PROYECCIÓN PODADA del catálogo: cada entrada referencia una clave del
+ * catálogo y hereda su ruta/permisos/icono/descripción. Tres formas:
+ *  - `hoja`     → una hoja del catálogo tal cual (entrada de primer nivel).
+ *  - `padre`    → un desplegable con SOLO los hijos aprobados (por clave, en
+ *                 orden; el principal primero). Los hijos legados quedan fuera
+ *                 del riel pero vivos en el catálogo/⌘K.
+ *  - `colapsar` → un padre del catálogo que Daniel quiere como HOJA DIRECTA: se
+ *                 pinta como una sola hoja que navega a su pantalla principal
+ *                 (`ruta`) con el gate `permisos` de esa pantalla. Cuando el
+ *                 destino es un HUB que auto-filtra sus tarjetas (Costos, EDR,
+ *                 Indicadores, EsMa) se usa la UNIÓN de permisos de los hijos
+ *                 para preservar EXACTO a quién le aparece el padre. Sus
+ *                 sub-vistas salen del riel y se alcanzan desde esa pantalla + ⌘K.
+ * ──────────────────────────────────────────────────────────────────────────── */
+type EspecRiel =
+  | { tipo: 'hoja'; clave: string }
+  | { tipo: 'padre'; clave: string; hijos: readonly string[] }
+  | { tipo: 'colapsar'; clave: string; ruta: `/${string}`; permisos: readonly ClavePermiso[] };
+
+const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] = [
+  { grupo: 'inicio', entradas: [{ tipo: 'hoja', clave: 'resumen' }] },
+  {
+    grupo: 'operacion',
+    entradas: [
+      { tipo: 'padre', clave: 'g-desarrollo', hijos: ['modelos', 'desarrollo', 'listas-precios'] },
+      { tipo: 'hoja', clave: 'pedidos' },
+      { tipo: 'padre', clave: 'produccion', hijos: ['ordenes', 'notas-salida'] },
+      { tipo: 'hoja', clave: 'ruta-critica' },
+      { tipo: 'padre', clave: 'calidad', hijos: ['calidad-consulta-auditorias', 'auditores'] },
+    ],
+  },
+  {
+    // 4 hojas planas (Daniel): cada una a su pantalla principal; sus kardex/movimientos/
+    // traspasos/catálogos salen del riel (viven en su pantalla + ⌘K).
+    grupo: 'inventarios',
+    entradas: [
+      {
+        tipo: 'colapsar',
+        clave: 'inventarios',
+        ruta: '/inventarios/existencias',
+        permisos: ['inventario-pt.ver'],
+      },
+      {
+        tipo: 'colapsar',
+        clave: 'telas',
+        ruta: '/inventarios/telas/existencias',
+        permisos: ['inventario-telas.ver'],
+      },
+      {
+        tipo: 'colapsar',
+        clave: 'avios',
+        ruta: '/inventarios/avios/existencias',
+        permisos: ['inventario-avios.ver'],
+      },
+      { tipo: 'colapsar', clave: 'compras', ruta: '/compras/ordenes', permisos: ['compras.ver'] },
+    ],
+  },
+  {
+    grupo: 'comercial',
+    entradas: [
+      {
+        tipo: 'padre',
+        clave: 'clientes',
+        hijos: ['clientes-catalogo', 'clientes-listas-precios', 'ventas'],
+      },
+      { tipo: 'hoja', clave: 'proveedores' },
+    ],
+  },
+  {
+    grupo: 'finanzas',
+    entradas: [
+      { tipo: 'hoja', clave: 'cxc' },
+      { tipo: 'hoja', clave: 'cxp' },
+      // Desviación interina (viva hasta F9): EsMa como hoja directa a su portada-hub, que
+      // auto-filtra por permiso. NUNCA un desplegable con sus 10 sub-vistas (esas van por ⌘K).
+      {
+        tipo: 'colapsar',
+        clave: 'esma',
+        ruta: '/esma',
+        permisos: ['esma.ver-pagos', 'esma.cargo-validar', 'esma.modificar'],
+      },
+    ],
+  },
+  {
+    // 4 hojas planas (Daniel): «Análisis RC» tal cual; Costos/EDR/Indicadores a su hub.
+    // El «Concentrado planeado vs real» sale del riel (se llega por ⌘K/URL).
+    grupo: 'analisis',
+    entradas: [
+      { tipo: 'hoja', clave: 'analisis-rc' },
+      {
+        tipo: 'colapsar',
+        clave: 'costos',
+        ruta: '/costos',
+        permisos: ['costos.ver', 'precostos.consultar'],
+      },
+      { tipo: 'colapsar', clave: 'edr', ruta: '/edr', permisos: ['edr.ver', 'edr.capturar'] },
+      {
+        tipo: 'colapsar',
+        clave: 'indicadores',
+        ruta: '/indicadores',
+        permisos: [
+          'indicadores.ver',
+          'indicadores.ip-productividad',
+          'indicadores.almacen-productividad',
+          'indicadores.ip-confiabilidad',
+          'indicadores.ip-muestrarios',
+          'indicadores.ciclicos-alta',
+          'indicadores.ciclicos-conteo',
+          'indicadores.ciclicos-consulta',
+        ],
+      },
+    ],
+  },
+  {
+    grupo: 'sistema',
+    entradas: [
+      {
+        tipo: 'padre',
+        clave: 'catalogos',
+        hijos: ['colores', 'tallas', 'temporadas', 'tipos-proceso', 'almacenes'],
+      },
+      // Hojas directas (Daniel): su configuración interna vive DENTRO de la pantalla.
+      {
+        tipo: 'colapsar',
+        clave: 'g-rc-config',
+        ruta: '/ruta-critica/procesos-responsables',
+        permisos: ['rc.catalogo-ver'],
+      },
+      {
+        // El destino /administracion es un HUB que auto-filtra (AdministracionPagina): incluye una
+        // tarjeta «Bitácora» gateada SOLO por `admin.ver-bitacora`. El gate = UNIÓN de permisos de
+        // TODAS las tarjetas hijas (como en Costos/EDR/Indicadores/EsMa) — así los roles que el seed
+        // deja con `admin.ver-bitacora` pero sin los `*.administrar` (Directivo, Gerencial…) siguen
+        // viendo la entrada y aterrizan en el hub, que les muestra solo la tarjeta Bitácora.
+        tipo: 'colapsar',
+        clave: 'administracion',
+        ruta: '/administracion',
+        permisos: [
+          'usuarios.administrar',
+          'roles.administrar',
+          'empresas.administrar',
+          'almacenes.administrar',
+          'admin.ver-bitacora',
+        ],
+      },
+    ],
+  },
+];
+
+const GRUPO_POR_CLAVE = new Map(GRUPOS_MENU.map((grupo) => [grupo.clave, grupo]));
+const HOJA_POR_CLAVE = new Map(MODULOS_MENU.map((modulo) => [modulo.clave, modulo]));
+const PADRE_POR_CLAVE = new Map(PADRES_MENU.map((padre) => [padre.clave, padre]));
+
+/** Resuelve una entrada del riel contra el catálogo (falla en build si una clave no existe). */
+function resolverEntradaRiel(espec: EspecRiel): EntradaMenu {
+  if (espec.tipo === 'hoja') {
+    const hoja = HOJA_POR_CLAVE.get(espec.clave);
+    if (hoja === undefined) {
+      throw new Error(`Riel: hoja desconocida «${espec.clave}»`);
+    }
+    return hoja;
+  }
+  const padre = PADRE_POR_CLAVE.get(espec.clave);
+  if (padre === undefined) {
+    throw new Error(`Riel: padre desconocido «${espec.clave}»`);
+  }
+  if (espec.tipo === 'colapsar') {
+    // Padre → hoja directa: hereda título/icono/descr. del padre; ruta y gate curados.
+    return {
+      clave: padre.clave,
+      titulo: padre.titulo,
+      descripcion: padre.descripcion,
+      ruta: espec.ruta,
+      icono: padre.icono,
+      permisos: espec.permisos,
+      ...(padre.destacado === true ? { destacado: true as const } : {}),
+    };
+  }
+  // Padre podado: SOLO los hijos aprobados, en el orden pedido.
+  const hijos = espec.hijos.map((clave) => {
+    const hijo = padre.hijos.find((h) => h.clave === clave);
+    if (hijo === undefined) {
+      throw new Error(`Riel: «${espec.clave}» no tiene hijo «${clave}»`);
+    }
+    return hijo;
+  });
+  return { ...padre, hijos };
+}
+
+/**
+ * EL RIEL ya resuelto (estructura de Daniel §3.1). Lo consumen el sidebar y el
+ * inicio (vía `filtrarGruposVisibles`); exportado para los tests.
+ */
+export const RIEL_GRUPOS: readonly GrupoMenu[] = ESPEC_RIEL.map((especGrupo) => {
+  const grupo = GRUPO_POR_CLAVE.get(especGrupo.grupo);
+  if (grupo === undefined) {
+    throw new Error(`Riel: grupo desconocido «${especGrupo.grupo}»`);
+  }
+  return {
+    clave: grupo.clave,
+    titulo: grupo.titulo,
+    entradas: especGrupo.entradas.map(resolverEntradaRiel),
+  };
+});
 
 /** ¿La hoja es visible con estos permisos? (A4) */
 export function esModuloVisible(modulo: ModuloMenu, permisos: ReadonlySet<ClavePermiso>): boolean {
@@ -1335,36 +1553,60 @@ export function esEntradaVisible(
 }
 
 /**
- * Filtra las HOJAS visibles para un conjunto de permisos efectivos (aplanadas).
- * Funcion pura: la usan la paleta ⌘K, el inicio y los tests.
+ * Filtra las HOJAS visibles del CATÁLOGO COMPLETO para un conjunto de permisos
+ * (aplanadas). Función pura: la usan el inicio y los tests.
  */
 export function filtrarModulosVisibles(permisos: ReadonlySet<ClavePermiso>): readonly ModuloMenu[] {
   return MODULOS_MENU.filter((modulo) => esModuloVisible(modulo, permisos));
 }
 
 /**
- * Filtra el menú AGRUPADO para el riel: descarta hojas sin permiso, poda los
- * hijos de cada padre, y elimina padres/grupos que quedaron vacíos.
+ * Filtra un menú AGRUPADO por permisos: descarta hojas sin permiso, poda los
+ * hijos de cada padre y elimina padres/grupos que quedaron vacíos. Se aplica
+ * tanto al riel (`filtrarGruposVisibles`) como al catálogo completo
+ * (`filtrarCatalogoVisible`).
  */
-export function filtrarGruposVisibles(permisos: ReadonlySet<ClavePermiso>): readonly GrupoMenu[] {
-  return GRUPOS_MENU.map((grupo) => {
-    const entradas = grupo.entradas
-      .map((entrada): EntradaMenu | null => {
-        if (entrada.hijos === undefined) {
-          return esModuloVisible(entrada, permisos) ? entrada : null;
-        }
-        const hijos = entrada.hijos.filter((hijo) => esModuloVisible(hijo, permisos));
-        return hijos.length > 0 ? { ...entrada, hijos } : null;
-      })
-      .filter((entrada): entrada is EntradaMenu => entrada !== null);
-    return { ...grupo, entradas };
-  }).filter((grupo) => grupo.entradas.length > 0);
+function filtrarGruposPorPermiso(
+  grupos: readonly GrupoMenu[],
+  permisos: ReadonlySet<ClavePermiso>,
+): readonly GrupoMenu[] {
+  return grupos
+    .map((grupo) => {
+      const entradas = grupo.entradas
+        .map((entrada): EntradaMenu | null => {
+          if (entrada.hijos === undefined) {
+            return esModuloVisible(entrada, permisos) ? entrada : null;
+          }
+          const hijos = entrada.hijos.filter((hijo) => esModuloVisible(hijo, permisos));
+          return hijos.length > 0 ? { ...entrada, hijos } : null;
+        })
+        .filter((entrada): entrada is EntradaMenu => entrada !== null);
+      return { ...grupo, entradas };
+    })
+    .filter((grupo) => grupo.entradas.length > 0);
 }
 
 /**
- * Busca una entrada por su clave: primero las hojas, luego los padres. Los
- * padres entran porque las rutas legadas `/produccion` y `/compras` (hoy sin
- * pantalla propia) siguen cayendo en la página comodín, que los presenta.
+ * El RIEL filtrado por permisos, para el menú lateral y la portada. Muestra
+ * SOLO la estructura aprobada por Daniel (no las sub-vistas legadas).
+ */
+export function filtrarGruposVisibles(permisos: ReadonlySet<ClavePermiso>): readonly GrupoMenu[] {
+  return filtrarGruposPorPermiso(RIEL_GRUPOS, permisos);
+}
+
+/**
+ * El CATÁLOGO COMPLETO filtrado por permisos, para la paleta ⌘K: encuentra
+ * TODAS las pantallas (también las que no están en el riel) respetando el gate.
+ */
+export function filtrarCatalogoVisible(permisos: ReadonlySet<ClavePermiso>): readonly GrupoMenu[] {
+  return filtrarGruposPorPermiso(GRUPOS_MENU, permisos);
+}
+
+/**
+ * Busca una entrada por su clave en el CATÁLOGO COMPLETO: primero las hojas,
+ * luego los padres. Los padres entran porque las rutas legadas `/produccion` y
+ * `/compras` (hoy sin pantalla propia) siguen cayendo en la página comodín, que
+ * los presenta.
  */
 export function buscarModuloPorClave(clave: string): EntradaMenu | undefined {
   return (

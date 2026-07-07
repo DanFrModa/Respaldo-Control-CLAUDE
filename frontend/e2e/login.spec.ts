@@ -71,23 +71,32 @@ test.describe('Inicio de sesión', () => {
       await expect(navegacion.getByRole('link', { name: hoja, exact: true })).toBeVisible();
     }
 
-    // Los PADRES son botones que despliegan (no navegan): al abrir "Producción"
-    // aparecen su hijo aprobado principal y los legados re-colgados.
-    const padres = navegacion.getByRole('button', { expanded: false });
-    expect(await padres.count()).toBeGreaterThanOrEqual(10);
+    // El riel muestra SOLO la estructura de Daniel (§3.1): EXACTAMENTE 5 padres desplegables
+    // (Desarrollo, Producción, Calidad, Clientes, Catálogos base), ni uno más.
+    const padres = navegacion.getByRole('button');
+    expect(await padres.count()).toBe(5);
+    // Al abrir "Producción" aparecen SUS DOS hijos aprobados y NADA de las 14 sub-vistas
+    // legadas (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
-    await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toBeVisible();
-    // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4); el
-    // concentrado vive en ANÁLISIS y la configuración bajo SISTEMA · Procesos y responsables.
-    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
     await expect(
-      navegacion.getByRole('link', { name: 'Concentrado planeado vs real' }),
+      navegacion.getByRole('link', { name: 'Notas de salida', exact: true }),
     ).toBeVisible();
-    await navegacion.getByTestId('nav-padre-g-rc-config').click();
+    await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toHaveCount(0);
+    // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4).
+    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
+    // "Procesos y responsables" y "Usuarios y accesos" son HOJAS DIRECTAS (Daniel): su
+    // configuración interna vive DENTRO de la pantalla, no como sub-menú del riel.
     await expect(
       navegacion.getByRole('link', { name: 'Procesos y responsables', exact: true }),
     ).toBeVisible();
+    await expect(
+      navegacion.getByRole('link', { name: 'Usuarios y accesos', exact: true }),
+    ).toBeVisible();
+    // El concentrado planeado-vs-real ya NO es entrada del riel (se llega por ⌘K/URL).
+    await expect(
+      navegacion.getByRole('link', { name: 'Concentrado planeado vs real' }),
+    ).toHaveCount(0);
 
     // El badge de alertas RC del encabezado está montado (dato real del backend).
     await expect(page.getByTestId('badge-alertas-rc')).toBeVisible();
