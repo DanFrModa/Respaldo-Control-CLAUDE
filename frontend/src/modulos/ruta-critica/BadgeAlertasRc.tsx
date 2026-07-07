@@ -42,11 +42,11 @@ export function BadgeAlertasRc(): React.JSX.Element | null {
       variant="ghost"
       size="icon"
       className="relative"
-      onClick={() => void navigate('/ruta-critica/bandeja')}
+      onClick={() => void navigate('/ruta-critica/pendientes')}
       aria-label={
-        total > 0 ? `${total} tareas con alerta de Ruta Crítica` : 'Bandeja de Ruta Crítica'
+        total > 0 ? `${total} tareas con alerta de Ruta Crítica` : 'Mis pendientes de Ruta Crítica'
       }
-      title="Bandeja de Ruta Crítica"
+      title="Mis pendientes de Ruta Crítica"
       data-testid="badge-alertas-rc"
       data-total={total}
     >

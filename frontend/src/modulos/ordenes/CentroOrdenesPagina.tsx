@@ -45,6 +45,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { AvanceProduccion } from '@/modulos/produccion/AvanceProduccion';
+import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
 
 import { FotosModeloOrden } from './FotosModeloOrden';
@@ -846,6 +847,9 @@ function DetalleCentroOrden({
   const navigate = useNavigate();
   const consulta = useOrden(idOrden);
   const orden = consulta.data;
+  // Panel "Ruta de la orden" (R4): el mosaico lo abre aquí mismo (sin navegar), reusando el
+  // MISMO componente de Mis pendientes; el detalle completo sigue en /ruta-critica/ordenes/:id.
+  const [rutaAbierta, setRutaAbierta] = useState(false);
 
   if (consulta.isPending) {
     return <p className="p-4 text-sm text-muted-foreground">Cargando detalle…</p>;
@@ -924,7 +928,7 @@ function DetalleCentroOrden({
           <Mosaico
             icono={Route}
             etiqueta="Ruta crítica"
-            onClick={() => void navigate(`/ruta-critica/ordenes/${orden.id}`)}
+            onClick={() => setRutaAbierta(true)}
             testid="mosaico-rc"
           />
           <Mosaico
@@ -948,6 +952,18 @@ function DetalleCentroOrden({
             testid="mosaico-modificar"
           />
         </div>
+
+        <PanelRutaOrden
+          idOrden={orden.id}
+          abierto={rutaAbierta}
+          alCerrar={() => setRutaAbierta(false)}
+          encabezado={{
+            folio: orden.folio,
+            modelo: orden.codigoModelo,
+            cliente: orden.cliente,
+            fechaEntrega: orden.fechaEntrega ?? null,
+          }}
+        />
 
         <Button
           className="w-full"

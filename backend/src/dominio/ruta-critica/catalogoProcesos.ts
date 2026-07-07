@@ -90,7 +90,7 @@ export interface ProcesoCompletoDto {
     | 'autorizacionArte'
     | 'entregaCliente'
     | 'manual';
-  tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+  tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion' | 'porDificultad';
   activo: boolean;
   roles: { idRol: number; nombre: string }[];
   antecesores: { idProceso: number; codigo: string; nombre: string }[];

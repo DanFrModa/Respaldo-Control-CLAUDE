@@ -31,15 +31,12 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
     ]);
   });
 
-  it('define 99 hojas y 15 padres con claves unicas (padres incluidos)', () => {
-    // 99 hojas = las 91 entradas del menú plano anterior − 10 que se volvieron padres
-    // (catalogos, produccion, compras, inventarios, ruta-critica, calidad, esma, costos, edr,
-    // indicadores) + 18 nuevas (resumen; bordados y su galería y etiquetas-marca, que antes solo
-    // vivían dentro del hub Catálogos; catálogos de telas/avíos/clientes; colores, tallas,
-    // temporadas y almacenes como hojas propias; el duplicado deliberado de listas de precios en
-    // Clientes; el panel de administración; y las 5 hojas «Próximamente»: Ventas, CxC, CxP,
-    // Análisis RC y Auditores).
-    expect(MODULOS_MENU).toHaveLength(99);
+  it('define 100 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+    // R1 dejó 99 hojas y 15 padres; R4 quita la hoja rc-bandeja (redirige a Mis pendientes) y el
+    // padre Ruta Crítica (vuelve HOJA DIRECTA a /ruta-critica/pendientes), y agrega la hoja
+    // rc-procesos-responsables con su padre SISTEMA «Procesos y responsables» (g-rc-config):
+    // 99 − 1 + 2 = 100 hojas; 15 − 1 + 1 = 15 padres.
+    expect(MODULOS_MENU).toHaveLength(100);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -63,7 +60,7 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
     };
     expect(primerHijo('g-desarrollo')).toBe('modelos');
     expect(primerHijo('produccion')).toBe('ordenes');
-    expect(primerHijo('ruta-critica')).toBe('rc-bandeja');
+    expect(primerHijo('g-rc-config')).toBe('rc-procesos-responsables');
     expect(primerHijo('calidad')).toBe('calidad-consulta-auditorias');
     expect(primerHijo('inventarios')).toBe('inventario-existencias');
     expect(primerHijo('catalogos')).toBe('colores');
@@ -168,7 +165,10 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
       ['ordenes', ['ordenes.ver']],
       ['notas-salida', ['notas.ver']],
       ['tipos-proceso', ['tipos-proceso.ver']],
-      ['rc-bandeja', ['rc.ruta-ver']],
+      // R4: Ruta Crítica es hoja directa a Mis pendientes con el gate de la bandeja anterior.
+      ['ruta-critica', ['rc.ruta-ver']],
+      ['rc-concentrado', ['rc.ruta-ver']],
+      ['rc-procesos-responsables', ['rc.catalogo-ver']],
       ['rc-procesos', ['rc.catalogo-ver']],
       ['calidad-consulta-auditorias', ['calidad.ver']],
       ['bitacora', ['admin.ver-bitacora']],
@@ -189,7 +189,8 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
   });
 
   it('los hubs siguen encontrando sus sub-vistas por prefijo de ruta (compatibilidad)', () => {
-    // `InventariosPagina` y `RutaCriticaPagina` listan tarjetas filtrando el menú plano.
+    // `InventariosPagina` lista tarjetas filtrando el menú plano; las sub-vistas RC ya no tienen
+    // hub (R4: /ruta-critica redirige a Mis pendientes) pero siguen siendo hojas del menú (⌘K).
     const inventarios = MODULOS_MENU.filter(
       (m) => m.subVista === true && m.ruta.startsWith('/inventarios/'),
     );
@@ -197,9 +198,9 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
     const rutaCritica = MODULOS_MENU.filter(
       (m) => m.subVista === true && m.ruta.startsWith('/ruta-critica/'),
     );
+    // R4: rc-bandeja desapareció (Mis pendientes es la hoja directa, no subVista).
     expect(rutaCritica.map((m) => m.clave).sort()).toEqual(
       [
-        'rc-bandeja',
         'rc-concentrado',
         'rc-dependencias',
         'rc-plantillas',
@@ -210,7 +211,9 @@ describe('catalogo del menu (rediseño R1: grupos + desplegables)', () => {
   });
 
   it('busca por clave: hojas, padres (rutas legadas /produccion y /compras) e inexistentes', () => {
-    expect(buscarModuloPorClave('rc-bandeja')?.titulo).toBe('Bandeja de tareas');
+    expect(buscarModuloPorClave('rc-procesos-responsables')?.titulo).toBe(
+      'Procesos y responsables',
+    );
     // Los padres se encuentran porque /produccion y /compras siguen cayendo en la página
     // comodín (no tienen pantalla propia) y esta debe poder presentarlos.
     const produccion = buscarModuloPorClave('produccion');

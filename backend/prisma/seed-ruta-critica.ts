@@ -409,6 +409,28 @@ const PROCESOS_RC: ProcesoSeed[] = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 4b. Rangos de DIFICULTAD por # de operaciones (rediseño R4, B7) — datos de EJEMPLO
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tabla de dificultad de ARRANQUE (spec §4.9, Excel `Procesos_RC.xlsx` de Daniel): rango de
+ * operaciones → nombre + días de costura. `opsHasta` null = abierto ("33+"). Es CONFIGURABLE:
+ * solo se siembra si la tabla está VACÍA (no pisa lo que Daniel edite después).
+ */
+const RANGOS_DIFICULTAD: {
+  opsDesde: number;
+  opsHasta: number | null;
+  nombre: string;
+  diasCostura: number;
+}[] = [
+  { opsDesde: 1, opsHasta: 8, nombre: 'Muy sencillo', diasCostura: 6 },
+  { opsDesde: 9, opsHasta: 14, nombre: 'Sencillo', diasCostura: 8 },
+  { opsDesde: 15, opsHasta: 22, nombre: 'Medio', diasCostura: 11 },
+  { opsDesde: 23, opsHasta: 32, nombre: 'Complejo', diasCostura: 15 },
+  { opsDesde: 33, opsHasta: null, nombre: 'Muy complejo', diasCostura: 20 },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 5. Checklist de IP de ejemplo (en la "Ficha técnica")
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -497,6 +519,20 @@ export async function sembrarRutaCritica(prisma: PrismaClient): Promise<void> {
   }
   if (filasDep.length > 0) {
     await prisma.procesoDep.createMany({ data: filasDep, skipDuplicates: true });
+  }
+
+  // 4b) Rangos de dificultad (R4, B7): solo si la tabla está VACÍA (no pisa la configuración).
+  const yaHayRangos = await prisma.rangoDificultad.count();
+  if (yaHayRangos === 0) {
+    await prisma.rangoDificultad.createMany({
+      data: RANGOS_DIFICULTAD.map((r, orden) => ({
+        opsDesde: r.opsDesde,
+        opsHasta: r.opsHasta,
+        nombre: r.nombre,
+        diasCostura: r.diasCostura,
+        orden,
+      })),
+    });
   }
 
   // 5) Checklist de IP de ejemplo: solo si el proceso aún no tiene ítems (no pisa lo capturado).

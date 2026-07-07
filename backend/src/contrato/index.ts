@@ -1340,6 +1340,9 @@ export {
   esquemaDuracionAplicacionCrear,
   esquemaDuracionAplicacionPatchCuerpo,
   esquemaDuracionAplicacionSalida,
+  esquemaRangoDificultadCrear,
+  esquemaRangoDificultadPatchCuerpo,
+  esquemaRangoDificultadSalida,
   esquemaCalendarioActualizar,
   esquemaCalendarioSalida,
   esquemaFestivosQuery,
@@ -1367,6 +1370,9 @@ export {
   type DatosDuracionAplicacionCrear,
   type DatosDuracionAplicacionPatchCuerpo,
   type DuracionAplicacionSalida,
+  type DatosRangoDificultadCrear,
+  type DatosRangoDificultadPatchCuerpo,
+  type RangoDificultadSalida,
   type DatosCalendarioActualizar,
   type CalendarioSalida,
   type FestivosQuery,
@@ -1387,6 +1393,7 @@ export {
   esquemaCapturarProceso,
   esquemaMarcarChecklist,
   esquemaEstadoSemaforo,
+  esquemaSecuenciaEstampadoCuerpo,
   esquemaRutaChecklistSalida,
   esquemaRutaProcesoSalida,
   esquemaRutaOrdenSalida,
@@ -1394,20 +1401,33 @@ export {
   type DatosAjustarRuta as DatosAjustarRutaContrato,
   type DatosCapturarProceso,
   type DatosMarcarChecklist,
+  type DatosSecuenciaEstampado,
   type RutaOrdenSalida,
 } from './esquemas/ruta-critica-programacion.js';
 
-// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5) ──
+// ── Ruta Crítica: bandeja "mis tareas" + conteo de alertas (Módulo 8, F5-E5; R4) ──
 export {
   esquemaBandejaRcQuery,
   esquemaBandejaChecklistSalida,
   esquemaBandejaTareaSalida,
   esquemaBandejaRcPagina,
   esquemaAlertasRcConteo,
+  esquemaUrgenciaPendiente,
+  esquemaTipoEventoRc,
+  esquemaResumenPendientesQuery,
+  esquemaResumenProcesoPendiente,
+  esquemaResumenPendientes,
+  esquemaResponsableRc,
+  esquemaResponsablesRc,
   type BandejaRcQuery,
   type BandejaTareaSalida,
   type BandejaRcPagina,
   type AlertasRcConteo,
+  type UrgenciaPendiente,
+  type TipoEventoRcContrato,
+  type ResumenPendientesQuery,
+  type ResumenPendientes,
+  type ResponsableRc,
 } from './esquemas/ruta-critica-bandeja.js';
 
 // ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ──

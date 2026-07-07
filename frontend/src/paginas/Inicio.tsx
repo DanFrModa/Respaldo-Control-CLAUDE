@@ -73,10 +73,10 @@ export function Inicio(): React.JSX.Element {
                 Ruta Crítica
               </h2>
               <Link
-                to="/ruta-critica/bandeja"
+                to="/ruta-critica/pendientes"
                 className="text-xs font-medium text-primary hover:underline"
               >
-                Ir a la bandeja de tareas
+                Ir a Mis pendientes
               </Link>
             </div>
             <KpiTiles kpis={kpisRc} className="mt-2" />

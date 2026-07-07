@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom';
 
 import { Toaster } from '@/components/ui/sonner';
 import { CascaronSistema } from '@/modulos/CascaronSistema';
@@ -98,15 +98,15 @@ import { ConsultaAuditoriasPagina } from '@/modulos/calidad/ConsultaAuditoriasPa
 import { DefectosPagina } from '@/modulos/calidad/DefectosPagina';
 import { PlanesAqlPagina } from '@/modulos/calidad/PlanesAqlPagina';
 import { TiposProductoPagina } from '@/modulos/calidad/TiposProductoPagina';
-import { BandejaTareasPagina } from '@/modulos/ruta-critica/BandejaTareasPagina';
 import { ConcentradoPagina } from '@/modulos/ruta-critica/ConcentradoPagina';
 import { ConfiguracionRcPagina } from '@/modulos/ruta-critica/ConfiguracionRcPagina';
 import { DependenciasPagina } from '@/modulos/ruta-critica/DependenciasPagina';
 import { PlantillasPagina } from '@/modulos/ruta-critica/PlantillasPagina';
+import { MisPendientesPagina } from '@/modulos/ruta-critica/MisPendientesPagina';
 import { ProcesosPagina } from '@/modulos/ruta-critica/ProcesosPagina';
+import { ProcesosResponsablesPagina } from '@/modulos/ruta-critica/ProcesosResponsablesPagina';
 import { ProgramarRcPagina } from '@/modulos/ruta-critica/ProgramarRcPagina';
 import { ReglasDuracionPagina } from '@/modulos/ruta-critica/ReglasDuracionPagina';
-import { RutaCriticaPagina } from '@/modulos/ruta-critica/RutaCriticaPagina';
 import { RutaPorOrdenPagina } from '@/modulos/ruta-critica/RutaPorOrdenPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
@@ -225,16 +225,25 @@ const router = createBrowserRouter([
           { path: 'esma/abonos', element: <CapturaMovimientoPagina concepto="abonos" /> },
           { path: 'esma/descuentos', element: <CapturaMovimientoPagina concepto="descuentos" /> },
           { path: 'esma/pagos', element: <CapturaPagosPagina /> },
-          // Ruta Crítica (Módulo 8) — portada-hub de las sub-vistas (antes caía en ":modulo").
-          { path: 'ruta-critica', element: <RutaCriticaPagina /> },
+          // Ruta Crítica (R4): el hub /ruta-critica se retiró — la operación diaria ES la
+          // pantalla (hoja directa); la configuración vive en SISTEMA · Procesos y responsables.
+          { path: 'ruta-critica', element: <Navigate to="/ruta-critica/pendientes" replace /> },
+          // Ruta Crítica (rediseño R4) — "Mis pendientes" (la guía diaria) y el catálogo de
+          // procesos y responsables (bajo SISTEMA). La bandeja vieja REDIRIGE a Mis pendientes
+          // (misma consulta, pantalla nueva); su URL sigue viva para ligas guardadas.
+          { path: 'ruta-critica/pendientes', element: <MisPendientesPagina /> },
+          { path: 'ruta-critica/procesos-responsables', element: <ProcesosResponsablesPagina /> },
           // Ruta Crítica (Módulo 8, F5-E1) — catálogo configurable + editor de dependencias.
           { path: 'ruta-critica/procesos', element: <ProcesosPagina /> },
           { path: 'ruta-critica/dependencias', element: <DependenciasPagina /> },
           // Ruta Crítica (Módulo 8, F5-E2) — plantillas de ruta y reglas de duración.
           { path: 'ruta-critica/plantillas', element: <PlantillasPagina /> },
           { path: 'ruta-critica/reglas-duracion', element: <ReglasDuracionPagina /> },
-          // Ruta Crítica (Módulo 8, F5-E5) — motor por orden: bandeja, programar y RC por orden.
-          { path: 'ruta-critica/bandeja', element: <BandejaTareasPagina /> },
+          // Ruta Crítica (Módulo 8, F5-E5) — la bandeja vive ahora en Mis pendientes (R4).
+          {
+            path: 'ruta-critica/bandeja',
+            element: <Navigate to="/ruta-critica/pendientes" replace />,
+          },
           // Ruta Crítica (Módulo 8, F5-E7) — concentrado "planeado vs real" (tablero gerencial).
           { path: 'ruta-critica/concentrado', element: <ConcentradoPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },

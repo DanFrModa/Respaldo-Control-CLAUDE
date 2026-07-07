@@ -140,6 +140,23 @@ export type DatosMarcarChecklist = z.infer<typeof esquemaMarcarChecklist>;
 /** Estados del semáforo de cumplimiento (F5-E4). */
 export const esquemaEstadoSemaforo = z.enum(['aTiempo', 'enRiesgo', 'atrasado']);
 
+// ── Secuencia de estampado por orden (R4, B10) ────────────────────────────────
+
+/**
+ * Cuerpo para ELEGIR la secuencia de estampado de una orden FLEXIBLE (R4, B10): reprograma la
+ * ruta viva en el momento (agrega/quita la dependencia "recibo de estampado → envío a costura"
+ * y re-encola el CPM). Solo `antes` | `despues` (la flexibilidad es del MODELO, no una elección).
+ */
+export const esquemaSecuenciaEstampadoCuerpo = z
+  .object({
+    secuencia: z
+      .enum(['antes', 'despues'], { error: 'La secuencia debe ser "antes" o "despues"' })
+      .describe('¿El estampado va ANTES o DESPUÉS de coser?'),
+  })
+  .describe('Elección de secuencia de estampado de una orden flexible (reprograma en vivo).');
+/** Datos validados de la elección de secuencia. */
+export type DatosSecuenciaEstampado = z.infer<typeof esquemaSecuenciaEstampadoCuerpo>;
+
 // ── Salida: la ruta viva de una orden ─────────────────────────────────────────
 
 /** Un ítem de checklist de un proceso de la ruta viva. */
@@ -162,11 +179,36 @@ export const esquemaRutaProcesoSalida = z
     ultimoProceso: z.boolean(),
     esResurtido: z.boolean(),
     condicionAplicabilidad: z.enum(['ninguna', 'soloSiLlevaAplicacion']),
+    tipoEvento: z
+      .enum([
+        'recepcionTela',
+        'corte',
+        'envioCostura',
+        'reciboCostura',
+        'envioEstampado',
+        'reciboEstampado',
+        'auditoria',
+        'autorizacionArte',
+        'entregaCliente',
+        'manual',
+      ])
+      .describe('Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.'),
+    rolesResponsables: z
+      .array(z.string())
+      .describe('Nombres de los roles responsables del proceso (N:M, R4).'),
+    esResponsableActual: z
+      .boolean()
+      .describe('¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4).'),
     duracionDias: z.number().int().describe('Duración estimada del proceso (días).'),
     acumuladoDias: z.number().int().nullable().describe('Días acumulados (lo llena el CPM, E4).'),
     fechaPlaneadaOriginal: z.iso.datetime().nullable().describe('Planeada original (CPM, E4).'),
     fechaPlaneadaVigente: z.iso.datetime().nullable().describe('Planeada vigente (CPM, E4).'),
     fechaReal: z.iso.datetime().nullable().describe('Fecha real de cumplimiento, o null.'),
+    diasRestantes: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4).'),
     estado: z.enum(['pendiente', 'activo', 'completado']),
     capturadoPorId: z.string().nullable(),
     capturadoPorNombre: z
@@ -200,6 +242,23 @@ export const esquemaRutaOrdenSalida = z
     idArticuloRC: z.number().int().nullable(),
     idTipoTela: z.number().int().nullable(),
     idAplicacion: z.number().int().nullable(),
+    secuenciaEstampadoModelo: z
+      .enum(['antes', 'despues', 'flexible'])
+      .describe('Secuencia de estampado del MODELO (R4, B10).'),
+    secEstampadoElegido: z
+      .enum(['antes', 'despues'])
+      .nullable()
+      .describe('Elección de la orden (solo flexibles), o null si no se ha decidido.'),
+    secuenciaEstampadoEfectiva: z
+      .enum(['antes', 'despues'])
+      .describe('Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).'),
+    motivoSinRuta: z
+      .string()
+      .nullable()
+      .describe(
+        'Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en ' +
+          'bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro.',
+      ),
     estadoRecalculo: z
       .enum(['calculado', 'recalculando', 'sin-ruta'])
       .describe(

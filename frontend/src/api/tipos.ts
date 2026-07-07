@@ -657,6 +657,16 @@ export type DuracionAplicacionRcCrear =
 export type DuracionAplicacionRcEditar =
   paths['/api/ruta-critica/reglas-duracion/aplicacion/{id}']['patch']['requestBody']['content']['application/json'];
 
+/** Rango de dificultad por # de operaciones (R4, B7 — tabla configurable). */
+export type RangoDificultadRc =
+  paths['/api/ruta-critica/reglas-duracion/dificultad']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo de alta de rango de dificultad. */
+export type RangoDificultadRcCrear =
+  paths['/api/ruta-critica/reglas-duracion/dificultad']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de edición de rango de dificultad. */
+export type RangoDificultadRcEditar =
+  paths['/api/ruta-critica/reglas-duracion/dificultad/{id}']['patch']['requestBody']['content']['application/json'];
+
 /** Calendario laboral de una empresa. */
 export type CalendarioRc =
   paths['/api/ruta-critica/calendario/{idEmpresa}']['get']['responses']['200']['content']['application/json'];
@@ -717,6 +727,20 @@ export type BandejaRcQuery = NonNullable<
 /** Conteo de alertas (atrasados / en riesgo) para el badge del header. */
 export type AlertasRcConteo =
   paths['/api/ruta-critica/alertas/conteo']['get']['responses']['200']['content']['application/json'];
+
+/** Urgencia de un pendiente (R4): vencida / hoy / semana / despues / sinFecha. */
+export type UrgenciaPendienteRc = TareaRc['urgencia'];
+/** Resumen de "Mis pendientes" (R4): KPIs + grupos por proceso (agregado en servidor). */
+export type ResumenPendientesRc =
+  paths['/api/ruta-critica/bandeja/resumen']['get']['responses']['200']['content']['application/json'];
+/** Un grupo por proceso del resumen de pendientes. */
+export type ResumenProcesoPendienteRc = ResumenPendientesRc['porProceso'][number];
+/** Un usuario del selector "Viendo pendientes de:" (R4, supervisión). */
+export type ResponsableRc =
+  paths['/api/ruta-critica/bandeja/responsables']['get']['responses']['200']['content']['application/json'][number];
+/** Cuerpo para elegir la secuencia de estampado de una orden flexible (R4, B10). */
+export type SecuenciaEstampadoCuerpo =
+  paths['/api/ruta-critica/ordenes/{id}/secuencia-estampado']['post']['requestBody']['content']['application/json'];
 
 // ── Ruta Crítica: concentrado "planeado vs real" (Módulo 8, F5-E7) ────────────
 

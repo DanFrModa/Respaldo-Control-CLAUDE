@@ -11,9 +11,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
+import { ErrorPermiso } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { consultarBandeja, contarAlertas } from './bandeja.js';
+import {
+  consultarBandeja,
+  contarAlertas,
+  listarResponsablesRc,
+  resumenPendientes,
+} from './bandeja.js';
 import { completarProceso } from './cumplimiento.js';
 import { obtenerRutaOrden } from './rutaOrden.js';
 
@@ -346,5 +352,130 @@ describe('capturadoPorNombre en GET ruta (aditivo, F5-E5)', () => {
     const ruta = await obtenerRutaOrden(lector, idOrden, bd());
     const renglon = ruta.procesos.find((p) => p.id === idRuta);
     expect(renglon?.capturadoPorNombre).toBeNull();
+  });
+});
+
+describe('Mis pendientes (R4): deUsuario, resumen y responsables', () => {
+  it('deUsuario con rc.programar devuelve los pendientes del SUPERVISADO (por sus roles)', async () => {
+    const idOrden = await crearOrdenConRc();
+    const corte = await crearProcesoDef('corte');
+    const envio = await crearProcesoDef('envio');
+    const rCorte = await crearRenglon(idOrden, corte, { secuencia: 0, estado: 'activo' });
+    await crearRenglon(idOrden, envio, { secuencia: 1, estado: 'activo' });
+
+    // Laura es responsable SOLO del corte.
+    const { idRol, idUsuario: idLaura } = await crearUsuarioConRol('laura', 'Corte');
+    await cliente.procesoDefRol.create({ data: { idProcesoDef: corte, idRol } });
+
+    const supervisor = sesionDePrueba({
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.ruta-ver', 'rc.programar'],
+    });
+    const pagina = await consultarBandeja(supervisor, { deUsuario: idLaura }, bd(), hoy);
+    expect(pagina.datos.map((t) => t.idRutaOrden)).toEqual([rCorte]);
+  });
+
+  it('deUsuario SIN rc.programar es 403 (no se degrada en silencio)', async () => {
+    const { idUsuario: idLaura } = await crearUsuarioConRol('laura2', 'Corte2');
+    const { idUsuario: idOtro } = await crearUsuarioConRol('otro', 'OtraCosa2');
+    const sinPermiso = sesionDePrueba({
+      id: idOtro,
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.ruta-ver'],
+    });
+    await expect(
+      consultarBandeja(sinPermiso, { deUsuario: idLaura }, bd(), hoy),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+    await expect(
+      resumenPendientes(sinPermiso, { deUsuario: idLaura }, bd(), hoy),
+    ).rejects.toBeInstanceOf(ErrorPermiso);
+  });
+
+  it('la tarea trae urgencia/tipoEvento/fechaEntrega derivados en servidor', async () => {
+    const idOrden = await crearOrdenConRc();
+    await cliente.orden.update({
+      where: { id: idOrden },
+      data: { fechaEntrega: new Date('2026-07-15T00:00:00Z') },
+    });
+    const proc = await cliente.procesoDef.create({
+      data: { codigo: 'corte-auto', nombre: 'CORTE', tipoEvento: 'corte' },
+    });
+    await crearRenglon(idOrden, proc.id, {
+      secuencia: 0,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-20', // 2 días antes de "hoy" → vencida
+    });
+    const admin = sesionDePrueba({
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.ruta-ver', 'roles.administrar'],
+    });
+    const pagina = await consultarBandeja(admin, {}, bd(), hoy);
+    expect(pagina.datos).toHaveLength(1);
+    const tarea = pagina.datos[0]!;
+    expect(tarea.urgencia).toBe('vencida');
+    expect(tarea.tipoEvento).toBe('corte');
+    expect(tarea.fechaEntrega).toBe('2026-07-15T00:00:00.000Z');
+  });
+
+  it('resumenPendientes agrega KPIs y grupos por proceso EN SERVIDOR', async () => {
+    const idOrden = await crearOrdenConRc();
+    const corte = await crearProcesoDef('corte');
+    const envio = await crearProcesoDef('envio');
+    // corte: 1 vencida + 1 para hoy (dos órdenes no: mismo idOrden no permite duplicar proceso →
+    // segunda orden para el segundo renglón de corte).
+    await crearRenglon(idOrden, corte, {
+      secuencia: 0,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-20',
+    });
+    const idOrden2 = await crearOrdenConRc();
+    await crearRenglon(idOrden2, corte, {
+      secuencia: 0,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-22',
+    });
+    // envio: 1 en la semana (hoy+2) y 1 más adelante (hoy+10).
+    await crearRenglon(idOrden, envio, {
+      secuencia: 1,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-06-24',
+    });
+    await crearRenglon(idOrden2, envio, {
+      secuencia: 1,
+      estado: 'activo',
+      fechaPlaneadaVigente: '2026-07-02',
+    });
+
+    const admin = sesionDePrueba({
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.ruta-ver', 'roles.administrar'],
+    });
+    const resumen = await resumenPendientes(admin, {}, bd(), hoy);
+    expect(resumen.total).toBe(4);
+    expect(resumen.vencidas).toBe(1);
+    expect(resumen.paraHoy).toBe(1);
+    expect(resumen.estaSemana).toBe(1);
+    expect(resumen.masAdelante).toBe(1);
+    // Grupos: corte (1 vencida + 1 hoy) va primero; envio después.
+    expect(resumen.porProceso.map((g) => g.codigoProceso)).toEqual(['corte', 'envio']);
+    expect(resumen.porProceso[0]).toMatchObject({ total: 2, vencidas: 1, paraHoy: 1 });
+  });
+
+  it('listarResponsablesRc lista usuarios con roles responsables y exige rc.programar', async () => {
+    const proc = await crearProcesoDef('corte');
+    const { idRol, idUsuario } = await crearUsuarioConRol('laura3', 'Corte3');
+    await cliente.procesoDefRol.create({ data: { idProcesoDef: proc, idRol } });
+    // Usuario SIN rol responsable: no debe aparecer.
+    await crearUsuarioConRol('ajeno', 'SinProcesos');
+
+    const supervisor = sesionDePrueba({
+      idEmpresaActiva: idEmpresa,
+      permisos: ['rc.programar'],
+    });
+    const lista = await listarResponsablesRc(supervisor, bd());
+    expect(lista.map((u) => u.id)).toEqual([idUsuario]);
+
+    const sinPermiso = sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: ['rc.ruta-ver'] });
+    await expect(listarResponsablesRc(sinPermiso, bd())).rejects.toBeInstanceOf(ErrorPermiso);
   });
 });

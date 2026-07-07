@@ -17,6 +17,8 @@ import type {
   ConcentradoRcPagina,
   ConcentradoRcQuery,
   ProgramarRcCuerpo,
+  ResponsableRc,
+  ResumenPendientesRc,
   RutaOrden,
 } from './tipos';
 
@@ -159,6 +161,84 @@ export function useConteoAlertasRc(
     },
     enabled: habilitado,
     refetchInterval: intervaloMs,
+  });
+}
+
+// ── Mis pendientes (R4): resumen + responsables + secuencia de estampado ─────
+
+/**
+ * Resumen de "Mis pendientes" (R4): KPIs (vencidas/hoy/semana/total) y grupos por proceso,
+ * agregados EN SERVIDOR (A1). `deUsuario` (supervisión) resume los pendientes de otro usuario.
+ */
+export function useResumenPendientesRc(
+  opciones: { deUsuario?: string } = {},
+): UseQueryResult<ResumenPendientesRc, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_RC_BANDEJA, 'resumen', opciones.deUsuario ?? 'yo'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/ruta-critica/bandeja/resumen', {
+        params: {
+          query: opciones.deUsuario === undefined ? {} : { deUsuario: opciones.deUsuario },
+        },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Usuarios del selector "Viendo pendientes de:" (R4). SOLO para supervisores (`rc.programar`):
+ * `habilitado` lo apaga para el resto (el backend re-verifica con 403).
+ */
+export function useResponsablesRc(
+  opciones: { habilitado?: boolean } = {},
+): UseQueryResult<ResponsableRc[], ErrorDeApi> {
+  const { habilitado = true } = opciones;
+  return useQuery({
+    queryKey: [...CLAVE_RC_BANDEJA, 'responsables'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/ruta-critica/bandeja/responsables');
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    enabled: habilitado,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Argumentos de elegir la secuencia de estampado de una orden flexible (R4, B10). */
+export interface ArgsSecuenciaEstampado {
+  idOrden: number;
+  secuencia: 'antes' | 'despues';
+}
+
+/**
+ * Elige si el estampado va ANTES o DESPUÉS de coser en una orden FLEXIBLE: reprograma la ruta
+ * viva en el momento (el backend edita la dependencia y re-encola el CPM). Invalida ruta +
+ * bandeja + alertas.
+ */
+export function useElegirSecuenciaEstampado(): UseMutationResult<
+  RutaOrden,
+  ErrorDeApi,
+  ArgsSecuenciaEstampado
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ idOrden, secuencia }: ArgsSecuenciaEstampado) => {
+      const { data, error } = await api.POST('/api/ruta-critica/ordenes/{id}/secuencia-estampado', {
+        params: { path: { id: idOrden } },
+        body: { secuencia },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: (_data, vars) => {
+      void qc.invalidateQueries({ queryKey: [...CLAVE_RC_RUTA, vars.idOrden] });
+      void qc.invalidateQueries({ queryKey: CLAVE_RC_BANDEJA });
+      void qc.invalidateQueries({ queryKey: CLAVE_RC_ALERTAS });
+    },
   });
 }
 

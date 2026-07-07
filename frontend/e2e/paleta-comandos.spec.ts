@@ -18,16 +18,16 @@ test.describe('Paleta de comandos ⌘K', () => {
     await page.getByTestId('abrir-paleta').click();
     await expect(page.getByTestId('paleta-input')).toBeVisible();
 
-    // Teclear filtra pantallas: "Bandeja" → Ruta Crítica · Bandeja de tareas.
-    await page.getByTestId('paleta-input').fill('Bandeja');
-    const opcionBandeja = page
+    // Teclear filtra pantallas: "Ruta" → Ruta Crítica (hoja directa a Mis pendientes, R4).
+    await page.getByTestId('paleta-input').fill('Ruta Crítica');
+    const opcionRc = page
       .getByTestId('paleta-resultados')
-      .getByText('Bandeja de tareas', { exact: false })
+      .getByText('Ruta Crítica', { exact: true })
       .first();
-    await expect(opcionBandeja).toBeVisible();
-    await opcionBandeja.click();
-    await expect(page).toHaveURL(/\/ruta-critica\/bandeja$/);
-    await expect(page.getByRole('heading', { name: /Bandeja/ })).toBeVisible();
+    await expect(opcionRc).toBeVisible();
+    await opcionRc.click();
+    await expect(page).toHaveURL(/\/ruta-critica\/pendientes$/);
+    await expect(page.getByRole('heading', { name: 'Mis pendientes' })).toBeVisible();
 
     // Reabrir con el atajo de teclado Ctrl+K (toggle).
     await page.keyboard.press('Control+k');

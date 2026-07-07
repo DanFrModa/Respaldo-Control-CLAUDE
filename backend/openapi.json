@@ -89309,7 +89309,8 @@
                               "fija",
                               "porCantidad",
                               "porTipoTela",
-                              "porAplicacion"
+                              "porAplicacion",
+                              "porDificultad"
                             ],
                             "description": "Cómo se estima su duración."
                           },
@@ -89708,7 +89709,8 @@
                       "fija",
                       "porCantidad",
                       "porTipoTela",
-                      "porAplicacion"
+                      "porAplicacion",
+                      "porDificultad"
                     ]
                   }
                 },
@@ -89789,7 +89791,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -90180,7 +90183,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -90542,7 +90546,8 @@
                       "fija",
                       "porCantidad",
                       "porTipoTela",
-                      "porAplicacion"
+                      "porAplicacion",
+                      "porDificultad"
                     ]
                   },
                   "activo": {
@@ -90635,7 +90640,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -91024,7 +91030,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -91439,7 +91446,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -91854,7 +91862,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -92283,7 +92292,8 @@
                         "fija",
                         "porCantidad",
                         "porTipoTela",
-                        "porAplicacion"
+                        "porAplicacion",
+                        "porDificultad"
                       ],
                       "description": "Cómo se estima su duración."
                     },
@@ -99866,6 +99876,1159 @@
         }
       }
     },
+    "/api/ruta-critica/reglas-duracion/dificultad": {
+      "get": {
+        "summary": "Listar los rangos de dificultad por # de operaciones (tabla configurable)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirInactivos",
+            "required": false,
+            "description": "Incluye los desactivados (\"true\"/\"false\")."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                      },
+                      "opsDesde": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Límite inferior (inclusive)."
+                      },
+                      "opsHasta": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Límite superior, o null = abierto (\"33+\")."
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "description": "Nombre de la dificultad (p. ej. \"Muy sencillo\")."
+                      },
+                      "diasCostura": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "Días de costura del rango."
+                      },
+                      "activo": {
+                        "type": "boolean"
+                      },
+                      "creadoEn": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                        "description": "Fecha de alta (ISO 8601)."
+                      },
+                      "creadoPorId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Id del usuario que lo creó."
+                      },
+                      "modificadoEn": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                        "description": "Fecha de la última modificación (ISO 8601)."
+                      },
+                      "modificadoPorId": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "Id del último usuario que lo modificó."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "opsDesde",
+                      "opsHasta",
+                      "nombre",
+                      "diasCostura",
+                      "activo",
+                      "creadoEn",
+                      "creadoPorId",
+                      "modificadoEn",
+                      "modificadoPorId"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7)."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Crear un rango de dificultad (valida que no se solape con los activos)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "opsDesde": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "description": "Límite inferior del rango de operaciones (inclusive)."
+                  },
+                  "opsHasta": {
+                    "description": "Límite superior (inclusive), o null = abierto hacia arriba (\"33+\").",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "diasCostura": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3650,
+                    "description": "Días de costura que aporta este rango (regla porDificultad)."
+                  }
+                },
+                "required": [
+                  "opsDesde",
+                  "nombre",
+                  "diasCostura"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "opsDesde": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Límite inferior (inclusive)."
+                    },
+                    "opsHasta": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite superior, o null = abierto (\"33+\")."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la dificultad (p. ej. \"Muy sencillo\")."
+                    },
+                    "diasCostura": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Días de costura del rango."
+                    },
+                    "activo": {
+                      "type": "boolean"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "opsDesde",
+                    "opsHasta",
+                    "nombre",
+                    "diasCostura",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/reglas-duracion/dificultad/{id}": {
+      "patch": {
+        "summary": "Actualizar un rango de dificultad",
+        "tags": [
+          "ruta-critica"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "opsDesde": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "opsHasta": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "diasCostura": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3650
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "opsDesde": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Límite inferior (inclusive)."
+                    },
+                    "opsHasta": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite superior, o null = abierto (\"33+\")."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la dificultad (p. ej. \"Muy sencillo\")."
+                    },
+                    "diasCostura": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Días de costura del rango."
+                    },
+                    "activo": {
+                      "type": "boolean"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "opsDesde",
+                    "opsHasta",
+                    "nombre",
+                    "diasCostura",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Desactivar un rango de dificultad (borrado suave)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del recurso."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "opsDesde": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Límite inferior (inclusive)."
+                    },
+                    "opsHasta": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Límite superior, o null = abierto (\"33+\")."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre de la dificultad (p. ej. \"Muy sencillo\")."
+                    },
+                    "diasCostura": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Días de costura del rango."
+                    },
+                    "activo": {
+                      "type": "boolean"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "opsDesde",
+                    "opsHasta",
+                    "nombre",
+                    "diasCostura",
+                    "activo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Rango de dificultad por # de operaciones (tabla configurable, R4/B7)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ruta-critica/calendario/{idEmpresa}": {
       "get": {
         "summary": "Obtener el calendario laboral de una empresa",
@@ -101684,6 +102847,49 @@
                         }
                       ]
                     },
+                    "secuenciaEstampadoModelo": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del MODELO (R4, B10)."
+                    },
+                    "secEstampadoElegido": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Elección de la orden (solo flexibles), o null si no se ha decidido."
+                    },
+                    "secuenciaEstampadoEfectiva": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues"
+                      ],
+                      "description": "Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes)."
+                    },
+                    "motivoSinRuta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA \"Programar ahora\" (R4). Null si hay ruta o no hay rastro."
+                    },
                     "estadoRecalculo": {
                       "type": "string",
                       "enum": [
@@ -101746,6 +102952,33 @@
                               "soloSiLlevaAplicacion"
                             ]
                           },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "rolesResponsables": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Nombres de los roles responsables del proceso (N:M, R4)."
+                          },
+                          "esResponsableActual": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                          },
                           "duracionDias": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -101803,6 +103036,19 @@
                               }
                             ],
                             "description": "Fecha real de cumplimiento, o null."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
                           },
                           "estado": {
                             "type": "string",
@@ -101923,11 +103169,15 @@
                           "ultimoProceso",
                           "esResurtido",
                           "condicionAplicabilidad",
+                          "tipoEvento",
+                          "rolesResponsables",
+                          "esResponsableActual",
                           "duracionDias",
                           "acumuladoDias",
                           "fechaPlaneadaOriginal",
                           "fechaPlaneadaVigente",
                           "fechaReal",
+                          "diasRestantes",
                           "estado",
                           "capturadoPorId",
                           "capturadoPorNombre",
@@ -101960,6 +103210,10 @@
                     "idArticuloRC",
                     "idTipoTela",
                     "idAplicacion",
+                    "secuenciaEstampadoModelo",
+                    "secEstampadoElegido",
+                    "secuenciaEstampadoEfectiva",
+                    "motivoSinRuta",
                     "estadoRecalculo",
                     "semaforo",
                     "procesos",
@@ -102324,6 +103578,49 @@
                         }
                       ]
                     },
+                    "secuenciaEstampadoModelo": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del MODELO (R4, B10)."
+                    },
+                    "secEstampadoElegido": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Elección de la orden (solo flexibles), o null si no se ha decidido."
+                    },
+                    "secuenciaEstampadoEfectiva": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues"
+                      ],
+                      "description": "Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes)."
+                    },
+                    "motivoSinRuta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA \"Programar ahora\" (R4). Null si hay ruta o no hay rastro."
+                    },
                     "estadoRecalculo": {
                       "type": "string",
                       "enum": [
@@ -102386,6 +103683,33 @@
                               "soloSiLlevaAplicacion"
                             ]
                           },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "rolesResponsables": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Nombres de los roles responsables del proceso (N:M, R4)."
+                          },
+                          "esResponsableActual": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                          },
                           "duracionDias": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -102443,6 +103767,19 @@
                               }
                             ],
                             "description": "Fecha real de cumplimiento, o null."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
                           },
                           "estado": {
                             "type": "string",
@@ -102563,11 +103900,15 @@
                           "ultimoProceso",
                           "esResurtido",
                           "condicionAplicabilidad",
+                          "tipoEvento",
+                          "rolesResponsables",
+                          "esResponsableActual",
                           "duracionDias",
                           "acumuladoDias",
                           "fechaPlaneadaOriginal",
                           "fechaPlaneadaVigente",
                           "fechaReal",
+                          "diasRestantes",
                           "estado",
                           "capturadoPorId",
                           "capturadoPorNombre",
@@ -102600,6 +103941,10 @@
                     "idArticuloRC",
                     "idTipoTela",
                     "idAplicacion",
+                    "secuenciaEstampadoModelo",
+                    "secEstampadoElegido",
+                    "secuenciaEstampadoEfectiva",
+                    "motivoSinRuta",
                     "estadoRecalculo",
                     "semaforo",
                     "procesos",
@@ -102873,6 +104218,49 @@
                         }
                       ]
                     },
+                    "secuenciaEstampadoModelo": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del MODELO (R4, B10)."
+                    },
+                    "secEstampadoElegido": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Elección de la orden (solo flexibles), o null si no se ha decidido."
+                    },
+                    "secuenciaEstampadoEfectiva": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues"
+                      ],
+                      "description": "Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes)."
+                    },
+                    "motivoSinRuta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA \"Programar ahora\" (R4). Null si hay ruta o no hay rastro."
+                    },
                     "estadoRecalculo": {
                       "type": "string",
                       "enum": [
@@ -102935,6 +104323,33 @@
                               "soloSiLlevaAplicacion"
                             ]
                           },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "rolesResponsables": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Nombres de los roles responsables del proceso (N:M, R4)."
+                          },
+                          "esResponsableActual": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                          },
                           "duracionDias": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -102992,6 +104407,19 @@
                               }
                             ],
                             "description": "Fecha real de cumplimiento, o null."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
                           },
                           "estado": {
                             "type": "string",
@@ -103112,11 +104540,15 @@
                           "ultimoProceso",
                           "esResurtido",
                           "condicionAplicabilidad",
+                          "tipoEvento",
+                          "rolesResponsables",
+                          "esResponsableActual",
                           "duracionDias",
                           "acumuladoDias",
                           "fechaPlaneadaOriginal",
                           "fechaPlaneadaVigente",
                           "fechaReal",
+                          "diasRestantes",
                           "estado",
                           "capturadoPorId",
                           "capturadoPorNombre",
@@ -103149,6 +104581,677 @@
                     "idArticuloRC",
                     "idTipoTela",
                     "idAplicacion",
+                    "secuenciaEstampadoModelo",
+                    "secEstampadoElegido",
+                    "secuenciaEstampadoEfectiva",
+                    "motivoSinRuta",
+                    "estadoRecalculo",
+                    "semaforo",
+                    "procesos",
+                    "advertencias"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Ruta Crítica viva de una orden (F5-E3/E4)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/ordenes/{id}/secuencia-estampado": {
+      "post": {
+        "summary": "Elegir si el estampado va ANTES o DESPUÉS de coser (órdenes flexibles; reprograma en vivo)",
+        "tags": [
+          "ruta-critica"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "secuencia": {
+                    "type": "string",
+                    "enum": [
+                      "antes",
+                      "despues"
+                    ],
+                    "description": "¿El estampado va ANTES o DESPUÉS de coser?"
+                  }
+                },
+                "required": [
+                  "secuencia"
+                ],
+                "description": "Elección de secuencia de estampado de una orden flexible (reprograma en vivo)."
+              }
+            }
+          },
+          "description": "Elección de secuencia de estampado de una orden flexible (reprograma en vivo)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id de la orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ruta Crítica viva de una orden (F5-E3/E4).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idOrden": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "rcActiva": {
+                      "type": "boolean",
+                      "description": "¿La RC está generada y vigente?"
+                    },
+                    "fechaInicioRC": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fechaEntregaRC": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "fechaProgramada": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "esResurtido": {
+                      "type": "boolean"
+                    },
+                    "idArticuloRC": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "idTipoTela": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "idAplicacion": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "secuenciaEstampadoModelo": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del MODELO (R4, B10)."
+                    },
+                    "secEstampadoElegido": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Elección de la orden (solo flexibles), o null si no se ha decidido."
+                    },
+                    "secuenciaEstampadoEfectiva": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues"
+                      ],
+                      "description": "Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes)."
+                    },
+                    "motivoSinRuta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA \"Programar ahora\" (R4). Null si hay ruta o no hay rastro."
+                    },
+                    "estadoRecalculo": {
+                      "type": "string",
+                      "enum": [
+                        "calculado",
+                        "recalculando",
+                        "sin-ruta"
+                      ],
+                      "description": "Estado del cálculo de fechas: \"calculado\" (fechas vigentes listas), \"recalculando\" (hay procesos sin fecha vigente; el CPM aún no terminó) o \"sin-ruta\" (F5-E4)."
+                    },
+                    "semaforo": {
+                      "type": "string",
+                      "enum": [
+                        "aTiempo",
+                        "enRiesgo",
+                        "atrasado"
+                      ],
+                      "description": "Semáforo de cumplimiento de la orden (el peor de sus procesos) (F5-E4)."
+                    },
+                    "procesos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón de ruta."
+                          },
+                          "idProcesoDef": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del proceso (ProcesoDef)."
+                          },
+                          "codigoProceso": {
+                            "type": "string"
+                          },
+                          "nombreProceso": {
+                            "type": "string"
+                          },
+                          "secuencia": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "critico": {
+                            "type": "boolean"
+                          },
+                          "ultimoProceso": {
+                            "type": "boolean"
+                          },
+                          "esResurtido": {
+                            "type": "boolean"
+                          },
+                          "condicionAplicabilidad": {
+                            "type": "string",
+                            "enum": [
+                              "ninguna",
+                              "soloSiLlevaAplicacion"
+                            ]
+                          },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "rolesResponsables": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Nombres de los roles responsables del proceso (N:M, R4)."
+                          },
+                          "esResponsableActual": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                          },
+                          "duracionDias": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Duración estimada del proceso (días)."
+                          },
+                          "acumuladoDias": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días acumulados (lo llena el CPM, E4)."
+                          },
+                          "fechaPlaneadaOriginal": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Planeada original (CPM, E4)."
+                          },
+                          "fechaPlaneadaVigente": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Planeada vigente (CPM, E4)."
+                          },
+                          "fechaReal": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha real de cumplimiento, o null."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "pendiente",
+                              "activo",
+                              "completado"
+                            ]
+                          },
+                          "capturadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "capturadoPorNombre": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5)."
+                          },
+                          "capturadoEn": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "origenCaptura": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "manual",
+                                  "evento"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "parcialEnCurso": {
+                            "type": "boolean",
+                            "description": "¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa."
+                          },
+                          "semaforo": {
+                            "type": "string",
+                            "enum": [
+                              "aTiempo",
+                              "enRiesgo",
+                              "atrasado"
+                            ],
+                            "description": "Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4)."
+                          },
+                          "idsAntecesores": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "description": "Antecesores en la ruta (idProcesoDef)."
+                          },
+                          "checklist": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "descripcion": {
+                                  "type": "string"
+                                },
+                                "orden": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                "hecho": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "descripcion",
+                                "orden",
+                                "hecho"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idProcesoDef",
+                          "codigoProceso",
+                          "nombreProceso",
+                          "secuencia",
+                          "critico",
+                          "ultimoProceso",
+                          "esResurtido",
+                          "condicionAplicabilidad",
+                          "tipoEvento",
+                          "rolesResponsables",
+                          "esResponsableActual",
+                          "duracionDias",
+                          "acumuladoDias",
+                          "fechaPlaneadaOriginal",
+                          "fechaPlaneadaVigente",
+                          "fechaReal",
+                          "diasRestantes",
+                          "estado",
+                          "capturadoPorId",
+                          "capturadoPorNombre",
+                          "capturadoEn",
+                          "origenCaptura",
+                          "parcialEnCurso",
+                          "semaforo",
+                          "idsAntecesores",
+                          "checklist"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Proceso de la ruta viva de una orden."
+                      }
+                    },
+                    "advertencias": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos no fatales del cálculo de duraciones."
+                    }
+                  },
+                  "required": [
+                    "idOrden",
+                    "rcActiva",
+                    "fechaInicioRC",
+                    "fechaEntregaRC",
+                    "fechaProgramada",
+                    "esResurtido",
+                    "idArticuloRC",
+                    "idTipoTela",
+                    "idAplicacion",
+                    "secuenciaEstampadoModelo",
+                    "secEstampadoElegido",
+                    "secuenciaEstampadoEfectiva",
+                    "motivoSinRuta",
                     "estadoRecalculo",
                     "semaforo",
                     "procesos",
@@ -103624,6 +105727,49 @@
                         }
                       ]
                     },
+                    "secuenciaEstampadoModelo": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del MODELO (R4, B10)."
+                    },
+                    "secEstampadoElegido": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Elección de la orden (solo flexibles), o null si no se ha decidido."
+                    },
+                    "secuenciaEstampadoEfectiva": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues"
+                      ],
+                      "description": "Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes)."
+                    },
+                    "motivoSinRuta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA \"Programar ahora\" (R4). Null si hay ruta o no hay rastro."
+                    },
                     "estadoRecalculo": {
                       "type": "string",
                       "enum": [
@@ -103686,6 +105832,33 @@
                               "soloSiLlevaAplicacion"
                             ]
                           },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "rolesResponsables": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Nombres de los roles responsables del proceso (N:M, R4)."
+                          },
+                          "esResponsableActual": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                          },
                           "duracionDias": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -103743,6 +105916,19 @@
                               }
                             ],
                             "description": "Fecha real de cumplimiento, o null."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
                           },
                           "estado": {
                             "type": "string",
@@ -103863,11 +106049,15 @@
                           "ultimoProceso",
                           "esResurtido",
                           "condicionAplicabilidad",
+                          "tipoEvento",
+                          "rolesResponsables",
+                          "esResponsableActual",
                           "duracionDias",
                           "acumuladoDias",
                           "fechaPlaneadaOriginal",
                           "fechaPlaneadaVigente",
                           "fechaReal",
+                          "diasRestantes",
                           "estado",
                           "capturadoPorId",
                           "capturadoPorNombre",
@@ -103900,6 +106090,10 @@
                     "idArticuloRC",
                     "idTipoTela",
                     "idAplicacion",
+                    "secuenciaEstampadoModelo",
+                    "secEstampadoElegido",
+                    "secuenciaEstampadoEfectiva",
+                    "motivoSinRuta",
                     "estadoRecalculo",
                     "semaforo",
                     "procesos",
@@ -104196,6 +106390,49 @@
                         }
                       ]
                     },
+                    "secuenciaEstampadoModelo": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del MODELO (R4, B10)."
+                    },
+                    "secEstampadoElegido": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "antes",
+                            "despues"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Elección de la orden (solo flexibles), o null si no se ha decidido."
+                    },
+                    "secuenciaEstampadoEfectiva": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues"
+                      ],
+                      "description": "Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes)."
+                    },
+                    "motivoSinRuta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA \"Programar ahora\" (R4). Null si hay ruta o no hay rastro."
+                    },
                     "estadoRecalculo": {
                       "type": "string",
                       "enum": [
@@ -104258,6 +106495,33 @@
                               "soloSiLlevaAplicacion"
                             ]
                           },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "rolesResponsables": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Nombres de los roles responsables del proceso (N:M, R4)."
+                          },
+                          "esResponsableActual": {
+                            "type": "boolean",
+                            "description": "¿Quien consulta es responsable de este proceso (o admin)? — badge \"tú\" (R4)."
+                          },
                           "duracionDias": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -104315,6 +106579,19 @@
                               }
                             ],
                             "description": "Fecha real de cumplimiento, o null."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
                           },
                           "estado": {
                             "type": "string",
@@ -104435,11 +106712,15 @@
                           "ultimoProceso",
                           "esResurtido",
                           "condicionAplicabilidad",
+                          "tipoEvento",
+                          "rolesResponsables",
+                          "esResponsableActual",
                           "duracionDias",
                           "acumuladoDias",
                           "fechaPlaneadaOriginal",
                           "fechaPlaneadaVigente",
                           "fechaReal",
+                          "diasRestantes",
                           "estado",
                           "capturadoPorId",
                           "capturadoPorNombre",
@@ -104472,6 +106753,10 @@
                     "idArticuloRC",
                     "idTipoTela",
                     "idAplicacion",
+                    "secuenciaEstampadoModelo",
+                    "secEstampadoElegido",
+                    "secuenciaEstampadoEfectiva",
+                    "motivoSinRuta",
                     "estadoRecalculo",
                     "semaforo",
                     "procesos",
@@ -104702,6 +106987,16 @@
             "name": "todas",
             "required": false,
             "description": "Supervisión: si true (y con permiso), muestra TODAS las tareas activas de la empresa, no solo las de los roles del usuario."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "in": "query",
+            "name": "deUsuario",
+            "required": false,
+            "description": "Supervisión (R4, \"Viendo pendientes de:\"): id del usuario cuyos pendientes se consultan. Exige el permiso de supervisión (rc.programar); sin él, 403."
           }
         ],
         "security": [
@@ -104783,6 +107078,35 @@
                             "type": "boolean",
                             "description": "¿Es un proceso crítico de la ruta?"
                           },
+                          "tipoEvento": {
+                            "type": "string",
+                            "enum": [
+                              "recepcionTela",
+                              "corte",
+                              "envioCostura",
+                              "reciboCostura",
+                              "envioEstampado",
+                              "reciboEstampado",
+                              "auditoria",
+                              "autorizacionArte",
+                              "entregaCliente",
+                              "manual"
+                            ],
+                            "description": "Cómo se completa el proceso (R4): manual = a mano; el resto, auto por su evento de sistema."
+                          },
+                          "fechaEntrega": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de entrega comprometida de la orden, o null."
+                          },
                           "fechaPlaneadaVigente": {
                             "anyOf": [
                               {
@@ -104795,6 +107119,30 @@
                               }
                             ],
                             "description": "Fecha planeada vigente del proceso (CPM, E4), o null si aún no se ha fechado."
+                          },
+                          "urgencia": {
+                            "type": "string",
+                            "enum": [
+                              "vencida",
+                              "hoy",
+                              "semana",
+                              "despues",
+                              "sinFecha"
+                            ],
+                            "description": "Clasificación de urgencia del pendiente (R4): vencida / hoy / semana / despues / sinFecha."
+                          },
+                          "diasRestantes": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4)."
                           },
                           "diasAtraso": {
                             "type": "integer",
@@ -104864,7 +107212,11 @@
                           "codigoProceso",
                           "nombreProceso",
                           "critico",
+                          "tipoEvento",
+                          "fechaEntrega",
                           "fechaPlaneadaVigente",
+                          "urgencia",
+                          "diasRestantes",
                           "diasAtraso",
                           "semaforo",
                           "parcialEnCurso",
@@ -104909,6 +107261,423 @@
                   ],
                   "additionalProperties": false,
                   "description": "Página de la bandeja \"mis tareas\" de la Ruta Crítica."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/bandeja/resumen": {
+      "get": {
+        "summary": "Resumen de \"Mis pendientes\": KPIs (vencidas/hoy/semana/total) y grupos por proceso",
+        "tags": [
+          "ruta-critica"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "in": "query",
+            "name": "deUsuario",
+            "required": false,
+            "description": "Supervisión: id del usuario cuyos pendientes se resumen (exige rc.programar)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de \"Mis pendientes\" de la Ruta Crítica (KPIs + grupos por proceso).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "vencidas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pendientes vencidos (fecha planeada < hoy)."
+                    },
+                    "paraHoy": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pendientes para hoy."
+                    },
+                    "estaSemana": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pendientes de los próximos 4 días."
+                    },
+                    "masAdelante": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pendientes programados más adelante."
+                    },
+                    "sinFecha": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pendientes sin fecha planeada (CPM en curso)."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de pendientes a cargo."
+                    },
+                    "porProceso": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idProcesoDef": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tipo de proceso (ProcesoDef)."
+                          },
+                          "codigoProceso": {
+                            "type": "string",
+                            "description": "Código del proceso."
+                          },
+                          "nombreProceso": {
+                            "type": "string",
+                            "description": "Nombre del proceso."
+                          },
+                          "total": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Pendientes de este proceso."
+                          },
+                          "vencidas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos están vencidos."
+                          },
+                          "paraHoy": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos son para hoy."
+                          }
+                        },
+                        "required": [
+                          "idProcesoDef",
+                          "codigoProceso",
+                          "nombreProceso",
+                          "total",
+                          "vencidas",
+                          "paraHoy"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Grupos por tipo de proceso, ordenados por lo más atorado."
+                    }
+                  },
+                  "required": [
+                    "vencidas",
+                    "paraHoy",
+                    "estaSemana",
+                    "masAdelante",
+                    "sinFecha",
+                    "total",
+                    "porProceso"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen de \"Mis pendientes\" de la Ruta Crítica (KPIs + grupos por proceso)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/bandeja/responsables": {
+      "get": {
+        "summary": "Usuarios con roles responsables de la Ruta Crítica (selector \"Viendo pendientes de:\")",
+        "tags": [
+          "ruta-critica"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuarios activos con algún rol responsable de procesos de la Ruta Crítica.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "Id del usuario."
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "description": "Nombre para mostrar."
+                      },
+                      "username": {
+                        "type": "string",
+                        "description": "Nombre de usuario (login)."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "nombre",
+                      "username"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "description": "Usuarios activos con algún rol responsable de procesos de la Ruta Crítica."
                 }
               }
             }

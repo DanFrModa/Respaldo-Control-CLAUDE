@@ -37364,7 +37364,12 @@ export interface paths {
                  * @description Cómo se estima su duración.
                  * @enum {string}
                  */
-                tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+                tipoDuracion:
+                  | 'fija'
+                  | 'porCantidad'
+                  | 'porTipoTela'
+                  | 'porAplicacion'
+                  | 'porDificultad';
                 /** @description Falso si está desactivado (borrado suave). */
                 activo: boolean;
                 /** @description Roles responsables (N:M). */
@@ -37532,7 +37537,12 @@ export interface paths {
               | 'entregaCliente'
               | 'manual';
             /** @enum {string} */
-            tipoDuracion?: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+            tipoDuracion?:
+              | 'fija'
+              | 'porCantidad'
+              | 'porTipoTela'
+              | 'porAplicacion'
+              | 'porDificultad';
           };
         };
       };
@@ -37580,7 +37590,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -37776,7 +37791,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -37961,7 +37981,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -38124,7 +38149,12 @@ export interface paths {
               | 'entregaCliente'
               | 'manual';
             /** @enum {string} */
-            tipoDuracion?: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+            tipoDuracion?:
+              | 'fija'
+              | 'porCantidad'
+              | 'porTipoTela'
+              | 'porAplicacion'
+              | 'porDificultad';
             activo?: boolean;
           };
         };
@@ -38173,7 +38203,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -38373,7 +38408,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -38578,7 +38618,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -38786,7 +38831,12 @@ export interface paths {
                * @description Cómo se estima su duración.
                * @enum {string}
                */
-              tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+              tipoDuracion:
+                | 'fija'
+                | 'porCantidad'
+                | 'porTipoTela'
+                | 'porAplicacion'
+                | 'porDificultad';
               /** @description Falso si está desactivado (borrado suave). */
               activo: boolean;
               /** @description Roles responsables (N:M). */
@@ -42475,6 +42525,569 @@ export interface paths {
     };
     trace?: never;
   };
+  '/api/ruta-critica/reglas-duracion/dificultad': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los rangos de dificultad por # de operaciones (tabla configurable) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Incluye los desactivados ("true"/"false"). */
+          incluirInactivos?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Límite inferior (inclusive). */
+              opsDesde: number;
+              /** @description Límite superior, o null = abierto ("33+"). */
+              opsHasta: number | null;
+              /** @description Nombre de la dificultad (p. ej. "Muy sencillo"). */
+              nombre: string;
+              /** @description Días de costura del rango. */
+              diasCostura: number;
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            }[];
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Crear un rango de dificultad (valida que no se solape con los activos) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Límite inferior del rango de operaciones (inclusive). */
+            opsDesde: number;
+            /** @description Límite superior (inclusive), o null = abierto hacia arriba ("33+"). */
+            opsHasta?: number | null;
+            nombre: string;
+            /** @description Días de costura que aporta este rango (regla porDificultad). */
+            diasCostura: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Rango de dificultad por # de operaciones (tabla configurable, R4/B7). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Límite inferior (inclusive). */
+              opsDesde: number;
+              /** @description Límite superior, o null = abierto ("33+"). */
+              opsHasta: number | null;
+              /** @description Nombre de la dificultad (p. ej. "Muy sencillo"). */
+              nombre: string;
+              /** @description Días de costura del rango. */
+              diasCostura: number;
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/reglas-duracion/dificultad/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Desactivar un rango de dificultad (borrado suave) */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Rango de dificultad por # de operaciones (tabla configurable, R4/B7). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Límite inferior (inclusive). */
+              opsDesde: number;
+              /** @description Límite superior, o null = abierto ("33+"). */
+              opsHasta: number | null;
+              /** @description Nombre de la dificultad (p. ej. "Muy sencillo"). */
+              nombre: string;
+              /** @description Días de costura del rango. */
+              diasCostura: number;
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Actualizar un rango de dificultad */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del recurso. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          'application/json': {
+            opsDesde?: number;
+            opsHasta?: number | null;
+            nombre?: string;
+            diasCostura?: number;
+            activo?: boolean;
+          };
+        };
+      };
+      responses: {
+        /** @description Rango de dificultad por # de operaciones (tabla configurable, R4/B7). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              id: number;
+              /** @description Límite inferior (inclusive). */
+              opsDesde: number;
+              /** @description Límite superior, o null = abierto ("33+"). */
+              opsHasta: number | null;
+              /** @description Nombre de la dificultad (p. ej. "Muy sencillo"). */
+              nombre: string;
+              /** @description Días de costura del rango. */
+              diasCostura: number;
+              activo: boolean;
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   '/api/ruta-critica/calendario/{idEmpresa}': {
     parameters: {
       query?: never;
@@ -43388,6 +44001,20 @@ export interface paths {
               idTipoTela: number | null;
               idAplicacion: number | null;
               /**
+               * @description Secuencia de estampado del MODELO (R4, B10).
+               * @enum {string}
+               */
+              secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+              /** @description Elección de la orden (solo flexibles), o null si no se ha decidido. */
+              secEstampadoElegido: ('antes' | 'despues') | null;
+              /**
+               * @description Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).
+               * @enum {string}
+               */
+              secuenciaEstampadoEfectiva: 'antes' | 'despues';
+              /** @description Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro. */
+              motivoSinRuta: string | null;
+              /**
                * @description Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).
                * @enum {string}
                */
@@ -43410,6 +44037,25 @@ export interface paths {
                 esResurtido: boolean;
                 /** @enum {string} */
                 condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Nombres de los roles responsables del proceso (N:M, R4). */
+                rolesResponsables: string[];
+                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
                 /** @description Días acumulados (lo llena el CPM, E4). */
@@ -43420,6 +44066,8 @@ export interface paths {
                 fechaPlaneadaVigente: string | null;
                 /** @description Fecha real de cumplimiento, o null. */
                 fechaReal: string | null;
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
@@ -43574,6 +44222,20 @@ export interface paths {
               idTipoTela: number | null;
               idAplicacion: number | null;
               /**
+               * @description Secuencia de estampado del MODELO (R4, B10).
+               * @enum {string}
+               */
+              secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+              /** @description Elección de la orden (solo flexibles), o null si no se ha decidido. */
+              secEstampadoElegido: ('antes' | 'despues') | null;
+              /**
+               * @description Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).
+               * @enum {string}
+               */
+              secuenciaEstampadoEfectiva: 'antes' | 'despues';
+              /** @description Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro. */
+              motivoSinRuta: string | null;
+              /**
                * @description Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).
                * @enum {string}
                */
@@ -43596,6 +44258,25 @@ export interface paths {
                 esResurtido: boolean;
                 /** @enum {string} */
                 condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Nombres de los roles responsables del proceso (N:M, R4). */
+                rolesResponsables: string[];
+                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
                 /** @description Días acumulados (lo llena el CPM, E4). */
@@ -43606,6 +44287,8 @@ export interface paths {
                 fechaPlaneadaVigente: string | null;
                 /** @description Fecha real de cumplimiento, o null. */
                 fechaReal: string | null;
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
@@ -43779,6 +44462,20 @@ export interface paths {
               idTipoTela: number | null;
               idAplicacion: number | null;
               /**
+               * @description Secuencia de estampado del MODELO (R4, B10).
+               * @enum {string}
+               */
+              secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+              /** @description Elección de la orden (solo flexibles), o null si no se ha decidido. */
+              secEstampadoElegido: ('antes' | 'despues') | null;
+              /**
+               * @description Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).
+               * @enum {string}
+               */
+              secuenciaEstampadoEfectiva: 'antes' | 'despues';
+              /** @description Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro. */
+              motivoSinRuta: string | null;
+              /**
                * @description Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).
                * @enum {string}
                */
@@ -43801,6 +44498,25 @@ export interface paths {
                 esResurtido: boolean;
                 /** @enum {string} */
                 condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Nombres de los roles responsables del proceso (N:M, R4). */
+                rolesResponsables: string[];
+                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
                 /** @description Días acumulados (lo llena el CPM, E4). */
@@ -43811,6 +44527,8 @@ export interface paths {
                 fechaPlaneadaVigente: string | null;
                 /** @description Fecha real de cumplimiento, o null. */
                 fechaReal: string | null;
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
@@ -43921,6 +44639,240 @@ export interface paths {
         };
       };
     };
+    trace?: never;
+  };
+  '/api/ruta-critica/ordenes/{id}/secuencia-estampado': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Elegir si el estampado va ANTES o DESPUÉS de coser (órdenes flexibles; reprograma en vivo) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden de producción. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Elección de secuencia de estampado de una orden flexible (reprograma en vivo). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * @description ¿El estampado va ANTES o DESPUÉS de coser?
+             * @enum {string}
+             */
+            secuencia: 'antes' | 'despues';
+          };
+        };
+      };
+      responses: {
+        /** @description Ruta Crítica viva de una orden (F5-E3/E4). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              idOrden: number;
+              /** @description ¿La RC está generada y vigente? */
+              rcActiva: boolean;
+              fechaInicioRC: string | null;
+              fechaEntregaRC: string | null;
+              fechaProgramada: string | null;
+              esResurtido: boolean;
+              idArticuloRC: number | null;
+              idTipoTela: number | null;
+              idAplicacion: number | null;
+              /**
+               * @description Secuencia de estampado del MODELO (R4, B10).
+               * @enum {string}
+               */
+              secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+              /** @description Elección de la orden (solo flexibles), o null si no se ha decidido. */
+              secEstampadoElegido: ('antes' | 'despues') | null;
+              /**
+               * @description Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).
+               * @enum {string}
+               */
+              secuenciaEstampadoEfectiva: 'antes' | 'despues';
+              /** @description Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro. */
+              motivoSinRuta: string | null;
+              /**
+               * @description Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).
+               * @enum {string}
+               */
+              estadoRecalculo: 'calculado' | 'recalculando' | 'sin-ruta';
+              /**
+               * @description Semáforo de cumplimiento de la orden (el peor de sus procesos) (F5-E4).
+               * @enum {string}
+               */
+              semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+              procesos: {
+                /** @description Id del renglón de ruta. */
+                id: number;
+                /** @description Id del proceso (ProcesoDef). */
+                idProcesoDef: number;
+                codigoProceso: string;
+                nombreProceso: string;
+                secuencia: number;
+                critico: boolean;
+                ultimoProceso: boolean;
+                esResurtido: boolean;
+                /** @enum {string} */
+                condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Nombres de los roles responsables del proceso (N:M, R4). */
+                rolesResponsables: string[];
+                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                esResponsableActual: boolean;
+                /** @description Duración estimada del proceso (días). */
+                duracionDias: number;
+                /** @description Días acumulados (lo llena el CPM, E4). */
+                acumuladoDias: number | null;
+                /** @description Planeada original (CPM, E4). */
+                fechaPlaneadaOriginal: string | null;
+                /** @description Planeada vigente (CPM, E4). */
+                fechaPlaneadaVigente: string | null;
+                /** @description Fecha real de cumplimiento, o null. */
+                fechaReal: string | null;
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
+                /** @enum {string} */
+                estado: 'pendiente' | 'activo' | 'completado';
+                capturadoPorId: string | null;
+                /** @description Nombre de quién capturó el cumplimiento (resuelto del Usuario), o null (F5-E5). */
+                capturadoPorNombre: string | null;
+                capturadoEn: string | null;
+                origenCaptura: ('manual' | 'evento') | null;
+                /** @description ¿Hay una entrada PARCIAL en curso (auto-avance, F5-E6)? El proceso aún no se completa. */
+                parcialEnCurso: boolean;
+                /**
+                 * @description Semáforo de cumplimiento del proceso (HOY vs planeada vigente) (F5-E4).
+                 * @enum {string}
+                 */
+                semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                /** @description Antecesores en la ruta (idProcesoDef). */
+                idsAntecesores: number[];
+                checklist: {
+                  id: number;
+                  descripcion: string;
+                  orden: number;
+                  hecho: boolean;
+                }[];
+              }[];
+              /** @description Avisos no fatales del cálculo de duraciones. */
+              advertencias: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/ruta-critica/ordenes/{id}/plan-impreso': {
@@ -44085,6 +45037,20 @@ export interface paths {
               idTipoTela: number | null;
               idAplicacion: number | null;
               /**
+               * @description Secuencia de estampado del MODELO (R4, B10).
+               * @enum {string}
+               */
+              secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+              /** @description Elección de la orden (solo flexibles), o null si no se ha decidido. */
+              secEstampadoElegido: ('antes' | 'despues') | null;
+              /**
+               * @description Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).
+               * @enum {string}
+               */
+              secuenciaEstampadoEfectiva: 'antes' | 'despues';
+              /** @description Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro. */
+              motivoSinRuta: string | null;
+              /**
                * @description Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).
                * @enum {string}
                */
@@ -44107,6 +45073,25 @@ export interface paths {
                 esResurtido: boolean;
                 /** @enum {string} */
                 condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Nombres de los roles responsables del proceso (N:M, R4). */
+                rolesResponsables: string[];
+                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
                 /** @description Días acumulados (lo llena el CPM, E4). */
@@ -44117,6 +45102,8 @@ export interface paths {
                 fechaPlaneadaVigente: string | null;
                 /** @description Fecha real de cumplimiento, o null. */
                 fechaReal: string | null;
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
@@ -44281,6 +45268,20 @@ export interface paths {
               idTipoTela: number | null;
               idAplicacion: number | null;
               /**
+               * @description Secuencia de estampado del MODELO (R4, B10).
+               * @enum {string}
+               */
+              secuenciaEstampadoModelo: 'antes' | 'despues' | 'flexible';
+              /** @description Elección de la orden (solo flexibles), o null si no se ha decidido. */
+              secEstampadoElegido: ('antes' | 'despues') | null;
+              /**
+               * @description Secuencia EFECTIVA planeada (elección > modelo; flexible sin elección = antes).
+               * @enum {string}
+               */
+              secuenciaEstampadoEfectiva: 'antes' | 'despues';
+              /** @description Si la orden no tiene ruta y la RC automática la omitió/falló (R3), el motivo en bitácora — para el CTA "Programar ahora" (R4). Null si hay ruta o no hay rastro. */
+              motivoSinRuta: string | null;
+              /**
                * @description Estado del cálculo de fechas: "calculado" (fechas vigentes listas), "recalculando" (hay procesos sin fecha vigente; el CPM aún no terminó) o "sin-ruta" (F5-E4).
                * @enum {string}
                */
@@ -44303,6 +45304,25 @@ export interface paths {
                 esResurtido: boolean;
                 /** @enum {string} */
                 condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
+                /**
+                 * @description Cómo se completa (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Nombres de los roles responsables del proceso (N:M, R4). */
+                rolesResponsables: string[];
+                /** @description ¿Quien consulta es responsable de este proceso (o admin)? — badge "tú" (R4). */
+                esResponsableActual: boolean;
                 /** @description Duración estimada del proceso (días). */
                 duracionDias: number;
                 /** @description Días acumulados (lo llena el CPM, E4). */
@@ -44313,6 +45333,8 @@ export interface paths {
                 fechaPlaneadaVigente: string | null;
                 /** @description Fecha real de cumplimiento, o null. */
                 fechaReal: string | null;
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
                 /** @enum {string} */
                 estado: 'pendiente' | 'activo' | 'completado';
                 capturadoPorId: string | null;
@@ -44453,6 +45475,8 @@ export interface paths {
           busquedaCliente?: string;
           /** @description Supervisión: si true (y con permiso), muestra TODAS las tareas activas de la empresa, no solo las de los roles del usuario. */
           todas?: string;
+          /** @description Supervisión (R4, "Viendo pendientes de:"): id del usuario cuyos pendientes se consultan. Exige el permiso de supervisión (rc.programar); sin él, 403. */
+          deUsuario?: string;
         };
         header?: never;
         path?: never;
@@ -44491,8 +45515,32 @@ export interface paths {
                 nombreProceso: string;
                 /** @description ¿Es un proceso crítico de la ruta? */
                 critico: boolean;
+                /**
+                 * @description Cómo se completa el proceso (R4): manual = a mano; el resto, auto por su evento de sistema.
+                 * @enum {string}
+                 */
+                tipoEvento:
+                  | 'recepcionTela'
+                  | 'corte'
+                  | 'envioCostura'
+                  | 'reciboCostura'
+                  | 'envioEstampado'
+                  | 'reciboEstampado'
+                  | 'auditoria'
+                  | 'autorizacionArte'
+                  | 'entregaCliente'
+                  | 'manual';
+                /** @description Fecha de entrega comprometida de la orden, o null. */
+                fechaEntrega: string | null;
                 /** @description Fecha planeada vigente del proceso (CPM, E4), o null si aún no se ha fechado. */
                 fechaPlaneadaVigente: string | null;
+                /**
+                 * @description Clasificación de urgencia del pendiente (R4): vencida / hoy / semana / despues / sinFecha.
+                 * @enum {string}
+                 */
+                urgencia: 'vencida' | 'hoy' | 'semana' | 'despues' | 'sinFecha';
+                /** @description Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4). */
+                diasRestantes: number | null;
                 /** @description Días NATURALES vencidos respecto a la planeada vigente (>0 si vencida; 0 si no). */
                 diasAtraso: number;
                 /**
@@ -44523,6 +45571,244 @@ export interface paths {
               /** @description Total de páginas. */
               totalPaginas: number;
             };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/bandeja/resumen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resumen de "Mis pendientes": KPIs (vencidas/hoy/semana/total) y grupos por proceso */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Supervisión: id del usuario cuyos pendientes se resumen (exige rc.programar). */
+          deUsuario?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumen de "Mis pendientes" de la Ruta Crítica (KPIs + grupos por proceso). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Pendientes vencidos (fecha planeada < hoy). */
+              vencidas: number;
+              /** @description Pendientes para hoy. */
+              paraHoy: number;
+              /** @description Pendientes de los próximos 4 días. */
+              estaSemana: number;
+              /** @description Pendientes programados más adelante. */
+              masAdelante: number;
+              /** @description Pendientes sin fecha planeada (CPM en curso). */
+              sinFecha: number;
+              /** @description Total de pendientes a cargo. */
+              total: number;
+              /** @description Grupos por tipo de proceso, ordenados por lo más atorado. */
+              porProceso: {
+                /** @description Tipo de proceso (ProcesoDef). */
+                idProcesoDef: number;
+                /** @description Código del proceso. */
+                codigoProceso: string;
+                /** @description Nombre del proceso. */
+                nombreProceso: string;
+                /** @description Pendientes de este proceso. */
+                total: number;
+                /** @description Cuántos están vencidos. */
+                vencidas: number;
+                /** @description Cuántos son para hoy. */
+                paraHoy: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/bandeja/responsables': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Usuarios con roles responsables de la Ruta Crítica (selector "Viendo pendientes de:") */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Usuarios activos con algún rol responsable de procesos de la Ruta Crítica. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del usuario. */
+              id: string;
+              /** @description Nombre para mostrar. */
+              nombre: string;
+              /** @description Nombre de usuario (login). */
+              username: string;
+            }[];
           };
         };
         /** @description Respuesta de error de la API. */

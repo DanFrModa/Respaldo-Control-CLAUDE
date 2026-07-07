@@ -24,6 +24,9 @@ import { z } from 'zod';
 import type {
   AlertasRcConteo,
   BandejaTareaSalida,
+  ResponsableRc,
+  ResumenPendientes,
+  UrgenciaPendiente,
 } from '../../contrato/esquemas/ruta-critica-bandeja.js';
 import type { Prisma } from '../../datos/index.js';
 
@@ -38,6 +41,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
+import { diasRestantesProceso } from './rutaOrden.js';
 import { estadoSemaforoProceso, type EstadoSemaforo } from './semaforoYRiesgo.js';
 
 // ── Días de atraso (puro) ───────────────────────────────────────────────────────────────────────
@@ -59,6 +63,26 @@ export function diasAtrasoProceso(fechaPlaneadaVigente: Date | null, hoy: Date):
     (aMedianocheUtc(hoy).getTime() - aMedianocheUtc(fechaPlaneadaVigente).getTime()) / MS_DIA,
   );
   return Math.max(0, dias);
+}
+
+/** Días que abarca la sección "esta semana" de Mis pendientes (próximos 4 días, como el proto). */
+const DIAS_SEMANA_PENDIENTES = 4;
+
+/**
+ * URGENCIA de un pendiente (R4, A1: la clasificación vive en el dominio): compara la fecha
+ * planeada vigente contra HOY en días naturales UTC — `vencida` (< hoy), `hoy`, `semana`
+ * (próximos 4 días), `despues`, o `sinFecha` (el CPM aún no fecha). PURA.
+ */
+export function urgenciaProceso(fechaPlaneadaVigente: Date | null, hoy: Date): UrgenciaPendiente {
+  if (fechaPlaneadaVigente === null) return 'sinFecha';
+  const MS_DIA = 24 * 60 * 60 * 1000;
+  const dias = Math.round(
+    (aMedianocheUtc(fechaPlaneadaVigente).getTime() - aMedianocheUtc(hoy).getTime()) / MS_DIA,
+  );
+  if (dias < 0) return 'vencida';
+  if (dias === 0) return 'hoy';
+  if (dias <= DIAS_SEMANA_PENDIENTES) return 'semana';
+  return 'despues';
 }
 
 // ── Orden por urgencia (puro) ─────────────────────────────────────────────────────────────────────
@@ -104,11 +128,12 @@ const INCLUDE_TAREA = {
     select: {
       folio: true,
       idModelo: true,
+      fechaEntrega: true,
       modelo: { select: { codigo: true, descripcion: true } },
       cliente: { select: { nombre: true } },
     },
   },
-  procesoDef: { select: { codigo: true, nombre: true } },
+  procesoDef: { select: { codigo: true, nombre: true, tipoEvento: true } },
   checklist: {
     orderBy: { orden: 'asc' },
     select: { id: true, descripcion: true, orden: true, hecho: true },
@@ -135,8 +160,12 @@ function aTareaSalida(fila: TareaConRelaciones, hoy: Date): BandejaTareaSalida {
     codigoProceso: fila.procesoDef.codigo,
     nombreProceso: fila.procesoDef.nombre,
     critico: fila.critico,
+    tipoEvento: fila.procesoDef.tipoEvento,
+    fechaEntrega: fila.orden.fechaEntrega === null ? null : fila.orden.fechaEntrega.toISOString(),
     fechaPlaneadaVigente:
       fila.fechaPlaneadaVigente === null ? null : fila.fechaPlaneadaVigente.toISOString(),
+    urgencia: urgenciaProceso(fila.fechaPlaneadaVigente, hoy),
+    diasRestantes: diasRestantesProceso(fila.fechaPlaneadaVigente, hoy),
     diasAtraso: diasAtrasoProceso(fila.fechaPlaneadaVigente, hoy),
     semaforo,
     parcialEnCurso: fila.parcialEnCurso,
@@ -160,8 +189,20 @@ async function procesosResponsablesDe(
   sesion: SesionUsuario,
 ): Promise<number[] | null> {
   if (sesion.permisos.has('roles.administrar')) return null; // admin: sin filtro.
+  return procesosResponsablesDeUsuario(cliente, sesion.id);
+}
+
+/**
+ * Ids de los `ProcesoDef` de los que el usuario `idUsuario` es RESPONSABLE por sus roles (la misma
+ * intersección N:M), SIN el atajo de admin: al supervisar "pendientes de X" (R4) se muestra lo que
+ * los ROLES de X cubren, no un "todo" implícito.
+ */
+async function procesosResponsablesDeUsuario(
+  cliente: ReturnType<typeof clienteLectura>,
+  idUsuario: string,
+): Promise<number[]> {
   const rolesUsuario = await cliente.usuarioRol.findMany({
-    where: { idUsuario: sesion.id },
+    where: { idUsuario },
     select: { idRol: true },
   });
   const idsRol = rolesUsuario.map((r) => r.idRol);
@@ -213,6 +254,7 @@ const esquemaBandejaDominio = esquemaPaginacion.extend({
   idOrden: z.number().int().positive().optional(),
   busquedaCliente: z.string().trim().max(200).optional(),
   todas: z.boolean().default(false),
+  deUsuario: z.string().trim().max(100).optional(),
 });
 
 /** Parámetros que acepta `consultarBandeja` (forma nativa, no la de la URL). */
@@ -237,8 +279,21 @@ export async function consultarBandeja(
   // programación (planeación/supervisión). Sin él, el flag se ignora y se acota a las propias.
   const verTodas = filtros.todas && sesion.permisos.has('rc.programar');
 
-  // Procesos de los que el usuario es responsable (null = admin → todos). Con `verTodas`, no filtra.
-  const idsResponsable = verTodas ? null : await procesosResponsablesDe(cliente, sesion);
+  // "Viendo pendientes de:" (R4): consultar los pendientes de OTRO usuario exige el MISMO permiso
+  // de supervisión que `todas` (`rc.programar`) — aquí sí con 403 duro (no se ignora en silencio:
+  // devolver "mis" tareas como si fueran las de otro engañaría a la pantalla).
+  const deOtro = filtros.deUsuario !== undefined && filtros.deUsuario !== sesion.id;
+  if (deOtro) {
+    verificarPermiso(sesion, 'rc.programar');
+  }
+
+  // Procesos responsables: del usuario SUPERVISADO (por sus roles, sin atajo de admin) o del que
+  // consulta (null = admin → todos). Con `verTodas`, no filtra.
+  const idsResponsable = deOtro
+    ? await procesosResponsablesDeUsuario(cliente, filtros.deUsuario ?? '')
+    : verTodas
+      ? null
+      : await procesosResponsablesDe(cliente, sesion);
 
   // El filtro EXPLÍCITO por proceso se INTERSECA con los procesos responsables (no los pisa): si el
   // usuario filtra por un proceso del que no es responsable, no ve nada.
@@ -304,4 +359,125 @@ export async function contarAlertas(
     else if (estado === 'enRiesgo') enRiesgo += 1;
   }
   return { atrasados, enRiesgo };
+}
+
+// ── Resumen "Mis pendientes" (R4): KPIs + agrupación por proceso, EN SERVIDOR ─────────────────────
+
+/** Parámetros del resumen: solo el "de quién" (supervisión, mismo gate que la bandeja). */
+const esquemaResumenDominio = z.object({
+  deUsuario: z.string().trim().max(100).optional(),
+});
+
+/** Parámetros de `resumenPendientes`. */
+export type ParametrosResumenPendientes = z.input<typeof esquemaResumenDominio>;
+
+/**
+ * RESUMEN de "Mis pendientes" (R4): agrega EN SERVIDOR (A1) los KPIs de la pantalla (vencidas /
+ * para hoy / esta semana / más adelante / total) y los grupos por TIPO de proceso con su conteo
+ * (para el toggle "Agrupar por: Proceso"). Misma definición de "mis tareas" que la bandeja
+ * (misma intersección de roles, mismo `deUsuario` supervisado con `rc.programar`). Lectura;
+ * exige `rc.ruta-ver`.
+ */
+export async function resumenPendientes(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenPendientes = {},
+  bd?: ContextoBd,
+  ahora: Date = new Date(),
+): Promise<ResumenPendientes> {
+  verificarPermiso(sesion, 'rc.ruta-ver');
+  const filtros = validarEntrada(esquemaResumenDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  const deOtro = filtros.deUsuario !== undefined && filtros.deUsuario !== sesion.id;
+  if (deOtro) {
+    verificarPermiso(sesion, 'rc.programar');
+  }
+  const idsResponsable = deOtro
+    ? await procesosResponsablesDeUsuario(cliente, filtros.deUsuario ?? '')
+    : await procesosResponsablesDe(cliente, sesion);
+
+  const filas = await cliente.rutaOrden.findMany({
+    where: whereTareasActivas(sesion, idsResponsable),
+    select: {
+      fechaPlaneadaVigente: true,
+      idProcesoDef: true,
+      procesoDef: { select: { codigo: true, nombre: true } },
+    },
+  });
+
+  const resumen: ResumenPendientes = {
+    vencidas: 0,
+    paraHoy: 0,
+    estaSemana: 0,
+    masAdelante: 0,
+    sinFecha: 0,
+    total: filas.length,
+    porProceso: [],
+  };
+  const porProceso = new Map<
+    number,
+    {
+      codigoProceso: string;
+      nombreProceso: string;
+      total: number;
+      vencidas: number;
+      paraHoy: number;
+    }
+  >();
+  for (const f of filas) {
+    const urgencia = urgenciaProceso(f.fechaPlaneadaVigente, ahora);
+    if (urgencia === 'vencida') resumen.vencidas += 1;
+    else if (urgencia === 'hoy') resumen.paraHoy += 1;
+    else if (urgencia === 'semana') resumen.estaSemana += 1;
+    else if (urgencia === 'despues') resumen.masAdelante += 1;
+    else resumen.sinFecha += 1;
+
+    const grupo = porProceso.get(f.idProcesoDef) ?? {
+      codigoProceso: f.procesoDef.codigo,
+      nombreProceso: f.procesoDef.nombre,
+      total: 0,
+      vencidas: 0,
+      paraHoy: 0,
+    };
+    grupo.total += 1;
+    if (urgencia === 'vencida') grupo.vencidas += 1;
+    if (urgencia === 'hoy') grupo.paraHoy += 1;
+    porProceso.set(f.idProcesoDef, grupo);
+  }
+
+  // Grupos ordenados por lo más ATORADO (vencidas, luego para hoy, luego volumen; empate por id).
+  resumen.porProceso = [...porProceso.entries()]
+    .map(([idProcesoDef, g]) => ({ idProcesoDef, ...g }))
+    .sort(
+      (a, b) =>
+        b.vencidas - a.vencidas ||
+        b.paraHoy - a.paraHoy ||
+        b.total - a.total ||
+        a.idProcesoDef - b.idProcesoDef,
+    );
+  return resumen;
+}
+
+// ── Responsables RC (selector "Viendo pendientes de:", R4) ────────────────────────────────────────
+
+/**
+ * Usuarios ACTIVOS con algún rol RESPONSABLE de procesos activos de la RC — la población del
+ * selector "Viendo pendientes de:". Es una función de SUPERVISIÓN: exige `rc.programar` (el mismo
+ * gate que ver pendientes ajenos; NADA de permisos nuevos). Ordenados por nombre.
+ */
+export async function listarResponsablesRc(
+  sesion: SesionUsuario,
+  bd?: ContextoBd,
+): Promise<ResponsableRc[]> {
+  verificarPermiso(sesion, 'rc.programar');
+  const cliente = clienteLectura(bd);
+  const usuarios = await cliente.usuario.findMany({
+    where: {
+      activo: true,
+      roles: { some: { rol: { procesos: { some: { procesoDef: { activo: true } } } } } },
+    },
+    select: { id: true, nombre: true, username: true },
+    orderBy: [{ nombre: 'asc' }, { id: 'asc' }],
+  });
+  return usuarios;
 }

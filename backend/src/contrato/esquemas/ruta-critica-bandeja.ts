@@ -57,6 +57,15 @@ export const esquemaBandejaRcQuery = z
         'Supervisión: si true (y con permiso), muestra TODAS las tareas activas de la empresa, ' +
           'no solo las de los roles del usuario.',
       ),
+    deUsuario: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe(
+        'Supervisión (R4, "Viendo pendientes de:"): id del usuario cuyos pendientes se consultan. ' +
+          'Exige el permiso de supervisión (rc.programar); sin él, 403.',
+      ),
   })
   .describe('Filtros y paginación de la bandeja "mis tareas" de la Ruta Crítica.');
 
@@ -64,6 +73,31 @@ export const esquemaBandejaRcQuery = z
 export type BandejaRcQuery = z.infer<typeof esquemaBandejaRcQuery>;
 
 // ── Bandeja "mis tareas": salida ────────────────────────────────────────────────────────────────
+
+/**
+ * URGENCIA del pendiente (R4, "Mis pendientes"): clasificación EN SERVIDOR (A1) de la fecha
+ * planeada vigente contra HOY (días naturales UTC): `vencida` (< hoy), `hoy`, `semana` (próximos
+ * 4 días, como el proto), `despues` (más adelante) o `sinFecha` (el CPM aún no fecha).
+ */
+export const esquemaUrgenciaPendiente = z.enum(['vencida', 'hoy', 'semana', 'despues', 'sinFecha']);
+/** Urgencia de un pendiente. */
+export type UrgenciaPendiente = z.infer<typeof esquemaUrgenciaPendiente>;
+
+/** Tipo de EVENTO del proceso (espejo de `TipoEventoProceso`): `manual` = se marca a mano. */
+export const esquemaTipoEventoRc = z.enum([
+  'recepcionTela',
+  'corte',
+  'envioCostura',
+  'reciboCostura',
+  'envioEstampado',
+  'reciboEstampado',
+  'auditoria',
+  'autorizacionArte',
+  'entregaCliente',
+  'manual',
+]);
+/** Tipo de evento de un proceso RC. */
+export type TipoEventoRcContrato = z.infer<typeof esquemaTipoEventoRc>;
 
 /** Un ítem de checklist de la tarea (renglón de la bandeja). */
 export const esquemaBandejaChecklistSalida = z.object({
@@ -91,10 +125,25 @@ export const esquemaBandejaTareaSalida = z
     codigoProceso: z.string().describe('Código del proceso (kebab-case).'),
     nombreProceso: z.string().describe('Nombre del proceso (para la UI).'),
     critico: z.boolean().describe('¿Es un proceso crítico de la ruta?'),
+    tipoEvento: esquemaTipoEventoRc.describe(
+      'Cómo se completa el proceso (R4): manual = a mano; el resto, auto por su evento de sistema.',
+    ),
+    fechaEntrega: z.iso
+      .datetime()
+      .nullable()
+      .describe('Fecha de entrega comprometida de la orden, o null.'),
     fechaPlaneadaVigente: z.iso
       .datetime()
       .nullable()
       .describe('Fecha planeada vigente del proceso (CPM, E4), o null si aún no se ha fechado.'),
+    urgencia: esquemaUrgenciaPendiente.describe(
+      'Clasificación de urgencia del pendiente (R4): vencida / hoy / semana / despues / sinFecha.',
+    ),
+    diasRestantes: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Días naturales a la planeada vigente (negativo = vencido; null sin fecha) (R4).'),
     diasAtraso: z
       .number()
       .int()
@@ -127,6 +176,69 @@ export const esquemaBandejaRcPagina = z
 
 /** Forma de la respuesta paginada de la bandeja. */
 export type BandejaRcPagina = z.infer<typeof esquemaBandejaRcPagina>;
+
+// ── Resumen "Mis pendientes" (R4): KPIs + agrupación por proceso, EN SERVIDOR ───────────────────
+
+/** Filtros del resumen de pendientes (querystring): solo el "de quién" (supervisión). */
+export const esquemaResumenPendientesQuery = z
+  .object({
+    deUsuario: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .describe('Supervisión: id del usuario cuyos pendientes se resumen (exige rc.programar).'),
+  })
+  .describe('Filtros del resumen de "Mis pendientes" de la Ruta Crítica.');
+/** Query del resumen de pendientes. */
+export type ResumenPendientesQuery = z.infer<typeof esquemaResumenPendientesQuery>;
+
+/** Conteos de un TIPO de proceso dentro de los pendientes (para "Agrupar por: Proceso"). */
+export const esquemaResumenProcesoPendiente = z.object({
+  idProcesoDef: z.number().int().describe('Tipo de proceso (ProcesoDef).'),
+  codigoProceso: z.string().describe('Código del proceso.'),
+  nombreProceso: z.string().describe('Nombre del proceso.'),
+  total: z.number().int().describe('Pendientes de este proceso.'),
+  vencidas: z.number().int().describe('Cuántos están vencidos.'),
+  paraHoy: z.number().int().describe('Cuántos son para hoy.'),
+});
+
+/**
+ * RESUMEN de "Mis pendientes" (R4): los KPIs de la pantalla (Vencidas · Para hoy · Esta semana ·
+ * Total a tu cargo) + los grupos por tipo de proceso con su conteo — TODO agregado en servidor
+ * (A1: cero pivotes en el cliente).
+ */
+export const esquemaResumenPendientes = z
+  .object({
+    vencidas: z.number().int().describe('Pendientes vencidos (fecha planeada < hoy).'),
+    paraHoy: z.number().int().describe('Pendientes para hoy.'),
+    estaSemana: z.number().int().describe('Pendientes de los próximos 4 días.'),
+    masAdelante: z.number().int().describe('Pendientes programados más adelante.'),
+    sinFecha: z.number().int().describe('Pendientes sin fecha planeada (CPM en curso).'),
+    total: z.number().int().describe('Total de pendientes a cargo.'),
+    porProceso: z
+      .array(esquemaResumenProcesoPendiente)
+      .describe('Grupos por tipo de proceso, ordenados por lo más atorado.'),
+  })
+  .describe('Resumen de "Mis pendientes" de la Ruta Crítica (KPIs + grupos por proceso).');
+/** Forma del resumen de pendientes. */
+export type ResumenPendientes = z.infer<typeof esquemaResumenPendientes>;
+
+// ── Responsables RC (selector "Viendo pendientes de:", R4) ──────────────────────────────────────
+
+/** Un usuario elegible en el selector de supervisión (tiene roles responsables en la RC). */
+export const esquemaResponsableRc = z.object({
+  id: z.string().describe('Id del usuario.'),
+  nombre: z.string().describe('Nombre para mostrar.'),
+  username: z.string().describe('Nombre de usuario (login).'),
+});
+
+/** Lista de usuarios visibles en el selector "Viendo pendientes de:" (exige rc.programar). */
+export const esquemaResponsablesRc = z
+  .array(esquemaResponsableRc)
+  .describe('Usuarios activos con algún rol responsable de procesos de la Ruta Crítica.');
+/** Forma de un responsable RC. */
+export type ResponsableRc = z.infer<typeof esquemaResponsableRc>;
 
 // ── Conteo de alertas (badge del header) ────────────────────────────────────────────────────────
 

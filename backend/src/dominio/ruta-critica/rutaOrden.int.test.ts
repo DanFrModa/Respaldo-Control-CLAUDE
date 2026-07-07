@@ -46,7 +46,14 @@ async function crearProceso(
     ultimoProceso: boolean;
     esResurtido: boolean;
     condicionAplicabilidad: 'ninguna' | 'soloSiLlevaAplicacion';
-    tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion';
+    tipoDuracion: 'fija' | 'porCantidad' | 'porTipoTela' | 'porAplicacion' | 'porDificultad';
+    tipoEvento:
+      | 'corte'
+      | 'envioCostura'
+      | 'reciboCostura'
+      | 'envioEstampado'
+      | 'reciboEstampado'
+      | 'manual';
     checklist: string[];
   }> = {},
 ): Promise<number> {
@@ -59,6 +66,7 @@ async function crearProceso(
       esResurtido: opciones.esResurtido ?? false,
       condicionAplicabilidad: opciones.condicionAplicabilidad ?? 'ninguna',
       tipoDuracion: opciones.tipoDuracion ?? 'fija',
+      tipoEvento: opciones.tipoEvento ?? 'manual',
       ...(opciones.checklist && opciones.checklist.length > 0
         ? {
             checklist: { create: opciones.checklist.map((d, i) => ({ descripcion: d, orden: i })) },
@@ -495,6 +503,183 @@ describe('generarRutaOrden (F5-E3)', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('generarRutaOrden — dificultad por # de operaciones (R4, B7)', () => {
+  /** Tabla de dificultad del seed de R4. */
+  async function crearRangosDificultad(): Promise<void> {
+    await cliente.rangoDificultad.createMany({
+      data: [
+        { opsDesde: 1, opsHasta: 8, nombre: 'Muy sencillo', diasCostura: 6, orden: 0 },
+        { opsDesde: 9, opsHasta: 14, nombre: 'Sencillo', diasCostura: 8, orden: 1 },
+        { opsDesde: 15, opsHasta: 22, nombre: 'Medio', diasCostura: 11, orden: 2 },
+        { opsDesde: 33, opsHasta: null, nombre: 'Muy complejo', diasCostura: 20, orden: 4 },
+      ],
+    });
+  }
+
+  it('porDificultad toma los días del RANGO del # de operaciones del modelo', async () => {
+    await crearRangosDificultad();
+    await cliente.modelo.update({ where: { id: idModelo }, data: { numOperaciones: 18 } });
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idConAplic } = await crearReglas();
+    const costura = await crearProceso('costura', { tipoDuracion: 'porDificultad' });
+    await crearPlantilla({ idArticulo }, [{ idProcesoDef: costura, tiempoEstandar: 4 }]);
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      {
+        idOrden,
+        idArticuloRC: idArticulo,
+        fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+        idTipoTela: idTela,
+        idAplicacion: idConAplic,
+      },
+      bd(),
+    );
+    // 18 operaciones → rango "Medio" → 11 días (NO el tiempo estándar de 4).
+    expect(ruta.procesos.find((p) => p.codigoProceso === 'costura')!.duracionDias).toBe(11);
+    expect(ruta.advertencias).toEqual([]);
+  });
+
+  it('40 operaciones cae en el rango abierto "33+" → 20 días', async () => {
+    await crearRangosDificultad();
+    await cliente.modelo.update({ where: { id: idModelo }, data: { numOperaciones: 40 } });
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idConAplic } = await crearReglas();
+    const costura = await crearProceso('costura', { tipoDuracion: 'porDificultad' });
+    await crearPlantilla({ idArticulo }, [{ idProcesoDef: costura, tiempoEstandar: 4 }]);
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      {
+        idOrden,
+        idArticuloRC: idArticulo,
+        fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+        idTipoTela: idTela,
+        idAplicacion: idConAplic,
+      },
+      bd(),
+    );
+    expect(ruta.procesos.find((p) => p.codigoProceso === 'costura')!.duracionDias).toBe(20);
+  });
+
+  it('modelo SIN # de operaciones → FALLBACK al tiempo estándar + advertencia (jamás truena)', async () => {
+    await crearRangosDificultad();
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idConAplic } = await crearReglas();
+    const costura = await crearProceso('costura', { tipoDuracion: 'porDificultad' });
+    await crearPlantilla({ idArticulo }, [{ idProcesoDef: costura, tiempoEstandar: 4 }]);
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      {
+        idOrden,
+        idArticuloRC: idArticulo,
+        fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+        idTipoTela: idTela,
+        idAplicacion: idConAplic,
+      },
+      bd(),
+    );
+    expect(ruta.procesos.find((p) => p.codigoProceso === 'costura')!.duracionDias).toBe(4);
+    expect(ruta.advertencias.some((a) => a.includes('operaciones'))).toBe(true);
+  });
+});
+
+describe('generarRutaOrden — secuencia de estampado (R4, B10)', () => {
+  /**
+   * Plantilla mínima con la forma real de la rama: corte → envío-estampado → recibo-estampado
+   * (condicionales) y corte → envío-costura. La arista "recibo-estampado → envío-costura" NO está
+   * en la plantilla: la agrega (o no) el motor según la secuencia EFECTIVA.
+   */
+  async function plantillaConEstampado(): Promise<{
+    idArticulo: number;
+    idTela: number;
+    idSinAplic: number;
+    idConAplic: number;
+    recibo: number;
+    envioCostura: number;
+  }> {
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idSinAplic, idConAplic } = await crearReglas();
+    const corte = await crearProceso('corte', { tipoEvento: 'corte' });
+    const envioEst = await crearProceso('envio-est', {
+      tipoEvento: 'envioEstampado',
+      condicionAplicabilidad: 'soloSiLlevaAplicacion',
+    });
+    const recibo = await crearProceso('recibo-est', {
+      tipoEvento: 'reciboEstampado',
+      condicionAplicabilidad: 'soloSiLlevaAplicacion',
+    });
+    const envioCostura = await crearProceso('envio-costura', { tipoEvento: 'envioCostura' });
+    await crearPlantilla({ idArticulo }, [
+      { idProcesoDef: corte, tiempoEstandar: 2 },
+      { idProcesoDef: envioEst, tiempoEstandar: 1, antecesores: [corte] },
+      { idProcesoDef: recibo, tiempoEstandar: 5, antecesores: [envioEst] },
+      { idProcesoDef: envioCostura, tiempoEstandar: 1, antecesores: [corte] },
+    ]);
+    return { idArticulo, idTela, idSinAplic, idConAplic, recibo, envioCostura };
+  }
+
+  function datosProg(
+    idOrden: number,
+    ids: { idArticulo: number; idTela: number },
+    idAplicacion: number,
+  ) {
+    return {
+      idOrden,
+      idArticuloRC: ids.idArticulo,
+      fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+      idTipoTela: ids.idTela,
+      idAplicacion,
+    };
+  }
+
+  it('modelo "antes" (default) + lleva aplicación → la confección ESPERA al recibo de estampado', async () => {
+    const ctx = await plantillaConEstampado();
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      datosProg(idOrden, ctx, ctx.idConAplic),
+      bd(),
+    );
+    expect(ruta.secuenciaEstampadoModelo).toBe('antes');
+    expect(ruta.secuenciaEstampadoEfectiva).toBe('antes');
+    const envio = ruta.procesos.find((p) => p.codigoProceso === 'envio-costura')!;
+    expect(envio.idsAntecesores).toContain(ctx.recibo);
+  });
+
+  it('modelo "despues" → la confección NO espera al estampado', async () => {
+    await cliente.modelo.update({
+      where: { id: idModelo },
+      data: { secuenciaEstampado: 'despues' },
+    });
+    const ctx = await plantillaConEstampado();
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      datosProg(idOrden, ctx, ctx.idConAplic),
+      bd(),
+    );
+    expect(ruta.secuenciaEstampadoEfectiva).toBe('despues');
+    const envio = ruta.procesos.find((p) => p.codigoProceso === 'envio-costura')!;
+    expect(envio.idsAntecesores).not.toContain(ctx.recibo);
+  });
+
+  it('sin aplicación NO amarra nada (los condicionales se omiten como siempre)', async () => {
+    const ctx = await plantillaConEstampado();
+    const idOrden = await crearOrden(1200);
+    const ruta = await generarRutaOrden(
+      sesionProg(),
+      datosProg(idOrden, ctx, ctx.idSinAplic),
+      bd(),
+    );
+    const codigos = ruta.procesos.map((p) => p.codigoProceso);
+    expect(codigos).not.toContain('recibo-est');
+    const envio = ruta.procesos.find((p) => p.codigoProceso === 'envio-costura')!;
+    expect(envio.idsAntecesores).not.toContain(ctx.recibo);
   });
 });
 

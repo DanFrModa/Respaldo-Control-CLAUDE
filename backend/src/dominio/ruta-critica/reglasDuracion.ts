@@ -15,12 +15,16 @@ import {
   esquemaDuracionTelaPatchCuerpo,
   esquemaFactorCantidadCrear,
   esquemaFactorCantidadPatchCuerpo,
+  esquemaRangoDificultadCrear,
+  esquemaRangoDificultadPatchCuerpo,
   type DatosDuracionAplicacionCrear,
   type DatosDuracionAplicacionPatchCuerpo,
   type DatosDuracionTelaCrear,
   type DatosDuracionTelaPatchCuerpo,
   type DatosFactorCantidadCrear,
   type DatosFactorCantidadPatchCuerpo,
+  type DatosRangoDificultadCrear,
+  type DatosRangoDificultadPatchCuerpo,
 } from '../../contrato/index.js';
 import type { Prisma } from '../../datos/index.js';
 
@@ -28,7 +32,12 @@ import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
-import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
+import {
+  clienteLectura,
+  enTransaccion,
+  type ContextoBd,
+  type Tx,
+} from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
 // ── Factor por cantidad (ex CP_Cant) ──────────────────────────────────────────
@@ -475,5 +484,224 @@ export async function desactivarDuracionAplicacion(
       throw new ErrorConflicto(`La aplicación "${actual.nombre}" ya está desactivada.`);
     }
     return actualizarDuracionAplicacion(sesion, id, { activo: false }, { tx });
+  }, bd);
+}
+
+// ── Rangos de DIFICULTAD por # de operaciones (rediseño R4, B7) ───────────────
+
+/** Rango de dificultad tal como lo devuelve el dominio. */
+export interface RangoDificultadDto {
+  id: number;
+  opsDesde: number;
+  opsHasta: number | null;
+  nombre: string;
+  diasCostura: number;
+  activo: boolean;
+  creadoEn: Date;
+  creadoPorId: string | null;
+  modificadoEn: Date;
+  modificadoPorId: string | null;
+}
+
+function aRangoDto(r: {
+  id: number;
+  opsDesde: number;
+  opsHasta: number | null;
+  nombre: string;
+  diasCostura: number;
+  activo: boolean;
+  creadoEn: Date;
+  creadoPorId: string | null;
+  modificadoEn: Date;
+  modificadoPorId: string | null;
+}): RangoDificultadDto {
+  return {
+    id: r.id,
+    opsDesde: r.opsDesde,
+    opsHasta: r.opsHasta,
+    nombre: r.nombre,
+    diasCostura: r.diasCostura,
+    activo: r.activo,
+    creadoEn: r.creadoEn,
+    creadoPorId: r.creadoPorId,
+    modificadoEn: r.modificadoEn,
+    modificadoPorId: r.modificadoPorId,
+  };
+}
+
+/** Coherencia del rango: `opsHasta` (si viene) no puede quedar debajo de `opsDesde`. */
+function exigirRangoOpsValido(opsDesde: number, opsHasta: number | null): void {
+  if (opsHasta !== null && opsDesde > opsHasta) {
+    throw new ErrorValidacion(
+      'El límite inferior de operaciones no puede ser mayor que el superior.',
+    );
+  }
+}
+
+/**
+ * SERIALIZA las escrituras del catálogo de dificultad (advisory lock transaccional con llave
+ * CONSTANTE — el catálogo es GLOBAL, una sola llave basta). Sin esto, el chequeo de no-solape es
+ * TOCTOU bajo Read Committed: dos admins creando/activando rangos solapados A LA VEZ pasan ambos
+ * `exigirSinSolape` y quedan dos rangos activos traslapados. Debe ser la PRIMERA instrucción de la
+ * transacción de crear/actualizar, ANTES de leer los activos. Llave 0x52440001 ('R','D' + 1),
+ * familia distinta de las llaves por orden (0x4f… de capturas/etapas/estampado): no colisionan.
+ */
+async function bloquearCatalogoDificultad(tx: Tx): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${0x52440001}::int, ${0}::int)`;
+}
+
+/**
+ * Valida que el rango propuesto NO se SOLAPE con ningún otro rango ACTIVO (excluyendo `idActual`
+ * al editar). Dos rangos `[d1, h1]` y `[d2, h2]` (h null = ∞) se solapan si `d1 ≤ h2` y `d2 ≤ h1`.
+ * Server-side (la BD no lo puede expresar con un unique): la tabla de dificultad debe ser una
+ * PARTICIÓN sin ambigüedad — un # de operaciones cae en a lo más un rango.
+ */
+async function exigirSinSolape(
+  tx: Tx,
+  propuesto: { opsDesde: number; opsHasta: number | null },
+  idActual?: number,
+): Promise<void> {
+  const activos = await tx.rangoDificultad.findMany({
+    where: { activo: true, ...(idActual === undefined ? {} : { id: { not: idActual } }) },
+    select: { opsDesde: true, opsHasta: true, nombre: true },
+  });
+  for (const otro of activos) {
+    const seSolapan =
+      (otro.opsHasta === null || propuesto.opsDesde <= otro.opsHasta) &&
+      (propuesto.opsHasta === null || otro.opsDesde <= propuesto.opsHasta);
+    if (seSolapan) {
+      const etiqueta =
+        otro.opsHasta === null
+          ? `${String(otro.opsDesde)}+`
+          : `${String(otro.opsDesde)}–${String(otro.opsHasta)}`;
+      throw new ErrorValidacion(
+        `El rango se solapa con "${otro.nombre}" (${etiqueta} operaciones). ` +
+          'Los rangos de dificultad activos no pueden traslaparse.',
+      );
+    }
+  }
+}
+
+/** Lista TODOS los rangos de dificultad, ordenados por el límite inferior. */
+export async function listarRangosDificultad(
+  sesion: SesionUsuario,
+  incluirInactivos = false,
+  bd?: ContextoBd,
+): Promise<RangoDificultadDto[]> {
+  verificarPermiso(sesion, 'rc.catalogo-ver');
+  const filas = await clienteLectura(bd).rangoDificultad.findMany({
+    where: incluirInactivos ? {} : { activo: true },
+    orderBy: { opsDesde: 'asc' },
+  });
+  return filas.map(aRangoDto);
+}
+
+/** Crea un rango de dificultad (valida coherencia y NO-solape con los activos). */
+export async function crearRangoDificultad(
+  sesion: SesionUsuario,
+  entrada: DatosRangoDificultadCrear,
+  bd?: ContextoBd,
+): Promise<RangoDificultadDto> {
+  verificarPermiso(sesion, 'rc.catalogo-administrar');
+  const datos = validarEntrada(esquemaRangoDificultadCrear, entrada);
+  const opsHasta = datos.opsHasta ?? null;
+  exigirRangoOpsValido(datos.opsDesde, opsHasta);
+
+  return enTransaccion(async (tx) => {
+    // PRIMERO el lock del catálogo (anti-TOCTOU del no-solape), luego el chequeo.
+    await bloquearCatalogoDificultad(tx);
+    await exigirSinSolape(tx, { opsDesde: datos.opsDesde, opsHasta });
+    const fila = await tx.rangoDificultad.create({
+      data: {
+        opsDesde: datos.opsDesde,
+        opsHasta,
+        nombre: datos.nombre,
+        diasCostura: datos.diasCostura,
+        orden: datos.opsDesde,
+        ...datosCreacion(sesion),
+      },
+    });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'RangoDificultad',
+      idEntidad: fila.id,
+      accion: 'CREAR',
+      datos: { nombre: fila.nombre, opsDesde: fila.opsDesde, opsHasta: fila.opsHasta },
+    });
+    return aRangoDto(fila);
+  }, bd);
+}
+
+/** Actualiza un rango de dificultad (re-valida coherencia y no-solape sobre el resultado). */
+export async function actualizarRangoDificultad(
+  sesion: SesionUsuario,
+  id: number,
+  entrada: DatosRangoDificultadPatchCuerpo,
+  bd?: ContextoBd,
+): Promise<RangoDificultadDto> {
+  verificarPermiso(sesion, 'rc.catalogo-administrar');
+  const datos = validarEntrada(esquemaRangoDificultadPatchCuerpo, entrada);
+
+  return enTransaccion(async (tx) => {
+    // PRIMERO el lock del catálogo (anti-TOCTOU del no-solape), luego leer/validar.
+    await bloquearCatalogoDificultad(tx);
+    const actual = await tx.rangoDificultad.findUnique({ where: { id } });
+    if (actual === null) {
+      throw new ErrorNoEncontrado('RangoDificultad', id);
+    }
+    // Valores RESULTANTES (lo que quedaría tras el patch): sobre ellos se valida todo.
+    const opsDesde = datos.opsDesde ?? actual.opsDesde;
+    const opsHasta = datos.opsHasta === undefined ? actual.opsHasta : (datos.opsHasta ?? null);
+    const activo = datos.activo ?? actual.activo;
+    exigirRangoOpsValido(opsDesde, opsHasta);
+    if (activo) {
+      await exigirSinSolape(tx, { opsDesde, opsHasta }, id);
+    }
+
+    const cambios: Prisma.RangoDificultadUpdateInput = {};
+    if (datos.opsDesde !== undefined) {
+      cambios.opsDesde = datos.opsDesde;
+      cambios.orden = datos.opsDesde;
+    }
+    if (datos.opsHasta !== undefined) cambios.opsHasta = datos.opsHasta ?? null;
+    if (datos.nombre !== undefined) cambios.nombre = datos.nombre;
+    if (datos.diasCostura !== undefined) cambios.diasCostura = datos.diasCostura;
+    if (datos.activo !== undefined) cambios.activo = datos.activo;
+    if (Object.keys(cambios).length === 0) {
+      return aRangoDto(actual);
+    }
+    Object.assign(cambios, datosModificacion(sesion));
+    const fila = await tx.rangoDificultad.update({ where: { id }, data: cambios });
+    await registrarBitacora(tx, sesion, {
+      entidad: 'RangoDificultad',
+      idEntidad: id,
+      accion: datos.activo === false ? 'DESACTIVAR' : 'MODIFICAR',
+      datos: {
+        nombre: fila.nombre,
+        opsDesde: fila.opsDesde,
+        opsHasta: fila.opsHasta,
+        diasCostura: fila.diasCostura,
+        activo: fila.activo,
+      },
+    });
+    return aRangoDto(fila);
+  }, bd);
+}
+
+/** Desactiva (borrado suave) un rango de dificultad. */
+export async function desactivarRangoDificultad(
+  sesion: SesionUsuario,
+  id: number,
+  bd?: ContextoBd,
+): Promise<RangoDificultadDto> {
+  verificarPermiso(sesion, 'rc.catalogo-administrar');
+  return enTransaccion(async (tx) => {
+    const actual = await tx.rangoDificultad.findUnique({ where: { id } });
+    if (actual === null) {
+      throw new ErrorNoEncontrado('RangoDificultad', id);
+    }
+    if (!actual.activo) {
+      throw new ErrorConflicto(`El rango "${actual.nombre}" ya está desactivado.`);
+    }
+    return actualizarRangoDificultad(sesion, id, { activo: false }, { tx });
   }, bd);
 }

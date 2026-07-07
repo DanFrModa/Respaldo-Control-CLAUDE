@@ -21,9 +21,11 @@ import {
   esquemaParamRutaProceso,
   esquemaProgramarRc,
   esquemaRutaOrdenSalida,
+  esquemaSecuenciaEstampadoCuerpo,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
+import { elegirSecuenciaEstampado } from '../../dominio/ruta-critica/estampado.js';
 import {
   ajustarRutaOrden,
   generarRutaOrden,
@@ -50,6 +52,10 @@ function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
     idArticuloRC: r.idArticuloRC,
     idTipoTela: r.idTipoTela,
     idAplicacion: r.idAplicacion,
+    secuenciaEstampadoModelo: r.secuenciaEstampadoModelo,
+    secEstampadoElegido: r.secEstampadoElegido,
+    secuenciaEstampadoEfectiva: r.secuenciaEstampadoEfectiva,
+    motivoSinRuta: r.motivoSinRuta,
     estadoRecalculo: r.estadoRecalculo,
     semaforo: r.semaforo,
     procesos: r.procesos.map((p) => ({
@@ -62,11 +68,15 @@ function aRutaSalida(r: RutaOrdenDto): z.infer<typeof esquemaRutaOrdenSalida> {
       ultimoProceso: p.ultimoProceso,
       esResurtido: p.esResurtido,
       condicionAplicabilidad: p.condicionAplicabilidad,
+      tipoEvento: p.tipoEvento,
+      rolesResponsables: p.rolesResponsables,
+      esResponsableActual: p.esResponsableActual,
       duracionDias: p.duracionDias,
       acumuladoDias: p.acumuladoDias,
       fechaPlaneadaOriginal: iso(p.fechaPlaneadaOriginal),
       fechaPlaneadaVigente: iso(p.fechaPlaneadaVigente),
       fechaReal: iso(p.fechaReal),
+      diasRestantes: p.diasRestantes,
       estado: p.estado,
       capturadoPorId: p.capturadoPorId,
       capturadoPorNombre: p.capturadoPorNombre,
@@ -162,6 +172,33 @@ export const rutasProgramacionRc: FastifyPluginCallbackZod = (app, _opciones, do
         ...(cuerpo.agregar === undefined ? {} : { agregar: cuerpo.agregar }),
         ...(cuerpo.quitar === undefined ? {} : { quitar: cuerpo.quitar }),
         ...(cuerpo.dependencias === undefined ? {} : { dependencias: cuerpo.dependencias }),
+      });
+      return aRutaSalida(ruta);
+    },
+  });
+
+  // ── Elegir la secuencia de estampado de una orden FLEXIBLE (R4, B10) ──────────
+  // Reprograma la ruta viva EN EL MOMENTO: agrega/quita la dependencia condicional "recibo de
+  // estampado → envío a costura", guarda la elección y re-encola el CPM. 409 si el modelo no es
+  // flexible o el estampado ya se completó.
+  app.route({
+    method: 'POST',
+    url: '/ruta-critica/ordenes/:id/secuencia-estampado',
+    preHandler: app.conPermiso('rc.programar'),
+    schema: {
+      tags: ['ruta-critica'],
+      summary:
+        'Elegir si el estampado va ANTES o DESPUÉS de coser (órdenes flexibles; reprograma en vivo)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamOrdenRc,
+      body: esquemaSecuenciaEstampadoCuerpo,
+      response: { 200: esquemaRutaOrdenSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const ruta = await elegirSecuenciaEstampado(sesion, {
+        idOrden: request.params.id,
+        secuencia: request.body.secuencia,
       });
       return aRutaSalida(ruta);
     },

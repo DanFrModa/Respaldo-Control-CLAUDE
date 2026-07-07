@@ -1,9 +1,10 @@
-import type { SemaforoRc } from '@/api/tipos';
+import type { SemaforoRc, TipoEventoProceso } from '@/api/tipos';
 
 /**
- * Piezas compartidas (COMPONENTES) de las vistas del MOTOR de la Ruta Crítica (F5-E5): el SEMÁFORO
- * tri-estado (`aTiempo` / `enRiesgo` / `atrasado`) que pintan la bandeja, la RC por orden y el badge
- * del header. CERO lógica de negocio (A1): el valor lo DERIVA el backend; aquí solo se PRESENTA.
+ * Piezas compartidas (COMPONENTES) de las vistas del MOTOR de la Ruta Crítica (F5-E5; R4): el
+ * SEMÁFORO tri-estado (`aTiempo` / `enRiesgo` / `atrasado`) que pintan la bandeja, la RC por orden
+ * y el badge del header, y los mapas de PRESENTACIÓN del tipo de evento (auto vs manual). CERO
+ * lógica de negocio (A1): el valor lo DERIVA el backend; aquí solo se PRESENTA.
  */
 
 /** Color del punto del semáforo por estado (emerald / amber / red). */
@@ -81,3 +82,44 @@ export function fechaRc(valor: string | null | undefined): string {
     year: 'numeric',
   });
 }
+
+// ── Auto-completado por evento (R4): mapas de PRESENTACIÓN del tipoEvento ─────
+
+/** ¿El proceso se completa SOLO (por un evento del sistema)? `manual` = a mano. */
+export function esProcesoAutomatico(tipoEvento: TipoEventoProceso): boolean {
+  return tipoEvento !== 'manual';
+}
+
+/**
+ * Descripción del EVENTO que auto-completa cada proceso (proto: "⟳ auto — al registrar: …").
+ * Solo texto de presentación; el mapeo real evento→proceso vive en el auto-avance del backend.
+ */
+export const EVENTO_RC_DESCRIPCION: Record<TipoEventoProceso, string> = {
+  recepcionTela: 'la recepción de material (Compras)',
+  corte: 'el corte (Avance de producción)',
+  envioCostura: 'el envío a maquila (Avance)',
+  reciboCostura: 'el recibo de maquila (Avance)',
+  envioEstampado: 'el envío a estampado (Avance)',
+  reciboEstampado: 'el recibo de estampado (Avance)',
+  auditoria: 'la auditoría AQL (Calidad)',
+  autorizacionArte: 'el arte autorizado',
+  entregaCliente: 'la entrega a cliente (Almacén)',
+  manual: 'se marca a mano',
+};
+
+/**
+ * Pantalla del sistema donde se REGISTRA el evento de cada proceso (el botón "Registrar" de Mis
+ * pendientes navega ahí). `null` = sin pantalla propia todavía → la UI ofrece "Marcar hecho".
+ */
+export const RUTA_PANTALLA_EVENTO: Record<TipoEventoProceso, string | null> = {
+  recepcionTela: '/compras/recepcion',
+  corte: '/produccion/corte',
+  envioCostura: '/produccion/envios',
+  reciboCostura: '/produccion/recibos',
+  envioEstampado: '/produccion/envios',
+  reciboEstampado: '/produccion/recibos',
+  auditoria: '/calidad/auditorias/nueva',
+  autorizacionArte: null,
+  entregaCliente: '/produccion/entregas',
+  manual: null,
+};

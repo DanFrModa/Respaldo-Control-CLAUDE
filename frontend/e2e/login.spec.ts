@@ -78,11 +78,15 @@ test.describe('Inicio de sesión', () => {
     await navegacion.getByRole('button', { name: 'Producción' }).click();
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
     await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toBeVisible();
-    // Y "Ruta Crítica" (la entrada estrella) despliega su bandeja y concentrado.
-    await navegacion.getByTestId('nav-padre-ruta-critica').click();
-    await expect(navegacion.getByRole('link', { name: 'Bandeja de tareas' })).toBeVisible();
+    // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4); el
+    // concentrado vive en ANÁLISIS y la configuración bajo SISTEMA · Procesos y responsables.
+    await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
     await expect(
       navegacion.getByRole('link', { name: 'Concentrado planeado vs real' }),
+    ).toBeVisible();
+    await navegacion.getByTestId('nav-padre-g-rc-config').click();
+    await expect(
+      navegacion.getByRole('link', { name: 'Procesos y responsables', exact: true }),
     ).toBeVisible();
 
     // El badge de alertas RC del encabezado está montado (dato real del backend).

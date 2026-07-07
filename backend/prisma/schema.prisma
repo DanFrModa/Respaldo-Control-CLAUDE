@@ -1433,6 +1433,15 @@ model Modelo {
   /// Distinto del folio de la OP y del nº de desarrollo (`codigo`). Null = nunca ha salido.
   numeroProduccion Int? @unique @map("numero_produccion")
 
+  /// # de OPERACIONES de la prenda (rediseño R4, B7): deriva la DIFICULTAD contra la tabla
+  /// `RangoDificultad` (regla `porDificultad` del CPM). Se CAPTURA en el editor de desarrollo
+  /// (R5); null = sin capturar → la duración cae al tiempo estándar del proceso (fallback).
+  numOperaciones Int? @map("num_operaciones")
+
+  /// Secuencia del estampado/bordado respecto a la costura (rediseño R4, B10 — por MODELO;
+  /// la captura en el editor de desarrollo llega en R5). Ver el enum `SecuenciaEstampado`.
+  secuenciaEstampado SecuenciaEstampado @default(antes) @map("secuencia_estampado")
+
   /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
   idTemporada    Int?          @map("id_temporada")
   temporada      Temporada?    @relation(fields: [idTemporada], references: [id], onDelete: Restrict)
@@ -2054,6 +2063,10 @@ model Orden {
   /// Aplicación elegida para la programación de v2 (FK a DuracionPorAplicacion). Restrict, nullable.
   idDuracionAplicacion Int?                   @map("id_duracion_aplicacion")
   duracionAplicacion   DuracionPorAplicacion? @relation(fields: [idDuracionAplicacion], references: [id], onDelete: Restrict)
+  /// Elección de secuencia de estampado de ESTA orden (rediseño R4, B10): solo aplica cuando el
+  /// modelo es `flexible` (antes|despues; `flexible` no es un valor válido aquí — lo valida el
+  /// dominio). Null = hereda la secuencia del modelo / aún sin decidir.
+  secEstampadoElegido  SecuenciaEstampado?    @map("sec_estampado_elegido")
   /// Renglones de la RUTA VIVA de esta orden (un proceso por renglón) (F5-E3, D11). Cascade.
   rutaProcesos         RutaOrden[]
 
@@ -3540,15 +3553,33 @@ enum TipoEventoProceso {
 
 /// Cómo se calcula la DURACIÓN estimada de un proceso (F5-E1). TIPADO SIMPLE: `fija`
 /// (días fijos), `porCantidad` (escala con las piezas — ex `CP_Procesos.Variable`),
-/// `porTipoTela` o `porAplicacion`. El cálculo concreto (la fórmula y los parámetros
-/// por proceso) lo definirá el motor de E2+; aquí solo se clasifica.
+/// `porTipoTela`, `porAplicacion` o `porDificultad` (rediseño R4, B7: los días salen
+/// del RANGO de # de operaciones del modelo — tabla `RangoDificultad`; pensado para la
+/// costura/maquila). El cálculo concreto vive en `calcularDuracion`.
 enum TipoDuracionProceso {
   fija
   porCantidad
   porTipoTela
   porAplicacion
+  porDificultad
 
   @@map("tipo_duracion_proceso")
+}
+
+/// SECUENCIA del estampado/bordado respecto a la costura (rediseño R4, B10 — decisión
+/// Daniel 6-jul): `antes` = la confección SIEMPRE espera al estampado (dependencia
+/// `reciboEstampado → envioCostura` en la ruta); `despues` = se estampa la prenda ya
+/// cosida (sin esa dependencia); `flexible` = se decide EN PRODUCCIÓN por orden, según
+/// la carga (la orden guarda su elección en `Orden.secEstampadoElegido` y la ruta se
+/// reprograma en vivo). El default del catálogo es `antes` (hoy el taller estampa los
+/// paneles cortados antes de coser: la rama de estampado del catálogo cuelga entre el
+/// corte y la confección).
+enum SecuenciaEstampado {
+  antes
+  despues
+  flexible
+
+  @@map("secuencia_estampado")
 }
 
 /// Definición de un PROCESO de la Ruta Crítica (catálogo configurable y GLOBAL — sin
@@ -3833,6 +3864,35 @@ model DuracionPorTipoTela {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@map("duracion_tipo_tela")
+}
+
+/// RANGO de DIFICULTAD por # de operaciones (rediseño R4, B7 — spec §4.9): la dificultad de una
+/// prenda NO se teclea, se DERIVA del `Modelo.numOperaciones` (capturado en el desarrollo, R5)
+/// contra esta tabla CONFIGURABLE (Daniel define cuántos niveles, sus rangos, nombres y días).
+/// `opsHasta` null = rango abierto ("33+"). Alimenta la regla `porDificultad` de
+/// `calcularDuracion` (impacta sobre todo la costura/maquila). Los rangos ACTIVOS no se solapan
+/// (validación server-side en el dominio). Catálogo GLOBAL, borrado SUAVE, auditoría A7.
+model RangoDificultad {
+  id          Int     @id @default(autoincrement())
+  /// Límite inferior del rango de operaciones (inclusive).
+  opsDesde    Int     @map("ops_desde")
+  /// Límite superior (inclusive), o null = abierto hacia arriba ("33+").
+  opsHasta    Int?    @map("ops_hasta")
+  /// Nombre de la dificultad (p. ej. "Muy sencillo", "Complejo").
+  nombre      String
+  /// Días de costura que aporta este rango (la duración del proceso `porDificultad`).
+  diasCostura Int     @map("dias_costura")
+  /// Posición de despliegue en la tabla (lo gestiona el dominio).
+  orden       Int     @default(0)
+  activo      Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@index([opsDesde])
+  @@map("rango_dificultad")
 }
 
 /// Duración (días de espera) POR APLICACIÓN/estampado (ex `RC_Aplicaciones`, 9). El origen NO trae

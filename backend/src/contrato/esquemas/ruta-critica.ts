@@ -51,12 +51,13 @@ export const ETIQUETAS_TIPO_EVENTO_PROCESO: Record<TipoEventoProcesoClave, strin
   manual: 'Manual (sin evento del sistema)',
 };
 
-/** Cómo se calcula la duración estimada de un proceso (TIPADO; la fórmula la pone el motor E2+). */
+/** Cómo se calcula la duración estimada de un proceso (TIPADO; la fórmula vive en el motor). */
 export const TIPOS_DURACION_PROCESO = [
   'fija',
   'porCantidad',
   'porTipoTela',
   'porAplicacion',
+  'porDificultad',
 ] as const;
 /** Clave de tipo de duración. */
 export type TipoDuracionProcesoClave = (typeof TIPOS_DURACION_PROCESO)[number];
@@ -66,6 +67,7 @@ export const ETIQUETAS_TIPO_DURACION_PROCESO: Record<TipoDuracionProcesoClave, s
   porCantidad: 'Escala con la cantidad de piezas',
   porTipoTela: 'Según el tipo de tela',
   porAplicacion: 'Según la aplicación',
+  porDificultad: 'Por dificultad (# de operaciones del modelo)',
 };
 
 // ── Campos base ──────────────────────────────────────────────────────────────

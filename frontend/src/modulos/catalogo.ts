@@ -429,61 +429,17 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
         ],
       },
+      // Ruta Crítica = HOJA DIRECTA a "Mis pendientes" (R4: revierte la desviación interina (a)
+      // de R1 — decisión Daniel 6-jul: la operación diaria es la guía por persona). Las vistas de
+      // configuración viven bajo SISTEMA · Procesos y responsables; el concentrado, en ANÁLISIS.
       {
         clave: 'ruta-critica',
         titulo: 'Ruta Crítica',
-        descripcion: 'Workflow de procesos con fechas, semáforos y bandeja de tareas',
+        descripcion: 'Mis pendientes: tu guía diaria de procesos de la Ruta Crítica',
+        ruta: '/ruta-critica/pendientes',
         icono: 'ruta',
         destacado: true,
-        hijos: [
-          // Acceso principal: la bandeja de tareas ("Mis pendientes" llega en R4).
-          {
-            clave: 'rc-bandeja',
-            titulo: 'Bandeja de tareas',
-            descripcion: 'Mis procesos pendientes de la Ruta Crítica, ordenados por urgencia',
-            ruta: '/ruta-critica/bandeja',
-            icono: 'lista-tareas',
-            permisos: ['rc.ruta-ver'],
-            subVista: true,
-          },
-          {
-            clave: 'rc-concentrado',
-            titulo: 'Concentrado planeado vs real',
-            descripcion:
-              'Todas las órdenes con Ruta Crítica viva: semáforo y atraso por proceso, con Excel',
-            ruta: '/ruta-critica/concentrado',
-            icono: 'grafica',
-            permisos: ['rc.ruta-ver'],
-            subVista: true,
-          },
-          {
-            clave: 'rc-plantillas',
-            titulo: 'Plantillas de ruta',
-            descripcion: 'Qué procesos lleva cada artículo, su tiempo estándar y su encadenamiento',
-            ruta: '/ruta-critica/plantillas',
-            icono: 'lista-tareas',
-            permisos: ['rc.catalogo-ver'],
-            subVista: true,
-          },
-          {
-            clave: 'rc-dependencias',
-            titulo: 'Dependencias',
-            descripcion: 'Editor del grafo de dependencias entre procesos (sin ciclos)',
-            ruta: '/ruta-critica/dependencias',
-            icono: 'ruta',
-            permisos: ['rc.catalogo-ver'],
-            subVista: true,
-          },
-          {
-            clave: 'rc-reglas-duracion',
-            titulo: 'Reglas de duración',
-            descripcion: 'Factores por cantidad y días por tipo de tela o aplicación',
-            ruta: '/ruta-critica/reglas-duracion',
-            icono: 'calendario',
-            permisos: ['rc.catalogo-ver'],
-            subVista: true,
-          },
-        ],
+        permisos: ['rc.ruta-ver'],
       },
       {
         clave: 'calidad',
@@ -962,6 +918,18 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         permisos: 'autenticado',
         proximamente: 'Llega en R7',
       },
+      // Hija INTERINA (decisión R4): el concentrado planeado-vs-real es ANÁLISIS, no operación
+      // diaria; vive junto a "Análisis RC" hasta que R7 lo absorba/reacomode.
+      {
+        clave: 'rc-concentrado',
+        titulo: 'Concentrado planeado vs real',
+        descripcion:
+          'Todas las órdenes con Ruta Crítica viva: semáforo y atraso por proceso, con Excel',
+        ruta: '/ruta-critica/concentrado',
+        icono: 'grafica',
+        permisos: ['rc.ruta-ver'],
+        subVista: true,
+      },
       {
         clave: 'costos',
         titulo: 'Costos',
@@ -1230,16 +1198,64 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
         ],
       },
-      // Config de la Ruta Crítica: procesos · tiempos · antecesores · responsables (la pantalla
-      // unificada llega en R4; mientras, el catálogo de procesos actual).
+      // Config de la Ruta Crítica (R4): la pantalla unificada "Procesos y responsables" es el
+      // acceso principal; las demás vistas de configuración (plantillas, reglas de duración,
+      // dependencias y el catálogo avanzado) cuelgan como hijas — enlazadas también desde la
+      // propia pantalla (sub-nav) y accesibles por ⌘K.
       {
-        clave: 'rc-procesos',
+        clave: 'g-rc-config',
         titulo: 'Procesos y responsables',
-        descripcion: 'Catálogo configurable de procesos: banderas, roles responsables y checklists',
-        ruta: '/ruta-critica/procesos',
+        descripcion:
+          'Configuración de la Ruta Crítica: procesos, tiempos, antecesores y responsables',
         icono: 'lista-tareas',
-        permisos: ['rc.catalogo-ver'],
-        subVista: true,
+        hijos: [
+          {
+            clave: 'rc-procesos-responsables',
+            titulo: 'Procesos y responsables',
+            descripcion:
+              'Catálogo de procesos de la RC: responsables, tiempos, dependencias y auto-completado',
+            ruta: '/ruta-critica/procesos-responsables',
+            icono: 'lista-tareas',
+            permisos: ['rc.catalogo-ver'],
+          },
+          {
+            clave: 'rc-plantillas',
+            titulo: 'Plantillas de ruta',
+            descripcion: 'Qué procesos lleva cada artículo, su tiempo estándar y su encadenamiento',
+            ruta: '/ruta-critica/plantillas',
+            icono: 'lista-tareas',
+            permisos: ['rc.catalogo-ver'],
+            subVista: true,
+          },
+          {
+            clave: 'rc-reglas-duracion',
+            titulo: 'Reglas de duración',
+            descripcion: 'Factores por cantidad, días por tela/aplicación y rangos de dificultad',
+            ruta: '/ruta-critica/reglas-duracion',
+            icono: 'calendario',
+            permisos: ['rc.catalogo-ver'],
+            subVista: true,
+          },
+          {
+            clave: 'rc-dependencias',
+            titulo: 'Dependencias',
+            descripcion: 'Editor del grafo de dependencias entre procesos (sin ciclos)',
+            ruta: '/ruta-critica/dependencias',
+            icono: 'ruta',
+            permisos: ['rc.catalogo-ver'],
+            subVista: true,
+          },
+          {
+            clave: 'rc-procesos',
+            titulo: 'Catálogo de procesos (avanzado)',
+            descripcion:
+              'Catálogo configurable de procesos: banderas, roles responsables y checklists',
+            ruta: '/ruta-critica/procesos',
+            icono: 'lista-tareas',
+            permisos: ['rc.catalogo-ver'],
+            subVista: true,
+          },
+        ],
       },
       {
         clave: 'administracion',
@@ -1287,7 +1303,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
 
 /**
  * Todas las HOJAS del menú, aplanadas (padres → hijos, en orden). La usan los
- * hubs (`InventariosPagina`, `RutaCriticaPagina`), el inicio y la paleta ⌘K.
+ * hubs (p. ej. `InventariosPagina`), el inicio y la paleta ⌘K.
  * Nombre conservado del menú plano anterior por compatibilidad.
  */
 export const MODULOS_MENU: readonly ModuloMenu[] = GRUPOS_MENU.flatMap((grupo) =>

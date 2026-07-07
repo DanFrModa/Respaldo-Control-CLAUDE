@@ -88,4 +88,61 @@ test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
     // El backend rechaza el ciclo con un mensaje claro en español (toast).
     await expect(page.getByText(/ciclo/i)).toBeVisible();
   });
+
+  test('Procesos y responsables (R4): agrega un rango de dificultad y edita una dependencia', async ({
+    page,
+  }) => {
+    const sufijo = Date.now().toString().slice(-6);
+    const codigoA = `e2e-pyr-a-${sufijo}`;
+    const nombreA = `PyR A ${sufijo}`;
+    const codigoB = `e2e-pyr-b-${sufijo}`;
+    const nombreB = `PyR B ${sufijo}`;
+
+    await entrarComoAdmin(page);
+
+    // Dos procesos frescos para editar su dependencia sin tocar el catálogo real.
+    await page.goto('/ruta-critica/procesos');
+    for (const [codigo, nombre] of [
+      [codigoA, nombreA],
+      [codigoB, nombreB],
+    ] as const) {
+      await page.getByTestId('nuevo-proceso-rc').click();
+      const dlg = page.getByRole('dialog');
+      await dlg.getByLabel('Código').fill(codigo);
+      await dlg.getByLabel('Nombre').fill(nombre);
+      await page.getByTestId('guardar-proceso-rc').click();
+      await expect(page.getByText(`Proceso "${nombre}" creado.`)).toBeVisible();
+    }
+
+    // ── La pantalla nueva (SISTEMA · Procesos y responsables) ───────────────────
+    await page.goto('/ruta-critica/procesos-responsables');
+    await expect(page.getByRole('heading', { name: 'Procesos y responsables' })).toBeVisible();
+
+    // ── Agregar un RANGO de dificultad (B7). Rango altísimo para no solaparse con el seed. ──
+    const desde = 5000 + Number(sufijo.slice(-3)); // único por corrida y lejos del seed (1..33+)
+    await page.getByTestId('pyr-agregar-rango').click();
+    const dlgRango = page.getByRole('dialog');
+    await dlgRango.getByTestId('rango-ops-desde').fill(String(desde));
+    await dlgRango.getByTestId('rango-ops-hasta').fill(String(desde + 9));
+    await dlgRango.getByTestId('rango-nombre').fill(`Rango E2E ${sufijo}`);
+    await dlgRango.getByTestId('rango-dias').fill('9');
+    await dlgRango.getByTestId('rango-guardar').click();
+    await expect(page.getByText('Tabla de dificultad actualizada.')).toBeVisible();
+    await expect(
+      page.getByTestId('pyr-rango').filter({ hasText: `Rango E2E ${sufijo}` }),
+    ).toBeVisible();
+
+    // ── Editar una DEPENDENCIA desde el renglón expandible: B espera a A ────────
+    const filaB = page.getByTestId('pyr-proceso').filter({ hasText: nombreB });
+    await filaB.getByTestId('pyr-expandir').click();
+    const deps = page.getByTestId('pyr-dependencias');
+    await deps.getByTestId('pyr-antecesor-input').fill(nombreA);
+    await deps.getByTestId('pyr-antecesor-opcion').first().click();
+    await deps.getByTestId('pyr-agregar-antecesor').click();
+    await expect(page.getByText(`Antecesor agregado: ${nombreA} → ${nombreB}.`)).toBeVisible();
+    // El chip aparece en "Espera a" y el DETONA del otro lado se deriva solo; quitarlo lo regresa.
+    await expect(deps.getByTestId('pyr-chip-antecesor').filter({ hasText: nombreA })).toBeVisible();
+    await deps.getByTestId('pyr-quitar-antecesor').first().click();
+    await expect(page.getByText(`Antecesor quitado de ${nombreB}.`)).toBeVisible();
+  });
 });

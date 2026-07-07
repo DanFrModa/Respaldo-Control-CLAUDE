@@ -32,6 +32,9 @@ import type {
   PlantillaRc,
   PlantillaRcCrear,
   PlantillaRcEditar,
+  RangoDificultadRc,
+  RangoDificultadRcCrear,
+  RangoDificultadRcEditar,
 } from './tipos';
 
 /**
@@ -379,6 +382,79 @@ export function useDesactivarDuracionTelaRc(): UseMutationResult<
       const { data, error } = await api.DELETE('/api/ruta-critica/reglas-duracion/tela/{id}', {
         params: { path: { id } },
       });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_REGLAS_RC }),
+  });
+}
+
+// ── Reglas de duración: rangos de DIFICULTAD por # de operaciones (R4, B7) ─────
+
+export function useRangosDificultadRc(
+  incluirInactivos = false,
+): UseQueryResult<RangoDificultadRc[], ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_REGLAS_RC, 'dificultad', { incluirInactivos }],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/ruta-critica/reglas-duracion/dificultad', {
+        params: { query: { incluirInactivos: incluirInactivos ? 'true' : 'false' } },
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+  });
+}
+
+export function useCrearRangoDificultadRc(): UseMutationResult<
+  RangoDificultadRc,
+  ErrorDeApi,
+  RangoDificultadRcCrear
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (cuerpo: RangoDificultadRcCrear) => {
+      const { data, error } = await api.POST('/api/ruta-critica/reglas-duracion/dificultad', {
+        body: cuerpo,
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_REGLAS_RC }),
+  });
+}
+
+export function useActualizarRangoDificultadRc(): UseMutationResult<
+  RangoDificultadRc,
+  ErrorDeApi,
+  { id: number; cuerpo: RangoDificultadRcEditar }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, cuerpo }: { id: number; cuerpo: RangoDificultadRcEditar }) => {
+      const { data, error } = await api.PATCH('/api/ruta-critica/reglas-duracion/dificultad/{id}', {
+        params: { path: { id } },
+        body: cuerpo,
+      });
+      if (!data) throw new ErrorDeApi(error);
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_REGLAS_RC }),
+  });
+}
+
+export function useDesactivarRangoDificultadRc(): UseMutationResult<
+  RangoDificultadRc,
+  ErrorDeApi,
+  number
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const { data, error } = await api.DELETE(
+        '/api/ruta-critica/reglas-duracion/dificultad/{id}',
+        { params: { path: { id } } },
+      );
       if (!data) throw new ErrorDeApi(error);
       return data;
     },
