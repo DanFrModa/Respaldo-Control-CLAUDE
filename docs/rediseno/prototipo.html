@@ -1816,9 +1816,9 @@ function vProduccion() {
 /* Cada pedido interno (folio consecutivo -F) engloba varios modelos; cada
    modelo = una orden de producción (No. Ord). Van juntos en insumos y entrega. */
 const PEDIDOS_MES = [
-  { folio:'1508-F', cliente:'C&A', empresa:'FR', vig:'07-jul → 22-jul', estatus:'Vigente', modelos:[
-    { modelo:'62410', nombre:'Playera Cherry On Top', desRef:{pi:0,mi:0}, cant:1800, precio:168.00, fecha:'22-jul', ord:'', corte:0 },
-    { modelo:'62411', nombre:'Short deportivo felpa', desRef:{pi:0,mi:1}, cant:1200, precio:154.00, fecha:'22-jul', ord:'', corte:0 },
+  { folio:'1508-F', cliente:'C&A', empresa:'FR', vig:'07-jul → 22-jul', estatus:'Vigente', ocCliente:'OC-CA-4471', modelos:[
+    { modelo:'62410', nombre:'Playera Cherry On Top', desRef:{pi:0,mi:0}, cant:1800, precio:168.00, fecha:'22-jul', ord:'', corte:0, ocCliente:'OC-CA-4471' },
+    { modelo:'62411', nombre:'Short deportivo felpa', desRef:{pi:0,mi:1}, cant:1200, precio:154.00, fecha:'22-jul', ord:'', corte:0, ocCliente:'OC-CA-4471' },
   ]},
   { folio:'1502-F', cliente:'IB Coppel', empresa:'FR', vig:'04-jul → 04-jul', estatus:'Vigente', modelos:[
     { modelo:'32138', cant:5201, precio:112.74, fecha:'03-mar', ord:'5489', corte:5366 },
@@ -1905,21 +1905,23 @@ function cadenaTraza(o) {
   const arrow = `<span style="color:var(--faint);display:inline-flex;align-items:center" aria-hidden="true">${IC.chevron}</span>`;
   const desOk = o.desNum && desModeloByNum(o.desNum);
   const opLabel = o.ord ? '#' + o.ord + (o.prodNum ? ' · mod. ' + o.prodNum : '') : 'por generar';
+  const ocNode = o.ocCliente ? `<span style="display:inline-flex;flex-direction:column;gap:1px;padding:5px 12px;border-radius:9px;border:1px dashed var(--brand);background:var(--card)" title="Orden de compra original del cliente (referencia)"><span style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)">OC cliente</span><span class="mono" style="font-size:12.5px;font-weight:600;color:var(--brand)">${o.ocCliente}</span></span>${arrow}` : '';
   return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0 14px">
-    ${trzNode('Desarrollo', desOk ? '#' + o.desNum : '—', !!desOk, `abrirDesarrolloDeModelo('${o.desNum}')`, o.desName || 'Ficha de desarrollo')}
+    ${ocNode}${trzNode('Desarrollo', desOk ? '#' + o.desNum : '—', !!desOk, `abrirDesarrolloDeModelo('${o.desNum}')`, o.desName || 'Ficha de desarrollo')}
     ${arrow}${trzNode('Lista de precios', 'cotización', true, `ir('cotizaciones')`, 'Lista de precios del cliente (F8)')}
     ${arrow}${trzNode('Pedido interno', o.folio || '—', !!o.folio, `ir('pedidos')`, 'Pedido interno')}
     ${arrow}${trzNode('OP · producción', opLabel, !!o.ord, `ir('pedidos')`, 'Orden de producción · nº interno de producción')}
   </div>`;
 }
 /* --- Constructor del pedido interno (sin matriz) --- */
-function abrirNuevoPedido() { pedBuilder = { cliente: CLIENTES[0], empresa: 'FR Moda', fecha: '', modelos: [{ codigo: '', cant: 0, precio: 0 }] }; renderPedBuilder(); pedScrim.classList.add('show'); }
+function abrirNuevoPedido() { pedBuilder = { cliente: CLIENTES[0], empresa: 'FR Moda', fecha: '', oc: '', modelos: [{ codigo: '', cant: 0, precio: 0 }] }; renderPedBuilder(); pedScrim.classList.add('show'); }
 function cerrarPed() { pedScrim.classList.remove('show'); }
 function pedSync() {
   const p = pedPanel; if (!p.querySelector('#pedCliente')) return;
   pedBuilder.cliente = p.querySelector('#pedCliente').value;
   pedBuilder.empresa = p.querySelector('#pedEmpresa').value;
   pedBuilder.fecha = p.querySelector('#pedFecha').value;
+  const ocEl = p.querySelector('#pedOC'); if (ocEl) pedBuilder.oc = ocEl.value;
   [...p.querySelectorAll('.ped-mod')].forEach((row, mi) => {
     const m = pedBuilder.modelos[mi]; if (!m) return;
     m.codigo = row.querySelector('.ped-cod').value;
@@ -1944,8 +1946,9 @@ function crearPedidoInterno() {
   if (!validos.length) { mostrarToast('Agrega al menos un modelo con número y cantidad'); return; }
   const folio = nextFolioPed();
   const emp = pedBuilder.empresa === 'Marilyn Fitness' ? 'MF' : 'FR';
-  const modelos = validos.map(m => { const dd = desModeloByNum(m.codigo); return { modelo: m.codigo, nombre: m.nombre || (dd ? dd.m.nombre : ''), desRef: dd ? { pi: dd.pi, mi: dd.mi } : null, cant: m.cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord: '', corte: 0 }; });
-  PEDIDOS_MES.unshift({ folio, cliente: pedBuilder.cliente, empresa: emp, vig: (pedBuilder.fecha || 'jul') + ' → ' + (pedBuilder.fecha || 'jul'), estatus: 'Vigente', modelos });
+  const oc = pedBuilder.oc || '';
+  const modelos = validos.map(m => { const dd = desModeloByNum(m.codigo); return { modelo: m.codigo, nombre: m.nombre || (dd ? dd.m.nombre : ''), desRef: dd ? { pi: dd.pi, mi: dd.mi } : null, cant: m.cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord: '', corte: 0, ocCliente: oc }; });
+  PEDIDOS_MES.unshift({ folio, cliente: pedBuilder.cliente, empresa: emp, vig: (pedBuilder.fecha || 'jul') + ' → ' + (pedBuilder.fecha || 'jul'), estatus: 'Vigente', ocCliente: oc, modelos });
   cerrarPed(); ir('pedidos');
   mostrarToast('Pedido ' + folio + ' creado · genera la OP de cada modelo con el botón "Generar OP"');
 }
@@ -1966,6 +1969,7 @@ function renderPedBuilder() {
         <label><span class="ffk">Cliente</span><select class="pc-in" id="pedCliente">${CLIENTES.map(c => `<option${b.cliente === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
         <label><span class="ffk">Empresa</span><select class="pc-in" id="pedEmpresa">${['FR Moda', 'Marilyn Fitness'].map(e => `<option${b.empresa === e ? ' selected' : ''}>${e}</option>`).join('')}</select></label>
         <label><span class="ffk">Fecha de entrega</span><input class="pc-in" id="pedFecha" value="${b.fecha}" placeholder="15 jul"></label>
+        <label><span class="ffk">OC del cliente (referencia)</span><input class="pc-in mono" id="pedOC" value="${b.oc || ''}" placeholder="OC-CA-4471"></label>
       </div>
       <div class="pc-hint-cell" style="margin-top:8px">El pedido referencia el <b>modelo de desarrollo</b> (su ficha con BOM/telas/avíos/dificultad) con su <b>cantidad y precio</b>. <b>Desarrollo y Producción son bases distintas:</b> el <b>nº interno de producción se asigna al generar la OP</b> (salida a producción), que es cuando queda ligado y hereda su desarrollo. La <b>matriz color×talla NACE en la OP</b>, no aquí.</div>
     </div>
@@ -1995,7 +1999,7 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && pedScrim.classLis
 /* --- Generar OP desde un modelo del pedido: aquí NACE la matriz color×talla --- */
 function abrirGenerarOP(fi, mi) {
   const m = PEDIDOS_MES[fi].modelos[mi];
-  opGen = { fi, mi, codigo: m.modelo, nombre: m.nombre || '', cliente: PEDIDOS_MES[fi].cliente, cant: m.cant, fecha: m.fecha, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] };
+  opGen = { fi, mi, codigo: m.modelo, nombre: m.nombre || '', cliente: PEDIDOS_MES[fi].cliente, oc: m.ocCliente || PEDIDOS_MES[fi].ocCliente || '', cant: m.cant, fecha: m.fecha, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] };
   renderOpGen(); opScrim.classList.add('show');
 }
 function cerrarOp() { opScrim.classList.remove('show'); }
@@ -2045,12 +2049,13 @@ function renderOpGen() {
   <div class="proc-head">
     <span class="ph-hero">OP</span>
     <div style="flex:1;min-width:0"><h2>Generar OP · Modelo ${g.codigo}</h2>
-      <div class="ph-meta"><span>${g.cliente}</span><span>Pedido interno ${folio}</span>${g.nombre ? `<span>${g.nombre}</span>` : ''}</div>
+      <div class="ph-meta"><span>${g.cliente}</span><span>Pedido interno ${folio}</span>${g.oc ? `<span>OC cliente ${g.oc}</span>` : ''}${g.nombre ? `<span>${g.nombre}</span>` : ''}</div>
     </div>
     <button class="icon-btn" onclick="cerrarOp()" title="Cerrar (esc)">${icXsvg}</button>
   </div>
   <div class="proc-body">
-    ${cadenaTraza({ desNum: g.codigo, desName: g.nombre, folio, ord: '' })}
+    ${cadenaTraza({ ocCliente: g.oc, desNum: g.codigo, desName: g.nombre, folio, ord: '' })}
+    ${g.oc ? `<div class="pc-hint-cell" style="margin:-6px 0 12px">Esta OP guarda la <b>OC original del cliente</b> como referencia: <b class="mono">${g.oc}</b> — queda amarrada a la orden aunque el pedido interno se reorganice.</div>` : ''}
     <div class="audit-hint" style="margin-bottom:12px">${IC.info}<span><b>Generar la OP es la salida a producción:</b> el modelo entra al <b>catálogo de producción</b> (base distinta a Desarrollo) con su <b>nº interno de producción</b> y queda <b>ligado</b> a su ficha de desarrollo${dev ? ` <b>#${g.codigo}</b>` : ''}, de la que <b>hereda</b> BOM/telas/avíos/dificultad. ${dev ? `<button class="btn ghost sm" style="margin-left:4px;vertical-align:middle" onclick="abrirDesarrolloDeModelo('${g.codigo}')">Ver desarrollo</button>` : '<b>Sin ficha de desarrollo</b> (modelo histórico).'}</span></div>
     <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>La <b>matriz color×talla nace aquí</b>. Distribuye la cantidad del pedido (<b>${g.cant.toLocaleString('es-MX')} pz</b>) por color y talla; al generar se le programa su <b>Ruta Crítica</b> sola.</span></div>
     <div class="table-wrap"><table class="data"><thead><tr><th>Color</th>${g.tallas.map(t => `<th class="r">${t}</th>`).join('')}<th class="r">Total</th><th></th></tr></thead><tbody>
@@ -2111,10 +2116,10 @@ function desModeloByClienteNum(ref) {
   return null;
 }
 let impWiz = null;
-function abrirImportador() { impWiz = { paso: 1, cliente: CLIENTES_PC[0], archivo: null, mapeo: {}, ligas: {} }; renderImp(); impScrim.classList.add('show'); }
+function abrirImportador() { impWiz = { paso: 1, cliente: CLIENTES_PC[0], archivo: null, oc: '', mapeo: {}, ligas: {} }; renderImp(); impScrim.classList.add('show'); }
 function cerrarImp() { impScrim.classList.remove('show'); }
 function impTienePlantilla() { return !!PLANTILLAS_CLIENTE[impWiz.cliente]; }
-function impCargarArchivo() { impWiz.archivo = IMP_ARCHIVO_DEMO; impWiz.mapeo = Object.assign({}, PLANTILLAS_CLIENTE[impWiz.cliente] || {}); renderImp(); }
+function impCargarArchivo() { impWiz.archivo = IMP_ARCHIVO_DEMO; if (!impWiz.oc) impWiz.oc = 'OC-CA-4471'; impWiz.mapeo = Object.assign({}, PLANTILLAS_CLIENTE[impWiz.cliente] || {}); renderImp(); }
 function impSetCliente(v) { impWiz.cliente = v; if (impWiz.archivo) impWiz.mapeo = Object.assign({}, PLANTILLAS_CLIENTE[v] || {}); renderImp(); }
 function impMapeoCompleto() { const roles = Object.values(impWiz.mapeo); return roles.includes('modelo') && roles.includes('cant'); }
 function impSyncMapeo() { impPanel.querySelectorAll('.imp-map').forEach(sel => { const col = sel.dataset.col, v = sel.value; if (v) impWiz.mapeo[col] = v; else delete impWiz.mapeo[col]; }); }
@@ -2168,13 +2173,14 @@ function impConfirmar() {
   const reconocidos = grupos.filter(g => g.dev);
   if (!reconocidos.length) { mostrarToast('Liga al menos un modelo a su desarrollo para poder generar'); return; }
   const folio = nextFolioPed();
-  const modelos = reconocidos.map(g => ({ modelo: g.dev.m.nuestro, nombre: g.dev.m.nombre, desRef: { pi: g.dev.pi, mi: g.dev.mi }, cant: g.total, precio: g.precio, fecha: '22-jul', ord: '', corte: 0, refCliente: g.ref }));
-  PEDIDOS_MES.unshift({ folio, cliente: impWiz.cliente, empresa: 'FR', vig: '07-jul → 22-jul', estatus: 'Vigente', modelos, origen: 'import' });
+  const oc = impWiz.oc || '', archivoOC = impWiz.archivo.nombre;
+  const modelos = reconocidos.map(g => ({ modelo: g.dev.m.nuestro, nombre: g.dev.m.nombre, desRef: { pi: g.dev.pi, mi: g.dev.mi }, cant: g.total, precio: g.precio, fecha: '22-jul', ord: '', corte: 0, refCliente: g.ref, ocCliente: oc }));
+  PEDIDOS_MES.unshift({ folio, cliente: impWiz.cliente, empresa: 'FR', vig: '07-jul → 22-jul', estatus: 'Vigente', ocCliente: oc, archivoOC, modelos, origen: 'import' });
   let nOP = 0;
   reconocidos.forEach((g, k) => { const mat = construirMatriz(g.filas); salidaAProduccion(modelos[k], impWiz.cliente, mat.tallas, mat.colores); nOP++; });
   const noRec = grupos.length - reconocidos.length;
   cerrarImp(); ir('pedidos');
-  mostrarToast('Pedido ' + folio + ' importado de ' + impWiz.cliente + ' · ' + nOP + ' OP(s) con su matriz + RC' + (noRec ? ' · ' + noRec + ' sin reconocer quedaron fuera' : ''));
+  mostrarToast('Pedido ' + folio + ' importado de ' + impWiz.cliente + (oc ? ' (OC ' + oc + ')' : '') + ' · ' + nOP + ' OP(s) con su matriz + RC' + (noRec ? ' · ' + noRec + ' sin reconocer quedaron fuera' : ''));
 }
 function renderImp() {
   const w = impWiz;
@@ -2184,7 +2190,8 @@ function renderImp() {
   if (w.paso === 1) {
     body = `
       <div class="pc-sec"><h4>¿De qué cliente es el pedido?</h4>
-        <div class="pc-fields"><label><span class="ffk">Cliente</span><select class="pc-in" onchange="impSetCliente(this.value)">${CLIENTES_PC.map(c => `<option${w.cliente === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
+        <div class="pc-fields"><label><span class="ffk">Cliente</span><select class="pc-in" onchange="impSetCliente(this.value)">${CLIENTES_PC.map(c => `<option${w.cliente === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+        <label><span class="ffk">OC del cliente (referencia)</span><input class="pc-in mono" value="${w.oc || ''}" oninput="impWiz.oc=this.value" placeholder="OC-CA-4471"></label></div>
         <div style="margin-top:8px">${impTienePlantilla() ? `<span class="badge ok" style="font-size:11px"><span class="d"></span>Formato guardado · se mapea solo</span>` : `<span class="badge warn" style="font-size:11px"><span class="d"></span>Sin formato guardado · hay que enseñárselo una vez</span>`}</div>
       </div>
       <div class="pc-sec"><h4>Archivo del cliente</h4>
@@ -2218,7 +2225,7 @@ function renderImp() {
           <td>${g.dev ? '<span class="badge ok" style="font-size:10px"><span class="d"></span>reconocido</span>' : '<span class="badge crit" style="font-size:10px"><span class="d"></span>sin reconocer</span>'}</td>
         </tr>`).join('')}
       </tbody></table></div>
-      <div class="pc-hint-cell" style="margin-top:10px"><b>${rec}</b> de ${grupos.length} modelos reconocidos · ${tot.toLocaleString('es-MX')} pz. Como el archivo trae <b>color y talla</b>, al generar se crean el <b>pedido interno</b> y las <b>OPs con su matriz</b> (y su Ruta Crítica) de una vez.</div>`;
+      <div class="pc-hint-cell" style="margin-top:10px"><b>${rec}</b> de ${grupos.length} modelos reconocidos · ${tot.toLocaleString('es-MX')} pz. Como el archivo trae <b>color y talla</b>, al generar se crean el <b>pedido interno</b> y las <b>OPs con su matriz</b> (y su Ruta Crítica) de una vez${w.oc ? `, guardando la <b>OC del cliente</b> (<span class="mono">${w.oc}</span>) como referencia en cada OP` : ''}.</div>`;
   }
   const footBtn = w.paso === 1
     ? `<button class="btn primary" onclick="impIrPaso(${impTienePlantilla() ? 3 : 2})"${w.archivo ? '' : ' disabled'}>${impTienePlantilla() ? 'Continuar a vista previa' : 'Enseñar formato'} ${IC.chevron}</button>`
@@ -2283,7 +2290,7 @@ function vPedidos() {
         const cor  = p.modelos.reduce((a,m)=>a+m.corte,0);
         return `<tbody data-ped="${i}">
           <tr class="grp">
-            <td><span class="grp-tog"><span class="chev">${IC.chevron}</span><b>${p.folio}</b><span class="grp-count">${p.modelos.length} mod.</span></span></td>
+            <td><span class="grp-tog"><span class="chev">${IC.chevron}</span><b>${p.folio}</b><span class="grp-count">${p.modelos.length} mod.</span>${p.ocCliente ? `<span class="grp-count" style="border:1px dashed var(--brand);color:var(--brand)" title="OC original del cliente">OC ${p.ocCliente}</span>` : ''}</span></td>
             <td class="cell-strong">${p.cliente}</td>
             <td class="num" style="color:var(--muted)">${p.vig}</td>
             <td></td>
@@ -2327,13 +2334,14 @@ function drawerOrden(p, m) {
     <span class="dt-hero" style="background:linear-gradient(150deg,var(--brand-bright),var(--brand))">${String(m.modelo).slice(0,2)}</span>
     <div style="flex:1;min-width:0">
       <div style="display:flex;align-items:center;gap:8px"><h2 style="font-size:16px">Modelo ${m.modelo}</h2><span class="badge ${bc}"><span class="d"></span>${bt}</span></div>
-      <div class="cell-code" style="margin-top:2px">Pedido ${p.folio} · ${p.cliente} · Orden ${m.ord}</div>
+      <div class="cell-code" style="margin-top:2px">Pedido ${p.folio} · ${p.cliente} · Orden ${m.ord}${(m.ocCliente || p.ocCliente) ? ` · OC cliente ${m.ocCliente || p.ocCliente}` : ''}</div>
     </div>
     <button class="icon-btn" id="closeDrawer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
   </div>
   <div class="drawer-body">
     <div class="dsec"><h4>Orden de producción</h4><div class="fields">
       <div class="field"><div class="k">No. orden</div><div class="v mono">${m.ord}</div></div>
+      <div class="field"><div class="k">OC del cliente</div><div class="v mono" title="Orden de compra original del cliente (referencia)">${(m.ocCliente || p.ocCliente) || '—'}</div></div>
       <div class="field"><div class="k">Fecha orden</div><div class="v">${m.fecha}</div></div>
       <div class="field"><div class="k">Cantidad pedida</div><div class="v num">${m.cant.toLocaleString('es-MX')}</div></div>
       <div class="field"><div class="k">Precio unitario</div><div class="v mono">$${m.precio.toFixed(2)}</div></div>
