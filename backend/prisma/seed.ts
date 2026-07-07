@@ -161,6 +161,11 @@ function definirRoles(): {
     // reparto que el resto de catálogos). El `.ver` y los permisos de desarrollo/listas cascadean.
     'concepto-costo.administrar',
     'estado-lista.administrar',
+    // F5 — catálogo de Ruta Crítica (procesos/plantillas/reglas/calendario laboral): administrar
+    // solo Administrador y AdministracionDireccion (mismo reparto que el resto de catálogos
+    // maestros). `rc.catalogo-ver` y el motor de RC cascadean. (Fix de pentest: antes se colaba a
+    // roles clericales.)
+    'rc.catalogo-administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
