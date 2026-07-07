@@ -966,6 +966,9 @@
 <!-- Generar OP desde un modelo del pedido (aquí NACE la matriz color×talla) -->
 <div class="proc-scrim" id="opScrim"><div class="proc" id="opPanel"></div></div>
 
+<!-- Importar pedido del cliente (plantilla de mapeo por cliente → pedido interno + OPs) -->
+<div class="proc-scrim" id="impScrim"><div class="proc" id="impPanel"></div></div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -2010,19 +2013,27 @@ function opRecalc() {
 }
 function opAddColor() { opSync(); opGen.colores.push({ n: COLORES_PED[0], q: opGen.tallas.map(() => 0) }); renderOpGen(); }
 function opDelColor(ci) { opSync(); opGen.colores.splice(ci, 1); renderOpGen(); }
-function confirmarGenerarOP() {
-  opSync();
-  if (opTotal() === 0) { mostrarToast('Captura las cantidades por color y talla'); return; }
+/* Salida a producción de un renglón de pedido: mintea el nº interno de producción,
+   liga al desarrollo, fija la matriz y programa la Ruta Crítica. Reutilizado por
+   "Generar OP" y por el importador de pedidos de cliente. */
+function salidaAProduccion(m, cliente, tallas, colores) {
   const ord = String(parseInt(nextOrdPed(), 10) || 5500);
-  const m = PEDIDOS_MES[opGen.fi].modelos[opGen.mi];
-  // Salida a producción: el modelo entra al catálogo de producción con su nº interno (se liga al desarrollo)
   const dev = desModeloByNum(m.modelo);
   let prodNum;
   if (dev) { if (!dev.m.prodNum) dev.m.prodNum = nextProdModelo(); prodNum = dev.m.prodNum; }
   else { prodNum = m.modelo; } // histórico: el código del pedido ya es su nº de producción
   m.prodNum = prodNum;
-  m.ord = ord; m.cant = opTotal(); m.matriz = { tallas: opGen.tallas, colores: JSON.parse(JSON.stringify(opGen.colores)) };
-  generarRutaRC(ord, opGen.codigo, opGen.cliente, opGen.fecha || 'julio');
+  m.ord = ord;
+  m.cant = colores.reduce((s, c) => s + c.q.reduce((a, b) => a + (+b || 0), 0), 0);
+  m.matriz = { tallas: [...tallas], colores: JSON.parse(JSON.stringify(colores)) };
+  generarRutaRC(ord, m.modelo, cliente, m.fecha || 'julio');
+  return { ord, prodNum, dev };
+}
+function confirmarGenerarOP() {
+  opSync();
+  if (opTotal() === 0) { mostrarToast('Captura las cantidades por color y talla'); return; }
+  const m = PEDIDOS_MES[opGen.fi].modelos[opGen.mi];
+  const { ord, prodNum, dev } = salidaAProduccion(m, opGen.cliente, opGen.tallas, opGen.colores);
   cerrarOp(); ir('pedidos');
   mostrarToast('OP ' + ord + ' generada · salió a producción como modelo #' + prodNum + (dev ? ' (ligado a desarrollo #' + m.modelo + ')' : '') + ' · matriz + Ruta Crítica programada sola');
 }
@@ -2061,6 +2072,179 @@ function renderOpGen() {
 }
 opScrim.onclick = (e) => { if (e.target === opScrim) cerrarOp(); };
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && opScrim.classList.contains('show')) cerrarOp(); });
+
+/* ===== IMPORTADOR DE PEDIDO DEL CLIENTE (Etapa 3) — plantilla de mapeo por cliente.
+   El DISEÑO/FLUJO vive aquí (prototipo). El MOTOR real (parsear el archivo, guardar
+   la plantilla, amarrar modelo-del-cliente ↔ desarrollo, la transacción de alta) es
+   BACKEND — función NUEVA, pendiente de meter al plan (F8/F10). Ver §7 del md. ===== */
+const impScrim = document.getElementById('impScrim');
+const impPanel = document.getElementById('impPanel');
+const IMP_ROLES = [
+  { k: '', t: '— ignorar —' },
+  { k: 'modelo', t: 'Modelo del cliente' },
+  { k: 'color', t: 'Color' },
+  { k: 'talla', t: 'Talla' },
+  { k: 'cant', t: 'Cantidad' },
+  { k: 'precio', t: 'Precio' },
+];
+/* Plantillas de mapeo ya "aprendidas" (columna del archivo → rol). C&A ya tiene; otros no. */
+let PLANTILLAS_CLIENTE = { 'C&A': { Estilo: 'modelo', Color: 'color', Talla: 'talla', Piezas: 'cant', Precio: 'precio' } };
+/* Archivo demo del cliente. CA-KM-114/115 amarran a desarrollo (por clienteNum); CA-KM-999 no. */
+const IMP_ARCHIVO_DEMO = {
+  nombre: 'Pedido_C&A_PV26.xlsx',
+  columnas: ['Estilo', 'Descripción', 'Color', 'Talla', 'Piezas', 'Precio'],
+  filas: [
+    ['CA-KM-114', 'Playera Cherry', 'Rojo A', 'CH', 400, 168],
+    ['CA-KM-114', 'Playera Cherry', 'Rojo A', 'M', 600, 168],
+    ['CA-KM-114', 'Playera Cherry', 'Azul marino', 'G', 500, 168],
+    ['CA-KM-115', 'Short felpa', 'Negro', 'CH', 300, 154],
+    ['CA-KM-115', 'Short felpa', 'Negro', 'M', 400, 154],
+    ['CA-KM-999', 'Sudadera nueva', 'Blanco', 'M', 200, 140],
+  ],
+};
+function desModeloByClienteNum(ref) {
+  const s = String(ref).trim();
+  for (let pi = 0; pi < PROYECTOS.length; pi++) {
+    const mi = PROYECTOS[pi].modelos.findIndex(m => (m.clienteNum || '') === s);
+    if (mi >= 0) return { pi, mi, m: PROYECTOS[pi].modelos[mi], proy: PROYECTOS[pi] };
+  }
+  return null;
+}
+let impWiz = null;
+function abrirImportador() { impWiz = { paso: 1, cliente: CLIENTES_PC[0], archivo: null, mapeo: {}, ligas: {} }; renderImp(); impScrim.classList.add('show'); }
+function cerrarImp() { impScrim.classList.remove('show'); }
+function impTienePlantilla() { return !!PLANTILLAS_CLIENTE[impWiz.cliente]; }
+function impCargarArchivo() { impWiz.archivo = IMP_ARCHIVO_DEMO; impWiz.mapeo = Object.assign({}, PLANTILLAS_CLIENTE[impWiz.cliente] || {}); renderImp(); }
+function impSetCliente(v) { impWiz.cliente = v; if (impWiz.archivo) impWiz.mapeo = Object.assign({}, PLANTILLAS_CLIENTE[v] || {}); renderImp(); }
+function impMapeoCompleto() { const roles = Object.values(impWiz.mapeo); return roles.includes('modelo') && roles.includes('cant'); }
+function impSyncMapeo() { impPanel.querySelectorAll('.imp-map').forEach(sel => { const col = sel.dataset.col, v = sel.value; if (v) impWiz.mapeo[col] = v; else delete impWiz.mapeo[col]; }); }
+function impGuardarPlantilla() {
+  impSyncMapeo();
+  if (!impMapeoCompleto()) { mostrarToast('Marca al menos qué columna es Modelo y cuál Cantidad'); return; }
+  PLANTILLAS_CLIENTE[impWiz.cliente] = Object.assign({}, impWiz.mapeo);
+  impWiz.paso = 3; renderImp();
+  mostrarToast('Formato de ' + impWiz.cliente + ' guardado · la próxima vez se mapea solo');
+}
+function impIrPaso(n) {
+  if (n >= 2 && !impWiz.archivo) { mostrarToast('Primero carga el archivo del cliente'); return; }
+  if (impWiz.paso === 2) impSyncMapeo();
+  if (n === 3 && !impMapeoCompleto()) { mostrarToast('Falta mapear el formato (Modelo + Cantidad)'); return; }
+  impWiz.paso = n; renderImp();
+}
+/* Aplica el mapeo al archivo y agrupa por modelo del cliente (amarrando al desarrollo) */
+function impParsear() {
+  const map = impWiz.mapeo, cols = impWiz.archivo.columnas, idx = {};
+  Object.keys(map).forEach(col => { idx[map[col]] = cols.indexOf(col); });
+  const grupos = {};
+  impWiz.archivo.filas.forEach(f => {
+    const ref = idx.modelo != null ? String(f[idx.modelo]) : '';
+    if (!grupos[ref]) grupos[ref] = { ref, filas: [] };
+    grupos[ref].filas.push({
+      color: (idx.color >= 0) ? f[idx.color] : '—',
+      talla: (idx.talla >= 0) ? f[idx.talla] : '—',
+      cant: (idx.cant >= 0) ? (+f[idx.cant] || 0) : 0,
+      precio: (idx.precio >= 0) ? (+f[idx.precio] || 0) : 0,
+    });
+  });
+  return Object.values(grupos).map(g => {
+    const total = g.filas.reduce((a, r) => a + r.cant, 0);
+    const ligaManual = impWiz.ligas[g.ref];
+    const dev = ligaManual ? desModeloByNum(ligaManual) : desModeloByClienteNum(g.ref);
+    return { ref: g.ref, filas: g.filas, total, precio: g.filas[0] ? g.filas[0].precio : 0, dev };
+  });
+}
+function impLigar(ref, val) { if (val) impWiz.ligas[ref] = val; else delete impWiz.ligas[ref]; renderImp(); }
+function construirMatriz(rows) {
+  const tallas = [];
+  TALLAS_PED.forEach(t => { if (rows.some(r => r.talla === t)) tallas.push(t); });
+  rows.forEach(r => { if (r.talla && r.talla !== '—' && !tallas.includes(r.talla)) tallas.push(r.talla); });
+  if (!tallas.length) tallas.push('Única');
+  const colores = [];
+  rows.forEach(r => { if (!colores.includes(r.color)) colores.push(r.color); });
+  return { tallas, colores: colores.map(cn => ({ n: cn, q: tallas.map(t => rows.filter(r => r.color === cn && (r.talla === t || tallas[0] === 'Única')).reduce((a, r) => a + r.cant, 0)) })) };
+}
+function impConfirmar() {
+  const grupos = impParsear();
+  const reconocidos = grupos.filter(g => g.dev);
+  if (!reconocidos.length) { mostrarToast('Liga al menos un modelo a su desarrollo para poder generar'); return; }
+  const folio = nextFolioPed();
+  const modelos = reconocidos.map(g => ({ modelo: g.dev.m.nuestro, nombre: g.dev.m.nombre, desRef: { pi: g.dev.pi, mi: g.dev.mi }, cant: g.total, precio: g.precio, fecha: '22-jul', ord: '', corte: 0, refCliente: g.ref }));
+  PEDIDOS_MES.unshift({ folio, cliente: impWiz.cliente, empresa: 'FR', vig: '07-jul → 22-jul', estatus: 'Vigente', modelos, origen: 'import' });
+  let nOP = 0;
+  reconocidos.forEach((g, k) => { const mat = construirMatriz(g.filas); salidaAProduccion(modelos[k], impWiz.cliente, mat.tallas, mat.colores); nOP++; });
+  const noRec = grupos.length - reconocidos.length;
+  cerrarImp(); ir('pedidos');
+  mostrarToast('Pedido ' + folio + ' importado de ' + impWiz.cliente + ' · ' + nOP + ' OP(s) con su matriz + RC' + (noRec ? ' · ' + noRec + ' sin reconocer quedaron fuera' : ''));
+}
+function renderImp() {
+  const w = impWiz;
+  const chip = (n, t) => `<button type="button" onclick="impIrPaso(${n})" style="display:inline-flex;align-items:center;gap:6px;padding:5px 13px;border-radius:20px;border:1px solid ${w.paso === n ? 'var(--brand)' : 'var(--line)'};background:${w.paso === n ? 'var(--brand)' : 'var(--card)'};color:${w.paso === n ? '#fff' : 'var(--muted)'};font-family:inherit;cursor:pointer"><b>${n}</b> ${t}</button>`;
+  const stepper = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap">${chip(1, 'Origen')}<span style="color:var(--faint)">${IC.chevron}</span>${chip(2, 'Formato')}<span style="color:var(--faint)">${IC.chevron}</span>${chip(3, 'Vista previa')}</div>`;
+  let body = '';
+  if (w.paso === 1) {
+    body = `
+      <div class="pc-sec"><h4>¿De qué cliente es el pedido?</h4>
+        <div class="pc-fields"><label><span class="ffk">Cliente</span><select class="pc-in" onchange="impSetCliente(this.value)">${CLIENTES_PC.map(c => `<option${w.cliente === c ? ' selected' : ''}>${c}</option>`).join('')}</select></label></div>
+        <div style="margin-top:8px">${impTienePlantilla() ? `<span class="badge ok" style="font-size:11px"><span class="d"></span>Formato guardado · se mapea solo</span>` : `<span class="badge warn" style="font-size:11px"><span class="d"></span>Sin formato guardado · hay que enseñárselo una vez</span>`}</div>
+      </div>
+      <div class="pc-sec"><h4>Archivo del cliente</h4>
+        ${w.archivo
+          ? `<div class="pc-hint-cell" style="display:flex;align-items:center;justify-content:space-between;gap:12px"><span>📄 <b>${w.archivo.nombre}</b> · ${w.archivo.filas.length} renglones · ${w.archivo.columnas.length} columnas</span><button class="btn ghost sm" onclick="impCargarArchivo()">Reemplazar</button></div>`
+          : `<button class="btn ghost" onclick="impCargarArchivo()" style="width:100%;padding:22px;border-style:dashed">${IC.download}Elegir archivo del cliente (Excel/PDF)…</button><div class="pc-hint-cell" style="margin-top:8px">En el demo se carga un archivo de ejemplo de C&A (Estilo · Color · Talla · Piezas · Precio).</div>`}
+      </div>`;
+  } else if (w.paso === 2) {
+    body = `
+      <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span><b>Enséñale el formato del cliente (solo una vez):</b> di qué es cada columna de su archivo. Se guarda como <b>plantilla de ${w.cliente}</b> y la próxima vez se mapea solo.</span></div>
+      <div class="table-wrap"><table class="data"><thead><tr><th>Columna del archivo</th><th>Ejemplo</th><th>¿Qué es?</th></tr></thead><tbody>
+        ${w.archivo.columnas.map(col => `<tr>
+          <td class="mono"><b>${col}</b></td>
+          <td style="color:var(--muted)">${w.archivo.filas[0] ? w.archivo.filas[0][w.archivo.columnas.indexOf(col)] : ''}</td>
+          <td><select class="pc-in imp-map" data-col="${col}" style="height:30px;min-width:190px">${IMP_ROLES.map(r => `<option value="${r.k}"${(w.mapeo[col] || '') === r.k ? ' selected' : ''}>${r.t}</option>`).join('')}</select></td>
+        </tr>`).join('')}
+      </tbody></table></div>`;
+  } else {
+    const grupos = impParsear();
+    const rec = grupos.filter(g => g.dev).length, tot = grupos.reduce((a, g) => a + g.total, 0);
+    body = `
+      <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>Se aplicó el formato de <b>${w.cliente}</b> y se amarró cada modelo del cliente con <b>nuestro desarrollo</b> (por su nº de cliente). Revisa, liga lo que no reconoció y genera.</span></div>
+      <div class="table-wrap"><table class="data"><thead><tr><th>Modelo del cliente</th><th>Liga a desarrollo</th><th class="r">Pz</th><th class="r">Rengl.</th><th>Estatus</th></tr></thead><tbody>
+        ${grupos.map(g => `<tr>
+          <td class="mono"><b>${g.ref}</b></td>
+          <td>${g.dev
+            ? `<span class="mono" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" title="Ver desarrollo" onclick="abrirDesarrolloDeModelo('${g.dev.m.nuestro}')">#${g.dev.m.nuestro}</span> <span style="color:var(--faint);font-size:11px">${g.dev.m.nombre}</span>`
+            : `<select class="pc-in" onchange="impLigar('${g.ref}', this.value)" style="height:30px;min-width:240px">${devModelOptions('')}</select>`}</td>
+          <td class="r num">${g.total.toLocaleString('es-MX')}</td>
+          <td class="r num" style="color:var(--muted)">${g.filas.length}</td>
+          <td>${g.dev ? '<span class="badge ok" style="font-size:10px"><span class="d"></span>reconocido</span>' : '<span class="badge crit" style="font-size:10px"><span class="d"></span>sin reconocer</span>'}</td>
+        </tr>`).join('')}
+      </tbody></table></div>
+      <div class="pc-hint-cell" style="margin-top:10px"><b>${rec}</b> de ${grupos.length} modelos reconocidos · ${tot.toLocaleString('es-MX')} pz. Como el archivo trae <b>color y talla</b>, al generar se crean el <b>pedido interno</b> y las <b>OPs con su matriz</b> (y su Ruta Crítica) de una vez.</div>`;
+  }
+  const footBtn = w.paso === 1
+    ? `<button class="btn primary" onclick="impIrPaso(${impTienePlantilla() ? 3 : 2})"${w.archivo ? '' : ' disabled'}>${impTienePlantilla() ? 'Continuar a vista previa' : 'Enseñar formato'} ${IC.chevron}</button>`
+    : w.paso === 2
+      ? `<button class="btn primary" onclick="impGuardarPlantilla()">${IC.check}Guardar formato y continuar</button>`
+      : `<button class="btn primary" onclick="impConfirmar()">${IC.check}Generar pedido interno + OPs</button>`;
+  impPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">IM</span>
+    <div style="flex:1;min-width:0"><h2>Importar pedido del cliente</h2>
+      <div class="ph-meta"><span>${w.cliente}</span><span>plantilla de mapeo por cliente</span><span>→ pedido interno + OPs</span></div>
+    </div>
+    <button class="icon-btn" onclick="cerrarImp()" title="Cerrar (esc)">${icXsvg}</button>
+  </div>
+  <div class="proc-body">
+    ${stepper}
+    ${body}
+  </div>
+  <div class="nota-foot">
+    <div class="nota-tot" style="font-size:11.5px;color:var(--faint);font-weight:400">El motor real (parseo · plantilla · amarre · alta) es <b>backend</b> · función nueva por planear</div>
+    <div style="display:flex;gap:8px"><button class="btn ghost" onclick="cerrarImp()">Cancelar</button>${footBtn}</div>
+  </div>`;
+}
+impScrim.onclick = (e) => { if (e.target === impScrim) cerrarImp(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && impScrim.classList.contains('show')) cerrarImp(); });
+
 function vPedidos() {
   let totPed=0, totImp=0, totCorte=0, totOrd=0;
   PEDIDOS_MES.forEach(p => p.modelos.forEach(m => { totPed+=m.cant; totImp+=m.cant*m.precio; totCorte+=m.corte; totOrd++; }));
@@ -2068,7 +2252,7 @@ function vPedidos() {
   return `
   <div class="page-head">
     <div><h1>Pedidos</h1><div class="sub">Pedidos internos por mes · cada pedido agrupa varias órdenes de producción (van juntos en insumos y entrega)</div></div>
-    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn primary" onclick="abrirNuevoPedido()">${IC.plus}Nuevo pedido</button></div>
+    <div class="actions"><button class="btn ghost">${IC.download}Exportar</button><button class="btn ghost" onclick="abrirImportador()">${IC.download}Importar de cliente</button><button class="btn primary" onclick="abrirNuevoPedido()">${IC.plus}Nuevo pedido</button></div>
   </div>
 
   <div class="monthbar">
