@@ -162,6 +162,10 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
       .click();
     await expect(page).toHaveURL(/\/ruta-critica\/pendientes$/);
     await expect(page.getByRole('heading', { name: 'Mis pendientes' })).toBeVisible();
+    // AISLA las filas de ESTA corrida: el admin ve TODO y la página trae 100 tareas por consulta —
+    // con la BD del CI llena de órdenes de otros specs, la fila podía quedar FUERA de la página
+    // (el flaky de la 1ª corrida). El filtro por cliente es SERVER-SIDE (parámetro de la bandeja).
+    await page.getByTestId('pendientes-buscar-cliente').fill(cliente);
     const fila1 = page.getByTestId('pendientes-fila').filter({ hasText: proc1Nombre });
     await expect(fila1).toBeVisible();
     // Los procesos del test no tienen evento de sistema → tag "✋ manual" + botón "Marcar hecho".

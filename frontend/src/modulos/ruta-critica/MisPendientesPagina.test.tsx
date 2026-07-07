@@ -217,6 +217,22 @@ describe('<MisPendientesPagina>', () => {
     );
   });
 
+  it('la búsqueda por cliente viaja al SERVIDOR (parámetro busquedaCliente de la bandeja)', async () => {
+    const usuario = userEvent.setup();
+    useBandejaRc.mockReturnValue(consulta([tarea(1)]));
+    renderConProveedores(<MisPendientesPagina />, {
+      sesion: estadoSesionDePrueba(['rc.ruta-ver']),
+    });
+
+    await usuario.type(screen.getByTestId('pendientes-buscar-cliente'), 'Liver');
+    // El texto viaja con debounce (300 ms) al parámetro server-side de la consulta.
+    await vi.waitFor(() => {
+      expect(useBandejaRc).toHaveBeenLastCalledWith(
+        expect.objectContaining({ busquedaCliente: 'Liver' }),
+      );
+    });
+  });
+
   it('muestra el vacío feliz cuando no hay pendientes', () => {
     useBandejaRc.mockReturnValue(consulta([]));
     useResumenPendientesRc.mockReturnValue({

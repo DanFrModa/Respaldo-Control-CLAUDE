@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, ClipboardList, Loader2, Users } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ClipboardList, Loader2, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -14,6 +14,8 @@ import { ComboboxBuscable } from '@/components/dominio/ComboboxBuscable';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
 import { PanelRutaOrden, type EncabezadoRutaOrden } from './PanelRutaOrden';
@@ -73,11 +75,18 @@ export function MisPendientesPagina(): React.JSX.Element {
   const responsables = useResponsablesRc({ habilitado: esSupervisor });
   const deUsuario = indiceUsuario === null ? undefined : responsables.data?.[indiceUsuario]?.id;
 
+  // Búsqueda por cliente EN SERVIDOR (parámetro existente de la bandeja): sin ella, un admin —
+  // que ve TODO — puede tener a su orden fuera del tope de la página (la bandeja vieja la tenía
+  // y Mis pendientes la había perdido). Los KPIs siguen siendo el total a cargo (sin filtrar).
+  const [textoCliente, setTextoCliente] = useState('');
+  const busquedaCliente = useDebounce(textoCliente.trim(), 300);
+
   const resumen = useResumenPendientesRc(deUsuario === undefined ? {} : { deUsuario });
   const bandeja = useBandejaRc({
     pagina: 1,
     porPagina: TOPE_TAREAS,
     ...(deUsuario === undefined ? {} : { deUsuario }),
+    ...(busquedaCliente.length > 0 ? { busquedaCliente } : {}),
   });
 
   const [agruparPor, setAgruparPor] = useState<'urgencia' | 'proceso'>('urgencia');
@@ -146,6 +155,22 @@ export function MisPendientesPagina(): React.JSX.Element {
           </div>
         </div>
 
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="relative w-full max-w-xs">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              className="pl-8"
+              placeholder="Buscar por cliente…"
+              value={textoCliente}
+              onChange={(e) => setTextoCliente(e.target.value)}
+              data-testid="pendientes-buscar-cliente"
+            />
+          </div>
+        </div>
+
         {esSupervisor ? (
           <div
             className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border bg-secondary/50 px-3 py-2 text-sm"
@@ -189,7 +214,9 @@ export function MisPendientesPagina(): React.JSX.Element {
             className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
             data-testid="pendientes-vacio"
           >
-            Sin pendientes 🎉 — nada vencido ni para hoy.
+            {busquedaCliente.length > 0
+              ? 'Sin pendientes que coincidan con la búsqueda.'
+              : 'Sin pendientes 🎉 — nada vencido ni para hoy.'}
           </div>
         ) : (
           <>

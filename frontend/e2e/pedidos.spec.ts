@@ -138,16 +138,24 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(panelCentro.getByTestId('traza-oc')).toContainText(ocCliente);
     await expect(panelCentro.getByTestId('traza-desarrollo')).toBeEnabled();
 
-    // ── La RC se programó SOLA (outbox → consumidor, B5): poll sobre su pantalla ─
-    // `toPass` reintenta el callback COMPLETO aunque una aserción interna lance (con `expect.poll`
-    // una excepción del callback aborta el poll — hallazgo del reviewer). El consumidor corre en
-    // el backend del compose (outbox + pg-boss): se re-consulta RECARGANDO en cada intento.
-    await panelCentro.getByTestId('mosaico-rc').click();
-    await expect(page.getByRole('heading', { name: 'Ruta Crítica de la orden' })).toBeVisible();
+    // ── La RC se programó SOLA (outbox → consumidor, B5): poll sobre el PANEL (R4) ─
+    // R4 cambió el mosaico "Ruta crítica": ya NO navega a /ruta-critica/ordenes/:id — abre el
+    // PANEL deslizante "Ruta de la orden" aquí mismo. El consumidor corre en el backend del
+    // compose (outbox + pg-boss): se reintenta CERRANDO (Esc) y REABRIENDO el panel — cada
+    // apertura re-consulta la ruta — hasta que la ruta exista y liste sus procesos. `toPass`
+    // reintenta el callback COMPLETO aunque una aserción interna lance.
     await expect(async () => {
-      await page.reload();
-      await expect(page.getByRole('heading', { name: 'Ruta Crítica de la orden' })).toBeVisible();
-      await expect(page.getByTestId('rc-procesos')).toBeVisible({ timeout: 2_000 });
+      await panelCentro.getByTestId('mosaico-rc').click();
+      try {
+        await expect(
+          page.getByRole('heading', { name: `Ruta de la orden ${folioOrden}` }),
+        ).toBeVisible();
+        await expect(page.getByTestId('panel-ruta-procesos')).toBeVisible({ timeout: 2_000 });
+      } finally {
+        // Cierra el panel (modal) para que el siguiente intento — o el siguiente paso — pueda
+        // interactuar con la página aunque este intento haya fallado.
+        await page.keyboard.press('Escape');
+      }
     }).toPass({ timeout: 90_000, intervals: [3_000] });
 
     // ── La edición fina F2 sigue viva en /pedidos/administrar (pedido real) ─────

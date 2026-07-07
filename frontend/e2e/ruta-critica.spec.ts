@@ -118,8 +118,23 @@ test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
     await page.goto('/ruta-critica/procesos-responsables');
     await expect(page.getByRole('heading', { name: 'Procesos y responsables' })).toBeVisible();
 
-    // ── Agregar un RANGO de dificultad (B7). Rango altísimo para no solaparse con el seed. ──
-    const desde = 5000 + Number(sufijo.slice(-3)); // único por corrida y lejos del seed (1..33+)
+    // ── Tabla de dificultad (B7). La tabla es una PARTICIÓN: el rango ABIERTO del seed
+    // ("33 – ∞") solapa por diseño con CUALQUIER alta nueva, así que primero se ACOTA ese rango
+    // (EDITAR, condicional: un retry ya lo dejó acotado) y con el espacio libre se AGREGA el del
+    // test; de pilón se verifica que el server RECHAZA un alta solapada con su mensaje claro.
+    await expect(page.getByTestId('pyr-rango').first()).toBeVisible(); // la tabla ya cargó (seed)
+    const filasAbiertas = page.getByTestId('pyr-rango').filter({ hasText: '∞' });
+    if ((await filasAbiertas.count()) > 0) {
+      await filasAbiertas.first().getByTestId('pyr-editar-rango').click();
+      const dlgEditar = page.getByRole('dialog');
+      await dlgEditar.getByTestId('rango-ops-hasta').fill('4999');
+      await dlgEditar.getByTestId('rango-guardar').click();
+      await expect(page.getByText('Tabla de dificultad actualizada.').first()).toBeVisible();
+      await expect(page.getByTestId('pyr-rango').filter({ hasText: '∞' })).toHaveCount(0);
+    }
+
+    // Alta en el espacio liberado: bloques de 10 en [5000, 8990], únicos por corrida (sufijo).
+    const desde = 5000 + (Number(sufijo) % 400) * 10;
     await page.getByTestId('pyr-agregar-rango').click();
     const dlgRango = page.getByRole('dialog');
     await dlgRango.getByTestId('rango-ops-desde').fill(String(desde));
@@ -127,10 +142,21 @@ test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
     await dlgRango.getByTestId('rango-nombre').fill(`Rango E2E ${sufijo}`);
     await dlgRango.getByTestId('rango-dias').fill('9');
     await dlgRango.getByTestId('rango-guardar').click();
-    await expect(page.getByText('Tabla de dificultad actualizada.')).toBeVisible();
+    await expect(page.getByText('Tabla de dificultad actualizada.').first()).toBeVisible();
     await expect(
       page.getByTestId('pyr-rango').filter({ hasText: `Rango E2E ${sufijo}` }),
     ).toBeVisible();
+
+    // El server RECHAZA un alta que se encima (la validación de no-solape, end-to-end).
+    await page.getByTestId('pyr-agregar-rango').click();
+    const dlgSolape = page.getByRole('dialog');
+    await dlgSolape.getByTestId('rango-ops-desde').fill(String(desde + 5));
+    await dlgSolape.getByTestId('rango-ops-hasta').fill(String(desde + 20));
+    await dlgSolape.getByTestId('rango-nombre').fill(`Choca E2E ${sufijo}`);
+    await dlgSolape.getByTestId('rango-dias').fill('3');
+    await dlgSolape.getByTestId('rango-guardar').click();
+    await expect(page.getByText(/no pueden traslaparse/).first()).toBeVisible();
+    await dlgSolape.getByRole('button', { name: 'Cancelar' }).click();
 
     // ── Editar una DEPENDENCIA desde el renglón expandible: B espera a A ────────
     const filaB = page.getByTestId('pyr-proceso').filter({ hasText: nombreB });
