@@ -2066,6 +2066,15 @@ const PROCESOS_CAT = [
 ];
 const procCat = (nombre) => PROCESOS_CAT.find(x => x.p === nombre) || { p: nombre, auto: true, evento: 'Avance de producción', resp: '—', t:[1,1,1,1,1,1] };
 const tRange = (t) => { const a = t || [1]; return { min: Math.min(...a), max: Math.max(...a), vary: Math.min(...a) !== Math.max(...a) }; };
+/* Dificultad DERIVADA del # de operaciones de la prenda (dato real del desarrollo).
+   Umbrales de ejemplo (Daniel definirá los reales). La costura se toma de la banda. */
+const OPS_UMBRALES = [8, 14, 20, 28, 38]; // ≤8→1/6 · ≤14→2/6 · ≤20→3/6 · ≤28→4/6 · ≤38→5/6 · >38→6/6
+function dificultadDeOps(ops) { ops = ops || 0; for (let i = 0; i < OPS_UMBRALES.length; i++) if (ops <= OPS_UMBRALES[i]) return i + 1; return 6; }
+function difDerivadaHTML(ops) {
+  if (!ops) return '<span style="color:var(--faint)">Captura el # de operaciones para derivar la dificultad.</span>';
+  const d = dificultadDeOps(ops); const cost = (procCat('Maquila (costura)').t || [])[d - 1] || 0;
+  return `→ Dificultad <span class="badge ${d >= 5 ? 'crit' : d >= 3 ? 'warn' : 'ok'}" style="font-size:10px"><span class="d"></span>${DIF_LBL[d - 1]}</span> · tiempo de costura ≈ <b>${cost} d</b>`;
+}
 let procExpand = new Set();
 function toggleProcExp(i) { if (procExpand.has(i)) procExpand.delete(i); else procExpand.add(i); ir('rc-procesos'); }
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
@@ -2183,7 +2192,7 @@ function vProcesosRC() {
     <div><h1>Procesos y responsables</h1><div class="sub">Catálogo de procesos de la Ruta Crítica · responsable · tiempo por operación (varía por dificultad 1-6) · variables · auto-completado</div></div>
     <div class="actions"><button class="btn primary" onclick="mostrarToast('Nuevo proceso — demo')">${IC.plus}Nuevo proceso</button></div>
   </div>
-  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se <b>agregan o quitan</b>. Cada proceso tiene su <b>responsable</b> y su <b>tiempo</b>, que puede variar por la <b>dificultad de la prenda (1-6, definida en el desarrollo del modelo → impacta sobre todo la costura)</b> o depender de un catálogo (ej. <b>velocidad de recepción de la tela</b>). Los tiempos alimentan la ruta <b>hacia atrás</b>. Casi todos se marcan <b>solos</b>. Abre cada renglón (▸) para el detalle.</span></div>
+  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se <b>agregan o quitan</b>. Cada proceso tiene su <b>responsable</b> y su <b>tiempo</b>, que puede variar por la <b>dificultad de la prenda (1-6, que se DERIVA del # de operaciones definido en el desarrollo del modelo → impacta sobre todo la costura)</b> o depender de un catálogo (ej. <b>velocidad de recepción de la tela</b>). Los tiempos alimentan la ruta <b>hacia atrás</b>. Casi todos se marcan <b>solos</b>. Abre cada renglón (▸) para el detalle.</span></div>
   <div class="card">
     <div class="toolbar"><b>Secuencia de procesos</b><span class="count">${PROCESOS_CAT.length}</span><span class="tool-right" style="color:var(--muted);font-size:12px">${nAuto} automáticos · ${PROCESOS_CAT.length - nAuto} manuales</span></div>
     <div class="table-wrap"><table class="data"><thead><tr>
@@ -3261,19 +3270,19 @@ const nFotos = (m) => (m.fotos || 0) + ((m.fotosArr && m.fotosArr.length) || 0);
 
 let PROYECTOS = [
   { num: 'P-1042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '2 jul 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', dificultad: 2, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.42 }], maquilero: 'Confecciones León', corte: 3.5, maquila: 25, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
-    { nuestro: '62411', clienteNum: 'CA-KM-115', nombre: 'Short deportivo felpa', estatus: 'proceso', dificultad: 3, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.38 }], maquilero: 'Rima Textil', corte: 3, maquila: 22, procesos: [{ tipo: 'Bordado', precio: 8 }], avios: [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Short.pdf'], fotos: 2 },
-    { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', dificultad: 4, telas: [], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0 },
+    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', operaciones: 12, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.42 }], maquilero: 'Confecciones León', corte: 3.5, maquila: 25, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
+    { nuestro: '62411', clienteNum: 'CA-KM-115', nombre: 'Short deportivo felpa', estatus: 'proceso', operaciones: 18, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.38 }], maquilero: 'Rima Textil', corte: 3, maquila: 22, procesos: [{ tipo: 'Bordado', precio: 8 }], avios: [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Short.pdf'], fotos: 2 },
+    { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', operaciones: 24, telas: [], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0 },
   ] },
   { num: 'P-1041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '28 jun 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', dificultad: 5, telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquilero: 'Maquilas del Bajío', corte: 6, maquila: 30, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
-    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', dificultad: 2, telas: [{ nom: 'Algodón peinado 30/1', consumo: 0.30 }], maquilero: 'Costura Express', corte: 2.5, maquila: 18, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
+    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', operaciones: 34, telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquilero: 'Maquilas del Bajío', corte: 6, maquila: 30, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
+    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', operaciones: 10, telas: [{ nom: 'Algodón peinado 30/1', consumo: 0.30 }], maquilero: 'Costura Express', corte: 2.5, maquila: 18, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
   ] },
   { num: 'P-1039', cliente: 'Liverpool', depto: 'Infantil', temporada: 'OI26', fecha: '20 jun 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62330', clienteNum: 'LV-INF-88', nombre: 'Conjunto felpa bebé', estatus: 'borrador', dificultad: 3, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.25 }, { nom: 'Franela lavada 180g', consumo: 0.08 }], maquilero: 'Óscar Jiménez', corte: 2.5, maquila: 20, procesos: [], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 4 }], pdfs: ['TechPack_Conjunto.pdf'], fotos: 2 },
+    { nuestro: '62330', clienteNum: 'LV-INF-88', nombre: 'Conjunto felpa bebé', estatus: 'borrador', operaciones: 16, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.25 }, { nom: 'Franela lavada 180g', consumo: 0.08 }], maquilero: 'Óscar Jiménez', corte: 2.5, maquila: 20, procesos: [], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 4 }], pdfs: ['TechPack_Conjunto.pdf'], fotos: 2 },
   ] },
   { num: 'P-1035', cliente: 'Cklass', depto: 'Catálogo', temporada: 'PV27', fecha: '10 jun 2026', estatus: 'cerrado', modelos: [
-    { nuestro: '62124', clienteNum: '154-40', nombre: 'Blusa manga larga', estatus: 'aprobado', dificultad: 4, telas: [{ nom: 'Lycra suplex 240g', consumo: 0.32 }], maquilero: 'Textil Guerra', corte: 3, maquila: 24, procesos: [{ tipo: 'Sublimado', precio: 9 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }], pdfs: ['TechPack_Blusa.pdf'], fotos: 3 },
+    { nuestro: '62124', clienteNum: '154-40', nombre: 'Blusa manga larga', estatus: 'aprobado', operaciones: 26, telas: [{ nom: 'Lycra suplex 240g', consumo: 0.32 }], maquilero: 'Textil Guerra', corte: 3, maquila: 24, procesos: [{ tipo: 'Sublimado', precio: 9 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }], pdfs: ['TechPack_Blusa.pdf'], fotos: 3 },
   ] },
 ];
 
@@ -3414,7 +3423,7 @@ function guardarProyecto() {
 /* ---- Editor de modelo ---- */
 const pcScrim = document.getElementById('pcScrim');
 const pcPanel = document.getElementById('pcPanel');
-function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', dificultad: 3, telas: [{ nom: '', consumo: 0 }], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
+function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', operaciones: 0, telas: [{ nom: '', consumo: 0 }], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
 function editarModelo(pi, mi) { pcEdit = { pIdx: pi, mIdx: mi, m: JSON.parse(JSON.stringify(PROYECTOS[pi].modelos[mi])) }; if (!pcEdit.m.fotosArr) pcEdit.m.fotosArr = []; renderModeloEditor(); pcScrim.classList.add('show'); }
 function cerrarModeloEditor() { pcScrim.classList.remove('show'); }
 function pcSync() {
@@ -3424,7 +3433,8 @@ function pcSync() {
   m.nuestro = p.querySelector('#pcNuestro').value.trim();
   m.clienteNum = p.querySelector('#pcCliente').value.trim();
   m.estatus = p.querySelector('#pcEstatus').value;
-  m.dificultad = parseInt(p.querySelector('#pcDificultad').value) || 3;
+  m.operaciones = parseInt(p.querySelector('#pcOperaciones').value) || 0;
+  m.dificultad = dificultadDeOps(m.operaciones);
   m.telas = [...p.querySelectorAll('.pc-tela-row')].map(r => ({ nom: r.querySelector('.pc-tela-nom').value, prov: r.querySelector('.pc-tela-prov') ? r.querySelector('.pc-tela-prov').value : '', color: r.querySelector('.pc-tela-color') ? r.querySelector('.pc-tela-color').value : '', consumo: parseFloat(r.querySelector('.pc-tela-cons').value) || 0 }));
   m.maquilero = p.querySelector('#pcMaquilero').value;
   m.corte = parseFloat(p.querySelector('#pcCorte').value) || 0;
@@ -3438,6 +3448,7 @@ function pcRecalc() {
   const c = costoModelo(pcEdit.m);
   const set = (id, v) => { const el = pcPanel.querySelector(id); if (el) el.innerHTML = v; };
   set('#pcCTela', money(c.tela)); set('#pcCAvios', money(c.avios)); set('#pcCProc', money(c.procs)); set('#pcCCorte', money(c.corte)); set('#pcCMaq', money(c.maq));
+  const dd = pcPanel.querySelector('#pcDifDerivada'); if (dd) dd.innerHTML = difDerivadaHTML(pcEdit.m.operaciones);
   set('#pcCTotal', money(c.costo));
   pcPanel.querySelectorAll('.pc-avio-row').forEach(r => {
     const nom = r.querySelector('.pc-avio-nom').value, prov = r.querySelector('.pc-avio-prov') ? r.querySelector('.pc-avio-prov').value : '', cons = parseFloat(r.querySelector('.pc-avio-cons').value) || 0;
@@ -3489,9 +3500,9 @@ function renderModeloEditor() {
         <label><span class="ffk">Nº de modelo (nuestro)</span><input class="pc-in mono" id="pcNuestro" value="${m.nuestro || ''}" placeholder="62410" style="text-align:left"></label>
         <label><span class="ffk">Nº de modelo (del cliente)</span><input class="pc-in mono" id="pcCliente" value="${m.clienteNum || ''}" placeholder="CA-KM-114" style="text-align:left"></label>
         <label><span class="ffk">Estatus</span><select class="pc-in" id="pcEstatus">${['borrador', 'proceso', 'completo', 'aprobado'].map(e => `<option value="${e}"${m.estatus === e ? ' selected' : ''}>${estModeloBadge(e)[1]}</option>`).join('')}</select></label>
-        <label><span class="ffk">Dificultad (1-6)</span><select class="pc-in" id="pcDificultad">${[1, 2, 3, 4, 5, 6].map(d => `<option value="${d}"${(m.dificultad || 3) === d ? ' selected' : ''}>${DIF_LBL[d - 1]}</option>`).join('')}</select></label>
+        <label><span class="ffk"># de operaciones (costura)</span><input class="pc-in mono" id="pcOperaciones" type="number" step="1" min="0" value="${m.operaciones || ''}" placeholder="24"></label>
       </div>
-      <div class="pc-hint-cell" style="margin-top:8px">La <b>dificultad (1-6)</b> se define aquí, en el desarrollo del modelo. La <b>Ruta Crítica la toma de aquí</b> y con ella calcula los tiempos — impacta <b>sobre todo el tiempo de costura (maquila)</b>.</div>
+      <div class="pc-hint-cell" style="margin-top:8px">La <b>dificultad NO se teclea a mano</b>: sale del <b># de operaciones</b> de la prenda (dato real del desarrollo). Con ese número se <b>deriva la dificultad (1-6)</b> y de ahí los <b>tiempos</b> — sobre todo el de <b>costura</b>. <span id="pcDifDerivada">${difDerivadaHTML(m.operaciones || 0)}</span></div>
     </div>
 
     <div class="pc-sec">
