@@ -95,6 +95,17 @@ Se construyen una vez (R1–R2) en `frontend/src/components/dominio/` y se reús
 4. **Al terminar:** cotejo 1:1 de cada pantalla contra el prototipo → ajustar e2e → regenerar OpenAPI + cliente → **actualizar la tabla §2 de este doc con nota de cierre** → preguntar a Gabriel si comitear (TODO junto, docs incluidas) → con su OK, preguntar si abrir PR a `prueba`.
 5. **Nunca:** commit/push sin OK expreso de Gabriel · Docker local · leer archivos generados completos · lógica de negocio en el front.
 
+### 3.6 Corrida nocturna AUTORIZADA (Gabriel, 7-jul-2026) — modo autónomo encadenado
+
+> Gabriel autorizó EXPRESAMENTE este modo para la(s) sesión(es) que ejecuten el rediseño mientras él duerme. **Sustituye al punto 4-5 de §3.5 SOLO en lo siguiente** (todo lo demás del plan sigue igual):
+
+1. **Por fase:** construir con 1 coder + 1 reviewer independiente (2 reviewers en piezas críticas de backend); el reviewer tiene la última palabra. Cotejo 1:1 contra el prototipo + e2e ajustados + OpenAPI/cliente regenerados ANTES de dar la fase por lista.
+2. **Al cerrar la fase:** actualizar §2 de este doc (estado + nota de cierre) → **comitear TODO junto** (docs incluidas) en la rama de trabajo → **pushear** → **abrir el PR a `prueba`** (o actualizar el MISMO PR si ya existe).
+3. **Vigilar el CI del PR** (GitHub Actions): si falla → diagnosticar, corregir, pushear al MISMO PR, repetir hasta VERDE. Con CI verde → **arrancar la SIGUIENTE fase** (R1→R2→R3→… en el orden de §5) sobre la misma rama/PR, y así sucesivamente hasta donde alcance.
+4. **Si una fase no logra CI verde** tras intentos razonables: revertir SUS commits (el PR se queda verde con las fases completas), documentarlo en §2 con el diagnóstico, y continuar con lo que no dependa de ella (o detenerse dejando reporte claro).
+5. **Límites que NO cambian:** NUNCA hacer merge del PR (eso es de Gabriel), NUNCA push directo a `prueba` ni `main`, NUNCA Docker local. Las preguntas abiertas usan los defaults de §6 sin esperar respuesta.
+6. **Al parar (por término o bloqueo):** dejar en la descripción del PR el resumen por fase (qué entregó, CI, pendientes) y §2 al día — es lo primero que Gabriel lee al despertar. Recordatorio para su deploy: si alguna fase agregó permisos/seed, `prueba` necesita `SEED_ON_START=true`.
+
 ---
 
 ## 4. Brechas de backend — AUDITORÍA VERIFICADA contra `prueba` @ `1195ce5` (7-jul-2026, F8 completa)
