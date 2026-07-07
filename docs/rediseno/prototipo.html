@@ -862,6 +862,9 @@
   .rc-task { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .12s; }
   .rc-task:last-child { border-bottom: none; }
   .rc-task:hover { background: var(--hover); }
+  .dep-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 4px 2px 8px; }
+  .dep-chip button { border: none; background: transparent; color: var(--faint); cursor: pointer; font-size: 12px; line-height: 1; padding: 0 2px; }
+  .dep-chip button:hover { color: var(--crit); }
 </style>
 
 <div class="app" id="app">
@@ -2115,6 +2118,17 @@ const antesDe = (nom) => ANTECESORES[nom] || [];
 const detonaDe = (nom) => Object.keys(ANTECESORES).filter(k => (ANTECESORES[k] || []).includes(nom));
 let procExpand = new Set();
 function toggleProcExp(i) { if (procExpand.has(i)) procExpand.delete(i); else procExpand.add(i); ir('rc-procesos'); }
+function procAddAntes(i) {
+  const p = PROCESOS_CAT[i].p; const sel = document.getElementById('antesSel-' + i); const val = sel ? sel.value : '';
+  if (!val) return;
+  if (!ANTECESORES[p]) ANTECESORES[p] = [];
+  if (!ANTECESORES[p].includes(val)) ANTECESORES[p].push(val);
+  ir('rc-procesos'); mostrarToast('Antecesor agregado: ' + val + ' → ' + p);
+}
+function procDelAntes(i, ai) {
+  const p = PROCESOS_CAT[i].p; if (ANTECESORES[p]) ANTECESORES[p].splice(ai, 1);
+  ir('rc-procesos'); mostrarToast('Antecesor quitado de ' + p);
+}
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
 let rcPersona = 'Laura Hernández';
 function misPendientes(persona) {
@@ -2267,12 +2281,18 @@ function vProcesosRC() {
           </div>
           <div style="margin-top:9px;display:flex;gap:6px"><button class="btn ghost sm" onclick="mostrarToast('Editar tiempos — demo')">Editar tiempos</button><button class="btn ghost sm" onclick="mostrarToast('Asignar responsable — demo')">Responsable</button></div>
         </div>
-        <div style="min-width:250px">
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Dependencias en la ruta (CPM)</div>
-          <div style="font-size:12.5px;line-height:1.7">
-            <b>Espera a:</b> ${antesDe(x.p).length ? antesDe(x.p).join(', ') : '<span style="color:var(--faint)">— es el inicio —</span>'}${ANTES_FLEX[x.p] ? ` <span style="color:var(--warn)">+ ${ANTES_FLEX[x.p]} (si estampa antes · flexible)</span>` : ''}<br>
-            <b>Detona →</b> ${detonaDe(x.p).length ? detonaDe(x.p).join(', ') : '<span style="color:var(--faint)">— fin —</span>'}
+        <div style="min-width:290px">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Dependencias en la ruta (CPM) · <span style="color:var(--brand-bright)">editable</span></div>
+          <div style="font-size:12px;margin-bottom:4px"><b>Espera a</b> (antecesores):</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px">
+            ${antesDe(x.p).length ? antesDe(x.p).map((a, ai) => `<span class="dep-chip">${a}<button onclick="procDelAntes(${i},${ai})" title="Quitar antecesor">✕</button></span>`).join('') : '<span style="color:var(--faint);font-size:12px">— es el inicio —</span>'}
+            ${ANTES_FLEX[x.p] ? `<span class="dep-chip" style="border-style:dashed" title="Solo si la prenda estampa antes de coser (flexible)">${ANTES_FLEX[x.p]} · flexible</span>` : ''}
           </div>
+          <div style="display:flex;gap:5px;align-items:center;margin-bottom:9px">
+            <select class="pc-in" id="antesSel-${i}" style="height:30px;padding:2px 6px;font-size:12px;max-width:190px"><option value="">+ agregar antecesor…</option>${PROCESOS_CAT.map(y => y.p).filter(n => n !== x.p && !antesDe(x.p).includes(n)).map(n => `<option>${n}</option>`).join('')}</select>
+            <button class="btn ghost sm" onclick="procAddAntes(${i})" title="Agregar">${IC.plus}</button>
+          </div>
+          <div style="font-size:12px;color:var(--muted)"><b>Detona →</b> ${detonaDe(x.p).length ? detonaDe(x.p).join(', ') : '<span style="color:var(--faint)">— fin —</span>'}</div>
         </div>
       </div></td></tr>` : ''}`; }).join('')}
     </tbody></table></div>
