@@ -960,8 +960,11 @@
 <!-- Ruta de la orden (Ruta Crítica hacia atrás) -->
 <div class="proc-scrim" id="rutaScrim"><div class="proc" id="rutaPanel"></div></div>
 
-<!-- Nuevo pedido interno (folio auto → OP por modelo con matriz color×talla) -->
+<!-- Nuevo pedido interno (folio auto → modelos con cantidad y precio) -->
 <div class="proc-scrim" id="pedScrim"><div class="proc" id="pedPanel"></div></div>
+
+<!-- Generar OP desde un modelo del pedido (aquí NACE la matriz color×talla) -->
+<div class="proc-scrim" id="opScrim"><div class="proc" id="opPanel"></div></div>
 
 <div class="toast" id="toast"></div>
 
@@ -1844,16 +1847,18 @@ const corteBadge = (c, cant) => c>=cant ? ['ok','Cortado'] : c===0 ? ['neutral',
 const nextOrdPed = () => { let mx=0; PEDIDOS_MES.forEach(p=>p.modelos.forEach(m=>{ const n=parseInt(m.ord,10)||0; if(n>mx)mx=n; })); return String(mx+1); };
 const money = (n) => '$' + n.toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 });
 
-/* ===== Constructor de PEDIDO INTERNO → genera una OP por modelo (con matriz color×talla) ===== */
+/* ===== PEDIDO INTERNO (modelos con cantidad y precio). La matriz color×talla NO va
+   en el pedido: NACE en la OP, al generarla desde cada modelo (decisión Daniel 7-jul). ===== */
 const pedScrim = document.getElementById('pedScrim');
 const pedPanel = document.getElementById('pedPanel');
+const opScrim = document.getElementById('opScrim');
+const opPanel = document.getElementById('opPanel');
 const TALLAS_PED = ['XCH', 'CH', 'M', 'G', 'XG'];
 const COLORES_PED = ['Rojo A', 'Azul marino', 'Negro', 'Blanco', 'Verde pino', 'Rosa'];
-let pedBuilder = null;
-const nuevoModeloPed = () => ({ codigo: '', precio: 0, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] });
-const pedTotalModelo = (m) => (m.colores || []).reduce((s, c) => s + c.q.reduce((a, b) => a + (+b || 0), 0), 0);
+let pedBuilder = null, opGen = null;
 const nextFolioPed = () => { let mx = 0; PEDIDOS_MES.forEach(p => { const n = parseInt(String(p.folio).split('-')[0], 10) || 0; if (n > mx) mx = n; }); return (mx + 1) + '-F'; };
-function abrirNuevoPedido() { pedBuilder = { cliente: CLIENTES[0], empresa: 'FR Moda', fecha: '', modelos: [nuevoModeloPed()] }; renderPedBuilder(); pedScrim.classList.add('show'); }
+/* --- Constructor del pedido interno (sin matriz) --- */
+function abrirNuevoPedido() { pedBuilder = { cliente: CLIENTES[0], empresa: 'FR Moda', fecha: '', modelos: [{ codigo: '', cant: 0, precio: 0 }] }; renderPedBuilder(); pedScrim.classList.add('show'); }
 function cerrarPed() { pedScrim.classList.remove('show'); }
 function pedSync() {
   const p = pedPanel; if (!p.querySelector('#pedCliente')) return;
@@ -1863,35 +1868,27 @@ function pedSync() {
   [...p.querySelectorAll('.ped-mod')].forEach((row, mi) => {
     const m = pedBuilder.modelos[mi]; if (!m) return;
     m.codigo = row.querySelector('.ped-cod').value;
+    m.cant = parseInt(row.querySelector('.ped-cant').value) || 0;
     m.precio = parseFloat(row.querySelector('.ped-precio').value) || 0;
-    [...row.querySelectorAll('.ped-color-sel')].forEach((sel, ci) => { if (m.colores[ci]) m.colores[ci].n = sel.value; });
-    [...row.querySelectorAll('.ped-cel')].forEach(cel => { const ci = +cel.dataset.c, ti = +cel.dataset.t; if (m.colores[ci]) m.colores[ci].q[ti] = parseInt(cel.value) || 0; });
   });
 }
 function pedRecalc() {
   pedSync();
-  pedPanel.querySelectorAll('.ped-mod').forEach((row, mi) => { const st = row.querySelector('.ped-subt'); if (st) st.textContent = pedTotalModelo(pedBuilder.modelos[mi]).toLocaleString('es-MX') + ' pz'; row.querySelectorAll('.ped-rowtot').forEach((el, ci) => { if (pedBuilder.modelos[mi].colores[ci]) el.textContent = pedBuilder.modelos[mi].colores[ci].q.reduce((a, b) => a + (+b || 0), 0); }); });
-  const ft = pedPanel.querySelector('#pedFootTot'); if (ft) { const tp = pedBuilder.modelos.reduce((s, m) => s + pedTotalModelo(m), 0); const ti = pedBuilder.modelos.reduce((s, m) => s + pedTotalModelo(m) * m.precio, 0); ft.innerHTML = `${pedBuilder.modelos.length} modelo${pedBuilder.modelos.length > 1 ? 's' : ''} · ${tp.toLocaleString('es-MX')} pz · ${money(ti)}`; }
+  const ft = pedPanel.querySelector('#pedFootTot'); if (ft) { const tp = pedBuilder.modelos.reduce((s, m) => s + m.cant, 0); const ti = pedBuilder.modelos.reduce((s, m) => s + m.cant * m.precio, 0); ft.innerHTML = `${pedBuilder.modelos.length} modelo${pedBuilder.modelos.length > 1 ? 's' : ''} · ${tp.toLocaleString('es-MX')} pz · ${money(ti)}`; }
+  pedPanel.querySelectorAll('.ped-mod').forEach((row, mi) => { const im = row.querySelector('.ped-imp'); if (im) im.textContent = money((pedBuilder.modelos[mi].cant || 0) * (pedBuilder.modelos[mi].precio || 0)); });
 }
-function pedAddModelo() { pedSync(); pedBuilder.modelos.push(nuevoModeloPed()); renderPedBuilder(); }
+function pedAddModelo() { pedSync(); pedBuilder.modelos.push({ codigo: '', cant: 0, precio: 0 }); renderPedBuilder(); }
 function pedDelModelo(i) { pedSync(); pedBuilder.modelos.splice(i, 1); renderPedBuilder(); }
-function pedAddColor(mi) { pedSync(); pedBuilder.modelos[mi].colores.push({ n: COLORES_PED[0], q: pedBuilder.modelos[mi].tallas.map(() => 0) }); renderPedBuilder(); }
-function pedDelColor(mi, ci) { pedSync(); pedBuilder.modelos[mi].colores.splice(ci, 1); renderPedBuilder(); }
 function crearPedidoInterno() {
   pedSync();
-  const validos = pedBuilder.modelos.filter(m => m.codigo && pedTotalModelo(m) > 0);
-  if (!validos.length) { mostrarToast('Agrega al menos un modelo con número y cantidades en la matriz'); return; }
+  const validos = pedBuilder.modelos.filter(m => m.codigo && m.cant > 0);
+  if (!validos.length) { mostrarToast('Agrega al menos un modelo con número y cantidad'); return; }
   const folio = nextFolioPed();
   const emp = pedBuilder.empresa === 'Marilyn Fitness' ? 'MF' : 'FR';
-  let ordN = parseInt(nextOrdPed(), 10) || 5500;
-  const modelos = validos.map(m => {
-    const ord = String(ordN++); const cant = pedTotalModelo(m);
-    generarRutaRC(ord, m.codigo, pedBuilder.cliente, pedBuilder.fecha || 'julio');
-    return { modelo: m.codigo, cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord, corte: 0, matriz: { tallas: m.tallas, colores: JSON.parse(JSON.stringify(m.colores)) } };
-  });
+  const modelos = validos.map(m => ({ modelo: m.codigo, cant: m.cant, precio: m.precio, fecha: pedBuilder.fecha || 'jul', ord: '', corte: 0 }));
   PEDIDOS_MES.unshift({ folio, cliente: pedBuilder.cliente, empresa: emp, vig: (pedBuilder.fecha || 'jul') + ' → ' + (pedBuilder.fecha || 'jul'), estatus: 'Vigente', modelos });
   cerrarPed(); ir('pedidos');
-  mostrarToast('Pedido ' + folio + ' creado · ' + modelos.length + ' OP' + (modelos.length > 1 ? 's' : '') + ' generada' + (modelos.length > 1 ? 's' : '') + ' con matriz color×talla + su Ruta Crítica');
+  mostrarToast('Pedido ' + folio + ' creado · genera la OP de cada modelo con el botón "Generar OP"');
 }
 function renderPedBuilder() {
   const b = pedBuilder;
@@ -1899,7 +1896,7 @@ function renderPedBuilder() {
   <div class="proc-head">
     <span class="ph-hero">PI</span>
     <div style="flex:1;min-width:0"><h2>Nuevo pedido interno</h2>
-      <div class="ph-meta"><span>Folio automático al crear</span><span>cada modelo → una OP con su matriz color×talla</span></div>
+      <div class="ph-meta"><span>Folio automático al crear</span><span>de cada modelo se genera su OP</span></div>
     </div>
     <button class="icon-btn" onclick="cerrarPed()" title="Cerrar (esc)">${icXsvg}</button>
   </div>
@@ -1911,37 +1908,93 @@ function renderPedBuilder() {
         <label><span class="ffk">Empresa</span><select class="pc-in" id="pedEmpresa">${['FR Moda', 'Marilyn Fitness'].map(e => `<option${b.empresa === e ? ' selected' : ''}>${e}</option>`).join('')}</select></label>
         <label><span class="ffk">Fecha de entrega</span><input class="pc-in" id="pedFecha" value="${b.fecha}" placeholder="15 jul"></label>
       </div>
-      <div class="pc-hint-cell" style="margin-top:8px">La OP <b>nace de este pedido</b>: cada modelo genera su propia orden de producción con su <b>matriz color×talla</b> (D4). El nº de modelo lo <b>liga a su desarrollo/pre-costeo</b> (Etapa 2) y de ahí hereda BOM, telas, avíos y costo.</div>
+      <div class="pc-hint-cell" style="margin-top:8px">El pedido lleva los <b>modelos con su cantidad y precio</b>. La <b>matriz color×talla NACE en la OP</b>: al crear el pedido, cada modelo trae un botón <b>"Generar OP"</b> donde se captura. El nº de modelo lo <b>liga a su desarrollo/pre-costeo</b> (Etapa 2).</div>
     </div>
-    ${b.modelos.map((m, mi) => `<div class="pc-sec ped-mod">
-      <h4>Modelo ${mi + 1} <span class="hint ped-subt">${pedTotalModelo(m).toLocaleString('es-MX')} pz</span></h4>
-      <div class="pc-fields">
-        <label><span class="ffk">Nº de modelo (nuestro)</span><input class="pc-in mono ped-cod" value="${m.codigo}" placeholder="62190"></label>
-        <label><span class="ffk">Precio de venta ($)</span><input class="pc-in mono ped-precio" type="number" step="any" min="0" value="${m.precio || ''}" placeholder="148.00"></label>
-        <label style="align-self:flex-end">${b.modelos.length > 1 ? `<button class="btn ghost sm" onclick="pedDelModelo(${mi})">${icXsvg}Quitar modelo</button>` : ''}</label>
-      </div>
-      <div style="margin-top:10px;font-size:12px;color:var(--muted);margin-bottom:5px">Matriz color × talla <span style="color:var(--faint)">(la cantidad del modelo = suma de la matriz → alimenta la OP)</span></div>
-      <div class="table-wrap"><table class="data" style="font-size:12.5px"><thead><tr><th>Color</th>${m.tallas.map(t => `<th class="r">${t}</th>`).join('')}<th class="r">Total</th><th></th></tr></thead><tbody>
-        ${m.colores.map((c, ci) => `<tr>
-          <td><select class="pc-in ped-color-sel" style="height:30px;padding:2px 6px;min-width:118px">${COLORES_PED.map(x => `<option${c.n === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
-          ${c.q.map((q, ti) => `<td class="r"><input class="pc-in mono ped-cel" data-c="${ci}" data-t="${ti}" type="number" min="0" value="${q || ''}" style="width:54px;text-align:right;padding:3px 5px" placeholder="0"></td>`).join('')}
-          <td class="r num"><b class="ped-rowtot">${c.q.reduce((a, b2) => a + (+b2 || 0), 0)}</b></td>
-          <td class="r">${m.colores.length > 1 ? `<button class="dg-x" onclick="pedDelColor(${mi},${ci})" title="Quitar color">✕</button>` : ''}</td>
+    <div class="pc-sec">
+      <h4>Modelos del pedido</h4>
+      <div class="table-wrap"><table class="data"><thead><tr><th>Nº de modelo (nuestro)</th><th class="r">Cantidad</th><th class="r">Precio venta</th><th class="r">Importe</th><th></th></tr></thead><tbody>
+        ${b.modelos.map((m, mi) => `<tr class="ped-mod">
+          <td><input class="pc-in mono ped-cod" value="${m.codigo}" placeholder="62190" style="min-width:130px"></td>
+          <td class="r"><input class="pc-in mono ped-cant" type="number" min="0" value="${m.cant || ''}" placeholder="0" style="width:100px;text-align:right"></td>
+          <td class="r"><input class="pc-in mono ped-precio" type="number" step="any" min="0" value="${m.precio || ''}" placeholder="148.00" style="width:100px;text-align:right"></td>
+          <td class="r mono ped-imp">${money((m.cant || 0) * (m.precio || 0))}</td>
+          <td class="r">${b.modelos.length > 1 ? `<button class="dg-x" onclick="pedDelModelo(${mi})" title="Quitar">✕</button>` : ''}</td>
         </tr>`).join('')}
       </tbody></table></div>
-      <button class="btn ghost sm" onclick="pedAddColor(${mi})" style="margin-top:7px">${IC.plus}Agregar color</button>
-    </div>`).join('')}
-    <button class="btn ghost" onclick="pedAddModelo()">${IC.plus}Agregar modelo</button>
+      <button class="btn ghost sm" onclick="pedAddModelo()" style="margin-top:8px">${IC.plus}Agregar modelo</button>
+    </div>
   </div>
   <div class="nota-foot">
     <div class="nota-tot" id="pedFootTot">${b.modelos.length} modelos</div>
-    <div style="display:flex;gap:8px"><button class="btn ghost" onclick="cerrarPed()">Cancelar</button><button class="btn primary" onclick="crearPedidoInterno()">${IC.check}Crear pedido y generar OPs</button></div>
+    <div style="display:flex;gap:8px"><button class="btn ghost" onclick="cerrarPed()">Cancelar</button><button class="btn primary" onclick="crearPedidoInterno()">${IC.check}Crear pedido interno</button></div>
   </div>`;
   pedPanel.oninput = pedRecalc; pedPanel.onchange = pedRecalc;
   pedRecalc();
 }
 pedScrim.onclick = (e) => { if (e.target === pedScrim) cerrarPed(); };
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && pedScrim.classList.contains('show')) cerrarPed(); });
+/* --- Generar OP desde un modelo del pedido: aquí NACE la matriz color×talla --- */
+function abrirGenerarOP(fi, mi) {
+  const m = PEDIDOS_MES[fi].modelos[mi];
+  opGen = { fi, mi, codigo: m.modelo, cliente: PEDIDOS_MES[fi].cliente, cant: m.cant, fecha: m.fecha, tallas: [...TALLAS_PED], colores: [{ n: COLORES_PED[0], q: TALLAS_PED.map(() => 0) }] };
+  renderOpGen(); opScrim.classList.add('show');
+}
+function cerrarOp() { opScrim.classList.remove('show'); }
+const opTotal = () => (opGen.colores || []).reduce((s, c) => s + c.q.reduce((a, b) => a + (+b || 0), 0), 0);
+function opSync() {
+  const p = opPanel; if (!p.querySelector('.op-cel')) return;
+  [...p.querySelectorAll('.op-color-sel')].forEach((sel, ci) => { if (opGen.colores[ci]) opGen.colores[ci].n = sel.value; });
+  [...p.querySelectorAll('.op-cel')].forEach(cel => { const ci = +cel.dataset.c, ti = +cel.dataset.t; if (opGen.colores[ci]) opGen.colores[ci].q[ti] = parseInt(cel.value) || 0; });
+}
+function opRecalc() {
+  opSync();
+  opPanel.querySelectorAll('.op-rowtot').forEach((el, ci) => { if (opGen.colores[ci]) el.textContent = opGen.colores[ci].q.reduce((a, b) => a + (+b || 0), 0); });
+  const tot = opTotal(), cap = opPanel.querySelector('#opCap');
+  if (cap) { const diff = tot - opGen.cant; cap.innerHTML = `Capturado <b class="mono">${tot.toLocaleString('es-MX')}</b> / ${opGen.cant.toLocaleString('es-MX')} pz ${diff === 0 ? '<span class="badge ok" style="font-size:10px"><span class="d"></span>cuadra</span>' : `<span class="badge ${diff > 0 ? 'crit' : 'warn'}" style="font-size:10px"><span class="d"></span>${diff > 0 ? 'sobran ' + diff : 'faltan ' + (-diff)}</span>`}`; }
+}
+function opAddColor() { opSync(); opGen.colores.push({ n: COLORES_PED[0], q: opGen.tallas.map(() => 0) }); renderOpGen(); }
+function opDelColor(ci) { opSync(); opGen.colores.splice(ci, 1); renderOpGen(); }
+function confirmarGenerarOP() {
+  opSync();
+  if (opTotal() === 0) { mostrarToast('Captura las cantidades por color y talla'); return; }
+  const ord = String(parseInt(nextOrdPed(), 10) || 5500);
+  const m = PEDIDOS_MES[opGen.fi].modelos[opGen.mi];
+  m.ord = ord; m.cant = opTotal(); m.matriz = { tallas: opGen.tallas, colores: JSON.parse(JSON.stringify(opGen.colores)) };
+  generarRutaRC(ord, opGen.codigo, opGen.cliente, opGen.fecha || 'julio');
+  cerrarOp(); ir('pedidos');
+  mostrarToast('OP ' + ord + ' generada · matriz color×talla capturada + Ruta Crítica programada sola');
+}
+function renderOpGen() {
+  const g = opGen;
+  opPanel.innerHTML = `
+  <div class="proc-head">
+    <span class="ph-hero">OP</span>
+    <div style="flex:1;min-width:0"><h2>Generar OP · Modelo ${g.codigo}</h2>
+      <div class="ph-meta"><span>${g.cliente}</span><span>Pedido interno ${PEDIDOS_MES[g.fi].folio}</span></div>
+    </div>
+    <button class="icon-btn" onclick="cerrarOp()" title="Cerrar (esc)">${icXsvg}</button>
+  </div>
+  <div class="proc-body">
+    <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>La <b>matriz color×talla nace aquí</b>, en la OP. Distribuye la cantidad del pedido (<b>${g.cant.toLocaleString('es-MX')} pz</b>) por color y talla. Al generar, la OP hereda el <b>desarrollo</b> del modelo (BOM/telas/avíos) y se le programa su <b>Ruta Crítica</b> sola.</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr><th>Color</th>${g.tallas.map(t => `<th class="r">${t}</th>`).join('')}<th class="r">Total</th><th></th></tr></thead><tbody>
+      ${g.colores.map((c, ci) => `<tr>
+        <td><select class="pc-in op-color-sel" style="height:30px;padding:2px 6px;min-width:118px">${COLORES_PED.map(x => `<option${c.n === x ? ' selected' : ''}>${x}</option>`).join('')}</select></td>
+        ${c.q.map((q, ti) => `<td class="r"><input class="pc-in mono op-cel" data-c="${ci}" data-t="${ti}" type="number" min="0" value="${q || ''}" style="width:56px;text-align:right;padding:3px 5px" placeholder="0"></td>`).join('')}
+        <td class="r num"><b class="op-rowtot">${c.q.reduce((a, b2) => a + (+b2 || 0), 0)}</b></td>
+        <td class="r">${g.colores.length > 1 ? `<button class="dg-x" onclick="opDelColor(${ci})" title="Quitar color">✕</button>` : ''}</td>
+      </tr>`).join('')}
+    </tbody></table></div>
+    <button class="btn ghost sm" onclick="opAddColor()" style="margin-top:8px">${IC.plus}Agregar color</button>
+  </div>
+  <div class="nota-foot">
+    <div class="nota-tot" id="opCap"></div>
+    <div style="display:flex;gap:8px"><button class="btn ghost" onclick="cerrarOp()">Cancelar</button><button class="btn primary" onclick="confirmarGenerarOP()">${IC.check}Generar OP</button></div>
+  </div>`;
+  opPanel.oninput = opRecalc; opPanel.onchange = opRecalc;
+  opRecalc();
+}
+opScrim.onclick = (e) => { if (e.target === opScrim) cerrarOp(); };
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && opScrim.classList.contains('show')) cerrarOp(); });
 function vPedidos() {
   let totPed=0, totImp=0, totCorte=0, totOrd=0;
   PEDIDOS_MES.forEach(p => p.modelos.forEach(m => { totPed+=m.cant; totImp+=m.cant*m.precio; totCorte+=m.corte; totOrd++; }));
@@ -1993,7 +2046,7 @@ function vPedidos() {
           ${p.modelos.map((m,j)=>{ const [bc,bt]=corteBadge(m.corte,m.cant); return `<tr class="sub" data-ped="${i}" data-mod="${j}">
             <td><span class="sub-mod mono">${m.modelo}</span></td>
             <td></td><td></td>
-            <td class="cell-code">${m.ord}</td>
+            <td class="cell-code">${m.ord ? m.ord : `<button class="btn ghost sm" onclick="event.stopPropagation();abrirGenerarOP(${i},${j})">${IC.plus}Generar OP</button>`}</td>
             <td class="r num">${m.cant.toLocaleString('es-MX')}</td>
             <td class="r mono">$${m.precio.toFixed(2)}</td>
             <td class="r mono">${money(m.cant*m.precio)}</td>
