@@ -2164,6 +2164,19 @@ function procDelAntes(i, ai) {
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
 let rcPersona = 'Laura Hernández';
 let rcAgrupar = 'urgencia';
+/* La Ruta Crítica se genera SOLA al dar de alta la orden de producción (no hay
+   botón manual): se arma hacia atrás desde la entrega con los procesos del catálogo. */
+function generarRutaRC(orden, modelo, cliente, entrega) {
+  RUTAS.unshift({ orden, modelo, cliente, entrega: entrega || hoyStr(), proc: [
+    { p: 'Compra de tela',       r: 'Miguel Torres',   f: '—', e: 'hoy',     d: 0 },
+    { p: 'Corte',                r: 'Laura Hernández', f: '—', e: 'proximo', d: 2 },
+    { p: 'Envío a maquila',      r: 'Laura Hernández', f: '—', e: 'proximo', d: 3 },
+    { p: 'Maquila (costura)',    r: 'Laura Hernández', f: '—', e: 'proximo', d: 5 },
+    { p: 'Recibo de maquila',    r: 'Laura Hernández', f: '—', e: 'proximo', d: 6 },
+    { p: 'Auditoría de calidad', r: 'Carlos Vega',     f: '—', e: 'proximo', d: 7 },
+    { p: 'Entrega a cliente',    r: 'Sofía Ramírez',   f: entrega || '—', e: 'proximo', d: 8 },
+  ] });
+}
 function gruposPorProceso(P) {
   const m = {};
   P.forEach(t => (m[t.p] = m[t.p] || []).push(t));
@@ -2210,7 +2223,7 @@ function vRc() {
   return `
   <div class="page-head">
     <div><h1>Mis pendientes</h1><div class="sub">Tu guía diaria de Ruta Crítica · hoy <b>6 jul 2026</b> · una orden pasa por varios procesos; aquí ves los que te tocan a ti</div></div>
-    <div class="actions"><button class="btn ghost">${IC.printer}Mi día (PDF)</button><button class="btn primary" data-add="rc">${IC.plus}Programar RC</button></div>
+    <div class="actions"><button class="btn ghost">${IC.printer}Mi día (PDF)</button></div>
   </div>
   <div class="banner">${IC.usuarios}<span>Viendo pendientes de: <select class="minisel" style="margin:0 4px" onchange="rcPersona=this.value;ir('rc')">${RC_PERSONAS.map(p => `<option${p === rcPersona ? ' selected' : ''}>${p}</option>`).join('')}</select> — cada quien ve solo los suyos; como admin puedes revisar los de cualquiera. Una persona puede ser responsable de <b>varios procesos</b>.</span></div>
   <div class="kpis">
@@ -4629,7 +4642,7 @@ const FORMS = {
     },
   },
   ordenes: {
-    titulo: 'Nueva orden de producción', vista: 'ordenes', exito: 'Orden creada',
+    titulo: 'Nueva orden de producción', vista: 'ordenes', exito: 'Orden creada · su Ruta Crítica se programó sola',
     campos: [
       { k:'modelo', l:'Modelo (código)', t:'text', ph:'62190', req:true, col:2 },
       { k:'cliente', l:'Cliente', t:'select', op:CLIENTES },
@@ -4640,8 +4653,10 @@ const FORMS = {
       { k:'precio', l:'Precio de venta ($)', t:'number', ph:'0.00', col:2 },
     ],
     crear: (v) => {
-      OP.unshift({ emp:(v.empresa==='Marilyn Fitness'?'MF':'FR'), op:nextOpNum(), modelo:v.modelo, ref:v.ref||'—', ord:nums(v.piezas), corte:0, maq:'', nmaq:0, est:'', ped:String(1500+PEDIDOS_MES.length), oc:'', mes:v.mes||'julio', cli:v.cliente, pVta:dec(v.precio)||148, tela:'Felpa' });
+      const opNum = nextOpNum();
+      OP.unshift({ emp:(v.empresa==='Marilyn Fitness'?'MF':'FR'), op:opNum, modelo:v.modelo, ref:v.ref||'—', ord:nums(v.piezas), corte:0, maq:'', nmaq:0, est:'', ped:String(1500+PEDIDOS_MES.length), oc:'', mes:v.mes||'julio', cli:v.cliente, pVta:dec(v.precio)||148, tela:'Felpa' });
       opSel = 0;
+      generarRutaRC(opNum, v.modelo, v.cliente, v.mes || 'julio');
     },
   },
   produccion: {
@@ -4653,24 +4668,6 @@ const FORMS = {
       { k:'maquilero', l:'Maquilero destino', t:'text', ph:'Confecciones León' },
     ],
     crear: (v) => PROD.unshift([ v.orden, v.modelo, nums(v.cortado), 0, 0, v.maquilero||'—', 'warn', 'Corte' ]),
-  },
-  rc: {
-    titulo: 'Programar Ruta Crítica', vista: 'rc', exito: 'Ruta programada',
-    campos: [
-      { k:'orden', l:'Orden', t:'select', op:()=>OP.map(o=>o.op), req:true },
-      { k:'modelo', l:'Modelo', t:'select', op:opModelos },
-      { k:'cliente', l:'Cliente', t:'select', op:CLIENTES },
-      { k:'compromiso', l:'Entrega comprometida', t:'text', ph:'12 jul' },
-    ],
-    crear: (v) => RUTAS.unshift({ orden: v.orden, modelo: v.modelo, cliente: v.cliente, entrega: v.compromiso || hoyStr(), proc: [
-      { p:'Compra de tela',       r:'Miguel Torres',   f:'—', e:'hoy',     d:0 },
-      { p:'Corte',                r:'Laura Hernández', f:'—', e:'proximo', d:2 },
-      { p:'Envío a maquila',      r:'Laura Hernández', f:'—', e:'proximo', d:3 },
-      { p:'Maquila (costura)',    r:'Laura Hernández', f:'—', e:'proximo', d:5 },
-      { p:'Recibo de maquila',    r:'Laura Hernández', f:'—', e:'proximo', d:6 },
-      { p:'Auditoría de calidad', r:'Carlos Vega',     f:'—', e:'proximo', d:7 },
-      { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:v.compromiso||'—', e:'proximo', d:8 },
-    ] }),
   },
   inventarios: {
     titulo: 'Movimiento de inventario PT', vista: 'inventarios', exito: 'Movimiento registrado',
