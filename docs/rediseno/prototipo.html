@@ -2037,43 +2037,50 @@ const RUTAS = [
   ]},
 ];
 /* Catálogo de procesos de la Ruta Crítica (ProcesoDef de F5): responsable por
-   default + auto-completado por evento del sistema + TIEMPO por operación con
-   variación por DIFICULTAD (1-6) + variables (depende de catálogo / condicional).
-   Configurable: se agregan/quitan procesos y se asignan responsables. Los tiempos
-   alimentan el cálculo de la ruta HACIA ATRÁS (CPM). t = [d1..d6] días por dificultad. */
-const DIF_LBL = ['Sencillo 1/6', 'Sencillo+ 2/6', 'Medio 3/6', 'Medio+ 4/6', 'Difícil 5/6', 'Difícil+ 6/6'];
+   default + auto-completado por evento del sistema + TIEMPO por operación + variables
+   (depende de catálogo / condicional). Configurable: se agregan/quitan procesos y se
+   asignan responsables. Los tiempos alimentan la ruta HACIA ATRÁS (CPM).
+   La COSTURA no lleva tiempo fijo: sale de TABLA_DIF (rangos de # de operaciones). */
 const PROCESOS_CAT = [
-  { n:1,  p:'Revisión de orden de producción', area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Liberar la OP (Producción)',              t:[1,1,1,1,1,1] },
-  { n:3,  p:'Programación',                    area:'Producción', resp:'Laura Hernández', auto:false, evento:'Se programa a mano',                      t:[1,1,1,1,1,1] },
-  { n:4,  p:'Autorización de fit',             area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar autorización de fit',           t:[15,15,15,15,15,15] },
-  { n:5,  p:'Autorización de arte',            area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar arte autorizado',               t:[2,2,2,2,2,2], condicional:'Solo si la prenda lleva estampado o bordado' },
-  { n:6,  p:'Compra de tela',                  area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Crear orden de compra de tela',           t:[2,2,2,2,2,2] },
-  { n:7,  p:'Autorización tono de tela',       area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar tono autorizado',               t:[15,15,15,15,15,15] },
-  { n:8,  p:'Autorización de avíos',           area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar avíos autorizados',             t:[12,12,12,12,12,12] },
-  { n:9,  p:'Surtido de avíos',                area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Nota de salida de avíos',                 t:[12,12,12,12,12,12] },
-  { n:10, p:'Recepción de tela',               area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras)',         t:[20,20,20,20,20,20], depende:'Velocidad de recepción', dependeEj:'Local 5 d · Nacional 12 d · Importada 30 d', dependeNota:'Depende de qué tan rápido llega la tela (no del material). Catálogo pendiente de Daniel.' },
-  { n:11, p:'Auditoría de corte',              area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría de corte',            t:[3,3,3,3,3,3] },
-  { n:12, p:'Corte',                           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar corte (Avance de producción)',  t:[3,3,3,3,3,3] },
-  { n:13, p:'Envío a procesos (estampado/bordado)', area:'Producción', resp:'Laura Hernández', auto:true, evento:'Envío a estampado (Avance)',        t:[1,1,1,1,1,1], condicional:'Solo si la prenda lleva estampado o bordado' },
-  { n:14, p:'Recepción de procesos',           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de estampado (Avance)',            t:[5,5,5,5,5,5], condicional:'Solo si la prenda lleva estampado o bordado' },
-  { n:15, p:'Envío a maquila',                 area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Envío a maquila (Avance)',                t:[1,1,1,1,1,1] },
-  { n:16, p:'Maquila (costura)',               area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance)',              t:[6,8,10,13,16,20] },
-  { n:17, p:'Recibo de maquila',               area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance)',              t:[3,3,3,3,3,3] },
-  { n:18, p:'Auditoría de calidad',            area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría AQL',                 t:[2,2,2,2,2,2] },
-  { n:19, p:'Empaque',                         area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar empaque',                       t:[5,6,7,8,9,10] },
-  { n:20, p:'Entrega a cliente (CEDIS)',       area:'Ventas',     resp:'Sofía Ramírez',   auto:true,  evento:'Entrega a cliente (Almacén)',             t:[5,5,5,5,5,5] },
-  { n:21, p:'Aceptación de cliente',           area:'Ventas',     resp:'Sofía Ramírez',   auto:false, evento:'Confirma el cliente',                     t:[3,3,3,3,3,3] },
+  { n:1,  p:'Revisión de orden de producción', area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Liberar la OP (Producción)',              dias:1 },
+  { n:2,  p:'Programación',                    area:'Producción', resp:'Laura Hernández', auto:false, evento:'Se programa a mano',                      dias:1 },
+  { n:3,  p:'Autorización de fit',             area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar autorización de fit',           dias:15 },
+  { n:4,  p:'Autorización de arte',            area:'Desarrollo', resp:'Gabriel Masri',   auto:true,  evento:'Registrar arte autorizado',               dias:2, condicional:'Solo si la prenda lleva estampado o bordado' },
+  { n:5,  p:'Compra de tela',                  area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Crear orden de compra de tela',           dias:2 },
+  { n:6,  p:'Autorización tono de tela',       area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar tono autorizado',               dias:15 },
+  { n:7,  p:'Autorización de avíos',           area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Registrar avíos autorizados',             dias:12 },
+  { n:8,  p:'Surtido de avíos',                area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Nota de salida de avíos',                 dias:12 },
+  { n:9,  p:'Recepción de tela',               area:'Compras',    resp:'Miguel Torres',   auto:true,  evento:'Recepción de material (Compras)',         depende:'Velocidad de recepción', dependeEj:'Local 5 d · Nacional 12 d · Importada 30 d', dependeNota:'Depende de qué tan rápido llega la tela (no del material). Catálogo pendiente de Daniel.' },
+  { n:10, p:'Auditoría de corte',              area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría de corte',            dias:3 },
+  { n:11, p:'Corte',                           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar corte (Avance de producción)',  dias:3 },
+  { n:12, p:'Envío a procesos (estampado/bordado)', area:'Producción', resp:'Laura Hernández', auto:true, evento:'Envío a estampado (Avance)',        dias:1, condicional:'Solo si la prenda lleva estampado o bordado' },
+  { n:13, p:'Recepción de procesos',           area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de estampado (Avance)',            dias:5, condicional:'Solo si la prenda lleva estampado o bordado' },
+  { n:14, p:'Envío a maquila',                 area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Envío a maquila (Avance)',                dias:1 },
+  { n:15, p:'Maquila (costura)',               area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance)',              tablaOps:true, depende:'# de operaciones' },
+  { n:16, p:'Recibo de maquila',               area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Recibo de maquila (Avance)',              dias:3 },
+  { n:17, p:'Auditoría de calidad',            area:'Calidad',    resp:'Carlos Vega',     auto:true,  evento:'Registrar auditoría AQL',                 dias:2 },
+  { n:18, p:'Empaque',                         area:'Producción', resp:'Laura Hernández', auto:true,  evento:'Registrar empaque',                       dias:5 },
+  { n:19, p:'Entrega a cliente (CEDIS)',       area:'Ventas',     resp:'Sofía Ramírez',   auto:true,  evento:'Entrega a cliente (Almacén)',             dias:5 },
+  { n:20, p:'Aceptación de cliente',           area:'Ventas',     resp:'Sofía Ramírez',   auto:false, evento:'Confirma el cliente',                     dias:3 },
 ];
-const procCat = (nombre) => PROCESOS_CAT.find(x => x.p === nombre) || { p: nombre, auto: true, evento: 'Avance de producción', resp: '—', t:[1,1,1,1,1,1] };
-const tRange = (t) => { const a = t || [1]; return { min: Math.min(...a), max: Math.max(...a), vary: Math.min(...a) !== Math.max(...a) }; };
-/* Dificultad DERIVADA del # de operaciones de la prenda (dato real del desarrollo).
-   Umbrales de ejemplo (Daniel definirá los reales). La costura se toma de la banda. */
-const OPS_UMBRALES = [8, 14, 20, 28, 38]; // ≤8→1/6 · ≤14→2/6 · ≤20→3/6 · ≤28→4/6 · ≤38→5/6 · >38→6/6
-function dificultadDeOps(ops) { ops = ops || 0; for (let i = 0; i < OPS_UMBRALES.length; i++) if (ops <= OPS_UMBRALES[i]) return i + 1; return 6; }
+const procCat = (nombre) => PROCESOS_CAT.find(x => x.p === nombre) || { p: nombre, auto: true, evento: 'Avance de producción', resp: '—', dias:1 };
+/* TABLA DE DIFICULTAD (configurable): rangos de # de operaciones → nombre de dificultad
+   + tiempo de costura (días). NO es una escala fija 1-6: Daniel define cuántos niveles,
+   sus rangos, nombres y tiempos. El # de operaciones se captura en el desarrollo del modelo. */
+let TABLA_DIF = [
+  { min:1,  max:8,   nombre:'Muy sencillo', costura:6 },
+  { min:9,  max:14,  nombre:'Sencillo',     costura:8 },
+  { min:15, max:22,  nombre:'Medio',        costura:11 },
+  { min:23, max:32,  nombre:'Complejo',     costura:15 },
+  { min:33, max:999, nombre:'Muy complejo', costura:20 },
+];
+const filaDif = (ops) => TABLA_DIF.find(r => ops >= r.min && ops <= r.max) || null;
+const costuraDias = (ops) => { const f = filaDif(ops); return f ? f.costura : 0; };
 function difDerivadaHTML(ops) {
   if (!ops) return '<span style="color:var(--faint)">Captura el # de operaciones para derivar la dificultad.</span>';
-  const d = dificultadDeOps(ops); const cost = (procCat('Maquila (costura)').t || [])[d - 1] || 0;
-  return `→ Dificultad <span class="badge ${d >= 5 ? 'crit' : d >= 3 ? 'warn' : 'ok'}" style="font-size:10px"><span class="d"></span>${DIF_LBL[d - 1]}</span> · tiempo de costura ≈ <b>${cost} d</b>`;
+  const f = filaDif(ops);
+  if (!f) return `<span style="color:var(--faint)">No hay rango en la tabla para ${ops} operaciones.</span>`;
+  return `→ Dificultad <span class="badge warn" style="font-size:10px"><span class="d"></span>${f.nombre}</span> · tiempo de costura ≈ <b>${f.costura} d</b>`;
 }
 let procExpand = new Set();
 function toggleProcExp(i) { if (procExpand.has(i)) procExpand.delete(i); else procExpand.add(i); ir('rc-procesos'); }
@@ -2180,19 +2187,15 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape' && rutaScrim.classLi
 function vProcesosRC() {
   const areaCls = { 'Producción': 'info', 'Compras': 'warn', 'Calidad': 'crit', 'Ventas': 'ok', 'Desarrollo': 'neutral' };
   const nAuto = PROCESOS_CAT.filter(x => x.auto).length;
-  const tiempoCell = (x) => {
-    if (x.depende) return `<span class="badge info" style="font-size:10px"><span class="d"></span>variable</span> <span style="color:var(--muted);font-size:11px">según ${x.depende}</span>`;
-    const r = tRange(x.t);
-    return r.vary
-      ? `<b class="mono">${r.min}–${r.max}</b> <span style="color:var(--muted);font-size:11px">d · por dif.</span>`
-      : `<b class="mono">${r.min}</b> <span style="color:var(--muted);font-size:11px">d</span>`;
-  };
+  const tiempoCell = (x) => x.depende
+    ? `<span class="badge info" style="font-size:10px"><span class="d"></span>variable</span> <span style="color:var(--muted);font-size:11px">según ${x.depende}</span>`
+    : `<b class="mono">${x.dias}</b> <span style="color:var(--muted);font-size:11px">d</span>`;
   return `
   <div class="page-head">
-    <div><h1>Procesos y responsables</h1><div class="sub">Catálogo de procesos de la Ruta Crítica · responsable · tiempo por operación (varía por dificultad 1-6) · variables · auto-completado</div></div>
+    <div><h1>Procesos y responsables</h1><div class="sub">Catálogo de procesos de la Ruta Crítica · responsable · tiempo por operación (la costura, por # de operaciones) · variables · auto-completado</div></div>
     <div class="actions"><button class="btn primary" onclick="mostrarToast('Nuevo proceso — demo')">${IC.plus}Nuevo proceso</button></div>
   </div>
-  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se <b>agregan o quitan</b>. Cada proceso tiene su <b>responsable</b> y su <b>tiempo</b>, que puede variar por la <b>dificultad de la prenda (1-6, que se DERIVA del # de operaciones definido en el desarrollo del modelo → impacta sobre todo la costura)</b> o depender de un catálogo (ej. <b>velocidad de recepción de la tela</b>). Los tiempos alimentan la ruta <b>hacia atrás</b>. Casi todos se marcan <b>solos</b>. Abre cada renglón (▸) para el detalle.</span></div>
+  <div class="banner">${IC.info}<span>La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se <b>agregan o quitan</b>. Cada proceso tiene su <b>responsable</b> y su <b>tiempo</b>, que puede variar por la <b>dificultad de la prenda (que se DERIVA del # de operaciones definido en el desarrollo del modelo → impacta sobre todo la costura, ver tabla abajo)</b> o depender de un catálogo (ej. <b>velocidad de recepción de la tela</b>). Los tiempos alimentan la ruta <b>hacia atrás</b>. Casi todos se marcan <b>solos</b>. Abre cada renglón (▸) para el detalle.</span></div>
   <div class="card">
     <div class="toolbar"><b>Secuencia de procesos</b><span class="count">${PROCESOS_CAT.length}</span><span class="tool-right" style="color:var(--muted);font-size:12px">${nAuto} automáticos · ${PROCESOS_CAT.length - nAuto} manuales</span></div>
     <div class="table-wrap"><table class="data"><thead><tr>
@@ -2210,16 +2213,18 @@ function vProcesosRC() {
           : `<span class="badge warn"><span class="d"></span>✋ Manual</span> <span style="color:var(--muted);font-size:12px">${x.evento}</span>`}</td>
       </tr>${exp ? `<tr class="lp-detrow"><td colspan="7"><div style="padding:6px 2px 10px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start">
         <div style="flex:0 0 480px;max-width:480px">
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">${x.depende ? 'Tiempo según la <b>' + x.depende + '</b>' : 'Tiempo por dificultad de la prenda (días)'}</div>
-          ${x.depende
-            ? `<div class="dg" style="max-width:460px"><div class="dg-row"><span>Depende de la <b>${x.depende}</b></span><b class="mono">${x.dependeEj}</b></div></div>${x.dependeNota ? `<div style="font-size:11.5px;color:var(--faint);margin-top:5px;max-width:460px">${x.dependeNota}</div>` : ''}`
-            : `<div style="display:flex;gap:6px;flex-wrap:wrap">${x.t.map((d, di) => `<div style="text-align:center;border:1px solid var(--border);border-radius:8px;padding:5px 10px;background:${tRange(x.t).vary ? 'var(--brand-soft)' : 'var(--panel-2)'}"><div style="font-size:10px;color:var(--faint)">${DIF_LBL[di]}</div><div class="mono" style="font-weight:700;font-size:14px">${d} d</div></div>`).join('')}</div>`}
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">${x.tablaOps ? 'Tiempo de <b>costura</b> según el # de operaciones (tabla de dificultad)' : x.depende ? 'Tiempo según la <b>' + x.depende + '</b>' : 'Tiempo fijo del proceso'}</div>
+          ${x.tablaOps
+            ? `<div class="dg" style="max-width:460px">${TABLA_DIF.map(r => `<div class="dg-row"><span>${r.max >= 999 ? r.min + '+' : r.min + '–' + r.max} oper. · <b>${r.nombre}</b></span><b class="mono">${r.costura} d</b></div>`).join('')}</div><div style="font-size:11.5px;color:var(--faint);margin-top:5px;max-width:460px">Se configura en la <b>tabla de dificultad</b> (abajo). El # de operaciones viene del desarrollo del modelo.</div>`
+            : x.depende
+              ? `<div class="dg" style="max-width:460px"><div class="dg-row"><span>Depende de la <b>${x.depende}</b></span><b class="mono">${x.dependeEj}</b></div></div>${x.dependeNota ? `<div style="font-size:11.5px;color:var(--faint);margin-top:5px;max-width:460px">${x.dependeNota}</div>` : ''}`
+              : `<div class="dg" style="max-width:300px"><div class="dg-row"><span>Tiempo fijo</span><b class="mono">${x.dias} d</b></div></div>`}
         </div>
         <div style="min-width:240px">
           <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Variables / reglas</div>
           <div style="font-size:12.5px;line-height:1.75">
             ${x.condicional ? `⚠ <b>Condicional:</b> ${x.condicional}<br>` : '✓ Aplica a todas las prendas<br>'}
-            ${x.depende ? `🔧 <b>Tiempo variable</b> según ${x.depende}<br>` : (tRange(x.t).vary ? '🔧 <b>Tiempo variable</b> por dificultad (1-6)<br>' : '⏱ Tiempo fijo<br>')}
+            ${x.tablaOps ? '🔧 <b>Tiempo variable</b> según # de operaciones (tabla)<br>' : x.depende ? `🔧 <b>Tiempo variable</b> según ${x.depende}<br>` : '⏱ Tiempo fijo<br>'}
             ${x.auto ? `⟳ <b>Automático</b> al registrar: ${x.evento}` : `✋ <b>Manual</b> — ${x.evento}`}
           </div>
           <div style="margin-top:9px;display:flex;gap:6px"><button class="btn ghost sm" onclick="mostrarToast('Editar tiempos — demo')">Editar tiempos</button><button class="btn ghost sm" onclick="mostrarToast('Asignar responsable — demo')">Responsable</button></div>
@@ -2227,7 +2232,21 @@ function vProcesosRC() {
       </div></td></tr>` : ''}`; }).join('')}
     </tbody></table></div>
   </div>
-  <div class="pc-hint-cell" style="margin-top:12px;max-width:970px">Basado en el catálogo real de Daniel (26 procesos con tiempo por operación y por dificultad 1-6). En el real (backend <b>F5</b>): <b>ProcesoDef</b> (roles N:M, antecesor/DAG, <b>duración por dificultad</b>) + reglas <b>condicionales</b> (¿lleva estampado/bordado?) + duración <b>dependiente de catálogo</b> (tipo de tela). Los tiempos alimentan el <b>CPM backward-pass</b> que ya calcula las fechas. El auto-completado sale del auto-avance por eventos.</div>`;
+  <div class="card" style="margin-top:14px">
+    <div class="toolbar"><b>Tabla de dificultad por # de operaciones</b><span class="count">${TABLA_DIF.length} rangos</span><button class="btn ghost sm" style="margin-left:auto" onclick="mostrarToast('Agregar rango — demo')">${IC.plus}Agregar rango</button></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th># de operaciones</th><th>Dificultad</th><th class="r">Tiempo de costura</th><th></th>
+    </tr></thead><tbody>
+      ${TABLA_DIF.map(r => `<tr>
+        <td class="mono">${r.min} – ${r.max >= 999 ? '∞' : r.max}</td>
+        <td class="cell-strong">${r.nombre}</td>
+        <td class="r mono">${r.costura} d</td>
+        <td class="r"><button class="btn ghost sm" onclick="mostrarToast('Editar rango — demo')">Editar</button></td>
+      </tr>`).join('')}
+    </tbody></table></div>
+    <div class="pc-hint-cell" style="margin-top:10px;max-width:940px">Esta tabla la <b>defines tú</b>: cuántos niveles, sus rangos de operaciones, nombres y el tiempo de costura de cada uno (<b>no</b> es una escala fija 1-6). El <b># de operaciones</b> de cada prenda se captura en el <b>desarrollo del modelo</b> y cae en uno de estos rangos → determina su dificultad y su tiempo de costura.</div>
+  </div>
+  <div class="pc-hint-cell" style="margin-top:12px;max-width:970px">Basado en el catálogo real de Daniel (Procesos_RC.xlsx). En el real (backend <b>F5</b>): <b>ProcesoDef</b> (roles N:M, antecesor/DAG, duración) + reglas <b>condicionales</b> (¿lleva estampado/bordado?) + duración <b>dependiente de catálogo</b> (velocidad de recepción) + <b>tabla de dificultad por operaciones</b> para la costura. Los tiempos alimentan el <b>CPM backward-pass</b> que ya calcula las fechas.</div>`;
 }
 
 /* ---- Inventario PT ---- */
@@ -3434,7 +3453,7 @@ function pcSync() {
   m.clienteNum = p.querySelector('#pcCliente').value.trim();
   m.estatus = p.querySelector('#pcEstatus').value;
   m.operaciones = parseInt(p.querySelector('#pcOperaciones').value) || 0;
-  m.dificultad = dificultadDeOps(m.operaciones);
+  m.dificultad = (filaDif(m.operaciones) || {}).nombre || '';
   m.telas = [...p.querySelectorAll('.pc-tela-row')].map(r => ({ nom: r.querySelector('.pc-tela-nom').value, prov: r.querySelector('.pc-tela-prov') ? r.querySelector('.pc-tela-prov').value : '', color: r.querySelector('.pc-tela-color') ? r.querySelector('.pc-tela-color').value : '', consumo: parseFloat(r.querySelector('.pc-tela-cons').value) || 0 }));
   m.maquilero = p.querySelector('#pcMaquilero').value;
   m.corte = parseFloat(p.querySelector('#pcCorte').value) || 0;
@@ -3502,7 +3521,7 @@ function renderModeloEditor() {
         <label><span class="ffk">Estatus</span><select class="pc-in" id="pcEstatus">${['borrador', 'proceso', 'completo', 'aprobado'].map(e => `<option value="${e}"${m.estatus === e ? ' selected' : ''}>${estModeloBadge(e)[1]}</option>`).join('')}</select></label>
         <label><span class="ffk"># de operaciones (costura)</span><input class="pc-in mono" id="pcOperaciones" type="number" step="1" min="0" value="${m.operaciones || ''}" placeholder="24"></label>
       </div>
-      <div class="pc-hint-cell" style="margin-top:8px">La <b>dificultad NO se teclea a mano</b>: sale del <b># de operaciones</b> de la prenda (dato real del desarrollo). Con ese número se <b>deriva la dificultad (1-6)</b> y de ahí los <b>tiempos</b> — sobre todo el de <b>costura</b>. <span id="pcDifDerivada">${difDerivadaHTML(m.operaciones || 0)}</span></div>
+      <div class="pc-hint-cell" style="margin-top:8px">La <b>dificultad NO se teclea a mano</b>: sale del <b># de operaciones</b> de la prenda (dato real del desarrollo). Con ese número se <b>deriva la dificultad</b> (según la tabla de rangos, configurable) y de ahí los <b>tiempos</b> — sobre todo el de <b>costura</b>. <span id="pcDifDerivada">${difDerivadaHTML(m.operaciones || 0)}</span></div>
     </div>
 
     <div class="pc-sec">
