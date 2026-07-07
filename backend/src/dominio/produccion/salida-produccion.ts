@@ -40,7 +40,7 @@ import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion
 import { validarEntrada } from '../../comun/validacion.js';
 import { ligarOrdenNucleo } from '../desarrollo/liga-orden.js';
 
-import { crearOrden, sincronizarReferencias, validarReferencias } from './ordenes.js';
+import { crearOrden, obtenerOrden, sincronizarReferencias, validarReferencias } from './ordenes.js';
 
 /**
  * MINTEA (o reusa) el nº interno de producción del modelo, de forma ATÓMICA: el UPDATE condicional
@@ -133,9 +133,14 @@ export async function salidaAProduccion(
     );
 
     // 2) Referencias del cliente (D7), si vienen: helpers compartidos con `guardarReferenciasOrden`.
+    let ordenSalida = orden;
     if (datos.referencias !== undefined && datos.referencias.length > 0) {
       await validarReferencias(tx, orden.idCliente, datos.referencias);
       await sincronizarReferencias(tx, sesion, orden.id, datos.referencias);
+      // La salida de `crearOrden` se LEYÓ antes de escribir las referencias (fallo del CI): se
+      // relee EN LA MISMA tx para que la respuesta las traiga (la promesa de B4 es "refs D7 en la
+      // misma operación", también en el payload que consume la UI).
+      ordenSalida = await obtenerOrden(sesion, orden.id, { tx });
     }
 
     // 3) Liga al desarrollo (núcleo de F8-E6) — solo si el renglón tiene desarrollo.
@@ -166,7 +171,7 @@ export async function salidaAProduccion(
     });
 
     return {
-      orden,
+      orden: ordenSalida,
       numeroProduccion: numero.numero,
       numeroProduccionMinteado: numero.minteado,
       idDesarrollo: linea.idDesarrollo,
