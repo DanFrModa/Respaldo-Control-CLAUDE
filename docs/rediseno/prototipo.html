@@ -1992,7 +1992,7 @@ const RUTAS = [
     { p:'Auditoría de calidad', r:'Carlos Vega',     f:'11 jul', e:'proximo', d:5 },
     { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'12 jul', e:'proximo', d:6 },
   ]},
-  { orden:'OP-8829', modelo:'Short deportivo', cliente:'Suburbia', entrega:'9 jul', proc:[
+  { orden:'OP-8829', modelo:'Short deportivo', cliente:'Suburbia', entrega:'9 jul', estampadoSeq:'flexible', proc:[
     { p:'Compra de tela',       r:'Miguel Torres',   f:'20 jun', e:'done', d:-16 },
     { p:'Corte',                r:'Laura Hernández', f:'26 jun', e:'done', d:-10 },
     { p:'Envío a estampado',    r:'Laura Hernández', f:'30 jun', e:'done', d:-6 },
@@ -2082,6 +2082,37 @@ function difDerivadaHTML(ops) {
   if (!f) return `<span style="color:var(--faint)">No hay rango en la tabla para ${ops} operaciones.</span>`;
   return `→ Dificultad <span class="badge warn" style="font-size:10px"><span class="d"></span>${f.nombre}</span> · tiempo de costura ≈ <b>${f.costura} d</b>`;
 }
+/* ANTECESORES (DAG del CPM) — versión CORREGIDA tras la revisión de congruencia:
+   varios antecesores por proceso (un proceso espera a TODOS los suyos) y ramas
+   reconectadas (avíos y estampado sí bloquean la confección). Basado en la tabla
+   de Daniel (Procesos_RC-antecesores.xlsx) con las correcciones propuestas. */
+const ANTECESORES = {
+  'Revisión de orden de producción': [],
+  'Programación': ['Revisión de orden de producción'],
+  'Autorización de fit': ['Revisión de orden de producción'],
+  'Autorización de arte': ['Revisión de orden de producción'],
+  'Compra de tela': ['Revisión de orden de producción'],
+  'Autorización tono de tela': ['Compra de tela'],
+  'Autorización de avíos': ['Revisión de orden de producción'],
+  'Surtido de avíos': ['Autorización de avíos'],
+  'Recepción de tela': ['Compra de tela', 'Autorización tono de tela'],
+  'Auditoría de corte': ['Recepción de tela'],
+  'Corte': ['Auditoría de corte'],
+  'Envío a procesos (estampado/bordado)': ['Corte', 'Autorización de arte'],
+  'Recepción de procesos': ['Envío a procesos (estampado/bordado)'],
+  'Envío a maquila': ['Corte', 'Surtido de avíos'],
+  'Maquila (costura)': ['Envío a maquila'],
+  'Recibo de maquila': ['Maquila (costura)'],
+  'Auditoría de calidad': ['Recibo de maquila'],
+  'Empaque': ['Auditoría de calidad'],
+  'Entrega a cliente (CEDIS)': ['Empaque'],
+  'Aceptación de cliente': ['Entrega a cliente (CEDIS)'],
+};
+/* La confección (Envío a maquila) además espera al estampado SI la prenda estampa
+   ANTES de coser — dependencia FLEXIBLE que se decide por modelo/carga (ver secEstampado). */
+const ANTES_FLEX = { 'Envío a maquila': 'Recepción de procesos' };
+const antesDe = (nom) => ANTECESORES[nom] || [];
+const detonaDe = (nom) => Object.keys(ANTECESORES).filter(k => (ANTECESORES[k] || []).includes(nom));
 let procExpand = new Set();
 function toggleProcExp(i) { if (procExpand.has(i)) procExpand.delete(i); else procExpand.add(i); ir('rc-procesos'); }
 const RC_PERSONAS = ['Laura Hernández', 'Miguel Torres', 'Carlos Vega', 'Sofía Ramírez', 'Gabriel Masri'];
@@ -2158,6 +2189,7 @@ function renderRutaOrden(orden) {
   </div>
   <div class="proc-body">
     <div class="audit-hint" style="margin-bottom:14px">${IC.info}<span>Ruta generada <b>hacia atrás</b> desde la fecha de entrega (CPM): cada proceso tiene su <b>fecha compromiso</b> y su <b>responsable</b>. El semáforo compara la fecha contra hoy. La <b>mayoría se marca sola</b> al registrar su acción en el sistema. Avance ${done}/${R.proc.length}.</span></div>
+    ${R.estampadoSeq ? `<div class="banner" style="margin-bottom:14px">${IC.info}<span><b>Estampado / bordado en esta orden:</b> ${R.estampadoSeq === 'antes' ? '<b>ANTES de coser</b> — la confección espera al estampado.' : R.estampadoSeq === 'despues' ? '<b>DESPUÉS de coser.</b>' : '<b>FLEXIBLE</b> — decídelo aquí en producción según la carga:'} ${R.estampadoSeq === 'flexible' ? `<button class="btn ghost sm" style="margin-left:6px" onclick="rutaSetEstampado('${R.orden}','antes')">Estampar ANTES</button> <button class="btn ghost sm" onclick="rutaSetEstampado('${R.orden}','despues')">Estampar DESPUÉS</button>` : `<button class="btn ghost sm" style="margin-left:6px" onclick="rutaSetEstampado('${R.orden}','flexible')">Cambiar</button>`}</span></div>` : ''}
     ${R.proc.map(x => { const cat = procCat(x.p); return `<div style="display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:${x.r === rcPersona ? 'var(--brand-soft)' : 'var(--panel-2)'}">
       <span style="width:11px;height:11px;border-radius:50%;background:${col[x.e]};flex:none"></span>
       <div style="flex:1;min-width:0">
@@ -2174,6 +2206,12 @@ function renderRutaOrden(orden) {
 }
 function abrirRuta(orden) { renderRutaOrden(orden); rutaScrim.classList.add('show'); }
 function cerrarRuta() { rutaScrim.classList.remove('show'); }
+function rutaSetEstampado(orden, seq) {
+  const R = RUTAS.find(r => r.orden === orden); if (!R) return;
+  R.estampadoSeq = seq;
+  renderRutaOrden(orden);
+  mostrarToast('Ruta reprogramada · estampado ' + (seq === 'antes' ? 'ANTES' : seq === 'despues' ? 'DESPUÉS' : 'flexible') + ' de coser');
+}
 function rcHecho(orden, proc) {
   const R = RUTAS.find(r => r.orden === orden); if (!R) return;
   const x = R.proc.find(p => p.p === proc); if (x) x.e = 'done';
@@ -2228,6 +2266,13 @@ function vProcesosRC() {
             ${x.auto ? `⟳ <b>Automático</b> al registrar: ${x.evento}` : `✋ <b>Manual</b> — ${x.evento}`}
           </div>
           <div style="margin-top:9px;display:flex;gap:6px"><button class="btn ghost sm" onclick="mostrarToast('Editar tiempos — demo')">Editar tiempos</button><button class="btn ghost sm" onclick="mostrarToast('Asignar responsable — demo')">Responsable</button></div>
+        </div>
+        <div style="min-width:250px">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px">Dependencias en la ruta (CPM)</div>
+          <div style="font-size:12.5px;line-height:1.7">
+            <b>Espera a:</b> ${antesDe(x.p).length ? antesDe(x.p).join(', ') : '<span style="color:var(--faint)">— es el inicio —</span>'}${ANTES_FLEX[x.p] ? ` <span style="color:var(--warn)">+ ${ANTES_FLEX[x.p]} (si estampa antes · flexible)</span>` : ''}<br>
+            <b>Detona →</b> ${detonaDe(x.p).length ? detonaDe(x.p).join(', ') : '<span style="color:var(--faint)">— fin —</span>'}
+          </div>
         </div>
       </div></td></tr>` : ''}`; }).join('')}
     </tbody></table></div>
@@ -3289,13 +3334,13 @@ const nFotos = (m) => (m.fotos || 0) + ((m.fotosArr && m.fotosArr.length) || 0);
 
 let PROYECTOS = [
   { num: 'P-1042', cliente: 'C&A', depto: 'KIDS Moda', temporada: 'PV26', fecha: '2 jul 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', operaciones: 12, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.42 }], maquilero: 'Confecciones León', corte: 3.5, maquila: 25, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
+    { nuestro: '62410', clienteNum: 'CA-KM-114', nombre: 'Playera Cherry On Top', estatus: 'aprobado', operaciones: 12, secEstampado: 'antes', telas: [{ nom: 'Felpa francesa 320g', consumo: 0.42 }], maquilero: 'Confecciones León', corte: 3.5, maquila: 25, procesos: [{ tipo: 'Estampado DTF', precio: 6.5 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }, { nom: 'Etiqueta de composición', consumo: 1 }, { nom: 'Hilo poliéster Tex 40', consumo: 0.02 }], pdfs: ['TechPack_Cherry.pdf'], fotos: 3 },
     { nuestro: '62411', clienteNum: 'CA-KM-115', nombre: 'Short deportivo felpa', estatus: 'proceso', operaciones: 18, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.38 }], maquilero: 'Rima Textil', corte: 3, maquila: 22, procesos: [{ tipo: 'Bordado', precio: 8 }], avios: [{ nom: 'Resorte 3 cm', consumo: 0.9 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Short.pdf'], fotos: 2 },
     { nuestro: '62412', clienteNum: '', nombre: 'Sudadera capucha', estatus: 'borrador', operaciones: 24, telas: [], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0 },
   ] },
   { num: 'P-1041', cliente: 'Hang Ten', depto: 'Surf', temporada: 'PV26', fecha: '28 jun 2026', estatus: 'abierto', modelos: [
-    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', operaciones: 34, telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquilero: 'Maquilas del Bajío', corte: 6, maquila: 30, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
-    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', operaciones: 10, telas: [{ nom: 'Algodón peinado 30/1', consumo: 0.30 }], maquilero: 'Costura Express', corte: 2.5, maquila: 18, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
+    { nuestro: '62058', clienteNum: 'A17E210', nombre: 'Bermuda playa stretch', estatus: 'completo', operaciones: 34, secEstampado: 'flexible', telas: [{ nom: 'Mezclilla stretch 8oz', consumo: 0.55 }, { nom: 'Franela lavada 180g', consumo: 0.12 }], maquilero: 'Maquilas del Bajío', corte: 6, maquila: 30, procesos: [{ tipo: 'Lavado', precio: 4.5 }, { tipo: 'Estampado serigrafía', precio: 5 }], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 2 }, { nom: 'Cierre #5 metálico', consumo: 1 }, { nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Bermuda.pdf', 'Medidas.pdf'], fotos: 4 },
+    { nuestro: '62059', clienteNum: 'A17E190', nombre: 'Playera surf estampada', estatus: 'proceso', operaciones: 10, secEstampado: 'despues', telas: [{ nom: 'Algodón peinado 30/1', consumo: 0.30 }], maquilero: 'Costura Express', corte: 2.5, maquila: 18, procesos: [{ tipo: 'Estampado DTF', precio: 7 }], avios: [{ nom: 'Etiqueta tejida MJD', consumo: 1 }], pdfs: ['TechPack_Surf.pdf'], fotos: 1 },
   ] },
   { num: 'P-1039', cliente: 'Liverpool', depto: 'Infantil', temporada: 'OI26', fecha: '20 jun 2026', estatus: 'abierto', modelos: [
     { nuestro: '62330', clienteNum: 'LV-INF-88', nombre: 'Conjunto felpa bebé', estatus: 'borrador', operaciones: 16, telas: [{ nom: 'Felpa francesa 320g', consumo: 0.25 }, { nom: 'Franela lavada 180g', consumo: 0.08 }], maquilero: 'Óscar Jiménez', corte: 2.5, maquila: 20, procesos: [], avios: [{ nom: 'Botón 4 hoyos 18L', consumo: 4 }], pdfs: ['TechPack_Conjunto.pdf'], fotos: 2 },
@@ -3442,7 +3487,7 @@ function guardarProyecto() {
 /* ---- Editor de modelo ---- */
 const pcScrim = document.getElementById('pcScrim');
 const pcPanel = document.getElementById('pcPanel');
-function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', operaciones: 0, telas: [{ nom: '', consumo: 0 }], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
+function nuevoModelo(pi) { pcEdit = { pIdx: pi, mIdx: -1, m: { nuestro: '', clienteNum: '', nombre: '', estatus: 'borrador', operaciones: 0, secEstampado: 'na', telas: [{ nom: '', consumo: 0 }], maquilero: '', corte: 0, maquila: 0, procesos: [], avios: [], pdfs: [], fotos: 0, fotosArr: [] } }; renderModeloEditor(); pcScrim.classList.add('show'); }
 function editarModelo(pi, mi) { pcEdit = { pIdx: pi, mIdx: mi, m: JSON.parse(JSON.stringify(PROYECTOS[pi].modelos[mi])) }; if (!pcEdit.m.fotosArr) pcEdit.m.fotosArr = []; renderModeloEditor(); pcScrim.classList.add('show'); }
 function cerrarModeloEditor() { pcScrim.classList.remove('show'); }
 function pcSync() {
@@ -3454,6 +3499,7 @@ function pcSync() {
   m.estatus = p.querySelector('#pcEstatus').value;
   m.operaciones = parseInt(p.querySelector('#pcOperaciones').value) || 0;
   m.dificultad = (filaDif(m.operaciones) || {}).nombre || '';
+  m.secEstampado = (p.querySelector('#pcSecEstampado') || {}).value || 'na';
   m.telas = [...p.querySelectorAll('.pc-tela-row')].map(r => ({ nom: r.querySelector('.pc-tela-nom').value, prov: r.querySelector('.pc-tela-prov') ? r.querySelector('.pc-tela-prov').value : '', color: r.querySelector('.pc-tela-color') ? r.querySelector('.pc-tela-color').value : '', consumo: parseFloat(r.querySelector('.pc-tela-cons').value) || 0 }));
   m.maquilero = p.querySelector('#pcMaquilero').value;
   m.corte = parseFloat(p.querySelector('#pcCorte').value) || 0;
@@ -3560,6 +3606,10 @@ function renderModeloEditor() {
         </div>`).join('') || '<div class="pc-empty">Sin procesos. Agrega estampado, bordado, etc.</div>'}
       </div>
       <button class="btn ghost sm" onclick="pcAddProceso()" style="margin-top:8px">${IC.plus}Agregar proceso</button>
+      <div class="pc-fields" style="margin-top:14px">
+        <label class="col2"><span class="ffk">Secuencia de estampado / bordado en la Ruta Crítica</span><select class="pc-in" id="pcSecEstampado">${[['na', 'No lleva estampado / bordado'], ['antes', 'Antes de coser (forzado)'], ['despues', 'Después de coser'], ['flexible', 'Flexible — se decide en producción según la carga']].map(([v, l]) => `<option value="${v}"${(m.secEstampado || 'na') === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
+      </div>
+      <div class="pc-hint-cell" style="margin-top:8px">Define si el estampado/bordado va <b>antes o después</b> de coser. <b>Antes (forzado)</b> = la confección SIEMPRE espera al estampado. <b>Flexible</b> = se decide en <b>producción</b> según la carga de trabajo — <b>incluso con el ciclo ya empezado</b> (petición Daniel).</div>
     </div>
 
     <div class="pc-sec">
