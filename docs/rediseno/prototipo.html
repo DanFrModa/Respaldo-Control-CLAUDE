@@ -1044,6 +1044,7 @@ const NAV = [
     { clave:'cxp', titulo:'Cuentas por pagar', icono:IC.costos },
   ]},
   { grupo: 'Análisis', items: [
+    { clave:'analisis-rc', titulo:'Análisis RC', icono:IC.rc },
     { clave:'costos', titulo:'Costos', icono:IC.costos },
     { clave:'edr', titulo:'EDR', icono:IC.indicadores },
     { clave:'indicadores', titulo:'Indicadores', icono:IC.indicadores },
@@ -2036,6 +2037,30 @@ const RUTAS = [
     { p:'Auditoría de calidad', r:'Carlos Vega',     f:'4 jul',  e:'done', d:-2 },
     { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'5 jul',  e:'vencido', d:-1 },
   ]},
+  { orden:'OP-8860', modelo:'Blusa de lino', cliente:'El Palacio', entrega:'18 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'28 jun', e:'done', d:-8 },
+    { p:'Corte',                r:'Laura Hernández', f:'3 jul',  e:'done', d:-3 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'9 jul',  e:'proximo', d:3 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'13 jul', e:'proximo', d:7 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'15 jul', e:'proximo', d:9 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'18 jul', e:'proximo', d:12 },
+  ]},
+  { orden:'OP-8861', modelo:'Camisa oxford', cliente:'Sanborns', entrega:'20 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'1 jul',  e:'done', d:-5 },
+    { p:'Corte',                r:'Laura Hernández', f:'7 jul',  e:'proximo', d:1 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'10 jul', e:'proximo', d:4 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'15 jul', e:'proximo', d:9 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'17 jul', e:'proximo', d:11 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'20 jul', e:'proximo', d:14 },
+  ]},
+  { orden:'OP-8862', modelo:'Falda plisada', cliente:'Liverpool', entrega:'22 jul', proc:[
+    { p:'Compra de tela',       r:'Miguel Torres',   f:'4 jul',  e:'done', d:-2 },
+    { p:'Corte',                r:'Laura Hernández', f:'9 jul',  e:'proximo', d:3 },
+    { p:'Envío a maquila',      r:'Laura Hernández', f:'12 jul', e:'proximo', d:6 },
+    { p:'Recibo de maquila',    r:'Laura Hernández', f:'16 jul', e:'proximo', d:10 },
+    { p:'Auditoría de calidad', r:'Carlos Vega',     f:'18 jul', e:'proximo', d:12 },
+    { p:'Entrega a cliente',    r:'Sofía Ramírez',   f:'22 jul', e:'proximo', d:16 },
+  ]},
 ];
 /* Catálogo de procesos de la Ruta Crítica (ProcesoDef de F5): responsable por
    default + auto-completado por evento del sistema + TIEMPO por operación + variables
@@ -2233,6 +2258,110 @@ function rcHecho(orden, proc) {
 }
 rutaScrim.onclick = (e) => { if (e.target === rutaScrim) cerrarRuta(); };
 addEventListener('keydown', (e) => { if (e.key === 'Escape' && rutaScrim.classList.contains('show')) cerrarRuta(); });
+
+/* ===== Análisis de Ruta Crítica (tablero de gestión) ===== */
+const AREA_DE = { 'Laura Hernández': 'Producción', 'Miguel Torres': 'Compras', 'Carlos Vega': 'Calidad', 'Sofía Ramírez': 'Ventas', 'Gabriel Masri': 'Desarrollo' };
+/* Histórico de desempeño por persona (ejemplo; en el real sale del kardex de procesos). */
+const PERF = {
+  'Laura Hernández': { completados: 48, aTiempo: 41, reaccion: 6, tend: 3 },
+  'Miguel Torres': { completados: 22, aTiempo: 15, reaccion: 20, tend: -2 },
+  'Carlos Vega': { completados: 30, aTiempo: 29, reaccion: 3, tend: 1 },
+  'Sofía Ramírez': { completados: 18, aTiempo: 17, reaccion: 4, tend: 0 },
+  'Gabriel Masri': { completados: 12, aTiempo: 11, reaccion: 8, tend: 1 },
+};
+function estadoOrden(R) {
+  const pend = R.proc.filter(p => p.e !== 'done');
+  if (!pend.length) return { est: 'entregada', urg: 99 };
+  if (R.proc.some(p => p.e === 'vencido')) return { est: 'atrasada', urg: Math.min(...R.proc.filter(p => p.e === 'vencido').map(p => p.d)) };
+  if (R.proc.some(p => p.e === 'hoy')) return { est: 'riesgo', urg: 0 };
+  return { est: 'atiempo', urg: Math.min(...pend.map(p => p.d)) };
+}
+const procActual = (R) => R.proc.find(p => p.e === 'vencido') || R.proc.find(p => p.e === 'hoy') || R.proc.find(p => p.e === 'proximo') || {};
+function perfUsuario(u) {
+  const p = PERF[u] || { completados: 0, aTiempo: 0, reaccion: 0, tend: 0 };
+  const mp = misPendientes(u);
+  const vencidos = mp.filter(t => t.e === 'vencido').length;
+  const hoy = mp.filter(t => t.e === 'hoy').length;
+  const onTime = p.completados ? Math.round(p.aTiempo / p.completados * 100) : 0;
+  const score = Math.max(0, Math.min(100, onTime - vencidos * 6));
+  const bono = score >= 90 && vencidos === 0;
+  return { u, area: AREA_DE[u] || '—', reaccion: p.reaccion, tend: p.tend, completados: p.completados, vencidos, hoy, activos: mp.length, onTime, score, bono };
+}
+const califBadge = (s) => s >= 90 ? ['ok', 'Excelente'] : s >= 75 ? ['info', 'Bien'] : s >= 60 ? ['warn', 'Regular'] : ['crit', 'Bajo'];
+function cuellos() {
+  const m = {};
+  RUTAS.forEach(R => R.proc.forEach(p => { if (p.e === 'vencido' || p.e === 'hoy') { (m[p.p] = m[p.p] || { vencido: 0, hoy: 0 })[p.e]++; } }));
+  return Object.entries(m).map(([proc, c]) => ({ proc, vencido: c.vencido, hoy: c.hoy, total: c.vencido + c.hoy })).sort((a, b) => b.total - a.total || b.vencido - a.vencido);
+}
+function vAnalisisRC() {
+  const ords = RUTAS.map(R => ({ R, ...estadoOrden(R) }));
+  const activos = ords.filter(o => o.est !== 'entregada');
+  const nAtras = activos.filter(o => o.est === 'atrasada').length, nRiesgo = activos.filter(o => o.est === 'riesgo').length, nTiempo = activos.filter(o => o.est === 'atiempo').length;
+  const cumpl = activos.length ? Math.round(nTiempo / activos.length * 100) : 0;
+  const atender = activos.filter(o => o.est === 'atrasada' || o.est === 'riesgo').sort((a, b) => a.urg - b.urg);
+  const perfs = RC_PERSONAS.map(perfUsuario).sort((a, b) => b.score - a.score);
+  const conBono = perfs.filter(p => p.bono).length;
+  const cue = cuellos();
+  const estBadge = { atrasada: ['crit', 'Atrasada'], riesgo: ['warn', 'En riesgo'], atiempo: ['ok', 'A tiempo'], entregada: ['neutral', 'Entregada'] };
+  return `
+  <div class="page-head">
+    <div><h1>Análisis de Ruta Crítica</h1><div class="sub">Salud de las órdenes · desempeño del equipo · cuellos de botella · hoy <b>6 jul 2026</b></div></div>
+    <div class="actions"><button class="btn ghost">${IC.printer}Exportar</button></div>
+  </div>
+  <div class="kpis">
+    ${kpi('Órdenes activas', String(activos.length), '', 'up', '', 'en la RC')}
+    ${kpi('A tiempo', String(nTiempo), '', 'up', 'ok', 'sin atraso')}
+    ${kpi('En riesgo', String(nRiesgo), '', 'down', 'hoy', 'se juegan la fecha')}
+    ${kpi('Atrasadas', String(nAtras), '', 'down', '⚠', 'acción urgente')}
+    ${kpi('Cumplimiento', String(cumpl), '%', cumpl >= 80 ? 'up' : 'down', '', 'órdenes a tiempo')}
+  </div>
+  <div class="card" style="margin-bottom:14px;overflow:hidden">
+    <div class="toolbar" style="box-shadow:inset 3px 0 0 var(--crit)"><b style="color:var(--crit)">⚠ Órdenes que requieren atención</b><span class="count">${atender.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">ordenadas por urgencia · clic para ver la ruta</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Orden</th><th>Modelo</th><th>Cliente</th><th>Etapa atorada</th><th>Responsable</th><th>Estado</th><th class="r">Holgura</th><th>Entrega</th>
+    </tr></thead><tbody>
+      ${atender.map(o => { const pa = procActual(o.R); const [bc, bl] = estBadge[o.est]; return `<tr style="cursor:pointer" onclick="abrirRuta('${o.R.orden}')">
+        <td class="cell-code">${o.R.orden}</td><td class="cell-strong">${o.R.modelo}</td><td>${o.R.cliente}</td>
+        <td>${pa.p || '—'}</td><td>${pa.r || '—'}</td>
+        <td><span class="badge ${bc}"><span class="d"></span>${bl}</span></td>
+        <td class="r num" style="color:${o.urg < 0 ? 'var(--crit)' : o.urg === 0 ? 'var(--warn)' : 'var(--muted)'}">${o.urg < 0 ? o.urg + ' d' : o.urg === 0 ? 'hoy' : '+' + o.urg + ' d'}</td>
+        <td>${o.R.entrega}</td>
+      </tr>`; }).join('') || '<tr><td colspan="8" class="pc-empty" style="padding:18px">Ninguna orden en riesgo ni atrasada 🎉</td></tr>'}
+    </tbody></table></div>
+  </div>
+  <div class="card" style="margin-bottom:14px;overflow:hidden">
+    <div class="toolbar"><b>Desempeño del equipo (RC)</b><span class="count">${perfs.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">${conBono} con bono esta semana</span><button class="btn primary sm" style="margin-left:10px" onclick="mostrarToast('Evaluación semanal generada — demo')">${IC.check}Generar evaluación semanal</button></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Persona</th><th>Área</th><th class="r">A cargo</th><th class="r">Vencidos</th><th class="r">% en tiempo</th><th class="r">Reacción</th><th>Tendencia</th><th class="r">Calificación</th><th>Bono</th>
+    </tr></thead><tbody>
+      ${perfs.map(p => { const [bc, bl] = califBadge(p.score); return `<tr>
+        <td class="cell-strong">${p.u}</td><td>${p.area}</td>
+        <td class="r num">${p.activos}</td>
+        <td class="r num" style="color:${p.vencidos ? 'var(--crit)' : 'var(--muted)'}">${p.vencidos}</td>
+        <td class="r num">${p.onTime}%</td>
+        <td class="r num">${p.reaccion} h</td>
+        <td>${p.tend > 0 ? `<span style="color:var(--ok)">▲ +${p.tend}%</span>` : p.tend < 0 ? `<span style="color:var(--crit)">▼ ${p.tend}%</span>` : '<span style="color:var(--faint)">—</span>'}</td>
+        <td class="r"><b class="mono">${p.score}</b> <span class="badge ${bc}" style="font-size:10px"><span class="d"></span>${bl}</span></td>
+        <td>${p.bono ? '<span class="badge ok"><span class="d"></span>Bono ✓</span>' : '<span style="color:var(--faint);font-size:12px">—</span>'}</td>
+      </tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="pc-hint-cell" style="margin-top:10px;max-width:940px">La <b>calificación</b> = % de procesos entregados en tiempo, penalizado por los vencidos que trae hoy. <b>Bono semanal</b> = calificación ≥ 90 y <b>0 vencidos</b>. La <b>reacción</b> = tiempo promedio en atender un proceso desde que cae en su cancha. Umbrales del bono configurables.</div>
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div class="toolbar"><b>Cuellos de botella por proceso</b><span class="count">${cue.length}</span><span style="margin-left:auto;color:var(--muted);font-size:12px">dónde se atoran más las órdenes (sistémico, no de personas)</span></div>
+    <div class="table-wrap"><table class="data"><thead><tr>
+      <th>Proceso</th><th class="r">Vencidos</th><th class="r">Para hoy</th><th class="r">Total atorado</th><th>Peso</th>
+    </tr></thead><tbody>
+      ${cue.map(c => `<tr>
+        <td class="cell-strong">${c.proc}</td>
+        <td class="r num" style="color:${c.vencido ? 'var(--crit)' : 'var(--muted)'}">${c.vencido}</td>
+        <td class="r num">${c.hoy}</td>
+        <td class="r num">${c.total}</td>
+        <td style="min-width:120px">${barra(Math.round(c.total / ((cue[0] || {}).total || 1) * 100))}</td>
+      </tr>`).join('') || '<tr><td colspan="5" class="pc-empty" style="padding:16px">Sin procesos atorados.</td></tr>'}
+    </tbody></table></div>
+  </div>`;
+}
 /* Catálogo de procesos de la Ruta Crítica (ProcesoDef + responsables + auto) */
 function vProcesosRC() {
   const areaCls = { 'Producción': 'info', 'Compras': 'warn', 'Calidad': 'crit', 'Ventas': 'ok', 'Desarrollo': 'neutral' };
@@ -4236,7 +4365,7 @@ const CAT_AUDITORES = { titulo: 'Auditores', sub: 'Control de calidad · auditor
 
 const VISTAS = {
   resumen: vResumen, modelos: vModelos, ordenes: vOrdenes, produccion: vProduccion,
-  pedidos: vPedidos, rc: vRc, 'rc-procesos': vProcesosRC, inventarios: vInventarios, telas: vTelas, compras: vCompras,
+  pedidos: vPedidos, rc: vRc, 'rc-procesos': vProcesosRC, 'analisis-rc': vAnalisisRC, inventarios: vInventarios, telas: vTelas, compras: vCompras,
   proveedores: vProveedores, costos: vCostos, indicadores: vIndicadores, calidad: vCalidad, usuarios: vUsuarios,
   'notas-salida': vNotasSalida, precosteos: vPrecosteos,
   avios: vAvios, clientes: vClientes, 'listas-precios': vListas, ventas: vVentas,
