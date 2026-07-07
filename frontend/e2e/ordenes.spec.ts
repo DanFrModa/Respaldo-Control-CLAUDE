@@ -3,21 +3,87 @@ import { expect, test, type Page } from '@playwright/test';
 import { crearColorYTalla, entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del módulo ÓRDENES (rediseño R2) contra el stack real:
+ * E2E del módulo ÓRDENES (rediseño R2/R3) contra el stack real:
  *
- *  1. La CAPTURA/edición completa (F2-E3, lista + detalle) sigue viva en
- *     `/produccion/ordenes/captura`: crear pedido → orden → matriz → copiar → referencia D7 →
- *     cancelar (el flujo original, con la ruta nueva).
+ *  1. La OP ya NO se crea suelta (R3, §4.1): nace del PEDIDO con "Generar OP" (la matriz nace ahí).
+ *     La CAPTURA/edición completa (F2-E3) sigue viva en `/produccion/ordenes/captura` para EDITAR:
+ *     re-guardar la matriz, copiarla de otra orden, capturar la referencia D7 y cancelar.
  *  2. El CENTRO DE COMANDO (`/produccion/ordenes`, §4.2) + AVANCE de producción (§4.3): la tabla
  *     de 13 columnas con filtros de servidor, el panel persistente con la matriz siempre visible,
- *     doble clic → avance, y el registro REAL de un corte (combobox de cortador + matriz con
- *     candado + "capturado por"). También la paleta ⌘K encontrando la orden por folio (B4).
+ *     doble clic → avance, y el registro REAL de un corte. También la paleta ⌘K por folio (B4).
  *
  * Lecciones F5-E4 aplicadas: color+talla se siembran PRIMERO (`crearColorYTalla`); las lecturas
  * de "el primero" usan filtros por texto único de la corrida (nada depende del orden de la suite).
  */
 
-/** Crea cliente + modelo + pedido (50 pzas) y una orden con matriz de 20 pzas. Devuelve el folio. */
+/** Crea un pedido interno con `renglones` renglones del MISMO modelo vía la edición F2. */
+async function crearPedidoF2(
+  page: Page,
+  nombres: { cliente: string; codigoModelo: string },
+  renglones = 1,
+): Promise<void> {
+  await page.goto('/pedidos/administrar');
+  await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
+  await page.getByTestId('nuevo-pedido').click();
+  const dialogoPedido = page.getByRole('dialog');
+  await dialogoPedido.getByLabel('Cliente').selectOption({ label: nombres.cliente });
+  for (let i = 0; i < renglones; i++) {
+    await dialogoPedido.getByTestId('agregar-renglon').click();
+    const filaRenglon = dialogoPedido.getByTestId('fila-renglon').nth(i);
+    await filaRenglon
+      .getByLabel('Modelo del renglón')
+      .selectOption({ label: nombres.codigoModelo });
+    await filaRenglon.getByLabel('Cantidad del renglón').fill('50');
+  }
+  await page.getByTestId('guardar-pedido').click();
+  await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();
+}
+
+/**
+ * GENERA la OP de un renglón sin orden del pedido del cliente dado (pantalla nueva de Pedidos,
+ * R3): matriz de `piezas` en el color/talla de la corrida. Devuelve el folio de la OP.
+ */
+async function generarOp(
+  page: Page,
+  nombres: { cliente: string; color: string; talla: string },
+  piezas: string,
+): Promise<string> {
+  await page.goto('/pedidos');
+  await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
+  const grupo = page.getByTestId('pedidos-grupo').filter({ hasText: nombres.cliente }).first();
+  await expect(grupo).toBeVisible();
+  await grupo.getByTestId('pedidos-generar-op').first().click();
+
+  const panelOp = page.getByTestId('panel-generar-op');
+  await expect(panelOp.getByRole('heading', { name: /Generar OP/ })).toBeVisible();
+  const matriz = panelOp.getByTestId('matriz-op');
+  await matriz.getByTestId('matriz-op-agregar-talla').selectOption({ label: nombres.talla });
+  await matriz.getByTestId('matriz-op-agregar-color').selectOption({ label: nombres.color });
+  await matriz.getByTestId('matriz-op-celda').first().fill(piezas);
+  await page.getByTestId('confirmar-generar-op').click();
+
+  const toast = page.getByText(/OP \d+ creada/).first();
+  await expect(toast).toBeVisible();
+  const folio = /OP (\d+) creada/.exec((await toast.textContent()) ?? '')?.[1] ?? '';
+  expect(folio).not.toBe('');
+  // El toast largo tapa botones; se espera a que se vaya antes de seguir interactuando.
+  await expect(page.getByText(/salió a producción como modelo #\d+/)).toBeVisible();
+  return folio;
+}
+
+/** Selecciona una orden por folio en la CAPTURA (`/produccion/ordenes/captura`). */
+async function abrirOrdenEnCaptura(page: Page, folio: string): Promise<void> {
+  await page.goto('/produccion/ordenes/captura');
+  await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
+  await page.getByTestId('buscar-orden').fill(folio);
+  await page
+    .getByTestId('fila-orden')
+    .filter({ hasText: `Orden ${folio}` })
+    .first()
+    .click();
+}
+
+/** Crea cliente + modelo + pedido (F2) y una OP de 20 pzas vía "Generar OP". Devuelve el folio. */
 async function crearOrdenConMatriz(
   page: Page,
   nombres: { cliente: string; codigoModelo: string; color: string; talla: string },
@@ -38,50 +104,16 @@ async function crearOrdenConMatriz(
   await page.getByTestId('guardar-modelo').click();
   await expect(page.getByText(`Modelo "${nombres.codigoModelo}" creado.`)).toBeVisible();
 
-  // Pedido con un renglón (origen de la orden).
-  await page.goto('/pedidos');
-  await page.getByTestId('nuevo-pedido').click();
-  const dialogoPedido = page.getByRole('dialog');
-  await dialogoPedido.getByLabel('Cliente').selectOption({ label: nombres.cliente });
-  await dialogoPedido.getByTestId('agregar-renglon').click();
-  const filaRenglon = dialogoPedido.getByTestId('fila-renglon').first();
-  await filaRenglon.getByLabel('Modelo del renglón').selectOption({ label: nombres.codigoModelo });
-  await filaRenglon.getByLabel('Cantidad del renglón').fill('50');
-  await page.getByTestId('guardar-pedido').click();
-  await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();
-
-  // Orden desde el renglón, en la pantalla de CAPTURA (la de siempre, ruta nueva).
-  await page.goto('/produccion/ordenes/captura');
-  await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
-  await page.getByTestId('nuevo-orden').click();
-  const dialogoAlta = page.getByRole('dialog');
-  await dialogoAlta.getByTestId('orden-buscar-pedido').fill(nombres.cliente);
-  await dialogoAlta.getByTestId('orden-pedido-opcion').first().click();
-  await dialogoAlta.getByTestId('orden-renglon-opcion').first().click();
-  await page.getByTestId('confirmar-nueva-orden').click();
-  const toastCreada = page.getByText(/Orden \d+ creada\./);
-  await expect(toastCreada).toBeVisible();
-  const folio = /Orden (\d+) creada\./.exec((await toastCreada.textContent()) ?? '')?.[1] ?? '';
-  expect(folio).not.toBe('');
-
-  // Matriz: el color y la talla creados para ESTA corrida (determinista, lección F5-E4).
-  const detalle = page.getByTestId('detalle-orden');
-  const matriz = detalle.getByTestId('matriz-orden');
-  await matriz.getByTestId('matriz-orden-agregar-color').selectOption({ label: nombres.color });
-  const agregarTalla = matriz.getByTestId('matriz-orden-agregar-talla');
-  if (await agregarTalla.isEnabled()) {
-    await agregarTalla.selectOption({ label: nombres.talla });
-  }
-  await matriz.getByTestId('matriz-orden-celda').first().fill('20');
-  await detalle.getByTestId('guardar-matriz').click();
-  await expect(page.getByText('Matriz guardada.')).toBeVisible();
-  return folio;
+  // Pedido (edición F2) + salida a producción con la matriz de 20 (R3).
+  await crearPedidoF2(page, nombres);
+  return generarOp(page, nombres, '20');
 }
 
 test.describe('Órdenes — captura completa (F2-E3, en /captura)', () => {
-  test('crear orden → matriz (pasa a completa) → copiar matriz → referencia D7 → cancelar', async ({
+  test('Generar OP (nace completa) → re-guardar matriz → copiar matriz → referencia D7 → cancelar', async ({
     page,
   }) => {
+    test.setTimeout(150_000);
     const sufijo = Date.now().toString().slice(-6);
     const cliente = `Cliente Ordenes ${sufijo}`;
     const codigoModelo = `ORD-${sufijo}`;
@@ -121,58 +153,26 @@ test.describe('Órdenes — captura completa (F2-E3, en /captura)', () => {
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
-    // ── Pedido con un renglón ───────────────────────────────────────────────────
-    await page.goto('/pedidos');
-    await page.getByTestId('nuevo-pedido').click();
-    const dialogoPedido = page.getByRole('dialog');
-    await dialogoPedido.getByLabel('Cliente').selectOption({ label: cliente });
-    await dialogoPedido.getByTestId('agregar-renglon').click();
-    const filaRenglon = dialogoPedido.getByTestId('fila-renglon').first();
-    await filaRenglon.getByLabel('Modelo del renglón').selectOption({ label: codigoModelo });
-    await filaRenglon.getByLabel('Cantidad del renglón').fill('50');
-    await page.getByTestId('guardar-pedido').click();
-    await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();
+    // ── Pedido con DOS renglones (dos OPs: una para copiarle la matriz a la otra) ─
+    await crearPedidoF2(page, { cliente, codigoModelo }, 2);
+    const folio1 = await generarOp(page, { cliente, color, talla }, '20');
+    const folio2 = await generarOp(page, { cliente, color, talla }, '5');
 
-    // ── Orden desde el renglón (pantalla de CAPTURA, ruta nueva /captura) ───────
-    await page.goto('/produccion/ordenes/captura');
-    await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
-
-    await page.getByTestId('nuevo-orden').click();
-    const dialogoAlta = page.getByRole('dialog');
-    await expect(dialogoAlta.getByRole('heading', { name: 'Nueva orden' })).toBeVisible();
-    await dialogoAlta.getByTestId('orden-buscar-pedido').fill(cliente);
-    await dialogoAlta.getByTestId('orden-pedido-opcion').first().click();
-    await dialogoAlta.getByTestId('orden-renglon-opcion').first().click();
-    await page.getByTestId('confirmar-nueva-orden').click();
-    await expect(page.getByText(/Orden \d+ creada\./)).toBeVisible();
-
+    // ── La OP nace COMPLETA (matriz al crear, R3) y la matriz se puede RE-guardar ─
+    await abrirOrdenEnCaptura(page, folio1);
     const detalle = page.getByTestId('detalle-orden');
-    await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Capturada');
-
-    // ── Matriz: color + talla de ESTA corrida y una cantidad ────────────────────
+    await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Completa');
     const matriz = detalle.getByTestId('matriz-orden');
-    await matriz.getByTestId('matriz-orden-agregar-color').selectOption({ label: color });
-    const agregarTalla = matriz.getByTestId('matriz-orden-agregar-talla');
-    if (await agregarTalla.isEnabled()) {
-      await agregarTalla.selectOption({ label: talla });
-    }
-    await matriz.getByTestId('matriz-orden-celda').first().fill('20');
+    await matriz.getByTestId('matriz-orden-celda').first().fill('25');
     await detalle.getByTestId('guardar-matriz').click();
     await expect(page.getByText('Matriz guardada.')).toBeVisible();
-    await expect(detalle.getByTestId('estado-orden').first()).toHaveText('Completa');
 
-    // ── Segunda orden + copiar matriz ───────────────────────────────────────────
-    await page.getByTestId('nuevo-orden').click();
-    const dialogoAlta2 = page.getByRole('dialog');
-    await dialogoAlta2.getByTestId('orden-buscar-pedido').fill(cliente);
-    await dialogoAlta2.getByTestId('orden-pedido-opcion').first().click();
-    await dialogoAlta2.getByTestId('orden-renglon-opcion').first().click();
-    await page.getByTestId('confirmar-nueva-orden').click();
-    await expect(page.getByText(/Orden \d+ creada\./)).toBeVisible();
-
+    // ── Copiar la matriz de la OP 1 sobre la OP 2 ───────────────────────────────
+    await abrirOrdenEnCaptura(page, folio2);
     await detalle.getByTestId('abrir-copiar-matriz').click();
     const dialogoCopiar = page.getByRole('dialog');
     await expect(dialogoCopiar.getByRole('heading', { name: /Copiar matriz/ })).toBeVisible();
+    await dialogoCopiar.getByTestId('copiar-matriz-buscar').fill(folio1);
     await dialogoCopiar.getByTestId('copiar-matriz-opcion').first().click();
     await page.getByTestId('confirmar-copiar-matriz').click();
     await expect(page.getByText('Matriz copiada.')).toBeVisible();
@@ -200,6 +200,7 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
   test('la tabla de 13 columnas filtra en servidor, el panel muestra la matriz y el avance registra un corte', async ({
     page,
   }) => {
+    test.setTimeout(150_000);
     const sufijo = (Date.now() + 1).toString().slice(-6);
     const cliente = `Cliente Centro ${sufijo}`;
     const codigoModelo = `CEN-${sufijo}`;
@@ -221,7 +222,7 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await page.getByTestId('guardar-proveedor').click();
     await expect(page.getByText(`Proveedor "${cortador}" creado.`)).toBeVisible();
 
-    // ── Orden con matriz (20 pzas) ──────────────────────────────────────────────
+    // ── Orden con matriz (20 pzas) vía Generar OP (R3) ──────────────────────────
     const folio = await crearOrdenConMatriz(page, { cliente, codigoModelo, color, talla });
 
     // ── Centro de comando: buscar por folio (filtro de servidor) ────────────────
@@ -248,6 +249,9 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await expect(panel.getByTestId('centro-mosaicos')).toBeVisible();
     await expect(panel.getByTestId('mosaico-habilitacion')).toBeDisabled();
     await expect(panel.getByTestId('panel-precios')).toBeVisible();
+    // La cadena de trazabilidad (R3) enseña el pedido interno y la OP.
+    await expect(panel.getByTestId('traza-op')).toContainText(folio);
+    await expect(panel.getByTestId('traza-pedido')).toBeEnabled();
 
     // ── Doble clic → AVANCE DE PRODUCCIÓN (stepper de 5 etapas) ────────────────
     await fila.dblclick();

@@ -32,7 +32,8 @@
  */
 import { registrarBitacora } from '../../comun/auditoria.js';
 import { registrarConsumidorEventos, type MensajeEventoDominio } from '../../comun/cola-eventos.js';
-import { EVENTOS_OUTBOX } from '../../comun/eventos-dominio.js';
+import { EVENTOS_OUTBOX, type EventoOrdenCreada } from '../../comun/eventos-dominio.js';
+import { procesarOrdenCreada, registrarFalloRcAutomatica } from './rcAutomatica.js';
 import { COLAS_JOBS, encolarJob, type PayloadRecalcularRuta } from '../../comun/jobs/index.js';
 import { ResultadoAuditoria, TipoAuditoria, TipoEventoProceso } from '../../datos/index.js';
 import { enTransaccion, type ContextoBd, type Tx } from '../../comun/transaccion.js';
@@ -648,6 +649,13 @@ export async function procesarEventoAutoAvance(
     return;
   }
 
+  // ── Orden creada (rediseño R3, B5): la RC se programa SOLA ─────────────────────────────────
+  if (tipo === EVENTOS_OUTBOX.ordenCreada) {
+    const p = payload as EventoOrdenCreada;
+    await procesarOrdenCreada(p, bd);
+    return;
+  }
+
   // Tipo desconocido: se ignora silenciosamente (otro consumidor podría manejarlo en el futuro).
 }
 
@@ -798,10 +806,51 @@ async function encolarRecalculo(idOrden: number, idEmpresa: number): Promise<voi
 }
 
 /**
+ * MANEJA un mensaje de la cola con la política de errores POR TIPO de evento (separado del wiring
+ * de pg-boss para probarlo directo, sin cola viva):
+ *
+ *  • Eventos del AUTO-AVANCE F3→F5 (corte/envío/recibo/entrega/material/auditoría): atrapa y
+ *    loguea SIN propagar — comportamiento preexistente de F5-E6 (evitar acumular reintentos por un
+ *    error de datos puntual). NO cambiar.
+ *  • `orden-creada` (R3-B5, hallazgo H2 del reviewer): un error INESPERADO deja bitácora AUDITABLE
+ *    `rc-automatica-fallida` (best-effort: si la BD está caída, la bitácora no debe enmascarar el
+ *    error original) y SE PROPAGA para que pg-boss REINTENTE — el consumidor es idempotente
+ *    (`rcActiva` → no-op) y la ruta está blindada por sus uniques, así que reintentar es seguro.
+ *    Sin esto, un parpadeo de BD dejaba la orden sin RC EN SILENCIO. Las omisiones CONTROLADAS
+ *    (sin fecha de entrega, catálogos RC vacíos) NO lanzan: las resuelve `procesarOrdenCreada`
+ *    con su propia bitácora `rc-automatica-omitida`.
+ */
+export async function manejarEventoAutoAvance(
+  mensaje: MensajeEventoDominio,
+  registrarError: (mensaje: string, error: unknown) => void = (msg, err) => {
+    console.error(msg, err);
+  },
+  bd?: ContextoBd,
+): Promise<void> {
+  try {
+    await procesarEventoAutoAvance(mensaje, bd);
+  } catch (error) {
+    if (mensaje.tipo === EVENTOS_OUTBOX.ordenCreada) {
+      await registrarFalloRcAutomatica(mensaje, error, bd);
+      registrarError(
+        `RC automática: falló el evento "orden-creada" (fila ${String(mensaje.id)}); pg-boss reintenta.`,
+        error,
+      );
+      throw error; // pg-boss reintenta (idempotente); si agota reintentos, queda la bitácora.
+    }
+    registrarError(
+      `Auto-avance RC: falló el evento "${mensaje.tipo}" (fila ${String(mensaje.id)}).`,
+      error,
+    );
+  }
+}
+
+/**
  * Registra el CONSUMIDOR del auto-avance en la cola de eventos de dominio (F5-E6). Lo llama el
  * bootstrap del servidor DESPUÉS de `iniciarColaEventos`. NO-OP si la cola está inactiva (tests/CI).
- * El handler atrapa y loguea (no propaga): pg-boss reintentaría, y aunque el auto-avance es
- * idempotente, evitamos acumular reintentos por un error de datos puntual.
+ * La política de errores vive en {@link manejarEventoAutoAvance}: los eventos F3→F5 se atrapan y
+ * loguean (no propagan); `orden-creada` (RC automática, R3-B5) deja bitácora del fallo y PROPAGA
+ * para que pg-boss reintente.
  *
  * @param registrarError hook para logear (por defecto `console.error`); el servidor inyecta el suyo.
  */
@@ -810,16 +859,7 @@ export async function registrarAutoAvanceRc(
     console.error(msg, err);
   },
 ): Promise<void> {
-  await registrarConsumidorEventos(async (mensaje) => {
-    try {
-      await procesarEventoAutoAvance(mensaje);
-    } catch (error) {
-      registrarError(
-        `Auto-avance RC: falló el evento "${mensaje.tipo}" (fila ${String(mensaje.id)}).`,
-        error,
-      );
-    }
-  });
+  await registrarConsumidorEventos((mensaje) => manejarEventoAutoAvance(mensaje, registrarError));
 }
 
 // Re-exporta el tipo para que el wiring/tests no dependan de `comun/cola-eventos` directamente.

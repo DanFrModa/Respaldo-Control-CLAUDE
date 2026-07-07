@@ -106,14 +106,17 @@ export const rutasProgramacionRc: FastifyPluginCallbackZod = (app, _opciones, do
     return sesion;
   };
 
-  // ── Programar (generar / re-generar) la RC de una orden ──────────────────────
+  // ── RE-programar la RC de una orden (rediseño R3, B5: la generación INICIAL es AUTOMÁTICA al
+  //    nacer la OP — evento outbox `orden-creada` → `rcAutomatica.ts`; este endpoint queda como la
+  //    vía MANUAL para corregir artículo/tela/aplicación/fechas o re-generar) ───────────────────
   app.route({
     method: 'POST',
     url: '/ruta-critica/ordenes/:id/programar',
     preHandler: app.conPermiso('rc.programar'),
     schema: {
       tags: ['ruta-critica'],
-      summary: 'Programar (generar/re-generar) la Ruta Crítica de una orden',
+      summary:
+        'Re-programar la Ruta Crítica de una orden (la generación inicial es automática al crear la OP)',
       security: SEGURIDAD_SESION,
       params: esquemaParamOrdenRc,
       body: esquemaProgramarRc,

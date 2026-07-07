@@ -57,6 +57,7 @@ function bdParaCrear(): ContextoBd {
     noCostear: false,
     fechaCompletada: new Date('2026-06-16T00:00:00Z'),
     motivoCancelada: null,
+    ocCliente: null,
     tallasV1: null,
     maquilaOrd: null,
     aplicacionOrd: null,
@@ -95,6 +96,7 @@ function bdParaCrear(): ContextoBd {
             pedCancelado: false,
             noProducir: false,
             folio: 100n,
+            ocCliente: null,
           },
         }),
       ),
@@ -105,6 +107,8 @@ function bdParaCrear(): ContextoBd {
       findFirst: vi.fn(() => Promise.resolve(ordenDetallada)),
     },
     bitacora: { create: vi.fn(() => Promise.resolve({})) },
+    // El alta escribe el evento outbox `orden-creada` en la MISMA tx (R3, B5).
+    eventoOutbox: { create: vi.fn(() => Promise.resolve({ id: 1 })) },
     // `siguienteFolio` usa $queryRaw con tagged template → devuelve la fila con el folio.
     $queryRaw: vi.fn(() => Promise.resolve([{ valor: 7n }])),
   } as unknown as Tx;

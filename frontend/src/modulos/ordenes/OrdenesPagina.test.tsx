@@ -109,6 +109,7 @@ function orden(
     noCostear: false,
     fechaCompletada: null,
     motivoCancelada: opciones.estado === 'cancelada' ? 'Cliente canceló' : null,
+    ocCliente: null,
     tallasV1: null,
     maquilaOrd: null,
     aplicacionOrd: null,
@@ -142,7 +143,13 @@ function consultaConDatos(datos: Orden[]): EstadoConsulta {
   };
 }
 
-const PERM_TODOS = ['ordenes.ver', 'ordenes.administrar', 'ordenes.cancelar'] as const;
+// "Nueva orden" abre el constructor de PEDIDO (R3): exige tambien pedidos.administrar.
+const PERM_TODOS = [
+  'ordenes.ver',
+  'ordenes.administrar',
+  'ordenes.cancelar',
+  'pedidos.administrar',
+] as const;
 
 describe('<OrdenesPagina>', () => {
   beforeEach(() => {
@@ -196,11 +203,22 @@ describe('<OrdenesPagina>', () => {
     expect(screen.queryByTestId('guardar-matriz')).not.toBeInTheDocument();
   });
 
-  it('muestra el botón "Nueva orden" con permiso de administrar', () => {
+  it('muestra el botón "Nueva orden" con ordenes.administrar + pedidos.administrar', () => {
     useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
     renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
 
     expect(screen.getByTestId('nuevo-orden')).toBeInTheDocument();
+  });
+
+  it('sin pedidos.administrar NO ofrece "Nueva orden" (abre el constructor de pedido, R3)', () => {
+    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
+    renderConProveedores(<OrdenesPagina />, {
+      sesion: estadoSesionDePrueba(['ordenes.ver', 'ordenes.administrar', 'ordenes.cancelar']),
+    });
+
+    expect(screen.queryByTestId('nuevo-orden')).not.toBeInTheDocument();
+    // La edición de la orden (matriz/encabezado) sigue disponible con ordenes.administrar.
+    expect(screen.getByTestId('cancelar-orden')).toBeInTheDocument();
   });
 
   it('muestra el badge de estado DERIVADO (sin botón "marcar completa")', () => {

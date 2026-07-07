@@ -43,6 +43,13 @@ export const EVENTOS_OUTBOX = {
    * reprobar o limpiar), no solo al aprobar, para que des-completar también funcione (decisión (f)).
    */
   auditoriaCalidadResuelta: 'auditoria-calidad-resuelta',
+  /**
+   * Una ORDEN de producción NACIÓ por captura (rediseño R3, B5: `salidaAProduccion` o el alta
+   * directa de /captura — ambas pasan por `crearOrden`, el punto ÚNICO). El consumidor genera la
+   * Ruta Crítica AUTOMÁTICA de la orden ("la RC se programa sola", proto §4.1); la captura NUNCA
+   * espera al CPM. El modo migración (`crearOrdenMigrada`) NO lo publica: el histórico no programa RC.
+   */
+  ordenCreada: 'orden-creada',
 } as const;
 
 /** Nombre válido de evento de outbox. */
@@ -53,6 +60,21 @@ export const VERSION_MATERIAL_RECIBIDO = 1;
 
 /** Versión actual del contrato del evento `auditoria-calidad-resuelta` (F6-E2). */
 export const VERSION_AUDITORIA_CALIDAD = 1;
+
+/** Versión actual del contrato del evento `orden-creada` (rediseño R3, B5). */
+export const VERSION_ORDEN_CREADA = 1;
+
+/**
+ * Carga del evento `orden-creada` (R3, B5). Lo MÍNIMO para que el consumidor programe la RC
+ * automática: a qué orden apunta. El consumidor RELEE de la BD todo lo demás (fecha de entrega,
+ * modelo, catálogos RC) — idempotente: si la orden ya tiene RC activa, el evento es un no-op.
+ */
+export type EventoOrdenCreada = {
+  /** Empresa dueña del hecho (A9). */
+  idEmpresa: number;
+  /** Orden de producción recién creada. */
+  idOrden: number;
+};
 
 /**
  * Carga del evento `auditoria-calidad-resuelta` (F6-E2). Lo MÍNIMO para que el auto-avance de la RC

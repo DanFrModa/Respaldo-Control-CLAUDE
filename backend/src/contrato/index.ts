@@ -377,6 +377,47 @@ export {
   type PedidoRealesLista,
 } from './esquemas/pedido.js';
 
+// ── Adjuntos del pedido interno (rediseño R3, B3) ──
+export {
+  esquemaPedidoAdjuntoCrear,
+  esquemaPedidoAdjuntoSubida,
+  esquemaPedidoAdjuntoSalida,
+  esquemaPedidoAdjuntosLista,
+  type DatosPedidoAdjuntoCrear,
+  type PedidoAdjuntoSubida,
+  type PedidoAdjuntoSalida,
+  type PedidoAdjuntosLista,
+} from './esquemas/adjunto-pedido.js';
+
+// ── Salida a producción + candidatos de desarrollo (rediseño R3, B4/B6) ──
+export {
+  esquemaSalidaProduccionCuerpo,
+  esquemaSalidaProduccionSalida,
+  esquemaCandidatosDesarrolloQuery,
+  esquemaCandidatoDesarrollo,
+  esquemaCandidatosDesarrolloSalida,
+  type DatosSalidaProduccion,
+  type SalidaProduccionSalida,
+  type CandidatosDesarrolloQuery,
+  type CandidatoDesarrollo,
+  type CandidatosDesarrolloSalida,
+} from './esquemas/salida-produccion.js';
+
+// ── Consulta de pedidos por mes (rediseño R3, B6 — proto §4.1) ──
+export {
+  esquemaPedidosPorMesQuery,
+  esquemaEstatusPedidoMes,
+  esquemaPedidoMesRenglon,
+  esquemaPedidoMesFila,
+  esquemaPedidosPorMesTotales,
+  esquemaPedidosPorMesSalida,
+  type PedidosPorMesQuery,
+  type PedidoMesRenglon,
+  type PedidoMesFila,
+  type PedidosPorMesTotales,
+  type PedidosPorMesSalida,
+} from './esquemas/pedidos-mes.js';
+
 // ── Órdenes de producción (Módulo ÓRDENES, F2-E2; doc 03-Produccion) ──────────
 export {
   esquemaOrdenTallaEntrada,

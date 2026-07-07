@@ -19,11 +19,13 @@ import { useLocation, useNavigate } from 'react-router-dom';
 
 import { useClientes } from '@/api/clientes';
 import { useEmpresas } from '@/api/empresas';
+import { useExpedienteOrden, useSugerenciaLiga } from '@/api/liga-orden';
 import { useOrden } from '@/api/ordenes';
 import { useOrdenesCentro } from '@/api/ordenes-centro';
 import { imprimirOrden } from '@/api/ordenes-consulta';
 import { useProveedores, useRolesProveedor } from '@/api/proveedores';
 import type { Orden, OrdenCentro, OrdenesCentroQuery } from '@/api/tipos';
+import { CadenaTrazabilidad, type NodoTraza } from '@/components/dominio/CadenaTrazabilidad';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import { ComboboxBuscable } from '@/components/dominio/ComboboxBuscable';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
@@ -45,7 +47,6 @@ import { cn } from '@/lib/utils';
 import { AvanceProduccion } from '@/modulos/produccion/AvanceProduccion';
 import { useSesion } from '@/sesion/useSesion';
 
-import { DialogoNuevaOrden } from './DialogoNuevaOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
@@ -113,6 +114,9 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
+  // "Nueva orden" abre el CONSTRUCTOR DE PEDIDO (R3: la OP nace del pedido) → exige TAMBIÉN
+  // `pedidos.administrar` (hallazgo del reviewer: sin él, el constructor solo cosecharía 403s).
+  const puedeCrearPedido = tienePermiso('pedidos.administrar');
   const puedeVerDesarrollo = tienePermiso('desarrollo.ver');
   const puedeAdministrarDesarrollo = tienePermiso('desarrollo.administrar');
   const verImportes = tienePermiso('consultas.ver-importes');
@@ -181,7 +185,6 @@ export function CentroOrdenesPagina(): React.JSX.Element {
 
   // ── Avance de producción (doble clic / botón) ──────────────────────────────
   const [avanceDe, setAvanceDe] = useState<{ id: number; folioPedido: number | null } | null>(null);
-  const [altaAbierta, setAltaAbierta] = useState(false);
 
   function abrirAvance(fila: { id: number; folioPedido: number | null }): void {
     setAvanceDe({ id: fila.id, folioPedido: fila.folioPedido });
@@ -287,8 +290,14 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             <RefreshCw className={cn(consulta.isFetching && 'animate-spin')} aria-hidden />
             Actualizar
           </Button>
-          {puedeAdministrar ? (
-            <Button size="sm" onClick={() => setAltaAbierta(true)} data-testid="centro-nueva-orden">
+          {puedeAdministrar && puedeCrearPedido ? (
+            // La OP no se crea suelta: nace del PEDIDO (R3, §4.1). "Nueva orden" abre el
+            // constructor de pedido interno en la pantalla de Pedidos.
+            <Button
+              size="sm"
+              onClick={() => void navigate('/pedidos', { state: { abrirConstructor: true } })}
+              data-testid="centro-nueva-orden"
+            >
               <Plus aria-hidden />
               Nueva orden
             </Button>
@@ -604,18 +613,6 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           alCerrar={() => setAvanceDe(null)}
         />
       ) : null}
-
-      {/* Alta (la orden nace de un renglón de pedido, F2). */}
-      {altaAbierta ? (
-        <DialogoNuevaOrden
-          abierto
-          alCambiarAbierto={setAltaAbierta}
-          alCreada={(idNueva) => {
-            setIdSeleccionada(idNueva);
-            void consulta.refetch();
-          }}
-        />
-      ) : null}
     </div>
   );
 }
@@ -747,6 +744,73 @@ function MatrizResumen({ orden }: { orden: Orden }): React.JSX.Element {
       </table>
     </div>
   );
+}
+
+/**
+ * Cadena de trazabilidad COMPACTA del panel (R3, §4.1): `OC cliente → Desarrollo → Lista →
+ * Pedido → OP`. El nodo de desarrollo/lista se resuelve con el expediente F8-E6 (mismas claves de
+ * cache que `SeccionDesarrolloOrden`: cero peticiones extra); sin `desarrollo.ver` quedan
+ * apagados. Los históricos sin ficha avisan "modelo anterior al módulo de Desarrollo".
+ */
+function CadenaTrazaOrden({
+  orden,
+  fila,
+  puedeVerDesarrollo,
+}: {
+  orden: Orden;
+  fila: OrdenCentro | undefined;
+  puedeVerDesarrollo: boolean;
+}): React.JSX.Element {
+  const navigate = useNavigate();
+  const sugerencia = useSugerenciaLiga(puedeVerDesarrollo ? orden.id : undefined);
+  const yaLigada = sugerencia.data?.yaLigada === true;
+  const expediente = useExpedienteOrden(puedeVerDesarrollo ? orden.id : undefined, yaLigada);
+
+  const nodos: NodoTraza[] = [
+    ...(orden.ocCliente !== null
+      ? [
+          {
+            clave: 'oc' as const,
+            etiqueta: 'OC cliente',
+            valor: orden.ocCliente,
+            activo: true,
+            titulo: 'Orden de compra original del cliente (snapshot en la OP)',
+          },
+        ]
+      : []),
+    {
+      clave: 'desarrollo',
+      etiqueta: 'Desarrollo',
+      valor: yaLigada ? `#${expediente.data?.codigoModelo ?? orden.codigoModelo}` : '—',
+      activo: yaLigada,
+      ...(yaLigada
+        ? { onNavegar: () => void navigate('/desarrollo', { state: { idModelo: orden.idModelo } }) }
+        : {
+            titulo: puedeVerDesarrollo
+              ? 'modelo anterior al módulo de Desarrollo (sin liga)'
+              : 'Requiere permiso de Desarrollo',
+          }),
+    },
+    {
+      clave: 'lista',
+      etiqueta: 'Lista de precios',
+      valor: expediente.data?.lista != null ? `#${expediente.data.lista.folioLista}` : '—',
+      activo: expediente.data?.lista != null,
+      ...(expediente.data?.lista != null
+        ? { onNavegar: () => void navigate('/listas-precios') }
+        : {}),
+    },
+    {
+      clave: 'pedido',
+      etiqueta: 'Pedido interno',
+      valor: fila?.folioPedido != null ? `${fila.folioPedido}-F` : '—',
+      activo: fila?.folioPedido != null,
+      ...(fila?.folioPedido != null ? { onNavegar: () => void navigate('/pedidos') } : {}),
+    },
+    { clave: 'op', etiqueta: 'OP · producción', valor: `#${orden.folio}`, activo: true },
+  ];
+
+  return <CadenaTrazabilidad nodos={nodos} compacta />;
 }
 
 /** Campo etiqueta/valor chico del panel (proto `.field`). */
@@ -903,8 +967,16 @@ function DetalleCentroOrden({
         </div>
       </div>
 
-      {/* ── Con scroll: precios, encabezado, tela y compra, foto, desarrollo ── */}
+      {/* ── Con scroll: trazabilidad, precios, encabezado, tela y compra, foto, desarrollo ── */}
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        {/* Cadena de trazabilidad (R3, §4.1): OC cliente → Desarrollo → Lista → Pedido → OP. */}
+        <section>
+          <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            Trazabilidad
+          </h4>
+          <CadenaTrazaOrden orden={orden} fila={fila} puedeVerDesarrollo={puedeVerDesarrollo} />
+        </section>
+
         <section>
           <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
             Precios

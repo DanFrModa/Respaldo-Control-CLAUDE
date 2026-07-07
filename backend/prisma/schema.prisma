@@ -460,6 +460,9 @@ model Archivo {
   /// Adjunto de orden de producción que apunta a este archivo (F8-E6, R6), si lo hay. Inversa de
   /// `OrdenArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA sola orden — Cascade en ambos).
   ordenArchivo     OrdenArchivo?
+  /// Adjunto de pedido interno que apunta a este archivo (rediseño R3, B3), si lo hay. Inversa de
+  /// `PedidoArchivo.archivo`; 0 o 1 (un archivo se adjunta a UN solo pedido — Cascade en ambos).
+  pedidoArchivo    PedidoArchivo?
 
   @@map("archivos")
 }
@@ -1417,11 +1420,18 @@ model Genero {
 /// vive en el modelo (D4). NO lleva `idEtiquetaMarca` (se difiere a F7/Costos).
 model Modelo {
   id          Int      @id @default(autoincrement())
-  /// Código/clave de negocio del modelo. Único global (ADR-0007).
+  /// Código/clave de negocio del modelo. Único global (ADR-0007). Con el rediseño R3 (B4) este
+  /// código es el nº de DESARROLLO; el nº de PRODUCCIÓN es `numeroProduccion` (bases distintas).
   codigo      String   @unique
   descripcion String?
   /// Costo de maquila base que heredan las órdenes (doc 01-Modelos §4).
   maquilaBase Decimal? @map("maquila_base") @db.Decimal(12, 2)
+
+  /// Nº INTERNO de producción (rediseño R3, B4 — aclaración Daniel 7-jul: Desarrollo y Producción
+  /// son bases distintas). Se MINTEA por la secuencia atómica `numero_produccion_seq` (A3) la
+  /// PRIMERA vez que el modelo sale a producción (`salidaAProduccion`) y se REUSA entre sus OPs.
+  /// Distinto del folio de la OP y del nº de desarrollo (`codigo`). Null = nunca ha salido.
+  numeroProduccion Int? @unique @map("numero_produccion")
 
   /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
   idTemporada    Int?          @map("id_temporada")
@@ -1719,6 +1729,11 @@ model Pedido {
   /// Pedido cancelado — cancelación SUAVE, sigue consultable (viejo: `PedCancelado`).
   pedCancelado    Boolean @default(false) @map("ped_cancelado")
 
+  /// OC ORIGINAL del cliente (rediseño R3, B3 — petición Daniel 7-jul §4.1): el nº de orden de
+  /// compra del cliente, captura VIVA y editable. Al crear cada OP se copia como SNAPSHOT a
+  /// `Orden.ocCliente` (editar este campo NO re-escribe las órdenes ya nacidas).
+  ocCliente String? @map("oc_cliente")
+
   /// SNAPSHOT MIGRADO de SOLO LECTURA (viejo: `Pedidos.IdOrdCompra` "Orden de compra
   /// ligada", presente en 233 de 1,529 pedidos). SIN FK hasta que OrdCompra exista en F4
   /// (entonces se promueve a relación real). Lo puebla el ETL de E5; NINGÚN endpoint de F2
@@ -1727,6 +1742,9 @@ model Pedido {
 
   lineas PedidoLinea[]
   reales PedidoReal[]
+  /// Adjuntos de apoyo del pedido en R2 (rediseño R3, B3 — el documento original de la OC del
+  /// cliente, Excel/PDF/imágenes). Cascade: son del pedido.
+  archivos PedidoArchivo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1736,6 +1754,28 @@ model Pedido {
   @@unique([idEmpresa, folio])
   @@index([idCliente])
   @@map("pedidos")
+}
+
+/// Puente pedido ↔ archivo R2 (rediseño R3, B3). Liga un `Archivo` (motor de archivos de F0) a un
+/// PEDIDO interno como adjunto de apoyo — típicamente el documento ORIGINAL de la OC del cliente.
+/// Espejo exacto de `OrdenArchivo`. `onDelete`:
+///  • Cascade hacia `Pedido`: los adjuntos son del pedido.
+///  • Cascade hacia `Archivo`: al quitar el adjunto se borra también su `Archivo` (el objeto físico
+///    en R2 lo borra el dominio best-effort tras el commit — ver `dominio/pedidos/adjuntos-pedido.ts`).
+model PedidoArchivo {
+  id        Int    @id @default(autoincrement())
+  idPedido  Int    @map("id_pedido")
+  idArchivo String @map("id_archivo")
+
+  pedido  Pedido  @relation(fields: [idPedido], references: [id], onDelete: Cascade)
+  archivo Archivo @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idPedido])
+  @@map("pedido_archivo")
 }
 
 /// Renglón de un pedido interno (F2-E1 — ex `PedidosDet`, doc 02-Pedidos §2). Un modelo
@@ -1750,6 +1790,12 @@ model PedidoLinea {
   pedido   Pedido @relation(fields: [idPedido], references: [id], onDelete: Cascade)
   idModelo Int    @map("id_modelo")
   modelo   Modelo @relation(fields: [idModelo], references: [id], onDelete: Restrict)
+
+  /// Desarrollo del que sale el renglón (rediseño R3, B4): el constructor elige el modelo DE
+  /// DESARROLLO (F8) y deja aquí la traza directa renglón→desarrollo; `salidaAProduccion` la usa
+  /// para ligar la OP (`DesarrolloOrden`). Nullable: renglones legado/F2 sin desarrollo. Restrict.
+  idDesarrollo Int?        @map("id_desarrollo")
+  desarrollo   Desarrollo? @relation(fields: [idDesarrollo], references: [id], onDelete: Restrict)
 
   /// Cantidad pedida (viejo: `CantPed`).
   cantidadPedida Int     @map("cantidad_pedida")
@@ -1776,6 +1822,7 @@ model PedidoLinea {
 
   @@index([idPedido])
   @@index([idModelo])
+  @@index([idDesarrollo])
   @@map("pedido_linea")
 }
 
@@ -1928,6 +1975,11 @@ model Orden {
   /// CADENA CRUDA de tallas del viejo (viejo: `Tallas`, p. ej. "CHM G EX"). De SOLO LECTURA, se
   /// conserva para trazabilidad; el despivote a `OrdenLineaTalla` (matriz real) lo hace el ETL.
   tallasV1 String? @map("tallas_v1")
+
+  /// SNAPSHOT de la OC original del cliente (rediseño R3, B3 — petición Daniel 7-jul §4.1): se
+  /// copia de `Pedido.ocCliente` AL CREAR la orden y ya NO se re-escribe (queda amarrado a la OP
+  /// aunque el pedido interno se reorganice). Ningún endpoint lo edita.
+  ocCliente String? @map("oc_cliente")
 
   /// Costo de maquila de la orden (viejo: `MaquilaOrd`). DATO conservado de v1; su motor (costeo)
   /// llega en F3/F6 — sin lógica en F2.
@@ -5101,6 +5153,8 @@ model Desarrollo {
   precostos    Precosto[]
   ordenLigadas DesarrolloOrden[]
   listaLineas  ListaPreciosLinea[]
+  /// Renglones de pedido interno que salen de este desarrollo (rediseño R3, B4). Restrict.
+  pedidoLineas PedidoLinea[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")

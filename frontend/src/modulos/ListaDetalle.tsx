@@ -97,6 +97,12 @@ export interface PropsListaDetalle<T> {
   alNuevo: () => void;
   textoNuevo: string;
   /**
+   * Muestra el botón "Nuevo" del encabezado (además de `puedeAdministrar`). Para pantallas cuyo
+   * ALTA exige un permiso ADICIONAL al de administrar (p. ej. Órdenes/captura R3: "Nueva orden"
+   * abre el constructor de PEDIDO, que exige `pedidos.administrar`). Por defecto se muestra.
+   */
+  mostrarNuevo?: boolean | undefined;
+  /**
    * Acciones EXTRA del encabezado de la pantalla (botones secundarios junto a
    * "Nuevo"): se pintan a la izquierda del botón "Nuevo", solo si
    * `puedeAdministrar`. P. ej. "Fusionar" en Colores. Opcional: las pantallas que
@@ -154,6 +160,7 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     puedeAdministrar,
     alNuevo,
     textoNuevo,
+    mostrarNuevo = true,
     accionesEncabezado,
     alEditar,
     alDesactivar,
@@ -239,10 +246,12 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
         {puedeAdministrar ? (
           <div className="flex flex-wrap items-center gap-2">
             {accionesEncabezado}
-            <Button onClick={alNuevo} data-testid={`nuevo-${testid}`}>
-              <PlusIcon aria-hidden />
-              {textoNuevo}
-            </Button>
+            {mostrarNuevo ? (
+              <Button onClick={alNuevo} data-testid={`nuevo-${testid}`}>
+                <PlusIcon aria-hidden />
+                {textoNuevo}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>

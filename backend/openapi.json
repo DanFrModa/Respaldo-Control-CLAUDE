@@ -30529,6 +30529,17 @@
                             "type": "boolean",
                             "description": "Cancelación suave: el pedido sigue consultable."
                           },
+                          "ocCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                          },
                           "idOrdCompraV1": {
                             "anyOf": [
                               {
@@ -30655,6 +30666,32 @@
                                     }
                                   ],
                                   "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                                },
+                                "idDesarrollo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                                },
+                                "numeroProduccion": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción."
                                 }
                               },
                               "required": [
@@ -30667,7 +30704,9 @@
                                 "precio",
                                 "importe",
                                 "entregadoParcialV1",
-                                "cantFaltanteV1"
+                                "cantFaltanteV1",
+                                "idDesarrollo",
+                                "numeroProduccion"
                               ],
                               "additionalProperties": false,
                               "description": "Renglón de un pedido interno."
@@ -30723,6 +30762,7 @@
                           "entregadoTienda",
                           "noProducir",
                           "pedCancelado",
+                          "ocCliente",
                           "idOrdCompraV1",
                           "totalPiezas",
                           "totalImporte",
@@ -30975,6 +31015,11 @@
                     "description": "Marcado para no producir.",
                     "type": "boolean"
                   },
+                  "ocCliente": {
+                    "description": "OC ORIGINAL del cliente (rediseño R3, B3): su nº de orden de compra. Captura viva; al crear cada OP se copia como snapshot a la orden.",
+                    "type": "string",
+                    "maxLength": 100
+                  },
                   "lineas": {
                     "default": [],
                     "description": "Renglones del pedido (modelo + cantidad + precio).",
@@ -31004,6 +31049,19 @@
                           "description": "Precio pactado por prenda — snapshot del pedido (viejo: Precio). Opcional: un usuario sin `pedidos.importes` NO lo manda; el dominio conserva el precio almacenado (renglón existente) o usa 0 (renglón nuevo).",
                           "type": "number",
                           "minimum": 0
+                        },
+                        "idDesarrollo": {
+                          "description": "Desarrollo (F8) del que sale el renglón (rediseño R3, B4): el constructor elige el modelo DE DESARROLLO. El dominio valida que el desarrollo sea de ese modelo y del cliente del pedido. `null` lo desliga; omitido = no tocar (edición) / sin desarrollo (alta).",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -31138,6 +31196,17 @@
                       "type": "boolean",
                       "description": "Cancelación suave: el pedido sigue consultable."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                    },
                     "idOrdCompraV1": {
                       "anyOf": [
                         {
@@ -31264,6 +31333,32 @@
                               }
                             ],
                             "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                          },
+                          "idDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción."
                           }
                         },
                         "required": [
@@ -31276,7 +31371,9 @@
                           "precio",
                           "importe",
                           "entregadoParcialV1",
-                          "cantFaltanteV1"
+                          "cantFaltanteV1",
+                          "idDesarrollo",
+                          "numeroProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -31332,6 +31429,7 @@
                     "entregadoTienda",
                     "noProducir",
                     "pedCancelado",
+                    "ocCliente",
                     "idOrdCompraV1",
                     "totalPiezas",
                     "totalImporte",
@@ -31632,6 +31730,17 @@
                       "type": "boolean",
                       "description": "Cancelación suave: el pedido sigue consultable."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                    },
                     "idOrdCompraV1": {
                       "anyOf": [
                         {
@@ -31758,6 +31867,32 @@
                               }
                             ],
                             "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                          },
+                          "idDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción."
                           }
                         },
                         "required": [
@@ -31770,7 +31905,9 @@
                           "precio",
                           "importe",
                           "entregadoParcialV1",
-                          "cantFaltanteV1"
+                          "cantFaltanteV1",
+                          "idDesarrollo",
+                          "numeroProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -31826,6 +31963,7 @@
                     "entregadoTienda",
                     "noProducir",
                     "pedCancelado",
+                    "ocCliente",
                     "idOrdCompraV1",
                     "totalPiezas",
                     "totalImporte",
@@ -32074,6 +32212,18 @@
                     "description": "Marcado para no producir.",
                     "type": "boolean"
                   },
+                  "ocCliente": {
+                    "description": "OC del cliente (`null` la vacía; omitida = no tocar). Editar aquí NO re-escribe el snapshot de las órdenes ya nacidas (R3, B3).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "lineas": {
                     "description": "Set COMPLETO de renglones (si se omite, no se tocan).",
                     "type": "array",
@@ -32102,6 +32252,19 @@
                           "description": "Precio pactado por prenda — snapshot del pedido (viejo: Precio). Opcional: un usuario sin `pedidos.importes` NO lo manda; el dominio conserva el precio almacenado (renglón existente) o usa 0 (renglón nuevo).",
                           "type": "number",
                           "minimum": 0
+                        },
+                        "idDesarrollo": {
+                          "description": "Desarrollo (F8) del que sale el renglón (rediseño R3, B4): el constructor elige el modelo DE DESARROLLO. El dominio valida que el desarrollo sea de ese modelo y del cliente del pedido. `null` lo desliga; omitido = no tocar (edición) / sin desarrollo (alta).",
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -32246,6 +32409,17 @@
                       "type": "boolean",
                       "description": "Cancelación suave: el pedido sigue consultable."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                    },
                     "idOrdCompraV1": {
                       "anyOf": [
                         {
@@ -32372,6 +32546,32 @@
                               }
                             ],
                             "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                          },
+                          "idDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción."
                           }
                         },
                         "required": [
@@ -32384,7 +32584,9 @@
                           "precio",
                           "importe",
                           "entregadoParcialV1",
-                          "cantFaltanteV1"
+                          "cantFaltanteV1",
+                          "idDesarrollo",
+                          "numeroProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -32440,6 +32642,7 @@
                     "entregadoTienda",
                     "noProducir",
                     "pedCancelado",
+                    "ocCliente",
                     "idOrdCompraV1",
                     "totalPiezas",
                     "totalImporte",
@@ -32761,6 +32964,17 @@
                       "type": "boolean",
                       "description": "Cancelación suave: el pedido sigue consultable."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                    },
                     "idOrdCompraV1": {
                       "anyOf": [
                         {
@@ -32887,6 +33101,32 @@
                               }
                             ],
                             "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                          },
+                          "idDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción."
                           }
                         },
                         "required": [
@@ -32899,7 +33139,9 @@
                           "precio",
                           "importe",
                           "entregadoParcialV1",
-                          "cantFaltanteV1"
+                          "cantFaltanteV1",
+                          "idDesarrollo",
+                          "numeroProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -32955,6 +33197,7 @@
                     "entregadoTienda",
                     "noProducir",
                     "pedCancelado",
+                    "ocCliente",
                     "idOrdCompraV1",
                     "totalPiezas",
                     "totalImporte",
@@ -33255,6 +33498,17 @@
                       "type": "boolean",
                       "description": "Cancelación suave: el pedido sigue consultable."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "OC original del cliente (R3, B3 — captura viva del pedido), o null."
+                    },
                     "idOrdCompraV1": {
                       "anyOf": [
                         {
@@ -33381,6 +33635,32 @@
                               }
                             ],
                             "description": "Snapshot migrado de SOLO LECTURA: cantidad faltante en el viejo (no saldo vivo)."
+                          },
+                          "idDesarrollo": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Desarrollo (F8) del que sale el renglón (R3, B4), o null (legado/F2)."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº interno de producción del MODELO del renglón (R3, B4), o null si el modelo aún no sale a producción."
                           }
                         },
                         "required": [
@@ -33393,7 +33673,9 @@
                           "precio",
                           "importe",
                           "entregadoParcialV1",
-                          "cantFaltanteV1"
+                          "cantFaltanteV1",
+                          "idDesarrollo",
+                          "numeroProduccion"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de un pedido interno."
@@ -33449,6 +33731,7 @@
                     "entregadoTienda",
                     "noProducir",
                     "pedCancelado",
+                    "ocCliente",
                     "idOrdCompraV1",
                     "totalPiezas",
                     "totalImporte",
@@ -35548,6 +35831,2536 @@
         }
       }
     },
+    "/api/pedidos/{idPedido}/adjuntos": {
+      "post": {
+        "summary": "Preparar la subida de un adjunto del pedido (R3, B3 — la OC original del cliente)",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombreOriginal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Nombre del archivo tal como lo llama el usuario."
+                  },
+                  "tipoMime": {
+                    "type": "string",
+                    "pattern": "^[\\w.+-]+\\/[\\w.+-]+$",
+                    "description": "Tipo MIME del archivo (ej. application/pdf, image/png)."
+                  },
+                  "tamanoBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño)."
+                  }
+                },
+                "required": [
+                  "nombreOriginal",
+                  "tipoMime",
+                  "tamanoBytes"
+                ],
+                "description": "Datos para preparar la subida de un adjunto de un pedido."
+              }
+            }
+          },
+          "description": "Datos para preparar la subida de un adjunto de un pedido."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idPedido",
+            "required": true,
+            "description": "Id del pedido interno."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de preparar la subida de un adjunto de pedido (URL prefirmada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idArchivo": {
+                      "type": "string",
+                      "description": "Id del registro Archivo creado."
+                    },
+                    "nombreOriginal": {
+                      "type": "string",
+                      "description": "Nombre original del archivo."
+                    },
+                    "urlSubida": {
+                      "type": "string",
+                      "description": "URL PUT prefirmada: el navegador sube directo a R2."
+                    },
+                    "expiraEnSegundos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Vigencia de la URL de subida (segundos)."
+                    }
+                  },
+                  "required": [
+                    "idArchivo",
+                    "nombreOriginal",
+                    "urlSubida",
+                    "expiraEnSegundos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de preparar la subida de un adjunto de pedido (URL prefirmada)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Listar los adjuntos de un pedido",
+        "tags": [
+          "pedidos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idPedido",
+            "required": true,
+            "description": "Id del pedido interno."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adjuntos de un pedido interno.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del registro Archivo."
+                          },
+                          "nombreOriginal": {
+                            "type": "string",
+                            "description": "Nombre original del archivo."
+                          },
+                          "tipoMime": {
+                            "type": "string",
+                            "description": "Tipo MIME del archivo."
+                          },
+                          "tamanoBytes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño en bytes."
+                          },
+                          "urlDescarga": {
+                            "type": "string",
+                            "description": "URL GET prefirmada para ver/descargar el archivo."
+                          },
+                          "subidoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién subió el archivo, o null."
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha en que se adjuntó (ISO 8601)."
+                          }
+                        },
+                        "required": [
+                          "idArchivo",
+                          "nombreOriginal",
+                          "tipoMime",
+                          "tamanoBytes",
+                          "urlDescarga",
+                          "subidoPorId",
+                          "creadoEn"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Adjunto de un pedido con su URL de descarga."
+                      },
+                      "description": "Adjuntos del pedido."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Adjuntos de un pedido interno."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/{idPedido}/adjuntos/{idArchivo}": {
+      "delete": {
+        "summary": "Quitar un adjunto del pedido",
+        "tags": [
+          "pedidos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idPedido",
+            "required": true,
+            "description": "Id del pedido interno."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "idArchivo",
+            "required": true,
+            "description": "Id del adjunto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/por-mes": {
+      "get": {
+        "summary": "Consulta de pedidos por mes (agrupada pedido → renglones, con totales)",
+        "tags": [
+          "pedidos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "in": "query",
+            "name": "anio",
+            "required": false,
+            "description": "Año de la entrega del pedido (fechaHasta ?? fechaDe)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            },
+            "in": "query",
+            "name": "mes",
+            "required": false,
+            "description": "Mes de la entrega (1-12); ausente = Todos."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCliente",
+            "required": false,
+            "description": "Filtra por cliente."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idEmpresa",
+            "required": false,
+            "description": "Paridad con el proto; un id distinto de la empresa activa devuelve vacío (A9)."
+          },
+          {
+            "schema": {
+              "default": "vigentes",
+              "type": "string",
+              "enum": [
+                "vigentes",
+                "entregados",
+                "cancelados",
+                "todos"
+              ]
+            },
+            "in": "query",
+            "name": "estatus",
+            "required": false,
+            "description": "Vigentes (no cancelados ni entregados) / Entregados / Cancelados / Todos."
+          },
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Pedidos por página."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de la consulta de pedidos por mes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del pedido."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio `-F` (consecutivo por empresa)."
+                          },
+                          "idEmpresa": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Empresa del pedido."
+                          },
+                          "empresa": {
+                            "type": "string",
+                            "description": "Nombre de la empresa (FR Moda / Marilyn Fitness)."
+                          },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del pedido."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          },
+                          "ocCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "OC original del cliente (chip), o null."
+                          },
+                          "fechaDe": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Ventana de entrega — desde, o null."
+                          },
+                          "fechaHasta": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Ventana de entrega — hasta, o null."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "enum": [
+                              "vigente",
+                              "entregado",
+                              "cancelado"
+                            ],
+                            "description": "Cancelado (pedCancelado) > Entregado (entregadoTienda) > Vigente."
+                          },
+                          "cantidadTotal": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Σ cantidades pedidas de los renglones."
+                          },
+                          "cortadoTotal": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Σ cortado de los renglones."
+                          },
+                          "importeTotal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Σ importes de los renglones, o null sin `pedidos.importes`."
+                          },
+                          "renglones": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Id del renglón (PedidoLinea)."
+                                },
+                                "idModelo": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Modelo del renglón."
+                                },
+                                "codigoModelo": {
+                                  "type": "string",
+                                  "description": "Nº de desarrollo (Modelo.codigo)."
+                                },
+                                "descripcionModelo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Descripción del modelo, o null."
+                                },
+                                "idDesarrollo": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Desarrollo del renglón (R3, B4), o null."
+                                },
+                                "numeroCliente": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nº del cliente para el modelo (del desarrollo), o null."
+                                },
+                                "numeroProduccion": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Nº interno de producción del modelo, o null si no ha salido a producción."
+                                },
+                                "cantidad": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Cantidad pedida del renglón."
+                                },
+                                "precio": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Precio por prenda, o null sin `pedidos.importes`."
+                                },
+                                "importe": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Importe (cantidad × precio), o null sin `pedidos.importes`."
+                                },
+                                "idOrden": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "OP más reciente VIVA del renglón (para el deep-link), o null (botón Generar OP)."
+                                },
+                                "folioOrden": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Folio de esa OP, o null."
+                                },
+                                "numOrdenes": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Cuántas OPs vivas tiene el renglón (resurtidos; 0 = sin orden)."
+                                },
+                                "cortado": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991,
+                                  "description": "Σ piezas cortadas (etapas de corte vivas, F3) de las OPs del renglón."
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "idModelo",
+                                "codigoModelo",
+                                "descripcionModelo",
+                                "idDesarrollo",
+                                "numeroCliente",
+                                "numeroProduccion",
+                                "cantidad",
+                                "precio",
+                                "importe",
+                                "idOrden",
+                                "folioOrden",
+                                "numOrdenes",
+                                "cortado"
+                              ],
+                              "additionalProperties": false,
+                              "description": "Renglón/modelo de un pedido en la consulta por mes."
+                            },
+                            "description": "Renglones/modelos del pedido."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "folio",
+                          "idEmpresa",
+                          "empresa",
+                          "idCliente",
+                          "cliente",
+                          "ocCliente",
+                          "fechaDe",
+                          "fechaHasta",
+                          "estatus",
+                          "cantidadTotal",
+                          "cortadoTotal",
+                          "importeTotal",
+                          "renglones"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Pedido agrupado con sus renglones (fila expandible de la consulta)."
+                      },
+                      "description": "Pedidos de la página (agrupados)."
+                    },
+                    "totales": {
+                      "type": "object",
+                      "properties": {
+                        "pedidos": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Pedidos que cumplen el filtro."
+                        },
+                        "ordenes": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "OPs vivas de esos pedidos."
+                        },
+                        "piezas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Σ piezas pedidas."
+                        },
+                        "cortado": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Σ piezas cortadas."
+                        },
+                        "avancePct": {
+                          "type": "number",
+                          "description": "Cortado / piezas × 100 (0 si no hay piezas)."
+                        },
+                        "importe": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ importes, o null sin `pedidos.importes`."
+                        }
+                      },
+                      "required": [
+                        "pedidos",
+                        "ordenes",
+                        "piezas",
+                        "cortado",
+                        "avancePct",
+                        "importe"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Totales del filtro completo para la barra al pie."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de pedidos que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página devuelta."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Pedidos por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "totales",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Página de la consulta de pedidos por mes."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/candidatos-desarrollo": {
+      "get": {
+        "summary": "Desarrollos candidatos para un renglón del pedido (búsqueda sin acentos)",
+        "tags": [
+          "pedidos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar SIN acentos ni mayúsculas: código/descripción del modelo, nº del cliente, nombre del proyecto o del cliente."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idCliente",
+            "required": false,
+            "description": "Filtra a los desarrollos de un cliente (el del encabezado del pedido)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "in": "query",
+            "name": "limite",
+            "required": false,
+            "description": "Máximo de candidatos a devolver (typeahead)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Desarrollos candidatos para el constructor de pedido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idDesarrollo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del desarrollo."
+                          },
+                          "idModelo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del modelo del desarrollo."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Nº de desarrollo (Modelo.codigo)."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "numeroCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº del cliente para este modelo, o null."
+                          },
+                          "numeroProduccion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nº interno de producción del modelo (si ya salió a producción), o null."
+                          },
+                          "idProyecto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Proyecto del desarrollo."
+                          },
+                          "folioProyecto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio del proyecto."
+                          },
+                          "nombreProyecto": {
+                            "type": "string",
+                            "description": "Nombre/tema del proyecto."
+                          },
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cliente del proyecto."
+                          },
+                          "nombreCliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          },
+                          "nombreDepartamento": {
+                            "type": "string",
+                            "description": "Departamento del cliente."
+                          },
+                          "precioSugerido": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio PROPUESTO para el renglón del pedido (del renglón de lista más reciente: aprobado ?? calculado), o null sin lista o sin `pedidos.importes`."
+                          }
+                        },
+                        "required": [
+                          "idDesarrollo",
+                          "idModelo",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "numeroCliente",
+                          "numeroProduccion",
+                          "idProyecto",
+                          "folioProyecto",
+                          "nombreProyecto",
+                          "idCliente",
+                          "nombreCliente",
+                          "nombreDepartamento",
+                          "precioSugerido"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Desarrollo candidato para un renglón del pedido."
+                      },
+                      "description": "Candidatos (tope `limite`)."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Desarrollos candidatos para el constructor de pedido."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/lineas/{idLinea}/salida-produccion": {
+      "post": {
+        "summary": "Generar la OP de un renglón (salida a producción: matriz + liga al desarrollo + nº de producción + RC automática)",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "lineas": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "description": "Id del renglón (color) existente (solo en edición; ausente = renglón nuevo).",
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "idColor": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Color del catálogo (F1; en v1 era texto libre)."
+                        },
+                        "tallas": {
+                          "default": [],
+                          "description": "Cantidades por talla de este color.",
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idTalla": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Talla del catálogo (D4)."
+                              },
+                              "cantidad": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Cantidad de prendas de esta talla en este color (viejo: T1..T8)."
+                              }
+                            },
+                            "required": [
+                              "idTalla",
+                              "cantidad"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "idColor"
+                      ]
+                    },
+                    "description": "Matriz color×talla de la OP (nace aquí; al menos un color)."
+                  },
+                  "referencias": {
+                    "description": "Valores de referencia del cliente (D7) para la orden, opcionales.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "idClienteCampo": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Campo de referencia del cliente (D7; debe ser del cliente de la orden y estar activo)."
+                        },
+                        "valor": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "description": "Valor capturado para ese campo en esta orden."
+                        }
+                      },
+                      "required": [
+                        "idClienteCampo",
+                        "valor"
+                      ]
+                    }
+                  },
+                  "fecha": {
+                    "description": "Fecha de la orden (YYYY-MM-DD); default hoy.",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  },
+                  "fechaEntrega": {
+                    "description": "Fecha de entrega comprometida de la OP; si se omite, hereda la ventana del pedido (fechaHasta ?? fechaDe).",
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                  }
+                },
+                "required": [
+                  "lineas"
+                ],
+                "description": "Datos para generar la OP (salida a producción) de un renglón de pedido."
+              }
+            }
+          },
+          "description": "Datos para generar la OP (salida a producción) de un renglón de pedido."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón del pedido (PedidoLinea)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de generar la OP (salida a producción).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "orden": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id interno de la orden."
+                        },
+                        "folio": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Folio consecutivo por empresa."
+                        },
+                        "idEmpresa": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Empresa dueña de la orden y del folio."
+                        },
+                        "estado": {
+                          "type": "string",
+                          "enum": [
+                            "capturada",
+                            "completa",
+                            "cancelada"
+                          ],
+                          "description": "Estado DERIVADO de la orden (no editable)."
+                        },
+                        "idPedidoLinea": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Renglón de pedido de origen (null solo en órdenes históricas migradas)."
+                        },
+                        "idModelo": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Modelo a producir."
+                        },
+                        "codigoModelo": {
+                          "type": "string",
+                          "description": "Código del modelo (para la UI)."
+                        },
+                        "descripcionModelo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Descripción del modelo, o null."
+                        },
+                        "idCliente": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cliente de la orden."
+                        },
+                        "cliente": {
+                          "type": "string",
+                          "description": "Nombre del cliente (para la UI)."
+                        },
+                        "idMaquilero": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Maquilero asignado (Proveedor), o null."
+                        },
+                        "maquilero": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre del maquilero, o null."
+                        },
+                        "idEtiquetaMarca": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Etiqueta de marca, o null."
+                        },
+                        "etiquetaMarca": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre de la etiqueta de marca, o null."
+                        },
+                        "idTela": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Tela dispuesta, o null."
+                        },
+                        "tela": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Nombre de la tela, o null."
+                        },
+                        "fecha": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha de la orden (YYYY-MM-DD), o null."
+                        },
+                        "fechaEntrega": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha de entrega comprometida, o null."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones generales, o null."
+                        },
+                        "composicion": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Composición textil, o null."
+                        },
+                        "compForzada": {
+                          "type": "boolean",
+                          "description": "La composición se capturó a mano."
+                        },
+                        "obsMaquila": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones de maquila, o null."
+                        },
+                        "noCostear": {
+                          "type": "boolean",
+                          "description": "No costear esta orden."
+                        },
+                        "fechaCompletada": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null."
+                        },
+                        "motivoCancelada": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Motivo de la cancelación, o null."
+                        },
+                        "ocCliente": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                        },
+                        "tallasV1": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Cadena cruda de tallas del viejo, de SOLO LECTURA (trazabilidad)."
+                        },
+                        "maquilaOrd": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo de maquila de v1 (dato; motor en F3/F6), o null."
+                        },
+                        "aplicacionOrd": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Costo de aplicación/estampado de v1 (dato; motor en F3/F6), o null."
+                        },
+                        "pagada": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Maquila pagada (dato de v1; motor en F6), o null."
+                        },
+                        "enRiesgo": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                        },
+                        "siRC": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                        },
+                        "rcViva": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Bandera RC de v1 (dato; motor en F5), o null."
+                        },
+                        "lineas": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del renglón (color)."
+                              },
+                              "idColor": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del color."
+                              },
+                              "color": {
+                                "type": "string",
+                                "description": "Nombre del color (para la UI)."
+                              },
+                              "tallas": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "idTalla": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Id de la talla."
+                                    },
+                                    "etiquetaTalla": {
+                                      "type": "string",
+                                      "description": "Etiqueta de la talla (para la UI)."
+                                    },
+                                    "cantidad": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991,
+                                      "description": "Cantidad de prendas de esta talla."
+                                    }
+                                  },
+                                  "required": [
+                                    "idTalla",
+                                    "etiquetaTalla",
+                                    "cantidad"
+                                  ],
+                                  "additionalProperties": false,
+                                  "description": "Cantidad por talla dentro de un color."
+                                },
+                                "description": "Cantidades por talla."
+                              },
+                              "totalPiezas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Suma de las cantidades de las tallas de este color."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "idColor",
+                              "color",
+                              "tallas",
+                              "totalPiezas"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Renglón (color) de la matriz de una orden."
+                          },
+                          "description": "Matriz: colores con sus tallas."
+                        },
+                        "totalPiezas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total de prendas de la orden (Σ de todas las tallas)."
+                        },
+                        "referencias": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del valor de referencia."
+                              },
+                              "idClienteCampo": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Campo de referencia del cliente."
+                              },
+                              "etiqueta": {
+                                "type": "string",
+                                "description": "Etiqueta del campo (para la UI)."
+                              },
+                              "valor": {
+                                "type": "string",
+                                "description": "Valor capturado."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "idClienteCampo",
+                              "etiqueta",
+                              "valor"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Valor de un campo de referencia de la orden."
+                          },
+                          "description": "Valores de referencia del cliente."
+                        },
+                        "comentarios": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id del comentario."
+                              },
+                              "idUsuario": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Usuario que lo escribió, o null."
+                              },
+                              "comentario": {
+                                "type": "string",
+                                "description": "Texto del comentario."
+                              },
+                              "fecha": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                                "description": "Fecha del comentario (ISO 8601)."
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "idUsuario",
+                              "comentario",
+                              "fecha"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Comentario inmutable de una orden."
+                          },
+                          "description": "Comentarios (cronológicos)."
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Fecha de alta (ISO 8601)."
+                        },
+                        "creadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del usuario que la creó."
+                        },
+                        "modificadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Fecha de la última modificación (ISO 8601)."
+                        },
+                        "modificadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del último usuario que la modificó."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "folio",
+                        "idEmpresa",
+                        "estado",
+                        "idPedidoLinea",
+                        "idModelo",
+                        "codigoModelo",
+                        "descripcionModelo",
+                        "idCliente",
+                        "cliente",
+                        "idMaquilero",
+                        "maquilero",
+                        "idEtiquetaMarca",
+                        "etiquetaMarca",
+                        "idTela",
+                        "tela",
+                        "fecha",
+                        "fechaEntrega",
+                        "observaciones",
+                        "composicion",
+                        "compForzada",
+                        "obsMaquila",
+                        "noCostear",
+                        "fechaCompletada",
+                        "motivoCancelada",
+                        "ocCliente",
+                        "tallasV1",
+                        "maquilaOrd",
+                        "aplicacionOrd",
+                        "pagada",
+                        "enRiesgo",
+                        "siRC",
+                        "rcViva",
+                        "lineas",
+                        "totalPiezas",
+                        "referencias",
+                        "comentarios",
+                        "creadoEn",
+                        "creadoPorId",
+                        "modificadoEn",
+                        "modificadoPorId"
+                      ],
+                      "additionalProperties": false,
+                      "description": "La orden de producción recién creada (con su matriz)."
+                    },
+                    "numeroProduccion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Nº interno de producción del modelo (minteado aquí si es su primera salida)."
+                    },
+                    "numeroProduccionMinteado": {
+                      "type": "boolean",
+                      "description": "true si esta salida MINTEÓ el número (primera OP del modelo); false si lo reusó."
+                    },
+                    "idDesarrollo": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Desarrollo ligado a la OP, o null (renglón sin desarrollo = caso legado)."
+                    },
+                    "ligaCreada": {
+                      "type": "boolean",
+                      "description": "true si se creó la liga DesarrolloOrden en esta operación."
+                    }
+                  },
+                  "required": [
+                    "orden",
+                    "numeroProduccion",
+                    "numeroProduccionMinteado",
+                    "idDesarrollo",
+                    "ligaCreada"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de generar la OP (salida a producción)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ordenes": {
       "get": {
         "summary": "Listar órdenes de producción",
@@ -35928,6 +38741,17 @@
                             ],
                             "description": "Motivo de la cancelación, o null."
                           },
+                          "ocCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                          },
                           "tallasV1": {
                             "anyOf": [
                               {
@@ -36225,6 +39049,7 @@
                           "noCostear",
                           "fechaCompletada",
                           "motivoCancelada",
+                          "ocCliente",
                           "tallasV1",
                           "maquilaOrd",
                           "aplicacionOrd",
@@ -36863,6 +39688,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -37160,6 +39996,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -37596,6 +40433,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -37893,6 +40741,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -38448,6 +41297,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -38745,6 +41605,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -39246,6 +42107,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -39543,6 +42415,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -40000,6 +42873,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -40297,6 +43181,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -40754,6 +43639,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -41051,6 +43947,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -41526,6 +44423,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -41823,6 +44731,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -43465,6 +46374,17 @@
                       ],
                       "description": "Motivo de la cancelación, o null."
                     },
+                    "ocCliente": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice."
+                    },
                     "tallasV1": {
                       "anyOf": [
                         {
@@ -43762,6 +46682,7 @@
                     "noCostear",
                     "fechaCompletada",
                     "motivoCancelada",
+                    "ocCliente",
                     "tallasV1",
                     "maquilaOrd",
                     "aplicacionOrd",
@@ -98594,7 +101515,7 @@
     },
     "/api/ruta-critica/ordenes/{id}/programar": {
       "post": {
-        "summary": "Programar (generar/re-generar) la Ruta Crítica de una orden",
+        "summary": "Re-programar la Ruta Crítica de una orden (la generación inicial es automática al crear la OP)",
         "tags": [
           "ruta-critica"
         ],

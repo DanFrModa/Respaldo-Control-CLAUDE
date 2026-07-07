@@ -73,6 +73,7 @@ import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
+import { PedidosMesPagina } from '@/modulos/pedidos/PedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
 import { DesarrolloPagina } from '@/modulos/desarrollo/DesarrolloPagina';
 import { ListasPreciosPagina } from '@/modulos/listas-precios/ListasPreciosPagina';
@@ -162,7 +163,10 @@ const router = createBrowserRouter([
           { path: 'catalogos/galeria-bordados', element: <GaleriaBordados /> },
           { path: 'modelos', element: <ModelosPagina /> },
           { path: 'modelos/galeria', element: <GaleriaModelos /> },
-          { path: 'pedidos', element: <PedidosPagina /> },
+          // Pedidos por mes (rediseño R3, §4.1): la pantalla nueva con el constructor y "Generar
+          // OP"; la edición fina F2 (renglones/reales/copiar) se conserva en /pedidos/administrar.
+          { path: 'pedidos', element: <PedidosMesPagina /> },
+          { path: 'pedidos/administrar', element: <PedidosPagina /> },
           // Desarrollo (Módulo 15, F8-E2/E6): pestañas Proyectos (lista+detalle) y Tablero por estado.
           { path: 'desarrollo', element: <DesarrolloPagina /> },
           // Listas de precios (Módulo 15, F8-E4): lista + detalle con la vista de aprobación del dueño.

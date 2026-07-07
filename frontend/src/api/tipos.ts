@@ -230,6 +230,31 @@ export type PedidoLineaEntrada = NonNullable<PedidoCrear['lineas']>[number];
 export type PedidoCopiar =
   paths['/api/pedidos/{id}/copiar']['post']['requestBody']['content']['application/json'];
 
+// ── Pedidos por mes + constructor + salida a produccion (rediseño R3, B4/B6) ──
+
+/** Respuesta de la consulta de pedidos por mes (`GET /api/pedidos/por-mes`). */
+export type PedidosPorMes =
+  paths['/api/pedidos/por-mes']['get']['responses']['200']['content']['application/json'];
+/** Fila agrupada (pedido `-F` + renglones) de la consulta por mes. */
+export type PedidoMesFila = PedidosPorMes['datos'][number];
+/** Renglon/modelo de un pedido en la consulta por mes. */
+export type PedidoMesRenglon = PedidoMesFila['renglones'][number];
+/** Parametros de la consulta por mes (querystring). */
+export type PedidosPorMesQuery = NonNullable<
+  paths['/api/pedidos/por-mes']['get']['parameters']['query']
+>;
+/** Respuesta del selector de desarrollos (`GET /api/pedidos/candidatos-desarrollo`). */
+export type CandidatosDesarrollo =
+  paths['/api/pedidos/candidatos-desarrollo']['get']['responses']['200']['content']['application/json'];
+/** Un desarrollo candidato para un renglon del pedido. */
+export type CandidatoDesarrollo = CandidatosDesarrollo['datos'][number];
+/** Cuerpo de generar la OP (`POST /api/pedidos/lineas/{idLinea}/salida-produccion`). */
+export type SalidaProduccionCuerpo =
+  paths['/api/pedidos/lineas/{idLinea}/salida-produccion']['post']['requestBody']['content']['application/json'];
+/** Resultado de la salida a produccion (OP + nº de produccion + liga). */
+export type SalidaProduccion =
+  paths['/api/pedidos/lineas/{idLinea}/salida-produccion']['post']['responses']['201']['content']['application/json'];
+
 /** Lista de pedidos reales de un pedido (`GET /api/pedidos/{id}/reales`). */
 export type PedidoRealesLista =
   paths['/api/pedidos/{id}/reales']['get']['responses']['200']['content']['application/json'];

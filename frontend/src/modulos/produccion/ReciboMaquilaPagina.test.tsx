@@ -98,6 +98,7 @@ const orden: Orden = {
   noCostear: false,
   fechaCompletada: '2026-06-18T00:00:00.000Z',
   motivoCancelada: null,
+  ocCliente: null,
   tallasV1: null,
   maquilaOrd: null,
   aplicacionOrd: null,

@@ -389,6 +389,12 @@ export const esquemaOrdenSalida = z
         'Fecha en que la orden quedó completa (sellada al primer guardado de matriz), o null.',
       ),
     motivoCancelada: z.string().nullable().describe('Motivo de la cancelación, o null.'),
+    ocCliente: z
+      .string()
+      .nullable()
+      .describe(
+        'SNAPSHOT de la OC original del cliente, copiado del pedido AL CREAR la orden (R3, B3). Solo lectura: queda amarrado aunque el pedido se reorganice.',
+      ),
     // ── Datos de v1 conservados de SOLO LECTURA (sin motor; ETL los puebla). ──
     tallasV1: z
       .string()

@@ -1,4 +1,4 @@
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Plus, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { useConteoAlertasRc } from '@/api/ruta-critica-programacion';
@@ -51,6 +51,18 @@ export function Inicio(): React.JSX.Element {
             Empresa activa: {sesion?.empresaActiva.nombre}. Encuentra cualquier pantalla con el menú
             o con Ctrl+K.
           </p>
+          {/* La OP no se crea suelta: nace del pedido (R3, §4.1) — abre el constructor. */}
+          {tienePermiso('pedidos.administrar') ? (
+            <Link
+              to="/pedidos"
+              state={{ abrirConstructor: true }}
+              data-testid="inicio-nueva-orden"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 text-sm font-medium text-primary-foreground ring-1 ring-white/25 transition-colors hover:bg-white/25"
+            >
+              <Plus className="size-4" aria-hidden />
+              Nueva orden
+            </Link>
+          ) : null}
         </section>
 
         {/* Indicadores reales de la Ruta Critica (solo con `rc.ruta-ver`). */}

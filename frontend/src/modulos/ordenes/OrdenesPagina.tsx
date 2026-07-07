@@ -27,7 +27,6 @@ import { useSesion } from '@/sesion/useSesion';
 import { AdjuntosOrden } from './AdjuntosOrden';
 import { DialogoCancelarOrden } from './DialogoCancelarOrden';
 import { DialogoCopiarMatriz } from './DialogoCopiarMatriz';
-import { DialogoNuevaOrden } from './DialogoNuevaOrden';
 import { EditorEncabezadoOrden } from './EditorEncabezadoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelComentarios } from './PanelComentarios';
@@ -103,6 +102,9 @@ export function OrdenesPagina(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
+  // "Nueva orden" abre el CONSTRUCTOR DE PEDIDO (R3: la OP nace del pedido) → exige TAMBIÉN
+  // `pedidos.administrar` (hallazgo del reviewer); `puedeAdministrar` sigue gobernando la edición.
+  const puedeCrearPedido = tienePermiso('pedidos.administrar');
   const puedeCancelar = tienePermiso('ordenes.cancelar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
@@ -130,7 +132,6 @@ export function OrdenesPagina(): React.JSX.Element {
   const consulta = useOrdenes(query);
 
   // ── Diálogos ───────────────────────────────────────────────────────────────
-  const [altaAbierta, setAltaAbierta] = useState(false);
   const [aCancelar, setACancelar] = useState<Orden | null>(null);
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
   // Id a enfocar en la lista (deep-link): tras crear, la orden nueva; o el `state.idOrden` del
@@ -147,13 +148,6 @@ export function OrdenesPagina(): React.JSX.Element {
   // Si la orden del deep-link no está en la página visible, se inyecta al frente para que
   // ListaDetalle pueda seleccionarla (mismo truco que ModelosPagina).
   const fichaDeepLink = useOrden(idAEnfocar ?? undefined);
-
-  /** Tras crear, enfoca la orden NUEVA (encabeza la página 1 por orden de folio desc). */
-  function alCreada(idNueva: number): void {
-    setTextoBusqueda('');
-    setPagina(1);
-    setIdAEnfocar(idNueva);
-  }
 
   function alBuscar(valor: string): void {
     setTextoBusqueda(valor);
@@ -210,8 +204,12 @@ export function OrdenesPagina(): React.JSX.Element {
         paginacion={paginacion}
         seleccionInicialId={idAEnfocar}
         puedeAdministrar={puedeAdministrar}
-        alNuevo={() => setAltaAbierta(true)}
+        // La OP no se crea suelta: nace del PEDIDO (R3, §4.1) — "Nueva orden" abre el
+        // constructor de pedido interno; esta captura queda para editar matrices existentes.
+        // El botón exige ADEMÁS `pedidos.administrar` (capturar pedidos); sin él se oculta.
+        alNuevo={() => void navigate('/pedidos', { state: { abrirConstructor: true } })}
         textoNuevo="Nueva orden"
+        mostrarNuevo={puedeCrearPedido}
         // El editor del encabezado va en el cuerpo del detalle (no en el diálogo de "Editar").
         alEditar={() => undefined}
         // Cancelar = desactivar (suave). Reactivar no aplica: una orden cancelada no se reactiva.
@@ -257,11 +255,8 @@ export function OrdenesPagina(): React.JSX.Element {
         )}
       />
 
-      {/* Los diálogos con búsqueda interna (pedidos/órdenes) se montan SOLO al abrirse: así no
-          consultan el API mientras están cerrados. */}
-      {altaAbierta ? (
-        <DialogoNuevaOrden abierto alCambiarAbierto={setAltaAbierta} alCreada={alCreada} />
-      ) : null}
+      {/* Los diálogos con búsqueda interna se montan SOLO al abrirse: así no consultan el API
+          mientras están cerrados. */}
       {aCopiarMatriz !== null ? (
         <DialogoCopiarMatriz
           abierto

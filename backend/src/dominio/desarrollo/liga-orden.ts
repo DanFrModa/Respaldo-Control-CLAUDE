@@ -38,7 +38,12 @@ import { datosCreacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { CODIGO_PRISMA, codigoErrorPrisma } from '../../comun/prisma-errores.js';
-import { clienteLectura, enTransaccion, type ContextoBd } from '../../comun/transaccion.js';
+import {
+  clienteLectura,
+  enTransaccion,
+  type ContextoBd,
+  type Tx,
+} from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull } from '../costos/decimales.js';
 import { aEventoSalida, incluirEvento } from './negociacion.js';
@@ -94,10 +99,102 @@ async function leerLigaSalida(
 // ── Operación 1: LIGAR ───────────────────────────────────────────────────────────────
 
 /**
- * LIGA una orden a un desarrollo (A2). Valida (A1): orden y desarrollo de la MISMA empresa (A9); la orden
- * aún no ligada (`idOrden @unique` lo blinda en BD → `ErrorConflicto` claro si carrera); desarrollo NO
- * apagado; coherencia MISMO modelo Y MISMO cliente (el desarrollo es de ese modelo para ese cliente, la
- * orden lo produce para un cliente). Bitácora en la tx. Requiere `desarrollo.administrar`.
+ * NÚCLEO transaccional de la liga desarrollo↔orden. Valida (A1): orden y desarrollo de la MISMA
+ * empresa (A9); la orden aún no ligada (`idOrden @unique` lo blinda en BD → `ErrorConflicto` claro
+ * si carrera); desarrollo NO apagado; coherencia MISMO modelo Y MISMO cliente. Crea la fila +
+ * bitácora EN LA `tx` DEL LLAMADOR. NO verifica permiso (eso lo hace cada operación pública que lo
+ * usa: `ligarOrden` con `desarrollo.administrar`; `salidaAProduccion` R3-B4 con
+ * `ordenes.administrar` — ahí la liga es un efecto de crear la OP, no una edición del expediente).
+ */
+export async function ligarOrdenNucleo(
+  tx: Tx,
+  sesion: SesionUsuario,
+  idOrden: number,
+  idDesarrollo: number,
+  idEmpresa: number,
+): Promise<void> {
+  const orden = await tx.orden.findFirst({
+    where: { id: idOrden, idEmpresa },
+    select: {
+      id: true,
+      folio: true,
+      estado: true,
+      idModelo: true,
+      idCliente: true,
+      desarrolloOrden: { select: { id: true } },
+    },
+  });
+  if (orden === null) {
+    throw new ErrorNoEncontrado('Orden', idOrden);
+  }
+  if (orden.estado === 'cancelada') {
+    throw new ErrorConflicto(
+      `La orden ${Number(orden.folio)} está cancelada; no se puede ligar a un desarrollo.`,
+    );
+  }
+  if (orden.desarrolloOrden !== null) {
+    throw new ErrorConflicto(
+      'La orden ya está ligada a un desarrollo; quita la liga actual antes de re-ligar.',
+    );
+  }
+
+  const desarrollo = await tx.desarrollo.findFirst({
+    where: { id: idDesarrollo, proyecto: { idEmpresa } },
+    select: {
+      id: true,
+      idModelo: true,
+      apagado: true,
+      modelo: { select: { codigo: true } },
+      proyecto: { select: { idCliente: true } },
+    },
+  });
+  if (desarrollo === null) {
+    throw new ErrorNoEncontrado('Desarrollo', idDesarrollo);
+  }
+  if (desarrollo.apagado) {
+    throw new ErrorConflicto(
+      `El desarrollo "${desarrollo.modelo.codigo}" está apagado; reactívalo para ligarlo.`,
+    );
+  }
+  if (desarrollo.idModelo !== orden.idModelo) {
+    throw new ErrorValidacion(
+      'El desarrollo es de otro modelo; liga un desarrollo del mismo modelo de la orden.',
+    );
+  }
+  if (desarrollo.proyecto.idCliente !== orden.idCliente) {
+    throw new ErrorValidacion(
+      'El desarrollo es de otro cliente; liga un desarrollo del mismo cliente de la orden.',
+    );
+  }
+
+  try {
+    await tx.desarrolloOrden.create({
+      data: { idDesarrollo, idOrden, ...datosCreacion(sesion) },
+      select: { id: true },
+    });
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto('La orden ya está ligada a un desarrollo.', { causa: error });
+    }
+    throw error;
+  }
+
+  await registrarBitacora(tx, sesion, {
+    entidad: 'Orden',
+    idEntidad: idOrden,
+    accion: 'OTRO',
+    datos: {
+      operacion: 'ligar-desarrollo',
+      idDesarrollo,
+      folioOrden: Number(orden.folio),
+    },
+  });
+}
+
+/**
+ * LIGA una orden a un desarrollo (A2) — la operación MANUAL del expediente (F8-E6). Las reglas
+ * viven en {@link ligarOrdenNucleo} (compartido con `salidaAProduccion`, R3-B4). Requiere
+ * `desarrollo.administrar`.
  */
 export async function ligarOrden(
   sesion: SesionUsuario,
@@ -110,82 +207,7 @@ export async function ligarOrden(
   const idEmpresa = sesion.idEmpresaActiva;
 
   await enTransaccion(async (tx) => {
-    const orden = await tx.orden.findFirst({
-      where: { id: idOrden, idEmpresa },
-      select: {
-        id: true,
-        folio: true,
-        estado: true,
-        idModelo: true,
-        idCliente: true,
-        desarrolloOrden: { select: { id: true } },
-      },
-    });
-    if (orden === null) {
-      throw new ErrorNoEncontrado('Orden', idOrden);
-    }
-    if (orden.estado === 'cancelada') {
-      throw new ErrorConflicto(
-        `La orden ${Number(orden.folio)} está cancelada; no se puede ligar a un desarrollo.`,
-      );
-    }
-    if (orden.desarrolloOrden !== null) {
-      throw new ErrorConflicto(
-        'La orden ya está ligada a un desarrollo; quita la liga actual antes de re-ligar.',
-      );
-    }
-
-    const desarrollo = await tx.desarrollo.findFirst({
-      where: { id: datos.idDesarrollo, proyecto: { idEmpresa } },
-      select: {
-        id: true,
-        idModelo: true,
-        apagado: true,
-        modelo: { select: { codigo: true } },
-        proyecto: { select: { idCliente: true } },
-      },
-    });
-    if (desarrollo === null) {
-      throw new ErrorNoEncontrado('Desarrollo', datos.idDesarrollo);
-    }
-    if (desarrollo.apagado) {
-      throw new ErrorConflicto(
-        `El desarrollo "${desarrollo.modelo.codigo}" está apagado; reactívalo para ligarlo.`,
-      );
-    }
-    if (desarrollo.idModelo !== orden.idModelo) {
-      throw new ErrorValidacion(
-        'El desarrollo es de otro modelo; liga un desarrollo del mismo modelo de la orden.',
-      );
-    }
-    if (desarrollo.proyecto.idCliente !== orden.idCliente) {
-      throw new ErrorValidacion(
-        'El desarrollo es de otro cliente; liga un desarrollo del mismo cliente de la orden.',
-      );
-    }
-
-    try {
-      await tx.desarrolloOrden.create({
-        data: { idDesarrollo: datos.idDesarrollo, idOrden, ...datosCreacion(sesion) },
-        select: { id: true },
-      });
-    } catch (error) {
-      if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
-        throw new ErrorConflicto('La orden ya está ligada a un desarrollo.', { causa: error });
-      }
-      throw error;
-    }
-
-    await registrarBitacora(tx, sesion, {
-      entidad: 'Orden',
-      idEntidad: idOrden,
-      accion: 'OTRO',
-      datos: {
-        operacion: 'ligar-desarrollo',
-        idDesarrollo: datos.idDesarrollo,
-        folioOrden: Number(orden.folio),
-      },
-    });
+    await ligarOrdenNucleo(tx, sesion, idOrden, datos.idDesarrollo, idEmpresa);
   }, bd);
 
   return leerLigaSalida(clienteLectura(bd), idOrden, idEmpresa);

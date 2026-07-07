@@ -92,7 +92,10 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('guardar-modelo').click();
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
-    await page.goto('/pedidos');
+    // Pedido por la edición F2 (/pedidos/administrar) SIN fecha de entrega: así la RC AUTOMÁTICA
+    // del alta (R3, B5) se OMITE (sin fecha no se puede planear) y ESTE test programa a MANO con
+    // su plantilla/artículo propios, como antes.
+    await page.goto('/pedidos/administrar');
     await page.getByTestId('nuevo-pedido').click();
     const dialogoPedido = page.getByRole('dialog');
     await dialogoPedido.getByLabel('Cliente').selectOption({ label: cliente });
@@ -103,27 +106,33 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     await page.getByTestId('guardar-pedido').click();
     await expect(page.getByText(/Pedido \d+ creado\./)).toBeVisible();
 
-    // R2: la captura completa vive en /captura (el centro de comando ocupa /produccion/ordenes).
+    // R3: la OP nace del pedido con "Generar OP" (ahí NACE su matriz de 20 pzas).
+    await page.goto('/pedidos');
+    await expect(page.getByRole('heading', { name: 'Pedidos' })).toBeVisible();
+    const grupo = page.getByTestId('pedidos-grupo').filter({ hasText: cliente }).first();
+    await expect(grupo).toBeVisible();
+    await grupo.getByTestId('pedidos-generar-op').first().click();
+    const panelOp = page.getByTestId('panel-generar-op');
+    const matrizOp = panelOp.getByTestId('matriz-op');
+    await matrizOp.getByTestId('matriz-op-agregar-talla').selectOption({ index: 1 });
+    await matrizOp.getByTestId('matriz-op-agregar-color').selectOption({ index: 1 });
+    await matrizOp.getByTestId('matriz-op-celda').first().fill('20');
+    await page.getByTestId('confirmar-generar-op').click();
+    const toastOp = page.getByText(/OP \d+ creada/).first();
+    await expect(toastOp).toBeVisible();
+    const folioOrden = /OP (\d+) creada/.exec((await toastOp.textContent()) ?? '')?.[1] ?? '';
+    expect(folioOrden).not.toBe('');
+
+    // La captura completa (edición) vive en /captura: ahí está el botón de programar la RC.
     await page.goto('/produccion/ordenes/captura');
     await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
-    await page.getByTestId('nuevo-orden').click();
-    const dialogoAlta = page.getByRole('dialog');
-    await dialogoAlta.getByTestId('orden-buscar-pedido').fill(cliente);
-    await dialogoAlta.getByTestId('orden-pedido-opcion').first().click();
-    await dialogoAlta.getByTestId('orden-renglon-opcion').first().click();
-    await page.getByTestId('confirmar-nueva-orden').click();
-    await expect(page.getByText(/Orden \d+ creada\./)).toBeVisible();
-
+    await page.getByTestId('buscar-orden').fill(folioOrden);
+    await page
+      .getByTestId('fila-orden')
+      .filter({ hasText: `Orden ${folioOrden}` })
+      .first()
+      .click();
     const detalle = page.getByTestId('detalle-orden');
-    const matriz = detalle.getByTestId('matriz-orden');
-    await matriz.getByTestId('matriz-orden-agregar-color').selectOption({ index: 1 });
-    const agregarTalla = matriz.getByTestId('matriz-orden-agregar-talla');
-    if (await agregarTalla.isEnabled()) {
-      await agregarTalla.selectOption({ index: 1 });
-    }
-    await matriz.getByTestId('matriz-orden-celda').first().fill('20');
-    await detalle.getByTestId('guardar-matriz').click();
-    await expect(page.getByText('Matriz guardada.')).toBeVisible();
 
     // ── 5) Programar la RC desde el detalle de la orden ─────────────────────────
     await detalle.getByTestId('orden-programar-rc').click();
