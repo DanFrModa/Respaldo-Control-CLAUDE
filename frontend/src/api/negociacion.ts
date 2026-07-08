@@ -37,6 +37,9 @@ export type AcuerdoCuerpo =
 /** Cuerpo del cambio de estado. */
 export type CambiarEstadoCuerpo =
   paths['/api/listas-precios/{id}/estado']['patch']['requestBody']['content']['application/json'];
+/** Resultado de la calculadora de negociación (costo/neto/margen). */
+export type SimulacionNegociacion =
+  paths['/api/listas-precios/lineas/{idLinea}/simular']['get']['responses']['200']['content']['application/json'];
 
 /** Clave raíz de la cache de eventos de negociación. */
 export const CLAVE_EVENTOS = ['negociacion-eventos'] as const;
@@ -44,6 +47,9 @@ export const CLAVE_EVENTOS = ['negociacion-eventos'] as const;
 function claveEventos(idLinea: number): readonly unknown[] {
   return [...CLAVE_EVENTOS, idLinea];
 }
+
+/** Clave raíz de la cache de la calculadora de negociación (§4.8). */
+export const CLAVE_SIMULACION = ['negociacion-simular'] as const;
 
 // ── Funciones del API ──────────────────────────────────────────────────────────
 
@@ -82,6 +88,21 @@ async function cambiarEstado(id: number, cuerpo: CambiarEstadoCuerpo): Promise<L
   return data;
 }
 
+async function simular(
+  idLinea: number,
+  precioObjetivo: number,
+  idPrecosto: number | undefined,
+): Promise<SimulacionNegociacion> {
+  const { data, error } = await api.GET('/api/listas-precios/lineas/{idLinea}/simular', {
+    params: {
+      path: { idLinea },
+      query: { precioObjetivo, ...(idPrecosto === undefined ? {} : { idPrecosto }) },
+    },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
 /** Historial de eventos de negociación de un renglón; deshabilitada si no hay renglón. */
@@ -92,6 +113,25 @@ export function useEventosLinea(
     queryKey: claveEventos(idLinea ?? 0),
     queryFn: () => listarEventos(idLinea as number),
     enabled: idLinea !== null,
+  });
+}
+
+/**
+ * Calculadora de negociación (§4.8): simula el margen de un `precioObjetivo` sobre un renglón (opcional
+ * `idPrecosto` para previsualizar el costo de una versión). El llamador pasa el objetivo YA DEBOUNCED y
+ * `habilitado` (típicamente `objetivo > 0`), para no golpear el backend en cada tecla. Toda la fórmula
+ * vive en el dominio (A1); aquí sólo se consume.
+ */
+export function useSimularNegociacion(
+  idLinea: number | null,
+  precioObjetivo: number,
+  opciones: { idPrecosto?: number; habilitado?: boolean } = {},
+): UseQueryResult<SimulacionNegociacion, ErrorDeApi> {
+  const { idPrecosto, habilitado = true } = opciones;
+  return useQuery({
+    queryKey: [...CLAVE_SIMULACION, idLinea ?? 0, precioObjetivo, idPrecosto ?? null],
+    queryFn: () => simular(idLinea as number, precioObjetivo, idPrecosto),
+    enabled: idLinea !== null && habilitado && precioObjetivo > 0,
   });
 }
 

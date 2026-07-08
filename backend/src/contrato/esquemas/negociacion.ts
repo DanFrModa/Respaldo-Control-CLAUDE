@@ -77,7 +77,52 @@ export const esquemaCambiarEstadoLista = z.object({
 /** Datos validados del cambio de estado. */
 export type DatosCambiarEstadoLista = z.infer<typeof esquemaCambiarEstadoLista>;
 
+/**
+ * Query de la CALCULADORA de negociación (rediseño R5, §4.8): un precio OBJETIVO propuesto y, opcional,
+ * la versión congelada cuyo costo simular (para previsualizar una ronda antes de guardarla). Sin
+ * `idPrecosto` usa el costo VIGENTE del renglón.
+ */
+export const esquemaSimularNegociacionQuery = z.object({
+  precioObjetivo: z.coerce
+    .number({ error: 'El precio objetivo debe ser un número' })
+    .nonnegative({ error: 'El precio objetivo no puede ser negativo' })
+    .describe('Precio de venta propuesto para simular su margen.'),
+  idPrecosto: z.coerce
+    .number({ error: 'El id del precosto debe ser un número' })
+    .int({ error: 'El id del precosto debe ser entero' })
+    .positive({ error: 'El id del precosto debe ser positivo' })
+    .optional()
+    .describe('Versión congelada cuyo costo simular (opcional; por defecto el costo vigente).'),
+});
+
+/** Datos validados de la calculadora. */
+export type DatosSimularNegociacion = z.infer<typeof esquemaSimularNegociacionQuery>;
+
 // ── Salida ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Resultado de la CALCULADORA de negociación en vivo (rediseño R5, §4.8): el costo, el precio neto y
+ * el margen bruto que deja un precio objetivo, coloreado contra el margen objetivo del cliente. Sólo
+ * lo devuelve el backend a quien tiene `consultas.ver-importes` (la ruta lo exige), así que todo va con
+ * número (no hay ocultación null aquí).
+ */
+export const esquemaSimulacionNegociacion = z
+  .object({
+    costo: z.number().describe('Costo unitario simulado (del precosto vigente o el indicado).'),
+    precioObjetivo: z.number().describe('Precio objetivo capturado (eco de la entrada).'),
+    precioNeto: z
+      .number()
+      .describe(
+        'Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta.',
+      ),
+    margenBrutoPct: z.number().describe('% de margen bruto real: (neto − costo) ÷ neto × 100.'),
+    margenObjetivoPct: z.number().describe('% de margen objetivo del cliente (meta a cumplir).'),
+    cumpleObjetivo: z.boolean().describe('¿El margen bruto alcanza el objetivo? (verde/rojo).'),
+  })
+  .describe('Simulación de margen de un precio objetivo (calculadora de negociación §4.8).');
+
+/** Forma del resultado de la calculadora. */
+export type SimulacionNegociacion = z.infer<typeof esquemaSimulacionNegociacion>;
 
 /** Un evento de negociación de un renglón (bitácora inmutable; importes ocultos sin permiso). */
 export const esquemaNegociacionEventoSalida = z

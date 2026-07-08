@@ -278,6 +278,37 @@ describe('API de modelos (F1-E4)', () => {
       const res = await crearModeloApi(cookie, { codigo: 'M2', idTemporada: temporada.id });
       expect(res.status).toBe(400);
     });
+
+    it('maquilero cotizado (R5/B9): acepta un proveedor de costura, rechaza uno sin ese rol', async () => {
+      const cookie = await cookieAdmin();
+      const rolCostura = await cliente.rolProveedor.findUniqueOrThrow({
+        where: { codigo: 'maquila-costura' },
+        select: { id: true },
+      });
+      const maquilero = await cliente.proveedor.create({
+        data: {
+          nombre: 'Costuras del Norte',
+          roles: { create: [{ idRolProveedor: rolCostura.id }] },
+        },
+      });
+      const noMaquilero = await cliente.proveedor.create({
+        data: { nombre: 'Telas SA (sin rol)' },
+      });
+
+      // Con un maquilero de costura → 201 y queda amarrado.
+      const ok = await crearModeloApi(cookie, {
+        codigo: 'MAQ-OK',
+        idMaquileroCotizado: maquilero.id,
+      });
+      expect(ok.status).toBe(201);
+
+      // Con un proveedor SIN el rol de costura → 400 (la autoridad es el servidor, A1).
+      const mal = await crearModeloApi(cookie, {
+        codigo: 'MAQ-MAL',
+        idMaquileroCotizado: noMaquilero.id,
+      });
+      expect(mal.status).toBe(400);
+    });
   });
 
   describe('BOM (telas/avíos/bordados)', () => {

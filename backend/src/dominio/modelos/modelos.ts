@@ -55,6 +55,8 @@ export type ModeloConRelaciones = Modelo & {
   curvaTalla: { nombre: string } | null;
   genero: { nombre: string } | null;
   tipoProducto: { nombre: string } | null;
+  /** Maquilero (costura) cotizado en el desarrollo (R5/B9), o null. */
+  maquileroCotizado: { nombre: string } | null;
   _count: { fotos: number };
   /**
    * URL prefirmada de la foto principal (la primera por orden, luego id), o `null` si no tiene
@@ -70,6 +72,7 @@ export const incluirRelacionesModelo = {
   curvaTalla: { select: { nombre: true } },
   genero: { select: { nombre: true } },
   tipoProducto: { select: { nombre: true } },
+  maquileroCotizado: { select: { nombre: true } },
   _count: { select: { fotos: true } },
 } satisfies Prisma.ModeloInclude;
 
@@ -193,7 +196,47 @@ function datosOpcionalesCrear(datos: DatosModeloCrear): Partial<Prisma.ModeloUnc
   if (datos.idCurvaTalla !== undefined) data.idCurvaTalla = datos.idCurvaTalla;
   if (datos.idGenero !== undefined) data.idGenero = datos.idGenero;
   if (datos.idTipoProducto !== undefined) data.idTipoProducto = datos.idTipoProducto;
+  // R5, B7/B8/B9/B10: campos del editor de desarrollo.
+  if (datos.numOperaciones !== undefined) data.numOperaciones = datos.numOperaciones;
+  if (datos.corteBase !== undefined) data.corteBase = datos.corteBase;
+  if (datos.idMaquileroCotizado !== undefined) data.idMaquileroCotizado = datos.idMaquileroCotizado;
+  if (datos.secuenciaEstampado !== undefined) data.secuenciaEstampado = datos.secuenciaEstampado;
   return data;
+}
+
+/**
+ * Código estable del rol de proveedor "Maquila (costura)" (seed `ROLES_PROVEEDOR_BASE`). El maquilero
+ * cotizado es, por definición, de costura → se valida contra ESTE rol (no cualquier proveedor).
+ */
+const ROL_MAQUILA_COSTURA = 'maquila-costura';
+
+/**
+ * Valida que un maquilero cotizado (Proveedor, si viene) exista, esté ACTIVO y tenga el rol
+ * "Maquila (costura)" (R5/B9). El front ya filtra por ese rol, pero vía API cualquiera podría fijar
+ * un proveedor arbitrario → la autoridad es el servidor (A1).
+ */
+async function exigirMaquileroValido(tx: Tx, idProveedor: number): Promise<void> {
+  const proveedor = await tx.proveedor.findUnique({
+    where: { id: idProveedor },
+    select: {
+      nombre: true,
+      activo: true,
+      roles: { where: { rol: { codigo: ROL_MAQUILA_COSTURA } }, select: { idProveedor: true } },
+    },
+  });
+  if (proveedor === null) {
+    throw new ErrorValidacion('El maquilero cotizado seleccionado no existe.');
+  }
+  if (!proveedor.activo) {
+    throw new ErrorValidacion(
+      `El maquilero "${proveedor.nombre}" está desactivado y no se puede asignar.`,
+    );
+  }
+  if (proveedor.roles.length === 0) {
+    throw new ErrorValidacion(
+      `El proveedor "${proveedor.nombre}" no es maquilero de costura; el maquilero cotizado debe tener el rol "Maquila (costura)".`,
+    );
+  }
 }
 
 /**
@@ -259,6 +302,40 @@ function aplicarOpcionalesEditar(
     detalle.idTipoProducto = { de: actual.idTipoProducto, a: datos.idTipoProducto };
   }
 
+  // R5, B7: # de operaciones (int nullable): omitir = no tocar; `null` = quitar; número = fijar.
+  if (datos.numOperaciones !== undefined && datos.numOperaciones !== actual.numOperaciones) {
+    cambios.numOperaciones = datos.numOperaciones;
+    detalle.numOperaciones = { de: actual.numOperaciones, a: datos.numOperaciones };
+  }
+  // R5, B8: corte (decimal nullable): omitir = no tocar; `null` = quitar; número = fijar.
+  if (cambiaDecimal(datos.corteBase, actual.corteBase)) {
+    const nuevo = datos.corteBase ?? null;
+    cambios.corteBase = nuevo;
+    detalle.corteBase = {
+      de: actual.corteBase === null ? null : actual.corteBase.toNumber(),
+      a: nuevo,
+    };
+  }
+  // R5, B9: maquilero cotizado (FK nullable): `null` lo quita; un id lo fija; omitir = no tocar.
+  if (
+    datos.idMaquileroCotizado !== undefined &&
+    datos.idMaquileroCotizado !== actual.idMaquileroCotizado
+  ) {
+    cambios.idMaquileroCotizado = datos.idMaquileroCotizado;
+    detalle.idMaquileroCotizado = {
+      de: actual.idMaquileroCotizado,
+      a: datos.idMaquileroCotizado,
+    };
+  }
+  // R5, B10: secuencia de estampado (enum, no nullable): omitir = no tocar.
+  if (
+    datos.secuenciaEstampado !== undefined &&
+    datos.secuenciaEstampado !== actual.secuenciaEstampado
+  ) {
+    cambios.secuenciaEstampado = datos.secuenciaEstampado;
+    detalle.secuenciaEstampado = { de: actual.secuenciaEstampado, a: datos.secuenciaEstampado };
+  }
+
   return detalle;
 }
 
@@ -289,6 +366,8 @@ export async function crearModelo(
       if (datos.idGenero !== undefined) await exigirGeneroValido(tx, datos.idGenero);
       if (datos.idTipoProducto !== undefined)
         await exigirTipoProductoValido(tx, datos.idTipoProducto);
+      if (datos.idMaquileroCotizado !== undefined)
+        await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
 
       const modelo = await tx.modelo.create({
         data: {
@@ -385,6 +464,13 @@ export async function actualizarModelo(
         datos.idTipoProducto !== actual.idTipoProducto
       ) {
         await exigirTipoProductoValido(tx, datos.idTipoProducto);
+      }
+      if (
+        datos.idMaquileroCotizado !== undefined &&
+        datos.idMaquileroCotizado !== null &&
+        datos.idMaquileroCotizado !== actual.idMaquileroCotizado
+      ) {
+        await exigirMaquileroValido(tx, datos.idMaquileroCotizado);
       }
 
       const huboCambio =

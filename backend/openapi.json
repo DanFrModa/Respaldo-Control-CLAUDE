@@ -22561,6 +22561,539 @@
         }
       }
     },
+    "/api/avios/{id}/medidas": {
+      "get": {
+        "summary": "Listar las medidas de un avío \"por medida\" (+ el promedio del precosto)",
+        "tags": [
+          "avios"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del avío."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Medidas de un avío con el promedio del precosteo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la medida."
+                          },
+                          "medida": {
+                            "type": "string",
+                            "description": "Etiqueta de la medida."
+                          },
+                          "precio": {
+                            "type": "number",
+                            "description": "Precio real de compra de esta medida."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden de despliegue."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está desactivada (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "medida",
+                          "precio",
+                          "orden",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Medida de un avío \"por medida\"."
+                      },
+                      "description": "Medidas del avío (ordenadas)."
+                    },
+                    "promedioPreCosto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Promedio de precios de las medidas activas (el que usa el precosto), o null."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "promedioPreCosto"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Medidas de un avío con el promedio del precosteo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Reemplazar el set de medidas de un avío (agrega/actualiza/desactiva)",
+        "tags": [
+          "avios"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "medidas": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "medida": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60,
+                          "description": "Etiqueta de la medida (ej. \"15 cm\", \"18 cm\")."
+                        },
+                        "precio": {
+                          "type": "number",
+                          "minimum": 0,
+                          "description": "Precio real de compra de esta medida (entra al promedio del precosto)."
+                        },
+                        "orden": {
+                          "description": "Orden de despliegue dentro del avío (opcional).",
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "medida",
+                        "precio"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "medidas"
+                ],
+                "description": "Set completo de medidas de un avío \"por medida\"."
+              }
+            }
+          },
+          "description": "Set completo de medidas de un avío \"por medida\"."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del avío."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Medidas de un avío con el promedio del precosteo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la medida."
+                          },
+                          "medida": {
+                            "type": "string",
+                            "description": "Etiqueta de la medida."
+                          },
+                          "precio": {
+                            "type": "number",
+                            "description": "Precio real de compra de esta medida."
+                          },
+                          "orden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden de despliegue."
+                          },
+                          "activo": {
+                            "type": "boolean",
+                            "description": "Falso si está desactivada (borrado suave)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "medida",
+                          "precio",
+                          "orden",
+                          "activo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Medida de un avío \"por medida\"."
+                      },
+                      "description": "Medidas del avío (ordenadas)."
+                    },
+                    "promedioPreCosto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Promedio de precios de las medidas activas (el que usa el precosto), o null."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "promedioPreCosto"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Medidas de un avío con el promedio del precosteo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/bordados": {
       "get": {
         "summary": "Listar bordados/estampados",
@@ -25389,6 +25922,63 @@
                             ],
                             "description": "Nombre del tipo de producto, o null."
                           },
+                          "numOperaciones": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                          },
+                          "corteBase": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo de corte por prenda (R5/B8), o null."
+                          },
+                          "idMaquileroCotizado": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                          },
+                          "maquileroCotizado": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                          },
+                          "secuenciaEstampado": {
+                            "type": "string",
+                            "enum": [
+                              "antes",
+                              "despues",
+                              "flexible"
+                            ],
+                            "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                          },
                           "cantidadFotos": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -25458,6 +26048,11 @@
                           "genero",
                           "idTipoProducto",
                           "tipoProducto",
+                          "numOperaciones",
+                          "corteBase",
+                          "idMaquileroCotizado",
+                          "maquileroCotizado",
+                          "secuenciaEstampado",
                           "cantidadFotos",
                           "urlFotoPrincipal",
                           "activo",
@@ -25697,6 +26292,29 @@
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
                   },
+                  "numOperaciones": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "corteBase": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "idMaquileroCotizado": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "secuenciaEstampado": {
+                    "type": "string",
+                    "enum": [
+                      "antes",
+                      "despues",
+                      "flexible"
+                    ],
+                    "description": "Secuencia del estampado respecto a la costura: antes | después | flexible."
+                  },
                   "descripcion": {
                     "type": "string",
                     "maxLength": 500
@@ -25850,6 +26468,63 @@
                       ],
                       "description": "Nombre del tipo de producto, o null."
                     },
+                    "numOperaciones": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                    },
+                    "corteBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de corte por prenda (R5/B8), o null."
+                    },
+                    "idMaquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                    },
+                    "maquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                    },
+                    "secuenciaEstampado": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -25919,6 +26594,11 @@
                     "genero",
                     "idTipoProducto",
                     "tipoProducto",
+                    "numOperaciones",
+                    "corteBase",
+                    "idMaquileroCotizado",
+                    "maquileroCotizado",
+                    "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "activo",
@@ -26241,6 +26921,63 @@
                       ],
                       "description": "Nombre del tipo de producto, o null."
                     },
+                    "numOperaciones": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                    },
+                    "corteBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de corte por prenda (R5/B8), o null."
+                    },
+                    "idMaquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                    },
+                    "maquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                    },
+                    "secuenciaEstampado": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -26451,6 +27188,11 @@
                     "genero",
                     "idTipoProducto",
                     "tipoProducto",
+                    "numOperaciones",
+                    "corteBase",
+                    "idMaquileroCotizado",
+                    "maquileroCotizado",
+                    "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "activo",
@@ -26691,6 +27433,50 @@
                       }
                     ]
                   },
+                  "numOperaciones": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "corteBase": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "idMaquileroCotizado": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "secuenciaEstampado": {
+                    "type": "string",
+                    "enum": [
+                      "antes",
+                      "despues",
+                      "flexible"
+                    ],
+                    "description": "Secuencia del estampado respecto a la costura: antes | después | flexible."
+                  },
                   "descripcion": {
                     "anyOf": [
                       {
@@ -26864,6 +27650,63 @@
                       ],
                       "description": "Nombre del tipo de producto, o null."
                     },
+                    "numOperaciones": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                    },
+                    "corteBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de corte por prenda (R5/B8), o null."
+                    },
+                    "idMaquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                    },
+                    "maquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                    },
+                    "secuenciaEstampado": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -26933,6 +27776,11 @@
                     "genero",
                     "idTipoProducto",
                     "tipoProducto",
+                    "numOperaciones",
+                    "corteBase",
+                    "idMaquileroCotizado",
+                    "maquileroCotizado",
+                    "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "activo",
@@ -27253,6 +28101,63 @@
                       ],
                       "description": "Nombre del tipo de producto, o null."
                     },
+                    "numOperaciones": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "# de operaciones de costura (R5/B7), o null si no se capturó."
+                    },
+                    "corteBase": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo de corte por prenda (R5/B8), o null."
+                    },
+                    "idMaquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del maquilero (costura) cotizado (R5/B9), o null."
+                    },
+                    "maquileroCotizado": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre del maquilero cotizado (R5/B9), o null."
+                    },
+                    "secuenciaEstampado": {
+                      "type": "string",
+                      "enum": [
+                        "antes",
+                        "despues",
+                        "flexible"
+                      ],
+                      "description": "Secuencia de estampado del modelo (R5/B10; default \"antes\")."
+                    },
                     "cantidadFotos": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -27322,6 +28227,11 @@
                     "genero",
                     "idTipoProducto",
                     "tipoProducto",
+                    "numOperaciones",
+                    "corteBase",
+                    "idMaquileroCotizado",
+                    "maquileroCotizado",
+                    "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
                     "activo",
@@ -152645,11 +153555,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -152671,7 +153585,8 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -153139,11 +154054,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -153165,7 +154084,8 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -153633,11 +154553,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -153659,7 +154583,8 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -154184,11 +155109,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -154210,7 +155139,8 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -154736,11 +155666,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -154762,7 +155696,8 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -154973,7 +155908,7 @@
         }
       },
       "delete": {
-        "summary": "Eliminar un renglón manual del precosto",
+        "summary": "Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte)",
         "tags": [
           "desarrollo"
         ],
@@ -155239,11 +156174,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -155265,7 +156204,518 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de precosto."
+                      },
+                      "description": "Renglones (agrupables por concepto)."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del usuario que lo creó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del último usuario que lo modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idDesarrollo",
+                    "version",
+                    "estado",
+                    "congelado",
+                    "congeladoEn",
+                    "congeladoPorId",
+                    "costoTotal",
+                    "lineas",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Precosto persistido de un desarrollo, con sus renglones."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/precostos/{id}/lineas/{idLinea}/restaurar": {
+      "post": {
+        "summary": "Restaurar un renglón BOM ajustado al valor del BOM del modelo",
+        "tags": [
+          "desarrollo"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del precosto."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de precosto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Precosto persistido de un desarrollo, con sus renglones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del precosto."
+                    },
+                    "idDesarrollo": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Desarrollo al que pertenece."
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Número de versión (consecutivo por desarrollo)."
+                    },
+                    "estado": {
+                      "type": "string",
+                      "enum": [
+                        "borrador",
+                        "congelado"
+                      ],
+                      "description": "Estado del precosto (borrador editable / congelado inmutable)."
+                    },
+                    "congelado": {
+                      "type": "boolean",
+                      "description": "Conveniencia: estado === \"congelado\" (inmutable)."
+                    },
+                    "congeladoEn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cuándo se congeló (ISO 8601), o null."
+                    },
+                    "congeladoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Quién lo congeló, o null."
+                    },
+                    "costoTotal": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Σ importes de los renglones (o null sin importes)."
+                    },
+                    "lineas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón."
+                          },
+                          "idConceptoCosto": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Concepto de costo del renglón."
+                          },
+                          "conceptoCodigo": {
+                            "type": "string",
+                            "description": "Código del concepto (para agrupar)."
+                          },
+                          "conceptoNombre": {
+                            "type": "string",
+                            "description": "Nombre del concepto."
+                          },
+                          "conceptoOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden de despliegue del concepto."
+                          },
+                          "conceptoFijo": {
+                            "type": "boolean",
+                            "description": "¿El concepto es fijo (tela/avíos/maquila)?"
+                          },
+                          "origen": {
+                            "type": "string",
+                            "enum": [
+                              "bom_tela",
+                              "bom_avio",
+                              "bom_bordado",
+                              "manual"
+                            ],
+                            "description": "Origen del renglón (BOM tela/avío/bordado, o manual)."
+                          },
+                          "descripcion": {
+                            "type": "string",
+                            "description": "Descripción del renglón (nombre del insumo o del concepto)."
+                          },
+                          "consumo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Consumo/cantidad (o null si no aplica)."
+                          },
+                          "precioUnit": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Precio unitario (o null sin importes)."
+                          },
+                          "importe": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe del renglón (o null sin importes)."
+                          },
+                          "notas": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Notas del renglón, o null."
+                          },
+                          "idTela": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza: tela del amarre, o null."
+                          },
+                          "idTelaProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza: proveedor-tela amarrado, o null."
+                          },
+                          "idAvio": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza: avío del amarre, o null."
+                          },
+                          "idAvioProveedor": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza: proveedor del avío usado, o null."
+                          },
+                          "idBordado": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Traza: bordado, o null."
+                          },
+                          "editable": {
+                            "type": "boolean",
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
+                          },
+                          "eliminable": {
+                            "type": "boolean",
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "idConceptoCosto",
+                          "conceptoCodigo",
+                          "conceptoNombre",
+                          "conceptoOrden",
+                          "conceptoFijo",
+                          "origen",
+                          "descripcion",
+                          "consumo",
+                          "precioUnit",
+                          "importe",
+                          "notas",
+                          "idTela",
+                          "idTelaProveedor",
+                          "idAvio",
+                          "idAvioProveedor",
+                          "idBordado",
+                          "editable",
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -155733,11 +157183,15 @@
                           },
                           "editable": {
                             "type": "boolean",
-                            "description": "¿La UI puede editar este renglón? (solo origen manual)."
+                            "description": "¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12)."
                           },
                           "eliminable": {
                             "type": "boolean",
-                            "description": "¿La UI puede eliminarlo? (manual y concepto NO fijo)."
+                            "description": "¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12)."
+                          },
+                          "ajustado": {
+                            "type": "boolean",
+                            "description": "¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa)."
                           }
                         },
                         "required": [
@@ -155759,7 +157213,8 @@
                           "idAvioProveedor",
                           "idBordado",
                           "editable",
-                          "eliminable"
+                          "eliminable",
+                          "ajustado"
                         ],
                         "additionalProperties": false,
                         "description": "Renglón de precosto."
@@ -155821,6 +157276,880 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desarrollos/dificultad": {
+      "get": {
+        "summary": "Resolver la dificultad derivada de un # de operaciones (R5/B7)",
+        "tags": [
+          "desarrollo"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "ops",
+            "required": true,
+            "description": "# de operaciones de costura a evaluar contra la tabla de rangos."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dificultad derivada del # de operaciones (R5, B7).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "numOperaciones": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "# de operaciones evaluado."
+                    },
+                    "rango": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del rango de dificultad."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del nivel (ej. \"Muy complejo\")."
+                            },
+                            "diasCostura": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Días de costura del CPM para este nivel."
+                            },
+                            "opsDesde": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Límite inferior del rango."
+                            },
+                            "opsHasta": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Límite superior del rango (null = abierto)."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "nombre",
+                            "diasCostura",
+                            "opsDesde",
+                            "opsHasta"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "El rango que casó, o null si ningún rango cubre ese # de operaciones."
+                    }
+                  },
+                  "required": [
+                    "numOperaciones",
+                    "rango"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Dificultad derivada del # de operaciones (R5, B7)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desarrollos/{idDesarrollo}/adjuntos": {
+      "post": {
+        "summary": "Preparar la subida de un adjunto (tech pack) del desarrollo (R5/B16)",
+        "tags": [
+          "desarrollo"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombreOriginal": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Nombre del archivo tal como lo llama el usuario."
+                  },
+                  "tipoMime": {
+                    "type": "string",
+                    "pattern": "^[\\w.+-]+\\/[\\w.+-]+$",
+                    "description": "Tipo MIME del archivo (ej. application/pdf, image/png)."
+                  },
+                  "tamanoBytes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño)."
+                  }
+                },
+                "required": [
+                  "nombreOriginal",
+                  "tipoMime",
+                  "tamanoBytes"
+                ],
+                "description": "Datos para preparar la subida de un adjunto de un desarrollo (tech pack)."
+              }
+            }
+          },
+          "description": "Datos para preparar la subida de un adjunto de un desarrollo (tech pack)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idDesarrollo",
+            "required": true,
+            "description": "Id del desarrollo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de preparar la subida de un adjunto de desarrollo (URL prefirmada).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idArchivo": {
+                      "type": "string",
+                      "description": "Id del registro Archivo creado."
+                    },
+                    "nombreOriginal": {
+                      "type": "string",
+                      "description": "Nombre original del archivo."
+                    },
+                    "urlSubida": {
+                      "type": "string",
+                      "description": "URL PUT prefirmada: el navegador sube directo a R2."
+                    },
+                    "expiraEnSegundos": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Vigencia de la URL de subida (segundos)."
+                    }
+                  },
+                  "required": [
+                    "idArchivo",
+                    "nombreOriginal",
+                    "urlSubida",
+                    "expiraEnSegundos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de preparar la subida de un adjunto de desarrollo (URL prefirmada)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Listar los adjuntos (tech pack) de un desarrollo",
+        "tags": [
+          "desarrollo"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idDesarrollo",
+            "required": true,
+            "description": "Id del desarrollo."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Adjuntos (tech pack) de un desarrollo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idArchivo": {
+                            "type": "string",
+                            "description": "Id del registro Archivo."
+                          },
+                          "nombreOriginal": {
+                            "type": "string",
+                            "description": "Nombre original del archivo."
+                          },
+                          "tipoMime": {
+                            "type": "string",
+                            "description": "Tipo MIME del archivo."
+                          },
+                          "tamanoBytes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tamaño en bytes."
+                          },
+                          "urlDescarga": {
+                            "type": "string",
+                            "description": "URL GET prefirmada para ver/descargar el archivo."
+                          },
+                          "subidoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Quién subió el archivo, o null."
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Fecha en que se adjuntó (ISO 8601)."
+                          }
+                        },
+                        "required": [
+                          "idArchivo",
+                          "nombreOriginal",
+                          "tipoMime",
+                          "tamanoBytes",
+                          "urlDescarga",
+                          "subidoPorId",
+                          "creadoEn"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Adjunto de un desarrollo con su URL de descarga."
+                      },
+                      "description": "Adjuntos del desarrollo."
+                    }
+                  },
+                  "required": [
+                    "datos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Adjuntos (tech pack) de un desarrollo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/desarrollos/{idDesarrollo}/adjuntos/{idArchivo}": {
+      "delete": {
+        "summary": "Quitar un adjunto del desarrollo",
+        "tags": [
+          "desarrollo"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idDesarrollo",
+            "required": true,
+            "description": "Id del desarrollo."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "idArchivo",
+            "required": true,
+            "description": "Id del adjunto."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Default Response"
           },
           "400": {
             "description": "Respuesta de error de la API.",
@@ -161023,6 +163352,497 @@
                   ],
                   "additionalProperties": false,
                   "description": "Historial de negociación de un renglón de lista (D13/R20b)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listas-precios/lineas/{idLinea}/simular": {
+      "get": {
+        "summary": "Simular el margen de un precio objetivo sobre un renglón (calculadora de negociación)",
+        "tags": [
+          "listas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 0
+            },
+            "in": "query",
+            "name": "precioObjetivo",
+            "required": true,
+            "description": "Precio de venta propuesto para simular su margen."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idPrecosto",
+            "required": false,
+            "description": "Versión congelada cuyo costo simular (opcional; por defecto el costo vigente)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de la lista."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Simulación de margen de un precio objetivo (calculadora de negociación §4.8).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "costo": {
+                      "type": "number",
+                      "description": "Costo unitario simulado (del precosto vigente o el indicado)."
+                    },
+                    "precioObjetivo": {
+                      "type": "number",
+                      "description": "Precio objetivo capturado (eco de la entrada)."
+                    },
+                    "precioNeto": {
+                      "type": "number",
+                      "description": "Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta."
+                    },
+                    "margenBrutoPct": {
+                      "type": "number",
+                      "description": "% de margen bruto real: (neto − costo) ÷ neto × 100."
+                    },
+                    "margenObjetivoPct": {
+                      "type": "number",
+                      "description": "% de margen objetivo del cliente (meta a cumplir)."
+                    },
+                    "cumpleObjetivo": {
+                      "type": "boolean",
+                      "description": "¿El margen bruto alcanza el objetivo? (verde/rojo)."
+                    }
+                  },
+                  "required": [
+                    "costo",
+                    "precioObjetivo",
+                    "precioNeto",
+                    "margenBrutoPct",
+                    "margenObjetivoPct",
+                    "cumpleObjetivo"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Simulación de margen de un precio objetivo (calculadora de negociación §4.8)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/listas-precios/lineas/{idLinea}/desglose-costo": {
+      "get": {
+        "summary": "Desglose de costo por concepto del precosto congelado de un renglón",
+        "tags": [
+          "listas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idLinea",
+            "required": true,
+            "description": "Id del renglón de la lista."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Desglose de costo por concepto de un renglón de lista (§4.8).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idPrecosto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Precosto congelado del renglón."
+                    },
+                    "versionPrecosto": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Nº de versión del precosto."
+                    },
+                    "grupos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "codigo": {
+                            "type": "string",
+                            "description": "Código del concepto de costo (tela/avios/maquila/corte/…)."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre legible del concepto."
+                          },
+                          "subtotal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Suma de importes del concepto (o null sin importes)."
+                          }
+                        },
+                        "required": [
+                          "codigo",
+                          "nombre",
+                          "subtotal"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Un concepto del desglose de costo con su subtotal."
+                      },
+                      "description": "Conceptos agrupados por tipo, ordenados por su orden de catálogo."
+                    },
+                    "costoTotal": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo total del renglón (o null sin importes)."
+                    }
+                  },
+                  "required": [
+                    "idPrecosto",
+                    "versionPrecosto",
+                    "grupos",
+                    "costoTotal"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Desglose de costo por concepto de un renglón de lista (§4.8)."
                 }
               }
             }

@@ -127,7 +127,74 @@ export const esquemaModeloBordados = z
     error: 'Hay bordados repetidos en el modelo',
   });
 
+// ── Secuencia de estampado (rediseño R4/R5, B10) ───────────────────────────────
+
+/** Secuencia del estampado/bordado respecto a la costura (por modelo). Espejo del enum de BD. */
+export const esquemaSecuenciaEstampado = z
+  .enum(['antes', 'despues', 'flexible'])
+  .describe('Secuencia del estampado respecto a la costura: antes | después | flexible.');
+
+/** Clave de la secuencia de estampado. */
+export type SecuenciaEstampadoClave = z.infer<typeof esquemaSecuenciaEstampado>;
+
+// ── Dificultad DERIVADA del # de operaciones (rediseño R5, B7) ──────────────────
+
+/** Querystring del resolvedor de dificultad: el # de operaciones a evaluar. */
+export const esquemaDificultadQuery = z
+  .object({
+    ops: z.coerce
+      .number({ error: 'El # de operaciones debe ser un número' })
+      .int({ error: 'El # de operaciones debe ser entero' })
+      .nonnegative({ error: 'El # de operaciones no puede ser negativo' })
+      .describe('# de operaciones de costura a evaluar contra la tabla de rangos.'),
+  })
+  .describe('Parámetros del resolvedor de dificultad por # de operaciones.');
+
+/** Forma del rango de dificultad que casó con el # de operaciones (o null si ninguno). */
+export const esquemaDificultadResuelta = z
+  .object({
+    numOperaciones: z.number().int().describe('# de operaciones evaluado.'),
+    rango: z
+      .object({
+        id: z.number().int().describe('Id del rango de dificultad.'),
+        nombre: z.string().describe('Nombre del nivel (ej. "Muy complejo").'),
+        diasCostura: z.number().int().describe('Días de costura del CPM para este nivel.'),
+        opsDesde: z.number().int().describe('Límite inferior del rango.'),
+        opsHasta: z
+          .number()
+          .int()
+          .nullable()
+          .describe('Límite superior del rango (null = abierto).'),
+      })
+      .nullable()
+      .describe('El rango que casó, o null si ningún rango cubre ese # de operaciones.'),
+  })
+  .describe('Dificultad derivada del # de operaciones (R5, B7).');
+
+/** Forma de la dificultad resuelta. */
+export type DificultadResuelta = z.infer<typeof esquemaDificultadResuelta>;
+
 // ── Modelo (datos generales) ───────────────────────────────────────────────────
+
+/**
+ * Campo `# de operaciones de costura` (rediseño R4/R5, B7): dato objetivo que deriva la DIFICULTAD
+ * contra la tabla `RangoDificultad` (y de ahí los días de costura del CPM). Entero no negativo.
+ */
+const esquemaNumOperaciones = z
+  .number({ error: 'El # de operaciones debe ser un número' })
+  .int({ error: 'El # de operaciones debe ser entero' })
+  .nonnegative({ error: 'El # de operaciones no puede ser negativo' });
+
+/** Costo de CORTE por prenda (rediseño R5, B8): separado de la maquila, sin proveedor. No negativo. */
+const esquemaCorteBase = z
+  .number({ error: 'El corte debe ser un número' })
+  .nonnegative({ error: 'El corte no puede ser negativo' });
+
+/** Maquilero (costura) cotizado (rediseño R5, B9): id de un Proveedor. */
+const esquemaIdMaquilero = z
+  .number({ error: 'El id del maquilero debe ser un número' })
+  .int({ error: 'El id del maquilero debe ser entero' })
+  .positive({ error: 'El id del maquilero debe ser positivo' });
 
 /** Campos opcionales del modelo (mismas reglas de longitud en alta y edición). */
 const camposOpcionalesModelo = {
@@ -179,6 +246,14 @@ export const esquemaModeloCrear = z.object({
     .int({ error: 'El id del tipo de producto debe ser entero' })
     .positive({ error: 'El id del tipo de producto debe ser positivo' })
     .optional(),
+  /** # de operaciones de costura (R5/B7): deriva la dificultad → días de costura del CPM. Opcional. */
+  numOperaciones: esquemaNumOperaciones.optional(),
+  /** Costo de corte por prenda (R5/B8), separado de la maquila, sin proveedor. Opcional. */
+  corteBase: esquemaCorteBase.optional(),
+  /** Maquilero (costura) cotizado (R5/B9). Si viene, el dominio exige Proveedor existente/activo. */
+  idMaquileroCotizado: esquemaIdMaquilero.optional(),
+  /** Secuencia de estampado (R5/B10): antes | después | flexible. Opcional (default 'antes' en BD). */
+  secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
   ...camposOpcionalesModelo,
 });
 
@@ -233,6 +308,14 @@ export const esquemaModeloEditar = z
       .positive({ error: 'El id del tipo de producto debe ser positivo' })
       .nullable()
       .optional(),
+    /** `null` quita el # de operaciones; un número lo fija; omitir = no tocar (R5/B7). */
+    numOperaciones: esquemaNumOperaciones.nullable().optional(),
+    /** `null` quita el corte; un número lo fija; omitir = no tocar (R5/B8). */
+    corteBase: esquemaCorteBase.nullable().optional(),
+    /** `null` quita el maquilero cotizado; un id lo fija; omitir = no tocar (R5/B9). */
+    idMaquileroCotizado: esquemaIdMaquilero.nullable().optional(),
+    /** Cambia la secuencia de estampado; omitir = no tocar (R5/B10). No es nullable (tiene default). */
+    secuenciaEstampado: esquemaSecuenciaEstampado.optional(),
     descripcion: camposOpcionalesModelo.descripcion.nullable(),
     activo: z.boolean({ error: 'Activo debe ser verdadero o falso' }).optional(),
   })
@@ -315,6 +398,24 @@ export const esquemaModeloSalida = z
       .nullable()
       .describe('Id del tipo de producto, o null (F6-E1).'),
     tipoProducto: z.string().nullable().describe('Nombre del tipo de producto, o null.'),
+    numOperaciones: z
+      .number()
+      .int()
+      .nullable()
+      .describe('# de operaciones de costura (R5/B7), o null si no se capturó.'),
+    corteBase: z.number().nullable().describe('Costo de corte por prenda (R5/B8), o null.'),
+    idMaquileroCotizado: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Id del maquilero (costura) cotizado (R5/B9), o null.'),
+    maquileroCotizado: z
+      .string()
+      .nullable()
+      .describe('Nombre del maquilero cotizado (R5/B9), o null.'),
+    secuenciaEstampado: esquemaSecuenciaEstampado.describe(
+      'Secuencia de estampado del modelo (R5/B10; default "antes").',
+    ),
     cantidadFotos: z.number().int().describe('Cantidad de fotos del modelo.'),
     /**
      * URL GET prefirmada de la FOTO PRINCIPAL del modelo (la primera por orden, luego id), o

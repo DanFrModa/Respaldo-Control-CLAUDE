@@ -35,6 +35,7 @@ import {
 import { formatearFechaHora, formatearMoneda } from '@/lib/formato';
 import { DialogoPrecosto } from '@/modulos/desarrollo/DialogoPrecosto';
 
+import { CalculadoraNegociacion } from './CalculadoraNegociacion';
 import { ComparadorVersiones } from './ComparadorVersiones';
 
 /** Clases del textarea (mismo estilo que el resto de formularios). */
@@ -128,6 +129,7 @@ export function DialogoNegociacionRenglon({
         abierto={nuevaRondaAbierta}
         alCambiarAbierto={setNuevaRondaAbierta}
         linea={linea}
+        verImportes={verImportes}
       />
       <DialogoRegistrarAcuerdo
         abierto={acuerdoAbierto}
@@ -243,10 +245,12 @@ function DialogoNuevaRonda({
   abierto,
   alCambiarAbierto,
   linea,
+  verImportes,
 }: {
   abierto: boolean;
   alCambiarAbierto: (abierto: boolean) => void;
   linea: ListaLinea;
+  verImportes: boolean;
 }): React.JSX.Element {
   const desarrollo = useDesarrollo(abierto ? linea.idDesarrollo : null);
   const historial = usePrecostosDesarrollo(abierto ? linea.idDesarrollo : null);
@@ -363,20 +367,44 @@ function DialogoNuevaRonda({
             />
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="ronda-precio">Precio acordado (opcional)</FieldLabel>
-            <Input
-              id="ronda-precio"
-              type="number"
-              step="0.01"
-              min="0"
-              inputMode="decimal"
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-              placeholder="(se toma el calculado si se deja vacío)"
-              data-testid="ronda-precio"
-            />
-          </Field>
+          {/* Precio objetivo + margen EN VIVO (§4.8): con importes, la calculadora se ve DESDE que se
+              captura el objetivo — por default contra el costo VIGENTE del renglón (caso "el cliente
+              ofrece $205, ¿me da margen sin tocar la prenda?"). Si el negociador cambia la prenda (B12) y
+              elige una versión congelada nueva, simula contra el costo de ESA versión. Guardar la ronda
+              sigue exigiendo una versión (registrarRonda adopta un precosto congelado). Sin importes,
+              cae al input llano. */}
+          {verImportes ? (
+            <div>
+              <p className="mb-1 text-sm font-medium">4. Precio objetivo y margen</p>
+              <CalculadoraNegociacion
+                idLinea={linea.id}
+                {...(idVersion === '' ? {} : { idPrecosto: Number(idVersion) })}
+                precioObjetivo={precio}
+                alCambiarPrecioObjetivo={setPrecio}
+                etiqueta="Precio acordado (opcional; se toma el calculado si se deja vacío)"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Margen contra el costo{' '}
+                {idVersion === '' ? 'VIGENTE del renglón' : 'de la versión elegida'}. Para GUARDAR
+                la ronda elige una versión congelada.
+              </p>
+            </div>
+          ) : (
+            <Field>
+              <FieldLabel htmlFor="ronda-precio">Precio acordado (opcional)</FieldLabel>
+              <Input
+                id="ronda-precio"
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+                placeholder="(se toma el calculado si se deja vacío)"
+                data-testid="ronda-precio"
+              />
+            </Field>
+          )}
         </div>
 
         <DialogFooter>

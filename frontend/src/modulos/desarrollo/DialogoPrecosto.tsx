@@ -13,6 +13,7 @@ import {
   usePrecosto,
   usePrecostosDesarrollo,
   useRecalcularPrecosto,
+  useRestaurarLinea,
   type Precosto,
   type PrecostoLinea,
   type PrecostoResumen,
@@ -40,6 +41,8 @@ import {
 } from '@/components/ui/table';
 import { moneda } from '@/modulos/costos/comun';
 import { useSesion } from '@/sesion/useSesion';
+
+import { TechPackDesarrollo } from './TechPackDesarrollo';
 
 /** Catálogo de conceptos activos (para el selector de renglones manuales). */
 const QUERY_CONCEPTOS = {
@@ -96,6 +99,7 @@ export function DialogoPrecosto({
 }): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedePrecostear = tienePermiso('desarrollo.precostear');
+  const puedeAdministrar = tienePermiso('desarrollo.administrar');
   // `verImportes` se deriva del PERMISO real (no de que `costoTotal` venga null): así no depende de
   // la invariante de ocultación del backend y no se rompe si un precosto legítimo tuviera total 0.
   const verImportes = tienePermiso('consultas.ver-importes');
@@ -196,6 +200,17 @@ export function DialogoPrecosto({
               {puedePrecostear ? ' Genera el primero para empezar.' : ''}
             </p>
           ) : null}
+
+          {/* R5/B16: tech pack (PDFs de referencia + fotos de muestra) del desarrollo. */}
+          {desarrollo !== undefined ? (
+            <section className="space-y-2 border-t pt-3" data-testid="seccion-tech-pack">
+              <h4 className="text-sm font-semibold">Tech pack y fotos</h4>
+              <TechPackDesarrollo
+                idDesarrollo={desarrollo.id}
+                puedeAdministrar={puedeAdministrar}
+              />
+            </section>
+          ) : null}
         </div>
 
         <DialogFooter>
@@ -271,6 +286,7 @@ function EditorPrecosto({
   const recalcular = useRecalcularPrecosto();
   const congelar = useCongelarPrecosto();
   const eliminar = useEliminarLinea();
+  const restaurar = useRestaurarLinea();
 
   const [confirmando, setConfirmando] = useState<'recalcular' | 'congelar' | null>(null);
 
@@ -303,7 +319,16 @@ function EditorPrecosto({
     eliminar.mutate(
       { id: precosto.id, idLinea: linea.id },
       {
-        onSuccess: () => toast.success('Renglón eliminado.'),
+        onSuccess: () => toast.success('Renglón quitado.'),
+        onError: (error) => toast.error(error.message),
+      },
+    );
+  }
+  function alRestaurar(linea: PrecostoLinea): void {
+    restaurar.mutate(
+      { id: precosto.id, idLinea: linea.id },
+      {
+        onSuccess: () => toast.success('Renglón restaurado al BOM.'),
         onError: (error) => toast.error(error.message),
       },
     );
@@ -358,7 +383,7 @@ function EditorPrecosto({
         >
           <span>
             {confirmando === 'recalcular'
-              ? 'Recalcular reemplaza los renglones de tela/avíos/bordado con los valores vigentes del BOM (respeta los manuales). ¿Continuar?'
+              ? 'Recalcular reemplaza los renglones de tela/avíos/bordado con los valores vigentes del BOM (respeta los manuales y los renglones AJUSTADOS en la negociación). ¿Continuar?'
               : 'Al congelar, esta versión queda INMUTABLE y sirve de base para la lista y la negociación. ¿Continuar?'}
           </span>
           <div className="flex gap-2">
@@ -414,7 +439,9 @@ function EditorPrecosto({
                     idPrecosto={precosto.id}
                     editable={puedeEditarLineas}
                     eliminando={eliminar.isPending}
+                    restaurando={restaurar.isPending}
                     alEliminar={() => alEliminar(linea)}
+                    alRestaurar={() => alRestaurar(linea)}
                   />
                 ))}
               </TableBody>
@@ -428,19 +455,24 @@ function EditorPrecosto({
   );
 }
 
-/** Un renglón: en modo lectura muestra los valores; editable (manual) alterna a inputs en línea. */
+/** Un renglón: en modo lectura muestra los valores; editable alterna a inputs en línea (B12: en un
+ * borrador CUALQUIER renglón se edita/quita; los BOM editados quedan "ajustados" y se pueden restaurar). */
 function RenglonPrecosto({
   linea,
   idPrecosto,
   editable,
   eliminando,
+  restaurando,
   alEliminar,
+  alRestaurar,
 }: {
   linea: PrecostoLinea;
   idPrecosto: number;
   editable: boolean;
   eliminando: boolean;
+  restaurando: boolean;
   alEliminar: () => void;
+  alRestaurar: () => void;
 }): React.JSX.Element {
   const editar = useEditarLinea();
   const [editando, setEditando] = useState(false);
@@ -546,39 +578,55 @@ function RenglonPrecosto({
 
   return (
     <TableRow data-testid="linea-precosto">
-      <TableCell>{linea.descripcion}</TableCell>
+      <TableCell>
+        <span>{linea.descripcion}</span>
+        {linea.ajustado ? (
+          <Badge variant="outline" className="ml-2 text-amber-600" data-testid="linea-ajustada">
+            Ajustado
+          </Badge>
+        ) : null}
+      </TableCell>
       <TableCell className="text-right">{linea.consumo ?? '—'}</TableCell>
       <TableCell className="text-right">{moneda(linea.precioUnit)}</TableCell>
       <TableCell className="text-right">{moneda(linea.importe)}</TableCell>
       {editable ? (
         <TableCell className="text-right">
-          {linea.editable ? (
-            <div className="flex justify-end gap-1">
+          <div className="flex justify-end gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={abrirEdicion}
+              data-testid="editar-linea"
+            >
+              Editar
+            </Button>
+            {linea.ajustado ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={abrirEdicion}
-                data-testid="editar-linea"
+                onClick={alRestaurar}
+                disabled={restaurando}
+                title="Restaurar al valor del BOM del modelo"
+                data-testid="restaurar-linea"
               >
-                Editar
+                <RefreshCwIcon aria-hidden />
               </Button>
-              {linea.eliminable ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={alEliminar}
-                  disabled={eliminando}
-                  data-testid="eliminar-linea"
-                >
-                  <Trash2Icon aria-hidden />
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <span className="text-xs text-muted-foreground">del BOM</span>
-          )}
+            ) : null}
+            {linea.eliminable ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={alEliminar}
+                disabled={eliminando}
+                data-testid="eliminar-linea"
+              >
+                <Trash2Icon aria-hidden />
+              </Button>
+            ) : null}
+          </div>
         </TableCell>
       ) : null}
     </TableRow>
@@ -645,9 +693,10 @@ function FormAgregarManual({ idPrecosto }: { idPrecosto: number }): React.JSX.El
             data-testid="agregar-linea-concepto"
           >
             <option value="">Elige…</option>
-            {/* Sólo conceptos NO fijos: tela/avíos/maquila/bordado salen del BOM, no a mano (B1). */}
+            {/* R5/B12: se puede agregar bajo cualquier concepto SALVO los anclas maquila/corte (ya
+                tienen su renglón fijo por prenda). Tela/avíos sí, como renglón scratch de negociación. */}
             {(conceptos.data?.datos ?? [])
-              .filter((c) => !c.fijo)
+              .filter((c) => c.codigo !== 'maquila' && c.codigo !== 'corte')
               .map((c) => (
                 <option key={c.id} value={String(c.id)}>
                   {c.nombre}

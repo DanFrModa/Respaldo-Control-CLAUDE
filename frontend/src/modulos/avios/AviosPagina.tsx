@@ -24,6 +24,7 @@ import {
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoAvio } from './DialogoAvio';
+import { MedidasAvio } from './MedidasAvio';
 
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
@@ -202,7 +203,7 @@ export function AviosPagina(): React.JSX.Element {
             {a.favorito ? <TipoBadge tono="avios">Favorito</TipoBadge> : null}
           </span>
         )}
-        renderDetalle={(a) => <DetalleAvio avio={a} />}
+        renderDetalle={(a) => <DetalleAvio avio={a} puedeAdministrar={puedeAdministrar} />}
       />
 
       {/* Diálogos */}
@@ -241,7 +242,13 @@ export function AviosPagina(): React.JSX.Element {
  * General siempre se muestra (clave/descripción existen). Usa las piezas de
  * `@/modulos/detalle` para verse igual que el resto.
  */
-function DetalleAvio({ avio }: { avio: Avio }): React.JSX.Element {
+function DetalleAvio({
+  avio,
+  puedeAdministrar,
+}: {
+  avio: Avio;
+  puedeAdministrar: boolean;
+}): React.JSX.Element {
   return (
     <>
       {/* ── General (siempre: clave/descripción existen) ─────────────────────── */}
@@ -303,6 +310,11 @@ function DetalleAvio({ avio }: { avio: Avio }): React.JSX.Element {
             ))}
           </ul>
         )}
+      </SeccionDetalle>
+
+      {/* ── Medidas del avío "por medida" (R5, B11) ──────────────────────────── */}
+      <SeccionDetalle titulo="Medidas del avío (por medida)" icono={Ruler}>
+        <MedidasAvio idAvio={avio.id} puedeAdministrar={puedeAdministrar} />
       </SeccionDetalle>
 
       <Historial creadoEn={avio.creadoEn} modificadoEn={avio.modificadoEn} />

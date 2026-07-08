@@ -10201,6 +10201,274 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/avios/{id}/medidas': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar las medidas de un avío "por medida" (+ el promedio del precosto) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del avío. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Medidas de un avío con el promedio del precosteo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Medidas del avío (ordenadas). */
+              datos: {
+                /** @description Id de la medida. */
+                id: number;
+                /** @description Etiqueta de la medida. */
+                medida: string;
+                /** @description Precio real de compra de esta medida. */
+                precio: number;
+                /** @description Orden de despliegue. */
+                orden: number;
+                /** @description Falso si está desactivada (borrado suave). */
+                activo: boolean;
+              }[];
+              /** @description Promedio de precios de las medidas activas (el que usa el precosto), o null. */
+              promedioPreCosto: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    /** Reemplazar el set de medidas de un avío (agrega/actualiza/desactiva) */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del avío. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Set completo de medidas de un avío "por medida". */
+      requestBody: {
+        content: {
+          'application/json': {
+            medidas: {
+              /** @description Etiqueta de la medida (ej. "15 cm", "18 cm"). */
+              medida: string;
+              /** @description Precio real de compra de esta medida (entra al promedio del precosto). */
+              precio: number;
+              /** @description Orden de despliegue dentro del avío (opcional). */
+              orden?: number;
+            }[];
+          };
+        };
+      };
+      responses: {
+        /** @description Medidas de un avío con el promedio del precosteo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Medidas del avío (ordenadas). */
+              datos: {
+                /** @description Id de la medida. */
+                id: number;
+                /** @description Etiqueta de la medida. */
+                medida: string;
+                /** @description Precio real de compra de esta medida. */
+                precio: number;
+                /** @description Orden de despliegue. */
+                orden: number;
+                /** @description Falso si está desactivada (borrado suave). */
+                activo: boolean;
+              }[];
+              /** @description Promedio de precios de las medidas activas (el que usa el precosto), o null. */
+              promedioPreCosto: number | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/bordados': {
     parameters: {
       query?: never;
@@ -11510,6 +11778,19 @@ export interface paths {
                 idTipoProducto: number | null;
                 /** @description Nombre del tipo de producto, o null. */
                 tipoProducto: string | null;
+                /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+                numOperaciones: number | null;
+                /** @description Costo de corte por prenda (R5/B8), o null. */
+                corteBase: number | null;
+                /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+                idMaquileroCotizado: number | null;
+                /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+                maquileroCotizado: string | null;
+                /**
+                 * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+                 * @enum {string}
+                 */
+                secuenciaEstampado: 'antes' | 'despues' | 'flexible';
                 /** @description Cantidad de fotos del modelo. */
                 cantidadFotos: number;
                 /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -11642,6 +11923,14 @@ export interface paths {
             idCurvaTalla?: number;
             idGenero?: number;
             idTipoProducto?: number;
+            numOperaciones?: number;
+            corteBase?: number;
+            idMaquileroCotizado?: number;
+            /**
+             * @description Secuencia del estampado respecto a la costura: antes | después | flexible.
+             * @enum {string}
+             */
+            secuenciaEstampado?: 'antes' | 'despues' | 'flexible';
             descripcion?: string;
           };
         };
@@ -11678,6 +11967,19 @@ export interface paths {
               idTipoProducto: number | null;
               /** @description Nombre del tipo de producto, o null. */
               tipoProducto: string | null;
+              /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+              numOperaciones: number | null;
+              /** @description Costo de corte por prenda (R5/B8), o null. */
+              corteBase: number | null;
+              /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+              idMaquileroCotizado: number | null;
+              /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+              maquileroCotizado: string | null;
+              /**
+               * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+               * @enum {string}
+               */
+              secuenciaEstampado: 'antes' | 'despues' | 'flexible';
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -11840,6 +12142,19 @@ export interface paths {
               idTipoProducto: number | null;
               /** @description Nombre del tipo de producto, o null. */
               tipoProducto: string | null;
+              /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+              numOperaciones: number | null;
+              /** @description Costo de corte por prenda (R5/B8), o null. */
+              corteBase: number | null;
+              /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+              idMaquileroCotizado: number | null;
+              /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+              maquileroCotizado: string | null;
+              /**
+               * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+               * @enum {string}
+               */
+              secuenciaEstampado: 'antes' | 'despues' | 'flexible';
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -12037,6 +12352,19 @@ export interface paths {
               idTipoProducto: number | null;
               /** @description Nombre del tipo de producto, o null. */
               tipoProducto: string | null;
+              /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+              numOperaciones: number | null;
+              /** @description Costo de corte por prenda (R5/B8), o null. */
+              corteBase: number | null;
+              /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+              idMaquileroCotizado: number | null;
+              /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+              maquileroCotizado: string | null;
+              /**
+               * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+               * @enum {string}
+               */
+              secuenciaEstampado: 'antes' | 'despues' | 'flexible';
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -12164,6 +12492,14 @@ export interface paths {
             idCurvaTalla?: number | null;
             idGenero?: number | null;
             idTipoProducto?: number | null;
+            numOperaciones?: number | null;
+            corteBase?: number | null;
+            idMaquileroCotizado?: number | null;
+            /**
+             * @description Secuencia del estampado respecto a la costura: antes | después | flexible.
+             * @enum {string}
+             */
+            secuenciaEstampado?: 'antes' | 'despues' | 'flexible';
             descripcion?: string | null;
             activo?: boolean;
           };
@@ -12201,6 +12537,19 @@ export interface paths {
               idTipoProducto: number | null;
               /** @description Nombre del tipo de producto, o null. */
               tipoProducto: string | null;
+              /** @description # de operaciones de costura (R5/B7), o null si no se capturó. */
+              numOperaciones: number | null;
+              /** @description Costo de corte por prenda (R5/B8), o null. */
+              corteBase: number | null;
+              /** @description Id del maquilero (costura) cotizado (R5/B9), o null. */
+              idMaquileroCotizado: number | null;
+              /** @description Nombre del maquilero cotizado (R5/B9), o null. */
+              maquileroCotizado: string | null;
+              /**
+               * @description Secuencia de estampado del modelo (R5/B10; default "antes").
+               * @enum {string}
+               */
+              secuenciaEstampado: 'antes' | 'despues' | 'flexible';
               /** @description Cantidad de fotos del modelo. */
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
@@ -65603,10 +65952,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -65798,10 +66149,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -65997,10 +66350,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -66209,10 +66564,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -66329,7 +66686,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Eliminar un renglón manual del precosto */
+    /** Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte) */
     delete: {
       parameters: {
         query?: never;
@@ -66409,10 +66766,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -66608,10 +66967,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -66714,7 +67075,7 @@ export interface paths {
     };
     trace?: never;
   };
-  '/api/precostos/{id}/congelar': {
+  '/api/precostos/{id}/lineas/{idLinea}/restaurar': {
     parameters: {
       query?: never;
       header?: never;
@@ -66723,7 +67084,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Congelar el precosto (versión inmutable) */
+    /** Restaurar un renglón BOM ajustado al valor del BOM del modelo */
     post: {
       parameters: {
         query?: never;
@@ -66731,6 +67092,8 @@ export interface paths {
         path: {
           /** @description Id del precosto. */
           id: number;
+          /** @description Id del renglón de precosto. */
+          idLinea: number;
         };
         cookie?: never;
       };
@@ -66801,10 +67164,12 @@ export interface paths {
                 idAvioProveedor: number | null;
                 /** @description Traza: bordado, o null. */
                 idBordado: number | null;
-                /** @description ¿La UI puede editar este renglón? (solo origen manual). */
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
                 editable: boolean;
-                /** @description ¿La UI puede eliminarlo? (manual y concepto NO fijo). */
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
                 eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
               }[];
               /**
                * Format: date-time
@@ -66906,6 +67271,691 @@ export interface paths {
       };
     };
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/precostos/{id}/congelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Congelar el precosto (versión inmutable) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del precosto. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Precosto persistido de un desarrollo, con sus renglones. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del precosto. */
+              id: number;
+              /** @description Desarrollo al que pertenece. */
+              idDesarrollo: number;
+              /** @description Número de versión (consecutivo por desarrollo). */
+              version: number;
+              /**
+               * @description Estado del precosto (borrador editable / congelado inmutable).
+               * @enum {string}
+               */
+              estado: 'borrador' | 'congelado';
+              /** @description Conveniencia: estado === "congelado" (inmutable). */
+              congelado: boolean;
+              /** @description Cuándo se congeló (ISO 8601), o null. */
+              congeladoEn: string | null;
+              /** @description Quién lo congeló, o null. */
+              congeladoPorId: string | null;
+              /** @description Σ importes de los renglones (o null sin importes). */
+              costoTotal: number | null;
+              /** @description Renglones (agrupables por concepto). */
+              lineas: {
+                /** @description Id del renglón. */
+                id: number;
+                /** @description Concepto de costo del renglón. */
+                idConceptoCosto: number;
+                /** @description Código del concepto (para agrupar). */
+                conceptoCodigo: string;
+                /** @description Nombre del concepto. */
+                conceptoNombre: string;
+                /** @description Orden de despliegue del concepto. */
+                conceptoOrden: number;
+                /** @description ¿El concepto es fijo (tela/avíos/maquila)? */
+                conceptoFijo: boolean;
+                /**
+                 * @description Origen del renglón (BOM tela/avío/bordado, o manual).
+                 * @enum {string}
+                 */
+                origen: 'bom_tela' | 'bom_avio' | 'bom_bordado' | 'manual';
+                /** @description Descripción del renglón (nombre del insumo o del concepto). */
+                descripcion: string;
+                /** @description Consumo/cantidad (o null si no aplica). */
+                consumo: number | null;
+                /** @description Precio unitario (o null sin importes). */
+                precioUnit: number | null;
+                /** @description Importe del renglón (o null sin importes). */
+                importe: number | null;
+                /** @description Notas del renglón, o null. */
+                notas: string | null;
+                /** @description Traza: tela del amarre, o null. */
+                idTela: number | null;
+                /** @description Traza: proveedor-tela amarrado, o null. */
+                idTelaProveedor: number | null;
+                /** @description Traza: avío del amarre, o null. */
+                idAvio: number | null;
+                /** @description Traza: proveedor del avío usado, o null. */
+                idAvioProveedor: number | null;
+                /** @description Traza: bordado, o null. */
+                idBordado: number | null;
+                /** @description ¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12). */
+                editable: boolean;
+                /** @description ¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12). */
+                eliminable: boolean;
+                /** @description ¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa). */
+                ajustado: boolean;
+              }[];
+              /**
+               * Format: date-time
+               * @description Fecha de alta (ISO 8601).
+               */
+              creadoEn: string;
+              /** @description Id del usuario que lo creó. */
+              creadoPorId: string | null;
+              /**
+               * Format: date-time
+               * @description Fecha de la última modificación (ISO 8601).
+               */
+              modificadoEn: string;
+              /** @description Id del último usuario que lo modificó. */
+              modificadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/desarrollos/dificultad': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resolver la dificultad derivada de un # de operaciones (R5/B7) */
+    get: {
+      parameters: {
+        query: {
+          /** @description # de operaciones de costura a evaluar contra la tabla de rangos. */
+          ops: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Dificultad derivada del # de operaciones (R5, B7). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description # de operaciones evaluado. */
+              numOperaciones: number;
+              /** @description El rango que casó, o null si ningún rango cubre ese # de operaciones. */
+              rango: {
+                /** @description Id del rango de dificultad. */
+                id: number;
+                /** @description Nombre del nivel (ej. "Muy complejo"). */
+                nombre: string;
+                /** @description Días de costura del CPM para este nivel. */
+                diasCostura: number;
+                /** @description Límite inferior del rango. */
+                opsDesde: number;
+                /** @description Límite superior del rango (null = abierto). */
+                opsHasta: number | null;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/desarrollos/{idDesarrollo}/adjuntos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Listar los adjuntos (tech pack) de un desarrollo */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          idDesarrollo: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Adjuntos (tech pack) de un desarrollo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Adjuntos del desarrollo. */
+              datos: {
+                /** @description Id del registro Archivo. */
+                idArchivo: string;
+                /** @description Nombre original del archivo. */
+                nombreOriginal: string;
+                /** @description Tipo MIME del archivo. */
+                tipoMime: string;
+                /** @description Tamaño en bytes. */
+                tamanoBytes: number;
+                /** @description URL GET prefirmada para ver/descargar el archivo. */
+                urlDescarga: string;
+                /** @description Quién subió el archivo, o null. */
+                subidoPorId: string | null;
+                /**
+                 * Format: date-time
+                 * @description Fecha en que se adjuntó (ISO 8601).
+                 */
+                creadoEn: string;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Preparar la subida de un adjunto (tech pack) del desarrollo (R5/B16) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          idDesarrollo: number;
+        };
+        cookie?: never;
+      };
+      /** @description Datos para preparar la subida de un adjunto de un desarrollo (tech pack). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Nombre del archivo tal como lo llama el usuario. */
+            nombreOriginal: string;
+            /** @description Tipo MIME del archivo (ej. application/pdf, image/png). */
+            tipoMime: string;
+            /** @description Tamaño exacto en bytes (la URL prefirmada solo acepta este tamaño). */
+            tamanoBytes: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de preparar la subida de un adjunto de desarrollo (URL prefirmada). */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Id del registro Archivo creado. */
+              idArchivo: string;
+              /** @description Nombre original del archivo. */
+              nombreOriginal: string;
+              /** @description URL PUT prefirmada: el navegador sube directo a R2. */
+              urlSubida: string;
+              /** @description Vigencia de la URL de subida (segundos). */
+              expiraEnSegundos: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/desarrollos/{idDesarrollo}/adjuntos/{idArchivo}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Quitar un adjunto del desarrollo */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del desarrollo. */
+          idDesarrollo: number;
+          /** @description Id del adjunto. */
+          idArchivo: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     options?: never;
     head?: never;
     patch?: never;
@@ -68983,6 +70033,278 @@ export interface paths {
                  */
                 registradoEn: string;
               }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/listas-precios/lineas/{idLinea}/simular': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Simular el margen de un precio objetivo sobre un renglón (calculadora de negociación) */
+    get: {
+      parameters: {
+        query: {
+          /** @description Precio de venta propuesto para simular su margen. */
+          precioObjetivo: number;
+          /** @description Versión congelada cuyo costo simular (opcional; por defecto el costo vigente). */
+          idPrecosto?: number;
+        };
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Simulación de margen de un precio objetivo (calculadora de negociación §4.8). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Costo unitario simulado (del precosto vigente o el indicado). */
+              costo: number;
+              /** @description Precio objetivo capturado (eco de la entrada). */
+              precioObjetivo: number;
+              /** @description Precio neto = objetivo − (descuentos + regalías + costo de ventas) sobre la venta. */
+              precioNeto: number;
+              /** @description % de margen bruto real: (neto − costo) ÷ neto × 100. */
+              margenBrutoPct: number;
+              /** @description % de margen objetivo del cliente (meta a cumplir). */
+              margenObjetivoPct: number;
+              /** @description ¿El margen bruto alcanza el objetivo? (verde/rojo). */
+              cumpleObjetivo: boolean;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/listas-precios/lineas/{idLinea}/desglose-costo': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Desglose de costo por concepto del precosto congelado de un renglón */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del renglón de la lista. */
+          idLinea: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Desglose de costo por concepto de un renglón de lista (§4.8). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Precosto congelado del renglón. */
+              idPrecosto: number;
+              /** @description Nº de versión del precosto. */
+              versionPrecosto: number;
+              /** @description Conceptos agrupados por tipo, ordenados por su orden de catálogo. */
+              grupos: {
+                /** @description Código del concepto de costo (tela/avios/maquila/corte/…). */
+                codigo: string;
+                /** @description Nombre legible del concepto. */
+                nombre: string;
+                /** @description Suma de importes del concepto (o null sin importes). */
+                subtotal: number | null;
+              }[];
+              /** @description Costo total del renglón (o null sin importes). */
+              costoTotal: number | null;
             };
           };
         };

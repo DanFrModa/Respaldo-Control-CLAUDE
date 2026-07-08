@@ -75,6 +75,11 @@ test.describe('Precosto (F8-E3)', () => {
     const editor = dialogo.getByTestId('editor-precosto');
     await expect(editor).toBeVisible();
 
+    // R5/B8: el CORTE es un costo fijo por prenda, renglón propio SEPARADO de la maquila → su grupo
+    // aparece siempre al generar (aunque el modelo no capture `corteBase`, entra en $0).
+    await expect(editor.getByTestId('grupo-corte')).toBeVisible();
+    await expect(editor.getByTestId('grupo-maquila')).toBeVisible();
+
     // ── Edita la MAQUILA (renglón manual) ───────────────────────────────────────
     const grupoMaquila = editor.getByTestId('grupo-maquila');
     await grupoMaquila.getByTestId('editar-linea').click();

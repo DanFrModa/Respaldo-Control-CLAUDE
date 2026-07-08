@@ -4,7 +4,11 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { calcularPrecioLista, type FactoresLista } from './precio-lista.js';
+import {
+  calcularPrecioLista,
+  simularMargenNegociacion,
+  type FactoresLista,
+} from './precio-lista.js';
 
 /** Factores base para variar en cada caso (evita repetir el objeto completo). */
 function factores(parcial: Partial<FactoresLista> = {}): FactoresLista {
@@ -84,5 +88,59 @@ describe('calcularPrecioLista (cascada de factores sobre la venta, redondeo al a
     expect(() => calcularPrecioLista(100, factores({ regaliasPct: Number.NaN }))).toThrow(
       RangeError,
     );
+  });
+});
+
+describe('simularMargenNegociacion (inversa de la cascada: margen a partir de un precio objetivo)', () => {
+  it('es la INVERSA exacta de calcularPrecioLista: al precio de lista, el margen bruto = el objetivo', () => {
+    // Sin redondeo (200 es exacto): objetivo = precio de lista ⇒ margen bruto = margen objetivo.
+    const f = factores({ margenPct: 50, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 });
+    const precioLista = calcularPrecioLista(100, f); // 250 exacto
+    const sim = simularMargenNegociacion(100, precioLista, f);
+    expect(sim.precioNeto).toBeCloseTo(200, 6); // 250 × (1 − 0.20)
+    expect(sim.margenBrutoPct).toBeCloseTo(50, 6); // (200 − 100) / 200 × 100
+    expect(sim.margenObjetivoPct).toBe(50);
+    expect(sim.cumpleObjetivo).toBe(true);
+  });
+
+  it('precio objetivo por DEBAJO del de lista ⇒ margen bruto < objetivo ⇒ NO cumple (rojo)', () => {
+    const f = factores({ margenPct: 50, descuentosPct: 10, regaliasPct: 5, costoVentasPct: 5 });
+    const sim = simularMargenNegociacion(100, 205, f); // 250 sería el "cumple"; 205 queda corto
+    expect(sim.precioNeto).toBeCloseTo(164, 6); // 205 × 0.80
+    expect(sim.margenBrutoPct).toBeLessThan(50);
+    expect(sim.cumpleObjetivo).toBe(false);
+  });
+
+  it('sin factores sobre la venta: neto = objetivo y margen = (objetivo − costo)/objetivo', () => {
+    const sim = simularMargenNegociacion(60, 100, factores({ margenPct: 40 }));
+    expect(sim.precioNeto).toBe(100);
+    expect(sim.margenBrutoPct).toBeCloseTo(40, 6); // (100 − 60) / 100
+    expect(sim.cumpleObjetivo).toBe(true); // 40 ≥ 40
+  });
+
+  it('costo mayor que el neto ⇒ margen bruto NEGATIVO (pérdida), no cumple', () => {
+    const sim = simularMargenNegociacion(120, 100, factores({ margenPct: 30 }));
+    expect(sim.margenBrutoPct).toBeLessThan(0);
+    expect(sim.cumpleObjetivo).toBe(false);
+  });
+
+  it('precio objetivo 0 (neto ≤ 0) ⇒ margen 0 y no cumple (caso degenerado)', () => {
+    const sim = simularMargenNegociacion(50, 0, factores({ margenPct: 20 }));
+    expect(sim.precioNeto).toBe(0);
+    expect(sim.margenBrutoPct).toBe(0);
+    expect(sim.cumpleObjetivo).toBe(false);
+  });
+
+  it('valida los porcentajes y el objetivo igual que la cascada (RangeError)', () => {
+    expect(() => simularMargenNegociacion(100, 200, factores({ margenPct: 100 }))).toThrow(
+      RangeError,
+    );
+    expect(() =>
+      simularMargenNegociacion(100, 200, factores({ descuentosPct: 60, regaliasPct: 40 })),
+    ).toThrow(RangeError);
+    expect(() => simularMargenNegociacion(100, -5, factores({ margenPct: 20 }))).toThrow(
+      RangeError,
+    );
+    expect(() => simularMargenNegociacion(100, Number.NaN, factores())).toThrow(RangeError);
   });
 });

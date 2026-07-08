@@ -450,19 +450,22 @@ model Archivo {
 
   /// Adjunto de proveedor que apunta a este archivo (F1-E1B), si lo hay. Relación
   /// inversa exigida por Prisma; en la práctica es 0 o 1 (un archivo se adjunta una vez).
-  proveedorArchivo ProveedorArchivo?
+  proveedorArchivo  ProveedorArchivo?
   /// Bordado cuya foto es este archivo (F1-E3), si lo hay. Inversa de `Bordado.archivoFoto`;
   /// 0 o 1 (un archivo es la foto de un solo bordado).
-  bordado          Bordado?
+  bordado           Bordado?
   /// Foto de modelo que apunta a este archivo (F1-E4), si la hay. Inversa de
   /// `ModeloFoto.archivo`; 0 o 1 (un archivo es UNA foto de UN modelo — Cascade en ambos).
-  modeloFoto       ModeloFoto?
+  modeloFoto        ModeloFoto?
   /// Adjunto de orden de producción que apunta a este archivo (F8-E6, R6), si lo hay. Inversa de
   /// `OrdenArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA sola orden — Cascade en ambos).
-  ordenArchivo     OrdenArchivo?
+  ordenArchivo      OrdenArchivo?
   /// Adjunto de pedido interno que apunta a este archivo (rediseño R3, B3), si lo hay. Inversa de
   /// `PedidoArchivo.archivo`; 0 o 1 (un archivo se adjunta a UN solo pedido — Cascade en ambos).
-  pedidoArchivo    PedidoArchivo?
+  pedidoArchivo     PedidoArchivo?
+  /// Adjunto de desarrollo (tech pack) que apunta a este archivo (rediseño R5, B16), si lo hay.
+  /// Inversa de `DesarrolloArchivo.archivo`; 0 o 1 (un archivo se adjunta a UN solo desarrollo).
+  desarrolloArchivo DesarrolloArchivo?
 
   @@map("archivos")
 }
@@ -623,6 +626,8 @@ model Proveedor {
   telaProveedores         TelaProveedor[]
   /// Eventos de precio de orden donde es el proveedor con quien se NEGOCIÓ (rediseño R2). Restrict.
   ordenPrecioEventos      OrdenPrecioEvento[]
+  /// Modelos que lo cotizaron como MAQUILERO de costura en su desarrollo (rediseño R5, B9). Restrict.
+  modelosCotizados        Modelo[]             @relation("ModeloMaquileroCotizado")
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -1266,6 +1271,10 @@ model Avio {
 
   /// Proveedores que surten este avío con su precio (N:N a Proveedor).
   proveedores        AvioProveedor[]
+  /// Medidas del avío "por medida" (rediseño R5, B11) — cierres, elástico… Si tiene ≥1 medida
+  /// ACTIVA, el avío se considera "por medida": el precosto usa el PROMEDIO de sus precios y la
+  /// compra/MRP desglosa por medida×talla. Agrupadas DENTRO del avío padre (decisión Daniel).
+  medidas            AvioMedida[]
   /// Renglones del BOM de modelos que usan este avío (F1-E4, Restrict hacia el avío).
   modelos            ModeloAvio[]
   /// Renglones de kardex de AVÍO de este avío (dimensión avío×lote opcional + esGenerico,
@@ -1327,6 +1336,38 @@ model AvioProveedor {
   @@map("avio_proveedor")
 }
 
+/// Medida de un avío "POR MEDIDA" (rediseño R5, B11) — cierres, elástico… El avío se COSTEA con un
+/// solo precio en el precosto (el PROMEDIO SIMPLE de los precios de sus medidas activas, decisión
+/// Daniel: protege el costo sin desglosar) pero se COMPRA por medida, cada una con su precio real.
+/// Las medidas viven AGRUPADAS dentro del avío padre (NO son avíos independientes del catálogo,
+/// decisión Daniel). Ej.: "Cierre #5 metálico" → 15 cm $5.80 / 18 cm $6.20 / 22 cm $6.80. El amarre
+/// medida×talla del BOM vive en `ModeloAvioTalla.idAvioMedida` (lo consume el MRP a futuro; hoy
+/// nullable → no cambia el MRP existente). Cascade hacia Avio (config del avío); borrado suave.
+model AvioMedida {
+  id     Int     @id @default(autoincrement())
+  idAvio Int     @map("id_avio")
+  avio   Avio    @relation(fields: [idAvio], references: [id], onDelete: Cascade)
+  /// Etiqueta de la medida (ej. "15 cm", "18 cm"). Única DENTRO del avío (respaldada por @@unique).
+  medida String
+  /// Precio real de compra de esta medida (por unidad de compra). Entra al PROMEDIO del precosto.
+  precio Decimal @db.Decimal(12, 2)
+  /// Orden de despliegue dentro del avío (lo gestiona el dominio; no único en BD).
+  orden  Int     @default(0)
+  activo Boolean @default(true)
+
+  /// Amarres medida↔talla del BOM que apuntan a esta medida (R5, B11). SetNull al borrarla.
+  modeloAvioTallas ModeloAvioTalla[]
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idAvio, medida])
+  @@index([idAvio])
+  @@map("avio_medida")
+}
+
 /// Bordado / estampado (catálogo global, F1-E3, R2). Equivale a la tabla del viejo con
 /// `BorEst` y `Foto` (doc 01-Modelos §2). La foto vive en R2: FK DIRECTA al `Archivo` de
 /// F0 (1 bordado → 0..1 foto, sin tabla puente). `onDelete: SetNull` en la foto: quitar/
@@ -1353,7 +1394,7 @@ model Bordado {
   activo        Boolean     @default(true)
 
   /// Renglones del BOM de modelos que usan este bordado (F1-E4, Restrict hacia el bordado).
-  modelos ModeloBordado[]
+  modelos        ModeloBordado[]
   /// Renglones de precosto que valúan este bordado (F8-E3, traza). Restrict.
   precostoLineas PrecostoLinea[]
 
@@ -1441,6 +1482,17 @@ model Modelo {
   /// Secuencia del estampado/bordado respecto a la costura (rediseño R4, B10 — por MODELO;
   /// la captura en el editor de desarrollo llega en R5). Ver el enum `SecuenciaEstampado`.
   secuenciaEstampado SecuenciaEstampado @default(antes) @map("secuencia_estampado")
+
+  /// Costo de CORTE por prenda (rediseño R5, B8): costo fijo SEPARADO de la maquila/costura
+  /// (`maquilaBase`). Decisión Daniel: se ESTIMA aquí y NO lleva proveedor (el maquilero cotizado
+  /// aplica sólo a la costura). Alimenta el renglón `corte` del precosto (concepto fijo). Null = $0.
+  corteBase Decimal? @map("corte_base") @db.Decimal(12, 2)
+
+  /// Maquilero (COSTURA) con el que se COTIZÓ la maquila en el desarrollo (rediseño R5, B9). Es
+  /// sólo DATO aquí: siembra el DEFAULT del maquilero asignado en producción (F3/F5), cambiable
+  /// después. Restrict hacia Proveedor (un maquilero cotizado en un modelo no se borra físico).
+  idMaquileroCotizado Int?       @map("id_maquilero_cotizado")
+  maquileroCotizado   Proveedor? @relation("ModeloMaquileroCotizado", fields: [idMaquileroCotizado], references: [id], onDelete: Restrict)
 
   /// Temporada (opcional). Restrict: una temporada en uso no se borra físico → se desactiva.
   idTemporada    Int?          @map("id_temporada")
@@ -1532,16 +1584,16 @@ model ModeloFoto {
 /// tela usada por un modelo no se borra físico → se desactiva). Auditoría COMPLETA: los
 /// campos son editables (A7).
 model ModeloTela {
-  idModelo         Int     @map("id_modelo")
-  idTela           Int     @map("id_tela")
+  idModelo         Int            @map("id_modelo")
+  idTela           Int            @map("id_tela")
   /// Consumo de tela por prenda (doc 01-Modelos §2: `CantTela`).
-  consumoPorPrenda Decimal @map("consumo_por_prenda") @db.Decimal(12, 4)
+  consumoPorPrenda Decimal        @map("consumo_por_prenda") @db.Decimal(12, 4)
   /// 🔑 Entra en el PRE-costeo (estimación antes de producir).
-  paraPreCosto     Boolean @default(true) @map("para_pre_costo")
+  paraPreCosto     Boolean        @default(true) @map("para_pre_costo")
   /// 🔑 Se considera al PRODUCIR (lo que realmente se manda pedir/usar).
-  paraProduccion   Boolean @default(true) @map("para_produccion")
+  paraProduccion   Boolean        @default(true) @map("para_produccion")
   /// 🔑 Entra en el COSTEO real de la orden.
-  paraCosto        Boolean @default(true) @map("para_costo")
+  paraCosto        Boolean        @default(true) @map("para_costo")
   /// F8-E1 (R17): amarre OPCIONAL al renglón proveedor–tela–precio elegido por Desarrollo. La
   /// cascada de resolución de precios (dominio/costos/resolucion-precios.ts) lo PREFIERE; NULL =
   /// sin amarre → cascada por color/sugerido. SetNull: si el renglón proveedor se retira de la
@@ -1580,12 +1632,12 @@ model ModeloAvio {
   /// F8-E1 (R18): ¿este avío se consume por TALLA (cierres, elástico…)? Si true, las medidas viven
   /// en `tallas` (ModeloAvioTalla) y el precosto usa su PROMEDIO SIMPLE (decisión (g)); el MRP (E6)
   /// compra por medida×curva. Si false, se usa `consumoPorPrenda`. Default false.
-  consumoPorTalla   Boolean @default(false) @map("consumo_por_talla")
+  consumoPorTalla  Boolean @default(false) @map("consumo_por_talla")
   /// F8-E1 (R17): amarre OPCIONAL al `AvioProveedor` elegido por Desarrollo. Guarda el PROVEEDOR del
   /// par: `(idAvio de este renglón, idAvioProveedor)` → `AvioProveedor`. SIN FK de relación (mismo
   /// criterio y NOMBRE que `OrdenCompraLinea.idAvioProveedor` de F4: el par se reconstruye con
   /// `idAvio`, sin tocar `AvioProveedor`). NULL = sin amarre → el MRP (E6) cae a "más barato" (F4).
-  idAvioProveedor   Int?    @map("id_avio_proveedor")
+  idAvioProveedor  Int?    @map("id_avio_proveedor")
 
   /// Medidas por talla de este avío (F8-E1, R18) cuando `consumoPorTalla`. Cascade (FK compuesta).
   tallas ModeloAvioTalla[]
@@ -1749,8 +1801,8 @@ model Pedido {
   /// lo escribe.
   idOrdCompraV1 Int? @map("id_ord_compra_v1")
 
-  lineas PedidoLinea[]
-  reales PedidoReal[]
+  lineas   PedidoLinea[]
+  reales   PedidoReal[]
   /// Adjuntos de apoyo del pedido en R2 (rediseño R3, B3 — el documento original de la OC del
   /// cliente, Excel/PDF/imágenes). Cascade: son del pedido.
   archivos PedidoArchivo[]
@@ -5136,12 +5188,17 @@ model TelaProveedorColor {
 /// Talla. El precosto (E3) usa el PROMEDIO SIMPLE de estas medidas (decisión (g)); el MRP (E6) compra
 /// por medida×curva.
 model ModeloAvioTalla {
-  idModelo Int     @map("id_modelo")
-  idAvio   Int     @map("id_avio")
-  idTalla  Int     @map("id_talla")
-  talla    Talla   @relation(fields: [idTalla], references: [id], onDelete: Restrict)
+  idModelo     Int         @map("id_modelo")
+  idAvio       Int         @map("id_avio")
+  idTalla      Int         @map("id_talla")
+  talla        Talla       @relation(fields: [idTalla], references: [id], onDelete: Restrict)
   /// Medida (consumo) del avío para esta talla (R18).
-  consumo  Decimal @db.Decimal(12, 4)
+  consumo      Decimal     @db.Decimal(12, 4)
+  /// AMARRE medida×talla (rediseño R5, B11): qué `AvioMedida` (tamaño) usa esta talla, para que la
+  /// compra/MRP desglose por medida×talla con el precio real de la medida. NULLABLE → sin amarre: el
+  /// MRP cae a su comportamiento actual (no rompe F4/R6; el precosto ya usa el promedio). SetNull.
+  idAvioMedida Int?        @map("id_avio_medida")
+  avioMedida   AvioMedida? @relation(fields: [idAvioMedida], references: [id], onDelete: SetNull)
 
   modeloAvio ModeloAvio @relation(fields: [idModelo, idAvio], references: [idModelo, idAvio], onDelete: Cascade)
 
@@ -5153,6 +5210,7 @@ model ModeloAvioTalla {
   @@id([idModelo, idAvio, idTalla])
   @@index([idTalla])
   @@index([idModelo, idAvio])
+  @@index([idAvioMedida])
   @@map("modelo_avio_talla")
 }
 
@@ -5215,6 +5273,8 @@ model Desarrollo {
   listaLineas  ListaPreciosLinea[]
   /// Renglones de pedido interno que salen de este desarrollo (rediseño R3, B4). Restrict.
   pedidoLineas PedidoLinea[]
+  /// Tech pack / adjuntos del desarrollo en R2 (rediseño R5, B16: PDFs de referencia + fotos). Cascade.
+  archivos     DesarrolloArchivo[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -5224,6 +5284,26 @@ model Desarrollo {
   @@unique([idProyecto, idModelo])
   @@index([idModelo])
   @@map("desarrollos")
+}
+
+/// Tech pack / adjunto de un DESARROLLO (rediseño R5, B16) — PDFs de referencia + fotos de muestra
+/// en R2, ligados a UN desarrollo por tabla puente (espejo EXACTO de `OrdenArchivo`, sin `tipo`).
+/// Cascade en ambos lados: borrar el desarrollo o el archivo arrastra el puente. `@@unique(idArchivo)`
+/// = un archivo se adjunta a UN solo desarrollo.
+model DesarrolloArchivo {
+  id           Int    @id @default(autoincrement())
+  idDesarrollo Int    @map("id_desarrollo")
+  idArchivo    String @map("id_archivo")
+
+  desarrollo Desarrollo @relation(fields: [idDesarrollo], references: [id], onDelete: Cascade)
+  archivo    Archivo    @relation(fields: [idArchivo], references: [id], onDelete: Cascade)
+
+  creadoEn    DateTime @default(now()) @map("creado_en")
+  creadoPorId String?  @map("creado_por_id")
+
+  @@unique([idArchivo])
+  @@index([idDesarrollo])
+  @@map("desarrollo_archivo")
 }
 
 /// Liga desarrollo ↔ orden de producción (F8-E6): una orden liga a lo más UN desarrollo (`idOrden`
@@ -5271,9 +5351,9 @@ model Precosto {
   /// Costo total DERIVADO; se persiste al congelar. Nullable en borrador.
   costoTotal     Decimal?       @map("costo_total") @db.Decimal(12, 2)
 
-  lineas      PrecostoLinea[]
+  lineas                    PrecostoLinea[]
   /// Renglones de lista que usan esta versión congelada (F8-E4). Restrict.
-  listaLineas ListaPreciosLinea[]
+  listaLineas               ListaPreciosLinea[]
   /// Eventos de negociación que apuntan a esta versión como ANTERIOR (F8-E5). Restrict.
   negociacionesComoAnterior NegociacionEvento[] @relation("NegociacionPrecostoAnterior")
   /// Eventos de negociación que apuntan a esta versión como NUEVA (F8-E5). Restrict.
@@ -5313,22 +5393,28 @@ model PrecostoLinea {
   conceptoCosto   ConceptoCosto       @relation(fields: [idConceptoCosto], references: [id], onDelete: Restrict)
   origen          OrigenPrecostoLinea
   /// TRAZA del amarre (de dónde salió el precio). Todas nullable.
-  idTela          Int?           @map("id_tela")
-  tela            Tela?          @relation(fields: [idTela], references: [id], onDelete: Restrict)
-  idTelaProveedor Int?           @map("id_tela_proveedor")
-  telaProveedor   TelaProveedor? @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
-  idAvio          Int?           @map("id_avio")
-  avio            Avio?          @relation(fields: [idAvio], references: [id], onDelete: Restrict)
+  idTela          Int?                @map("id_tela")
+  tela            Tela?               @relation(fields: [idTela], references: [id], onDelete: Restrict)
+  idTelaProveedor Int?                @map("id_tela_proveedor")
+  telaProveedor   TelaProveedor?      @relation(fields: [idTelaProveedor], references: [id], onDelete: SetNull)
+  idAvio          Int?                @map("id_avio")
+  avio            Avio?               @relation(fields: [idAvio], references: [id], onDelete: Restrict)
   /// Proveedor del amarre de avío (par con `idAvio` → AvioProveedor; SIN FK, mismo nombre que F4). Snapshot.
-  idAvioProveedor Int?           @map("id_avio_proveedor")
-  idBordado       Int?           @map("id_bordado")
-  bordado         Bordado?       @relation(fields: [idBordado], references: [id], onDelete: Restrict)
+  idAvioProveedor Int?                @map("id_avio_proveedor")
+  idBordado       Int?                @map("id_bordado")
+  bordado         Bordado?            @relation(fields: [idBordado], references: [id], onDelete: Restrict)
   descripcion     String
   /// Consumo (tela: por prenda; avío por talla: PROMEDIO, decisión (g)). Nullable (bordado/manual).
-  consumo         Decimal?       @db.Decimal(12, 4)
-  precioUnit      Decimal        @map("precio_unit") @db.Decimal(12, 2)
-  importe         Decimal        @db.Decimal(12, 2)
-  notas           String?        @db.Text
+  consumo         Decimal?            @db.Decimal(12, 4)
+  precioUnit      Decimal             @map("precio_unit") @db.Decimal(12, 2)
+  importe         Decimal             @db.Decimal(12, 2)
+  /// Renglón de origen BOM AJUSTADO a mano en la CALCULADORA DE NEGOCIACIÓN (rediseño R5, B12): se
+  /// editó su consumo/precio o se quitó/agregó en la mesa, SIN tocar el BOM del modelo. Cuando está
+  /// en true, `recalcularDesdeBom` NO lo pisa (preserva el ajuste) y `restaurarLineaBom` lo revierte
+  /// al valor del BOM. Su `origen` conserva de qué BOM salió (traza). Los `manual` nacen en false
+  /// (no vienen del BOM y ya sobreviven al recalcular). Default false.
+  ajustado        Boolean             @default(false)
+  notas           String?             @db.Text
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")

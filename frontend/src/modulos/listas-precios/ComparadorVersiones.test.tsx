@@ -38,6 +38,7 @@ function linea(
     idBordado: null,
     editable: false,
     eliminable: false,
+    ajustado: false,
     ...over,
   };
 }

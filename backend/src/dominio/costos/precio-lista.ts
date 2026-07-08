@@ -77,3 +77,76 @@ export function calcularPrecioLista(costo: number, factores: FactoresLista): num
   const precio = precioBase / (1 - sumaVenta / 100);
   return Math.ceil(precio);
 }
+
+/**
+ * Resultado de simular un precio OBJETIVO en la mesa de negociación (rediseño R5, §4.8). Todos los
+ * porcentajes en 0–100 para calzar con el snapshot de factores de la lista y la UI.
+ */
+export interface SimulacionMargen {
+  /** Precio NETO = objetivo − (descuentos + regalías + costo de ventas) sobre la venta. */
+  precioNeto: number;
+  /** % de margen BRUTO real que deja ese objetivo = (neto − costo) ÷ neto × 100 (puede ser negativo). */
+  margenBrutoPct: number;
+  /** % de margen OBJETIVO del cliente (el `margenPct` del snapshot) — la meta a cumplir. */
+  margenObjetivoPct: number;
+  /** ¿El margen bruto real alcanza el objetivo? (para colorear en verde/rojo). */
+  cumpleObjetivo: boolean;
+}
+
+/**
+ * SIMULA el margen que deja un precio OBJETIVO propuesto en la mesa (INVERSA de `calcularPrecioLista`,
+ * §4.8): en vez de resolver el precio a partir del margen objetivo, parte de un precio propuesto y
+ * calcula el margen bruto REAL que deja contra el costo. Usa los MISMOS factores "sobre la venta" que
+ * la cascada D2 (por eso, cuando `precioObjetivo` = el precio calculado de lista, `margenBrutoPct`
+ * coincide EXACTO con `margenObjetivoPct`). Función PURA (la ejercitan los tests), aritmética AISLADA
+ * (A1: no se duplica en rutas/front). Valida los porcentajes igual que `calcularPrecioLista`.
+ *
+ * - `precioObjetivo` negativo o no finito ⇒ `RangeError` (el dominio valida antes).
+ * - `precioNeto ≤ 0` ⇒ `margenBrutoPct = 0` y `cumpleObjetivo = false` (objetivo degenerado).
+ */
+export function simularMargenNegociacion(
+  costo: number,
+  precioObjetivo: number,
+  factores: FactoresLista,
+): SimulacionMargen {
+  const { margenPct, descuentosPct, regaliasPct, costoVentasPct } = factores;
+
+  if (!porcentajeNoNegativo(margenPct) || margenPct >= 100) {
+    throw new RangeError(`margenPct fuera de rango [0,100): ${margenPct}`);
+  }
+  for (const [nombre, valor] of [
+    ['descuentosPct', descuentosPct],
+    ['regaliasPct', regaliasPct],
+    ['costoVentasPct', costoVentasPct],
+  ] as const) {
+    if (!porcentajeNoNegativo(valor)) {
+      throw new RangeError(`${nombre} inválido (debe ser ≥ 0): ${valor}`);
+    }
+  }
+  const sumaVenta = descuentosPct + regaliasPct + costoVentasPct;
+  if (sumaVenta >= 100) {
+    throw new RangeError(
+      `La suma de descuentos + regalías + costo de ventas debe ser < 100: ${sumaVenta}`,
+    );
+  }
+  if (!Number.isFinite(precioObjetivo) || precioObjetivo < 0) {
+    throw new RangeError(`precioObjetivo inválido (debe ser ≥ 0): ${precioObjetivo}`);
+  }
+
+  const precioNeto = precioObjetivo * (1 - sumaVenta / 100);
+  if (!(precioNeto > 0)) {
+    return {
+      precioNeto: 0,
+      margenBrutoPct: 0,
+      margenObjetivoPct: margenPct,
+      cumpleObjetivo: false,
+    };
+  }
+  const margenBrutoPct = ((precioNeto - costo) / precioNeto) * 100;
+  return {
+    precioNeto,
+    margenBrutoPct,
+    margenObjetivoPct: margenPct,
+    cumpleObjetivo: margenBrutoPct >= margenPct,
+  };
+}

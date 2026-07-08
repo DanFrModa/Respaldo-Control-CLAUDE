@@ -29,11 +29,14 @@ import {
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
   esquemaRondaRegistrar,
+  esquemaSimularNegociacionQuery,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
   type DatosRondaRegistrar,
+  type DatosSimularNegociacion,
   type ListaPreciosDetalle,
   type NegociacionEventoSalida,
+  type SimulacionNegociacion,
 } from '../../contrato/index.js';
 import { datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -46,7 +49,11 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 import { num, numOrNull } from '../costos/decimales.js';
-import { calcularPrecioLista, type FactoresLista } from '../costos/precio-lista.js';
+import {
+  calcularPrecioLista,
+  simularMargenNegociacion,
+  type FactoresLista,
+} from '../costos/precio-lista.js';
 import { factoresANumeros } from './cliente-factores.js';
 import {
   exigirLineaBloqueandoLista,
@@ -303,6 +310,77 @@ export async function cambiarEstadoLista(
   }, bd);
 
   return obtenerLista(sesion, idLista, bd);
+}
+
+// ── Calculadora de negociación (preview en vivo, §4.8) ──────────────────────────────────
+
+/**
+ * SIMULA el margen de un precio OBJETIVO sobre un renglón (rediseño R5, §4.8) — el motor de la
+ * calculadora "en vivo" de la mesa de negociación. Es una LECTURA pura (no muta nada): toma el costo
+ * (el vigente del renglón, o el de una versión congelada indicada para previsualizar una ronda) y los
+ * FACTORES snapshot de la lista, y delega la aritmética a `simularMargenNegociacion` (A1: la fórmula
+ * vive en el dominio, NO se duplica en el front; misma cascada que `calcularPrecioLista`). Scope por
+ * empresa (A9). Requiere `listas.negociar`; los números son importes puros → la ruta añade además
+ * `consultas.ver-importes` (como el PDF/Excel).
+ */
+export async function simularNegociacion(
+  sesion: SesionUsuario,
+  idLinea: number,
+  entrada: DatosSimularNegociacion,
+  bd?: ContextoBd,
+): Promise<SimulacionNegociacion> {
+  verificarPermiso(sesion, 'listas.negociar');
+  const datos = validarEntrada(esquemaSimularNegociacionQuery, entrada);
+  const cliente = clienteLectura(bd);
+  const idEmpresa = sesion.idEmpresaActiva;
+
+  // El renglón debe ser de la empresa activa (A9); trae su costo vigente + el snapshot de factores.
+  const linea = await cliente.listaPreciosLinea.findFirst({
+    where: { id: idLinea, lista: { idEmpresa } },
+    select: {
+      idDesarrollo: true,
+      costoUnit: true,
+      lista: {
+        select: { margenPct: true, descuentosPct: true, regaliasPct: true, costoVentasPct: true },
+      },
+    },
+  });
+  if (linea === null) {
+    throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
+  }
+
+  // Costo a simular: por defecto el VIGENTE del renglón; si se indica una versión, la de ESE precosto
+  // congelado del MISMO desarrollo (para previsualizar el margen de una ronda antes de guardarla).
+  let costo = num(linea.costoUnit);
+  if (datos.idPrecosto !== undefined) {
+    const precosto = await cliente.precosto.findFirst({
+      where: { id: datos.idPrecosto, desarrollo: { proyecto: { idEmpresa } } },
+      select: { idDesarrollo: true, estado: true, costoTotal: true },
+    });
+    if (precosto === null) {
+      throw new ErrorNoEncontrado('Precosto', datos.idPrecosto);
+    }
+    if (precosto.idDesarrollo !== linea.idDesarrollo) {
+      throw new ErrorValidacion(
+        'El precosto elegido no es del mismo desarrollo del renglón; elige una versión de ESTE modelo.',
+      );
+    }
+    if (precosto.estado !== 'congelado') {
+      throw new ErrorConflicto('Sólo se puede simular sobre una versión CONGELADA del precosto.');
+    }
+    costo = num(precosto.costoTotal);
+  }
+
+  const factores: FactoresLista = factoresANumeros(linea.lista);
+  const sim = simularMargenNegociacion(costo, datos.precioObjetivo, factores);
+  return {
+    costo,
+    precioObjetivo: datos.precioObjetivo,
+    precioNeto: sim.precioNeto,
+    margenBrutoPct: sim.margenBrutoPct,
+    margenObjetivoPct: sim.margenObjetivoPct,
+    cumpleObjetivo: sim.cumpleObjetivo,
+  };
 }
 
 // ── Historial de eventos de un renglón ─────────────────────────────────────────────────

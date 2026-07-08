@@ -58,12 +58,33 @@ export const esquemaModeloFormulario = z.object({
       error: 'La maquila base no puede ser negativa',
     })
     .describe('Costo de maquila base (vacío = sin valor).'),
+  /** Corte por prenda (R5/B8): costo fijo separado de la maquila, sin proveedor. */
+  corteBase: z
+    .string()
+    .refine((v) => v.trim() === '' || Number.isFinite(Number(v)), {
+      error: 'El corte debe ser un número',
+    })
+    .refine((v) => v.trim() === '' || Number(v) >= 0, {
+      error: 'El corte no puede ser negativo',
+    })
+    .describe('Costo de corte por prenda (vacío = sin valor).'),
+  /** # de operaciones de costura (R5/B7): deriva la dificultad → días de costura del CPM. */
+  numOperaciones: z
+    .string()
+    .refine((v) => v.trim() === '' || (Number.isInteger(Number(v)) && Number(v) >= 0), {
+      error: 'El # de operaciones debe ser un entero ≥ 0',
+    })
+    .describe('# de operaciones de costura (vacío = sin capturar).'),
+  /** Secuencia de estampado respecto a la costura (R5/B10). */
+  secuenciaEstampado: z.enum(['antes', 'despues', 'flexible']),
   // Selectores: id como texto ('' = sin asignar).
   idTemporada: z.string(),
   idCurvaTalla: z.string(),
   idGenero: z.string(),
   /** Tipo de producto (F6-E1, opcional). */
   idTipoProducto: z.string(),
+  /** Maquilero (costura) cotizado (R5/B9), selector de proveedores ('' = sin definir). */
+  idMaquileroCotizado: z.string(),
 });
 
 /** Datos del formulario de modelo. */

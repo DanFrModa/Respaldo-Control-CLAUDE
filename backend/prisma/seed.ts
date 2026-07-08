@@ -703,6 +703,10 @@ const CONCEPTOS_COSTO_BASE: { codigo: string; nombre: string; orden: number; fij
   { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
   { codigo: 'otros-procesos', nombre: 'Otros procesos', orden: 6, fijo: false },
   { codigo: 'otros', nombre: 'Otros', orden: 7, fijo: false },
+  // Corte (rediseño R5, B8): costo fijo por prenda SEPARADO de la maquila (decisión Daniel). El
+  // precosto crea su renglón fijo auto (`lineaCorte`). REQUIERE re-seed en `prueba` (SEED_ON_START):
+  // sin este concepto, `generarPrecosto` truena ("falta el concepto de costo base corte").
+  { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
 ];
 
 async function sembrarConceptosCosto(prisma: PrismaClient): Promise<void> {

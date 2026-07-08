@@ -11,10 +11,11 @@
  *  • `GET    /desarrollos/:idDesarrollo/precostos`         (ver)        → historial de versiones.
  *  • `POST   /desarrollos/:idDesarrollo/precostos`         (precostear) → genera un borrador vN+1.
  *  • `GET    /precostos/:id`                               (ver)        → precosto con renglones.
- *  • `POST   /precostos/:id/recalcular`                    (precostear) → refresca los renglones BOM.
+ *  • `POST   /precostos/:id/recalcular`                    (precostear) → refresca los BOM (respeta ajustados).
  *  • `POST   /precostos/:id/lineas`                        (precostear) → agrega un renglón manual.
- *  • `PATCH  /precostos/:id/lineas/:idLinea`               (precostear) → edita un renglón manual.
- *  • `DELETE /precostos/:id/lineas/:idLinea`               (precostear) → elimina un renglón manual.
+ *  • `PATCH  /precostos/:id/lineas/:idLinea`               (precostear) → edita CUALQUIER renglón (B12).
+ *  • `DELETE /precostos/:id/lineas/:idLinea`               (precostear) → quita un renglón (no anclas; B12).
+ *  • `POST   /precostos/:id/lineas/:idLinea/restaurar`     (precostear) → restaura un BOM ajustado (B12).
  *  • `POST   /precostos/:id/congelar`                      (precostear) → congela (inmutable).
  * Se registra en `app.ts`.
  */
@@ -34,11 +35,12 @@ import {
   agregarLineaManual,
   congelarVersion,
   editarLinea,
-  eliminarLineaManual,
+  eliminarLinea,
   generarPrecosto,
   listarPrecostosDeDesarrollo,
   obtenerPrecosto,
   recalcularDesdeBom,
+  restaurarLineaBom,
 } from '../../dominio/desarrollo/precostos.js';
 
 /** Parámetro de ruta `:idDesarrollo`. */
@@ -201,21 +203,39 @@ export const rutasPrecostos: FastifyPluginCallbackZod = (app, _opciones, done) =
     },
   });
 
-  // Eliminar un renglón manual (concepto no fijo).
+  // Quitar un renglón del borrador (cualquiera salvo los anclas maquila/corte — B12).
   app.route({
     method: 'DELETE',
     url: '/precostos/:id/lineas/:idLinea',
     preHandler: [app.conPermiso('desarrollo.precostear'), app.conPermiso('desarrollo.ver')],
     schema: {
       tags: ['desarrollo'],
-      summary: 'Eliminar un renglón manual del precosto',
+      summary: 'Quitar un renglón del precosto (negociación en vivo; no los anclas maquila/corte)',
       security: SEGURIDAD_SESION,
       params: esquemaParamLinea,
       response: { 200: esquemaPrecostoSalida, ...respuestasError },
     },
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
-      return eliminarLineaManual(sesion, request.params.id, request.params.idLinea);
+      return eliminarLinea(sesion, request.params.id, request.params.idLinea);
+    },
+  });
+
+  // Restaurar un renglón BOM ajustado a su valor del BOM del modelo (B12).
+  app.route({
+    method: 'POST',
+    url: '/precostos/:id/lineas/:idLinea/restaurar',
+    preHandler: [app.conPermiso('desarrollo.precostear'), app.conPermiso('desarrollo.ver')],
+    schema: {
+      tags: ['desarrollo'],
+      summary: 'Restaurar un renglón BOM ajustado al valor del BOM del modelo',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      response: { 200: esquemaPrecostoSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return restaurarLineaBom(sesion, request.params.id, request.params.idLinea);
     },
   });
 

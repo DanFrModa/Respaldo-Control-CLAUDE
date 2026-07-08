@@ -42,6 +42,7 @@ import {
   listarEventosDeLinea,
   registrarAcuerdo,
   registrarRonda,
+  simularNegociacion,
 } from './negociacion.js';
 
 let cliente: PrismaClient;
@@ -74,6 +75,7 @@ async function sembrarBase(): Promise<void> {
     { codigo: 'avios', nombre: 'Avíos', orden: 2, fijo: true },
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
+    { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
   ];
   for (const c of conceptos) {
     await cliente.conceptoCosto.create({ data: c });
@@ -432,6 +434,81 @@ describe('listarEventosDeLinea — inmutabilidad y ocultación', () => {
     expect(eventos[0]!.precioNuevo).toBeNull();
     expect(eventos[0]!.versionNueva).toBe(2);
     expect(eventos[0]!.acuerdo).toBe('sin importes');
+  });
+});
+
+describe('simularNegociacion — calculadora de margen en vivo (§4.8)', () => {
+  it('al precio de lista (100) el margen bruto iguala el objetivo (cumple)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIM');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const sim = await simularNegociacion(sesion(), idLinea, { precioObjetivo: 100 }, bd());
+    expect(sim.costo).toBe(40);
+    expect(sim.precioNeto).toBeCloseTo(80, 6); // 100 × (1 − 0.20)
+    expect(sim.margenBrutoPct).toBeCloseTo(50, 6); // (80 − 40) / 80
+    expect(sim.margenObjetivoPct).toBe(50);
+    expect(sim.cumpleObjetivo).toBe(true);
+  });
+
+  it('un objetivo por debajo del de lista NO cumple (margen bruto < objetivo)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIMBAJO');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+
+    const sim = await simularNegociacion(sesion(), idLinea, { precioObjetivo: 90 }, bd());
+    expect(sim.precioNeto).toBeCloseTo(72, 6); // 90 × 0.80
+    expect(sim.margenBrutoPct).toBeLessThan(50);
+    expect(sim.cumpleObjetivo).toBe(false);
+  });
+
+  it('con idPrecosto usa el costo de ESA versión congelada (preview de una ronda)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIMVER');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const idV2 = await congelarNuevaVersion(idDesarrollo, 60); // costo 90
+
+    const sim = await simularNegociacion(
+      sesion(),
+      idLinea,
+      { precioObjetivo: 100, idPrecosto: idV2 },
+      bd(),
+    );
+    expect(sim.costo).toBe(90); // el de la versión indicada, no el vigente (40)
+    expect(sim.margenBrutoPct).toBeLessThan(0); // 80 neto < 90 costo → pérdida
+    expect(sim.cumpleObjetivo).toBe(false);
+  });
+
+  it('rechaza un idPrecosto de OTRO desarrollo', async () => {
+    const idA = await desarrolloConPrecosto('MOD-SIMA');
+    const idB = await desarrolloConPrecosto('MOD-SIMB');
+    const listaA = await crearListaCon(idA);
+    const idLineaA = listaA.lineas[0]!.id;
+    const idV2B = await congelarNuevaVersion(idB, 60);
+    await expect(
+      simularNegociacion(sesion(), idLineaA, { precioObjetivo: 100, idPrecosto: idV2B }, bd()),
+    ).rejects.toThrow(ErrorValidacion);
+  });
+
+  it('sin listas.negociar → ErrorPermiso', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIMPERM');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const sinNegociar = sesion(['listas.ver', 'consultas.ver-importes']);
+    await expect(
+      simularNegociacion(sinNegociar, idLinea, { precioObjetivo: 100 }, bd()),
+    ).rejects.toThrow(ErrorPermiso);
+  });
+
+  it('un renglón de OTRA empresa no existe (A9)', async () => {
+    const idDesarrollo = await desarrolloConPrecosto('MOD-SIMA9');
+    const lista = await crearListaCon(idDesarrollo);
+    const idLinea = lista.lineas[0]!.id;
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Sim');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(
+      simularNegociacion(sesionOtra, idLinea, { precioObjetivo: 100 }, bd()),
+    ).rejects.toThrow(ErrorNoEncontrado);
   });
 });
 

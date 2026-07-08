@@ -22,6 +22,7 @@ const congelarMutate = vi.fn();
 const agregarMutate = vi.fn();
 const editarMutate = vi.fn();
 const eliminarMutate = vi.fn();
+const restaurarMutate = vi.fn();
 
 vi.mock('@/api/precostos', () => ({
   usePrecostosDesarrollo: () => historial,
@@ -32,14 +33,17 @@ vi.mock('@/api/precostos', () => ({
   useAgregarLinea: () => ({ mutate: agregarMutate, isPending: false }),
   useEditarLinea: () => ({ mutate: editarMutate, isPending: false }),
   useEliminarLinea: () => ({ mutate: eliminarMutate, isPending: false }),
+  useRestaurarLinea: () => ({ mutate: restaurarMutate, isPending: false }),
 }));
 
 vi.mock('@/api/conceptos-costo', () => ({
   useConceptosCosto: () => ({
     data: {
       datos: [
-        { id: 5, nombre: 'Estampado', fijo: false },
-        { id: 1, nombre: 'Tela', fijo: true }, // fijo → NO debe ofrecerse en el alta manual (B1)
+        { id: 5, codigo: 'estampado', nombre: 'Estampado', fijo: false },
+        { id: 1, codigo: 'tela', nombre: 'Tela', fijo: true }, // R5/B12: se PUEDE agregar manual (no es ancla)
+        { id: 3, codigo: 'maquila', nombre: 'Maquila', fijo: true }, // ancla → NO se ofrece (único por prenda)
+        { id: 8, codigo: 'corte', nombre: 'Corte', fijo: true }, // ancla → NO se ofrece (único por prenda)
       ],
     },
     isPending: false,
@@ -88,6 +92,7 @@ function linea(
     idBordado: null,
     editable: false,
     eliminable: false,
+    ajustado: false,
     ...over,
   };
 }
@@ -158,7 +163,15 @@ describe('<DialogoPrecosto>', () => {
     precostoEstado = {
       data: precosto({
         lineas: [
-          linea({ id: 1, conceptoCodigo: 'tela', descripcion: 'Felpa', editable: false }),
+          // Tela viene del BOM: editable + eliminable (no es ancla). Maquila es ancla: editable, no eliminable.
+          linea({
+            id: 1,
+            conceptoCodigo: 'tela',
+            descripcion: 'Felpa',
+            origen: 'bom_tela',
+            editable: true,
+            eliminable: true,
+          }),
           linea({
             id: 2,
             conceptoCodigo: 'maquila',
@@ -180,8 +193,10 @@ describe('<DialogoPrecosto>', () => {
     const editor = screen.getByTestId('editor-precosto');
     expect(within(editor).getByTestId('grupo-tela')).toBeInTheDocument();
     expect(within(editor).getByTestId('grupo-maquila')).toBeInTheDocument();
-    // La maquila (editable) tiene botón editar; la tela (BOM) muestra "del BOM".
-    expect(within(editor).getByTestId('editar-linea')).toBeInTheDocument();
+    // R5/B12: en un borrador CUALQUIER renglón se edita (tela BOM + maquila ancla) → 2 botones "Editar".
+    expect(within(editor).getAllByTestId('editar-linea')).toHaveLength(2);
+    // La maquila es ancla (no eliminable); la tela sí se puede quitar → 1 solo botón eliminar.
+    expect(within(editor).getAllByTestId('eliminar-linea')).toHaveLength(1);
 
     // Congelar pide confirmación y luego dispara la mutación.
     await usuario.click(within(editor).getByTestId('congelar-precosto'));
@@ -236,7 +251,7 @@ describe('<DialogoPrecosto>', () => {
     expect(screen.queryByTestId('congelar-precosto')).not.toBeInTheDocument();
   });
 
-  it('el alta manual NO ofrece conceptos FIJOS en el selector (B1)', () => {
+  it('el alta manual oculta SOLO los conceptos ancla maquila/corte (R5/B12)', () => {
     historial = { data: [resumen({ id: 11, version: 1 })], isPending: false };
     precostoEstado = {
       data: precosto({
@@ -252,9 +267,12 @@ describe('<DialogoPrecosto>', () => {
     );
 
     const select = screen.getByTestId('agregar-linea-concepto');
+    // R5/B12: para negociar se puede agregar un renglón scratch bajo cualquier concepto NO ancla,
+    // incluyendo tela (antes bloqueada por B1). Solo maquila/corte quedan fuera (únicos por prenda).
     expect(within(select).getByRole('option', { name: 'Estampado' })).toBeInTheDocument();
-    // "Tela" es fijo → NO debe aparecer como opción del alta manual.
-    expect(within(select).queryByRole('option', { name: 'Tela' })).not.toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: 'Tela' })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Maquila' })).not.toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Corte' })).not.toBeInTheDocument();
   });
 
   it('sin ver-importes bloquea editar/agregar (no sobrescribe a ciegas) pero deja recalcular/congelar', () => {

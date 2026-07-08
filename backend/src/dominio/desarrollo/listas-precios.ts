@@ -29,6 +29,7 @@ import {
   type DatosAjustarPrecioLinea,
   type DatosListaFactoresEditar,
   type DatosListaPreciosCrear,
+  type DesgloseCostoLinea,
   type ListaPreciosLineaSalida,
   type ListaPreciosResumen,
   type ListaPreciosDetalle,
@@ -45,7 +46,7 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
-import { num, numOrNull } from '../costos/decimales.js';
+import { num, numOrNull, redondear2 } from '../costos/decimales.js';
 import { calcularPrecioLista, type FactoresLista } from '../costos/precio-lista.js';
 import { factoresANumeros, resolverFactores, validarFactores } from './cliente-factores.js';
 
@@ -702,4 +703,73 @@ export async function candidatosParaLista(
       costoTotal: verImportes ? num(precosto?.costoTotal) : null,
     };
   });
+}
+
+/**
+ * DESGLOSE de costo de un renglón (rediseño R5, §4.8): agrupa los conceptos del precosto CONGELADO del
+ * renglón y suma sus importes EN EL SERVIDOR (A1 / lección F5-E7: la agregación nunca se pivotea en el
+ * cliente) — Tela · Avíos · Procesos · Corte · Maquila = costo total. Para que el dueño revise "que
+ * haga sentido" antes de aprobar/autorizar. Scope por empresa (A9); los importes se OCULTAN (null) sin
+ * `consultas.ver-importes`. Requiere `listas.ver` (evita el cruce de permisos con `desarrollo.ver`).
+ */
+export async function desgloseCostoLinea(
+  sesion: SesionUsuario,
+  idLinea: number,
+  bd?: ContextoBd,
+): Promise<DesgloseCostoLinea> {
+  verificarPermiso(sesion, 'listas.ver');
+  const verImportes = tienePermiso(sesion, 'consultas.ver-importes');
+
+  const linea = await clienteLectura(bd).listaPreciosLinea.findFirst({
+    where: { id: idLinea, lista: { idEmpresa: sesion.idEmpresaActiva } },
+    select: {
+      idPrecosto: true,
+      precosto: {
+        select: {
+          version: true,
+          costoTotal: true,
+          lineas: {
+            select: {
+              importe: true,
+              conceptoCosto: { select: { codigo: true, nombre: true, orden: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (linea === null) {
+    throw new ErrorNoEncontrado('Renglón de lista de precios', idLinea);
+  }
+
+  // Suma por concepto (server-side): un renglón por concepto con su subtotal, ordenado por catálogo.
+  const porConcepto = new Map<
+    string,
+    { codigo: string; nombre: string; orden: number; subtotal: number }
+  >();
+  for (const l of linea.precosto.lineas) {
+    const c = l.conceptoCosto;
+    const acc = porConcepto.get(c.codigo) ?? {
+      codigo: c.codigo,
+      nombre: c.nombre,
+      orden: c.orden,
+      subtotal: 0,
+    };
+    acc.subtotal += num(l.importe);
+    porConcepto.set(c.codigo, acc);
+  }
+  const grupos = [...porConcepto.values()]
+    .sort((a, b) => a.orden - b.orden)
+    .map((g) => ({
+      codigo: g.codigo,
+      nombre: g.nombre,
+      subtotal: verImportes ? redondear2(g.subtotal) : null,
+    }));
+
+  return {
+    idPrecosto: linea.idPrecosto,
+    versionPrecosto: linea.precosto.version,
+    grupos,
+    costoTotal: verImportes ? num(linea.precosto.costoTotal) : null,
+  };
 }
