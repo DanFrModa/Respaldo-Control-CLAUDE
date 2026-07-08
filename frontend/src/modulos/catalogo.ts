@@ -921,8 +921,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         descripcion: 'Análisis de la Ruta Crítica: cumplimiento, atrasos y cuellos de botella',
         ruta: '/analisis-rc',
         icono: 'grafica',
-        permisos: 'autenticado',
-        proximamente: 'Llega en R7',
+        permisos: ['rc.ruta-ver'],
       },
       // Hija INTERINA (decisión R4): el concentrado planeado-vs-real es ANÁLISIS, no operación
       // diaria; vive junto a "Análisis RC" hasta que R7 lo absorba/reacomode.

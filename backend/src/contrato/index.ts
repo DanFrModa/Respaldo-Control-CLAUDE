@@ -1486,6 +1486,29 @@ export {
   type ConcentradoPagina,
 } from './esquemas/ruta-critica-concentrado.js';
 
+// ── Ruta Crítica: tablero de gestión "Análisis RC" (Módulo 8, rediseño R7, B14) ──
+export {
+  esquemaOrdenAtencion,
+  esquemaAnalisisSalud,
+  esquemaEntregaCiclo,
+  esquemaOrdenAlerta,
+  esquemaRiesgoCliente,
+  esquemaCuelloProceso,
+  esquemaAnalisisRc,
+  esquemaBadgeDesempeno,
+  esquemaPersonaDesempeno,
+  esquemaParametrosDesempeno,
+  esquemaDesempenoRc,
+  type OrdenAtencion,
+  type OrdenAlerta,
+  type RiesgoCliente,
+  type CuelloProceso,
+  type AnalisisRc,
+  type BadgeDesempeno,
+  type PersonaDesempeno,
+  type DesempenoRc,
+} from './esquemas/ruta-critica-analisis.js';
+
 // ── Calidad: base configurable — defectos, tipos de producto y planes AQL (Módulo 8, F6-E1) ──
 export {
   SEVERIDADES_DEFECTO,

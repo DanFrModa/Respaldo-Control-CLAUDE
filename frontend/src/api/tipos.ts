@@ -768,6 +768,29 @@ export type ConcentradoRcQuery = NonNullable<
   paths['/api/ruta-critica/concentrado']['get']['parameters']['query']
 >;
 
+// ── Ruta Crítica: tablero de gestión "Análisis RC" (Módulo 8, rediseño R7) ────
+
+/** Respuesta del tablero Análisis RC (`GET /api/ruta-critica/analisis`). */
+export type AnalisisRc =
+  paths['/api/ruta-critica/analisis']['get']['responses']['200']['content']['application/json'];
+/** Salud de las órdenes (KPIs + triage). */
+export type AnalisisSalud = AnalisisRc['salud'];
+/** Una orden del triage "requieren atención". */
+export type OrdenAtencion = AnalisisSalud['atencion'][number];
+/** Entrega al cliente + tiempo de ciclo (con tendencias). */
+export type EntregaCiclo = AnalisisRc['entregaCiclo'];
+/** Una alerta predictiva (colchón proyectado por el forward pass). */
+export type OrdenAlerta = AnalisisRc['alertas'][number];
+/** Riesgo agregado por cliente. */
+export type RiesgoCliente = AnalisisRc['riesgoCliente'][number];
+/** Un cuello de botella por proceso. */
+export type CuelloProceso = AnalisisRc['cuellos'][number];
+/** Respuesta del desempeño del equipo (`GET /api/ruta-critica/analisis/desempeno`). */
+export type DesempenoRc =
+  paths['/api/ruta-critica/analisis/desempeno']['get']['responses']['200']['content']['application/json'];
+/** Desempeño de una persona en la RC (scoring + bono). */
+export type PersonaDesempeno = DesempenoRc['personas'][number];
+
 // ── Tipos de movimiento de inventario (Módulo 6, F3-E1; solo lectura) ────────
 
 /** Lista de tipos de movimiento de inventario (`GET /api/tipos-movimiento`). */

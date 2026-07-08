@@ -108,6 +108,7 @@ import { ProcesosResponsablesPagina } from '@/modulos/ruta-critica/ProcesosRespo
 import { ProgramarRcPagina } from '@/modulos/ruta-critica/ProgramarRcPagina';
 import { ReglasDuracionPagina } from '@/modulos/ruta-critica/ReglasDuracionPagina';
 import { RutaPorOrdenPagina } from '@/modulos/ruta-critica/RutaPorOrdenPagina';
+import { AnalisisRcPagina } from '@/modulos/analisis-rc/AnalisisRcPagina';
 import { TallasCurvasPagina } from '@/modulos/tallas/TallasCurvasPagina';
 import { TelasPagina } from '@/modulos/telas/TelasPagina';
 import { TiposProcesoPagina } from '@/modulos/tipos-proceso/TiposProcesoPagina';
@@ -246,6 +247,9 @@ const router = createBrowserRouter([
           },
           // Ruta Crítica (Módulo 8, F5-E7) — concentrado "planeado vs real" (tablero gerencial).
           { path: 'ruta-critica/concentrado', element: <ConcentradoPagina /> },
+          // Análisis RC (Módulo 8, rediseño R7) — tablero de gestión: salud, alertas predictivas,
+          // desempeño del equipo (scoring + bono) y cuellos.
+          { path: 'analisis-rc', element: <AnalisisRcPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden', element: <RutaPorOrdenPagina /> },
           { path: 'ruta-critica/ordenes/:idOrden/programar', element: <ProgramarRcPagina /> },
           // Calidad (Módulo 9, F6-E1) — catálogos base: defectos, tipos de producto, planes AQL.

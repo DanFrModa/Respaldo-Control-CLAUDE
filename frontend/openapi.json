@@ -109966,6 +109966,1024 @@
         }
       }
     },
+    "/api/ruta-critica/analisis": {
+      "get": {
+        "summary": "Tablero \"Análisis RC\": salud de órdenes, entrega/ciclo, alertas predictivas, riesgo y cuellos",
+        "tags": [
+          "ruta-critica"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tablero de gestión \"Análisis RC\": salud, entrega/ciclo, alertas, riesgo, cuellos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "salud": {
+                      "type": "object",
+                      "properties": {
+                        "ordenesActivas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Órdenes con la RC viva (empresa activa)."
+                        },
+                        "aTiempo": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Órdenes activas cuyo semáforo es a tiempo."
+                        },
+                        "enRiesgo": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Órdenes activas cuyo semáforo es en riesgo."
+                        },
+                        "atrasadas": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Órdenes activas cuyo semáforo es atrasado."
+                        },
+                        "cumplimiento": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "% de órdenes activas a tiempo (0-100), o null si no hay órdenes activas."
+                        },
+                        "atencion": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la orden."
+                              },
+                              "folioOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Folio consecutivo de la orden (por empresa)."
+                              },
+                              "cliente": {
+                                "type": "string",
+                                "description": "Nombre del cliente."
+                              },
+                              "codigoModelo": {
+                                "type": "string",
+                                "description": "Código del modelo."
+                              },
+                              "descripcionModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Descripción del modelo, o null."
+                              },
+                              "etapaAtorada": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Proceso más urgente sin cumplir (la etapa donde está atorada la orden)."
+                              },
+                              "responsable": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Rol(es) responsable(s) de la etapa atorada (concatenados), o null."
+                              },
+                              "semaforo": {
+                                "type": "string",
+                                "enum": [
+                                  "aTiempo",
+                                  "enRiesgo",
+                                  "atrasado"
+                                ],
+                                "description": "Semáforo de la orden (atrasado / en riesgo)."
+                              },
+                              "holguraDias": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Urgencia en días naturales: <0 vencida, 0 hoy, >0 días restantes (holgura)."
+                              },
+                              "fechaEntregaRC": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Fecha de entrega comprometida, o null."
+                              }
+                            },
+                            "required": [
+                              "idOrden",
+                              "folioOrden",
+                              "cliente",
+                              "codigoModelo",
+                              "descripcionModelo",
+                              "etapaAtorada",
+                              "responsable",
+                              "semaforo",
+                              "holguraDias",
+                              "fechaEntregaRC"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Una orden que requiere atención (triage de la salud de órdenes)."
+                          },
+                          "description": "Órdenes atrasadas + en riesgo, ordenadas por urgencia (la más apremiante primero)."
+                        }
+                      },
+                      "required": [
+                        "ordenesActivas",
+                        "aTiempo",
+                        "enRiesgo",
+                        "atrasadas",
+                        "cumplimiento",
+                        "atencion"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Salud de las órdenes: KPIs + triage."
+                    },
+                    "entregaCiclo": {
+                      "type": "object",
+                      "properties": {
+                        "onTimePct": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "% de entregas a tiempo en la ventana (0-100), o null si no hay órdenes medibles."
+                        },
+                        "onTimeATiempo": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Órdenes entregadas a tiempo en la ventana."
+                        },
+                        "onTimeMedibles": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Órdenes entregadas MEDIBLES (con fecha real y planeada) en la ventana."
+                        },
+                        "tendenciaSemanas": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "description": "% a tiempo por semana en las últimas 4 semanas (antiguo→reciente), para el sparkline."
+                        },
+                        "cicloPromedioDias": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Días naturales promedio OP→entrega en la ventana, o null si no hay datos."
+                        },
+                        "cicloTendenciaDias": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Delta del ciclo vs la ventana anterior (negativo = más rápido), o null."
+                        },
+                        "datosAl": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Sello de la última actualización de las vistas KPI (F7-E3), o null."
+                        }
+                      },
+                      "required": [
+                        "onTimePct",
+                        "onTimeATiempo",
+                        "onTimeMedibles",
+                        "tendenciaSemanas",
+                        "cicloPromedioDias",
+                        "cicloTendenciaDias",
+                        "datosAl"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Entrega al cliente + tiempo de ciclo (el resultado que de verdad importa)."
+                    },
+                    "alertas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la orden."
+                          },
+                          "folioOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la orden."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Código del modelo."
+                          },
+                          "descripcionModelo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Descripción del modelo, o null."
+                          },
+                          "procesosRestantes": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Procesos que aún faltan por cumplir."
+                          },
+                          "colchonDias": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Colchón proyectado en días hábiles (forward pass): <0 = va a atrasarse."
+                          },
+                          "fechaEntregaRC": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de entrega comprometida, o null."
+                          }
+                        },
+                        "required": [
+                          "idOrden",
+                          "folioOrden",
+                          "cliente",
+                          "codigoModelo",
+                          "descripcionModelo",
+                          "procesosRestantes",
+                          "colchonDias",
+                          "fechaEntregaRC"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Alerta predictiva de una orden (colchón proyectado por el CPM forward pass)."
+                      },
+                      "description": "Órdenes que hoy se ven a tiempo pero cuyo colchón proyectado no alcanza."
+                    },
+                    "riesgoCliente": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del cliente."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          },
+                          "activas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Órdenes activas del cliente."
+                          },
+                          "enRiesgo": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Órdenes del cliente en riesgo."
+                          },
+                          "atrasadas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Órdenes del cliente atrasadas."
+                          },
+                          "semaforo": {
+                            "type": "string",
+                            "enum": [
+                              "ok",
+                              "warn",
+                              "crit"
+                            ],
+                            "description": "Semáforo del cliente: crit si tiene atrasadas, warn si en riesgo, ok si no."
+                          }
+                        },
+                        "required": [
+                          "idCliente",
+                          "cliente",
+                          "activas",
+                          "enRiesgo",
+                          "atrasadas",
+                          "semaforo"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Riesgo agregado por cliente."
+                      },
+                      "description": "Riesgo por cliente (con semáforo)."
+                    },
+                    "cuellos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idProcesoDef": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Tipo de proceso (ProcesoDef)."
+                          },
+                          "codigoProceso": {
+                            "type": "string",
+                            "description": "Código del proceso."
+                          },
+                          "nombreProceso": {
+                            "type": "string",
+                            "description": "Nombre del proceso."
+                          },
+                          "vencidos": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Órdenes vencidas en ese proceso."
+                          },
+                          "hoy": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Órdenes que vencen HOY en ese proceso."
+                          },
+                          "total": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Total de órdenes actualmente atoradas en ese proceso."
+                          }
+                        },
+                        "required": [
+                          "idProcesoDef",
+                          "codigoProceso",
+                          "nombreProceso",
+                          "vencidos",
+                          "hoy",
+                          "total"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cuello de botella por proceso."
+                      },
+                      "description": "Cuellos de botella por proceso."
+                    }
+                  },
+                  "required": [
+                    "salud",
+                    "entregaCiclo",
+                    "alertas",
+                    "riesgoCliente",
+                    "cuellos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Tablero de gestión \"Análisis RC\": salud, entrega/ciclo, alertas, riesgo, cuellos."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/analisis/desempeno": {
+      "get": {
+        "summary": "Desempeño del equipo de la Ruta Crítica: scoring, calificación y bono por persona",
+        "tags": [
+          "ruta-critica"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Desempeño del equipo de la Ruta Crítica (scoring + bono).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "personas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idUsuario": {
+                            "type": "string",
+                            "description": "Id del usuario."
+                          },
+                          "nombre": {
+                            "type": "string",
+                            "description": "Nombre completo de la persona."
+                          },
+                          "area": {
+                            "type": "string",
+                            "description": "Área derivada de sus roles (concatenados)."
+                          },
+                          "activos": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Procesos activos a su cargo (por sus roles)."
+                          },
+                          "vencidos": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Procesos a su cargo vencidos AHORA."
+                          },
+                          "onTimePct": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "% de procesos que entregó en tiempo (histórico), o null si no tiene capturas."
+                          },
+                          "reaccionHoras": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Horas promedio en atender un proceso desde que cae en su cancha, o null."
+                          },
+                          "tendencia": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Delta del % en tiempo vs la semana pasada (puntos), o null si no hay base."
+                          },
+                          "calificacion": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Calificación 0-100 (% en tiempo − penalización por vencidos), o null sin historial."
+                          },
+                          "badge": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "excelente",
+                                  "bien",
+                                  "regular",
+                                  "bajo"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Etiqueta cualitativa del score, o null."
+                          },
+                          "bono": {
+                            "type": "boolean",
+                            "description": "¿Gana el bono semanal? (calificación ≥ umbral Y 0 vencidos)."
+                          },
+                          "sobrecarga": {
+                            "type": "boolean",
+                            "description": "¿Trae mucha carga? (para leer un score bajo con contexto)."
+                          }
+                        },
+                        "required": [
+                          "idUsuario",
+                          "nombre",
+                          "area",
+                          "activos",
+                          "vencidos",
+                          "onTimePct",
+                          "reaccionHoras",
+                          "tendencia",
+                          "calificacion",
+                          "badge",
+                          "bono",
+                          "sobrecarga"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Desempeño de una persona en la Ruta Crítica."
+                      },
+                      "description": "Desempeño por persona, ordenado por calificación (mejor primero)."
+                    },
+                    "conBono": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántas personas ganan el bono esta semana."
+                    },
+                    "parametros": {
+                      "type": "object",
+                      "properties": {
+                        "umbralBono": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Calificación mínima para el bono (default 90)."
+                        },
+                        "penalizacionPorVencido": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Puntos que resta cada proceso vencido a la calificación (default 5)."
+                        },
+                        "sobrecargaActivos": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "A partir de cuántos activos se marca \"sobrecarga\" (default 15)."
+                        }
+                      },
+                      "required": [
+                        "umbralBono",
+                        "penalizacionPorVencido",
+                        "sobrecargaActivos"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Umbrales configurables del scoring del desempeño."
+                    }
+                  },
+                  "required": [
+                    "personas",
+                    "conBono",
+                    "parametros"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Desempeño del equipo de la Ruta Crítica (scoring + bono)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ruta-critica/analisis/desempeno/excel": {
+      "get": {
+        "summary": "Evaluación semanal del equipo en Excel (.xlsx): mismo resultado que el desempeño",
+        "tags": [
+          "ruta-critica"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/calidad/defectos": {
       "get": {
         "summary": "Listar defectos del catálogo",
