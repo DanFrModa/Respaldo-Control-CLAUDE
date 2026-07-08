@@ -28,6 +28,10 @@ import { rutasDesarrollos } from './api/desarrollo/desarrollos.rutas.js';
 // Desarrollo (Módulo 15, F8-E3): precosto PERSISTIDO por desarrollo (versionable por congelado
 // inmutable), calculado desde el BOM con los precios amarrados de E1.
 import { rutasPrecostos } from './api/desarrollo/precostos.rutas.js';
+// Rediseño R5 (Módulo 15): tech pack / adjuntos del desarrollo (B16) + resolvedor de dificultad por
+// # de operaciones para el editor (B7). Reusan el RBAC desarrollo.*, sin permisos nuevos.
+import { rutasAdjuntosDesarrollo } from './api/desarrollo/adjuntos-desarrollo.rutas.js';
+import { rutasDificultad } from './api/desarrollo/dificultad.rutas.js';
 // Desarrollo (Módulo 15, F8-E4): listas de precios por Cliente+Departamento (factores + aprobación
 // del dueño + PDF/Excel) y los factores del cliente (sub-recurso del cliente).
 import { rutasListasPrecios } from './api/desarrollo/listas-precios.rutas.js';
@@ -336,6 +340,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // Desarrollo (Módulo 15, F8-E3): precosto persistido por desarrollo (RBAC desarrollo.ver/.precostear,
   // ya sembrados en E1). Importes ocultos sin consultas.ver-importes.
   await app.register(rutasPrecostos, { prefix: '/api' });
+  // Rediseño R5: adjuntos del desarrollo (B16) + dificultad por # de operaciones (B7). RBAC
+  // desarrollo.ver/.administrar (ya sembrados en E1). El `/desarrollos/dificultad` es segmento
+  // estático (como `/desarrollos/tablero`), se registra ANTES de nada que dependa de `:id`.
+  await app.register(rutasDificultad, { prefix: '/api' });
+  await app.register(rutasAdjuntosDesarrollo, { prefix: '/api' });
   // Desarrollo (Módulo 15, F8-E4): factores del cliente (sub-recurso) + listas de precios por
   // Cliente+Departamento (folio A3/A9, aprobación del dueño, PDF/Excel). RBAC listas.* (sembrados en
   // E1); importes ocultos sin consultas.ver-importes.

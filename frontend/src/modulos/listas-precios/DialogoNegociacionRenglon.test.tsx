@@ -19,6 +19,21 @@ vi.mock('@/api/negociacion', () => ({
   useEventosLinea: () => eventos,
   useRegistrarRonda: () => ({ mutate: rondaMutate, isPending: false }),
   useRegistrarAcuerdo: () => ({ mutate: acuerdoMutate, isPending: false }),
+  // La calculadora en vivo: el hook devuelve una simulación fija (no golpea red) para poder aseverar
+  // que el margen se pinta. Los valores exactos los prueban los tests del dominio/CalculadoraNegociacion.
+  useSimularNegociacion: () => ({
+    data: {
+      costo: 40,
+      precioObjetivo: 205,
+      precioNeto: 164,
+      margenBrutoPct: 75.6,
+      margenObjetivoPct: 50,
+      cumpleObjetivo: true,
+    },
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 vi.mock('@/api/precostos', () => ({
   usePrecostosDesarrollo: () => versiones,
@@ -150,7 +165,8 @@ describe('<DialogoNegociacionRenglon>', () => {
     await usuario.click(screen.getByTestId('abrir-nueva-ronda'));
     await usuario.selectOptions(screen.getByTestId('ronda-version'), '12');
     await usuario.type(screen.getByTestId('ronda-acuerdo'), 'Quitamos bolsas');
-    await usuario.type(screen.getByTestId('ronda-precio'), '150');
+    // Con versión elegida + verImportes, el precio se captura en la CALCULADORA (§4.8), no en un input llano.
+    await usuario.type(screen.getByTestId('calculadora-precio-objetivo'), '150');
     await usuario.click(screen.getByTestId('confirmar-ronda'));
 
     expect(rondaMutate).toHaveBeenCalledTimes(1);
@@ -161,6 +177,28 @@ describe('<DialogoNegociacionRenglon>', () => {
       },
       expect.anything(),
     );
+  });
+
+  it('la calculadora muestra el margen a COSTO VIGENTE sin elegir versión nueva (§4.8)', async () => {
+    const usuario = userEvent.setup();
+    renderConProveedores(
+      <DialogoNegociacionRenglon
+        abierto
+        alCambiarAbierto={() => {}}
+        linea={linea()}
+        verImportes
+        puedeNegociar
+      />,
+      { sesion: estadoSesionDePrueba(['listas.ver', 'listas.negociar']) },
+    );
+
+    await usuario.click(screen.getByTestId('abrir-nueva-ronda'));
+    const form = screen.getByTestId('form-nueva-ronda');
+    // Sin seleccionar versión (idVersion === ''): la calculadora ya está y, al capturar el objetivo,
+    // muestra el margen contra el costo VIGENTE del renglón (no exige congelar una versión nueva).
+    await usuario.type(within(form).getByTestId('calculadora-precio-objetivo'), '205');
+    expect(within(form).getByTestId('margen-bruto')).toBeInTheDocument();
+    expect(within(form).getByTestId('badge-cumple-objetivo')).toBeInTheDocument();
   });
 
   it('el acuerdo sin re-costeo llama a registrarAcuerdo', async () => {

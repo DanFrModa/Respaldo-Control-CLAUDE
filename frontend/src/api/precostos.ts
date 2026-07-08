@@ -121,6 +121,14 @@ async function eliminarLinea(id: number, idLinea: number): Promise<Precosto> {
   return data;
 }
 
+async function restaurarLinea(id: number, idLinea: number): Promise<Precosto> {
+  const { data, error } = await api.POST('/api/precostos/{id}/lineas/{idLinea}/restaurar', {
+    params: { path: { id, idLinea } },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 async function congelar(id: number): Promise<Precosto> {
   const { data, error } = await api.POST('/api/precostos/{id}/congelar', {
     params: { path: { id } },
@@ -187,11 +195,20 @@ export interface ArgsEliminarLinea {
   idLinea: number;
 }
 
-/** Elimina un renglón manual del precosto. */
+/** Quita un renglón del precosto (cualquiera salvo los anclas maquila/corte; B12). */
 export function useEliminarLinea(): UseMutationResult<Precosto, ErrorDeApi, ArgsEliminarLinea> {
   const invalidar = useInvalidar();
   return useMutation({
     mutationFn: ({ id, idLinea }: ArgsEliminarLinea) => eliminarLinea(id, idLinea),
+    onSuccess: invalidar,
+  });
+}
+
+/** Restaura un renglón BOM ajustado al valor del BOM del modelo (B12). */
+export function useRestaurarLinea(): UseMutationResult<Precosto, ErrorDeApi, ArgsEliminarLinea> {
+  const invalidar = useInvalidar();
+  return useMutation({
+    mutationFn: ({ id, idLinea }: ArgsEliminarLinea) => restaurarLinea(id, idLinea),
     onSuccess: invalidar,
   });
 }

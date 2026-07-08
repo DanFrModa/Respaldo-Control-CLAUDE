@@ -241,3 +241,38 @@ export const esquemaCandidatosQuery = z.object({
 
 /** Parámetros de los candidatos. */
 export type CandidatosQuery = z.infer<typeof esquemaCandidatosQuery>;
+
+/**
+ * DESGLOSE de costo de un renglón (rediseño R5, §4.8): los conceptos del precosto congelado del
+ * renglón agrupados y sumados EN EL SERVIDOR (A1: nunca se pivotea en el cliente) — Tela · Avíos ·
+ * Procesos · Corte · Maquila = costo total. Para que el dueño "vea que hace sentido" antes de aprobar.
+ * Los subtotales/total se OCULTAN (null) sin `consultas.ver-importes`.
+ */
+export const esquemaGrupoDesgloseCosto = z
+  .object({
+    codigo: z.string().describe('Código del concepto de costo (tela/avios/maquila/corte/…).'),
+    nombre: z.string().describe('Nombre legible del concepto.'),
+    subtotal: z
+      .number()
+      .nullable()
+      .describe('Suma de importes del concepto (o null sin importes).'),
+  })
+  .describe('Un concepto del desglose de costo con su subtotal.');
+
+/** Forma de un grupo del desglose. */
+export type GrupoDesgloseCosto = z.infer<typeof esquemaGrupoDesgloseCosto>;
+
+/** Respuesta del desglose de costo de un renglón. */
+export const esquemaDesgloseCostoLinea = z
+  .object({
+    idPrecosto: z.number().int().describe('Precosto congelado del renglón.'),
+    versionPrecosto: z.number().int().describe('Nº de versión del precosto.'),
+    grupos: z
+      .array(esquemaGrupoDesgloseCosto)
+      .describe('Conceptos agrupados por tipo, ordenados por su orden de catálogo.'),
+    costoTotal: z.number().nullable().describe('Costo total del renglón (o null sin importes).'),
+  })
+  .describe('Desglose de costo por concepto de un renglón de lista (§4.8).');
+
+/** Forma del desglose de costo. */
+export type DesgloseCostoLinea = z.infer<typeof esquemaDesgloseCostoLinea>;

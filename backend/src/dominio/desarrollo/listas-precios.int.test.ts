@@ -33,6 +33,7 @@ import {
   aprobarLinea,
   candidatosParaLista,
   crearLista,
+  desgloseCostoLinea,
   editarFactoresLista,
   listarListas,
   obtenerLista,
@@ -64,6 +65,7 @@ async function sembrarBase(): Promise<void> {
     { codigo: 'avios', nombre: 'Avíos', orden: 2, fijo: true },
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
+    { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
   ];
   for (const c of conceptos) {
     await cliente.conceptoCosto.create({ data: c });
@@ -555,5 +557,57 @@ describe('ocultación de importes y scope por empresa (A9)', () => {
         bd(),
       ),
     ).rejects.toThrow(ErrorPermiso);
+  });
+});
+
+describe('desgloseCostoLinea — desglose de costo por concepto (§4.8)', () => {
+  it('agrupa y suma los conceptos del precosto congelado (tela + corte + maquila = 40)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DESG');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+
+    const desglose = await desgloseCostoLinea(sesion(), idLinea, bd());
+    expect(desglose.costoTotal).toBe(40);
+    // Ordenados por el `orden` del catálogo: tela(1) · maquila(3) · corte(8). No hay avíos/bordado.
+    expect(desglose.grupos.map((g) => g.codigo)).toEqual(['tela', 'maquila', 'corte']);
+    const porCodigo = new Map(desglose.grupos.map((g) => [g.codigo, g.subtotal]));
+    expect(porCodigo.get('tela')).toBe(30); // 1.5 × 20
+    expect(porCodigo.get('maquila')).toBe(10);
+    expect(porCodigo.get('corte')).toBe(0);
+  });
+
+  it('sin consultas.ver-importes oculta los subtotales y el total (null), pero da la estructura', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DESG-OCU');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+
+    const desglose = await desgloseCostoLinea(sesion(['listas.ver']), idLinea, bd());
+    expect(desglose.costoTotal).toBeNull();
+    expect(desglose.grupos.every((g) => g.subtotal === null)).toBe(true);
+    expect(desglose.grupos.map((g) => g.codigo)).toContain('tela');
+  });
+
+  it('un renglón de OTRA empresa no existe (A9)', async () => {
+    await sembrarFactores();
+    const id = await desarrolloConPrecosto('MOD-DESG-A9');
+    const lista = await crearLista(
+      sesion(),
+      { idCliente: clienteNegocio.id, idClienteDepartamento: departamento.id, idsDesarrollo: [id] },
+      bd(),
+    );
+    const idLinea = lista.lineas[0]!.id;
+    const otra = await crearEmpresaPrueba(cliente, 'Otra Empresa Desglose');
+    const sesionOtra = sesionDePrueba({ idEmpresaActiva: otra.id, permisos: PERM });
+    await expect(desgloseCostoLinea(sesionOtra, idLinea, bd())).rejects.toThrow(ErrorNoEncontrado);
   });
 });

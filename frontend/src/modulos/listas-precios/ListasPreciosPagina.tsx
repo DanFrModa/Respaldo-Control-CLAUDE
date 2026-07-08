@@ -2,6 +2,8 @@ import {
   Building2,
   CalendarRange,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   FileDown,
   FileText,
   MessagesSquareIcon,
@@ -20,6 +22,7 @@ import {
   imprimirListaPdf,
   useAjustarPrecioLinea,
   useAprobarLinea,
+  useDesgloseCostoLinea,
   useListaPrecios,
   useListasPrecios,
   type ListaLinea,
@@ -379,6 +382,7 @@ function FilaRenglon({
   const aprobar = useAprobarLinea();
   const [tecleoAbierto, setTecleoAbierto] = useState(false);
   const [negociacionAbierta, setNegociacionAbierta] = useState(false);
+  const [expandido, setExpandido] = useState(false);
 
   function alAprobar(): void {
     aprobar.mutate(linea.id, {
@@ -388,81 +392,157 @@ function FilaRenglon({
   }
 
   return (
-    <TableRow data-testid="fila-renglon-lista" data-aprobado={linea.aprobado}>
-      <TableCell>
-        <span className="font-medium">{linea.codigoModelo}</span>
-        {linea.descripcionModelo ? (
-          <span className="block text-xs text-muted-foreground">{linea.descripcionModelo}</span>
-        ) : null}
-      </TableCell>
-      <TableCell>{linea.numeroCliente ?? '—'}</TableCell>
-      <TableCell className="text-right">
-        {verImportes ? formatearMoneda(linea.costoUnit) : '—'}
-      </TableCell>
-      <TableCell className="text-right">
-        {verImportes ? formatearMoneda(linea.precioCalculado) : '—'}
-      </TableCell>
-      <TableCell className="text-right">
-        {linea.aprobado ? (
-          <Badge variant="default" data-testid="precio-aprobado">
-            {verImportes ? formatearMoneda(linea.precioAprobado) : 'Aprobado'}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </TableCell>
-      <TableCell className="text-right">
-        <div className="flex justify-end gap-1">
-          {puedeAprobar ? (
-            <>
-              <Button
-                type="button"
-                size="sm"
-                onClick={alAprobar}
-                disabled={aprobar.isPending}
-                data-testid="aprobar-renglon"
-              >
-                <CheckIcon aria-hidden />
-                Aprobar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setTecleoAbierto(true)}
-                data-testid="teclear-precio"
-              >
-                Teclear
-              </Button>
-            </>
-          ) : null}
-          {/* La negociación (historial + comparador) la ve cualquiera con `listas.ver`; las acciones
+    <>
+      <TableRow data-testid="fila-renglon-lista" data-aprobado={linea.aprobado}>
+        <TableCell>
+          <div className="flex items-start gap-1.5">
+            <button
+              type="button"
+              onClick={() => setExpandido((v) => !v)}
+              aria-label={expandido ? 'Ocultar desglose de costo' : 'Ver desglose de costo'}
+              aria-expanded={expandido}
+              className="mt-0.5 text-muted-foreground hover:text-foreground"
+              data-testid="alternar-desglose"
+            >
+              {expandido ? (
+                <ChevronDownIcon className="size-4" aria-hidden />
+              ) : (
+                <ChevronRightIcon className="size-4" aria-hidden />
+              )}
+            </button>
+            <div>
+              <span className="font-medium">{linea.codigoModelo}</span>
+              {linea.descripcionModelo ? (
+                <span className="block text-xs text-muted-foreground">
+                  {linea.descripcionModelo}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </TableCell>
+        <TableCell>{linea.numeroCliente ?? '—'}</TableCell>
+        <TableCell className="text-right">
+          {verImportes ? formatearMoneda(linea.costoUnit) : '—'}
+        </TableCell>
+        <TableCell className="text-right">
+          {verImportes ? formatearMoneda(linea.precioCalculado) : '—'}
+        </TableCell>
+        <TableCell className="text-right">
+          {linea.aprobado ? (
+            <Badge variant="default" data-testid="precio-aprobado">
+              {verImportes ? formatearMoneda(linea.precioAprobado) : 'Aprobado'}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          )}
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-1">
+            {puedeAprobar ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={alAprobar}
+                  disabled={aprobar.isPending}
+                  data-testid="aprobar-renglon"
+                >
+                  <CheckIcon aria-hidden />
+                  Aprobar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTecleoAbierto(true)}
+                  data-testid="teclear-precio"
+                >
+                  Teclear
+                </Button>
+              </>
+            ) : null}
+            {/* La negociación (historial + comparador) la ve cualquiera con `listas.ver`; las acciones
               de negociar dentro del panel se gobiernan por `listas.negociar`. */}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setNegociacionAbierta(true)}
-            data-testid="abrir-negociacion"
-          >
-            <MessagesSquareIcon aria-hidden />
-            Negociación
-          </Button>
-        </div>
-        <DialogoAjustarPrecio
-          abierto={tecleoAbierto}
-          alCambiarAbierto={setTecleoAbierto}
-          linea={linea}
-        />
-        <DialogoNegociacionRenglon
-          abierto={negociacionAbierta}
-          alCambiarAbierto={setNegociacionAbierta}
-          linea={linea}
-          verImportes={verImportes}
-          puedeNegociar={puedeNegociar}
-        />
-      </TableCell>
-    </TableRow>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setNegociacionAbierta(true)}
+              data-testid="abrir-negociacion"
+            >
+              <MessagesSquareIcon aria-hidden />
+              Negociación
+            </Button>
+          </div>
+          <DialogoAjustarPrecio
+            abierto={tecleoAbierto}
+            alCambiarAbierto={setTecleoAbierto}
+            linea={linea}
+          />
+          <DialogoNegociacionRenglon
+            abierto={negociacionAbierta}
+            alCambiarAbierto={setNegociacionAbierta}
+            linea={linea}
+            verImportes={verImportes}
+            puedeNegociar={puedeNegociar}
+          />
+        </TableCell>
+      </TableRow>
+      {expandido ? (
+        <TableRow data-testid="desglose-renglon">
+          <TableCell colSpan={6} className="bg-muted/30">
+            <DesgloseCosto idLinea={linea.id} verImportes={verImportes} />
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Desglose de costo por concepto de un renglón (§4.8): Tela · Avíos · Procesos · Corte · Maquila =
+ * costo total. Server-side (A1: no se pivotea aquí). Se carga sólo al expandir el renglón.
+ */
+function DesgloseCosto({
+  idLinea,
+  verImportes,
+}: {
+  idLinea: number;
+  verImportes: boolean;
+}): React.JSX.Element {
+  const consulta = useDesgloseCostoLinea(idLinea);
+
+  if (consulta.isPending) {
+    return <p className="text-sm text-muted-foreground">Cargando desglose…</p>;
+  }
+  if (consulta.isError) {
+    return (
+      <p className="text-sm text-destructive" role="alert">
+        {consulta.error.message}
+      </p>
+    );
+  }
+  const desglose = consulta.data;
+  return (
+    <div className="space-y-1" data-testid="desglose-costo">
+      <p className="text-xs font-medium text-muted-foreground">
+        Desglose del precosto v{desglose.versionPrecosto}
+      </p>
+      <ul className="max-w-md space-y-0.5 text-sm">
+        {desglose.grupos.map((g) => (
+          <li key={g.codigo} className="flex justify-between gap-4" data-testid="desglose-concepto">
+            <span>{g.nombre}</span>
+            <span className="tabular-nums">{verImportes ? formatearMoneda(g.subtotal) : '—'}</span>
+          </li>
+        ))}
+        <li className="mt-1 flex justify-between gap-4 border-t pt-1 font-semibold">
+          <span>Costo total</span>
+          <span className="tabular-nums" data-testid="desglose-total">
+            {verImportes ? formatearMoneda(desglose.costoTotal) : '—'}
+          </span>
+        </li>
+      </ul>
+    </div>
   );
 }
 

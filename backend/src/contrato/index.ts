@@ -763,6 +763,8 @@ export {
   esquemaCandidatoLista,
   esquemaCandidatosLista,
   esquemaCandidatosQuery,
+  esquemaGrupoDesgloseCosto,
+  esquemaDesgloseCostoLinea,
   type DatosListaPreciosCrear,
   type DatosListaFactoresEditar,
   type DatosAjustarPrecioLinea,
@@ -774,6 +776,8 @@ export {
   type CandidatoLista,
   type CandidatosLista,
   type CandidatosQuery,
+  type GrupoDesgloseCosto,
+  type DesgloseCostoLinea,
 } from './esquemas/lista-precios.js';
 
 // ── Negociación por versiones de la lista (Módulo 15, F8-E5; D13/R20b) ──
@@ -781,13 +785,17 @@ export {
   esquemaRondaRegistrar,
   esquemaAcuerdoRegistrar,
   esquemaCambiarEstadoLista,
+  esquemaSimularNegociacionQuery,
   esquemaNegociacionEventoSalida,
   esquemaNegociacionEventos,
+  esquemaSimulacionNegociacion,
   type DatosRondaRegistrar,
   type DatosAcuerdoRegistrar,
   type DatosCambiarEstadoLista,
+  type DatosSimularNegociacion,
   type NegociacionEventoSalida,
   type NegociacionEventos,
+  type SimulacionNegociacion,
 } from './esquemas/negociacion.js';
 
 // ── Adjuntos de la orden de producción (R6, F8-E6) ──
@@ -801,6 +809,30 @@ export {
   type OrdenAdjuntoSalida,
   type OrdenAdjuntosLista,
 } from './esquemas/adjunto-orden.js';
+
+// ── Adjuntos / tech pack del desarrollo (rediseño R5, B16) ──
+export {
+  esquemaDesarrolloAdjuntoCrear,
+  esquemaDesarrolloAdjuntoSubida,
+  esquemaDesarrolloAdjuntoSalida,
+  esquemaDesarrolloAdjuntosLista,
+  type DatosDesarrolloAdjuntoCrear,
+  type DesarrolloAdjuntoSubida,
+  type DesarrolloAdjuntoSalida,
+  type DesarrolloAdjuntosLista,
+} from './esquemas/adjunto-desarrollo.js';
+
+// ── Medidas de un avío "por medida" (rediseño R5, B11) ──
+export {
+  esquemaAvioMedidaEntrada,
+  esquemaAvioMedidasCuerpo,
+  esquemaAvioMedidaSalida,
+  esquemaAvioMedidasLista,
+  type DatosAvioMedidaEntrada,
+  type DatosAvioMedidas,
+  type AvioMedidaSalida,
+  type AvioMedidasLista,
+} from './esquemas/avio-medida.js';
 
 // ── Enganche Desarrollo ↔ Producción (Módulo 15, F8-E6; D13/R16) ──
 export {

@@ -45,6 +45,9 @@ export type ListaFactoresEditar =
 /** Cuerpo de teclear precio de un renglón. */
 export type AjustarPrecio =
   paths['/api/listas-precios/lineas/{idLinea}/precio']['patch']['requestBody']['content']['application/json'];
+/** Desglose de costo por concepto de un renglón. */
+export type DesgloseCostoLinea =
+  paths['/api/listas-precios/lineas/{idLinea}/desglose-costo']['get']['responses']['200']['content']['application/json'];
 
 /** Clave raíz de la cache de listas. */
 export const CLAVE_LISTAS = ['listas-precios'] as const;
@@ -116,6 +119,14 @@ async function ajustar(idLinea: number, cuerpo: AjustarPrecio): Promise<ListaDet
   return data;
 }
 
+async function obtenerDesglose(idLinea: number): Promise<DesgloseCostoLinea> {
+  const { data, error } = await api.GET('/api/listas-precios/lineas/{idLinea}/desglose-costo', {
+    params: { path: { idLinea } },
+  });
+  if (!data) throw new ErrorDeApi(error);
+  return data;
+}
+
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
 /** Lista las listas de precios con los filtros dados. */
@@ -133,6 +144,17 @@ export function useListaPrecios(id: number | undefined): UseQueryResult<ListaDet
     queryKey: claveDetalle(id ?? 0),
     queryFn: () => obtener(id as number),
     enabled: id !== undefined,
+  });
+}
+
+/** Desglose de costo por concepto de un renglón (§4.8); deshabilitada hasta que se pida (`idLinea`). */
+export function useDesgloseCostoLinea(
+  idLinea: number | null,
+): UseQueryResult<DesgloseCostoLinea, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_LISTAS, 'desglose', idLinea ?? 0],
+    queryFn: () => obtenerDesglose(idLinea as number),
+    enabled: idLinea !== null,
   });
 }
 

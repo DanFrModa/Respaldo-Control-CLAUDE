@@ -142,8 +142,17 @@ export const esquemaPrecostoLineaSalida = z
       .nullable()
       .describe('Traza: proveedor del avío usado, o null.'),
     idBordado: z.number().int().nullable().describe('Traza: bordado, o null.'),
-    editable: z.boolean().describe('¿La UI puede editar este renglón? (solo origen manual).'),
-    eliminable: z.boolean().describe('¿La UI puede eliminarlo? (manual y concepto NO fijo).'),
+    editable: z
+      .boolean()
+      .describe('¿La UI puede editar este renglón en un borrador? (cualquiera; R5/B12).'),
+    eliminable: z
+      .boolean()
+      .describe('¿La UI puede quitarlo? (cualquiera salvo los anclas maquila/corte; R5/B12).'),
+    ajustado: z
+      .boolean()
+      .describe(
+        '¿Renglón de origen BOM ajustado a mano en la negociación? (recalcular no lo pisa).',
+      ),
   })
   .describe('Renglón de precosto.');
 

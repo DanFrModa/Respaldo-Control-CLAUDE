@@ -22,6 +22,7 @@ import {
   esquemaAjustarPrecioLinea,
   esquemaCandidatosLista,
   esquemaCandidatosQuery,
+  esquemaDesgloseCostoLinea,
   esquemaListaFactoresEditar,
   esquemaListaPreciosCrear,
   esquemaListaPreciosDetalle,
@@ -33,6 +34,8 @@ import {
   esquemaCambiarEstadoLista,
   esquemaNegociacionEventos,
   esquemaRondaRegistrar,
+  esquemaSimulacionNegociacion,
+  esquemaSimularNegociacionQuery,
 } from '../../contrato/esquemas/negociacion.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -41,6 +44,7 @@ import {
   aprobarLinea,
   candidatosParaLista,
   crearLista,
+  desgloseCostoLinea,
   editarFactoresLista,
   listarListas,
   obtenerLista,
@@ -50,6 +54,7 @@ import {
   listarEventosDeLinea,
   registrarAcuerdo,
   registrarRonda,
+  simularNegociacion,
 } from '../../dominio/desarrollo/negociacion.js';
 import { impresoListaPrecios } from '../../dominio/desarrollo/impresos/impreso-lista-precios.js';
 import { excelListaPrecios } from '../../dominio/desarrollo/impresos/excel-lista-precios.js';
@@ -284,6 +289,49 @@ export const rutasListasPrecios: FastifyPluginCallbackZod = (app, _opciones, don
       const sesion = await exigirSesion(() => request.obtenerSesion());
       const datos = await listarEventosDeLinea(sesion, request.params.idLinea);
       return { datos };
+    },
+  });
+
+  // Calculadora de negociación (§4.8): simula el margen de un precio objetivo. Todo es importes → se
+  // exige además `consultas.ver-importes` (como el PDF/Excel); es una lectura pura (no muta nada).
+  app.route({
+    method: 'GET',
+    url: '/listas-precios/lineas/:idLinea/simular',
+    preHandler: [
+      app.conPermiso('listas.negociar'),
+      app.conPermiso('listas.ver'),
+      app.conPermiso('consultas.ver-importes'),
+    ],
+    schema: {
+      tags: ['listas'],
+      summary:
+        'Simular el margen de un precio objetivo sobre un renglón (calculadora de negociación)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      querystring: esquemaSimularNegociacionQuery,
+      response: { 200: esquemaSimulacionNegociacion, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return simularNegociacion(sesion, request.params.idLinea, request.query);
+    },
+  });
+
+  // Desglose de costo por concepto de un renglón (§4.8): renglón expandible en la lista.
+  app.route({
+    method: 'GET',
+    url: '/listas-precios/lineas/:idLinea/desglose-costo',
+    preHandler: app.conPermiso('listas.ver'),
+    schema: {
+      tags: ['listas'],
+      summary: 'Desglose de costo por concepto del precosto congelado de un renglón',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamLinea,
+      response: { 200: esquemaDesgloseCostoLinea, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return desgloseCostoLinea(sesion, request.params.idLinea);
     },
   });
 

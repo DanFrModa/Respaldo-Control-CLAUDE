@@ -28,11 +28,12 @@ import {
   agregarLineaManual,
   congelarVersion,
   editarLinea,
-  eliminarLineaManual,
+  eliminarLinea,
   generarPrecosto,
   listarPrecostosDeDesarrollo,
   obtenerPrecosto,
   recalcularDesdeBom,
+  restaurarLineaBom,
 } from './precostos.js';
 
 let cliente: PrismaClient;
@@ -59,6 +60,7 @@ async function sembrarConceptos(): Promise<void> {
     { codigo: 'maquila', nombre: 'Maquila', orden: 3, fijo: true },
     { codigo: 'estampado', nombre: 'Estampado', orden: 4, fijo: false },
     { codigo: 'bordado', nombre: 'Bordado', orden: 5, fijo: false },
+    { codigo: 'corte', nombre: 'Corte', orden: 8, fijo: true },
   ];
   for (const c of base) {
     await cliente.conceptoCosto.create({ data: c });
@@ -135,7 +137,9 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     const tTela = precosto.lineas.find((l) => l.conceptoCodigo === 'tela');
     expect(tTela?.importe).toBe(37.5);
     expect(tTela?.idTelaProveedor).toBe(telaProv.id);
-    expect(tTela?.editable).toBe(false); // BOM: no editable a mano
+    expect(tTela?.editable).toBe(true); // R5/B12: cualquier renglón del borrador es editable
+    expect(tTela?.eliminable).toBe(true); // BOM: se puede quitar (reaparece al recalcular)
+    expect(tTela?.ajustado).toBe(false); // aún no se ha tocado a mano
 
     const tAvio = precosto.lineas.find((l) => l.conceptoCodigo === 'avios');
     expect(tAvio?.importe).toBe(10);
@@ -232,6 +236,40 @@ describe('generarPrecosto — desde el BOM con amarres (R17)', () => {
     expect(linea?.consumo).toBe(1.5); // fallback a consumoPorPrenda
     expect(linea?.importe).toBe(7.5); // 1.5 × 5
   });
+
+  it('avío "por medida" usa el PROMEDIO SIMPLE de los precios de las medidas (R5, B11)', async () => {
+    const avio: Avio = await cliente.avio.create({
+      data: {
+        clave: 'CIE-5',
+        descripcion: 'Cierre #5 metálico',
+        precioReferencia: 99, // NO se usa: gana el promedio de medidas
+        medidas: {
+          create: [
+            { medida: '15 cm', precio: 5.8 },
+            { medida: '18 cm', precio: 6.2 },
+            { medida: '22 cm', precio: 6.8 },
+            { medida: 'vieja', precio: 100, activo: false }, // inactiva: fuera del promedio
+          ],
+        },
+      },
+    });
+    const modelo = await cliente.modelo.create({
+      data: {
+        codigo: 'POR-MEDIDA',
+        maquilaBase: 0,
+        avios: { create: [{ idAvio: avio.id, consumoPorPrenda: 1 }] },
+      },
+    });
+    const idProyecto = await proyectoNuevo();
+    const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
+    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+
+    const linea = precosto.lineas.find((l) => l.conceptoCodigo === 'avios');
+    // promedio (5.8+6.2+6.8)/3 = 6.27 (redondeado a 2); la medida inactiva NO cuenta.
+    expect(linea?.precioUnit).toBe(6.27);
+    expect(linea?.importe).toBe(6.27); // 1 × 6.27
+    expect(linea?.idAvioProveedor).toBeNull(); // el precio salió de las medidas, no de un proveedor
+  });
 });
 
 describe('un solo borrador por desarrollo + versiones', () => {
@@ -303,30 +341,58 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     expect(precosto.lineas.find((l) => l.conceptoCodigo === 'estampado')?.importe).toBe(4); // NO pisado
     expect(precosto.costoTotal).toBe(43); // 30 + 9 + 4
 
-    // Elimina el manual (no fijo).
-    precosto = await eliminarLineaManual(sesion(), precosto.id, manual!.id, bd());
+    // Quita el manual (no ancla).
+    precosto = await eliminarLinea(sesion(), precosto.id, manual!.id, bd());
     expect(precosto.lineas.some((l) => l.conceptoCodigo === 'estampado')).toBe(false);
     expect(precosto.costoTotal).toBe(39);
   });
 
-  it('rechaza agregar un renglón manual bajo un concepto FIJO (tela/avíos/maquila/bordado)', async () => {
+  it('rechaza agregar un manual bajo un concepto ANCLA (maquila/corte); tela/avíos SÍ se pueden (B12)', async () => {
     const modelo = await cliente.modelo.create({ data: { codigo: 'B1', maquilaBase: 5 } });
     const idProyecto = await proyectoNuevo();
     const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
     const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
 
-    const conceptoTela = await cliente.conceptoCosto.findFirstOrThrow({
-      where: { codigo: 'tela' },
+    // Los anclas (maquila/corte) YA tienen su renglón fijo por prenda → no se duplican.
+    const conceptoMaquila = await cliente.conceptoCosto.findFirstOrThrow({
+      where: { codigo: 'maquila' },
+    });
+    const conceptoCorte = await cliente.conceptoCosto.findFirstOrThrow({
+      where: { codigo: 'corte' },
     });
     await expect(
       agregarLineaManual(
         sesion(),
         precosto.id,
-        { idConceptoCosto: conceptoTela.id, precioUnit: 10 },
+        { idConceptoCosto: conceptoMaquila.id, precioUnit: 10 },
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
-    // El estampado (no fijo) SÍ se agrega.
+    await expect(
+      agregarLineaManual(
+        sesion(),
+        precosto.id,
+        { idConceptoCosto: conceptoCorte.id, precioUnit: 10 },
+        bd(),
+      ),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+
+    // R5/B12: un renglón de tela SÍ se puede agregar a mano en la calculadora (scratch), y es quitable.
+    const conceptoTela = await cliente.conceptoCosto.findFirstOrThrow({
+      where: { codigo: 'tela' },
+    });
+    const conManualTela = await agregarLineaManual(
+      sesion(),
+      precosto.id,
+      { idConceptoCosto: conceptoTela.id, descripcion: 'Tela extra', precioUnit: 10 },
+      bd(),
+    );
+    const manualTela = conManualTela.lineas.find(
+      (l) => l.conceptoCodigo === 'tela' && l.origen === 'manual',
+    );
+    expect(manualTela?.eliminable).toBe(true);
+
+    // El estampado (no fijo) también.
     const estampado = await cliente.conceptoCosto.findFirstOrThrow({
       where: { codigo: 'estampado' },
     });
@@ -340,7 +406,7 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
     ).resolves.toMatchObject({ estado: 'borrador' });
   });
 
-  it('no permite eliminar la maquila (fijo) ni editar un renglón BOM', async () => {
+  it('no permite eliminar los anclas maquila/corte, pero SÍ editar/quitar/restaurar un BOM (B8/B12)', async () => {
     const tela: Tela = await cliente.tela.create({
       data: { nombre: 'Jersey', precioSugerido: 10 },
     });
@@ -348,22 +414,46 @@ describe('conceptos manuales + recalcular respeta manuales', () => {
       data: {
         codigo: 'REGLAS',
         maquilaBase: 6,
+        corteBase: 4,
         telas: { create: [{ idTela: tela.id, consumoPorPrenda: 2 }] },
       },
     });
     const idProyecto = await proyectoNuevo();
     const desarrollo = await crearDesarrollo(sesion(), idProyecto, { idModelo: modelo.id }, bd());
-    const precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
+    let precosto = await generarPrecosto(sesion(), desarrollo.id, bd());
 
+    // B8: el renglón de corte nació con el corteBase del modelo.
+    const corte = precosto.lineas.find((l) => l.conceptoCodigo === 'corte')!;
+    expect(corte.importe).toBe(4);
+    expect(corte.eliminable).toBe(false); // ancla fija
+
+    // Los anclas maquila/corte NO se eliminan.
     const maquila = precosto.lineas.find((l) => l.conceptoCodigo === 'maquila')!;
-    await expect(
-      eliminarLineaManual(sesion(), precosto.id, maquila.id, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(eliminarLinea(sesion(), precosto.id, maquila.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
+    await expect(eliminarLinea(sesion(), precosto.id, corte.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
 
+    // B12: editar un renglón BOM AHORA se permite y lo marca `ajustado` (traza).
     const telaLinea = precosto.lineas.find((l) => l.conceptoCodigo === 'tela')!;
-    await expect(
-      editarLinea(sesion(), precosto.id, telaLinea.id, { precioUnit: 99 }, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+    precosto = await editarLinea(sesion(), precosto.id, telaLinea.id, { precioUnit: 99 }, bd());
+    const ajustada = precosto.lineas.find((l) => l.conceptoCodigo === 'tela')!;
+    expect(ajustada.ajustado).toBe(true);
+    expect(ajustada.importe).toBe(198); // 2 × 99
+
+    // Recalcular NO pisa el renglón ajustado (respeta el ajuste de la mesa).
+    await cliente.tela.update({ where: { id: tela.id }, data: { precioSugerido: 50 } });
+    precosto = await recalcularDesdeBom(sesion(), precosto.id, bd());
+    expect(precosto.lineas.find((l) => l.conceptoCodigo === 'tela')?.importe).toBe(198); // sigue ajustado
+    expect(precosto.lineas.filter((l) => l.conceptoCodigo === 'tela')).toHaveLength(1); // sin duplicar
+
+    // Restaurar lo devuelve al valor del BOM (2 × 50) y limpia `ajustado`.
+    precosto = await restaurarLineaBom(sesion(), precosto.id, ajustada.id, bd());
+    const restaurada = precosto.lineas.find((l) => l.conceptoCodigo === 'tela')!;
+    expect(restaurada.ajustado).toBe(false);
+    expect(restaurada.importe).toBe(100); // 2 × 50 (sugerido vigente)
   });
 });
 
@@ -404,9 +494,9 @@ describe('congelado inmutable + estado del desarrollo', () => {
     await expect(
       editarLinea(sesion(), borrador.id, maquila.id, { precioUnit: 99 }, bd()),
     ).rejects.toBeInstanceOf(ErrorConflicto);
-    await expect(
-      eliminarLineaManual(sesion(), borrador.id, maquila.id, bd()),
-    ).rejects.toBeInstanceOf(ErrorConflicto);
+    await expect(eliminarLinea(sesion(), borrador.id, maquila.id, bd())).rejects.toBeInstanceOf(
+      ErrorConflicto,
+    );
     await expect(congelarVersion(sesion(), borrador.id, bd())).rejects.toBeInstanceOf(
       ErrorConflicto,
     );

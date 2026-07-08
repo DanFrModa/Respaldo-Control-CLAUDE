@@ -58,14 +58,21 @@ export type EntradaLineaEditar = z.input<typeof esquemaPrecostoLineaEditar>;
  */
 const NAMESPACE_LOCK_PRECOSTO = 20_531;
 
-/** Códigos de concepto BASE que el BOM alimenta (los siembra el seed, `fijo=true` salvo bordado). */
-const CONCEPTOS_BOM = ['tela', 'avios', 'maquila', 'bordado'] as const;
+/**
+ * Códigos de concepto BASE que el motor del precosto alimenta directo (NO manuales del usuario): del
+ * BOM (tela/avíos/bordado) o los costos fijos por prenda (maquila y —rediseño R5, B8— corte). Los
+ * siembra el seed con `fijo=true` salvo `bordado`. `corte` es el renglón nuevo de R5 (costo de corte
+ * separado de la costura; decisión Daniel).
+ */
+const CONCEPTOS_BOM = ['tela', 'avios', 'maquila', 'corte', 'bordado'] as const;
 
 /** Ids de los conceptos base resueltos por código (se leen una vez por operación). */
 interface ConceptosBase {
   tela: number;
   avios: number;
   maquila: number;
+  /** Corte (rediseño R5, B8): costo fijo por prenda separado de la maquila. */
+  corte: number;
   bordado: number;
 }
 
@@ -101,6 +108,9 @@ const incluirBomModelo = {
           precioReferencia: true,
           factorConversion: true,
           proveedores: { select: { idProveedor: true, precio: true, factorConversion: true } },
+          // R5, B11: medidas ACTIVAS del avío "por medida". Si trae ≥1, el precosto usa el PROMEDIO
+          // SIMPLE de sus precios (decisión Daniel) en vez de la cascada por proveedor.
+          medidas: { where: { activo: true }, select: { precio: true } },
         },
       },
       tallas: { select: { consumo: true } },
@@ -123,6 +133,32 @@ type LineaNueva = Omit<Prisma.PrecostoLineaCreateManyInput, 'idPrecosto'>;
 /** Promedio SIMPLE de una lista de números (asume no vacía; el llamador lo garantiza). */
 function promedioSimple(valores: number[]): number {
   return valores.reduce((s, v) => s + v, 0) / valores.length;
+}
+
+/** Orígenes que salen del BOM (se regeneran al recalcular salvo que estén AJUSTADOS, B12). */
+const ORIGENES_BOM = ['bom_tela', 'bom_avio', 'bom_bordado'] as const;
+
+/** Códigos de los conceptos ANCLA fijos (rediseño R5): un renglón `manual` por prenda, único, que se
+ * EDITA pero NO se elimina ni se agrega dos veces (maquila/costura y corte). */
+const CONCEPTOS_ANCLA = ['maquila', 'corte'] as const;
+
+/**
+ * ¿Es un renglón ANCLA fijo (B8/B12)? Los renglones auto-creados de maquila y corte: origen `manual`
+ * + concepto fijo `maquila`/`corte`. Son ÚNICOS por precosto, editables pero NO eliminables (a
+ * diferencia del resto, que en un borrador sí se puede quitar en la calculadora de negociación).
+ */
+function esAnclaFija(origen: string, conceptoCodigo: string): boolean {
+  return origen === 'manual' && (CONCEPTOS_ANCLA as readonly string[]).includes(conceptoCodigo);
+}
+
+/** Clave de identidad de un renglón BOM (origen + insumo) para casar ajustes con la regeneración. */
+function claveBom(l: {
+  origen: string | null | undefined;
+  idTela?: number | null;
+  idAvio?: number | null;
+  idBordado?: number | null;
+}): string {
+  return `${l.origen ?? ''}:${l.idTela ?? ''}:${l.idAvio ?? ''}:${l.idBordado ?? ''}`;
 }
 
 /**
@@ -175,22 +211,31 @@ function lineasBomDesdeModelo(
       a.consumoPorTalla && a.tallas.length > 0
         ? promedioSimple(a.tallas.map((x) => num(x.consumo)))
         : num(a.consumoPorPrenda);
-    const resuelto = resolverPrecioAvio({
-      precioReferencia: numOrNull(a.avio.precioReferencia),
-      factorConversionAvio: numOrNull(a.avio.factorConversion),
-      idAvioProveedor: a.idAvioProveedor,
-      proveedores: a.avio.proveedores.map((p) => ({
-        idProveedor: p.idProveedor,
-        precio: numOrNull(p.precio),
-        factorConversion: numOrNull(p.factorConversion),
-      })),
-    });
+    // R5, B11: avío "por medida" (con ≥1 medida activa) → el precio = PROMEDIO SIMPLE de los precios
+    // de las medidas (protege el costo sin desglosar; el desglose real vive en la compra/MRP). La
+    // traza de proveedor queda en null (el precio NO salió de un proveedor sino del promedio de medidas).
+    const porMedida = a.avio.medidas.length > 0;
+    const resuelto = porMedida
+      ? {
+          precio: redondear2(promedioSimple(a.avio.medidas.map((m) => num(m.precio)))),
+          idProveedor: null,
+        }
+      : resolverPrecioAvio({
+          precioReferencia: numOrNull(a.avio.precioReferencia),
+          factorConversionAvio: numOrNull(a.avio.factorConversion),
+          idAvioProveedor: a.idAvioProveedor,
+          proveedores: a.avio.proveedores.map((p) => ({
+            idProveedor: p.idProveedor,
+            precio: numOrNull(p.precio),
+            factorConversion: numOrNull(p.factorConversion),
+          })),
+        });
     const precioUnit = resuelto.precio ?? 0;
     lineas.push({
       idConceptoCosto: conceptos.avios,
       origen: 'bom_avio',
       idAvio: a.idAvio,
-      // El proveedor cuyo precio se USÓ (amarre o más barato); null si salió de referencia/sin-precio.
+      // El proveedor cuyo precio se USÓ (amarre o más barato); null si salió de referencia/medidas.
       idAvioProveedor: resuelto.idProveedor,
       descripcion: `${a.avio.clave} — ${a.avio.descripcion}`,
       consumo,
@@ -239,6 +284,28 @@ function lineaMaquila(
   };
 }
 
+/**
+ * Renglón de CORTE (rediseño R5, B8): costo fijo por prenda SEPARADO de la maquila/costura (decisión
+ * Daniel). Concepto fijo `corte`, origen `manual` (editable luego; sobrevive al recalcular). Su
+ * importe default es `Modelo.corteBase` (o $0 si no se capturó); SIN proveedor. Espejo de `lineaMaquila`.
+ */
+function lineaCorte(
+  modelo: { corteBase: Prisma.Decimal | null },
+  conceptos: ConceptosBase,
+  sesion: SesionUsuario,
+): LineaNueva {
+  const corte = redondear2(num(modelo.corteBase));
+  return {
+    idConceptoCosto: conceptos.corte,
+    origen: 'manual',
+    descripcion: 'Corte',
+    consumo: null,
+    precioUnit: corte,
+    importe: corte,
+    ...datosCreacion(sesion),
+  };
+}
+
 /** Resuelve los ids de los conceptos BASE por código (falla claro si el seed no los sembró). */
 async function conceptosBase(tx: Tx): Promise<ConceptosBase> {
   const filas = await tx.conceptoCosto.findMany({
@@ -259,6 +326,7 @@ async function conceptosBase(tx: Tx): Promise<ConceptosBase> {
     tela: exigir('tela'),
     avios: exigir('avios'),
     maquila: exigir('maquila'),
+    corte: exigir('corte'),
     bordado: exigir('bordado'),
   };
 }
@@ -282,7 +350,7 @@ function aLineaSalida(
   linea: PrecostoConLineas['lineas'][number],
   verImportes: boolean,
 ): PrecostoLineaSalida {
-  const esManual = linea.origen === 'manual';
+  const esAncla = esAnclaFija(linea.origen, linea.conceptoCosto.codigo);
   return {
     id: linea.id,
     idConceptoCosto: linea.idConceptoCosto,
@@ -301,9 +369,14 @@ function aLineaSalida(
     idAvio: linea.idAvio,
     idAvioProveedor: linea.idAvioProveedor,
     idBordado: linea.idBordado,
-    editable: esManual,
-    // La maquila (concepto fijo) se EDITA pero no se elimina; los BOM se regeneran al recalcular.
-    eliminable: esManual && !linea.conceptoCosto.fijo,
+    // R5, B12: en la calculadora de negociación CUALQUIER renglón de un borrador se puede editar
+    // (los BOM pasan a `ajustado`). La UI gatea la edición tras `precosto.congelado`.
+    editable: true,
+    // Todo se puede quitar en un borrador SALVO los anclas fijos (maquila/corte: se editan, no se
+    // borran). Los BOM quitados reaparecen al recalcular (reset al BOM del modelo); los ajustados no.
+    eliminable: !esAncla,
+    // R5, B12: renglón de origen BOM ajustado a mano (recalcular no lo pisa; se puede restaurar).
+    ajustado: linea.ajustado,
   };
 }
 
@@ -453,6 +526,7 @@ export async function generarPrecosto(
     const conceptos = await conceptosBase(tx);
     const lineas = [
       ...lineasBomDesdeModelo(modelo, conceptos, sesion),
+      lineaCorte(modelo, conceptos, sesion),
       lineaMaquila(modelo, conceptos, sesion),
     ];
 
@@ -525,10 +599,23 @@ export async function recalcularDesdeBom(
     }
     const conceptos = await conceptosBase(tx);
 
-    await tx.precostoLinea.deleteMany({
-      where: { idPrecosto, origen: { in: ['bom_tela', 'bom_avio', 'bom_bordado'] } },
+    // R5, B12: los renglones BOM AJUSTADOS a mano en la negociación se PRESERVAN (no se regeneran).
+    // Se borran sólo los BOM no ajustados y se re-generan del modelo, SALTANDO los insumos que ya
+    // tienen un renglón ajustado (evita duplicar la misma tela/avío/bordado). Los quitados a mano SÍ
+    // reaparecen (recalcular = reset explícito al BOM del modelo); para conservar un cambio definitivo
+    // se edita el BOM del modelo. Los `manual` (maquila/corte/procesos) nunca los toca este recalcular.
+    const ajustadas = await tx.precostoLinea.findMany({
+      where: { idPrecosto, ajustado: true, origen: { in: [...ORIGENES_BOM] } },
+      select: { origen: true, idTela: true, idAvio: true, idBordado: true },
     });
-    const lineas = lineasBomDesdeModelo(modelo, conceptos, sesion);
+    const clavesAjustadas = new Set(ajustadas.map(claveBom));
+
+    await tx.precostoLinea.deleteMany({
+      where: { idPrecosto, origen: { in: [...ORIGENES_BOM] }, ajustado: false },
+    });
+    const lineas = lineasBomDesdeModelo(modelo, conceptos, sesion).filter(
+      (l) => !clavesAjustadas.has(claveBom(l)),
+    );
     if (lineas.length > 0) {
       await tx.precostoLinea.createMany({
         data: lineas.map((l) => ({ ...l, idPrecosto })),
@@ -552,9 +639,11 @@ export async function recalcularDesdeBom(
  * fijo. El importe = `consumo × precioUnit` (si hay consumo) o `precioUnit` a secas. Sólo sobre un
  * BORRADOR. Requiere `desarrollo.precostear`.
  *
- * Se RECHAZAN los conceptos FIJOS (tela/avíos/maquila/bordado): esos rubros salen del BOM (o de la
- * maquila) y ya tienen su renglón; un manual bajo un fijo quedaría `origen:'manual'`+`conceptoFijo`,
- * inmune al recalcular Y no eliminable (`eliminable = manual && !fijo`), y colarse al congelado.
+ * Se RECHAZAN sólo los conceptos ANCLA (`maquila`/`corte`): son ÚNICOS por prenda y ya tienen su
+ * renglón auto-creado (se EDITA, no se duplica). Cualquier otro concepto activo se puede agregar a
+ * mano — incluidos tela/avíos como renglón de la calculadora de negociación (R5, B12): un manual bajo
+ * tela/avíos queda `origen:'manual'`, sobrevive al recalcular (no viene del BOM) y ES eliminable
+ * (`eliminable = !esAncla`), así que no queda atrapado como antes.
  */
 export async function agregarLineaManual(
   sesion: SesionUsuario,
@@ -577,7 +666,7 @@ export async function agregarLineaManual(
 
     const concepto = await tx.conceptoCosto.findUnique({
       where: { id: datos.idConceptoCosto },
-      select: { id: true, nombre: true, activo: true, fijo: true },
+      select: { id: true, codigo: true, nombre: true, activo: true, fijo: true },
     });
     if (concepto === null) {
       throw new ErrorNoEncontrado('ConceptoCosto', datos.idConceptoCosto);
@@ -585,9 +674,9 @@ export async function agregarLineaManual(
     if (!concepto.activo) {
       throw new ErrorConflicto(`El concepto de costo "${concepto.nombre}" está desactivado.`);
     }
-    if (concepto.fijo) {
+    if ((CONCEPTOS_ANCLA as readonly string[]).includes(concepto.codigo)) {
       throw new ErrorConflicto(
-        `El concepto "${concepto.nombre}" es fijo: sale del BOM/maquila, no se agrega a mano.`,
+        `El concepto "${concepto.nombre}" ya tiene su renglón fijo por prenda; edítalo en vez de agregar otro.`,
       );
     }
 
@@ -623,9 +712,11 @@ export async function agregarLineaManual(
 }
 
 /**
- * Edita un renglón MANUAL (incluida la maquila): descripción/consumo/precio/notas (PATCH parcial). El
- * importe se recompone. Los renglones de ORIGEN BOM NO se editan a mano (recalcular). Sólo sobre un
- * BORRADOR. Requiere `desarrollo.precostear`.
+ * Edita CUALQUIER renglón de un borrador (rediseño R5, B12 — calculadora de negociación en vivo):
+ * descripción/consumo/precio/notas (PATCH parcial). El importe se recompone. Si el renglón viene del
+ * BOM (tela/avío/bordado), al editarlo pasa a `ajustado=true` (traza) para que `recalcularDesdeBom`
+ * NO lo pise; `restaurarLineaBom` lo revierte al valor del BOM. Los manuales se editan igual que
+ * antes. Sólo sobre un BORRADOR. Requiere `desarrollo.precostear`.
  */
 export async function editarLinea(
   sesion: SesionUsuario,
@@ -651,17 +742,14 @@ export async function editarLinea(
     if (linea === null) {
       throw new ErrorNoEncontrado('PrecostoLinea', idLinea);
     }
-    if (linea.origen !== 'manual') {
-      throw new ErrorConflicto(
-        'Este renglón viene del BOM; recalcula desde el BOM en vez de editarlo a mano.',
-      );
-    }
 
     const descripcion = datos.descripcion ?? linea.descripcion;
     const consumo = datos.consumo === undefined ? numOrNull(linea.consumo) : datos.consumo;
     const precioUnit =
       datos.precioUnit === undefined ? linea.precioUnit.toNumber() : datos.precioUnit;
     const importe = consumo === null ? redondear2(precioUnit) : redondear2(consumo * precioUnit);
+    // Editar un renglón de origen BOM lo marca AJUSTADO (B12): recalcular ya no lo pisa.
+    const esBom = (ORIGENES_BOM as readonly string[]).includes(linea.origen);
 
     await tx.precostoLinea.update({
       where: { id: idLinea },
@@ -670,6 +758,7 @@ export async function editarLinea(
         consumo,
         precioUnit,
         importe,
+        ...(esBom ? { ajustado: true } : {}),
         ...(datos.notas === undefined ? {} : { notas: datos.notas }),
         ...datosModificacion(sesion),
       },
@@ -688,10 +777,13 @@ export async function editarLinea(
 }
 
 /**
- * Elimina un renglón MANUAL de concepto NO fijo (los fijos —maquila— se editan pero no se borran; los
- * BOM se regeneran al recalcular). Sólo sobre un BORRADOR. Requiere `desarrollo.precostear`.
+ * Quita un renglón de un borrador (rediseño R5, B12): en la calculadora de negociación se puede
+ * quitar CUALQUIER renglón (una tela/avío/proceso — "se quitan bolsas traseras") SALVO los ANCLAS
+ * fijos (maquila/corte: se editan, no se borran). Un renglón de origen BOM quitado reaparece al
+ * `recalcularDesdeBom` (reset al BOM del modelo); para quitarlo definitivamente se edita el BOM del
+ * modelo. Sólo sobre un BORRADOR. Requiere `desarrollo.precostear`.
  */
-export async function eliminarLineaManual(
+export async function eliminarLinea(
   sesion: SesionUsuario,
   idPrecosto: number,
   idLinea: number,
@@ -708,19 +800,14 @@ export async function eliminarLineaManual(
 
     const linea = await tx.precostoLinea.findFirst({
       where: { id: idLinea, idPrecosto },
-      select: { id: true, origen: true, conceptoCosto: { select: { fijo: true, nombre: true } } },
+      select: { id: true, origen: true, conceptoCosto: { select: { codigo: true, nombre: true } } },
     });
     if (linea === null) {
       throw new ErrorNoEncontrado('PrecostoLinea', idLinea);
     }
-    if (linea.origen !== 'manual') {
+    if (esAnclaFija(linea.origen, linea.conceptoCosto.codigo)) {
       throw new ErrorConflicto(
-        'Este renglón viene del BOM; no se elimina a mano (recalcula desde el BOM).',
-      );
-    }
-    if (linea.conceptoCosto.fijo) {
-      throw new ErrorConflicto(
-        `El renglón de "${linea.conceptoCosto.nombre}" es fijo; se edita pero no se elimina.`,
+        `El renglón de "${linea.conceptoCosto.nombre}" es fijo por prenda; se edita pero no se elimina.`,
       );
     }
 
@@ -732,6 +819,96 @@ export async function eliminarLineaManual(
       idEntidad: idPrecosto,
       accion: 'MODIFICAR',
       datos: { operacion: 'eliminar-linea', idLinea },
+    });
+  }, bd);
+
+  return obtenerPrecosto(sesion, idPrecosto, bd);
+}
+
+/**
+ * RESTAURA un renglón de origen BOM AJUSTADO (rediseño R5, B12) al valor del BOM del modelo: recupera
+ * consumo/precio/proveedor del BOM vigente y limpia `ajustado`. Si el insumo YA NO existe en el BOM
+ * (se quitó del modelo), la restauración lo ELIMINA (queda igual que un recalcular). Sólo aplica a
+ * renglones BOM ajustados de un BORRADOR. Requiere `desarrollo.precostear`.
+ */
+export async function restaurarLineaBom(
+  sesion: SesionUsuario,
+  idPrecosto: number,
+  idLinea: number,
+  bd?: ContextoBd,
+): Promise<PrecostoSalida> {
+  verificarPermiso(sesion, 'desarrollo.precostear');
+
+  await enTransaccion(async (tx) => {
+    await bloquearDesarrolloDePrecosto(tx, idPrecosto, sesion.idEmpresaActiva);
+    const precosto = await exigirPrecosto(tx, idPrecosto, sesion.idEmpresaActiva);
+    exigirBorrador(precosto);
+
+    const linea = await tx.precostoLinea.findFirst({
+      where: { id: idLinea, idPrecosto },
+      select: {
+        id: true,
+        origen: true,
+        ajustado: true,
+        idTela: true,
+        idAvio: true,
+        idBordado: true,
+      },
+    });
+    if (linea === null) {
+      throw new ErrorNoEncontrado('PrecostoLinea', idLinea);
+    }
+    if (!(ORIGENES_BOM as readonly string[]).includes(linea.origen)) {
+      throw new ErrorConflicto(
+        'Sólo se restauran renglones que vienen del BOM (tela/avío/bordado).',
+      );
+    }
+
+    const desarrollo = await tx.desarrollo.findUnique({
+      where: { id: precosto.idDesarrollo },
+      select: { idModelo: true },
+    });
+    if (desarrollo === null) {
+      throw new ErrorNoEncontrado('Desarrollo', precosto.idDesarrollo);
+    }
+    const modelo = await tx.modelo.findUnique({
+      where: { id: desarrollo.idModelo },
+      include: incluirBomModelo,
+    });
+    if (modelo === null) {
+      throw new ErrorNoEncontrado('Modelo', desarrollo.idModelo);
+    }
+    const conceptos = await conceptosBase(tx);
+    const clave = claveBom(linea);
+    const original = lineasBomDesdeModelo(modelo, conceptos, sesion).find(
+      (l) => claveBom(l) === clave,
+    );
+
+    if (original === undefined) {
+      // El insumo ya no está en el BOM del modelo → restaurar = quitar el renglón.
+      await tx.precostoLinea.delete({ where: { id: idLinea } });
+    } else {
+      await tx.precostoLinea.update({
+        where: { id: idLinea },
+        data: {
+          descripcion: original.descripcion,
+          consumo: original.consumo ?? null,
+          precioUnit: original.precioUnit,
+          importe: original.importe,
+          idTelaProveedor: original.idTelaProveedor ?? null,
+          idAvioProveedor: original.idAvioProveedor ?? null,
+          ajustado: false,
+          ...datosModificacion(sesion),
+        },
+      });
+    }
+    await tx.precosto.update({ where: { id: idPrecosto }, data: { ...datosModificacion(sesion) } });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Precosto',
+      idEntidad: idPrecosto,
+      accion: 'MODIFICAR',
+      datos: { operacion: 'restaurar-linea-bom', idLinea, eliminado: original === undefined },
     });
   }, bd);
 

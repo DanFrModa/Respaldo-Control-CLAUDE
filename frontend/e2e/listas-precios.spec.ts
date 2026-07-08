@@ -121,6 +121,14 @@ test.describe('Listas de precios (F8-E4)', () => {
     // aprobado (evita strict mode: $100.00 aparece también en la celda del calculado).
     await expect(renglon.getByTestId('precio-aprobado')).toHaveText('$100.00');
 
+    // ── §4.8: el renglón EXPANDE su desglose de costo por concepto (server-side) ──
+    await renglon.getByTestId('alternar-desglose').click();
+    const desglose = page.getByTestId('desglose-renglon');
+    await expect(desglose).toBeVisible();
+    await expect(desglose.getByTestId('desglose-concepto').first()).toBeVisible();
+    await expect(desglose.getByTestId('desglose-total')).toHaveText('$50.00');
+    await renglon.getByTestId('alternar-desglose').click(); // colapsa
+
     // ── El PDF sale (R9): el endpoint responde 200 con application/pdf ───────────
     // Se verifica con una request autenticada (comparte cookies de sesión), no vía popup:
     // en Chromium headless de CI no hay visor de PDF, así que el tab nunca navega a la URL.
@@ -137,6 +145,10 @@ test.describe('Listas de precios (F8-E4)', () => {
     // Nueva ronda → abre el editor de precosto → genera v2 → maquila 80 → congela.
     await panel.getByTestId('abrir-nueva-ronda').click();
     const formRonda = page.getByTestId('form-nueva-ronda');
+    // §4.8: la calculadora es alcanzable a COSTO VIGENTE desde que se abre la ronda, SIN elegir una
+    // versión nueva (el caso "¿me da margen al precio que ofrece el cliente sin tocar la prenda?").
+    await formRonda.getByTestId('calculadora-precio-objetivo').fill('120');
+    await expect(formRonda.getByTestId('margen-bruto')).toBeVisible();
     await formRonda.getByTestId('abrir-editor-precosto').click();
 
     const editor = page.getByTestId('dialogo-precosto');
@@ -156,6 +168,11 @@ test.describe('Listas de precios (F8-E4)', () => {
     await expect(formRonda.getByTestId('ronda-version').locator('option')).toHaveCount(2);
     await formRonda.getByTestId('ronda-version').selectOption({ index: 1 });
     await formRonda.getByTestId('ronda-acuerdo').fill('Se sube la maquila (nueva versión)');
+    // §4.8: al elegir la versión, la CALCULADORA en vivo muestra el margen del precio objetivo contra
+    // el costo de la v2 (el objetivo capturado va también como precio acordado del evento).
+    await formRonda.getByTestId('calculadora-precio-objetivo').fill('200');
+    await expect(formRonda.getByTestId('margen-bruto')).toBeVisible();
+    await expect(formRonda.getByTestId('badge-cumple-objetivo')).toBeVisible();
     // `confirmar-ronda` vive en el DialogFooter (hermano del contenedor form-nueva-ronda), no dentro de
     // él → se busca a nivel page (es único en pantalla mientras el diálogo de ronda está abierto).
     await page.getByTestId('confirmar-ronda').click();
