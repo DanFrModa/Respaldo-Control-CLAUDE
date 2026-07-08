@@ -271,9 +271,11 @@ describe('desempenoRc — scoring + bono', () => {
     await cliente.usuarioRol.create({ data: { idUsuario: ana.id, idRol: rolCorte.id } });
     await cliente.usuarioRol.create({ data: { idUsuario: beto.id, idRol: rolEst.id } });
 
-    // Historial: Ana 2 capturas EN TIEMPO (100%); Beto 1 en tiempo + 1 tarde (50%).
-    const oHist = await crearOrden({ rcActiva: false });
-    await crearRenglon(oHist.idOrden, corte, {
+    // Historial: Ana 2 capturas EN TIEMPO (100%); Beto 1 en tiempo + 1 tarde (50%). El historial de
+    // una persona se acumula A TRAVÉS DE MUCHAS ÓRDENES (una captura de su proceso por orden), así que
+    // cada captura del MISMO proceso vive en una ORDEN distinta (RutaOrden es único por orden×proceso).
+    const oAna1 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oAna1.idOrden, corte, {
       secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-15',
@@ -281,24 +283,27 @@ describe('desempenoRc — scoring + bono', () => {
       capturadoPorId: ana.id,
       capturadoEn: '2026-06-14',
     });
-    await crearRenglon(oHist.idOrden, corte, {
-      secuencia: 1,
+    const oAna2 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oAna2.idOrden, corte, {
+      secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-16',
       fechaReal: '2026-06-16',
       capturadoPorId: ana.id,
       capturadoEn: '2026-06-16',
     });
-    await crearRenglon(oHist.idOrden, estampado, {
-      secuencia: 2,
+    const oBeto1 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oBeto1.idOrden, estampado, {
+      secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-15',
       fechaReal: '2026-06-15',
       capturadoPorId: beto.id,
       capturadoEn: '2026-06-15',
     });
-    await crearRenglon(oHist.idOrden, estampado, {
-      secuencia: 3,
+    const oBeto2 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oBeto2.idOrden, estampado, {
+      secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-15',
       fechaReal: '2026-06-20', // tarde
@@ -362,9 +367,11 @@ describe('desempenoRc — scoring + bono', () => {
     });
     await cliente.usuarioRol.create({ data: { idUsuario: dario.id, idRol: rolEmp.id } });
 
-    const oD = await crearOrden({ rcActiva: false });
+    // Darío captura "empaque" en 4 ÓRDENES distintas (una captura por orden; RutaOrden es único
+    // por orden×proceso, así que el mismo proceso no puede repetirse dentro de una orden).
     // Semana pasada (captado 2026-06-10, en [hoy-14, hoy-7)): 1 en tiempo + 1 tarde.
-    await crearRenglon(oD.idOrden, empaque, {
+    const oD1 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oD1.idOrden, empaque, {
       secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-10',
@@ -372,8 +379,9 @@ describe('desempenoRc — scoring + bono', () => {
       capturadoPorId: dario.id,
       capturadoEn: '2026-06-10',
     });
-    await crearRenglon(oD.idOrden, empaque, {
-      secuencia: 1,
+    const oD2 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oD2.idOrden, empaque, {
+      secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-10',
       fechaReal: '2026-06-12', // tarde
@@ -381,16 +389,18 @@ describe('desempenoRc — scoring + bono', () => {
       capturadoEn: '2026-06-10',
     });
     // Esta semana (captado 2026-06-18, en [hoy-7, hoy]): 2 en tiempo.
-    await crearRenglon(oD.idOrden, empaque, {
-      secuencia: 2,
+    const oD3 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oD3.idOrden, empaque, {
+      secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-18',
       fechaReal: '2026-06-18',
       capturadoPorId: dario.id,
       capturadoEn: '2026-06-18',
     });
-    await crearRenglon(oD.idOrden, empaque, {
-      secuencia: 3,
+    const oD4 = await crearOrden({ rcActiva: false });
+    await crearRenglon(oD4.idOrden, empaque, {
+      secuencia: 0,
       estado: 'completado',
       fechaPlaneadaVigente: '2026-06-18',
       fechaReal: '2026-06-18',
