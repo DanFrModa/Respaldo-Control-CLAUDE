@@ -3,6 +3,7 @@ import {
   Calendar,
   CheckCircle2,
   FileText,
+  Layers,
   Pencil,
   Printer,
   Send,
@@ -28,6 +29,7 @@ import { useSesion } from '@/sesion/useSesion';
 import { DetalleRenglonesNota } from './DetalleRenglonesNota';
 import { DialogoCancelarNota } from './DialogoCancelarNota';
 import { DialogoEditarNota } from './DialogoEditarNota';
+import { DialogoNotaTela } from './DialogoNotaTela';
 import { ETIQUETA_ESTATUS_NOTA, EstatusNotaBadge, fechaCortaNota } from './piezas';
 
 /** Renglones por página del listado. */
@@ -47,6 +49,8 @@ export function NotasSalidaPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeAdministrar = tienePermiso('notas.administrar');
   const puedeCancelar = tienePermiso('notas.cancelar');
+  // La nota de TELAS reusa el motor F4 (salida de tela a orden) → permiso propio (§4.6 dec. 2).
+  const puedeMoverTela = tienePermiso('inventario-telas.mover');
 
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -75,6 +79,7 @@ export function NotasSalidaPagina(): React.JSX.Element {
   // ── Diálogos ───────────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ nota?: NotaSalida; soloLectura: boolean } | null>(null);
   const [aCancelar, setACancelar] = useState<NotaSalida | null>(null);
+  const [notaTelaAbierta, setNotaTelaAbierta] = useState(false);
   const [idAEnfocar, setIdAEnfocar] = useState<number | null>(null);
 
   function alGuardada(idNueva: number): void {
@@ -175,6 +180,18 @@ export function NotasSalidaPagina(): React.JSX.Element {
         paginacion={paginacion}
         seleccionInicialId={idAEnfocar}
         puedeAdministrar={puedeAdministrar}
+        accionesEncabezado={
+          puedeMoverTela ? (
+            <Button
+              variant="outline"
+              onClick={() => setNotaTelaAbierta(true)}
+              data-testid="nueva-nota-tela"
+            >
+              <Layers aria-hidden />
+              Nueva nota de telas
+            </Button>
+          ) : undefined
+        }
         alNuevo={() => setEditar({ soloLectura: false })}
         textoNuevo="Nueva nota"
         alEditar={() => undefined}
@@ -269,6 +286,12 @@ export function NotasSalidaPagina(): React.JSX.Element {
           }
         }}
         nota={aCancelar ?? undefined}
+      />
+
+      <DialogoNotaTela
+        abierto={notaTelaAbierta}
+        alCambiarAbierto={setNotaTelaAbierta}
+        alGuardada={() => void consulta.refetch()}
       />
     </>
   );

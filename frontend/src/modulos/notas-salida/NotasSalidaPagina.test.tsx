@@ -23,6 +23,7 @@ vi.mock('@/api/proveedores', () => ({
 // El detalle abre estos diálogos (montados solo al usarse): se simplifican.
 vi.mock('./DialogoEditarNota', () => ({ DialogoEditarNota: () => null }));
 vi.mock('./DialogoCancelarNota', () => ({ DialogoCancelarNota: () => null }));
+vi.mock('./DialogoNotaTela', () => ({ DialogoNotaTela: () => null }));
 
 function paginaConUna(estatus: ReturnType<typeof notaDePrueba>['estatus'] = 'borrador') {
   useNotasSalidaMock.mockReturnValue({

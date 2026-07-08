@@ -608,6 +608,16 @@ export {
   type EstatusMaterialesSalida,
 } from './esquemas/mrp.js';
 
+// ── Habilitación / surtido de avíos por orden (rediseño R6, B13; §4.6) ──
+export {
+  esquemaEstadoHabilitacion,
+  esquemaHabilitacionAvio,
+  esquemaHabilitacionOrden,
+  type EstadoHabilitacion,
+  type HabilitacionAvio,
+  type HabilitacionOrden,
+} from './esquemas/habilitacion.js';
+
 // ── Producción / WIP + kardex (Módulo 4/6, F3-E1; doc 03-Produccion / 04-Inventarios) ──
 export {
   esquemaTipoProcesoCrear,

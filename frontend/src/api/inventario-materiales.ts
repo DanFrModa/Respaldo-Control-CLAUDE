@@ -167,13 +167,16 @@ export function useKardexTela(
 
 // ── Hooks de consulta: AVÍOS ───────────────────────────────────────────────────
 
-/** Existencias de avío por avío×almacén (multi-almacén, R4). */
+/** Existencias de avío por avío×almacén (multi-almacén, R4). `habilitado:false` la apaga (p. ej.
+ * el constructor de notas antes de elegir almacén). */
 export function useExistenciasAvio(
   query: ExistenciasAvioQuery,
+  opciones?: { habilitado?: boolean },
 ): UseQueryResult<ExistenciasAvio, ErrorDeApi> {
   return useQuery({
     queryKey: [...CLAVE_INVENTARIO_MATERIALES, 'avios', 'existencias', query],
     queryFn: () => listarExistenciasAvio(query),
+    enabled: opciones?.habilitado ?? true,
     placeholderData: keepPreviousData,
   });
 }

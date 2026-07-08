@@ -1,0 +1,61 @@
+/**
+ * Cálculo PURO del REQUERIDO de un avío de la receta (R18) — ÚNICA fuente de verdad compartida entre
+ * la explosión MRP (`compras/mrp.ts`) y la habilitación/surtido (`produccion/habilitacion-orden.ts`).
+ * Se extrae aquí (DEBE-2 del review de R6) para que la regla de Daniel NO viva duplicada y no
+ * pueda derivar entre módulos.
+ *
+ * Regla R18: si el avío NO se consume por talla → `consumoPorPrenda × totalPiezas`. Si SÍ → Σ(medida
+ * de la talla × piezas de esa talla en la orden); las tallas presentes en la orden SIN medida
+ * capturada caen a `consumoPorPrenda` y se reportan en `tallasSinMedida` para que el llamador decida
+ * si avisa (el MRP arma un aviso con las etiquetas; la habilitación lo ignora).
+ *
+ * Es una función pura sin BD: toma sólo los campos mínimos del BOM (no el `select` pesado del MRP).
+ */
+import type { Prisma } from '../../datos/index.js';
+
+import { num } from '../costos/decimales.js';
+
+/** Lo MÍNIMO de un renglón `ModeloAvio` para calcular el requerido R18 (sin acoplar al select). */
+export interface AvioRecetaR18 {
+  /** Consumo por prenda (fallback cuando no hay medida por talla). */
+  consumoPorPrenda: Prisma.Decimal;
+  /** ¿El avío maneja medida por talla? */
+  consumoPorTalla: boolean;
+  /** Medidas por talla (si `consumoPorTalla`). */
+  tallas: { idTalla: number; consumo: Prisma.Decimal }[];
+}
+
+/** Resultado del cálculo: el requerido + las tallas que cayeron al consumo por prenda (para avisos). */
+export interface RequeridoAvioResultado {
+  requerido: number;
+  /** idTalla de las tallas de la orden SIN medida capturada (usaron `consumoPorPrenda`). */
+  tallasSinMedida: number[];
+}
+
+/**
+ * Requerido de un avío (R18). `piezasPorTalla` = piezas de la orden agrupadas por talla. Devuelve el
+ * requerido y las tallas sin medida (el llamador arma el aviso si le interesa).
+ */
+export function requeridoAvioReceta(
+  avio: AvioRecetaR18,
+  totalPiezas: number,
+  piezasPorTalla: Map<number, number>,
+): RequeridoAvioResultado {
+  if (!avio.consumoPorTalla) {
+    return { requerido: num(avio.consumoPorPrenda) * totalPiezas, tallasSinMedida: [] };
+  }
+  const medidaPorTalla = new Map(avio.tallas.map((t) => [t.idTalla, num(t.consumo)]));
+  const consumoPorPrenda = num(avio.consumoPorPrenda);
+  let requerido = 0;
+  const tallasSinMedida: number[] = [];
+  for (const [idTalla, piezas] of piezasPorTalla) {
+    const medida = medidaPorTalla.get(idTalla);
+    if (medida !== undefined) {
+      requerido += medida * piezas;
+    } else {
+      requerido += consumoPorPrenda * piezas;
+      tallasSinMedida.push(idTalla);
+    }
+  }
+  return { requerido, tallasSinMedida };
+}
