@@ -144,6 +144,16 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
     await filaMisterio.getByTestId('importador-ligar-input').fill(modelos[2]!.codigo);
     await page.getByTestId('importador-ligar-opcion').first().click();
 
+    // Tras confirmar, el navegador adjunta la OC al pedido por el flujo presigned (igual que todos
+    // los adjuntos del repo): POST /api/.../adjuntos (backend real) → PUT directo a R2. Mockeamos
+    // SÓLO ese PUT externo (no es `/api/`) y lo resolvemos 200; el resto de la red pasa intacta.
+    // (El adjunto es no-fatal; el mock evita depender de credenciales R2 dummy en CI.)
+    await page.route('**/*', (route) => {
+      const peticion = route.request();
+      const esPutAR2 = peticion.method() === 'PUT' && !peticion.url().includes('/api/');
+      return esPutAR2 ? route.fulfill({ status: 200 }) : route.fallback();
+    });
+
     await wiz.getByTestId('importador-confirmar').click();
 
     // ── Toast + el pedido aparece en la consulta por mes ────────────────────────

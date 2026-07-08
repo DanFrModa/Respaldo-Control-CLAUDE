@@ -7,13 +7,16 @@
  *
  * Innegociables aplicados:
  *  • A1 — toda la lógica AQUÍ; las rutas sólo validan permiso + Zod y delegan.
- *  • A2 — pedido + adjunto + N líneas + N OPs + RC en UNA transacción (todo o nada).
+ *  • A2 — pedido + N líneas + N OPs + RC en UNA transacción (todo o nada); SIN I/O de red a R2
+ *    dentro de la tx (el adjunto va aparte, ver abajo).
  *  • A3/A9 — folio por la secuencia atómica `"pedido"` de la empresa activa; el pedido nace en la
  *    empresa de la sesión.
  *  • A4 — SIN permisos nuevos: leer/guardar plantilla = `pedidos.*`; confirmar = `pedidos.administrar`
  *    Y `ordenes.administrar` (el mismo gate que el constructor/Generar OP de R3).
- *  • A5 — el Excel original se adjunta al pedido (`PedidoArchivo` en R2, espejo de R3/B3).
- *  • A7 — auditoría uniforme (creado/modificadoPorId + Bitácora).
+ *  • A5/B3 — el Excel original se adjunta al pedido por el flujo presigned ESTÁNDAR del repo (igual
+ *    que todos los adjuntos): el CLIENTE lo sube tras el confirm, no el servidor. El confirm sólo
+ *    parsea el archivo (para la matriz) y devuelve `idPedido` para que el cliente lo ligue.
+ *  • A7 — auditoría uniforme (creado/modificadoPorId + Bitácora, incluye el nombre del archivo origen).
  *
  * Reconocimiento: modelo-del-cliente ↔ desarrollo por `Desarrollo.numeroCliente` (normalizado: sin
  * acentos, trim, minúsculas). Color y talla se resuelven por nombre normalizado contra el catálogo
@@ -45,7 +48,6 @@ import {
 } from '../../contrato/index.js';
 import type { Prisma, PrismaClient } from '../../datos/index.js';
 
-import { servicioArchivos, type ServicioArchivos } from '../../comun/archivos.js';
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
 import { dispararPublicacion } from '../../comun/cola-eventos.js';
 import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from '../../comun/errores.js';
@@ -61,12 +63,6 @@ import { validarEntrada } from '../../comun/validacion.js';
 
 import { CLAVE_SECUENCIA_PEDIDO } from './pedidos.js';
 import { salidaAProduccion } from '../produccion/salida-produccion.js';
-
-/** MIME de un .xlsx (el importador R8 sólo acepta Excel; PDF es iteración posterior). */
-const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-/** Carpeta R2 del Excel original del importador (key ordenada por UUID, A5). */
-const CARPETA_IMPORTADOS = 'pedidos/importados';
 
 /** Tope del archivo decodificado (los OCs son chicos; blinda memoria/parseo). */
 const MAX_ARCHIVO_BYTES = 10 * 1024 * 1024;
@@ -628,17 +624,21 @@ function aPreview(
 
 /**
  * Confirma la importación: crea el pedido interno + una OP por modelo RECONOCIDO (con su matriz +
- * liga + nº de producción + RC), reusando `salidaAProduccion`, en UNA transacción (A2). El Excel
- * original se adjunta al pedido (`PedidoArchivo`, B3). Los modelos sin desarrollo (ni auto ni
- * manual) se OMITEN y se devuelven en `noReconocidos`. Un modelo reconocido con colores/tallas que
- * no existen en el catálogo aborta TODO con un error claro (la vista previa ya lo avisó). Requiere
- * `pedidos.administrar` Y `ordenes.administrar`.
+ * liga + nº de producción + RC), reusando `salidaAProduccion`, en UNA transacción (A2). Los modelos
+ * sin desarrollo (ni auto ni manual) se OMITEN y se devuelven en `noReconocidos`. Un modelo
+ * reconocido con colores/tallas que no existen en el catálogo aborta TODO con un error claro (la
+ * vista previa ya lo avisó). Requiere `pedidos.administrar` Y `ordenes.administrar`.
+ *
+ * El Excel original NO se adjunta aquí: el confirmar es una transacción A2 PURA sin I/O de red a R2.
+ * El adjunto del pedido (B3) lo sube el CLIENTE por el flujo presigned estándar del repo (el mismo
+ * de todos los adjuntos), después de este confirm y de forma NO-FATAL — se devuelve `idPedido` para
+ * que pueda ligarlo. Aquí sólo se PARSEA el archivo (para la matriz, A1) y se guarda su nombre en la
+ * bitácora (auditoría del origen, A7).
  */
 export async function confirmarImportacion(
   sesion: SesionUsuario,
   entrada: DatosConfirmarImportacion,
   bd?: ContextoBd,
-  archivos: ServicioArchivos = servicioArchivos(),
 ): Promise<ConfirmarImportacionSalida> {
   verificarPermiso(sesion, 'pedidos.administrar');
   verificarPermiso(sesion, 'ordenes.administrar');
@@ -651,16 +651,6 @@ export async function confirmarImportacion(
     throw new ErrorValidacion('El archivo no tiene renglones con modelo del cliente.');
   }
 
-  // Sube el Excel original a R2 ANTES de la transacción (I/O de red fuera de la tx). Si la tx se
-  // revierte, el objeto queda huérfano (estado ya aceptado en el repo); si la subida falla, nada
-  // se crea. Sólo se sube cuando ya sabemos que hay algo que importar (grupos > 0).
-  const objeto = await archivos.subirObjeto({
-    nombreOriginal: datos.nombreArchivo,
-    tipoMime: MIME_XLSX,
-    cuerpo: buffer,
-    carpeta: CARPETA_IMPORTADOS,
-  });
-
   const ocCliente =
     datos.ocCliente === undefined || datos.ocCliente === null || datos.ocCliente === ''
       ? null
@@ -670,128 +660,104 @@ export async function confirmarImportacion(
     datos.resoluciones.map((r) => [normalizarClave(r.modeloCliente), r.idDesarrollo]),
   );
 
-  let resultado: ConfirmarImportacionSalida;
-  try {
-    resultado = await enTransaccion(async (tx) => {
-      await exigirClienteActivo(tx, datos.idCliente);
-      const reconocedor = await cargarReconocedor(tx, datos.idCliente, sesion.idEmpresaActiva);
+  const resultado = await enTransaccion(async (tx) => {
+    await exigirClienteActivo(tx, datos.idCliente);
+    const reconocedor = await cargarReconocedor(tx, datos.idCliente, sesion.idEmpresaActiva);
 
-      const resueltos = gruposCrudos.map((grupo) => resolverGrupo(grupo, reconocedor, ligaManual));
-      const reconocidos = resueltos.filter((grupo) => grupo.amarre !== null);
-      const noReconocidos = resueltos
-        .filter((grupo) => grupo.amarre === null)
-        .map((grupo) => grupo.modeloCliente);
+    const resueltos = gruposCrudos.map((grupo) => resolverGrupo(grupo, reconocedor, ligaManual));
+    const reconocidos = resueltos.filter((grupo) => grupo.amarre !== null);
+    const noReconocidos = resueltos
+      .filter((grupo) => grupo.amarre === null)
+      .map((grupo) => grupo.modeloCliente);
 
-      if (reconocidos.length === 0) {
-        throw new ErrorValidacion(
-          'Ningún modelo del archivo se reconoció ni se ligó a un desarrollo; liga al menos uno para importar.',
-        );
-      }
-
-      // Un modelo reconocido con colores/tallas que no existen en el catálogo NO puede armar su
-      // matriz: se rechaza TODO (A2) con un mensaje claro (la vista previa ya lo señaló).
-      const conProblemas = reconocidos.find(
-        (grupo) => grupo.coloresNoResueltos.length > 0 || grupo.tallasNoResueltas.length > 0,
+    if (reconocidos.length === 0) {
+      throw new ErrorValidacion(
+        'Ningún modelo del archivo se reconoció ni se ligó a un desarrollo; liga al menos uno para importar.',
       );
-      if (conProblemas !== undefined) {
-        const faltantes = [
-          ...conProblemas.coloresNoResueltos.map((c) => `color "${c}"`),
-          ...conProblemas.tallasNoResueltas.map((t) => `talla "${t}"`),
-        ].join(', ');
-        throw new ErrorValidacion(
-          `El modelo "${conProblemas.modeloCliente}" trae ${faltantes} que no existen en el catálogo; agrégalos o corrige el archivo antes de importar.`,
-        );
-      }
+    }
 
-      // Sólo los reconocidos CON piezas (matriz no vacía) generan OP; un modelo reconocido con todas
-      // sus cantidades en 0 no crea una OP vacía (evita un `salidaAProduccion` sin matriz).
-      const aGenerar = reconocidos.filter((grupo) => grupo.matriz.length > 0);
-      if (aGenerar.length === 0) {
-        throw new ErrorValidacion(
-          'Los modelos reconocidos no traen piezas (todas las cantidades están en 0).',
-        );
-      }
+    // Un modelo reconocido con colores/tallas que no existen en el catálogo NO puede armar su
+    // matriz: se rechaza TODO (A2) con un mensaje claro (la vista previa ya lo señaló).
+    const conProblemas = reconocidos.find(
+      (grupo) => grupo.coloresNoResueltos.length > 0 || grupo.tallasNoResueltas.length > 0,
+    );
+    if (conProblemas !== undefined) {
+      const faltantes = [
+        ...conProblemas.coloresNoResueltos.map((c) => `color "${c}"`),
+        ...conProblemas.tallasNoResueltas.map((t) => `talla "${t}"`),
+      ].join(', ');
+      throw new ErrorValidacion(
+        `El modelo "${conProblemas.modeloCliente}" trae ${faltantes} que no existen en el catálogo; agrégalos o corrige el archivo antes de importar.`,
+      );
+    }
 
-      // Pedido interno (empresa activa A9, folio A3, OC del cliente B3).
-      const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_PEDIDO);
-      const pedido = await tx.pedido.create({
+    // Sólo los reconocidos CON piezas (matriz no vacía) generan OP; un modelo reconocido con todas
+    // sus cantidades en 0 no crea una OP vacía (evita un `salidaAProduccion` sin matriz).
+    const aGenerar = reconocidos.filter((grupo) => grupo.matriz.length > 0);
+    if (aGenerar.length === 0) {
+      throw new ErrorValidacion(
+        'Los modelos reconocidos no traen piezas (todas las cantidades están en 0).',
+      );
+    }
+
+    // Pedido interno (empresa activa A9, folio A3, OC del cliente B3).
+    const folio = await siguienteFolio(tx, sesion.idEmpresaActiva, CLAVE_SECUENCIA_PEDIDO);
+    const pedido = await tx.pedido.create({
+      data: {
+        folio,
+        idEmpresa: sesion.idEmpresaActiva,
+        idCliente: datos.idCliente,
+        ocCliente,
+        ...datosCreacion(sesion),
+      },
+    });
+
+    // Una línea + una OP (salida a producción) por modelo reconocido con piezas, en ESTA transacción.
+    const ordenes: OrdenImportada[] = [];
+    for (const grupo of aGenerar) {
+      const amarre = grupo.amarre as DesarrolloAmarre;
+      const linea = await tx.pedidoLinea.create({
         data: {
-          folio,
-          idEmpresa: sesion.idEmpresaActiva,
-          idCliente: datos.idCliente,
-          ocCliente,
+          idPedido: pedido.id,
+          idModelo: amarre.idModelo,
+          idDesarrollo: amarre.id,
+          cantidadPedida: grupo.totalPiezas,
+          precio: grupo.precio,
           ...datosCreacion(sesion),
         },
       });
-
-      // Adjunta el Excel original al pedido (B3 — espejo de R3): registro `Archivo` (subido ya a R2).
-      const archivoRegistro = await tx.archivo.create({
-        data: {
-          bucket: objeto.bucket,
-          key: objeto.key,
-          nombreOriginal: objeto.nombreOriginal,
-          tipoMime: objeto.tipoMime,
-          tamanoBytes: objeto.tamanoBytes,
-          subidoPorId: sesion.id,
-        },
+      const salida = await salidaAProduccion(sesion, linea.id, { lineas: grupo.matriz }, { tx });
+      ordenes.push({
+        idOrden: salida.orden.id,
+        folio: salida.orden.folio,
+        numeroProduccion: salida.numeroProduccion,
+        codigoModelo: amarre.codigoModelo,
+        modeloCliente: grupo.modeloCliente,
+        totalPiezas: grupo.totalPiezas,
       });
-      await tx.pedidoArchivo.create({
-        data: { idPedido: pedido.id, idArchivo: archivoRegistro.id, creadoPorId: sesion.id },
-      });
+    }
 
-      // Una línea + una OP (salida a producción) por modelo reconocido con piezas, en ESTA transacción.
-      const ordenes: OrdenImportada[] = [];
-      for (const grupo of aGenerar) {
-        const amarre = grupo.amarre as DesarrolloAmarre;
-        const linea = await tx.pedidoLinea.create({
-          data: {
-            idPedido: pedido.id,
-            idModelo: amarre.idModelo,
-            idDesarrollo: amarre.id,
-            cantidadPedida: grupo.totalPiezas,
-            precio: grupo.precio,
-            ...datosCreacion(sesion),
-          },
-        });
-        const salida = await salidaAProduccion(sesion, linea.id, { lineas: grupo.matriz }, { tx });
-        ordenes.push({
-          idOrden: salida.orden.id,
-          folio: salida.orden.folio,
-          numeroProduccion: salida.numeroProduccion,
-          codigoModelo: amarre.codigoModelo,
-          modeloCliente: grupo.modeloCliente,
-          totalPiezas: grupo.totalPiezas,
-        });
-      }
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Pedido',
+      idEntidad: pedido.id,
+      accion: 'CREAR',
+      datos: {
+        operacion: 'importar-pedido',
+        folio: Number(folio),
+        idCliente: datos.idCliente,
+        archivo: datos.nombreArchivo,
+        reconocidos: reconocidos.length,
+        noReconocidos: noReconocidos.length,
+      },
+    });
 
-      await registrarBitacora(tx, sesion, {
-        entidad: 'Pedido',
-        idEntidad: pedido.id,
-        accion: 'CREAR',
-        datos: {
-          operacion: 'importar-pedido',
-          folio: Number(folio),
-          idCliente: datos.idCliente,
-          archivo: datos.nombreArchivo,
-          reconocidos: reconocidos.length,
-          noReconocidos: noReconocidos.length,
-        },
-      });
-
-      return {
-        idPedido: pedido.id,
-        folioPedido: Number(folio),
-        ordenes,
-        noReconocidos,
-      };
-    }, bd);
-  } catch (error) {
-    // Si la tx se revirtió por CUALQUIER razón (cliente inactivo, colores/tallas inexistentes,
-    // "sin piezas", fallo a mitad del loop en `salidaAProduccion`…), el Excel ya subido a R2
-    // quedaría huérfano: bórralo best-effort antes de re-lanzar. No enmascara el error original.
-    await archivos.eliminarObjeto(objeto.key).catch(() => {});
-    throw error;
-  }
+    return {
+      idPedido: pedido.id,
+      folioPedido: Number(folio),
+      ordenes,
+      noReconocidos,
+    };
+  }, bd);
 
   // Las OPs encolaron sus eventos `orden-creada` en la MISMA tx (ya commiteada): dispara el relay.
   dispararPublicacion();

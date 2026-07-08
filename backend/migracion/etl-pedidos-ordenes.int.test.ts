@@ -48,9 +48,6 @@ const archivosStub: ServicioArchivos = {
   urlDescarga() {
     throw new Error('archivosStub.urlDescarga no debe llamarse en este test');
   },
-  subirObjeto() {
-    throw new Error('archivosStub.subirObjeto no debe llamarse en este test');
-  },
   eliminarObjeto() {
     throw new Error('archivosStub.eliminarObjeto no debe llamarse en este test');
   },

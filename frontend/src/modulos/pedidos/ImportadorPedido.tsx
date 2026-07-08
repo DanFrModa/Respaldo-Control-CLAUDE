@@ -10,6 +10,7 @@ import {
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { useSubirAdjuntoPedido } from '@/api/adjuntos-pedido';
 import {
   archivoABase64,
   useAnalizarImportacion,
@@ -91,6 +92,9 @@ export function ImportadorPedido({
   const [ocCliente, setOcCliente] = useState('');
   const [nombreArchivo, setNombreArchivo] = useState('');
   const [base64, setBase64] = useState('');
+  // El File original: tras confirmar se adjunta al pedido por el flujo presigned (como todos los
+  // adjuntos del repo); no viaja en el confirm (ahí sólo va el base64 para armar la matriz).
+  const [archivo, setArchivo] = useState<File | null>(null);
 
   // Análisis del backend (columnas, muestras, plantilla vigente, vista previa).
   const [analisis, setAnalisis] = useState<AnalizarImportacion | null>(null);
@@ -111,7 +115,12 @@ export function ImportadorPedido({
   const analizar = useAnalizarImportacion();
   const guardarPlantilla = useGuardarPlantilla();
   const confirmar = useConfirmarImportacion();
-  const ocupado = analizar.isPending || guardarPlantilla.isPending || confirmar.isPending;
+  const subirAdjunto = useSubirAdjuntoPedido();
+  const ocupado =
+    analizar.isPending ||
+    guardarPlantilla.isPending ||
+    confirmar.isPending ||
+    subirAdjunto.isPending;
 
   const opcionesCliente = useMemo(
     () => (clientes.data?.datos ?? []).map((c) => ({ id: c.id, nombre: c.nombre })),
@@ -149,6 +158,7 @@ export function ImportadorPedido({
       const b64 = await archivoABase64(archivo);
       setBase64(b64);
       setNombreArchivo(archivo.name);
+      setArchivo(archivo);
     } catch {
       toast.error('No se pudo leer el archivo.');
     }
@@ -243,7 +253,25 @@ export function ImportadorPedido({
             `Pedido ${res.folioPedido}-F importado · ${nOp} OP(s) con su matriz + RC` +
               (fuera > 0 ? ` · ${fuera} sin reconocer quedaron fuera` : ''),
           );
-          alImportado();
+          // Adjunta la OC original al pedido recién creado por el flujo presigned estándar (igual que
+          // todos los adjuntos del repo). Es NO-FATAL: el pedido ya existe; si el PUT falla, sólo se
+          // avisa (se puede subir luego desde el pedido). Cerramos tras que el adjunto asiente.
+          if (archivo !== null) {
+            subirAdjunto.mutate(
+              { idPedido: res.idPedido, archivo },
+              {
+                onSuccess: () => alImportado(),
+                onError: () => {
+                  toast.warning(
+                    'El pedido se creó, pero no se pudo adjuntar el Excel original. Puedes subirlo desde el pedido.',
+                  );
+                  alImportado();
+                },
+              },
+            );
+          } else {
+            alImportado();
+          }
         },
         onError: (error) => toast.error(error.message),
       },

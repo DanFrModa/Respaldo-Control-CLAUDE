@@ -5,17 +5,17 @@
  *  • PARSEO + MAPEO del Excel (exceljs) → agrupa por modelo del cliente,
  *  • RECONOCIMIENTO por `Desarrollo.numeroCliente` (normalizado): reconocido / no-reconocido,
  *  • VISTA PREVIA (analizar) con la plantilla vigente pre-aplicada,
- *  • ALTA TRANSACCIONAL (confirmar): pedido interno + adjunto + OPs con matriz + RC (evento outbox),
- *    con un no-reconocido resuelto a mano,
+ *  • ALTA TRANSACCIONAL (confirmar): pedido interno + OPs con matriz + RC (evento outbox), con un
+ *    no-reconocido resuelto a mano. (El adjunto de la OC lo sube el CLIENTE por el flujo presigned
+ *    DESPUÉS del confirm — no es parte de esta transacción; ver el módulo).
  *  • TRANSACCIONALIDAD (A2): un modelo reconocido con color inexistente → rollback TOTAL,
  *  • ROLLBACK a MITAD del loop: 2 reconocidos, el 2º descontinuado → ni el pedido ni la 1ª OP ya
- *    creadas persisten, y el Excel subido a R2 se limpia (no queda huérfano).
+ *    creadas persisten (prueba real de A2, no un abort antes de crear nada).
  */
 import ExcelJS from 'exceljs';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ClavePermiso } from '../../contrato/index.js';
-import type { ServicioArchivos } from '../../comun/archivos.js';
 import { ErrorConflicto, ErrorValidacion } from '../../comun/errores.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import type { PrismaClient } from '../../datos/index.js';
@@ -43,33 +43,6 @@ const PERMISOS: ClavePermiso[] = [
 const sesion = (): SesionUsuario =>
   sesionDePrueba({ idEmpresaActiva: idEmpresa, permisos: [...PERMISOS] });
 const bd = () => ({ cliente });
-
-/** Fake del servicio de archivos: NO toca R2; `subirObjeto` devuelve una key ficticia. */
-function archivosFalsos(): ServicioArchivos {
-  return {
-    solicitarSubida() {
-      throw new Error('solicitarSubida no se usa en el importador');
-    },
-    urlDescarga(key) {
-      return Promise.resolve(`https://r2.fake/get/${key}`);
-    },
-    subirObjeto(solicitud) {
-      const tamano = Buffer.isBuffer(solicitud.cuerpo)
-        ? solicitud.cuerpo.length
-        : solicitud.cuerpo.byteLength;
-      return Promise.resolve({
-        bucket: 'control-v2-prueba',
-        key: `${solicitud.carpeta ?? 'general'}/fake/${solicitud.nombreOriginal}`,
-        nombreOriginal: solicitud.nombreOriginal,
-        tipoMime: solicitud.tipoMime,
-        tamanoBytes: tamano,
-      });
-    },
-    eliminarObjeto() {
-      return Promise.resolve();
-    },
-  };
-}
 
 /** Columnas del archivo demo (estilo C&A: Estilo · Color · Talla · Piezas · Precio). */
 const MAPEO_DEMO = [
@@ -214,7 +187,7 @@ describe('analizar / vista previa', () => {
 });
 
 describe('confirmar importación (alta transaccional)', () => {
-  it('crea el pedido + adjunto + una OP por modelo reconocido; el no-reconocido queda fuera', async () => {
+  it('crea el pedido + una OP por modelo reconocido; el no-reconocido queda fuera', async () => {
     const dev114 = await sembrarDesarrollo('DEV-114', 'CA-KM-114');
     await sembrarDesarrollo('DEV-115', 'CA-KM-115');
     const archivoBase64 = await construirXlsxBase64(FILAS_DEMO);
@@ -230,16 +203,13 @@ describe('confirmar importación (alta transaccional)', () => {
         resoluciones: [],
       },
       bd(),
-      archivosFalsos(),
     );
 
     // Nació el pedido con 2 OPs (114, 115); CA-KM-999 quedó fuera.
     expect(resultado.ordenes).toHaveLength(2);
     expect(resultado.noReconocidos).toEqual(['CA-KM-999']);
-
-    // El adjunto (Excel original) quedó ligado al pedido (B3).
-    const adjuntos = await cliente.pedidoArchivo.count({ where: { idPedido: resultado.idPedido } });
-    expect(adjuntos).toBe(1);
+    // Devuelve idPedido para que el cliente le suba el adjunto (OC) por el flujo presigned.
+    expect(resultado.idPedido).toBeGreaterThan(0);
 
     // Cada OP: snapshot de la OC, matriz con piezas y liga al desarrollo.
     const op114 = resultado.ordenes.find((o) => o.modeloCliente === 'CA-KM-114');
@@ -280,7 +250,6 @@ describe('confirmar importación (alta transaccional)', () => {
         resoluciones: [{ modeloCliente: 'CA-KM-999', idDesarrollo: dev999.idDesarrollo }],
       },
       bd(),
-      archivosFalsos(),
     );
 
     expect(resultado.ordenes).toHaveLength(3);
@@ -303,7 +272,6 @@ describe('confirmar importación (alta transaccional)', () => {
           resoluciones: [],
         },
         bd(),
-        archivosFalsos(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
 
@@ -312,12 +280,12 @@ describe('confirmar importación (alta transaccional)', () => {
     expect(await cliente.eventoOutbox.count({ where: { tipo: 'orden-creada' } })).toBe(0);
   });
 
-  it('A2: falla a MITAD del loop (2º modelo descontinuado) → rollback del pedido y de la 1ª OP YA creada + limpia el R2 huérfano', async () => {
+  it('A2: falla a MITAD del loop (2º modelo descontinuado) → rollback del pedido y de la 1ª OP YA creada', async () => {
     // Dos modelos RECONOCIDOS; el 1º (114) genera su OP bien, el 2º (115) está descontinuado
     // (`Modelo.activo=false`): se reconoce y pasa la vista previa (colores/tallas sí existen), pero
     // `crearOrden` lo rechaza DENTRO del loop, DESPUÉS de que el pedido y la 1ª OP ya se crearon en
-    // la MISMA tx → debe revertirse TODO (no queda pedido ni la 1ª OP), y el Excel ya subido a R2 se
-    // borra (Fix del reviewer: sin huérfano en el camino de falla a media tanda).
+    // la MISMA tx → debe revertirse TODO (no queda pedido ni la 1ª OP). Prueba REAL de A2 (el error
+    // ocurre a media tanda, no antes de crear nada).
     await sembrarDesarrollo('DEV-114', 'CA-KM-114');
     const dev115 = await sembrarDesarrollo('DEV-115', 'CA-KM-115');
     await cliente.modelo.update({ where: { id: dev115.idModelo }, data: { activo: false } });
@@ -326,16 +294,6 @@ describe('confirmar importación (alta transaccional)', () => {
       ['CA-KM-114', 'Rojo', 'CH', 400, 168],
       ['CA-KM-115', 'Negro', 'M', 300, 154],
     ]);
-
-    // Espía de `eliminarObjeto` para comprobar que el objeto huérfano se limpia.
-    const eliminados: string[] = [];
-    const archivosEspia: ServicioArchivos = {
-      ...archivosFalsos(),
-      eliminarObjeto(key) {
-        eliminados.push(key);
-        return Promise.resolve();
-      },
-    };
 
     await expect(
       confirmarImportacion(
@@ -348,7 +306,6 @@ describe('confirmar importación (alta transaccional)', () => {
           resoluciones: [],
         },
         bd(),
-        archivosEspia,
       ),
     ).rejects.toBeInstanceOf(ErrorConflicto);
 
@@ -356,8 +313,6 @@ describe('confirmar importación (alta transaccional)', () => {
     expect(await cliente.pedido.count()).toBe(0);
     expect(await cliente.orden.count()).toBe(0);
     expect(await cliente.eventoOutbox.count({ where: { tipo: 'orden-creada' } })).toBe(0);
-    // El Excel ya subido a R2 se borró (no queda huérfano).
-    expect(eliminados).toHaveLength(1);
   });
 
   it('ningún modelo reconocido → ErrorValidacion y nada se crea', async () => {
@@ -373,7 +328,6 @@ describe('confirmar importación (alta transaccional)', () => {
           resoluciones: [],
         },
         bd(),
-        archivosFalsos(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
     expect(await cliente.pedido.count()).toBe(0);
