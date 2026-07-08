@@ -94,7 +94,14 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
         await dialogoDes.getByLabel('Número del cliente (opcional)').fill(modelo.numCliente);
       }
       await page.getByTestId('guardar-desarrollo').click();
-      await expect(page.getByText('Desarrollo agregado.')).toBeVisible();
+      // Señal DETERMINISTA del alta (NO el toast genérico "Desarrollo agregado.", que se ACUMULA
+      // entre iteraciones — el diálogo reabre sin recargar la página — y rompe strict mode con 2
+      // toasts iguales): el diálogo se cierra y la fila del desarrollo aparece en el detalle con SU
+      // código de modelo (único por iteración). Esto además serializa el loop antes de reabrir.
+      await expect(dialogoDes).toBeHidden();
+      await expect(
+        detalleProyecto.getByTestId('fila-desarrollo').filter({ hasText: modelo.codigo }),
+      ).toBeVisible();
     }
 
     // ── Archivo del cliente (.xlsx) con los 2 reconocidos + 1 sin reconocer ──────
