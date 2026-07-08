@@ -90,6 +90,9 @@ function archivosFalsos(): ServicioArchivos {
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
     },
+    subirObjeto() {
+      throw new Error('subirObjeto no se usa en este test');
+    },
     eliminarObjeto() {
       return Promise.resolve();
     },

@@ -8,6 +8,7 @@ import {
   Printer,
   RefreshCw,
   Route,
+  Upload,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -29,6 +30,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { AdjuntosPedido } from './AdjuntosPedido';
 import { ConstructorPedido } from './ConstructorPedido';
+import { ImportadorPedido } from './ImportadorPedido';
 import { PanelGenerarOP } from './PanelGenerarOP';
 
 /**
@@ -161,8 +163,9 @@ export function PedidosMesPagina(): React.JSX.Element {
     (r) => r.id === seleccion?.idRenglon,
   );
 
-  // ── Overlays: constructor + Generar OP ─────────────────────────────────────
+  // ── Overlays: constructor + importador + Generar OP ────────────────────────
   const [constructorAbierto, setConstructorAbierto] = useState(false);
+  const [importadorAbierto, setImportadorAbierto] = useState(false);
   const [generarOpDe, setGenerarOpDe] = useState<{
     pedido: PedidoMesFila;
     renglon: PedidoMesRenglon;
@@ -220,6 +223,19 @@ export function PedidosMesPagina(): React.JSX.Element {
                 <Pencil aria-hidden />
                 Edición completa
               </Button>
+              {/* Importar de cliente CONFIRMA creando pedido + OPs → exige también `ordenes.administrar`
+                  (el mismo gate del constructor/Generar OP). Sin ese permiso, ocultar el botón. */}
+              {puedeCrearOp ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setImportadorAbierto(true)}
+                  data-testid="importar-de-cliente"
+                >
+                  <Upload aria-hidden />
+                  Importar de cliente
+                </Button>
+              ) : null}
               <Button
                 size="sm"
                 onClick={() => setConstructorAbierto(true)}
@@ -684,6 +700,15 @@ export function PedidosMesPagina(): React.JSX.Element {
           alCerrar={() => setConstructorAbierto(false)}
           alCreado={() => {
             setConstructorAbierto(false);
+            void consulta.refetch();
+          }}
+        />
+      ) : null}
+      {importadorAbierto ? (
+        <ImportadorPedido
+          alCerrar={() => setImportadorAbierto(false)}
+          alImportado={() => {
+            setImportadorAbierto(false);
             void consulta.refetch();
           }}
         />

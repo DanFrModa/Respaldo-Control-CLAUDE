@@ -39271,6 +39271,1627 @@
         }
       }
     },
+    "/api/pedidos/importacion/plantillas/{idCliente}": {
+      "get": {
+        "summary": "Plantilla de importación VIGENTE de un cliente (null si aún no tiene formato)",
+        "tags": [
+          "pedidos"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idCliente",
+            "required": true,
+            "description": "Id del cliente."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plantilla vigente del cliente (null = aún no tiene formato guardado).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plantilla": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id de la plantilla."
+                            },
+                            "idCliente": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cliente dueño de la plantilla."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre descriptivo del formato."
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Nº de versión dentro del cliente."
+                            },
+                            "vigente": {
+                              "type": "boolean",
+                              "description": "Si es la versión que se aplica hoy."
+                            },
+                            "mapeo": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "indice": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "description": "Posición (0-based) de la columna en el archivo."
+                                  },
+                                  "columna": {
+                                    "type": "string",
+                                    "maxLength": 255,
+                                    "description": "Encabezado de la columna (para mostrar; el índice manda al aplicar)."
+                                  },
+                                  "rol": {
+                                    "type": "string",
+                                    "enum": [
+                                      "modeloCliente",
+                                      "color",
+                                      "talla",
+                                      "cantidad",
+                                      "precio",
+                                      "ignorar"
+                                    ],
+                                    "description": "Rol de la columna: modelo del cliente / color / talla / cantidad / precio / ignorar."
+                                  }
+                                },
+                                "required": [
+                                  "indice",
+                                  "columna",
+                                  "rol"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Cómo se interpreta una columna del archivo del cliente."
+                              },
+                              "description": "Mapeo columna→rol guardado."
+                            },
+                            "creadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Fecha de alta (ISO 8601)."
+                            },
+                            "creadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Usuario que la guardó."
+                            },
+                            "modificadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Fecha de la última modificación (ISO 8601)."
+                            },
+                            "modificadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Último usuario que la modificó."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "idCliente",
+                            "nombre",
+                            "version",
+                            "vigente",
+                            "mapeo",
+                            "creadoEn",
+                            "creadoPorId",
+                            "modificadoEn",
+                            "modificadoPorId"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Plantilla de importación de un cliente."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "plantilla"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Plantilla vigente del cliente (null = aún no tiene formato guardado)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Guardar el formato del cliente como versión NUEVA (la anterior deja de ser vigente)",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "description": "Nombre descriptivo (default \"Formato del cliente vN\").",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "mapeo": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "indice": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Posición (0-based) de la columna en el archivo."
+                        },
+                        "columna": {
+                          "type": "string",
+                          "maxLength": 255,
+                          "description": "Encabezado de la columna (para mostrar; el índice manda al aplicar)."
+                        },
+                        "rol": {
+                          "type": "string",
+                          "enum": [
+                            "modeloCliente",
+                            "color",
+                            "talla",
+                            "cantidad",
+                            "precio",
+                            "ignorar"
+                          ],
+                          "description": "Rol de la columna: modelo del cliente / color / talla / cantidad / precio / ignorar."
+                        }
+                      },
+                      "required": [
+                        "indice",
+                        "columna",
+                        "rol"
+                      ],
+                      "description": "Cómo se interpreta una columna del archivo del cliente."
+                    },
+                    "description": "Mapeo columna→rol del archivo del cliente (Modelo/Color/Talla/Cantidad obligatorios)."
+                  }
+                },
+                "required": [
+                  "mapeo"
+                ],
+                "description": "Datos para guardar (versionar) la plantilla de un cliente."
+              }
+            }
+          },
+          "description": "Datos para guardar (versionar) la plantilla de un cliente."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "idCliente",
+            "required": true,
+            "description": "Id del cliente."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Plantilla de importación de un cliente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id de la plantilla."
+                    },
+                    "idCliente": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cliente dueño de la plantilla."
+                    },
+                    "nombre": {
+                      "type": "string",
+                      "description": "Nombre descriptivo del formato."
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Nº de versión dentro del cliente."
+                    },
+                    "vigente": {
+                      "type": "boolean",
+                      "description": "Si es la versión que se aplica hoy."
+                    },
+                    "mapeo": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "indice": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Posición (0-based) de la columna en el archivo."
+                          },
+                          "columna": {
+                            "type": "string",
+                            "maxLength": 255,
+                            "description": "Encabezado de la columna (para mostrar; el índice manda al aplicar)."
+                          },
+                          "rol": {
+                            "type": "string",
+                            "enum": [
+                              "modeloCliente",
+                              "color",
+                              "talla",
+                              "cantidad",
+                              "precio",
+                              "ignorar"
+                            ],
+                            "description": "Rol de la columna: modelo del cliente / color / talla / cantidad / precio / ignorar."
+                          }
+                        },
+                        "required": [
+                          "indice",
+                          "columna",
+                          "rol"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Cómo se interpreta una columna del archivo del cliente."
+                      },
+                      "description": "Mapeo columna→rol guardado."
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de alta (ISO 8601)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Usuario que la guardó."
+                    },
+                    "modificadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Fecha de la última modificación (ISO 8601)."
+                    },
+                    "modificadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Último usuario que la modificó."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "idCliente",
+                    "nombre",
+                    "version",
+                    "vigente",
+                    "mapeo",
+                    "creadoEn",
+                    "creadoPorId",
+                    "modificadoEn",
+                    "modificadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Plantilla de importación de un cliente."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/importacion/analizar": {
+      "post": {
+        "summary": "Analizar el Excel del cliente: columnas, muestras, plantilla vigente y vista previa",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idCliente": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cliente del pedido."
+                  },
+                  "nombreArchivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Nombre del archivo del cliente (para mostrar y adjuntar)."
+                  },
+                  "archivoBase64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 14680064,
+                    "description": "Contenido del Excel del cliente en base64 (acepta prefijo data: URL)."
+                  },
+                  "mapeo": {
+                    "description": "Mapeo a aplicar; si se omite, se usa la plantilla vigente del cliente (si hay).",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "indice": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Posición (0-based) de la columna en el archivo."
+                        },
+                        "columna": {
+                          "type": "string",
+                          "maxLength": 255,
+                          "description": "Encabezado de la columna (para mostrar; el índice manda al aplicar)."
+                        },
+                        "rol": {
+                          "type": "string",
+                          "enum": [
+                            "modeloCliente",
+                            "color",
+                            "talla",
+                            "cantidad",
+                            "precio",
+                            "ignorar"
+                          ],
+                          "description": "Rol de la columna: modelo del cliente / color / talla / cantidad / precio / ignorar."
+                        }
+                      },
+                      "required": [
+                        "indice",
+                        "columna",
+                        "rol"
+                      ],
+                      "description": "Cómo se interpreta una columna del archivo del cliente."
+                    }
+                  }
+                },
+                "required": [
+                  "idCliente",
+                  "nombreArchivo",
+                  "archivoBase64"
+                ],
+                "description": "Analiza el archivo del cliente y arma la vista previa."
+              }
+            }
+          },
+          "description": "Analiza el archivo del cliente y arma la vista previa."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado de analizar el archivo del cliente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "columnas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Encabezados de las columnas del archivo."
+                    },
+                    "muestras": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "description": "Primeras filas del archivo (para mostrar ejemplos al mapear)."
+                    },
+                    "totalFilas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de renglones de datos del archivo."
+                    },
+                    "plantillaVigente": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id de la plantilla."
+                            },
+                            "idCliente": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cliente dueño de la plantilla."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre descriptivo del formato."
+                            },
+                            "version": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Nº de versión dentro del cliente."
+                            },
+                            "vigente": {
+                              "type": "boolean",
+                              "description": "Si es la versión que se aplica hoy."
+                            },
+                            "mapeo": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "indice": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991,
+                                    "description": "Posición (0-based) de la columna en el archivo."
+                                  },
+                                  "columna": {
+                                    "type": "string",
+                                    "maxLength": 255,
+                                    "description": "Encabezado de la columna (para mostrar; el índice manda al aplicar)."
+                                  },
+                                  "rol": {
+                                    "type": "string",
+                                    "enum": [
+                                      "modeloCliente",
+                                      "color",
+                                      "talla",
+                                      "cantidad",
+                                      "precio",
+                                      "ignorar"
+                                    ],
+                                    "description": "Rol de la columna: modelo del cliente / color / talla / cantidad / precio / ignorar."
+                                  }
+                                },
+                                "required": [
+                                  "indice",
+                                  "columna",
+                                  "rol"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Cómo se interpreta una columna del archivo del cliente."
+                              },
+                              "description": "Mapeo columna→rol guardado."
+                            },
+                            "creadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Fecha de alta (ISO 8601)."
+                            },
+                            "creadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Usuario que la guardó."
+                            },
+                            "modificadoEn": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                              "description": "Fecha de la última modificación (ISO 8601)."
+                            },
+                            "modificadoPorId": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Último usuario que la modificó."
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "idCliente",
+                            "nombre",
+                            "version",
+                            "vigente",
+                            "mapeo",
+                            "creadoEn",
+                            "creadoPorId",
+                            "modificadoEn",
+                            "modificadoPorId"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Plantilla de importación de un cliente."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Formato guardado del cliente (null = hay que enseñárselo)."
+                    },
+                    "preview": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "grupos": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "modeloCliente": {
+                                    "type": "string",
+                                    "description": "Nº/estilo del modelo tal como viene en el archivo."
+                                  },
+                                  "reconocido": {
+                                    "type": "boolean",
+                                    "description": "true si se amarró a un desarrollo (por nº de cliente)."
+                                  },
+                                  "idDesarrollo": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Desarrollo amarrado, o null."
+                                  },
+                                  "idModelo": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Modelo del desarrollo, o null."
+                                  },
+                                  "codigoModelo": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Nº de desarrollo (Modelo.codigo), o null."
+                                  },
+                                  "descripcionModelo": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Descripción del modelo, o null."
+                                  },
+                                  "numeroProduccion": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Nº interno de producción del modelo (si ya salió), o null."
+                                  },
+                                  "totalPiezas": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Suma de cantidades del grupo."
+                                  },
+                                  "numRenglones": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Renglones del archivo en este grupo."
+                                  },
+                                  "precio": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "description": "Precio de referencia (primer renglón con precio), o null sin `pedidos.importes`."
+                                  },
+                                  "coloresNoResueltos": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "description": "Colores del archivo que NO existen en el catálogo (bloquean la matriz)."
+                                  },
+                                  "tallasNoResueltas": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    },
+                                    "description": "Tallas del archivo que NO existen en el catálogo (bloquean la matriz)."
+                                  },
+                                  "cantidadesIlegibles": {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991,
+                                    "description": "Renglones con cantidad presente pero NO numérica (p. ej. \"N/A\"): se tratan como 0."
+                                  }
+                                },
+                                "required": [
+                                  "modeloCliente",
+                                  "reconocido",
+                                  "idDesarrollo",
+                                  "idModelo",
+                                  "codigoModelo",
+                                  "descripcionModelo",
+                                  "numeroProduccion",
+                                  "totalPiezas",
+                                  "numRenglones",
+                                  "precio",
+                                  "coloresNoResueltos",
+                                  "tallasNoResueltas",
+                                  "cantidadesIlegibles"
+                                ],
+                                "additionalProperties": false,
+                                "description": "Un modelo del cliente en la vista previa."
+                              },
+                              "description": "Modelos del cliente detectados."
+                            },
+                            "totalGrupos": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántos modelos del cliente hay."
+                            },
+                            "totalReconocidos": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Cuántos se amarraron a un desarrollo."
+                            },
+                            "totalPiezas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Suma de piezas de todo el archivo."
+                            }
+                          },
+                          "required": [
+                            "grupos",
+                            "totalGrupos",
+                            "totalReconocidos",
+                            "totalPiezas"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Vista previa de la importación."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Vista previa (null si no hubo mapeo que aplicar)."
+                    }
+                  },
+                  "required": [
+                    "columnas",
+                    "muestras",
+                    "totalFilas",
+                    "plantillaVigente",
+                    "preview"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de analizar el archivo del cliente."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pedidos/importacion/confirmar": {
+      "post": {
+        "summary": "Confirmar la importación: pedido interno + OPs con matriz + RC (reusa salidaAProduccion)",
+        "tags": [
+          "pedidos"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "idCliente": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cliente del pedido (empresa activa de la sesión, A9)."
+                  },
+                  "nombreArchivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255,
+                    "description": "Nombre del archivo del cliente (para mostrar y adjuntar)."
+                  },
+                  "archivoBase64": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 14680064,
+                    "description": "Contenido del Excel del cliente en base64 (acepta prefijo data: URL)."
+                  },
+                  "mapeo": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "indice": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Posición (0-based) de la columna en el archivo."
+                        },
+                        "columna": {
+                          "type": "string",
+                          "maxLength": 255,
+                          "description": "Encabezado de la columna (para mostrar; el índice manda al aplicar)."
+                        },
+                        "rol": {
+                          "type": "string",
+                          "enum": [
+                            "modeloCliente",
+                            "color",
+                            "talla",
+                            "cantidad",
+                            "precio",
+                            "ignorar"
+                          ],
+                          "description": "Rol de la columna: modelo del cliente / color / talla / cantidad / precio / ignorar."
+                        }
+                      },
+                      "required": [
+                        "indice",
+                        "columna",
+                        "rol"
+                      ],
+                      "description": "Cómo se interpreta una columna del archivo del cliente."
+                    },
+                    "description": "Mapeo columna→rol del archivo del cliente (Modelo/Color/Talla/Cantidad obligatorios)."
+                  },
+                  "ocCliente": {
+                    "description": "OC original del cliente (referencia; se guarda como snapshot en cada OP, B3).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "resoluciones": {
+                    "default": [],
+                    "description": "Ligas manuales de los modelos que no se reconocieron solos.",
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "modeloCliente": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Nº/estilo del modelo del cliente tal como viene en el archivo."
+                        },
+                        "idDesarrollo": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "Desarrollo (del mismo cliente) al que se liga a mano."
+                        }
+                      },
+                      "required": [
+                        "modeloCliente",
+                        "idDesarrollo"
+                      ],
+                      "description": "Liga manual modelo-del-cliente → desarrollo."
+                    }
+                  }
+                },
+                "required": [
+                  "idCliente",
+                  "nombreArchivo",
+                  "archivoBase64",
+                  "mapeo"
+                ],
+                "description": "Confirma la importación: crea pedido interno + OPs + RC."
+              }
+            }
+          },
+          "description": "Confirma la importación: crea pedido interno + OPs + RC."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de la importación (pedido + OPs + no reconocidos).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "idPedido": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del pedido interno creado."
+                    },
+                    "folioPedido": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Folio del pedido (por empresa)."
+                    },
+                    "ordenes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrden": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OP creada."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la OP (por empresa)."
+                          },
+                          "numeroProduccion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Nº interno de producción minteado/reusado."
+                          },
+                          "codigoModelo": {
+                            "type": "string",
+                            "description": "Nº de desarrollo del modelo."
+                          },
+                          "modeloCliente": {
+                            "type": "string",
+                            "description": "Nº/estilo del modelo del cliente (del archivo)."
+                          },
+                          "totalPiezas": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Piezas de la OP (Σ de la matriz)."
+                          }
+                        },
+                        "required": [
+                          "idOrden",
+                          "folio",
+                          "numeroProduccion",
+                          "codigoModelo",
+                          "modeloCliente",
+                          "totalPiezas"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Una OP creada por la importación."
+                      },
+                      "description": "OPs creadas (una por modelo reconocido)."
+                    },
+                    "noReconocidos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Modelos del cliente que quedaron SIN desarrollo (no se importaron)."
+                    }
+                  },
+                  "required": [
+                    "idPedido",
+                    "folioPedido",
+                    "ordenes",
+                    "noReconocidos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de la importación (pedido + OPs + no reconocidos)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ordenes": {
       "get": {
         "summary": "Listar órdenes de producción",

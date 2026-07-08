@@ -144,6 +144,42 @@ const esquemaSolicitudSubida = z.object({
 
 export type SolicitudSubida = z.input<typeof esquemaSolicitudSubida>;
 
+/** Metadatos de una subida DIRECTA desde el servidor (sin URL prefirmada — el buffer ya lo tenemos). */
+const esquemaSubidaObjeto = z.object({
+  nombreOriginal: z.string().trim().min(1, 'El nombre del archivo es obligatorio.').max(255),
+  tipoMime: z
+    .string()
+    .trim()
+    .regex(/^[\w.+-]+\/[\w.+-]+$/, 'Tipo de archivo (MIME) inválido.'),
+  carpeta: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9]+(?:[/-][a-z0-9]+)*$/,
+      'Carpeta inválida (usa minúsculas y "/", ej. "pedidos/importados").',
+    )
+    .default('general'),
+});
+
+/** Datos de una subida directa (el cuerpo binario va aparte). */
+export interface SubidaObjeto {
+  nombreOriginal: string;
+  tipoMime: string;
+  /** Contenido binario del archivo (ya en memoria del servidor). */
+  cuerpo: Buffer | Uint8Array;
+  /** Carpeta lógica dentro del bucket (ej. `"pedidos/importados"`). */
+  carpeta?: string;
+}
+
+/** Objeto ya subido a R2 (para registrar el `Archivo` en la transacción del módulo). */
+export interface ObjetoSubido {
+  bucket: string;
+  key: string;
+  nombreOriginal: string;
+  tipoMime: string;
+  tamanoBytes: number;
+}
+
 /** Resultado de `solicitarSubida`. */
 export interface SubidaPreparada {
   /** Registro `Archivo` recién creado (su `id` se liga a la entidad del módulo). */
@@ -211,6 +247,18 @@ export interface ServicioArchivos {
     key: string,
     opciones?: { nombreDescarga?: string; expiraEnSegundos?: number },
   ): Promise<string>;
+
+  /**
+   * Sube un buffer DIRECTO a R2 desde el servidor (`PutObjectCommand` con `Body`), sin URL
+   * prefirmada — para cuando el archivo ya está en memoria del backend (ej. el Excel del importador
+   * de pedidos R8, que el servidor parsea con exceljs). Devuelve `{ bucket, key, … }` para que el
+   * módulo cree el registro `Archivo` en SU transacción.
+   *
+   * ⚠️ Llamar FUERA de la transacción de BD (es I/O de red): si la tx del módulo se revierte, el
+   * objeto queda huérfano (estado ya aceptado en el repo, igual que el flujo prefirmado); si la
+   * subida falla, el módulo no debe crear el registro.
+   */
+  subirObjeto(solicitud: SubidaObjeto): Promise<ObjetoSubido>;
 
   /**
    * Borra el OBJETO físico de R2 por su key (`DeleteObjectCommand`). Se usa al eliminar un adjunto
@@ -287,6 +335,39 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
         }),
         { expiresIn: opciones?.expiraEnSegundos ?? EXPIRACION_DESCARGA_SEGUNDOS },
       );
+    },
+
+    async subirObjeto(solicitud) {
+      const datos = validarEntrada(esquemaSubidaObjeto, {
+        nombreOriginal: solicitud.nombreOriginal,
+        tipoMime: solicitud.tipoMime,
+        carpeta: solicitud.carpeta,
+      });
+      const cuerpo = Buffer.isBuffer(solicitud.cuerpo)
+        ? solicitud.cuerpo
+        : Buffer.from(solicitud.cuerpo);
+      if (cuerpo.length === 0) {
+        throw new ErrorValidacion('El archivo está vacío.');
+      }
+      if (cuerpo.length > TAMANO_MAXIMO_BYTES) {
+        throw new ErrorValidacion('El archivo excede el máximo de 50 MB.');
+      }
+      const key = `${datos.carpeta}/${randomUUID()}/${sanearNombreArchivo(datos.nombreOriginal)}`;
+      await deps.cliente.send(
+        new PutObjectCommand({
+          Bucket: deps.bucket,
+          Key: key,
+          Body: cuerpo,
+          ContentType: datos.tipoMime,
+        }),
+      );
+      return {
+        bucket: deps.bucket,
+        key,
+        nombreOriginal: datos.nombreOriginal,
+        tipoMime: datos.tipoMime,
+        tamanoBytes: cuerpo.length,
+      };
     },
 
     async eliminarObjeto(key) {

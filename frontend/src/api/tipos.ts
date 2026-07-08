@@ -255,6 +255,39 @@ export type SalidaProduccionCuerpo =
 export type SalidaProduccion =
   paths['/api/pedidos/lineas/{idLinea}/salida-produccion']['post']['responses']['201']['content']['application/json'];
 
+// ── Importador del pedido del cliente (rediseño R8, B15 — proto §4.1 "Etapa 3") ──
+
+/** Plantilla de importacion VIGENTE de un cliente (`GET .../importacion/plantillas/{idCliente}`). */
+export type PlantillaImportacionVigente =
+  paths['/api/pedidos/importacion/plantillas/{idCliente}']['get']['responses']['200']['content']['application/json'];
+/** Una plantilla de importacion (mapeo columna→rol, versionada). */
+export type PlantillaImportacion = NonNullable<PlantillaImportacionVigente['plantilla']>;
+/** Un renglon de mapeo (columna del archivo → rol). */
+export type MapeoColumna = PlantillaImportacion['mapeo'][number];
+/** Rol de una columna del archivo del cliente (modeloCliente/color/talla/cantidad/precio/ignorar). */
+export type RolColumnaImportacion = MapeoColumna['rol'];
+/** Cuerpo de guardar (versionar) la plantilla de un cliente (`POST .../plantillas/{idCliente}`). */
+export type PlantillaImportacionGuardar =
+  paths['/api/pedidos/importacion/plantillas/{idCliente}']['post']['requestBody']['content']['application/json'];
+/** Cuerpo de analizar el archivo (`POST .../importacion/analizar`). */
+export type AnalizarImportacionCuerpo =
+  paths['/api/pedidos/importacion/analizar']['post']['requestBody']['content']['application/json'];
+/** Resultado de analizar (columnas + muestras + plantilla vigente + vista previa). */
+export type AnalizarImportacion =
+  paths['/api/pedidos/importacion/analizar']['post']['responses']['200']['content']['application/json'];
+/** La vista previa de la importacion (grupos + totales), o null. */
+export type PreviewImportacion = NonNullable<AnalizarImportacion['preview']>;
+/** Un grupo (modelo del cliente) de la vista previa. */
+export type GrupoImportacion = PreviewImportacion['grupos'][number];
+/** Cuerpo de confirmar la importacion (`POST .../importacion/confirmar`). */
+export type ConfirmarImportacionCuerpo =
+  paths['/api/pedidos/importacion/confirmar']['post']['requestBody']['content']['application/json'];
+/** Resultado de confirmar (pedido + OPs creadas + modelos no reconocidos). */
+export type ConfirmarImportacion =
+  paths['/api/pedidos/importacion/confirmar']['post']['responses']['201']['content']['application/json'];
+/** Una OP creada por la importacion. */
+export type OrdenImportada = ConfirmarImportacion['ordenes'][number];
+
 /** Lista de pedidos reales de un pedido (`GET /api/pedidos/{id}/reales`). */
 export type PedidoRealesLista =
   paths['/api/pedidos/{id}/reales']['get']['responses']['200']['content']['application/json'];
