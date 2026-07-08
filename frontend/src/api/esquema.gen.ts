@@ -46815,6 +46815,445 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ruta-critica/analisis': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Tablero "Análisis RC": salud de órdenes, entrega/ciclo, alertas predictivas, riesgo y cuellos */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tablero de gestión "Análisis RC": salud, entrega/ciclo, alertas, riesgo, cuellos. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Salud de las órdenes: KPIs + triage. */
+              salud: {
+                /** @description Órdenes con la RC viva (empresa activa). */
+                ordenesActivas: number;
+                /** @description Órdenes activas cuyo semáforo es a tiempo. */
+                aTiempo: number;
+                /** @description Órdenes activas cuyo semáforo es en riesgo. */
+                enRiesgo: number;
+                /** @description Órdenes activas cuyo semáforo es atrasado. */
+                atrasadas: number;
+                /** @description % de órdenes activas a tiempo (0-100), o null si no hay órdenes activas. */
+                cumplimiento: number | null;
+                /** @description Órdenes atrasadas + en riesgo, ordenadas por urgencia (la más apremiante primero). */
+                atencion: {
+                  /** @description Id de la orden. */
+                  idOrden: number;
+                  /** @description Folio consecutivo de la orden (por empresa). */
+                  folioOrden: number;
+                  /** @description Nombre del cliente. */
+                  cliente: string;
+                  /** @description Código del modelo. */
+                  codigoModelo: string;
+                  /** @description Descripción del modelo, o null. */
+                  descripcionModelo: string | null;
+                  /** @description Proceso más urgente sin cumplir (la etapa donde está atorada la orden). */
+                  etapaAtorada: string | null;
+                  /** @description Rol(es) responsable(s) de la etapa atorada (concatenados), o null. */
+                  responsable: string | null;
+                  /**
+                   * @description Semáforo de la orden (atrasado / en riesgo).
+                   * @enum {string}
+                   */
+                  semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                  /** @description Urgencia en días naturales: <0 vencida, 0 hoy, >0 días restantes (holgura). */
+                  holguraDias: number;
+                  /** @description Fecha de entrega comprometida, o null. */
+                  fechaEntregaRC: string | null;
+                }[];
+              };
+              /** @description Entrega al cliente + tiempo de ciclo (el resultado que de verdad importa). */
+              entregaCiclo: {
+                /** @description % de entregas a tiempo en la ventana (0-100), o null si no hay órdenes medibles. */
+                onTimePct: number | null;
+                /** @description Órdenes entregadas a tiempo en la ventana. */
+                onTimeATiempo: number;
+                /** @description Órdenes entregadas MEDIBLES (con fecha real y planeada) en la ventana. */
+                onTimeMedibles: number;
+                /** @description % a tiempo por semana en las últimas 4 semanas (antiguo→reciente), para el sparkline. */
+                tendenciaSemanas: number[];
+                /** @description Días naturales promedio OP→entrega en la ventana, o null si no hay datos. */
+                cicloPromedioDias: number | null;
+                /** @description Delta del ciclo vs la ventana anterior (negativo = más rápido), o null. */
+                cicloTendenciaDias: number | null;
+                /** @description Sello de la última actualización de las vistas KPI (F7-E3), o null. */
+                datosAl: string | null;
+              };
+              /** @description Órdenes que hoy se ven a tiempo pero cuyo colchón proyectado no alcanza. */
+              alertas: {
+                /** @description Id de la orden. */
+                idOrden: number;
+                /** @description Folio de la orden. */
+                folioOrden: number;
+                /** @description Nombre del cliente. */
+                cliente: string;
+                /** @description Código del modelo. */
+                codigoModelo: string;
+                /** @description Descripción del modelo, o null. */
+                descripcionModelo: string | null;
+                /** @description Procesos que aún faltan por cumplir. */
+                procesosRestantes: number;
+                /** @description Colchón proyectado en días hábiles (forward pass): <0 = va a atrasarse. */
+                colchonDias: number;
+                /** @description Fecha de entrega comprometida, o null. */
+                fechaEntregaRC: string | null;
+              }[];
+              /** @description Riesgo por cliente (con semáforo). */
+              riesgoCliente: {
+                /** @description Id del cliente. */
+                idCliente: number;
+                /** @description Nombre del cliente. */
+                cliente: string;
+                /** @description Órdenes activas del cliente. */
+                activas: number;
+                /** @description Órdenes del cliente en riesgo. */
+                enRiesgo: number;
+                /** @description Órdenes del cliente atrasadas. */
+                atrasadas: number;
+                /**
+                 * @description Semáforo del cliente: crit si tiene atrasadas, warn si en riesgo, ok si no.
+                 * @enum {string}
+                 */
+                semaforo: 'ok' | 'warn' | 'crit';
+              }[];
+              /** @description Cuellos de botella por proceso. */
+              cuellos: {
+                /** @description Tipo de proceso (ProcesoDef). */
+                idProcesoDef: number;
+                /** @description Código del proceso. */
+                codigoProceso: string;
+                /** @description Nombre del proceso. */
+                nombreProceso: string;
+                /** @description Órdenes vencidas en ese proceso. */
+                vencidos: number;
+                /** @description Órdenes que vencen HOY en ese proceso. */
+                hoy: number;
+                /** @description Total de órdenes actualmente atoradas en ese proceso. */
+                total: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/analisis/desempeno': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Desempeño del equipo de la Ruta Crítica: scoring, calificación y bono por persona */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Desempeño del equipo de la Ruta Crítica (scoring + bono). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Desempeño por persona, ordenado por calificación (mejor primero). */
+              personas: {
+                /** @description Id del usuario. */
+                idUsuario: string;
+                /** @description Nombre completo de la persona. */
+                nombre: string;
+                /** @description Área derivada de sus roles (concatenados). */
+                area: string;
+                /** @description Procesos activos a su cargo (por sus roles). */
+                activos: number;
+                /** @description Procesos a su cargo vencidos AHORA. */
+                vencidos: number;
+                /** @description % de procesos que entregó en tiempo (histórico), o null si no tiene capturas. */
+                onTimePct: number | null;
+                /** @description Horas promedio en atender un proceso desde que cae en su cancha, o null. */
+                reaccionHoras: number | null;
+                /** @description Delta del % en tiempo vs la semana pasada (puntos), o null si no hay base. */
+                tendencia: number | null;
+                /** @description Calificación 0-100 (% en tiempo − penalización por vencidos), o null sin historial. */
+                calificacion: number | null;
+                /** @description Etiqueta cualitativa del score, o null. */
+                badge: ('excelente' | 'bien' | 'regular' | 'bajo') | null;
+                /** @description ¿Gana el bono semanal? (calificación ≥ umbral Y 0 vencidos). */
+                bono: boolean;
+                /** @description ¿Trae mucha carga? (para leer un score bajo con contexto). */
+                sobrecarga: boolean;
+              }[];
+              /** @description Cuántas personas ganan el bono esta semana. */
+              conBono: number;
+              /** @description Umbrales configurables del scoring del desempeño. */
+              parametros: {
+                /** @description Calificación mínima para el bono (default 90). */
+                umbralBono: number;
+                /** @description Puntos que resta cada proceso vencido a la calificación (default 5). */
+                penalizacionPorVencido: number;
+                /** @description A partir de cuántos activos se marca "sobrecarga" (default 15). */
+                sobrecargaActivos: number;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/ruta-critica/analisis/desempeno/excel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Evaluación semanal del equipo en Excel (.xlsx): mismo resultado que el desempeño */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/calidad/defectos': {
     parameters: {
       query?: never;

@@ -77,6 +77,7 @@ import { rutasPlanesAql } from './api/calidad/planes-aql.rutas.js';
 import { rutasTiposProducto } from './api/calidad/tipos-producto.rutas.js';
 import { rutasBandejaRc } from './api/ruta-critica/bandeja.rutas.js';
 import { rutasConcentradoRc } from './api/ruta-critica/concentrado.rutas.js';
+import { rutasAnalisisRc } from './api/ruta-critica/analisis.rutas.js';
 import { rutasPlantillasRc } from './api/ruta-critica/plantillas.rutas.js';
 import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
 import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
@@ -285,6 +286,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // crudo, sin pivoteo en el cliente), paginado/filtrable/ordenable, + export a Excel del mismo
   // resultado. Solo lectura; RBAC rc.ruta-ver (reusado); A9 por empresa activa.
   await app.register(rutasConcentradoRc, { prefix: '/api' });
+  // RUTA CRÍTICA (Módulo 8, rediseño R7) — tablero de gestión "ANÁLISIS RC": salud de órdenes +
+  // entrega/ciclo (vista F7-E3) + alertas predictivas (CPM forward pass) + riesgo por cliente +
+  // cuellos, todo AGREGADO en el servidor (A1); y el desempeño del equipo (scoring + bono) en un
+  // endpoint aparte con gate rc.programar (+ su export a Excel). Solo lectura; A9 por empresa activa.
+  await app.register(rutasAnalisisRc, { prefix: '/api' });
   // CALIDAD (Módulo 8, F6-E1) — base configurable: catálogo de defectos enriquecido (severidad/
   // categoría/etiqueta por tipo), tipos de producto (clasificación de modelos) y el motor de planes
   // de muestreo AQL como DATOS (CRUD + resolución lote+nivel → muestra/límites). RBAC por ruta

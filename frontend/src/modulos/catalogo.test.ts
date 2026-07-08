@@ -97,7 +97,6 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       ['auditores', 'Llega en R9'],
       ['cxc', 'Llega con Finanzas (F9)'],
       ['cxp', 'Llega con Finanzas (F9)'],
-      ['analisis-rc', 'Llega en R7'],
     ] as const) {
       const hoja = MODULOS_MENU.find((m) => m.clave === clave);
       expect(hoja, clave).toBeDefined();
@@ -110,11 +109,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Sin permisos solo quedan las hojas de uso general: el resumen, los catálogos que heredaron
     // el gate del hub Catálogos (bordados + galería, telas, avíos, clientes, proveedores, colores,
-    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las 5 «Próximamente».
+    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las 4 «Próximamente».
     expect(visibles.map((m) => m.clave).sort()).toEqual(
       [
         'almacenes',
-        'analisis-rc',
         'auditores',
         'bordados',
         'catalogo-avios',
@@ -148,6 +146,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       ['tipos-proceso', ['tipos-proceso.ver']],
       ['ruta-critica', ['rc.ruta-ver']],
       ['rc-concentrado', ['rc.ruta-ver']],
+      ['analisis-rc', ['rc.ruta-ver']],
       ['rc-procesos-responsables', ['rc.catalogo-ver']],
       ['rc-procesos', ['rc.catalogo-ver']],
       ['calidad-consulta-auditorias', ['calidad.ver']],

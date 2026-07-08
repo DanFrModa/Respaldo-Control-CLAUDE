@@ -29,6 +29,7 @@
 import {
   sumarDiasHabiles,
   contarDiasHabiles,
+  esDiaHabil,
   type CalendarioLaboral,
 } from '../../comun/diasHabiles.js';
 
@@ -73,7 +74,9 @@ export interface ResultadoCpm {
  * ruta DEBE ser acíclico — lo garantizan `generarRutaOrden`/`ajustarRutaOrden` vía `grafo.ts`; aquí
  * es defensa en profundidad para no colgar el job en un ciclo imprevisto).
  */
-function ordenTopologico(procesos: readonly ProcesoCpm[]): ProcesoCpm[] {
+function ordenTopologico<T extends { id: number; idsAntecesores: number[] }>(
+  procesos: readonly T[],
+): T[] {
   const porId = new Map(procesos.map((p) => [p.id, p]));
   // gradoEntrante[p] = cuántos antecesores (válidos) tiene p.
   const gradoEntrante = new Map<number, number>();
@@ -95,7 +98,7 @@ function ordenTopologico(procesos: readonly ProcesoCpm[]): ProcesoCpm[] {
   for (const [id, grado] of gradoEntrante) {
     if (grado === 0) cola.push(id);
   }
-  const orden: ProcesoCpm[] = [];
+  const orden: T[] = [];
   while (cola.length > 0) {
     const id = cola.shift();
     if (id === undefined) break;
@@ -230,6 +233,136 @@ export function calcularCpm(
     fechasPorProceso,
     inicioRuta: inicioRutaFinal,
     acumuladoTotal,
+    advertencias,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+// FORWARD PASS predictivo — "alertas predictivas" del tablero Análisis RC (R7, B14; ADR-0016).
+//
+// El backward pass de arriba fecha la ruta desde la ENTREGA hacia atrás (planeación). El forward
+// pass responde una pregunta DISTINTA: si el trabajo QUE FALTA arranca HOY, ¿cuándo terminaría de
+// verdad la orden y alcanza la fecha de entrega? Proyecta las fechas de los procesos PENDIENTES
+// hacia adelante desde HOY (los ya completados no imponen retraso) y compara el fin proyectado
+// contra la entrega. El "COLCHÓN PROYECTADO" (slack) resultante detecta órdenes que HOY se ven a
+// tiempo (ningún proceso vencido) pero cuyo camino restante NO cabe antes de la entrega → van a
+// atrasarse. Es SOLO una proyección de lectura: no se persiste ni toca `fechaPlaneadaVigente`.
+// ══════════════════════════════════════════════════════════════════════════════════════════════
+
+/** Un proceso de la ruta tal como lo consume el FORWARD pass (puro). */
+export interface ProcesoForward {
+  /** Identificador del proceso dentro de la ruta (en el tablero: el id de `RutaOrden`). */
+  id: number;
+  /** Duración del proceso en DÍAS HÁBILES (ya calculada por `calcularDuracion`). */
+  duracionDias: number;
+  /** Ids (en este conjunto) de los procesos que DEBEN terminar antes de iniciar este. */
+  idsAntecesores: number[];
+  /** ¿El proceso ya está CUMPLIDO? (tiene `fechaReal`). Un completado no añade trabajo restante. */
+  completado: boolean;
+}
+
+/** Resultado de la proyección hacia adelante de una orden. */
+export interface ProyeccionForward {
+  /**
+   * Fin proyectado de TODA la ruta si el trabajo restante arranca HOY (día hábil, medianoche UTC).
+   * Si no queda nada pendiente, es HOY.
+   */
+  finProyectado: Date;
+  /**
+   * COLCHÓN proyectado en DÍAS HÁBILES con signo: `> 0` sobra holgura, `0` justo, `< 0` la orden
+   * NO alcanza a entregar a tiempo por proyección (aunque hoy no esté atrasada).
+   */
+  colchonDias: number;
+  /** Procesos aún sin completar (los que forman el trabajo restante). */
+  procesosRestantes: number;
+  /** Avisos no fatales (p. ej. duración 0). */
+  advertencias: string[];
+}
+
+/**
+ * Días hábiles con SIGNO entre `desde` y `hasta` (colchón/slack): 0 si es el mismo día; `+n` si
+ * `hasta` es posterior (hábiles ESTRICTAMENTE después de `desde`, sin contar el propio `desde` que
+ * ya está "consumido" por el fin del trabajo); `-n` si `hasta` es anterior (días hábiles de retraso).
+ * Reusa `contarDiasHabiles` (inclusivo) y descuenta el EXTREMO MÁS TEMPRANO — pero SOLO si ese
+ * extremo es día hábil (si cae en inhábil, `contarDiasHabiles` ya no lo contó, así que no se resta:
+ * restarlo subestimaría el colchón). PURO.
+ */
+function diasHabilesConSigno(desde: Date, hasta: Date, calendario: CalendarioLaboral): number {
+  const a = new Date(Date.UTC(desde.getUTCFullYear(), desde.getUTCMonth(), desde.getUTCDate()));
+  const b = new Date(Date.UTC(hasta.getUTCFullYear(), hasta.getUTCMonth(), hasta.getUTCDate()));
+  if (a.getTime() === b.getTime()) return 0;
+  if (a.getTime() < b.getTime()) {
+    return Math.max(0, contarDiasHabiles(a, b, calendario) - (esDiaHabil(a, calendario) ? 1 : 0));
+  }
+  return -Math.max(0, contarDiasHabiles(b, a, calendario) - (esDiaHabil(b, calendario) ? 1 : 0));
+}
+
+/**
+ * FORWARD PASS predictivo de una orden: proyecta el fin de la ruta arrancando el trabajo RESTANTE
+ * HOY y devuelve el colchón (slack) en días hábiles contra `fechaEntregaRC`. PURO e IDEMPOTENTE.
+ *
+ * Algoritmo:
+ *  1. Orden topológico (antecesores antes que sucesores).
+ *  2. Recorriendo hacia adelante:
+ *     - Proceso YA completado → su fin proyectado ANCLA en HOY (ya ocurrió; no empuja a nadie al futuro).
+ *     - Proceso pendiente → `inicio = MAX(HOY, MAX(fin de sus antecesores))`;
+ *       `fin = sumarDiasHabiles(inicio, +duracionDias)` (con duración 0, fin = inicio).
+ *  3. `finProyectado` de la ruta = el fin proyectado MÁS TARDÍO de todos los procesos (o HOY si vacío).
+ *  4. `colchonDias` = días hábiles con signo de `finProyectado` a `fechaEntregaRC`.
+ *
+ * @param procesos       procesos de la ruta (id, duración, antecesores, completado).
+ * @param hoy            fecha de referencia (se trunca a medianoche UTC).
+ * @param fechaEntregaRC fecha de entrega comprometida de la RC.
+ * @param calendario     calendario laboral ya cargado.
+ */
+export function proyectarColchonForward(
+  procesos: readonly ProcesoForward[],
+  hoy: Date,
+  fechaEntregaRC: Date,
+  calendario: CalendarioLaboral,
+): ProyeccionForward {
+  const advertencias: string[] = [];
+  const hoyMid = new Date(Date.UTC(hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate()));
+  const procesosRestantes = procesos.filter((p) => !p.completado).length;
+
+  if (procesos.length === 0 || procesosRestantes === 0) {
+    return {
+      finProyectado: hoyMid,
+      colchonDias: diasHabilesConSigno(hoyMid, fechaEntregaRC, calendario),
+      procesosRestantes: 0,
+      advertencias,
+    };
+  }
+
+  const orden = ordenTopologico(procesos);
+  const finPorId = new Map<number, Date>();
+  for (const p of orden) {
+    if (p.completado) {
+      // Ya ocurrió: ancla en HOY para no empujar a sus sucesores al futuro.
+      finPorId.set(p.id, hoyMid);
+      continue;
+    }
+    let inicio = hoyMid;
+    for (const idAnt of p.idsAntecesores) {
+      const finAnt = finPorId.get(idAnt) ?? hoyMid;
+      if (finAnt.getTime() > inicio.getTime()) inicio = finAnt;
+    }
+    const fin = sumarDiasHabiles(inicio, p.duracionDias, calendario);
+    finPorId.set(p.id, fin);
+    if (p.duracionDias === 0) {
+      advertencias.push(`El proceso ${String(p.id)} tiene duración 0 (inicio = fin).`);
+    }
+  }
+
+  let finProyectado = hoyMid;
+  for (const fin of finPorId.values()) {
+    if (fin.getTime() > finProyectado.getTime()) finProyectado = fin;
+  }
+
+  return {
+    finProyectado,
+    colchonDias: diasHabilesConSigno(finProyectado, fechaEntregaRC, calendario),
+    procesosRestantes,
     advertencias,
   };
 }
