@@ -383,6 +383,16 @@ export type OrdenPrecioEventos =
 /** Un evento inmutable del historial de precios. */
 export type OrdenPrecioEvento = OrdenPrecioEventos['eventos'][number];
 
+// ── Habilitación / surtido de avíos por orden (rediseño R6, B13; §4.6) ────────
+
+/** Tablero de habilitación de una orden (`GET /api/ordenes/{id}/habilitacion`). */
+export type HabilitacionOrden =
+  paths['/api/ordenes/{id}/habilitacion']['get']['responses']['200']['content']['application/json'];
+/** Un renglón (avío) del tablero de habilitación. */
+export type HabilitacionAvio = HabilitacionOrden['avios'][number];
+/** Estado de surtido de un avío en la orden. */
+export type EstadoHabilitacion = HabilitacionAvio['estado'];
+
 // ── Órdenes de compra (Módulo 4 · Compras, F4-E2) ─────────────────────────────
 
 /** Página de órdenes de compra (`GET /api/ordenes-compra`). */

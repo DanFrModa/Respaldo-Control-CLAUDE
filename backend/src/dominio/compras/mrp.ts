@@ -75,6 +75,7 @@ import {
 } from '../../comun/transaccion.js';
 import { num, numOrNull } from '../costos/decimales.js';
 import { resolverPrecioAvio, resolverPrecioTela } from '../costos/resolucion-precios.js';
+import { requeridoAvioReceta } from '../produccion/receta-avios.js';
 
 import { crearOC, type EntradaCrearOC } from './ordenes-compra.js';
 
@@ -349,9 +350,9 @@ function resolverProveedorPrecioAvioAmarrado(
 }
 
 /**
- * Cantidad requerida de un AVÍO (R18). Si NO se consume por talla → `consumoPorPrenda × totalPiezas`
- * (EXACTAMENTE como antes de F8). Si SÍ → Σ(medida de la talla × piezas de esa talla en la orden); las
- * tallas presentes en la orden SIN medida capturada caen a `consumoPorPrenda × piezas` + AVISO.
+ * Cantidad requerida de un AVÍO (R18). Delega el cálculo PURO al helper COMPARTIDO
+ * `requeridoAvioReceta` (`produccion/receta-avios.ts`, DEBE-2 — misma regla que la habilitación) y
+ * aquí sólo arma el AVISO con las etiquetas de las tallas que cayeron al consumo por prenda.
  */
 function requeridoAvio(
   ma: OrdenParaExplosion['modelo']['avios'][number],
@@ -359,26 +360,13 @@ function requeridoAvio(
   piezasPorTalla: Map<number, { piezas: number; etiqueta: string }>,
   avisos: string[],
 ): number {
-  if (!ma.consumoPorTalla) {
-    return num(ma.consumoPorPrenda) * totalPiezas;
-  }
-  const medidaPorTalla = new Map(ma.tallas.map((t) => [t.idTalla, num(t.consumo)]));
-  const consumoPorPrenda = num(ma.consumoPorPrenda);
-  let requerido = 0;
-  const sinMedida: string[] = [];
-  for (const [idTalla, { piezas, etiqueta }] of piezasPorTalla) {
-    const medida = medidaPorTalla.get(idTalla);
-    if (medida !== undefined) {
-      requerido += medida * piezas;
-    } else {
-      requerido += consumoPorPrenda * piezas;
-      sinMedida.push(etiqueta);
-    }
-  }
-  if (sinMedida.length > 0) {
+  const piezasSimple = new Map([...piezasPorTalla].map(([id, v]) => [id, v.piezas]));
+  const { requerido, tallasSinMedida } = requeridoAvioReceta(ma, totalPiezas, piezasSimple);
+  if (tallasSinMedida.length > 0) {
+    const etiquetas = tallasSinMedida.map((id) => piezasPorTalla.get(id)?.etiqueta ?? String(id));
     avisos.push(
       `Avío "${ma.avio.clave} — ${ma.avio.descripcion}": sin medida por talla (R18) para ` +
-        `${sinMedida.join(', ')}; se usó el consumo por prenda.`,
+        `${etiquetas.join(', ')}; se usó el consumo por prenda.`,
     );
   }
   return requerido;

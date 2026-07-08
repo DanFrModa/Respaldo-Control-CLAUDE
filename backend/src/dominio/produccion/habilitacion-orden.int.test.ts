@@ -1,0 +1,288 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+
+import type { ClavePermiso } from '../../contrato/index.js';
+import { ErrorNoEncontrado } from '../../comun/errores.js';
+import type { SesionUsuario } from '../../comun/permisos.js';
+import type {
+  Almacen,
+  Avio,
+  Color,
+  Empresa,
+  PrismaClient,
+  Proveedor,
+  Talla,
+} from '../../datos/index.js';
+import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
+import { sesionDePrueba } from '../../pruebas/sesiones.js';
+import { habilitacionOrden } from './habilitacion-orden.js';
+
+/**
+ * Integración del dominio de HABILITACIÓN / SURTIDO de avíos por orden (rediseño R6, B13) contra
+ * Postgres efímero (testcontainers; SOLO CI). Cubre lo que sólo la base valida:
+ *  • REQUERIDO = consumo × piezas de la orden (R18: por prenda y por talla).
+ *  • ENVIADO = Σ de renglones de notas CONFIRMADAS (NO borrador ni cancelada) por orden×avío.
+ *  • FALTA + estado por avío (completo / parcial / pendiente / sobre-surtido / extra) y % global.
+ *  • EXTRAS: avíos enviados fuera de la receta.
+ *  • RBAC: sin `ordenes.habilitacion` → 403; otra empresa → 404 (A9).
+ */
+
+let cliente: PrismaClient;
+let empresa: Empresa;
+let maquilero: Proveedor;
+let clienteNegocioId: number;
+let modeloId: number;
+let ordenId: number;
+let colorRojo: Color;
+let almacen: Almacen;
+let tallaCH: Talla;
+let tallaM: Talla;
+let avioBoton: Avio;
+let avioHilo: Avio;
+let avioCierre: Avio;
+
+const PERM: ClavePermiso[] = ['ordenes.habilitacion'];
+
+function sesion(permisos: ClavePermiso[], idEmpresaActiva = empresa.id): SesionUsuario {
+  return sesionDePrueba({ idEmpresaActiva, permisos });
+}
+
+const bd = () => ({ cliente });
+
+/** Crea una nota (con su renglón) directa en BD, con el estatus dado (para probar la agregación). */
+async function crearNota(
+  idAvio: number,
+  cantidad: number,
+  estatus: 'borrador' | 'confirmada' | 'cancelada',
+  numNota: bigint,
+): Promise<void> {
+  await cliente.notaSalida.create({
+    data: {
+      numNota,
+      idEmpresa: empresa.id,
+      idMaquilero: maquilero.id,
+      idAlmacen: almacen.id,
+      fechaElaboracion: new Date('2026-07-06T00:00:00.000Z'),
+      estatus,
+      creadoPorId: 'usuario-prueba',
+      modificadoPorId: 'usuario-prueba',
+      lineas: {
+        create: [
+          {
+            idOrden: ordenId,
+            idAvio,
+            cantidad,
+            unidad: 'pza',
+            creadoPorId: 'usuario-prueba',
+            modificadoPorId: 'usuario-prueba',
+          },
+        ],
+      },
+    },
+  });
+}
+
+beforeAll(() => {
+  cliente = clientePruebas();
+});
+
+afterAll(async () => {
+  await cliente.$disconnect();
+});
+
+beforeEach(async () => {
+  await limpiarBaseDatos(cliente);
+  empresa = await crearEmpresaPrueba(cliente);
+  maquilero = await cliente.proveedor.create({ data: { nombre: 'Maquila del Sur' } });
+  const clienteNegocio = await cliente.cliente.create({ data: { nombre: 'Liverpool' } });
+  clienteNegocioId = clienteNegocio.id;
+  colorRojo = await cliente.color.create({ data: { nombre: 'Rojo' } });
+  tallaCH = await cliente.talla.create({ data: { etiqueta: 'CH', orden: 1 } });
+  tallaM = await cliente.talla.create({ data: { etiqueta: 'M', orden: 2 } });
+  almacen = await cliente.almacen.create({ data: { nombre: 'Bodega', tipo: 'AVIO' } });
+  avioBoton = await cliente.avio.create({
+    data: { clave: 'BOT-01', descripcion: 'Botón', unidad: 'pza' },
+  });
+  avioHilo = await cliente.avio.create({
+    data: { clave: 'HIL-01', descripcion: 'Hilo', unidad: 'm', esGenerico: true },
+  });
+  avioCierre = await cliente.avio.create({
+    data: { clave: 'CIE-01', descripcion: 'Cierre', unidad: 'pza' },
+  });
+
+  const modelo = await cliente.modelo.create({ data: { codigo: 'A-100', descripcion: 'Playera' } });
+  modeloId = modelo.id;
+  // BOM (receta): botón 6 pza/prenda, hilo 2 m/prenda. El cierre NO va en la receta (será extra).
+  await cliente.modeloAvio.createMany({
+    data: [
+      { idModelo: modeloId, idAvio: avioBoton.id, consumoPorPrenda: 6 },
+      { idModelo: modeloId, idAvio: avioHilo.id, consumoPorPrenda: 2 },
+    ],
+  });
+
+  // Orden de 30 piezas (Rojo: CH 10 + M 20). Requerido: botón 180, hilo 60.
+  const orden = await cliente.orden.create({
+    data: {
+      folio: 1n,
+      idEmpresa: empresa.id,
+      idModelo: modeloId,
+      idCliente: clienteNegocioId,
+      idMaquilero: maquilero.id,
+      estado: 'completa',
+      fechaCompletada: new Date(),
+      lineas: {
+        create: [
+          {
+            idColor: colorRojo.id,
+            tallas: {
+              create: [
+                { idTalla: tallaCH.id, cantidad: 10 },
+                { idTalla: tallaM.id, cantidad: 20 },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
+  ordenId = orden.id;
+});
+
+describe('Habilitación (B13) — requerido vs. enviado por avío (R6)', () => {
+  it('sin notas: todo pendiente; requerido = consumo × piezas; % global 0', async () => {
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    expect(h.totalPiezas).toBe(30);
+    expect(h.maquilero).toBe('Maquila del Sur');
+    expect(h.avios).toHaveLength(2);
+    const boton = h.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.requerido).toBe(180);
+    expect(boton.enviado).toBe(0);
+    expect(boton.falta).toBe(180);
+    expect(boton.estado).toBe('pendiente');
+    expect(h.porcentajeGlobal).toBe(0);
+    expect(h.pendientes).toBe(2);
+    expect(h.faltanAvios).toBe(2);
+  });
+
+  it('solo las notas CONFIRMADAS cuentan como enviado (borrador/cancelada no)', async () => {
+    await crearNota(avioBoton.id, 100, 'confirmada', 1n);
+    await crearNota(avioBoton.id, 50, 'borrador', 2n);
+    await crearNota(avioBoton.id, 30, 'cancelada', 3n);
+
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    const boton = h.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.enviado).toBe(100);
+    expect(boton.falta).toBe(80);
+    expect(boton.estado).toBe('parcial');
+    expect(boton.porcentaje).toBeCloseTo((100 / 180) * 100);
+  });
+
+  it('completo cuando enviado = requerido', async () => {
+    await crearNota(avioBoton.id, 180, 'confirmada', 1n);
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    const boton = h.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.falta).toBe(0);
+    expect(boton.estado).toBe('completo');
+    expect(boton.porcentaje).toBe(100);
+  });
+
+  it('SOBRE-SURTIDO (>100%) es un estado válido, no un error', async () => {
+    await crearNota(avioBoton.id, 200, 'confirmada', 1n);
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    const boton = h.avios.find((a) => a.idAvio === avioBoton.id)!;
+    expect(boton.enviado).toBe(200);
+    expect(boton.falta).toBe(0);
+    expect(boton.estado).toBe('sobre-surtido');
+    expect(boton.porcentaje).toBeCloseTo((200 / 180) * 100);
+    // El sobre-surtido cuenta como completo en el resumen (falta ≤ 0), no infla el total enviado.
+    expect(boton.enviado).toBeGreaterThan(boton.requerido);
+  });
+
+  it('EXTRA: un avío enviado fuera de la receta aparece marcado extra', async () => {
+    await crearNota(avioCierre.id, 15, 'confirmada', 1n);
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    expect(h.avios).toHaveLength(3); // 2 de receta + 1 extra
+    const cierre = h.avios.find((a) => a.idAvio === avioCierre.id)!;
+    expect(cierre.esExtra).toBe(true);
+    expect(cierre.estado).toBe('extra');
+    expect(cierre.requerido).toBe(0);
+    expect(cierre.enviado).toBe(15);
+  });
+
+  it('REQUERIDO por talla (R18): usa la medida por talla cuando el avío la maneja', async () => {
+    // Hilo por talla: CH 3, M 4 → requerido = 3×10 + 4×20 = 110 (en vez de 2×30 = 60).
+    await cliente.modeloAvio.update({
+      where: { idModelo_idAvio: { idModelo: modeloId, idAvio: avioHilo.id } },
+      data: { consumoPorTalla: true },
+    });
+    await cliente.modeloAvioTalla.createMany({
+      data: [
+        { idModelo: modeloId, idAvio: avioHilo.id, idTalla: tallaCH.id, consumo: 3 },
+        { idModelo: modeloId, idAvio: avioHilo.id, idTalla: tallaM.id, consumo: 4 },
+      ],
+    });
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    const hilo = h.avios.find((a) => a.idAvio === avioHilo.id)!;
+    expect(hilo.requerido).toBe(110);
+  });
+
+  it('% global capa el enviado al requerido por avío', async () => {
+    // Botón sobre-surtido (200 > 180) + hilo pendiente (0). El global usa min(200,180)=180 sobre
+    // el total requerido 240 → 75%, no 200/240.
+    await crearNota(avioBoton.id, 200, 'confirmada', 1n);
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    expect(h.totalRequerido).toBe(240);
+    expect(h.totalEnviado).toBe(180);
+    expect(h.porcentajeGlobal).toBe(75);
+  });
+});
+
+describe('Habilitación (B13) — RBAC y aislamiento por empresa (A9)', () => {
+  it('sin permiso `ordenes.habilitacion` → 403', async () => {
+    await expect(habilitacionOrden(sesion([]), ordenId, bd())).rejects.toThrow();
+  });
+
+  it('orden de otra empresa → 404 (A9)', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    await expect(habilitacionOrden(sesion(PERM, otra.id), ordenId, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+  });
+
+  it('una nota de OTRA empresa que referencia la misma orden NO cuenta en enviado (A9 a nivel de nota)', async () => {
+    const otra = await crearEmpresaPrueba(cliente, 'Empresa B');
+    // Nota CONFIRMADA de la empresa B, pero su renglón referencia la orden (que es de la empresa A):
+    // el filtro `notaSalida.idEmpresa` de la habilitación debe excluirla del "enviado".
+    await cliente.notaSalida.create({
+      data: {
+        numNota: 1n,
+        idEmpresa: otra.id,
+        idMaquilero: maquilero.id,
+        idAlmacen: almacen.id,
+        fechaElaboracion: new Date('2026-07-06T00:00:00.000Z'),
+        estatus: 'confirmada',
+        creadoPorId: 'usuario-prueba',
+        modificadoPorId: 'usuario-prueba',
+        lineas: {
+          create: [
+            {
+              idOrden: ordenId,
+              idAvio: avioBoton.id,
+              cantidad: 500,
+              unidad: 'pza',
+              creadoPorId: 'usuario-prueba',
+              modificadoPorId: 'usuario-prueba',
+            },
+          ],
+        },
+      },
+    });
+    // Una nota CONFIRMADA de la empresa A (dueña de la orden): esta SÍ cuenta.
+    await crearNota(avioBoton.id, 100, 'confirmada', 1n);
+
+    const h = await habilitacionOrden(sesion(PERM), ordenId, bd());
+    const boton = h.avios.find((a) => a.idAvio === avioBoton.id)!;
+    // Solo las 100 de la empresa A; las 500 de la empresa B se ignoran (A9).
+    expect(boton.enviado).toBe(100);
+    expect(boton.falta).toBe(80);
+  });
+});

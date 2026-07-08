@@ -27,6 +27,7 @@ import type { FastifyPluginCallbackZod } from 'fastify-type-provider-zod';
 
 import {
   esquemaErrorApi,
+  esquemaHabilitacionOrden,
   esquemaListarOrdenes,
   esquemaOrdenCancelarCuerpo,
   esquemaOrdenComentarioCuerpo,
@@ -59,6 +60,7 @@ import {
   listarEventosPrecioOrden,
   obtenerPreciosOrden,
 } from '../../dominio/produccion/precios-orden.js';
+import { habilitacionOrden } from '../../dominio/produccion/habilitacion-orden.js';
 
 /** Parámetro de ruta `:id` (orden). */
 const esquemaParamId = z.object({
@@ -295,6 +297,27 @@ export const rutasOrdenes: FastifyPluginCallbackZod = (app, _opciones, done) => 
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return listarEventosPrecioOrden(sesion, request.params.id);
+    },
+  });
+
+  // ── Habilitación / surtido de avíos por orden (rediseño R6, B13; §4.6) ──────
+  // Requerido (receta × piezas, R18) vs. enviado (Σ notas de salida CONFIRMADAS) por avío, con
+  // extras y sobre-surtido. Permiso `ordenes.habilitacion` (por fin cableado). El front lo reusa
+  // para el panel de habilitación y para "Traer avíos de la orden" del constructor de notas.
+  app.route({
+    method: 'GET',
+    url: '/ordenes/:id/habilitacion',
+    preHandler: app.conPermiso('ordenes.habilitacion'),
+    schema: {
+      tags: ['ordenes'],
+      summary: 'Habilitación / surtido de avíos de la orden (requerido vs. enviado)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaHabilitacionOrden, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return habilitacionOrden(sesion, request.params.id);
     },
   });
 

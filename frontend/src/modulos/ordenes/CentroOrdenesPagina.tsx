@@ -45,6 +45,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { AvanceProduccion } from '@/modulos/produccion/AvanceProduccion';
+import { PanelHabilitacionOrden } from '@/modulos/notas-salida/PanelHabilitacionOrden';
 import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -121,6 +122,9 @@ export function CentroOrdenesPagina(): React.JSX.Element {
   const puedeVerDesarrollo = tienePermiso('desarrollo.ver');
   const puedeAdministrarDesarrollo = tienePermiso('desarrollo.administrar');
   const verImportes = tienePermiso('consultas.ver-importes');
+  // Habilitación/surtido de avíos (R6, §4.6): el mosaico exige `ordenes.habilitacion` (mismo permiso
+  // que el endpoint) — sin él el mosaico queda deshabilitado con tooltip, no cosecha 403s.
+  const puedeVerHabilitacion = tienePermiso('ordenes.habilitacion');
 
   // ── Filtros (todo server-side, B2) ─────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -260,6 +264,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
         fila={filaSeleccionada}
         puedeVerDesarrollo={puedeVerDesarrollo}
         puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
+        puedeVerHabilitacion={puedeVerHabilitacion}
         verImportes={verImportes}
         alRegistrarAvance={(folioPedido) =>
           abrirAvance({ id: (filaSeleccionada?.id ?? idSeleccionada) as number, folioPedido })
@@ -834,6 +839,7 @@ function DetalleCentroOrden({
   fila,
   puedeVerDesarrollo,
   puedeAdministrarDesarrollo,
+  puedeVerHabilitacion,
   verImportes,
   alRegistrarAvance,
 }: {
@@ -841,6 +847,7 @@ function DetalleCentroOrden({
   fila: OrdenCentro | undefined;
   puedeVerDesarrollo: boolean;
   puedeAdministrarDesarrollo: boolean;
+  puedeVerHabilitacion: boolean;
   verImportes: boolean;
   alRegistrarAvance: (folioPedido: number | null) => void;
 }): React.JSX.Element {
@@ -850,6 +857,8 @@ function DetalleCentroOrden({
   // Panel "Ruta de la orden" (R4): el mosaico lo abre aquí mismo (sin navegar), reusando el
   // MISMO componente de Mis pendientes; el detalle completo sigue en /ruta-critica/ordenes/:id.
   const [rutaAbierta, setRutaAbierta] = useState(false);
+  // Panel "Habilitación de avíos" (R6, §4.6): el mosaico lo abre aquí mismo (sin navegar).
+  const [habAbierta, setHabAbierta] = useState(false);
 
   if (consulta.isPending) {
     return <p className="p-4 text-sm text-muted-foreground">Cargando detalle…</p>;
@@ -907,8 +916,10 @@ function DetalleCentroOrden({
           <Mosaico
             icono={Layers}
             etiqueta="Habilitación"
-            deshabilitado
-            tooltip="Llega en R6 (notas de salida + surtido por orden)"
+            // Deshabilitado bloquea el click; solo se agrega el tooltip cuando falta el permiso.
+            onClick={() => setHabAbierta(true)}
+            deshabilitado={!puedeVerHabilitacion}
+            {...(puedeVerHabilitacion ? {} : { tooltip: 'Requiere permiso de Habilitación' })}
             testid="mosaico-habilitacion"
           />
           <Mosaico
@@ -964,6 +975,15 @@ function DetalleCentroOrden({
             fechaEntrega: orden.fechaEntrega ?? null,
           }}
         />
+
+        {puedeVerHabilitacion ? (
+          <PanelHabilitacionOrden
+            idOrden={orden.id}
+            abierto={habAbierta}
+            alCerrar={() => setHabAbierta(false)}
+            encabezado={{ folio: orden.folio, modelo: orden.codigoModelo }}
+          />
+        ) : null}
 
         <Button
           className="w-full"

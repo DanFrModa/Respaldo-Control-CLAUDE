@@ -1,4 +1,4 @@
-import { Factory, Printer, Send } from 'lucide-react';
+import { Boxes, Factory, Printer, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/useDebounce';
 
+import { PanelHabilitacionOrden } from './PanelHabilitacionOrden';
 import { EstatusNotaBadge, descripcionMaterialNota, fechaCortaNota } from './piezas';
 
 /** Notas por página de la orden elegida. */
@@ -38,6 +39,8 @@ export function NotasPorOrdenPagina(): React.JSX.Element {
   // Deep-link del centro de comando (R2): llega con la orden ya elegida.
   const [idOrden, setIdOrden] = useState<number | null>(leerIdOrdenDeepLink(location.state));
   const [pagina, setPagina] = useState(1);
+  // Panel de habilitación / surtido de la orden (R6, §4.6) — se abre desde el banner.
+  const [habAbierta, setHabAbierta] = useState(false);
 
   const idDeepLink = leerIdOrdenDeepLink(location.state);
   useEffect(() => {
@@ -147,11 +150,22 @@ export function NotasPorOrdenPagina(): React.JSX.Element {
         {/* Paso 2: notas ligadas */}
         {idOrden !== null ? (
           <div className="mt-6">
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Send className="size-4" aria-hidden />
-              Notas de salida
-              {ordenSeleccionada ? ` de la orden ${ordenSeleccionada.folio}` : ''}
-            </h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Send className="size-4" aria-hidden />
+                Notas de salida
+                {ordenSeleccionada ? ` de la orden ${ordenSeleccionada.folio}` : ''}
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setHabAbierta(true)}
+                data-testid="npo-ver-habilitacion"
+              >
+                <Boxes aria-hidden />
+                Ver habilitación
+              </Button>
+            </div>
 
             {notas.isPending ? (
               <div className="space-y-2" data-testid="npo-cargando">
@@ -248,6 +262,19 @@ export function NotasPorOrdenPagina(): React.JSX.Element {
           </div>
         ) : null}
       </div>
+
+      {idOrden !== null ? (
+        <PanelHabilitacionOrden
+          idOrden={idOrden}
+          abierto={habAbierta}
+          alCerrar={() => setHabAbierta(false)}
+          encabezado={
+            ordenSeleccionada
+              ? { folio: ordenSeleccionada.folio, modelo: ordenSeleccionada.codigoModelo }
+              : undefined
+          }
+        />
+      ) : null}
     </div>
   );
 }

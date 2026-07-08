@@ -247,8 +247,16 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     await expect(panel.getByTestId('centro-matriz')).toBeVisible();
     await expect(panel.getByTestId('centro-matriz-total')).toHaveText('20');
     await expect(panel.getByTestId('centro-mosaicos')).toBeVisible();
-    await expect(panel.getByTestId('mosaico-habilitacion')).toBeDisabled();
     await expect(panel.getByTestId('panel-precios')).toBeVisible();
+
+    // ── Mosaico Habilitación (R6): abre el panel de surtido de la orden ───────
+    await expect(panel.getByTestId('mosaico-habilitacion')).toBeEnabled();
+    await panel.getByTestId('mosaico-habilitacion').click();
+    await expect(page.getByTestId('panel-habilitacion')).toBeVisible();
+    await expect(page.getByTestId('hab-ver-notas')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('panel-habilitacion')).toBeHidden();
+
     // La cadena de trazabilidad (R3) enseña el pedido interno y la OP.
     await expect(panel.getByTestId('traza-op')).toContainText(folio);
     await expect(panel.getByTestId('traza-pedido')).toBeEnabled();

@@ -9,6 +9,7 @@ import {
 
 import { api } from './cliente';
 import { ErrorDeApi } from './errores';
+import { CLAVE_HABILITACION } from './habilitacion';
 import type {
   NotaSalida,
   NotaSalidaCancelar,
@@ -135,6 +136,8 @@ export function useNotaSalida(id: number | undefined): UseQueryResult<NotaSalida
 /** Invalida la lista de notas y, si se da, el detalle de UNA nota. */
 function invalidar(queryClient: ReturnType<typeof useQueryClient>, id?: number): void {
   void queryClient.invalidateQueries({ queryKey: CLAVE_NOTAS });
+  // Confirmar/cancelar una nota cambia el "enviado" de la habilitación de sus órdenes (B13, R6).
+  void queryClient.invalidateQueries({ queryKey: CLAVE_HABILITACION });
   if (id !== undefined) {
     void queryClient.invalidateQueries({ queryKey: claveNota(id) });
   }

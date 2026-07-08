@@ -19783,6 +19783,184 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ordenes/{id}/habilitacion': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Habilitación / surtido de avíos de la orden (requerido vs. enviado) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id de la orden. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Habilitación / surtido de avíos de una orden (requerido vs. enviado). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Orden de producción. */
+              idOrden: number;
+              /** @description Folio de la orden. */
+              folioOrden: number;
+              /** @description Modelo de la orden. */
+              idModelo: number;
+              /** @description Código del modelo. */
+              modelo: string;
+              /** @description Σ de piezas color×talla de la orden (base del requerido). */
+              totalPiezas: number;
+              /** @description Maquilero asignado a la orden, o null. */
+              idMaquilero: number | null;
+              /** @description Nombre del maquilero asignado, o null. */
+              maquilero: string | null;
+              /** @description % global de surtido (Σ min(enviado, requerido) / Σ requerido × 100). */
+              porcentajeGlobal: number;
+              /** @description Σ de requerido de los avíos de la receta. */
+              totalRequerido: number;
+              /** @description Σ de enviado (capado al requerido) de los avíos de la receta. */
+              totalEnviado: number;
+              /** @description # de avíos de la receta completos. */
+              completos: number;
+              /** @description # de avíos de la receta parciales. */
+              parciales: number;
+              /** @description # de avíos de la receta sin enviar. */
+              pendientes: number;
+              /** @description Σ de faltantes de los avíos de la receta. */
+              faltaTotal: number;
+              /** @description # de avíos de la receta con faltante > 0. */
+              faltanAvios: number;
+              /** @description Renglones (receta + extras). */
+              avios: {
+                /** @description Avío del catálogo. */
+                idAvio: number;
+                /** @description Clave del avío. */
+                clave: string;
+                /** @description Descripción del avío. */
+                descripcion: string;
+                /** @description Unidad del avío (pza, m…), o null. */
+                unidad: string | null;
+                /** @description ¿El avío es genérico (stock)? */
+                esGenerico: boolean;
+                /** @description Cantidad requerida = consumo × piezas de la orden (R18). 0 en los extras. */
+                requerido: number;
+                /** @description Cantidad ya enviada = Σ renglones de notas de salida CONFIRMADAS (orden×avío). */
+                enviado: number;
+                /** @description Faltante = max(0, requerido − enviado). 0 en completos/extras. */
+                falta: number;
+                /** @description % de surtido real del avío (enviado/requerido×100; puede pasar de 100). */
+                porcentaje: number;
+                /** @description ¿Es un avío enviado FUERA de la receta de la orden? */
+                esExtra: boolean;
+                /**
+                 * @description Estado de surtido del avío en la orden.
+                 * @enum {string}
+                 */
+                estado: 'completo' | 'parcial' | 'pendiente' | 'sobre-surtido' | 'extra';
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes/{id}/comentarios': {
     parameters: {
       query?: never;
