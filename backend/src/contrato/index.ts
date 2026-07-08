@@ -403,6 +403,38 @@ export {
   type CandidatosDesarrolloSalida,
 } from './esquemas/salida-produccion.js';
 
+// ── Importador del pedido del cliente (rediseño R8, B15 — proto §4.1 "Etapa 3") ──
+export {
+  esquemaRolColumnaImportacion,
+  esquemaMapeoColumna,
+  esquemaMapeoImportacion,
+  esquemaPlantillaImportacionSalida,
+  esquemaPlantillaImportacionVigente,
+  esquemaPlantillaImportacionGuardar,
+  esquemaAnalizarImportacionCuerpo,
+  esquemaGrupoImportacion,
+  esquemaPreviewImportacion,
+  esquemaAnalizarImportacionSalida,
+  esquemaResolucionImportacion,
+  esquemaConfirmarImportacionCuerpo,
+  esquemaOrdenImportada,
+  esquemaConfirmarImportacionSalida,
+  type RolColumnaImportacion,
+  type MapeoColumna,
+  type MapeoImportacion,
+  type PlantillaImportacionSalida,
+  type PlantillaImportacionVigente,
+  type DatosPlantillaImportacionGuardar,
+  type DatosAnalizarImportacion,
+  type GrupoImportacion,
+  type PreviewImportacion,
+  type AnalizarImportacionSalida,
+  type DatosResolucionImportacion,
+  type DatosConfirmarImportacion,
+  type OrdenImportada,
+  type ConfirmarImportacionSalida,
+} from './esquemas/importacion-pedido.js';
+
 // ── Consulta de pedidos por mes (rediseño R3, B6 — proto §4.1) ──
 export {
   esquemaPedidosPorMesQuery,

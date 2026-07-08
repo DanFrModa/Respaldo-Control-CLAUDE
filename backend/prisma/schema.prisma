@@ -975,6 +975,8 @@ model Cliente {
   proyectos              Proyecto[]
   /// Listas de precios de este cliente (F8-E4). Restrict.
   listasPrecios          ListaPrecios[]
+  /// Plantillas de importación del pedido del cliente (rediseño R8, B15 — mapeo de su Excel). Restrict.
+  plantillasImportacion  PlantillaImportacion[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -982,6 +984,37 @@ model Cliente {
   modificadoPorId String?  @map("modificado_por_id")
 
   @@map("clientes")
+}
+
+/// Plantilla de IMPORTACIÓN del pedido del cliente (rediseño R8, B15 — proto §4.1 "Etapa 3"): el
+/// cliente manda su Orden de Compra en SU formato (Excel); aquí se guarda, POR CLIENTE, cómo mapear
+/// cada columna de su archivo (uno de: modelo del cliente / color / talla / cantidad / precio /
+/// ignorar) para que las siguientes veces se importe solo. VERSIONADA e INMUTABLE por versión:
+/// "guardar cambios" crea una versión NUEVA (no edita la vieja); a lo más UNA `vigente` por cliente
+/// (regla de dominio bajo transacción, como el borrador único de `Precosto`). `mapeo` es JSON: por
+/// cada columna, su índice + encabezado + rol. Restrict hacia Cliente (una plantilla no se borra al
+/// borrar el cliente — igual que proyectos/listas). Auditoría uniforme (A7).
+model PlantillaImportacion {
+  id        Int     @id @default(autoincrement())
+  idCliente Int     @map("id_cliente")
+  cliente   Cliente @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  /// Nombre descriptivo del formato (p. ej. "OC C&A — hoja Estilos").
+  nombre    String
+  /// Nº de versión (1, 2, …) DENTRO del cliente. Guardar cambios = versión nueva; la vieja se conserva.
+  version   Int
+  /// La versión que se aplica hoy. A lo más UNA `true` por cliente (lo garantiza el dominio en tx).
+  vigente   Boolean @default(true)
+  /// Mapeo de columnas: `[{ indice, columna, rol }]` — `rol` ∈ modeloCliente|color|talla|cantidad|precio|ignorar.
+  mapeo     Json
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idCliente, version])
+  @@index([idCliente])
+  @@map("plantilla_importacion")
 }
 
 /// Definición de un campo de referencia POR cliente (D7 — PLANMAESTRO §4). Cada

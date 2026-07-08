@@ -16,6 +16,7 @@ import { rutasMedidasAvioTalla } from './api/modelos/medidas-avio-talla.rutas.js
 import { rutasPedidos } from './api/pedidos/pedidos.rutas.js';
 import { rutasAdjuntosPedido } from './api/pedidos/adjuntos-pedido.rutas.js';
 import { rutasSalidaProduccion } from './api/pedidos/salida-produccion.rutas.js';
+import { rutasImportacionPedido } from './api/pedidos/importacion-pedido.rutas.js';
 // Desarrollo, Cotización y Listas de Precios (Módulo 15, F8-E1) — catálogos de configuración +
 // sub-recursos de Tela/Cliente/Modelo. Los módulos de Proyecto/Precosto/Lista/Negociación llegan
 // en E2–E6 (su modelo de datos ya nace en la migración de E1).
@@ -181,6 +182,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // desarrollo del constructor y "Generar OP" (salida a producción). Rutas estáticas con prioridad
   // sobre `/pedidos/:id` (find-my-way).
   await app.register(rutasSalidaProduccion, { prefix: '/api' });
+  // Pedidos — IMPORTADOR del pedido del cliente (rediseño R8, B15): plantilla de mapeo por cliente,
+  // analizar/preview del Excel y confirmar (crea pedido + OPs con matriz + RC, reusa salidaAProduccion).
+  // Paths estáticos `/pedidos/importacion/...` con prioridad sobre `/pedidos/:id`. Sin permisos nuevos.
+  await app.register(rutasImportacionPedido, { prefix: '/api' });
   // Órdenes de producción (Módulo ÓRDENES, F2-E2) — alta desde un renglón de pedido, encabezado,
   // matriz (colores × tallas, total derivado), copiar matriz, cancelar (suave), referencias (D7)
   // y comentarios. Folio por empresa (A3/A9). Sin rutas de UPC.
