@@ -197,6 +197,9 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText(`Modelo "${codigoEditado}" descontinuado.`)).toBeVisible();
     await expect(page.getByTestId('fila-modelo').filter({ hasText: codigoEditado })).toHaveCount(0);
 
+    // Tras descontinuar, el cajón del modelo sigue abierto (la selección se retiene);
+    // ciérralo antes del toggle del fondo para que su overlay no bloquee el clic.
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-modelo').filter({ hasText: codigoEditado });
     await expect(filaInactiva).toBeVisible();
