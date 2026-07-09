@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { entrarComoAdmin } from './ayudas';
+import { cerrarCajon, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Proveedores contra el stack real, en la estructura LISTA +
@@ -68,6 +68,9 @@ test.describe('CRUD de Proveedores', () => {
     await expect(filaEditada).toBeVisible();
 
     // ── Desactivar (borrado suave) ─────────────────────────────────────────────
+    // El cajón sigue abierto (el nombre editado aún casa la búsqueda); ciérralo antes de
+    // volver a clickear la fila del fondo (el overlay modal impide estabilizar el clic).
+    await cerrarCajon(page);
     await filaEditada.click();
     await expect(detalle.getByRole('heading', { name: nombreEditado })).toBeVisible();
     await page.getByTestId('desactivar-proveedor').click();
@@ -82,6 +85,7 @@ test.describe('CRUD de Proveedores', () => {
     );
 
     // ── Mostrar desactivados → seleccionar → el detalle lo marca Inactivo ──────
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-proveedor').filter({ hasText: nombreEditado });
     await expect(filaInactiva).toBeVisible();
@@ -98,6 +102,7 @@ test.describe('CRUD de Proveedores', () => {
     await expect(detalle.getByText('Inactivo', { exact: true })).toHaveCount(0);
 
     // ── Buscar ─────────────────────────────────────────────────────────────────
+    await cerrarCajon(page);
     await page.getByTestId('buscar-proveedor').fill(nombreEditado);
     await expect(
       page.getByTestId('fila-proveedor').filter({ hasText: nombreEditado }),

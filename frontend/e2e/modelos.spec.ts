@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, cerrarCajon, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, re-vestido R9 a TABLA-FIRST + CAJÓN.
@@ -150,6 +150,9 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText('Bordados de la receta guardados.')).toBeVisible();
 
     // ── Crear un 2º modelo y COPIAR la receta del primero ───────────────────────
+    // El cajón del 1er modelo sigue abierto; ciérralo antes de tocar el botón del fondo
+    // (el overlay modal impide estabilizar el clic sobre "Nuevo modelo").
+    await cerrarCajon(page);
     await page.getByTestId('nuevo-modelo').click();
     const dialogoDestino = page.getByRole('dialog');
     await dialogoDestino.getByLabel('Código').fill(codigoDestino);
@@ -183,6 +186,8 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText(`Modelo "${codigoEditado}" actualizado.`)).toBeVisible();
 
     // ── Descontinuar (borrado suave) y reactivar ────────────────────────────────
+    // El cajón del 2º modelo sigue abierto tras editar; ciérralo antes de clickear su fila.
+    await cerrarCajon(page);
     await page.getByTestId('buscar-modelo').fill(codigoEditado);
     await page.getByTestId('fila-modelo').filter({ hasText: codigoEditado }).click();
     await page.getByTestId('desactivar-modelo').click();
@@ -201,6 +206,8 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
     await expect(page.getByText(`Modelo "${codigoEditado}" reactivado.`)).toBeVisible();
 
     // ── Buscar por descripción (el primer modelo) ───────────────────────────────
+    // Tras reactivar, el cajón del modelo quedó abierto; ciérralo antes del toggle del fondo.
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     await page.getByTestId('buscar-modelo').fill('Sudadera E2E');
     await expect(page.getByTestId('fila-modelo').filter({ hasText: codigo })).toBeVisible();

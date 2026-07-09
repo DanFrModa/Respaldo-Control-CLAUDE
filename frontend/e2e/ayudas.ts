@@ -40,6 +40,23 @@ export async function abrirDesplegableMenu(page: Page, nombre: string): Promise<
 }
 
 /**
+ * Cierra el CAJÓN de detalle (rediseño R9, `[data-slot="cajon-detalle"]`) si está abierto, y espera
+ * a que se desmonte. Es un Radix Dialog MODAL: mientras está abierto, su overlay + scroll-lock cubren
+ * la lista y el encabezado, así que un `.click()` sobre un renglón o un botón del fondo NO se
+ * estabiliza (el scroll-into-view de Playwright pelea con el scroll-lock → timeout "not stable"). Por
+ * eso, en los CRUD de cajón (clientes/modelos/proveedores) se cierra el cajón ANTES de cada
+ * interacción de fondo por CLIC (mismo patrón que `ordenes`/`pedidos`, que hacen `Escape`).
+ * Idempotente: si no hay cajón abierto, no hace nada (Escape solo se manda si está montado).
+ */
+export async function cerrarCajon(page: Page): Promise<void> {
+  const cajon = page.locator('[data-slot="cajon-detalle"]');
+  if ((await cajon.count()) > 0) {
+    await page.keyboard.press('Escape');
+    await expect(cajon).toHaveCount(0);
+  }
+}
+
+/**
  * Crea al vuelo un COLOR y una TALLA activos en los catálogos y devuelve sus etiquetas. Lo usan las
  * pruebas que arman una matriz color×talla (órdenes, movimientos/traspasos PT, entrega a cliente):
  * necesitan ≥1 color y ≥1 talla en el catálogo y NO deben depender del orden de la suite (antes

@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
+import { abrirDesplegableMenu, cerrarCajon, entrarComoAdmin } from './ayudas';
 
 /**
  * E2E del CRUD de Clientes (F1-E2, D7) contra el stack real, re-vestido R9 a TABLA-FIRST
@@ -64,6 +64,9 @@ test.describe('CRUD de Clientes', () => {
     await expect(filaEditada).toBeVisible();
 
     // ── Desactivar (borrado suave) ─────────────────────────────────────────────
+    // El cajón sigue abierto (el nombre editado aún casa la búsqueda); ciérralo antes de
+    // volver a clickear la fila del fondo (el overlay modal impide estabilizar el clic).
+    await cerrarCajon(page);
     await filaEditada.click();
     await expect(detalle.getByRole('heading', { name: nombreEditado })).toBeVisible();
     await page.getByTestId('desactivar-cliente').click();
@@ -77,6 +80,7 @@ test.describe('CRUD de Clientes', () => {
     );
 
     // ── Mostrar desactivados → seleccionar → Inactivo ──────────────────────────
+    await cerrarCajon(page);
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-cliente').filter({ hasText: nombreEditado });
     await expect(filaInactiva).toBeVisible();
@@ -90,6 +94,7 @@ test.describe('CRUD de Clientes', () => {
     await expect(detalle.getByText('Inactivo', { exact: true })).toHaveCount(0);
 
     // ── Buscar ─────────────────────────────────────────────────────────────────
+    await cerrarCajon(page);
     await page.getByTestId('buscar-cliente').fill(nombreEditado);
     await expect(page.getByTestId('fila-cliente').filter({ hasText: nombreEditado })).toBeVisible();
     await page.getByTestId('buscar-cliente').fill('zzz-no-existe-zzz');
