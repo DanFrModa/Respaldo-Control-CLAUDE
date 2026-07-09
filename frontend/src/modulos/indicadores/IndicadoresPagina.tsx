@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  ChartLine,
   ClipboardCheck,
   ClipboardList,
   Library,
@@ -115,17 +114,10 @@ export function IndicadoresPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <ChartLine className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Indicadores</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tableros directivos, productividad de IP y almacén, fichas confiables y muestrarios.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Indicadores</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Tableros directivos, productividad de IP y almacén, fichas confiables y muestrarios.
+        </p>
 
         <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibles.map((sub) => (

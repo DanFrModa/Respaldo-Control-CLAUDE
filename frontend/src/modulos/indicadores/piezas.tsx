@@ -15,7 +15,7 @@ import { Info } from 'lucide-react';
 export function BadgeHistorico(): React.JSX.Element {
   return (
     <span
-      className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-md bg-sidebar-accent/15 px-2 py-0.5 text-xs font-medium text-sidebar-accent-foreground"
+      className="mt-1 inline-flex w-fit items-center gap-1.5 rounded-md bg-info-soft px-2 py-0.5 text-xs font-medium text-info"
       data-testid="badge-historico"
     >
       <Info className="size-3.5 shrink-0" aria-hidden />

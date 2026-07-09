@@ -12,9 +12,17 @@ import {
 } from '@/api/muestrarios';
 import { useTemporadas } from '@/api/temporadas';
 import type { Muestrario, MuestrariosQuery } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -26,22 +34,15 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { atajosFecha, porcentaje } from './comun';
 
 type EstadoFiltro = '' | 'pendiente' | 'entregado' | 'cancelado';
 
 /**
- * MUESTRARIOS pendientes (F7-E4; doc 05 §A.3). Solicitud → seguimiento → entrega, con KPI de
- * cumplimiento (entregado ≤ requerido). Bajo `indicadores.ip-muestrarios` (el backend re-verifica, A1).
+ * MUESTRARIOS pendientes (F7-E4; doc 05 §A.3; proto `vIndicadores` — re-vestida R9): solicitud →
+ * seguimiento → entrega. page-head + KPIs de vistazo (Σ de SERVIDOR: cumplimiento) + toolbar (estado) +
+ * TABLA DENSA. Bajo `indicadores.ip-muestrarios` (el backend re-verifica, A1).
  */
 export function MuestrariosPagina(): React.JSX.Element {
   const [estado, setEstado] = useState<EstadoFiltro>('pendiente');
@@ -54,133 +55,158 @@ export function MuestrariosPagina(): React.JSX.Element {
 
   const filas = consulta.data?.datos ?? [];
 
+  const kpis: Kpi[] = [
+    { clave: 'total', etiqueta: 'Total', valor: (kpi.data?.total ?? 0).toLocaleString('es-MX') },
+    {
+      clave: 'pendientes',
+      etiqueta: 'Pendientes',
+      valor: (kpi.data?.pendientes ?? 0).toLocaleString('es-MX'),
+    },
+    {
+      clave: 'entregados',
+      etiqueta: 'Entregados',
+      valor: (kpi.data?.entregados ?? 0).toLocaleString('es-MX'),
+    },
+    {
+      clave: 'a-tiempo-tarde',
+      etiqueta: 'A tiempo / tarde',
+      valor: `${kpi.data?.aTiempo ?? 0} / ${kpi.data?.tarde ?? 0}`,
+    },
+    {
+      clave: 'cumplimiento',
+      etiqueta: '% cumplimiento',
+      valor: porcentaje(kpi.data?.porcentaje),
+      ...((kpi.data?.porcentaje ?? 0) >= 0.9 ? { tonoPie: 'ok' as const } : {}),
+    },
+  ];
+
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="muestrarios">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <PackageCheck className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold">Muestrarios</h1>
-            <p className="text-sm text-muted-foreground">
-              Boards y muestras solicitados, con su cumplimiento.
-            </p>
-          </div>
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="muestrarios">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+        >
+          <PackageCheck className="size-4.5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Muestrarios</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Boards y muestras solicitados, con su cumplimiento
+          </p>
         </div>
-        <Button type="button" onClick={() => setSolicitar(true)} data-testid="mu-solicitar">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => setSolicitar(true)}
+          data-testid="mu-solicitar"
+        >
           Solicitar muestrario
         </Button>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Metrica etiqueta="Total" valor={kpi.data?.total ?? 0} />
-        <Metrica etiqueta="Pendientes" valor={kpi.data?.pendientes ?? 0} />
-        <Metrica etiqueta="Entregados" valor={kpi.data?.entregados ?? 0} />
-        <Metrica
-          etiqueta="A tiempo / tarde"
-          valor={`${kpi.data?.aTiempo ?? 0} / ${kpi.data?.tarde ?? 0}`}
-        />
-        <Metrica etiqueta="% cumplimiento" valor={porcentaje(kpi.data?.porcentaje)} />
-      </div>
+      {/* ── KPIs ────────────────────────────────────────────────────────────── */}
+      <KpiTiles kpis={kpis} className="shrink-0" />
 
-      <Card>
-        <CardHeader className="flex-row flex-wrap items-end justify-between gap-3">
-          <div>
-            <CardTitle>Muestrarios</CardTitle>
-            <CardDescription>Filtra por estado.</CardDescription>
+      {/* ── Card: filtros + tabla ───────────────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={estado}
+            onChange={(e) => setEstado(e.target.value as EstadoFiltro)}
+            aria-label="Filtrar por estado"
+            data-testid="mu-estado"
+          >
+            <option value="">Todos</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="entregado">Entregados</option>
+            <option value="cancelado">Cancelados</option>
+          </SelectNativo>
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {filas.length.toLocaleString('es-MX')} muestrarios
+            </span>
           </div>
-          <Field className="w-44">
-            <FieldLabel htmlFor="mu-estado">Estado</FieldLabel>
-            <SelectNativo
-              id="mu-estado"
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as EstadoFiltro)}
-              data-testid="mu-estado"
-            >
-              <option value="">Todos</option>
-              <option value="pendiente">Pendientes</option>
-              <option value="entregado">Entregados</option>
-              <option value="cancelado">Cancelados</option>
-            </SelectNativo>
-          </Field>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
           {consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
           ) : filas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin muestrarios.</p>
+            <p className="p-6 text-sm text-muted-foreground">Sin muestrarios.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Categoría</TableHead>
-                    <TableHead className="text-right">Boards</TableHead>
-                    <TableHead className="text-right">Muestras</TableHead>
-                    <TableHead>Requerida</TableHead>
-                    <TableHead>Entregado</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filas.map((m) => (
-                    <TableRow key={m.id} data-testid={`mu-fila-${m.id}`}>
-                      <TableCell>{m.cliente}</TableCell>
-                      <TableCell>{m.categoria ?? '—'}</TableCell>
-                      <TableCell className="text-right">
-                        {m.boardsOK}/{m.cantBoards}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {m.muestrasOK}/{m.cantMuestras}
-                      </TableCell>
-                      <TableCell>{m.fechaRequerida}</TableCell>
-                      <TableCell>{m.fechaEntregado ?? '—'}</TableCell>
-                      <TableCell>
-                        <EstadoBadge muestrario={m} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {m.estado === 'pendiente' && (
-                          <>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEntregar(m)}
-                            >
-                              Entregar
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const motivo = window.prompt('Motivo de la cancelación:');
-                                if (motivo === null || motivo.trim().length < 3) return;
-                                cancelar.mutate(
-                                  { id: m.id, motivo: motivo.trim() },
-                                  {
-                                    onSuccess: () => toast.success('Muestrario cancelado.'),
-                                    onError: (err) => toast.error(err.message),
-                                  },
-                                );
-                              }}
-                            >
-                              Cancelar
-                            </Button>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Cliente</TablaDensaHead>
+                  <TablaDensaHead>Categoría</TablaDensaHead>
+                  <TablaDensaHead numerica>Boards</TablaDensaHead>
+                  <TablaDensaHead numerica>Muestras</TablaDensaHead>
+                  <TablaDensaHead>Requerida</TablaDensaHead>
+                  <TablaDensaHead>Entregado</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                  <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {filas.map((m) => (
+                  <TablaDensaFila key={m.id} data-testid={`mu-fila-${m.id}`}>
+                    <TablaDensaCelda>{m.cliente}</TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">
+                      {m.categoria ?? '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {m.boardsOK}/{m.cantBoards}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {m.muestrasOK}/{m.cantMuestras}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>{m.fechaRequerida}</TablaDensaCelda>
+                    <TablaDensaCelda>{m.fechaEntregado ?? '—'}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <EstadoBadge muestrario={m} />
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-right">
+                      {m.estado === 'pendiente' && (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEntregar(m)}
+                          >
+                            Entregar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const motivo = window.prompt('Motivo de la cancelación:');
+                              if (motivo === null || motivo.trim().length < 3) return;
+                              cancelar.mutate(
+                                { id: m.id, motivo: motivo.trim() },
+                                {
+                                  onSuccess: () => toast.success('Muestrario cancelado.'),
+                                  onError: (err) => toast.error(err.message),
+                                },
+                              );
+                            }}
+                          >
+                            Cancelar
+                          </Button>
+                        </>
+                      )}
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <DialogoSolicitar abierto={solicitar} alCerrar={() => setSolicitar(false)} />
       <DialogoEntregar muestrario={entregar} alCerrar={() => setEntregar(null)} />
@@ -189,29 +215,14 @@ export function MuestrariosPagina(): React.JSX.Element {
 }
 
 function EstadoBadge({ muestrario }: { muestrario: Muestrario }): React.JSX.Element {
-  if (muestrario.estado === 'cancelado') return <Badge variant="destructive">Cancelado</Badge>;
+  if (muestrario.estado === 'cancelado') return <ChipEstado tono="crit">Cancelado</ChipEstado>;
   if (muestrario.estado === 'entregado')
     return muestrario.aTiempo ? (
-      <Badge variant="secondary">A tiempo</Badge>
+      <ChipEstado tono="ok">A tiempo</ChipEstado>
     ) : (
-      <Badge variant="outline">Tarde</Badge>
+      <ChipEstado tono="warn">Tarde</ChipEstado>
     );
-  return <Badge variant="outline">Pendiente</Badge>;
-}
-
-function Metrica({
-  etiqueta,
-  valor,
-}: {
-  etiqueta: string;
-  valor: string | number;
-}): React.JSX.Element {
-  return (
-    <div className="rounded-lg bg-muted/40 p-3">
-      <p className="text-xs text-muted-foreground">{etiqueta}</p>
-      <p className="text-lg font-semibold">{valor}</p>
-    </div>
-  );
+  return <ChipEstado tono="neutro">Pendiente</ChipEstado>;
 }
 
 function DialogoSolicitar({

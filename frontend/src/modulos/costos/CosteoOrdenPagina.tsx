@@ -110,14 +110,17 @@ export function CosteoOrdenPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="costeo-orden">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Calculator className="size-5" aria-hidden />
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+        >
+          <Calculator className="size-4.5" aria-hidden />
         </span>
-        <div>
-          <h1 className="text-xl font-semibold">Costeo de orden</h1>
-          <p className="text-sm text-muted-foreground">
-            Teórico (receta × precios) vs guardado; el total se arma con el guardado.
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Costeo de orden</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Teórico (receta × precios) vs guardado; el total se arma con el guardado
           </p>
         </div>
       </header>
