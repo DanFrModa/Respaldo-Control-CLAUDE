@@ -559,3 +559,65 @@ export const esquemaProveedorAdjuntosLista = z
 
 /** Forma de la lista de adjuntos. */
 export type ProveedorAdjuntosLista = z.infer<typeof esquemaProveedorAdjuntosLista>;
+
+// ── Avíos que surte el proveedor (B17, rediseño R9 — lado PROVEEDOR de AvioProveedor) ──
+// El vínculo avío↔proveedor (R1) ya se administra desde el AVÍO (avios.administrar). B17
+// abre la MISMA relación desde el PROVEEDOR ("avíos que surte" con asignar/quitar), para la
+// pantalla de Proveedores del proto (`drawerProveedor`). Se gobierna con `proveedores.*` (el
+// permiso de la pantalla), sin permiso nuevo.
+
+/**
+ * Un avío que surte el proveedor, con SU precio y condiciones (el renglón `AvioProveedor`
+ * visto desde el lado proveedor). Trae la clave y descripción del avío embebidas para que la
+ * UI no cruce con el catálogo. Sale suelto en `GET /api/proveedores/{id}/avios`.
+ */
+export const esquemaProveedorAvioSalida = z
+  .object({
+    idAvio: z.number().int().describe('Id del avío.'),
+    clave: z.string().describe('Clave del avío (para la UI).'),
+    descripcion: z.string().describe('Descripción del avío (para la UI).'),
+    precio: z.number().nullable().describe('Precio al que este proveedor lo surte, o null.'),
+    condiciones: z.string().nullable().describe('Condiciones comerciales, o null.'),
+  })
+  .describe('Avío que surte un proveedor con su precio y condiciones (R1/B17).');
+
+/** Forma de un avío surtido por un proveedor tal como lo devuelve la API. */
+export type ProveedorAvioSalida = z.infer<typeof esquemaProveedorAvioSalida>;
+
+/** Lista de avíos que surte un proveedor (`GET /api/proveedores/{id}/avios`). */
+export const esquemaProveedorAviosLista = z
+  .object({
+    datos: z
+      .array(esquemaProveedorAvioSalida)
+      .describe('Avíos que surte el proveedor con su precio.'),
+  })
+  .describe('Avíos que surte un proveedor (B17).');
+
+/** Forma de la lista de avíos que surte un proveedor. */
+export type ProveedorAviosLista = z.infer<typeof esquemaProveedorAviosLista>;
+
+/**
+ * Cuerpo para asignar un avío a un proveedor (`POST /api/proveedores/{id}/avios`): el avío y,
+ * opcionalmente, el precio al que lo surte y las condiciones. Mismas reglas de precio/condiciones
+ * que el renglón embebido del avío (`esquemaAvioProveedorEntrada`).
+ */
+export const esquemaProveedorAvioAsignar = z
+  .object({
+    idAvio: z
+      .number({ error: 'El id del avío es obligatorio' })
+      .int({ error: 'El id del avío debe ser entero' })
+      .positive({ error: 'El id del avío debe ser positivo' }),
+    precio: z
+      .number({ error: 'El precio debe ser un número' })
+      .nonnegative({ error: 'El precio no puede ser negativo' })
+      .optional(),
+    condiciones: z
+      .string()
+      .trim()
+      .max(500, { error: 'Las condiciones no pueden tener más de 500 caracteres' })
+      .optional(),
+  })
+  .describe('Asignar un avío que surte el proveedor con su precio y condiciones (B17).');
+
+/** Datos validados para asignar un avío a un proveedor. */
+export type DatosProveedorAvioAsignar = z.infer<typeof esquemaProveedorAvioAsignar>;

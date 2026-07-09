@@ -1,4 +1,4 @@
-import { Tag, Warehouse } from 'lucide-react';
+import { Warehouse } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,8 +10,11 @@ import { Avatar, TipoBadge } from '@/components/dominio/visuales';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import type { Tono } from '@/lib/tono';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
+import {
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoAlmacen } from './DialogoAlmacen';
@@ -30,15 +33,13 @@ const TONO_POR_TIPO: Record<TipoAlmacenClave, Tono> = {
 };
 
 /**
- * Pantalla de Almacenes — CRUD del catalogo del kardex unico sobre el motor
- * LISTA + DETALLE (rediseño "Teal fresco"). Lista con busqueda (debounce),
- * **filtro por tipo** (PT/telas/avíos), paginacion de servidor y toggle de
- * inactivos; el detalle muestra el tipo y el historial, y permite editar /
- * desactivar / reactivar. Borrado suave reversible (desactivar con confirmacion,
- * reactivar directo); toasts; consciente de permisos.
+ * Pantalla de Almacenes — re-vestida R9 a TABLA-FIRST (proto `vCat`): tabla densa con el almacén, su
+ * tipo (badge PT/telas/avíos) y su estado, con **filtro por tipo** y acciones inline (editar/desactivar/
+ * activar). Borrado suave reversible; consciente de permisos.
  *
- * `almacenes.ver` gobierna el acceso a la pantalla; `almacenes.administrar`
- * decide las acciones de escritura. La decision real la toma el backend (A1).
+ * FIDELIDAD vs proto: el proto pinta una columna "Empresa" (nombre), pero el payload del almacén solo
+ * trae `idEmpresa` (sin el nombre de la empresa) → se omite (hueco reportado). `almacenes.ver` gobierna
+ * el acceso; `almacenes.administrar` decide las acciones (A1).
  */
 export function AlmacenesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -120,7 +121,7 @@ export function AlmacenesPagina(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -131,30 +132,46 @@ export function AlmacenesPagina(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<Almacen>[] = [
+    {
+      encabezado: 'Almacén',
+      render: (a) => (
+        <div className="flex items-center gap-2">
+          <Avatar nombre={a.nombre} tono={TONO_POR_TIPO[a.tipo]} tamano="sm">
+            <Warehouse className="size-4" aria-hidden />
+          </Avatar>
+          <span className="font-medium">{a.nombre}</span>
+        </div>
+      ),
+    },
+    {
+      encabezado: 'Tipo',
+      render: (a) => (
+        <TipoBadge tono={TONO_POR_TIPO[a.tipo]}>{ETIQUETAS_TIPO_ALMACEN[a.tipo]}</TipoBadge>
+      ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<Almacen>
+      <TablaCatalogo<Almacen>
         testid="almacen"
         titulo="Almacenes"
-        descripcion="Almacenes del kardex único (producto terminado, telas y avíos)."
+        descripcion="Catálogo base · multi-almacén (kardex D3)"
         icono={Warehouse}
+        unidad="almacenes"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(a) => a.id}
-        obtenerTitulo={(a) => a.nombre}
         obtenerActivo={(a) => a.activo}
-        obtenerSecundaria={(a) => ETIQUETAS_TIPO_ALMACEN[a.tipo]}
-        renderAvatarLista={(a) => (
-          <Avatar nombre={a.nombre} tono={TONO_POR_TIPO[a.tipo]} tamano="sm">
-            <Warehouse className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         filtros={
           <SelectNativo
+            className="h-8 w-auto text-sm"
             value={tipoFiltro}
             onChange={(e) => alCambiarTipo(e.target.value)}
             aria-label="Filtrar almacenes por tipo"
@@ -178,28 +195,6 @@ export function AlmacenesPagina(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarAlmacen}
-        renderAvatarDetalle={(a) => (
-          <Avatar nombre={a.nombre} tono={TONO_POR_TIPO[a.tipo]} tamano="lg">
-            <Warehouse className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderMeta={(a) => (
-          <TipoBadge tono={TONO_POR_TIPO[a.tipo]}>{ETIQUETAS_TIPO_ALMACEN[a.tipo]}</TipoBadge>
-        )}
-        renderDetalle={(a) => (
-          <>
-            <SeccionDetalle titulo="Datos del almacén">
-              <RejillaCampos>
-                <CampoDetalle icono={Tag} etiqueta="Tipo">
-                  <TipoBadge tono={TONO_POR_TIPO[a.tipo]}>
-                    {ETIQUETAS_TIPO_ALMACEN[a.tipo]}
-                  </TipoBadge>
-                </CampoDetalle>
-              </RejillaCampos>
-            </SeccionDetalle>
-            <Historial creadoEn={a.creadoEn} modificadoEn={a.modificadoEn} />
-          </>
-        )}
       />
 
       {/* Dialogos */}

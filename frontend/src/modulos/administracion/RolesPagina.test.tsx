@@ -87,6 +87,11 @@ describe('<RolesPagina>', () => {
     usePermisosCatalogo.mockReturnValue(estadoCatalogo());
   });
 
+  /** Abre el cajón de detalle del primer renglón. */
+  function abrirPrimero(): void {
+    fireEvent.click(screen.getAllByTestId('fila-rol')[0] as HTMLElement);
+  }
+
   it('lista los roles con badge "Sistema" y conteo de usuarios', () => {
     useRoles.mockReturnValue(
       estadoRoles([
@@ -99,11 +104,13 @@ describe('<RolesPagina>', () => {
     });
 
     expect(screen.getAllByTestId('fila-rol')).toHaveLength(2);
-    expect(screen.getAllByText('Administrador').length).toBeGreaterThan(0);
-    // El primero (Administrador) queda auto-seleccionado en el detalle: Sistema + conteo.
-    const detalle = screen.getByTestId('detalle-rol');
-    expect(within(detalle).getByText('Sistema')).toBeInTheDocument();
-    expect(within(detalle).getByText(/2 usuarios/)).toBeInTheDocument();
+    expect(screen.getByText('Administrador')).toBeInTheDocument();
+    // Tabla-first: al abrir el cajón, su TÍTULO trae Sistema + conteo de usuarios.
+    abrirPrimero();
+    const cajon = screen.getByTestId('detalle-rol').closest('[data-slot="cajon-detalle"]');
+    expect(cajon).not.toBeNull();
+    expect(within(cajon as HTMLElement).getByText('Sistema')).toBeInTheDocument();
+    expect(within(cajon as HTMLElement).getByText(/2 usuarios/)).toBeInTheDocument();
   });
 
   it('muestra el árbol de permisos con lo del rol ya marcado', () => {
@@ -114,6 +121,7 @@ describe('<RolesPagina>', () => {
       sesion: estadoSesionDePrueba(['roles.administrar']),
     });
 
+    abrirPrimero();
     expect(screen.getAllByTestId('grupo-permisos')).toHaveLength(2);
     expect(screen.getAllByTestId('permiso-checkbox')).toHaveLength(3);
     // El rol NO tiene almacenes.ver pero SÍ roles.administrar.
@@ -131,6 +139,7 @@ describe('<RolesPagina>', () => {
       sesion: estadoSesionDePrueba(['roles.administrar']),
     });
 
+    abrirPrimero();
     fireEvent.click(screen.getByRole('checkbox', { name: /almacenes\.ver/ })); // marca almacenes.ver
 
     const guardar = screen.getByTestId('guardar-permisos');
@@ -154,10 +163,11 @@ describe('<RolesPagina>', () => {
       sesion: estadoSesionDePrueba(['roles.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-rol');
-    expect(within(detalle).getByTestId('eliminar-rol')).toBeDisabled();
+    abrirPrimero();
+    // Editar/Eliminar viven en el encabezado del cajón (acciones).
+    expect(screen.getByTestId('eliminar-rol')).toBeDisabled();
     // Editar sí está disponible (se puede editar su descripción y permisos).
-    expect(within(detalle).getByTestId('editar-rol')).toBeEnabled();
+    expect(screen.getByTestId('editar-rol')).toBeEnabled();
   });
 
   it('un rol propio sin usuarios sí se puede eliminar', () => {
@@ -166,8 +176,8 @@ describe('<RolesPagina>', () => {
       sesion: estadoSesionDePrueba(['roles.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-rol');
-    expect(within(detalle).getByTestId('eliminar-rol')).toBeEnabled();
+    abrirPrimero();
+    expect(screen.getByTestId('eliminar-rol')).toBeEnabled();
   });
 
   it('un rol con usuarios asignados no se puede eliminar', () => {
@@ -176,8 +186,8 @@ describe('<RolesPagina>', () => {
       sesion: estadoSesionDePrueba(['roles.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-rol');
-    expect(within(detalle).getByTestId('eliminar-rol')).toBeDisabled();
+    abrirPrimero();
+    expect(screen.getByTestId('eliminar-rol')).toBeDisabled();
   });
 
   it('sin roles.administrar los checkboxes van deshabilitados y no hay Guardar', () => {
@@ -186,6 +196,7 @@ describe('<RolesPagina>', () => {
     );
     renderConProveedores(<RolesPagina />, { sesion: estadoSesionDePrueba([]) });
 
+    abrirPrimero();
     expect(screen.getByRole('checkbox', { name: /almacenes\.ver/ })).toBeDisabled();
     expect(screen.queryByTestId('guardar-permisos')).not.toBeInTheDocument();
     expect(screen.queryByTestId('nuevo-rol')).not.toBeInTheDocument();

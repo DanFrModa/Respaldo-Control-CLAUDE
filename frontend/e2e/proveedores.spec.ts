@@ -28,7 +28,9 @@ test.describe('CRUD de Proveedores', () => {
       .click();
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
 
-    const detalle = page.getByTestId('detalle-proveedor');
+    // El detalle vive en el CAJÓN deslizante (encabezado con nombre + estado, cuerpo con
+    // el testid `detalle-proveedor`); se scopea a todo el cajón para leer ambos.
+    const detalle = page.locator('[data-slot="cajon-detalle"]');
 
     // ── Crear ─────────────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-proveedor').click();
@@ -110,17 +112,14 @@ test.describe('CRUD de Proveedores', () => {
     await page.goto('/catalogos/proveedores');
     await expect(page.getByRole('heading', { name: 'Proveedores' })).toBeVisible();
 
-    const detalle = page.getByTestId('detalle-proveedor');
-
     await page.getByTestId('filtro-tipo-proveedor').selectOption('TELAS');
-    // El filtro recarga la lista en el servidor y el motor auto-selecciona el
-    // primero de la lista filtrada. Lo verificamos por el DETALLE (la fila muestra
-    // el contacto, no el tipo). Si el catálogo no tiene proveedores TELAS, la lista
-    // queda vacía: ambos resultados son válidos. (Sin click: la fila se remonta al
-    // recargar y un click temprano sería inestable.)
+    // El filtro recarga la lista en el servidor (tabla-first, sin auto-selección). Se
+    // verifica que los renglones muestren el tipo "Telas" (su badge) o, si el catálogo no
+    // tiene proveedores TELAS, que quede el estado vacío: ambos resultados son válidos.
     await expect(
-      detalle
-        .getByText('Telas')
+      page
+        .getByTestId('fila-proveedor')
+        .filter({ hasText: 'Telas' })
         .first()
         .or(page.getByText('No hay proveedores que coincidan con la búsqueda.')),
     ).toBeVisible();
@@ -174,7 +173,9 @@ test.describe('Proveedor enriquecido (R15)', () => {
 
     // ── Detalle: los roles se ven como chips ────────────────────────────────────
     await fila.click();
-    const detalle = page.getByTestId('detalle-proveedor');
+    // El detalle vive en el CAJÓN deslizante (encabezado con nombre + estado, cuerpo con
+    // el testid `detalle-proveedor`); se scopea a todo el cajón para leer ambos.
+    const detalle = page.locator('[data-slot="cajon-detalle"]');
     await expect(detalle.getByRole('heading', { name: nombre })).toBeVisible();
     await expect(detalle.getByTestId('roles-proveedor-detalle')).toBeVisible();
     await expect(

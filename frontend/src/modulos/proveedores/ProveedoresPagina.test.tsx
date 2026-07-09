@@ -44,6 +44,26 @@ vi.mock('@/api/proveedores', () => ({
     isError: false,
     error: null,
   }),
+  // Avíos que surte (B17): el cajón los muestra vía `AviosQueSurte`.
+  useAviosProveedor: () => ({
+    data: [],
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+  useAsignarAvioProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+  useQuitarAvioProveedor: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+// El selector de avíos del cajón (B17) consulta el catálogo de avíos.
+vi.mock('@/api/avios', () => ({
+  useAvios: () => ({
+    data: { datos: [], total: 0, pagina: 1, porPagina: 20, totalPaginas: 1 },
+    isPending: false,
+    isError: false,
+    isFetching: false,
+    error: null,
+  }),
 }));
 
 /** Proveedor de ejemplo (enriquecido R15; los campos nuevos vacios por defecto). */
@@ -121,10 +141,10 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
     });
 
-    // Hay dos renglones; el primero queda auto-seleccionado (aparece tambien en
-    // el detalle), por eso su nombre se busca con getAllByText.
+    // Tabla-first: dos renglones; el cajón de detalle se abre al hacer clic (no hay
+    // auto-selección), así que ambos nombres aparecen una vez en la tabla.
     expect(screen.getAllByTestId('fila-proveedor')).toHaveLength(2);
-    expect(screen.getAllByText('Telas del Norte').length).toBeGreaterThan(0);
+    expect(screen.getByText('Telas del Norte')).toBeInTheDocument();
     expect(screen.getByText('Avíos SA')).toBeInTheDocument();
   });
 
@@ -175,11 +195,12 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
     });
 
-    // El registro queda auto-seleccionado: "Desactivar" es un boton directo del detalle.
+    // Se abre el cajón del renglón; "Desactivar" es un botón del encabezado del cajón.
+    await usuario.click(screen.getByTestId('fila-proveedor'));
     await usuario.click(screen.getByTestId('desactivar-proveedor'));
 
-    const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByText('Desactivar proveedor')).toBeInTheDocument();
+    const dialogo = await screen.findByText('Desactivar proveedor');
+    expect(dialogo).toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('confirmar-accion'));
     expect(desactivarMutate).toHaveBeenCalledWith(7, expect.anything());
@@ -192,15 +213,16 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver', 'proveedores.administrar']),
     });
 
-    // El detalle del registro inactivo muestra su estado y ofrece "Activar".
-    const detalle = screen.getByTestId('detalle-proveedor');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // Al abrir el cajón del registro inactivo, ofrece "Activar" (no "Desactivar").
+    await usuario.click(screen.getByTestId('fila-proveedor'));
+    expect(screen.getByTestId('detalle-proveedor')).toBeInTheDocument();
     expect(screen.getByTestId('activar-proveedor')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-proveedor')).not.toBeInTheDocument();
 
     await usuario.click(screen.getByTestId('activar-proveedor'));
-    // Reactivar es no destructivo: NO abre diálogo de confirmación.
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // Reactivar es no destructivo: NO abre diálogo de confirmación (sí sigue abierto el
+    // cajón de detalle, que también es un dialog — por eso se busca el botón de confirmar).
+    expect(screen.queryByTestId('confirmar-accion')).not.toBeInTheDocument();
     expect(reactivarMutate).toHaveBeenCalledWith(9, expect.anything());
   });
 
@@ -236,7 +258,8 @@ describe('<ProveedoresPagina>', () => {
     expect(ultimaQuery?.rol).toBe(2);
   });
 
-  it('muestra los roles del proveedor como chips en el detalle', () => {
+  it('muestra los roles del proveedor como chips en el detalle', async () => {
+    const usuario = userEvent.setup();
     const conRoles = proveedor(3, 'Maquilas Unidas');
     conRoles.roles = [
       { id: 1, codigo: 'maquila-costura', nombre: 'Maquila — costura' },
@@ -247,6 +270,7 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver']),
     });
 
+    await usuario.click(screen.getByTestId('fila-proveedor'));
     const chips = screen.getByTestId('roles-proveedor-detalle');
     expect(within(chips).getByText('Maquila — costura')).toBeInTheDocument();
     expect(within(chips).getByText('Estampado / aplicación')).toBeInTheDocument();
@@ -254,7 +278,8 @@ describe('<ProveedoresPagina>', () => {
 
   // M2: el detalle muestra los datos R15 (fiscal/pago/operativo) y el conteo de
   // adjuntos, agrupados en secciones, mostrando solo lo que tiene valor.
-  it('muestra los datos enriquecidos (fiscal/pago/operativo) y el conteo de adjuntos', () => {
+  it('muestra los datos enriquecidos (fiscal/pago/operativo) y el conteo de adjuntos', async () => {
+    const usuario = userEvent.setup();
     const completo = proveedor(5, 'Proveedor Completo');
     completo.factura = true;
     completo.rfc = 'PCO010101AB1';
@@ -279,6 +304,7 @@ describe('<ProveedoresPagina>', () => {
       sesion: estadoSesionDePrueba(['proveedores.ver']),
     });
 
+    await usuario.click(screen.getByTestId('fila-proveedor'));
     const detalle = screen.getByTestId('detalle-proveedor');
     // Secciones agrupadas (encabezados).
     expect(within(detalle).getByText('Fiscal')).toBeInTheDocument();
@@ -299,13 +325,15 @@ describe('<ProveedoresPagina>', () => {
     expect(within(detalle).getByText('2 archivos')).toBeInTheDocument();
   });
 
-  it('no muestra las secciones enriquecidas si el proveedor no tiene esos datos', () => {
+  it('no muestra las secciones enriquecidas si el proveedor no tiene esos datos', async () => {
+    const usuario = userEvent.setup();
     // proveedor() crea todos los campos R15 en null/0 -> sin secciones extra.
     useProveedores.mockReturnValue(consultaConDatos([proveedor(6, 'Proveedor Pelón')]));
     renderConProveedores(<ProveedoresPagina />, {
       sesion: estadoSesionDePrueba(['proveedores.ver']),
     });
 
+    await usuario.click(screen.getByTestId('fila-proveedor'));
     const detalle = screen.getByTestId('detalle-proveedor');
     // La sección General siempre está; las enriquecidas (sin datos) no.
     expect(within(detalle).getByText('Datos del proveedor')).toBeInTheDocument();

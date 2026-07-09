@@ -1,4 +1,4 @@
-import { LayoutGrid, ListChecks, Ruler, Tag, type LucideIcon } from 'lucide-react';
+import { LayoutGrid, Ruler, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -15,14 +15,11 @@ import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
 import {
-  CampoDetalle,
-  Historial,
-  RejillaCampos,
-  SeccionDetalle,
-  ValorVacio,
-} from '@/modulos/detalle';
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoCurva } from './DialogoCurva';
@@ -35,13 +32,12 @@ const POR_PAGINA = 10;
 type Pestana = 'tallas' | 'curvas';
 
 /**
- * Pantalla de Tallas y curvas (F1-E2, PIEZA B — D4) sobre el motor LISTA + DETALLE
- * (rediseño "Teal fresco"). Dos pestañas: el catalogo de tallas individuales y las
- * curvas (conjuntos ORDENADOS de tallas). Ambas con busqueda (debounce), paginacion de
- * servidor, toggle de inactivos, borrado suave reversible, toasts y conscientes de
- * permisos. `tallas.ver` gobierna el acceso; `tallas.administrar` decide las acciones.
- * El backend decide (A1). Regla de negocio (la aplica el backend y se muestra en un
- * toast): una talla usada por una curva activa no se puede desactivar.
+ * Pantalla de Tallas y curvas (F1-E2, PIEZA B — D4) — re-vestida R9 a TABLA-FIRST (proto `vCat`).
+ * Dos pestañas: el catálogo de tallas individuales (etiqueta + orden) y las curvas (conjuntos
+ * ORDENADOS de tallas, mostradas como chips). Ambas tablas densas con búsqueda, inactivos y acciones
+ * inline. `tallas.ver` gobierna el acceso; `tallas.administrar` decide las acciones. El backend
+ * decide (A1). Regla de negocio (la aplica el backend, se muestra en toast): una talla usada por una
+ * curva activa no se puede desactivar.
  */
 export function TallasCurvasPagina(): React.JSX.Element {
   const [pestana, setPestana] = useState<Pestana>('tallas');
@@ -187,7 +183,7 @@ function PanelTallas(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -198,26 +194,36 @@ function PanelTallas(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<Talla>[] = [
+    {
+      encabezado: 'Talla',
+      render: (t) => (
+        <div className="flex items-center gap-2">
+          <Avatar nombre={t.etiqueta} tono="neutro" tamano="sm">
+            <Ruler className="size-4" aria-hidden />
+          </Avatar>
+          <span className="font-medium">{t.etiqueta}</span>
+        </div>
+      ),
+    },
+    { encabezado: 'Orden', numerica: true, render: (t) => t.orden },
+  ];
+
   return (
     <>
-      <ListaDetalle<Talla>
+      <TablaCatalogo<Talla>
         testid="talla"
         titulo="Tallas"
-        descripcion="Catálogo de tallas individuales (D4)."
+        descripcion="Catálogo base · tallas individuales (D4)"
         icono={Ruler}
+        unidad="tallas"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(t) => t.id}
-        obtenerTitulo={(t) => t.etiqueta}
         obtenerActivo={(t) => t.activo}
-        obtenerSecundaria={(t) => `Orden ${String(t.orden)}`}
-        renderAvatarLista={(t) => (
-          <Avatar nombre={t.etiqueta} tono="neutro" tamano="sm">
-            <Ruler className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -230,26 +236,6 @@ function PanelTallas(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarTalla}
-        renderAvatarDetalle={(t) => (
-          <Avatar nombre={t.etiqueta} tono="neutro" tamano="lg">
-            <Ruler className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderDetalle={(t) => (
-          <>
-            <SeccionDetalle titulo="Datos de la talla">
-              <RejillaCampos>
-                <CampoDetalle icono={Tag} etiqueta="Etiqueta">
-                  {t.etiqueta}
-                </CampoDetalle>
-                <CampoDetalle icono={ListChecks} etiqueta="Orden de despliegue">
-                  <span className="tabular-nums">{t.orden}</span>
-                </CampoDetalle>
-              </RejillaCampos>
-            </SeccionDetalle>
-            <Historial creadoEn={t.creadoEn} modificadoEn={t.modificadoEn} />
-          </>
-        )}
       />
 
       <DialogoTalla
@@ -357,7 +343,7 @@ function PanelCurvas(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -368,26 +354,54 @@ function PanelCurvas(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<Curva>[] = [
+    {
+      encabezado: 'Curva',
+      render: (c) => (
+        <div className="flex items-center gap-2">
+          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
+            <LayoutGrid className="size-4" aria-hidden />
+          </Avatar>
+          <span className="font-medium">{c.nombre}</span>
+        </div>
+      ),
+    },
+    {
+      encabezado: 'Tallas (en orden)',
+      render: (c) =>
+        c.items.length === 0 ? (
+          <span className="text-faint">—</span>
+        ) : (
+          <ol className="flex flex-wrap gap-1" data-testid="detalle-curva-tallas">
+            {c.items.map((item) => (
+              <li
+                key={item.idTalla}
+                className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-soft-foreground"
+              >
+                <span className="tabular-nums opacity-70">{item.posicion + 1}</span>
+                <span className="font-medium">{item.etiqueta}</span>
+              </li>
+            ))}
+          </ol>
+        ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<Curva>
+      <TablaCatalogo<Curva>
         testid="curva"
         titulo="Curvas"
-        descripcion="Conjuntos ordenados de tallas (D4)."
+        descripcion="Catálogo base · conjuntos ordenados de tallas (D4)"
         icono={LayoutGrid}
+        unidad="curvas"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(c) => c.id}
-        obtenerTitulo={(c) => c.nombre}
         obtenerActivo={(c) => c.activo}
-        obtenerSecundaria={(c) => `${String(c.items.length)} talla(s)`}
-        renderAvatarLista={(c) => (
-          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
-            <LayoutGrid className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -400,37 +414,6 @@ function PanelCurvas(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarCurva}
-        renderAvatarDetalle={(c) => (
-          <Avatar nombre={c.nombre} tono="servicios" tamano="lg">
-            <LayoutGrid className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderDetalle={(c) => (
-          <>
-            <SeccionDetalle titulo="Tallas de la curva (en orden)">
-              {c.items.length === 0 ? (
-                <ValorVacio />
-              ) : (
-                <ol
-                  className="flex flex-wrap gap-2"
-                  data-testid="detalle-curva-tallas"
-                  aria-label="Tallas de la curva en orden"
-                >
-                  {c.items.map((item) => (
-                    <li
-                      key={item.idTalla}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft px-2.5 py-1 text-sm text-primary-soft-foreground"
-                    >
-                      <span className="text-xs tabular-nums opacity-70">{item.posicion + 1}</span>
-                      <span className="font-medium">{item.etiqueta}</span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </SeccionDetalle>
-            <Historial creadoEn={c.creadoEn} modificadoEn={c.modificadoEn} />
-          </>
-        )}
       />
 
       <DialogoCurva

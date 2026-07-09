@@ -7,8 +7,11 @@ import type { Temporada, TemporadasQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { Historial } from '@/modulos/detalle';
+import {
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoTemporada } from './DialogoTemporada';
@@ -17,12 +20,13 @@ import { DialogoTemporada } from './DialogoTemporada';
 const POR_PAGINA = 10;
 
 /**
- * Pantalla de Temporadas — CRUD del catalogo de temporadas (ciclos comerciales)
- * sobre el motor LISTA + DETALLE (rediseño "Teal fresco"). Lista con busqueda
- * (debounce), paginacion de servidor y toggle de inactivos; el detalle muestra el
- * historial y permite editar / desactivar / reactivar. Borrado suave reversible;
- * toasts; consciente de permisos. `temporadas.ver` gobierna el acceso;
- * `temporadas.administrar` decide las acciones. El backend decide (A1).
+ * Pantalla de Temporadas — re-vestida R9 a TABLA-FIRST (proto `vCat`): tabla densa con la temporada y
+ * su estado (Vigente/Cerrada = activo/inactivo), acciones inline (editar/desactivar/activar). Borrado
+ * suave reversible; consciente de permisos.
+ *
+ * FIDELIDAD vs proto: el proto pinta una columna "Año", pero el backend de v2 solo guarda el NOMBRE de
+ * la temporada (sin año numérico aparte) → se omite (hueco reportado). `temporadas.ver` gobierna el
+ * acceso; `temporadas.administrar` decide las acciones (A1).
  */
 export function TemporadasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -96,7 +100,7 @@ export function TemporadasPagina(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -107,25 +111,35 @@ export function TemporadasPagina(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<Temporada>[] = [
+    {
+      encabezado: 'Temporada',
+      render: (t) => (
+        <div className="flex items-center gap-2">
+          <Avatar nombre={t.nombre} tono="pt" tamano="sm">
+            <CalendarRange className="size-4" aria-hidden />
+          </Avatar>
+          <span className="font-medium">{t.nombre}</span>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<Temporada>
+      <TablaCatalogo<Temporada>
         testid="temporada"
         titulo="Temporadas"
-        descripcion="Ciclos comerciales del año."
+        descripcion="Catálogo base · ciclos comerciales del año"
         icono={CalendarRange}
+        unidad="temporadas"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(t) => t.id}
-        obtenerTitulo={(t) => t.nombre}
         obtenerActivo={(t) => t.activo}
-        renderAvatarLista={(t) => (
-          <Avatar nombre={t.nombre} tono="pt" tamano="sm">
-            <CalendarRange className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -138,12 +152,6 @@ export function TemporadasPagina(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarTemporada}
-        renderAvatarDetalle={(t) => (
-          <Avatar nombre={t.nombre} tono="pt" tamano="lg">
-            <CalendarRange className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderDetalle={(t) => <Historial creadoEn={t.creadoEn} modificadoEn={t.modificadoEn} />}
       />
 
       {/* Dialogos */}

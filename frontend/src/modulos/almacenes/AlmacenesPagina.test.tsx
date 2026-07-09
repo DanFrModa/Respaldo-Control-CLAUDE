@@ -167,9 +167,9 @@ describe('<AlmacenesPagina>', () => {
       sesion: estadoSesionDePrueba(['almacenes.ver', 'almacenes.administrar']),
     });
 
-    // El detalle del registro inactivo muestra su estado y ofrece "Activar".
-    const detalle = screen.getByTestId('detalle-almacen');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // Tabla-first: el renglón inactivo muestra "Inactivo" y ofrece "Activar" inline.
+    const fila = screen.getByTestId('fila-almacen');
+    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-almacen')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-almacen')).not.toBeInTheDocument();
 

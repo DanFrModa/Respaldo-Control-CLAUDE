@@ -8,8 +8,11 @@ import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { Historial } from '@/modulos/detalle';
+import {
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoColor } from './DialogoColor';
@@ -19,11 +22,13 @@ import { DialogoFusionColores } from './DialogoFusionColores';
 const POR_PAGINA = 10;
 
 /**
- * Pantalla de Colores — CRUD del catalogo sobre el motor LISTA + DETALLE (rediseño
- * "Teal fresco"). Lista con busqueda (debounce), paginacion de servidor y toggle de
- * inactivos; alta con **alta rapida encadenada** (ver `DialogoColor`) y edicion en
- * dialogo; borrado suave reversible; toasts; consciente de permisos. `colores.ver`
- * gobierna el acceso; `colores.administrar` decide las acciones. El backend decide (A1).
+ * Pantalla de Colores — re-vestida R9 a TABLA-FIRST (proto `vCat`): page-head + toolbar (búsqueda,
+ * inactivos, "Fusionar") + tabla densa con el color y su estado, y acciones inline (editar/desactivar/
+ * activar). Alta con **alta rápida encadenada** (ver `DialogoColor`); borrado suave reversible.
+ *
+ * FIDELIDAD vs proto: el proto pinta columnas Código/Hex/Pantone, pero el backend de v2 solo guarda el
+ * NOMBRE del color (no hay hex/pantone/código) → esas columnas se omiten (no se inventan; hueco
+ * reportado). `colores.ver` gobierna el acceso; `colores.administrar` decide las acciones (A1).
  */
 export function ColoresPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -98,7 +103,7 @@ export function ColoresPagina(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -109,25 +114,35 @@ export function ColoresPagina(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<Color>[] = [
+    {
+      encabezado: 'Color',
+      render: (c) => (
+        <div className="flex items-center gap-2">
+          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
+            <Palette className="size-4" aria-hidden />
+          </Avatar>
+          <span className="font-medium">{c.nombre}</span>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<Color>
+      <TablaCatalogo<Color>
         testid="color"
         titulo="Colores"
-        descripcion="Catálogo de colores (úsalo para capturar varios colores seguidos)."
+        descripcion="Catálogo base · global (A9)"
         icono={Palette}
+        unidad="colores"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(c) => c.id}
-        obtenerTitulo={(c) => c.nombre}
         obtenerActivo={(c) => c.activo}
-        renderAvatarLista={(c) => (
-          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
-            <Palette className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -141,6 +156,7 @@ export function ColoresPagina(): React.JSX.Element {
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={() => setFusionAbierta(true)}
             data-testid="abrir-fusion-colores"
           >
@@ -151,12 +167,6 @@ export function ColoresPagina(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarColor}
-        renderAvatarDetalle={(c) => (
-          <Avatar nombre={c.nombre} tono="servicios" tamano="lg">
-            <Palette className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderDetalle={(c) => <Historial creadoEn={c.creadoEn} modificadoEn={c.modificadoEn} />}
       />
 
       {/* Dialogos */}

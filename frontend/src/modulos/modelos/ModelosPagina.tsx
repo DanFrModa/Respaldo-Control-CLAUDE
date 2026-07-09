@@ -1,15 +1,22 @@
 import {
   CalendarRange,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Image as ImageIcon,
+  Images,
   Layers,
+  Pencil,
+  Plus,
+  RotateCcw,
   Ruler,
   Shirt,
   Tag,
+  Trash2,
   Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import {
@@ -22,11 +29,21 @@ import {
 } from '@/api/modelos';
 import { useTemporadas } from '@/api/temporadas';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar } from '@/components/dominio/visuales';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
+import { Avatar, EstadoBadge, TipoBadge } from '@/components/dominio/visuales';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -79,14 +96,21 @@ function conDeepLinkInyectado(
 }
 
 /**
- * Pantalla de Modelos (Módulo 2, F1-E4) sobre el motor LISTA + DETALLE ("Teal fresco"). Lista
- * con búsqueda (debounce, por código/descripción), filtro por temporada, paginación de SERVIDOR
- * (volumen alto) y toggle de descontinuados. El detalle muestra los datos generales, las FOTOS
- * (galería con subida) y la RECETA/BOM (3 pestañas: telas/avíos/bordados + copiar receta), y
- * permite editar / descontinuar / reactivar.
+ * Pantalla de Modelos (Módulo 2, F1-E4) — re-vestida R9 a TABLA-FIRST fiel al proto `vModelos`:
+ * page-head (atajo a Galería + «Nuevo modelo») + toolbar (búsqueda por código/nombre, filtro por
+ * temporada, inactivos) + TABLA DENSA (Modelo · Temporada · Curva de tallas · Género · Estado) +
+ * barra de totales al pie con paginación de SERVIDOR (volumen alto). Al hacer clic en un renglón se
+ * abre un CAJÓN ancho con los datos generales, las FOTOS (galería con subida) y la RECETA/BOM (3
+ * pestañas + copiar receta); ahí se edita / descontinúa / reactiva. Conserva el DEEP-LINK
+ * (`state.idModelo`) que abre directo la ficha de un modelo (desde la galería u otra vista).
  *
- * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura. La
- * decisión real la toma el backend (A1).
+ * FIDELIDAD vs proto: el proto pinta columnas «Tela principal», «Colores» (swatches), «Stock PT» y
+ * «Costo», y en el cajón una «Matriz color×talla · existencia» — ninguno viene en el payload de la
+ * lista de modelos (tela/colores viven en el BOM/órdenes; existencia y costo son de otros módulos y
+ * no hay endpoint por-modelo cableado aquí) → se omiten (huecos reportados). También se omite el
+ * botón «Exportar» (sin endpoint de exportación de modelos).
+ *
+ * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1).
  */
 export function ModelosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -99,9 +123,12 @@ export function ModelosPagina(): React.JSX.Element {
   // Lo guardamos en estado local para que sobreviva al `navigate(..., { state: null })` que
   // limpia el state del historial (evita re-disparar en un refresh o al volver).
   const [idAbrir, setIdAbrir] = useState<number | null>(idDeepLink);
+  // El cajón guarda el ID; el modelo mostrado se DERIVA de la lista viva. Arranca en el deep-link.
+  const [seleccionId, setSeleccionId] = useState<number | null>(idDeepLink);
   useEffect(() => {
     if (idDeepLink !== null) {
       setIdAbrir(idDeepLink);
+      setSeleccionId(idDeepLink);
       // Consume el state: limpia el historial para que un refresh/volver no lo re-aplique.
       // navigate() es asíncrono en React Router 7; no necesitamos esperarlo.
       void navigate(location.pathname, { replace: true, state: null });
@@ -187,44 +214,52 @@ export function ModelosPagina(): React.JSX.Element {
   }
 
   const datos = consulta.data;
-  const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
-    ? {
-        total: datos.total,
-        pagina: datos.pagina,
-        totalPaginas,
-        ocupado: consulta.isFetching,
-        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
-        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
-      }
-    : undefined;
+  const total = datos?.total ?? 0;
+  const totalPaginas = datos?.totalPaginas ?? 1;
 
   // Registros a mostrar. Si hay deep-link y el modelo NO está en la página visible, lo
-  // inyectamos al principio para que `ListaDetalle` pueda seleccionarlo y abrir su ficha (sin
+  // inyectamos al principio para que el cajón pueda seleccionarlo y abrir su ficha (sin
   // depender de la paginación/filtro). El conteo del paginador (servidor) no se altera.
   const registros = conDeepLinkInyectado(datos?.datos ?? [], fichaDeepLink.data, idAbrir);
+  const seleccion = registros.find((m) => m.id === seleccionId) ?? null;
 
   return (
-    <>
-      <ListaDetalle<Modelo>
-        testid="modelo"
-        titulo="Modelos"
-        descripcion="Catálogo de modelos con sus fotos y su receta (BOM)."
-        icono={Shirt}
-        registros={registros}
-        seleccionInicialId={idAbrir}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(m) => m.id}
-        obtenerTitulo={(m) => m.codigo}
-        obtenerActivo={(m) => m.activo}
-        obtenerSecundaria={(m) => m.descripcion ?? m.temporada ?? '—'}
-        renderAvatarLista={(m) => <Avatar nombre={m.codigo} tono="pt" tamano="sm" />}
-        busqueda={textoBusqueda}
-        alBuscar={alBuscar}
-        filtros={
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Modelos</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Catálogo de producto · fotos y receta (BOM)
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/modelos/galeria" data-testid="ir-a-galeria-modelos">
+            <Images aria-hidden />
+            Galería
+          </Link>
+        </Button>
+        {puedeAdministrar ? (
+          <Button size="sm" onClick={abrirAlta} data-testid="nuevo-modelo">
+            <Plus aria-hidden />
+            Nuevo modelo
+          </Button>
+        ) : null}
+      </header>
+
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <Input
+            type="search"
+            className="h-8 w-60 text-sm"
+            placeholder="Buscar por código o nombre…"
+            value={textoBusqueda}
+            onChange={(e) => alBuscar(e.target.value)}
+            data-testid="buscar-modelo"
+          />
           <SelectNativo
+            className="h-8 text-sm"
             value={temporadaFiltro}
             onChange={(e) => alCambiarTemporada(e.target.value)}
             aria-label="Filtrar modelos por temporada"
@@ -237,23 +272,188 @@ export function ModelosPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={incluirInactivos}
+              onChange={alAlternarInactivos}
+              data-testid="mostrar-desactivados"
+            />
+            Incluir descontinuados
+          </label>
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {total.toLocaleString('es-MX')} modelos
+            </span>
+          </div>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando modelos…</p>
+          ) : registros.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground" data-testid="modelo-vacio">
+              No hay modelos que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Modelo</TablaDensaHead>
+                  <TablaDensaHead>Temporada</TablaDensaHead>
+                  <TablaDensaHead>Curva de tallas</TablaDensaHead>
+                  <TablaDensaHead>Género</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {registros.map((m) => (
+                  <TablaDensaFila
+                    key={m.id}
+                    seleccionada={seleccion?.id === m.id}
+                    className="cursor-pointer"
+                    onClick={() => setSeleccionId(m.id)}
+                    data-testid="fila-modelo"
+                  >
+                    <TablaDensaCelda>
+                      <div className="flex items-center gap-2">
+                        <Avatar nombre={m.codigo} tono="pt" tamano="sm" />
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{m.codigo}</div>
+                          {m.descripcion !== null && m.descripcion.trim() !== '' ? (
+                            <div className="truncate text-xs text-muted-foreground">
+                              {m.descripcion}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      {m.temporada !== null ? (
+                        <TipoBadge tono="neutro">{m.temporada}</TipoBadge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">
+                      {m.curvaTalla ?? '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">
+                      {m.genero ?? '—'}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <EstadoBadge activo={m.activo} />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Modelos (filtro)</span>
+            <b className="num">{total.toLocaleString('es-MX')}</b>
+          </span>
+          <span className="ml-auto flex items-center gap-1 text-muted-foreground">
+            Página {pagina} de {totalPaginas}
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina <= 1 || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina >= totalPaginas || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              aria-label="Página siguiente"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </Button>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Cajón de detalle del modelo (ancho: fotos + BOM necesitan espacio) ── */}
+      <CajonDetalle
+        className="sm:max-w-2xl lg:max-w-3xl"
+        abierto={seleccion !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setSeleccionId(null);
+        }}
+        titulo={
+          seleccion !== null ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {seleccion.codigo}
+              <EstadoBadge activo={seleccion.activo} />
+            </span>
+          ) : (
+            ''
+          )
         }
-        incluirInactivos={incluirInactivos}
-        alAlternarInactivos={alAlternarInactivos}
-        textoVacio="No hay modelos que coincidan con la búsqueda."
-        paginacion={paginacion}
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={abrirAlta}
-        textoNuevo="Nuevo modelo"
-        alEditar={abrirEdicion}
-        alDesactivar={setADescontinuar}
-        alReactivar={reactivarModelo}
-        renderAvatarDetalle={(m) => <Avatar nombre={m.codigo} tono="pt" tamano="lg" />}
-        renderMeta={(m) =>
-          m.temporada ? <span className="text-xs text-muted-foreground">{m.temporada}</span> : null
+        subtitulo={
+          seleccion !== null
+            ? [seleccion.descripcion, seleccion.temporada].filter(Boolean).join(' · ') || undefined
+            : undefined
         }
-        renderDetalle={(m) => <DetalleModelo modelo={m} puedeAdministrar={puedeAdministrar} />}
-      />
+        acciones={
+          seleccion !== null && puedeAdministrar ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => abrirEdicion(seleccion)}
+                data-testid="editar-modelo"
+              >
+                <Pencil aria-hidden />
+                Editar
+              </Button>
+              {seleccion.activo ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setADescontinuar(seleccion)}
+                  data-testid="desactivar-modelo"
+                >
+                  <Trash2 aria-hidden />
+                  Descontinuar
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => reactivarModelo(seleccion)}
+                  data-testid="activar-modelo"
+                >
+                  <RotateCcw aria-hidden />
+                  Reactivar
+                </Button>
+              )}
+            </>
+          ) : undefined
+        }
+      >
+        {seleccion !== null ? (
+          <DetalleModelo modelo={seleccion} puedeAdministrar={puedeAdministrar} />
+        ) : null}
+      </CajonDetalle>
 
       <DialogoModelo
         abierto={dialogoAbierto}
@@ -280,7 +480,7 @@ export function ModelosPagina(): React.JSX.Element {
         procesando={descontinuar.isPending}
         alConfirmar={confirmarDescontinuar}
       />
-    </>
+    </div>
   );
 }
 
@@ -299,7 +499,7 @@ function DetalleModelo({
   const ficha = useFichaModelo(modelo.id);
 
   return (
-    <>
+    <div data-testid="detalle-modelo">
       <SeccionDetalle titulo="Datos generales" icono={Shirt}>
         <RejillaCampos>
           <CampoDetalle icono={Tag} etiqueta="Código">
@@ -352,6 +552,6 @@ function DetalleModelo({
       </SeccionDetalle>
 
       <Historial creadoEn={modelo.creadoEn} modificadoEn={modelo.modificadoEn} />
-    </>
+    </div>
   );
 }

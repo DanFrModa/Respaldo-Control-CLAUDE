@@ -3,12 +3,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { abrirDesplegableMenu, entrarComoAdmin } from './ayudas';
 
 /**
- * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, en la estructura LISTA + DETALLE
- * ("Teal fresco"). Recorre el ciclo completo: dar de alta los componentes (1 tela, 1 avío, 1
- * bordado) → crear un modelo → subir una foto (red de R2 mockeada) → armar su receta (1 tela
- * con banderas + 1 avío + 1 bordado con precio) → crear un 2º modelo y COPIAR la receta del
- * primero → descontinuar → reactivar → buscar por código y por descripción. Nombres únicos por
- * corrida.
+ * E2E del Módulo 2 — Modelos (F1-E4) contra el stack real, re-vestido R9 a TABLA-FIRST + CAJÓN.
+ * Recorre el ciclo completo: dar de alta los componentes (1 tela, 1 avío, 1 bordado) → crear un
+ * modelo → subir una foto (red de R2 mockeada) → armar su receta (1 tela con banderas + 1 avío + 1
+ * bordado con precio) → crear un 2º modelo y COPIAR la receta del primero → descontinuar → reactivar
+ * → buscar por código y por descripción. Nombres únicos por corrida. El código y el estado
+ * (Activo/Inactivo) viven en el TÍTULO del cajón; fotos, BOM y campos, en su cuerpo — por eso
+ * `detalle` apunta al cajón completo.
  *
  * NOTA: requiere que la integración haya cableado el plugin de rutas, el menú (Modelos) y la
  * ruta `/modelos` en App.tsx; de lo contrario estas pruebas se omiten en CI hasta el cierre.
@@ -81,7 +82,7 @@ test.describe('Módulo Modelos (ficha + fotos + BOM)', () => {
       .click();
     await expect(page.getByRole('heading', { name: 'Modelos' })).toBeVisible();
 
-    const detalle = page.getByTestId('detalle-modelo');
+    const detalle = page.locator('[data-slot="cajon-detalle"]');
 
     // ── Crear el modelo ──────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-modelo').click();
