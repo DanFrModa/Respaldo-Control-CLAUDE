@@ -179,8 +179,11 @@ export function CapturaAuditoriaPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Medal className="size-5" aria-hidden />
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+        >
+          <Medal className="size-4.5" aria-hidden />
         </span>
         <div>
           <h1 className="text-xl font-semibold">Auditoría #{auditoria.numAuditoria}</h1>

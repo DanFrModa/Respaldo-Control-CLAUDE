@@ -93,8 +93,8 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
   it('las hojas sin pantalla llevan su nota de "Proximamente" y ruta de un segmento', () => {
     // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta.
     for (const [clave, nota] of [
-      ['ventas', 'Llega en R9'],
-      ['auditores', 'Llega en R9'],
+      ['ventas', 'Llega con Finanzas (F9)'],
+      ['auditores', 'Requiere catálogo de auditores (posterior)'],
       ['cxc', 'Llega con Finanzas (F9)'],
       ['cxp', 'Llega con Finanzas (F9)'],
     ] as const) {

@@ -1,11 +1,20 @@
-import { Factory, Layers, Search } from 'lucide-react';
+import { Factory, Layers, Scissors, Search } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useClientes } from '@/api/clientes';
 import { useWipOrden, useTableroWip } from '@/api/wip';
 import type { TableroWipQuery, WipOrden, WipOrdenFila, WipProcesoPendiente } from '@/api/tipos';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useDebounce } from '@/lib/useDebounce';
+import { useSesion } from '@/sesion/useSesion';
 
 /** Renglones por página del tablero. */
 const POR_PAGINA = 20;
@@ -37,15 +47,26 @@ function fmt(n: number): string {
 }
 
 /**
- * TABLERO WIP (F3-E5, form `Proceso` del viejo): avance de cada orden por etapa, DERIVADO en el
- * servidor (suma de etapas, sin acumuladores). Tabla resumen con búsqueda (folio/modelo/cliente/
- * referencia D7) + filtro por cliente y "solo pendientes". Al abrir una orden se ve el drill-down a
- * color×talla ("faltan 12 pzas talla 6 color rojo"). RESPONSIVE: tabla en escritorio, tarjetas en
- * móvil (las consultas también son móviles, regla del plan).
+ * TABLERO WIP (F3-E5, form `Proceso` del viejo; proto `vProduccion` — re-vestido R9). Avance de cada
+ * orden por etapa, DERIVADO en el servidor (suma de etapas, sin acumuladores). Kit tabla-first del
+ * rediseño: page-head + KPIs de vistazo + card con barra de herramientas (búsqueda folio/modelo/
+ * cliente/referencia D7 + filtro por cliente + "solo pendientes") + TABLA DENSA + barra de totales al
+ * pie con paginación. Al abrir una orden se ve el drill-down color×talla ("faltan 12 pzas talla 6
+ * color rojo"). RESPONSIVE: tabla en escritorio, tarjetas en móvil (las consultas también son móviles).
+ *
+ * FIDELIDAD vs proto: el proto pinta 4 KPIs de PIEZAS por etapa (Por cortar / En maquila / En estampado
+ * / Por recibir) agregadas; el endpoint `/produccion/wip` es POR ORDEN y no devuelve esos totales
+ * agregados (el agregado por etapa vive en el módulo Indicadores, `indicadores.ver`, otro permiso). No
+ * se pivotea en cliente (A1): por eso los KPIs son Órdenes en piso + Con pendientes (Σ de servidor) y la
+ * riqueza va en la tabla (pendientes por etapa por orden) — hueco de endpoint reportado al cerrar el lote.
  *
  * `produccion.wip-ver` gobierna el acceso a la pantalla.
  */
 export function TableroWipPagina(): React.JSX.Element {
+  const navigate = useNavigate();
+  const { tienePermiso } = useSesion();
+  const puedeCortar = tienePermiso('produccion.corte');
+
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
   const [idCliente, setIdCliente] = useState<string>(TODOS);
@@ -55,6 +76,12 @@ export function TableroWipPagina(): React.JSX.Element {
 
   const clientes = useClientes({ pagina: 1, porPagina: 100, ordenarPor: 'nombre' });
 
+  /** Filtros comunes (búsqueda + cliente), compartidos por la consulta y el conteo de pendientes. */
+  const filtrosComunes = {
+    ...(busqueda.length > 0 ? { busqueda } : {}),
+    ...(idCliente !== TODOS ? { idCliente: Number(idCliente) } : {}),
+  } as const;
+
   const query: TableroWipQuery = {
     pagina,
     porPagina: POR_PAGINA,
@@ -62,8 +89,7 @@ export function TableroWipPagina(): React.JSX.Element {
     direccion: 'desc',
     // El querystring espera stringbool ("true"/"false"); solo se manda cuando se piden pendientes.
     ...(soloPendientes ? { soloPendientes: 'true' } : {}),
-    ...(busqueda.length > 0 ? { busqueda } : {}),
-    ...(idCliente !== TODOS ? { idCliente: Number(idCliente) } : {}),
+    ...filtrosComunes,
   };
 
   const consulta = useTableroWip(query);
@@ -71,179 +97,240 @@ export function TableroWipPagina(): React.JSX.Element {
   const filas = datos?.datos ?? [];
   const totalPaginas = datos?.totalPaginas ?? 0;
 
+  // Conteo de órdenes CON pendientes bajo el mismo filtro (Σ de servidor, no pivote en cliente).
+  // porPagina:1 basta para leer el `total` sin traer renglones de más.
+  const conteoPendientes = useTableroWip({
+    pagina: 1,
+    porPagina: 1,
+    ordenarPor: 'folio',
+    direccion: 'desc',
+    soloPendientes: 'true',
+    ...filtrosComunes,
+  });
+
+  const kpis: Kpi[] = [
+    {
+      clave: 'ordenes',
+      etiqueta: 'Órdenes en piso',
+      valor: fmt(datos?.total ?? 0),
+      pie: 'coinciden con el filtro',
+    },
+    {
+      clave: 'con-pendientes',
+      etiqueta: 'Con pendientes',
+      valor: fmt(conteoPendientes.data?.total ?? 0),
+      pie: 'falta corte, envío, recibo o entrega',
+    },
+  ];
+
   /** Reinicia la paginación al cambiar un filtro. */
   function reiniciar(): void {
     setPagina(1);
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="tablero-wip">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Factory className="size-5" aria-hidden />
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="tablero-wip">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+        >
+          <Factory className="size-4.5" aria-hidden />
         </span>
-        <div>
-          <h1 className="text-xl font-semibold">Tablero WIP</h1>
-          <p className="text-sm text-muted-foreground">
-            Avance de cada orden por etapa (corte, envío, recibo y entrega), derivado de las etapas.
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Producción · WIP</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Trabajo en proceso por etapa (corte, envío, recibo y entrega) · derivado de los
+            movimientos
           </p>
         </div>
+        {puedeCortar ? (
+          <Button
+            size="sm"
+            onClick={() => void navigate('/produccion/corte')}
+            data-testid="wip-ir-corte"
+          >
+            <Scissors aria-hidden />
+            Registrar corte
+          </Button>
+        ) : null}
       </header>
 
-      {/* Filtros */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="relative sm:col-span-2 lg:col-span-2">
-          <Search
-            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            value={textoBusqueda}
-            onChange={(e) => {
-              setTextoBusqueda(e.target.value);
-              reiniciar();
-            }}
-            placeholder="Folio, modelo, cliente o referencia"
-            className="pl-8"
-            data-testid="wip-busqueda"
-            aria-label="Buscar órdenes"
-          />
-        </div>
-        <SelectNativo
-          value={idCliente}
-          onChange={(e) => {
-            setIdCliente(e.target.value);
-            reiniciar();
-          }}
-          aria-label="Filtrar por cliente"
-          data-testid="wip-cliente"
-        >
-          <option value={TODOS}>Todos los clientes</option>
-          {(clientes.data?.datos ?? []).map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.nombre}
-            </option>
-          ))}
-        </SelectNativo>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={soloPendientes}
-            onChange={(e) => {
-              setSoloPendientes(e.target.checked);
-              reiniciar();
-            }}
-            data-testid="wip-solo-pendientes"
-            className="size-4 rounded border-input"
-          />
-          Solo con pendientes
-        </label>
-      </div>
+      {/* ── KPIs ────────────────────────────────────────────────────────────── */}
+      <KpiTiles kpis={kpis} className="shrink-0" />
 
-      {consulta.isError ? (
-        <p className="text-sm text-destructive" role="alert">
-          {consulta.error.message}
-        </p>
-      ) : consulta.isPending ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
-      ) : filas.length === 0 ? (
-        <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No hay órdenes que coincidan con los filtros.
-        </p>
-      ) : (
-        <>
-          {/* Móvil: tarjetas apiladas. */}
-          <div className="space-y-3 md:hidden" data-testid="wip-tarjetas">
-            {filas.map((f) => (
-              <Card key={f.idOrden}>
-                <CardContent className="space-y-2 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium">
-                        #{f.folio} · {f.codigoModelo}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{f.cliente}</p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setOrdenDrill(f.idOrden)}
-                      data-testid="wip-detalle"
-                    >
-                      <Layers className="size-4" aria-hidden />
-                      Detalle
-                    </Button>
-                  </div>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    <Metrica etiqueta="Pedido" valor={f.pedido} />
-                    <Metrica etiqueta="Por cortar" valor={f.porCortar} resaltar />
-                    <Metrica etiqueta="Cortado" valor={f.cortado} />
-                    <Metrica etiqueta="Por enviar" valor={f.cortadoPorEnviar} resaltar />
-                    <Metrica etiqueta="Enviado" valor={f.enviado} />
-                    <Metrica etiqueta="Por recibir" valor={f.porRecibir} resaltar />
-                    <Metrica etiqueta="Recibido" valor={f.recibido} />
-                    <Metrica etiqueta="Por entregar" valor={f.porEntregar} resaltar />
-                  </dl>
-                </CardContent>
-              </Card>
-            ))}
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <div className="relative w-64">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              value={textoBusqueda}
+              onChange={(e) => {
+                setTextoBusqueda(e.target.value);
+                reiniciar();
+              }}
+              placeholder="Folio, modelo, cliente o referencia"
+              className="h-8 pl-8 text-sm"
+              data-testid="wip-busqueda"
+              aria-label="Buscar órdenes"
+            />
           </div>
-
-          {/* Escritorio: tabla. */}
-          <div
-            className="hidden overflow-x-auto rounded-md border md:block"
-            data-testid="wip-tabla"
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={idCliente}
+            onChange={(e) => {
+              setIdCliente(e.target.value);
+              reiniciar();
+            }}
+            aria-label="Filtrar por cliente"
+            data-testid="wip-cliente"
           >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Folio</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="text-right">Pedido</TableHead>
-                  <TableHead className="text-right">Por cortar</TableHead>
-                  <TableHead className="text-right">Por enviar</TableHead>
-                  <TableHead className="text-right">Por recibir</TableHead>
-                  <TableHead className="text-right">Por entregar</TableHead>
-                  <TableHead className="text-right">Detalle</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filas.map((f) => (
-                  <FilaWip key={f.idOrden} fila={f} alAbrir={() => setOrdenDrill(f.idOrden)} />
-                ))}
-              </TableBody>
-            </Table>
+            <option value={TODOS}>Todos los clientes</option>
+            {(clientes.data?.datos ?? []).map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.nombre}
+              </option>
+            ))}
+          </SelectNativo>
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={soloPendientes}
+              onChange={(e) => {
+                setSoloPendientes(e.target.checked);
+                reiniciar();
+              }}
+              data-testid="wip-solo-pendientes"
+            />
+            Solo con pendientes
+          </label>
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {fmt(datos?.total ?? 0)} órdenes
+            </span>
           </div>
+        </div>
 
-          {/* Paginación */}
-          {datos && datos.total > 0 ? (
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>
-                {fmt(datos.total)} órdenes · página {datos.pagina} de {totalPaginas}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={datos.pagina <= 1 || consulta.isFetching}
-                  onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                >
-                  Anterior
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={datos.pagina >= totalPaginas || consulta.isFetching}
-                  onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                >
-                  Siguiente
-                </Button>
-              </div>
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
             </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando órdenes…</p>
+          ) : filas.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground" data-testid="wip-vacio">
+              No hay órdenes que coincidan con los filtros.
+            </p>
+          ) : (
+            <>
+              {/* Móvil: tarjetas apiladas. */}
+              <div className="space-y-3 p-3 md:hidden" data-testid="wip-tarjetas">
+                {filas.map((f) => (
+                  <div key={f.idOrden} className="space-y-2 rounded-lg border bg-card p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium">
+                          #{f.folio} · {f.codigoModelo}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{f.cliente}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setOrdenDrill(f.idOrden)}
+                        data-testid="wip-detalle"
+                      >
+                        <Layers className="size-4" aria-hidden />
+                        Detalle
+                      </Button>
+                    </div>
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                      <Metrica etiqueta="Pedido" valor={f.pedido} />
+                      <Metrica etiqueta="Por cortar" valor={f.porCortar} resaltar />
+                      <Metrica etiqueta="Por enviar" valor={f.cortadoPorEnviar} resaltar />
+                      <Metrica etiqueta="Por recibir" valor={f.porRecibir} resaltar />
+                      <Metrica etiqueta="Por entregar" valor={f.porEntregar} resaltar />
+                    </dl>
+                  </div>
+                ))}
+              </div>
+
+              {/* Escritorio: tabla densa. */}
+              <div className="hidden md:block" data-testid="wip-tabla">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Orden</TablaDensaHead>
+                      <TablaDensaHead>Modelo</TablaDensaHead>
+                      <TablaDensaHead>Cliente</TablaDensaHead>
+                      <TablaDensaHead numerica>Pedido</TablaDensaHead>
+                      <TablaDensaHead numerica>Por cortar</TablaDensaHead>
+                      <TablaDensaHead numerica>Por enviar</TablaDensaHead>
+                      <TablaDensaHead numerica>Por recibir</TablaDensaHead>
+                      <TablaDensaHead numerica>Por entregar</TablaDensaHead>
+                      <TablaDensaHead className="text-right">Detalle</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((f) => (
+                      <FilaWip
+                        key={f.idOrden}
+                        fila={f}
+                        seleccionada={ordenDrill === f.idOrden}
+                        alAbrir={() => setOrdenDrill(f.idOrden)}
+                      />
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Órdenes (filtro)</span>
+            <b className="num">{fmt(datos?.total ?? 0)}</b>
+          </span>
+          {datos && datos.total > 0 ? (
+            <span
+              className="ml-auto flex items-center gap-2 text-muted-foreground"
+              data-testid="wip-paginacion"
+            >
+              Página {datos.pagina} de {totalPaginas}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={datos.pagina <= 1 || consulta.isFetching}
+                onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={datos.pagina >= totalPaginas || consulta.isFetching}
+                onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              >
+                Siguiente
+              </Button>
+            </span>
           ) : null}
-        </>
-      )}
+        </div>
+      </div>
 
       <DrillDownOrden idOrden={ordenDrill} alCerrar={() => setOrdenDrill(undefined)} />
     </div>
@@ -264,49 +351,50 @@ function Metrica({
   return (
     <div className="flex items-center justify-between gap-2">
       <dt className="text-muted-foreground">{etiqueta}</dt>
-      <dd className={`tabular-nums ${fuerte ? 'font-semibold text-foreground' : ''}`}>
-        {fmt(valor)}
-      </dd>
+      <dd className={`num ${fuerte ? 'font-semibold text-warn' : ''}`}>{fmt(valor)}</dd>
     </div>
   );
 }
 
-/** Celda numérica de la tabla; resalta los pendientes ≠ 0. */
+/** Celda numérica de la tabla; resalta los pendientes ≠ 0 (ámbar = falta trabajo). */
 function CeldaPendiente({ valor }: { valor: number }): React.JSX.Element {
   return (
-    <TableCell
-      className={`text-right tabular-nums ${valor !== 0 ? 'font-semibold' : 'text-muted-foreground'}`}
+    <TablaDensaCelda
+      numerica
+      className={valor !== 0 ? 'font-semibold text-warn' : 'text-muted-foreground'}
     >
       {fmt(valor)}
-    </TableCell>
+    </TablaDensaCelda>
   );
 }
 
 /** Una fila del tablero (escritorio). */
 function FilaWip({
   fila,
+  seleccionada,
   alAbrir,
 }: {
   fila: WipOrdenFila;
+  seleccionada: boolean;
   alAbrir: () => void;
 }): React.JSX.Element {
   return (
-    <TableRow data-testid="wip-fila">
-      <TableCell className="font-medium">#{fila.folio}</TableCell>
-      <TableCell>{fila.codigoModelo}</TableCell>
-      <TableCell>{fila.cliente}</TableCell>
-      <TableCell className="text-right tabular-nums">{fmt(fila.pedido)}</TableCell>
+    <TablaDensaFila seleccionada={seleccionada} data-testid="wip-fila">
+      <TablaDensaCelda className="font-medium">#{fila.folio}</TablaDensaCelda>
+      <TablaDensaCelda>{fila.codigoModelo}</TablaDensaCelda>
+      <TablaDensaCelda className="text-muted-foreground">{fila.cliente}</TablaDensaCelda>
+      <TablaDensaCelda numerica>{fmt(fila.pedido)}</TablaDensaCelda>
       <CeldaPendiente valor={fila.porCortar} />
       <CeldaPendiente valor={fila.cortadoPorEnviar} />
       <CeldaPendiente valor={fila.porRecibir} />
       <CeldaPendiente valor={fila.porEntregar} />
-      <TableCell className="text-right">
+      <TablaDensaCelda className="text-right">
         <Button variant="ghost" size="sm" onClick={alAbrir} data-testid="wip-detalle">
           <Layers className="size-4" aria-hidden />
           Ver
         </Button>
-      </TableCell>
-    </TableRow>
+      </TablaDensaCelda>
+    </TablaDensaFila>
   );
 }
 
