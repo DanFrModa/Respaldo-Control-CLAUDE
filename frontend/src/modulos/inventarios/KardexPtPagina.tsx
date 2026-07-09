@@ -1,11 +1,11 @@
-import { Ban, BookOpenText, Loader2Icon, Search } from 'lucide-react';
+import { Ban, Loader2Icon, Search } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useCancelarMovimientoPt, useKardexPt, useMovimientoPtPorFolio } from '@/api/inventarios';
-import type { MovimientoPt } from '@/api/tipos';
 import type { Modelo } from '@/api/modelos';
-import { Badge } from '@/components/ui/badge';
+import type { MovimientoPt } from '@/api/tipos';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -44,24 +44,27 @@ export function KardexPtPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <BookOpenText className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Kardex de producto terminado</h1>
-          <p className="text-sm text-muted-foreground">
-            Movimientos con saldo corrido por modelo, o el detalle de un movimiento por folio.
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Kardex de producto terminado</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Movimientos con saldo corrido por modelo, o el detalle de un movimiento por folio
           </p>
         </div>
       </header>
 
-      <div className="inline-flex rounded-md border p-0.5">
+      <div
+        className="flex w-fit overflow-hidden rounded-md border text-xs"
+        role="group"
+        aria-label="Modo del kardex"
+      >
         <button
           type="button"
           onClick={() => setModo('modelo')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            modo === 'modelo' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
+          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
+            modo === 'modelo'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
           data-testid="kardex-modo-modelo"
         >
@@ -70,8 +73,10 @@ export function KardexPtPagina(): React.JSX.Element {
         <button
           type="button"
           onClick={() => setModo('folio')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            modo === 'folio' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
+          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
+            modo === 'folio'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
           data-testid="kardex-modo-folio"
         >
@@ -150,7 +155,7 @@ function KardexPorModelo(): React.JSX.Element {
                       <TableCell>{r.fecha}</TableCell>
                       <TableCell className="flex items-center gap-1.5">
                         {r.tipoMov}
-                        {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
+                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
                       </TableCell>
                       <TableCell>{r.almacen}</TableCell>
                       <TableCell className="text-muted-foreground">
@@ -239,9 +244,9 @@ function KardexPorFolio(): React.JSX.Element {
                   <span className="text-muted-foreground">Folio:</span>{' '}
                   <strong>{movimiento.folio}</strong>
                   {movimiento.cancelado ? (
-                    <Badge variant="secondary" className="ml-2">
+                    <ChipEstado tono="neutro" className="ml-2">
                       Cancelado
-                    </Badge>
+                    </ChipEstado>
                   ) : null}
                 </p>
                 <p>

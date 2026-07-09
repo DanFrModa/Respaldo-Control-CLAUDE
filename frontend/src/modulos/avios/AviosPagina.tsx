@@ -1,4 +1,4 @@
-import { Boxes, Hash, Package, Ruler, Star, Tag, Truck, Wallet } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,17 +10,21 @@ import {
   type AviosQuery,
 } from '@/api/avios';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
+import { Avatar, EstadoBadge } from '@/components/dominio/visuales';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import {
-  CampoDetalle,
-  Historial,
-  RejillaCampos,
-  SeccionDetalle,
-  ValorVacio,
-} from '@/modulos/detalle';
+import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoAvio } from './DialogoAvio';
@@ -31,11 +35,6 @@ const POR_PAGINA = 10;
 
 /** Valor del filtro de género que significa "todos" (sin filtrar). */
 const GENERO_TODOS = 'TODOS';
-
-/** ¿La cadena tiene contenido real (no null ni vacía)? */
-function hayTexto(valor: string | null): valor is string {
-  return valor !== null && valor.trim() !== '';
-}
 
 /** Formatea un precio (number | null) como moneda corta es-MX, o "—". */
 function formatearPrecio(valor: number | null): string {
@@ -50,15 +49,23 @@ function formatearPrecio(valor: number | null): string {
 }
 
 /**
- * Pantalla de Avíos — CRUD del catálogo (F1-E3, R1) sobre el motor LISTA + DETALLE
- * (rediseño "Teal fresco"). Lista con búsqueda (debounce), **filtro por género (genérico/
- * no, R4)**, paginación de servidor y toggle de inactivos; el detalle muestra los datos del
- * avío y su tabla de **proveedores con precios** (R1), y permite editar / desactivar /
- * reactivar. Borrado suave reversible (desactivar con confirmación, reactivar directo);
- * toasts; consciente de permisos. El listado DISTINGUE los avíos genéricos con un badge.
+ * AVÍOS — catálogo (F1-E3, R1) re-vestido R9 a TABLA-FIRST fiel al proto `vAvios`: page-head + toolbar
+ * (filtro por género R4, búsqueda, inactivos) + TABLA DENSA con filas EXPANDIBLES (chevron) + barra de
+ * totales al pie. Cada avío distingue Genérico·stock / Por orden (chip), lleva su cuenta de
+ * PROVEEDORES (badge) y su precio de referencia; al expandir muestra los PROVEEDORES con su precio
+ * (el más barato marcado) y las MEDIDAS del avío "por medida" (promedio del precosteo, R5/B11), más las
+ * acciones de administración (editar/desactivar/activar). Borrado suave reversible.
  *
- * `avios.ver` gobierna el acceso a la pantalla; `avios.administrar` decide las acciones de
- * escritura. La decisión real la toma el backend (A1).
+ * FIDELIDAD vs proto: (1) el proto pinta KPIs (SKU · multi-proveedor · genéricos · sin proveedor) y una
+ * columna de EXISTENCIA + estado "Bajo mín."; esos agregados/umbrales NO viven en el endpoint del
+ * catálogo (la existencia vive en Inventario de avíos, y el conteo por atributo necesita un endpoint de
+ * resumen) → no se inventan en cliente (hueco reportado). (2) El badge "Por medida" del renglón
+ * colapsado necesita un flag en el payload del avío; hoy las medidas solo se conocen al expandir (se
+ * muestra ahí). (3) Alta/baja de proveedores va por "Editar" (el API actualiza el set de proveedores
+ * del avío de forma atómica), no con ✕ inline. El lado PROVEEDOR ("Avíos que surte", B17) es de otro lote.
+ *
+ * `avios.ver` gobierna el acceso; `avios.administrar` decide las acciones de escritura (el backend
+ * re-decide, A1).
  */
 export function AviosPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -67,10 +74,10 @@ export function AviosPagina(): React.JSX.Element {
   // ── Estado de la vista ─────────────────────────────────────────────────────
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  // Filtro por género: "TODOS" | "generico" | "normal".
   const [generoFiltro, setGeneroFiltro] = useState<string>(GENERO_TODOS);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
   const [pagina, setPagina] = useState(1);
+  const [expandidas, setExpandidas] = useState<ReadonlySet<number>>(new Set());
 
   const query: AviosQuery = {
     pagina,
@@ -105,6 +112,21 @@ export function AviosPagina(): React.JSX.Element {
     setDialogoAbierto(true);
   }
 
+  // Chevron = TOGGLE (abre/cierra). Clic en el cuerpo del renglón = EXPANDIR (idempotente): así un
+  // segundo clic en un renglón ya abierto NO lo cierra (colapsar es tarea del chevron).
+  function alternarExpandida(id: number): void {
+    setExpandidas((prev) => {
+      const siguiente = new Set(prev);
+      if (siguiente.has(id)) siguiente.delete(id);
+      else siguiente.add(id);
+      return siguiente;
+    });
+  }
+
+  function expandir(id: number): void {
+    setExpandidas((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  }
+
   function confirmarDesactivar(): void {
     if (aDesactivar === null) {
       return;
@@ -127,57 +149,44 @@ export function AviosPagina(): React.JSX.Element {
     });
   }
 
-  // Cambiar búsqueda, género o el filtro de inactivos reinicia a la página 1.
-  function alBuscar(valor: string): void {
-    setTextoBusqueda(valor);
-    setPagina(1);
-  }
-
-  function alCambiarGenero(valor: string): void {
-    setGeneroFiltro(valor);
-    setPagina(1);
-  }
-
-  function alAlternarInactivos(): void {
-    setIncluirInactivos((v) => !v);
+  function reiniciar(): void {
     setPagina(1);
   }
 
   const datos = consulta.data;
-  const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
-    ? {
-        total: datos.total,
-        pagina: datos.pagina,
-        totalPaginas,
-        ocupado: consulta.isFetching,
-        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
-        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
-      }
-    : undefined;
+  const filas = datos?.datos ?? [];
+  const total = datos?.total ?? 0;
+  const totalPaginas = datos?.totalPaginas ?? 1;
 
   return (
-    <>
-      <ListaDetalle<Avio>
-        testid="avio"
-        titulo="Avíos"
-        descripcion="Habilitación: botones, hilos, etiquetas… y sus proveedores."
-        icono={Boxes}
-        registros={datos?.datos ?? []}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(a) => a.id}
-        obtenerTitulo={(a) => a.clave}
-        obtenerActivo={(a) => a.activo}
-        obtenerSecundaria={(a) => a.descripcion}
-        renderAvatarLista={(a) => <Avatar nombre={a.clave} tono="avios" tamano="sm" />}
-        busqueda={textoBusqueda}
-        alBuscar={alBuscar}
-        filtros={
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Avíos</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Catálogo · cada avío puede tener varios proveedores con su precio (R1) · el proveedor se
+            amarra en la compra
+          </p>
+        </div>
+        {puedeAdministrar ? (
+          <Button size="sm" onClick={abrirAlta} data-testid="nuevo-avio">
+            <Plus aria-hidden />
+            Nuevo avío
+          </Button>
+        ) : null}
+      </header>
+
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
           <SelectNativo
+            className="h-8 w-auto text-sm"
             value={generoFiltro}
-            onChange={(e) => alCambiarGenero(e.target.value)}
+            onChange={(e) => {
+              setGeneroFiltro(e.target.value);
+              reiniciar();
+            }}
             aria-label="Filtrar avíos por género"
             data-testid="filtro-genero-avio"
           >
@@ -185,26 +194,112 @@ export function AviosPagina(): React.JSX.Element {
             <option value="generico">Solo genéricos</option>
             <option value="normal">Solo por orden</option>
           </SelectNativo>
-        }
-        incluirInactivos={incluirInactivos}
-        alAlternarInactivos={alAlternarInactivos}
-        textoVacio="No hay avíos que coincidan con la búsqueda."
-        paginacion={paginacion}
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={abrirAlta}
-        textoNuevo="Nuevo avío"
-        alEditar={abrirEdicion}
-        alDesactivar={setADesactivar}
-        alReactivar={reactivarAvio}
-        renderAvatarDetalle={(a) => <Avatar nombre={a.clave} tono="avios" tamano="lg" />}
-        renderMeta={(a) => (
-          <span className="flex flex-wrap gap-1.5">
-            {a.esGenerico ? <TipoBadge tono="neutro">Genérico</TipoBadge> : null}
-            {a.favorito ? <TipoBadge tono="avios">Favorito</TipoBadge> : null}
+          <Input
+            type="search"
+            className="h-8 w-52 text-sm"
+            placeholder="Buscar avío…"
+            value={textoBusqueda}
+            onChange={(e) => {
+              setTextoBusqueda(e.target.value);
+              reiniciar();
+            }}
+            data-testid="buscar-avio"
+          />
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={incluirInactivos}
+              onChange={() => {
+                setIncluirInactivos((v) => !v);
+                reiniciar();
+              }}
+              data-testid="mostrar-desactivados"
+            />
+            Incluir inactivos
+          </label>
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {total.toLocaleString('es-MX')} avíos
+            </span>
+          </div>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando avíos…</p>
+          ) : filas.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground" data-testid="avio-vacio">
+              No hay avíos que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead className="w-8" />
+                  <TablaDensaHead>Avío</TablaDensaHead>
+                  <TablaDensaHead>Proveedores</TablaDensaHead>
+                  <TablaDensaHead numerica>Precio ref.</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {filas.map((avio) => (
+                  <RenglonAvio
+                    key={avio.id}
+                    avio={avio}
+                    abierta={expandidas.has(avio.id)}
+                    puedeAdministrar={puedeAdministrar}
+                    onToggle={() => alternarExpandida(avio.id)}
+                    onExpandir={() => expandir(avio.id)}
+                    onEditar={() => abrirEdicion(avio)}
+                    onDesactivar={() => setADesactivar(avio)}
+                    onReactivar={() => reactivarAvio(avio)}
+                  />
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Avíos (filtro)</span>
+            <b className="num">{total.toLocaleString('es-MX')}</b>
           </span>
-        )}
-        renderDetalle={(a) => <DetalleAvio avio={a} puedeAdministrar={puedeAdministrar} />}
-      />
+          <span className="ml-auto flex items-center gap-1 text-muted-foreground">
+            Página {pagina} de {totalPaginas}
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina <= 1 || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina >= totalPaginas || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              aria-label="Página siguiente"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </Button>
+          </span>
+        </div>
+      </div>
 
       {/* Diálogos */}
       <DialogoAvio
@@ -232,92 +327,189 @@ export function AviosPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </>
+    </div>
   );
 }
 
 /**
- * Panel de DETALLE de un avío (M2): muestra sus datos generales y su tabla de proveedores
- * con precios (R1). Los campos sin dato no se pintan (no se llena de vacíos). La sección
- * General siempre se muestra (clave/descripción existen). Usa las piezas de
- * `@/modulos/detalle` para verse igual que el resto.
+ * Un renglón del catálogo de avíos + su fila EXPANDIBLE (proveedores con precio + medidas + acciones).
+ * El renglón colapsado muestra el chip Genérico/Por orden, la cuenta de proveedores, el precio de
+ * referencia y el estado (activo/inactivo). Clic en el renglón (o el chevron) lo expande.
  */
-function DetalleAvio({
+function RenglonAvio({
   avio,
+  abierta,
   puedeAdministrar,
+  onToggle,
+  onExpandir,
+  onEditar,
+  onDesactivar,
+  onReactivar,
 }: {
   avio: Avio;
+  abierta: boolean;
   puedeAdministrar: boolean;
+  onToggle: () => void;
+  onExpandir: () => void;
+  onEditar: () => void;
+  onDesactivar: () => void;
+  onReactivar: () => void;
 }): React.JSX.Element {
+  const provs = avio.proveedores;
+  // El más barato ENTRE LOS PROVEEDORES DEL AVÍO (presentación sobre el propio renglón, no dato oculto).
+  const preciosProv = provs.map((p) => p.precio).filter((p): p is number => p !== null);
+  const barato = preciosProv.length > 0 ? Math.min(...preciosProv) : null;
+
   return (
     <>
-      {/* ── General (siempre: clave/descripción existen) ─────────────────────── */}
-      <SeccionDetalle titulo="Datos del avío" icono={Package}>
-        <RejillaCampos>
-          <CampoDetalle icono={Hash} etiqueta="Clave">
-            {avio.clave}
-          </CampoDetalle>
-          <CampoDetalle icono={Tag} etiqueta="Descripción">
-            {avio.descripcion}
-          </CampoDetalle>
-          <CampoDetalle icono={Ruler} etiqueta="Unidad">
-            {hayTexto(avio.unidad) ? avio.unidad : <ValorVacio />}
-          </CampoDetalle>
-          <CampoDetalle icono={Package} etiqueta="Presentación">
-            {hayTexto(avio.presentacion) ? avio.presentacion : <ValorVacio />}
-          </CampoDetalle>
-          <CampoDetalle icono={Star} etiqueta="¿Favorito?">
-            {avio.favorito ? `Sí (cantidad: ${avio.cantFav ?? '—'})` : 'No'}
-          </CampoDetalle>
-          <CampoDetalle icono={Boxes} etiqueta="¿Genérico? (R4)">
-            {avio.esGenerico ? 'Sí (stock)' : 'No (por orden)'}
-          </CampoDetalle>
-          <CampoDetalle icono={Wallet} etiqueta="Precio de referencia" anchoCompleto>
-            {avio.precioReferencia !== null ? (
-              formatearPrecio(avio.precioReferencia)
-            ) : (
-              <ValorVacio />
-            )}
-          </CampoDetalle>
-        </RejillaCampos>
-      </SeccionDetalle>
+      <TablaDensaFila
+        seleccionada={abierta}
+        className="cursor-pointer"
+        onClick={onExpandir}
+        data-testid="fila-avio"
+      >
+        <TablaDensaCelda className="p-0 pl-2">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="grid size-7 place-items-center rounded hover:bg-muted"
+            aria-label={abierta ? 'Ocultar detalle' : 'Ver detalle'}
+            aria-expanded={abierta}
+            data-testid="expandir-avio"
+          >
+            <ChevronRight
+              className={cn('size-4 transition-transform', abierta && 'rotate-90')}
+              aria-hidden
+            />
+          </button>
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          <div className="flex items-center gap-2">
+            <Avatar nombre={avio.clave} tono="avios" tamano="sm" />
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-medium">{avio.descripcion}</span>
+                <ChipEstado
+                  tono={avio.esGenerico ? 'info' : 'neutro'}
+                  title={
+                    avio.esGenerico
+                      ? 'Genérico de stock · se netea en el MRP'
+                      : 'Se compra contra la orden'
+                  }
+                >
+                  {avio.esGenerico ? 'Genérico' : 'Por orden'}
+                </ChipEstado>
+              </div>
+              <div className="num text-xs text-faint">{avio.clave}</div>
+            </div>
+          </div>
+        </TablaDensaCelda>
+        <TablaDensaCelda>
+          {provs.length > 0 ? (
+            <ChipEstado tono="info">
+              {provs.length} proveedor{provs.length > 1 ? 'es' : ''}
+            </ChipEstado>
+          ) : (
+            <ChipEstado tono="warn">Sin proveedor</ChipEstado>
+          )}
+        </TablaDensaCelda>
+        <TablaDensaCelda numerica>{formatearPrecio(avio.precioReferencia)}</TablaDensaCelda>
+        <TablaDensaCelda>
+          <EstadoBadge activo={avio.activo} />
+        </TablaDensaCelda>
+      </TablaDensaFila>
 
-      {/* ── Proveedores y precios (R1) ───────────────────────────────────────── */}
-      <SeccionDetalle titulo="Proveedores y precios" icono={Truck}>
-        {avio.proveedores.length === 0 ? (
-          <p className="text-sm text-muted-foreground" data-testid="avio-sin-proveedores">
-            Este avío no tiene proveedores asignados.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2" data-testid="avio-proveedores-detalle">
-            {avio.proveedores.map((proveedor) => (
-              <li
-                key={proveedor.idProveedor}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{proveedor.nombreProveedor}</p>
-                  {hayTexto(proveedor.condiciones) ? (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {proveedor.condiciones}
-                    </p>
-                  ) : null}
+      {abierta ? (
+        <TablaDensaFila className="bg-muted/20 hover:bg-muted/20">
+          <TablaDensaCelda />
+          <TablaDensaCelda colSpan={4} className="py-3">
+            <div className="space-y-4" data-testid="detalle-avio">
+              {/* Proveedores y precios (R1). */}
+              <section>
+                <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  Proveedores y precios
+                </h4>
+                {provs.length === 0 ? (
+                  <p className="text-sm text-muted-foreground" data-testid="avio-sin-proveedores">
+                    Este avío no tiene proveedores asignados — se costea al{' '}
+                    <b>precio de referencia</b> ({formatearPrecio(avio.precioReferencia)}); el
+                    proveedor real se define en la compra (MRP/OC).
+                  </p>
+                ) : (
+                  <ul
+                    className="flex max-w-xl flex-col gap-1.5"
+                    data-testid="avio-proveedores-detalle"
+                  >
+                    {provs.map((p) => (
+                      <li
+                        key={p.idProveedor}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card px-3 py-1.5"
+                      >
+                        <span className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{p.nombreProveedor}</span>
+                          {p.precio !== null && p.precio === barato && provs.length > 1 ? (
+                            <ChipEstado tono="ok" sinPunto>
+                              más barato
+                            </ChipEstado>
+                          ) : null}
+                          {p.condiciones !== null && p.condiciones.trim() !== '' ? (
+                            <span className="text-xs text-faint">· {p.condiciones}</span>
+                          ) : null}
+                        </span>
+                        <span className="num shrink-0 text-sm font-medium">
+                          {formatearPrecio(p.precio)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {/* Medidas del avío "por medida" (R5, B11) — promedio del precosteo. */}
+              <section>
+                <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                  Medidas del avío
+                </h4>
+                <MedidasAvio idAvio={avio.id} puedeAdministrar={puedeAdministrar} />
+              </section>
+
+              {/* Acciones de administración. */}
+              {puedeAdministrar ? (
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="outline" size="sm" onClick={onEditar} data-testid="editar-avio">
+                    <Pencil aria-hidden />
+                    Editar
+                  </Button>
+                  {avio.activo ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onDesactivar}
+                      data-testid="desactivar-avio"
+                    >
+                      <Trash2 aria-hidden />
+                      Desactivar
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onReactivar}
+                      data-testid="activar-avio"
+                    >
+                      <RotateCcw aria-hidden />
+                      Activar
+                    </Button>
+                  )}
                 </div>
-                <span className="shrink-0 text-sm font-medium tabular-nums">
-                  {formatearPrecio(proveedor.precio)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </SeccionDetalle>
-
-      {/* ── Medidas del avío "por medida" (R5, B11) ──────────────────────────── */}
-      <SeccionDetalle titulo="Medidas del avío (por medida)" icono={Ruler}>
-        <MedidasAvio idAvio={avio.id} puedeAdministrar={puedeAdministrar} />
-      </SeccionDetalle>
-
-      <Historial creadoEn={avio.creadoEn} modificadoEn={avio.modificadoEn} />
+              ) : null}
+            </div>
+          </TablaDensaCelda>
+        </TablaDensaFila>
+      ) : null}
     </>
   );
 }

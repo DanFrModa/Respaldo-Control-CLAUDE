@@ -1,4 +1,3 @@
-import { PackageMinus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -81,15 +80,12 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackageMinus className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Salida de tela a orden</h1>
-          <p className="text-sm text-muted-foreground">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Salida de tela a orden</h1>
+          <p className="truncate text-xs text-muted-foreground">
             Descuenta tela del inventario ligándola a una orden de producción (única vía que
-            descuenta tela).
+            descuenta tela)
           </p>
         </div>
       </header>

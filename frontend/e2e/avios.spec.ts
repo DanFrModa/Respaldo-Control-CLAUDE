@@ -76,13 +76,13 @@ test.describe('CRUD de Avíos', () => {
     const filaNueva = page.getByTestId('fila-avio').filter({ hasText: clave });
     await expect(filaNueva).toBeVisible();
 
-    // ── Seleccionar → el detalle muestra proveedores y el badge Genérico ────────
+    // ── Expandir el renglón → el detalle muestra los proveedores (R9: filas expandibles) ──
+    // El estado (Activo) y el chip Genérico viven en el propio renglón; los proveedores, al expandir.
+    await expect(filaNueva.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(filaNueva.getByText('Genérico').first()).toBeVisible();
     await filaNueva.click();
-    await expect(detalle.getByRole('heading', { name: clave })).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
     await expect(detalle.getByTestId('avio-proveedores-detalle').getByText(prov1)).toBeVisible();
     await expect(detalle.getByTestId('avio-proveedores-detalle').getByText(prov2)).toBeVisible();
-    await expect(detalle.getByText('Genérico').first()).toBeVisible();
 
     // ── Editar (cambia la clave) ────────────────────────────────────────────────
     await page.getByTestId('editar-avio').click();
@@ -99,7 +99,7 @@ test.describe('CRUD de Avíos', () => {
 
     // ── Desactivar (borrado suave) ──────────────────────────────────────────────
     await filaEditada.click();
-    await expect(detalle.getByRole('heading', { name: claveEditada })).toBeVisible();
+    await expect(page.getByTestId('desactivar-avio')).toBeVisible();
     await page.getByTestId('desactivar-avio').click();
     const confirmacion = page.getByRole('dialog');
     await expect(confirmacion.getByRole('heading', { name: 'Desactivar avío' })).toBeVisible();
@@ -108,18 +108,18 @@ test.describe('CRUD de Avíos', () => {
     await expect(page.getByText(`Avío "${claveEditada}" desactivado.`)).toBeVisible();
     await expect(page.getByTestId('fila-avio').filter({ hasText: claveEditada })).toHaveCount(0);
 
-    // ── Mostrar desactivados → seleccionar → el detalle lo marca Inactivo ───────
+    // ── Mostrar desactivados → el renglón lo marca Inactivo; al expandir ofrece Activar ─
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-avio').filter({ hasText: claveEditada });
     await expect(filaInactiva).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toBeVisible();
     await filaInactiva.click();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toBeVisible();
 
-    // ── Reactivar (botón directo del detalle) ───────────────────────────────────
+    // ── Reactivar (botón directo del detalle expandido) ─────────────────────────
     await page.getByTestId('activar-avio').click();
     await expect(page.getByText(`Avío "${claveEditada}" activado.`)).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toHaveCount(0);
+    await expect(filaInactiva.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toHaveCount(0);
 
     // ── Buscar ──────────────────────────────────────────────────────────────────
     await page.getByTestId('buscar-avio').fill(claveEditada);

@@ -1,4 +1,4 @@
-import { PackagePlus, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -8,7 +8,7 @@ import { useOrdenesCompra } from '@/api/ordenes-compra';
 import { useRecepcionesDeOc, useRecibir, useReversarRecepcion } from '@/api/recepciones';
 import { useTelas } from '@/api/telas';
 import type { OrdenCompra, OrdenCompraLinea, Recepcion, RecepcionLineaEntrada } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -274,15 +274,12 @@ export function RecepcionComprasPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackagePlus className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Recepción de compra</h1>
-          <p className="text-sm text-muted-foreground">
-            Recibe (parcial o total) el material de una orden de compra autorizada: crea el lote de
-            la tela y da entrada al inventario.
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Recepción de compra</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Recibe (parcial o total) el material de una OC autorizada: crea el lote de la tela y da
+            entrada al inventario
           </p>
         </div>
       </header>
@@ -416,7 +413,9 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                               data-testid={`rec-incluir-${linea.id}`}
                             />
                             {descripcionMaterial(linea)}
-                            <Badge variant="outline">{tipo}</Badge>
+                            <ChipEstado tono="neutro" sinPunto>
+                              {tipo}
+                            </ChipEstado>
                           </label>
                           <span className="text-xs text-muted-foreground">
                             Pedido: {Number(linea.cantidad).toLocaleString('es-MX')}{' '}
@@ -593,9 +592,9 @@ export function RecepcionComprasPagina(): React.JSX.Element {
                         · {rec.lineas.length} renglón(es)
                       </span>
                       {rec.reversada ? (
-                        <Badge variant="destructive">Reversada</Badge>
+                        <ChipEstado tono="crit">Reversada</ChipEstado>
                       ) : (
-                        <Badge variant="secondary">Activa</Badge>
+                        <ChipEstado tono="ok">Activa</ChipEstado>
                       )}
                     </div>
                     {!rec.reversada && puedeRecibir ? (

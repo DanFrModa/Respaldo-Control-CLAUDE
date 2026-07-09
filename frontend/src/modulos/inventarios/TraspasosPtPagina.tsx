@@ -1,4 +1,3 @@
-import { ArrowLeftRight } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -144,14 +143,11 @@ export function TraspasosPtPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ArrowLeftRight className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Traspaso entre almacenes</h1>
-          <p className="text-sm text-muted-foreground">
-            Mueve un modelo de un almacén a otro por color × talla, en una sola operación.
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Traspaso entre almacenes</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Mueve un modelo de un almacén a otro por color × talla, en una sola operación
           </p>
         </div>
       </header>

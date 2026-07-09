@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -109,12 +109,13 @@ describe('<TelasPagina>', () => {
     ultimaQuery = undefined;
   });
 
-  it('lista las telas que devuelve el API', () => {
+  it('lista las telas que devuelve el API (tabla densa)', () => {
     useTelas.mockReturnValue(consultaConDatos([tela(1, 'Felpa A'), tela(2, 'Jersey B')]));
     renderConProveedores(<TelasPagina />, {
       sesion: estadoSesionDePrueba(['telas.ver', 'telas.administrar']),
     });
 
+    // Un renglón por tela (colapsados por defecto, R9: filas expandibles).
     expect(screen.getAllByTestId('fila-tela')).toHaveLength(2);
     expect(screen.getAllByText('Felpa A').length).toBeGreaterThan(0);
     expect(screen.getByText('Jersey B')).toBeInTheDocument();
@@ -143,7 +144,10 @@ describe('<TelasPagina>', () => {
   it('oculta las acciones de escritura para quien solo puede ver', () => {
     useTelas.mockReturnValue(consultaConDatos([tela(1, 'Felpa A')]));
     renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+
+    // "Nueva tela" no aparece; editar/desactivar solo viven en el renglón expandido y son admin.
     expect(screen.queryByTestId('nuevo-tela')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('fila-tela'));
     expect(screen.queryByTestId('editar-tela')).not.toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-tela')).not.toBeInTheDocument();
   });
@@ -158,7 +162,7 @@ describe('<TelasPagina>', () => {
     expect(ultimaQuery?.idCategoria).toBe(7);
   });
 
-  it('muestra los colores de la tela con su precio en el detalle', () => {
+  it('muestra los colores de la tela con su precio al expandir el renglón', () => {
     const conColores = tela(3, 'Felpa C', {
       colores: [
         { idColor: 1, nombre: 'Negro', precio: 95 },
@@ -168,6 +172,7 @@ describe('<TelasPagina>', () => {
     useTelas.mockReturnValue(consultaConDatos([conColores]));
     renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
 
+    fireEvent.click(screen.getByTestId('fila-tela'));
     const detalle = screen.getByTestId('tela-colores-detalle');
     expect(within(detalle).getByText('Negro')).toBeInTheDocument();
     expect(within(detalle).getByText('Blanco')).toBeInTheDocument();
@@ -175,9 +180,10 @@ describe('<TelasPagina>', () => {
     expect(within(detalle).getByText('Sin precio')).toBeInTheDocument();
   });
 
-  it('una tela sin colores muestra el aviso correspondiente en el detalle', () => {
+  it('una tela sin colores muestra el aviso correspondiente al expandir el renglón', () => {
     useTelas.mockReturnValue(consultaConDatos([tela(4, 'Sin colores', { colores: [] })]));
     renderConProveedores(<TelasPagina />, { sesion: estadoSesionDePrueba(['telas.ver']) });
+    fireEvent.click(screen.getByTestId('fila-tela'));
     expect(screen.getByTestId('tela-sin-colores')).toBeInTheDocument();
   });
 
@@ -188,6 +194,8 @@ describe('<TelasPagina>', () => {
       sesion: estadoSesionDePrueba(['telas.ver', 'telas.administrar']),
     });
 
+    // El detalle (con las acciones) se abre al expandir el renglón (tabla-first, R9).
+    await usuario.click(screen.getByTestId('fila-tela'));
     await usuario.click(screen.getByTestId('desactivar-tela'));
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar tela')).toBeInTheDocument();
@@ -202,8 +210,9 @@ describe('<TelasPagina>', () => {
       sesion: estadoSesionDePrueba(['telas.ver', 'telas.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-tela');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // El estado "Inactivo" se ve en el propio renglón; las acciones, al expandir.
+    expect(screen.getByText('Inactivo')).toBeInTheDocument();
+    await usuario.click(screen.getByTestId('fila-tela'));
     expect(screen.getByTestId('activar-tela')).toBeInTheDocument();
     await usuario.click(screen.getByTestId('activar-tela'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

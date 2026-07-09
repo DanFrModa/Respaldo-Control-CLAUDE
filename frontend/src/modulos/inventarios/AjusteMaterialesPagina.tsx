@@ -1,4 +1,4 @@
-import { ClipboardCheck, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -219,15 +219,12 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ClipboardCheck className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Ajuste / inventario físico</h1>
-          <p className="text-sm text-muted-foreground">
-            Toda corrección es un movimiento auditado (nunca se edita la existencia). El motivo es
-            obligatorio.
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Ajuste / inventario físico</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Toda corrección es un movimiento auditado (nunca se edita la existencia) · el motivo es
+            obligatorio
           </p>
         </div>
       </header>
