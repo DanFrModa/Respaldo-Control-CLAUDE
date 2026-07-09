@@ -2,11 +2,15 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Factory,
   FileText,
   Pencil,
+  Plus,
   Printer,
+  RefreshCw,
   ShoppingCart,
   Truck,
   UserRound,
@@ -18,19 +22,27 @@ import { toast } from 'sonner';
 import { imprimirOc, useAutorizarOc, useDuplicarOc, useOrdenesCompra } from '@/api/ordenes-compra';
 import { useProveedores } from '@/api/proveedores';
 import type { EstatusOrdenCompra, OrdenCompra, OrdenesCompraQuery } from '@/api/tipos';
-import { Avatar } from '@/components/dominio/visuales';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { formatearMoneda } from '@/lib/formato';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
+import { cn } from '@/lib/utils';
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
+import { DetalleRenglonesOc } from './DetalleRenglonesOc';
 import { DialogoCancelarOc } from './DialogoCancelarOc';
 import { DialogoEditarOc } from './DialogoEditarOc';
-import { DetalleRenglonesOc } from './DetalleRenglonesOc';
 import { ETIQUETA_ESTATUS_OC, EstatusOcBadge, fechaCortaOc } from './piezas';
 
 /** Renglones por página del listado. */
@@ -47,12 +59,19 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
 ];
 
 /**
- * Pantalla de ÓRDENES DE COMPRA (F4-E2) sobre el motor LISTA + DETALLE. La lista busca (folio /
- * proveedor) con paginación de servidor y filtros (proveedor, estatus, rango de fechas); el detalle
- * muestra el encabezado, los renglones (con su matriz talla×color), las órdenes ligadas y el total
- * DERIVADO. Crear/editar/duplicar exigen `compras.administrar`; autorizar `compras.autorizar`;
- * cancelar `compras.cancelar`. Las acciones de escritura se ocultan sin permiso; la decisión real la
- * toma el backend (A1). Reemplaza OrdCompraVer / OrdCompra / OrdCompraDet del sistema viejo.
+ * ÓRDENES DE COMPRA (F4-E2, proto `vCompras` — re-vestido R9 a TABLA-FIRST): compras a proveedores
+ * (make-to-order) con filtros arriba (proveedor, estatus, rango de fechas, búsqueda), tabla densa con
+ * su estatus y órdenes de producción ligadas, barra de totales al pie (importe de la página) y un
+ * CAJÓN de detalle al hacer clic (encabezado, renglones con su matriz talla×color, órdenes ligadas y
+ * total DERIVADO). Crear/editar/duplicar exigen `compras.administrar`; autorizar `compras.autorizar`;
+ * cancelar `compras.cancelar`. Las acciones se ocultan sin permiso; la decisión real la toma el
+ * backend (A1). Reemplaza OrdCompraVer / OrdCompra / OrdCompraDet del sistema viejo.
+ *
+ * FIDELIDAD vs proto: el proto pinta KPIs (OC abiertas · $ por recibir · faltantes MRP · recibido a
+ * tiempo) y una barra de "avance de recepción" por OC; el endpoint de la lista NO trae esos agregados
+ * ni el `recibido` por OC, así que el estatus (parcial/total) comunica la recepción y no hay KPIs
+ * inventados en cliente (hueco reportado). El banner de faltantes del MRP vive en Explosión/Estatus
+ * de materiales (donde está el dato).
  */
 export function OrdenesCompraPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -93,23 +112,12 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   const autorizar = useAutorizarOc();
   const duplicar = useDuplicarOc();
 
-  // ── Diálogos ───────────────────────────────────────────────────────────────
+  // ── Diálogos + cajón ─────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ oc?: OrdenCompra; soloLectura: boolean } | null>(null);
   const [aCancelar, setACancelar] = useState<OrdenCompra | null>(null);
-  const [idAEnfocar, setIdAEnfocar] = useState<number | null>(null);
+  const [seleccion, setSeleccion] = useState<OrdenCompra | null>(null);
 
-  function alGuardada(idNueva: number): void {
-    setTextoBusqueda('');
-    setPagina(1);
-    setIdAEnfocar(idNueva);
-  }
-
-  function alBuscar(valor: string): void {
-    setTextoBusqueda(valor);
-    setPagina(1);
-  }
-  function alAlternarCanceladas(): void {
-    setIncluirCanceladas((v) => !v);
+  function reiniciar(): void {
     setPagina(1);
   }
 
@@ -124,7 +132,6 @@ export function OrdenesCompraPagina(): React.JSX.Element {
     duplicar.mutate(oc.id, {
       onSuccess: (nueva) => {
         toast.success(`Orden de compra ${nueva.numCompra} creada (copia en borrador).`);
-        setIdAEnfocar(nueva.id);
         setPagina(1);
       },
       onError: (error) => toast.error(error.message),
@@ -144,185 +151,320 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   }
 
   const datos = consulta.data;
-  const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
-    ? {
-        total: datos.total,
-        pagina: datos.pagina,
-        totalPaginas,
-        ocupado: consulta.isFetching,
-        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
-        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
-      }
-    : undefined;
-
-  const filtros = (
-    <div className="space-y-2">
-      <SelectNativo
-        aria-label="Filtrar por proveedor"
-        value={idProveedor === null ? '' : String(idProveedor)}
-        onChange={(e) => {
-          setIdProveedor(e.target.value === '' ? null : Number(e.target.value));
-          setPagina(1);
-        }}
-        data-testid="filtro-proveedor-oc"
-      >
-        <option value="">Todos los proveedores</option>
-        {(proveedores.data?.datos ?? []).map((p) => (
-          <option key={p.id} value={String(p.id)}>
-            {p.nombre}
-          </option>
-        ))}
-      </SelectNativo>
-      <SelectNativo
-        aria-label="Filtrar por estatus"
-        value={estatus}
-        onChange={(e) => {
-          setEstatus(e.target.value as EstatusOrdenCompra | '');
-          setPagina(1);
-        }}
-        data-testid="filtro-estatus-oc"
-      >
-        <option value="">Todos los estatus</option>
-        {ESTATUS_FILTRO.map((s) => (
-          <option key={s} value={s}>
-            {ETIQUETA_ESTATUS_OC[s]}
-          </option>
-        ))}
-      </SelectNativo>
-      <div className="grid grid-cols-2 gap-2">
-        <Input
-          type="date"
-          aria-label="Fecha desde"
-          value={fechaDesde}
-          onChange={(e) => {
-            setFechaDesde(e.target.value);
-            setPagina(1);
-          }}
-          data-testid="filtro-fecha-desde-oc"
-        />
-        <Input
-          type="date"
-          aria-label="Fecha hasta"
-          value={fechaHasta}
-          onChange={(e) => {
-            setFechaHasta(e.target.value);
-            setPagina(1);
-          }}
-          data-testid="filtro-fecha-hasta-oc"
-        />
-      </div>
-    </div>
-  );
+  const filas = datos?.datos ?? [];
+  const total = datos?.total ?? 0;
+  const totalPaginas = datos?.totalPaginas ?? 1;
+  // Suma de PRESENTACIÓN de los importes visibles (cada `total` ya lo derivó el servidor, A1).
+  const importePagina = filas.reduce((a, o) => a + o.total, 0);
 
   return (
-    <>
-      <ListaDetalle<OrdenCompra>
-        testid="oc"
-        titulo="Órdenes de compra"
-        descripcion="Compras a proveedores con sus renglones y total."
-        icono={ShoppingCart}
-        registros={datos?.datos ?? []}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(o) => o.id}
-        obtenerTitulo={(o) => `OC ${o.numCompra}`}
-        obtenerActivo={(o) => o.estatus !== 'cancelada'}
-        obtenerSecundaria={(o) => `${o.proveedor} · ${formatearMoneda(o.total)}`}
-        renderAvatarLista={(o) => <Avatar nombre={o.proveedor} tono="neutro" tamano="sm" />}
-        busqueda={textoBusqueda}
-        alBuscar={alBuscar}
-        filtros={filtros}
-        incluirInactivos={incluirCanceladas}
-        alAlternarInactivos={alAlternarCanceladas}
-        textoVacio="No hay órdenes de compra que coincidan con la búsqueda."
-        paginacion={paginacion}
-        seleccionInicialId={idAEnfocar}
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={() => setEditar({ soloLectura: false })}
-        textoNuevo="Nueva OC"
-        alEditar={() => undefined}
-        alDesactivar={() => undefined}
-        alReactivar={() => undefined}
-        renderAvatarDetalle={(o) => <Avatar nombre={o.proveedor} tono="neutro" tamano="lg" />}
-        renderMeta={(o) => (
-          <span className="flex flex-wrap items-center gap-2">
-            <EstatusOcBadge estatus={o.estatus} />
-            <span className="text-sm text-muted-foreground">{formatearMoneda(o.total)}</span>
-          </span>
-        )}
-        ocultarAccionesBase
-        accionesExtra={(o) => (
-          <span className="flex flex-wrap items-center gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Órdenes de compra</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Compras a proveedores (make-to-order) · sus renglones, órdenes ligadas y total
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void consulta.refetch()}
+            data-testid="actualizar-oc"
+          >
+            <RefreshCw className={cn(consulta.isFetching && 'animate-spin')} aria-hidden />
+            Actualizar
+          </Button>
+          {puedeAdministrar ? (
             <Button
-              variant="outline"
               size="sm"
-              onClick={() => imprimirOc(o.id)}
-              data-testid="imprimir-oc"
+              onClick={() => setEditar({ soloLectura: false })}
+              data-testid="nuevo-oc"
             >
-              <Printer aria-hidden />
-              Imprimir
+              <Plus aria-hidden />
+              Nueva OC
             </Button>
-            {puedeEditar(o) ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditar({ oc: o, soloLectura: false })}
-                data-testid="editar-oc"
-              >
-                <Pencil aria-hidden />
-                Editar
+          ) : null}
+        </div>
+      </header>
+
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            aria-label="Filtrar por proveedor"
+            value={idProveedor === null ? '' : String(idProveedor)}
+            onChange={(e) => {
+              setIdProveedor(e.target.value === '' ? null : Number(e.target.value));
+              reiniciar();
+            }}
+            data-testid="filtro-proveedor-oc"
+          >
+            <option value="">Todos los proveedores</option>
+            {(proveedores.data?.datos ?? []).map((p) => (
+              <option key={p.id} value={String(p.id)}>
+                {p.nombre}
+              </option>
+            ))}
+          </SelectNativo>
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            aria-label="Filtrar por estatus"
+            value={estatus}
+            onChange={(e) => {
+              setEstatus(e.target.value as EstatusOrdenCompra | '');
+              reiniciar();
+            }}
+            data-testid="filtro-estatus-oc"
+          >
+            <option value="">Todos los estatus</option>
+            {ESTATUS_FILTRO.map((s) => (
+              <option key={s} value={s}>
+                {ETIQUETA_ESTATUS_OC[s]}
+              </option>
+            ))}
+          </SelectNativo>
+          <Input
+            type="date"
+            className="h-8 w-auto text-sm"
+            aria-label="Fecha desde"
+            value={fechaDesde}
+            onChange={(e) => {
+              setFechaDesde(e.target.value);
+              reiniciar();
+            }}
+            data-testid="filtro-fecha-desde-oc"
+          />
+          <Input
+            type="date"
+            className="h-8 w-auto text-sm"
+            aria-label="Fecha hasta"
+            value={fechaHasta}
+            onChange={(e) => {
+              setFechaHasta(e.target.value);
+              reiniciar();
+            }}
+            data-testid="filtro-fecha-hasta-oc"
+          />
+          <Input
+            type="search"
+            className="h-8 w-48 text-sm"
+            placeholder="Buscar folio o proveedor…"
+            value={textoBusqueda}
+            onChange={(e) => {
+              setTextoBusqueda(e.target.value);
+              reiniciar();
+            }}
+            data-testid="buscar-oc"
+          />
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={incluirCanceladas}
+              onChange={() => {
+                setIncluirCanceladas((v) => !v);
+                reiniciar();
+              }}
+              data-testid="incluir-canceladas-oc"
+            />
+            Incluir canceladas
+          </label>
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {total.toLocaleString('es-MX')} OC
+            </span>
+          </div>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
               </Button>
-            ) : puedeAdministrar ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setEditar({ oc: o, soloLectura: true })}
-                data-testid="ver-oc"
-              >
-                <FileText aria-hidden />
-                Ver
-              </Button>
-            ) : null}
-            {puedeAdministrar ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => duplicarOc(o)}
-                disabled={duplicar.isPending}
-                data-testid="duplicar-oc"
-              >
-                <Copy aria-hidden />
-                Duplicar
-              </Button>
-            ) : null}
-            {puedeAutorizar && o.estatus === 'pendiente_autorizacion' ? (
-              <Button
-                size="sm"
-                onClick={() => autorizarOc(o)}
-                disabled={autorizar.isPending}
-                data-testid="autorizar-oc"
-              >
-                <CheckCircle2 aria-hidden />
-                Autorizar
-              </Button>
-            ) : null}
-            {puedeCancelar && o.estatus !== 'cancelada' ? (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setACancelar(o)}
-                data-testid="cancelar-oc"
-              >
-                <XCircle aria-hidden />
-                Cancelar
-              </Button>
-            ) : null}
+            </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando órdenes de compra…</p>
+          ) : filas.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground" data-testid="oc-vacio">
+              No hay órdenes de compra que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>OC</TablaDensaHead>
+                  <TablaDensaHead>Proveedor</TablaDensaHead>
+                  <TablaDensaHead>Emisión</TablaDensaHead>
+                  <TablaDensaHead>Entrega</TablaDensaHead>
+                  <TablaDensaHead>Contra orden</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                  <TablaDensaHead numerica>Total</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {filas.map((oc) => (
+                  <TablaDensaFila
+                    key={oc.id}
+                    seleccionada={seleccion?.id === oc.id}
+                    className="cursor-pointer"
+                    onClick={() => setSeleccion(oc)}
+                    data-testid="fila-oc"
+                  >
+                    <TablaDensaCelda className="num font-medium">OC {oc.numCompra}</TablaDensaCelda>
+                    <TablaDensaCelda className="font-medium">{oc.proveedor}</TablaDensaCelda>
+                    <TablaDensaCelda className="num text-muted-foreground">
+                      {fechaCortaOc(oc.fecha)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="num text-muted-foreground">
+                      {fechaCortaOc(oc.fechaEntrega)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="num text-muted-foreground">
+                      {oc.ordenesLigadas.length === 0
+                        ? '—'
+                        : `${oc.ordenesLigadas[0]?.folio ?? ''}${
+                            oc.ordenesLigadas.length > 1
+                              ? ` (+${oc.ordenesLigadas.length - 1})`
+                              : ''
+                          }`}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <EstatusOcBadge estatus={oc.estatus} />
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold">
+                      {formatearMoneda(oc.total)}
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">OC (filtro)</span>
+            <b className="num">{total.toLocaleString('es-MX')}</b>
           </span>
-        )}
-        renderDetalle={(o) => <DetalleOc oc={o} />}
-      />
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Importe (página)</span>
+            <b className="num text-primary">{formatearMoneda(importePagina)}</b>
+          </span>
+          <span className="ml-auto flex items-center gap-1 text-muted-foreground">
+            Página {pagina} de {totalPaginas}
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina <= 1 || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.max(1, p - 1))}
+              aria-label="Página anterior"
+            >
+              <ChevronLeft className="size-4" aria-hidden />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={pagina >= totalPaginas || consulta.isFetching}
+              onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+              aria-label="Página siguiente"
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </Button>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Cajón de detalle de la OC ───────────────────────────────────────── */}
+      <CajonDetalle
+        abierto={seleccion !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setSeleccion(null);
+        }}
+        titulo={seleccion !== null ? `OC ${seleccion.numCompra}` : ''}
+        subtitulo={seleccion !== null ? seleccion.proveedor : undefined}
+      >
+        {seleccion !== null ? (
+          <div className="space-y-4" data-testid="detalle-oc">
+            {/* Acciones (según permiso + estatus). */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => imprimirOc(seleccion.id)}
+                data-testid="imprimir-oc"
+              >
+                <Printer aria-hidden />
+                Imprimir
+              </Button>
+              {puedeEditar(seleccion) ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditar({ oc: seleccion, soloLectura: false })}
+                  data-testid="editar-oc"
+                >
+                  <Pencil aria-hidden />
+                  Editar
+                </Button>
+              ) : puedeAdministrar ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditar({ oc: seleccion, soloLectura: true })}
+                  data-testid="ver-oc"
+                >
+                  <FileText aria-hidden />
+                  Ver
+                </Button>
+              ) : null}
+              {puedeAdministrar ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => duplicarOc(seleccion)}
+                  disabled={duplicar.isPending}
+                  data-testid="duplicar-oc"
+                >
+                  <Copy aria-hidden />
+                  Duplicar
+                </Button>
+              ) : null}
+              {puedeAutorizar && seleccion.estatus === 'pendiente_autorizacion' ? (
+                <Button
+                  size="sm"
+                  onClick={() => autorizarOc(seleccion)}
+                  disabled={autorizar.isPending}
+                  data-testid="autorizar-oc"
+                >
+                  <CheckCircle2 aria-hidden />
+                  Autorizar
+                </Button>
+              ) : null}
+              {puedeCancelar && seleccion.estatus !== 'cancelada' ? (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setACancelar(seleccion)}
+                  data-testid="cancelar-oc"
+                >
+                  <XCircle aria-hidden />
+                  Cancelar
+                </Button>
+              ) : null}
+            </div>
+
+            <DetalleOc oc={seleccion} />
+          </div>
+        ) : null}
+      </CajonDetalle>
 
       {editar !== null ? (
         <DialogoEditarOc
@@ -334,7 +476,10 @@ export function OrdenesCompraPagina(): React.JSX.Element {
           }}
           oc={editar.oc}
           soloLectura={editar.soloLectura}
-          alGuardada={alGuardada}
+          alGuardada={() => {
+            setTextoBusqueda('');
+            setPagina(1);
+          }}
         />
       ) : null}
 
@@ -347,7 +492,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
         }}
         oc={aCancelar ?? undefined}
       />
-    </>
+    </div>
   );
 }
 
@@ -355,18 +500,6 @@ export function OrdenesCompraPagina(): React.JSX.Element {
 function DetalleOc({ oc }: { oc: OrdenCompra }): React.JSX.Element {
   return (
     <>
-      <div className="flex justify-end">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => imprimirOc(oc.id)}
-          data-testid="imprimir-oc-detalle"
-        >
-          <Printer aria-hidden />
-          Imprimir PDF
-        </Button>
-      </div>
-
       <SeccionDetalle titulo="Datos de la orden de compra" icono={ShoppingCart}>
         <RejillaCampos>
           <CampoDetalle icono={UserRound} etiqueta="Proveedor">

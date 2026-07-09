@@ -1,4 +1,4 @@
-import { CheckCircle2, Inbox, Loader2Icon } from 'lucide-react';
+import { CheckCircle2, Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -49,19 +49,11 @@ export function BandejaAutorizacionPagina(): React.JSX.Element {
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4 lg:px-6">
-        <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-          >
-            <Inbox className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Autorización de compras</h1>
-            <p className="text-sm text-muted-foreground">
-              Órdenes de compra pendientes de autorizar.
-            </p>
-          </div>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Autorización de compras</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Órdenes de compra pendientes de autorizar
+          </p>
         </div>
         {datos ? (
           <span className="text-sm text-muted-foreground" data-testid="resumen-bandeja-oc">

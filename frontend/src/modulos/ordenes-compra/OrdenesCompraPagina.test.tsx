@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -100,6 +100,8 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     const { unmount } = renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'compras.autorizar']),
     });
+    // El detalle es un cajón que se abre al hacer clic en el renglón (tabla-first, R9).
+    fireEvent.click(screen.getByTestId('fila-oc'));
     const detalle = screen.getByTestId('detalle-oc');
     expect(within(detalle).getByTestId('autorizar-oc')).toBeInTheDocument();
     unmount();
@@ -109,6 +111,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
+    fireEvent.click(screen.getByTestId('fila-oc'));
     expect(screen.queryByTestId('autorizar-oc')).not.toBeInTheDocument();
   });
 
@@ -117,6 +120,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar']),
     });
+    fireEvent.click(screen.getByTestId('fila-oc'));
     const detalle = screen.getByTestId('detalle-oc');
     expect(within(detalle).queryByTestId('editar-oc')).not.toBeInTheDocument();
     expect(within(detalle).getByTestId('ver-oc')).toBeInTheDocument();
@@ -127,6 +131,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     renderConProveedores(<OrdenesCompraPagina />, {
       sesion: estadoSesionDePrueba(['compras.ver', 'compras.administrar', 'roles.administrar']),
     });
+    fireEvent.click(screen.getByTestId('fila-oc'));
     const detalle = screen.getByTestId('detalle-oc');
     expect(within(detalle).getByTestId('editar-oc')).toBeInTheDocument();
     expect(within(detalle).queryByTestId('ver-oc')).not.toBeInTheDocument();

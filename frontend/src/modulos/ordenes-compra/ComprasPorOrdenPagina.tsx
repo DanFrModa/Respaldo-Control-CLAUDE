@@ -1,4 +1,4 @@
-import { Factory, Printer, ShoppingCart } from 'lucide-react';
+import { Printer, ShoppingCart } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -82,17 +82,11 @@ export function ComprasPorOrdenPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b p-4 lg:px-6">
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <Factory className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Compras por orden</h1>
-          <p className="text-sm text-muted-foreground">
-            Órdenes de compra ligadas a una orden de producción.
+      <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Compras por orden</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Órdenes de compra ligadas a una orden de producción
           </p>
         </div>
       </div>

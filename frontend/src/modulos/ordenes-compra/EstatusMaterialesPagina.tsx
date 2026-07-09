@@ -1,31 +1,38 @@
-import { ClipboardList, Printer } from 'lucide-react';
+import { Info, Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import { useEstatusMateriales, imprimirEstatusMateriales } from '@/api/mrp';
 import { useConsultaOrdenes } from '@/api/ordenes-consulta';
 import type { EstatusMaterialFila } from '@/api/tipos';
+import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDebounce } from '@/lib/useDebounce';
 
-/** Estatus → etiqueta + color del semáforo (R7). */
-const SEMAFORO: Record<EstatusMaterialFila['estatus'], { etiqueta: string; clase: string }> = {
-  pendiente: { etiqueta: 'Pendiente', clase: 'bg-red-100 text-red-800' },
-  'en-oc': { etiqueta: 'En OC', clase: 'bg-amber-100 text-amber-800' },
-  'recibido-parcial': { etiqueta: 'Recibido parcial', clase: 'bg-sky-100 text-sky-800' },
-  completo: { etiqueta: 'Completo', clase: 'bg-emerald-100 text-emerald-800' },
-  'cubierto-por-stock': {
-    etiqueta: 'Cubierto por stock',
-    clase: 'bg-emerald-100 text-emerald-800',
-  },
+/** Estatus → etiqueta + tono semántico del semáforo (R7). */
+const SEMAFORO: Record<EstatusMaterialFila['estatus'], { etiqueta: string; tono: TonoEstado }> = {
+  pendiente: { etiqueta: 'Pendiente', tono: 'crit' },
+  'en-oc': { etiqueta: 'En OC', tono: 'warn' },
+  'recibido-parcial': { etiqueta: 'Recibido parcial', tono: 'info' },
+  completo: { etiqueta: 'Completo', tono: 'ok' },
+  'cubierto-por-stock': { etiqueta: 'Cubierto por stock', tono: 'ok' },
 };
 
 /**
- * TABLERO "qué tengo / qué falta" por orden (F4-E4, R7) — criterio de salida de la fase: reemplaza el
- * drive manual. Se elige una orden y el backend cruza, por material requerido, lo REQUERIDO vs lo que
- * está EN OC vs lo RECIBIDO → semáforo. Las líneas de OC sin requerido salen como "no identificado".
- * Diseñado para leerse bien en MÓVIL (tarjetas) y en escritorio (tabla). Solo presenta (A1).
+ * TABLERO "qué tengo / qué falta" por orden (F4-E4, R7 — re-vestido R9): criterio de salida de la fase,
+ * reemplaza el drive manual. Se elige una orden y el backend cruza, por material requerido, lo
+ * REQUERIDO vs lo que está EN OC vs lo RECIBIDO → semáforo (ChipEstado). Un BANNER de faltantes resume
+ * lo pendiente (aclaración Daniel §vCompras). Las líneas de OC sin requerido salen como "no
+ * identificado". Se lee bien en MÓVIL (tarjetas) y escritorio (tabla densa). Solo presenta (A1).
  */
 export function EstatusMaterialesPagina(): React.JSX.Element {
   const [textoBusqueda, setTextoBusqueda] = useState('');
@@ -41,20 +48,16 @@ export function EstatusMaterialesPagina(): React.JSX.Element {
 
   const estatus = useEstatusMateriales(idOrden ?? undefined);
   const filas = estatus.data?.filas ?? [];
+  // Faltantes = materiales requeridos aún pendientes (ni en OC ni recibidos).
+  const pendientes = filas.filter((f) => f.tipo !== 'no-identificado' && f.estatus === 'pendiente');
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-3 border-b p-4 lg:px-6">
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <ClipboardList className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Qué tengo / qué falta</h1>
-          <p className="text-sm text-muted-foreground">
-            Estatus de materiales por orden: requerido vs en compra vs recibido.
+      <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Qué tengo / qué falta</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Estatus de materiales por orden: requerido vs en compra vs recibido
           </p>
         </div>
       </div>
@@ -124,9 +127,23 @@ export function EstatusMaterialesPagina(): React.JSX.Element {
               </Button>
             </div>
 
+            {/* Banner de faltantes (vCompras): resume cuántos materiales requeridos siguen pendientes. */}
+            {pendientes.length > 0 ? (
+              <div
+                className="mb-3 flex items-center gap-2 rounded-md border border-crit/30 bg-crit-soft px-3 py-2 text-xs text-crit"
+                data-testid="est-banner-faltantes"
+              >
+                <Info className="size-4 shrink-0" aria-hidden />
+                <span>
+                  <b>{pendientes.length}</b> material(es) requeridos aún <b>pendientes</b> (ni en OC
+                  ni recibidos) para esta orden.
+                </span>
+              </div>
+            ) : null}
+
             {estatus.data && !estatus.data.tieneSnapshot ? (
               <p
-                className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800"
+                className="mb-3 rounded-md border border-warn/30 bg-warn-soft p-2 text-xs text-warn"
                 data-testid="est-sin-snapshot"
               >
                 Esta orden aún no se ha explosionado: el cruce solo muestra lo que ya esté en
@@ -171,42 +188,37 @@ export function EstatusMaterialesPagina(): React.JSX.Element {
                   ))}
                 </ul>
 
-                {/* ESCRITORIO: tabla. */}
-                <div
-                  className="hidden overflow-x-auto rounded-lg border md:block"
-                  data-testid="est-tabla"
-                >
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2 font-medium">Material</th>
-                        <th className="px-3 py-2 text-right font-medium">Requerido</th>
-                        <th className="px-3 py-2 text-right font-medium">En OC</th>
-                        <th className="px-3 py-2 text-right font-medium">Recibido</th>
-                        <th className="px-3 py-2 font-medium">Estatus</th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                {/* ESCRITORIO: tabla densa. */}
+                <div className="hidden md:block" data-testid="est-tabla">
+                  <TablaDensa>
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Material</TablaDensaHead>
+                        <TablaDensaHead numerica>Requerido</TablaDensaHead>
+                        <TablaDensaHead numerica>En OC</TablaDensaHead>
+                        <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                        <TablaDensaHead>Estatus</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
                       {filas.map((f, i) => (
-                        <tr key={`${f.material}-${i}`} className="border-t" data-testid="est-fila">
-                          <td className="px-3 py-2">{f.material}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">
+                        <TablaDensaFila key={`${f.material}-${i}`} data-testid="est-fila">
+                          <TablaDensaCelda className="font-medium">{f.material}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {formatearCantidad(f.requerido)}
                             {f.unidad ? ` ${f.unidad}` : ''}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {formatearCantidad(f.enOc)}
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>{formatearCantidad(f.enOc)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {formatearCantidad(f.recibido)}
-                          </td>
-                          <td className="px-3 py-2">
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>
                             <SemaforoBadge estatus={f.estatus} tipo={f.tipo} />
-                          </td>
-                        </tr>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
                       ))}
-                    </tbody>
-                  </table>
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
                 </div>
               </>
             )}
@@ -230,7 +242,7 @@ function Celda({
   return (
     <div>
       <dt className="text-muted-foreground">{etiqueta}</dt>
-      <dd className="font-medium tabular-nums">
+      <dd className="num font-medium">
         {formatearCantidad(valor)}
         {unidad ? ` ${unidad}` : ''}
       </dd>
@@ -248,22 +260,16 @@ function SemaforoBadge({
 }): React.JSX.Element {
   if (tipo === 'no-identificado') {
     return (
-      <span
-        className="shrink-0 rounded px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground"
-        data-testid="est-semaforo"
-      >
+      <ChipEstado tono="neutro" data-testid="est-semaforo">
         No identificado
-      </span>
+      </ChipEstado>
     );
   }
   const s = SEMAFORO[estatus];
   return (
-    <span
-      className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${s.clase}`}
-      data-testid="est-semaforo"
-    >
+    <ChipEstado tono={s.tono} data-testid="est-semaforo">
       {s.etiqueta}
-    </span>
+    </ChipEstado>
   );
 }
 

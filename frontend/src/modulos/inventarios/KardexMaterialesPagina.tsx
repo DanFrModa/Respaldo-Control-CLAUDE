@@ -1,4 +1,4 @@
-import { Ban, BookOpenText, Loader2Icon } from 'lucide-react';
+import { Ban, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,7 +11,7 @@ import {
 } from '@/api/inventario-materiales';
 import type { Tela } from '@/api/telas';
 import type { KardexAvioRenglon, KardexTelaRenglon } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -51,24 +51,27 @@ export function KardexMaterialesPagina(): React.JSX.Element {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <BookOpenText className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Kardex de materiales</h1>
-          <p className="text-sm text-muted-foreground">
-            Movimientos con saldo corrido por tela (lote) o por avío.
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Kardex de materiales</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Movimientos con saldo corrido por tela (lote) o por avío
           </p>
         </div>
       </header>
 
-      <div className="inline-flex rounded-md border p-0.5">
+      <div
+        className="flex w-fit overflow-hidden rounded-md border text-xs"
+        role="group"
+        aria-label="Tipo de material"
+      >
         <button
           type="button"
           onClick={() => setDimension('tela')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            dimension === 'tela' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
+          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
+            dimension === 'tela'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
           data-testid="kardex-mat-dim-tela"
         >
@@ -77,8 +80,10 @@ export function KardexMaterialesPagina(): React.JSX.Element {
         <button
           type="button"
           onClick={() => setDimension('avio')}
-          className={`rounded px-3 py-1.5 text-sm transition-colors ${
-            dimension === 'avio' ? 'bg-sidebar-accent/50 font-medium' : 'text-muted-foreground'
+          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
+            dimension === 'avio'
+              ? 'bg-primary text-primary-foreground'
+              : 'text-muted-foreground hover:bg-muted'
           }`}
           data-testid="kardex-mat-dim-avio"
         >
@@ -151,7 +156,7 @@ function KardexTela(): React.JSX.Element {
                         <span className="font-medium">
                           #{r.folio} · {r.tipoMov}
                         </span>
-                        {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
+                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {r.fecha} · {r.almacen} · Lote {r.loteClave ?? '(sin lote)'}
@@ -196,7 +201,7 @@ function KardexTela(): React.JSX.Element {
                         <TableCell>{r.fecha}</TableCell>
                         <TableCell className="flex items-center gap-1.5">
                           {r.tipoMov}
-                          {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
+                          {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
                         </TableCell>
                         <TableCell>{r.almacen}</TableCell>
                         <TableCell>{r.loteClave ?? '(sin lote)'}</TableCell>
@@ -307,7 +312,7 @@ function KardexAvio(): React.JSX.Element {
                         <span className="font-medium">
                           #{r.folio} · {r.tipoMov}
                         </span>
-                        {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
+                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {r.fecha} · {r.almacen}
@@ -351,7 +356,7 @@ function KardexAvio(): React.JSX.Element {
                         <TableCell>{r.fecha}</TableCell>
                         <TableCell className="flex items-center gap-1.5">
                           {r.tipoMov}
-                          {r.cancelado ? <Badge variant="secondary">Cancelado</Badge> : null}
+                          {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
                         </TableCell>
                         <TableCell>{r.almacen}</TableCell>
                         <TableCell className="text-right tabular-nums">
