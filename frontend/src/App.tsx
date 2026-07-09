@@ -90,6 +90,7 @@ import { BitacoraPagina } from '@/modulos/administracion/BitacoraPagina';
 import { RolesPagina } from '@/modulos/administracion/RolesPagina';
 import { ConceptosCostoPagina } from '@/modulos/conceptos-costo/ConceptosCostoPagina';
 import { EstadosListaPagina } from '@/modulos/estados-lista/EstadosListaPagina';
+import { AuditoresPagina } from '@/modulos/auditores/AuditoresPagina';
 import { AltaAuditoriaPagina } from '@/modulos/calidad/AltaAuditoriaPagina';
 import { AuditoriasPorMaquileroPagina } from '@/modulos/calidad/AuditoriasPorMaquileroPagina';
 import { CalidadPagina } from '@/modulos/calidad/CalidadPagina';
@@ -263,6 +264,9 @@ const router = createBrowserRouter([
           { path: 'calidad/auditorias', element: <ConsultaAuditoriasPagina /> },
           { path: 'calidad/auditorias/maquilero', element: <AuditoriasPorMaquileroPagina /> },
           { path: 'calidad/auditorias/:id', element: <CapturaAuditoriaPagina /> },
+          // Catálogo de auditores (rediseño R9 — proto CAT_AUDITORES). Ruta de un segmento
+          // (`/auditores`), gateada por `calidad.ver` en el menú; el backend re-verifica.
+          { path: 'auditores', element: <AuditoresPagina /> },
           // Costos (Módulo 6, F7-E1): hub + pre-costo/lista de precios (precostos.consultar) y
           // costeo de orden/lista de costos/márgenes (costos.ver/.capturar). Rutas estáticas antes
           // del catch-all ":modulo".

@@ -4505,6 +4505,31 @@ model AuditoriaDefecto {
   @@map("auditoria_defecto")
 }
 
+/// Catálogo de AUDITORES de calidad (rediseño R9 — proto `CAT_AUDITORES`). GLOBAL como los demás
+/// catálogos (A9, sin idEmpresa). Hoy `Usuario.esAuditor` (bool) y `Auditoria.auditorPorId` (String
+/// SIN FK, ADR-0005) identifican al auditor por su nombre; este catálogo le da entidad propia
+/// (nombre, rol y nivel AQL de certificación). El conteo de auditorías (`numeroAuditorias`) NO se
+/// persiste: se DERIVA best-effort del histórico contando las `Auditoria` cuyo `auditorPorId`
+/// coincide con el `nombre` (String histórico). CRUD patrón catálogo con borrado SUAVE (`activo`);
+/// `rol`/`nivelAql` se validan a listas cerradas en el dominio (A1). Auditoría A7.
+model Auditor {
+  id       Int     @id @default(autoincrement())
+  /// Nombre del auditor (único global; unicidad insensible a mayúsculas en el dominio).
+  nombre   String  @unique
+  /// Rol del auditor: "Auditor" | "Sr. Auditor" (validado en el dominio).
+  rol      String
+  /// Nivel AQL de certificación: "1.0" | "1.5" | "2.5" | "4.0" (validado en el dominio).
+  nivelAql String  @map("nivel_aql")
+  activo   Boolean @default(true)
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@map("auditores")
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // COSTOS (Módulo 6, F7-E1) — costo REAL por orden (doc 06-Costos-y-EDR §3; D1/D2).
 // El PRE-COSTO por modelo NO es tabla: es cálculo de dominio sobre la receta
