@@ -143,8 +143,9 @@ describe('<TemporadasPagina>', () => {
       sesion: estadoSesionDePrueba(['temporadas.ver', 'temporadas.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-temporada');
-    expect(within(detalle).getByText('Inactivo')).toBeInTheDocument();
+    // Tabla-first: el renglón inactivo muestra "Inactivo" y ofrece "Activar" inline.
+    const fila = screen.getByTestId('fila-temporada');
+    expect(within(fila).getByText('Inactivo')).toBeInTheDocument();
     expect(screen.getByTestId('activar-temporada')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-temporada')).not.toBeInTheDocument();
 

@@ -11,27 +11,34 @@ import {
 } from '@/api/roles';
 import type { Rol } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Avatar, TipoBadge } from '@/components/dominio/visuales';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ListaDetalle } from '@/modulos/ListaDetalle';
+import { Input } from '@/components/ui/input';
 import { CampoDetalle, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoRol } from './DialogoRol';
 
 /**
- * Pantalla de Roles y permisos (administración, RBAC A4) sobre el motor LISTA +
- * DETALLE. La lista muestra los roles (nombre, descripción, badge "Sistema" y
- * conteo de usuarios); el detalle presenta el árbol de permisos agrupado por
- * módulo (checkboxes = lo que queda, semántica de REEMPLAZO) con un botón
- * Guardar, más los diálogos de alta/edición/eliminación.
+ * Pantalla de Roles y permisos (administración, RBAC A4) — re-vestida R9 a TABLA-FIRST + CAJÓN
+ * (coherente con Usuarios/Clientes; el proto llega aquí por el atajo «Roles» de `vUsuarios`). La tabla
+ * densa lista los roles (Rol · Usuarios · Sistema); al hacer clic en un renglón se abre un cajón ANCHO
+ * con los datos del rol y el ÁRBOL DE PERMISOS agrupado por módulo (checkboxes = lo que queda,
+ * semántica de REEMPLAZO) + botón Guardar. Alta/edición/eliminación en diálogos.
  *
- * Un rol de SISTEMA no se renombra ni se elimina (el backend es la autoridad,
- * A1): la UI deshabilita esas acciones con su razón, pero SÍ permite editar sus
- * permisos. Los roles con usuarios asignados tampoco se eliminan. Todo va
- * gobernado por `roles.administrar` (no existe `.ver`): sin él, ni la pantalla se
- * alcanza ni hay acciones.
+ * Un rol de SISTEMA no se renombra ni se elimina (el backend es la autoridad, A1): la UI deshabilita
+ * esas acciones con su razón, pero SÍ permite editar sus permisos. Los roles con usuarios asignados
+ * tampoco se eliminan. Todo va gobernado por `roles.administrar` (no existe `.ver`).
  */
 export function RolesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -45,6 +52,8 @@ export function RolesPagina(): React.JSX.Element {
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
   const [enEdicion, setEnEdicion] = useState<Rol | undefined>(undefined);
   const [aEliminar, setAEliminar] = useState<Rol | null>(null);
+  // El cajón guarda el ID; el rol mostrado se DERIVA de la lista viva.
+  const [seleccionId, setSeleccionId] = useState<number | null>(null);
 
   // Los roles son pocos: se filtran en cliente por nombre/descripción (sin paginación).
   const registros = useMemo(() => {
@@ -77,94 +86,183 @@ export function RolesPagina(): React.JSX.Element {
       onSuccess: () => {
         toast.success(`Rol "${objetivo.nombre}" eliminado.`);
         setAEliminar(null);
+        setSeleccionId(null);
       },
       onError: (error) => toast.error(error.message),
     });
   }
 
+  const seleccion = registros.find((r) => r.id === seleccionId) ?? null;
+  const total = registros.length;
+
   return (
-    <>
-      <ListaDetalle<Rol>
-        testid="rol"
-        titulo="Roles y permisos"
-        descripcion="Roles del sistema y los permisos que otorga cada uno."
-        icono={ShieldCheck}
-        registros={registros}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(r) => r.id}
-        obtenerTitulo={(r) => r.nombre}
-        // Los roles no tienen estado de borrado suave: siempre "vigentes".
-        obtenerActivo={() => true}
-        obtenerSecundaria={(r) => (r.descripcion.length > 0 ? r.descripcion : 'Sin descripción')}
-        renderAvatarLista={(r) => (
-          <Avatar nombre={r.nombre} tono="pt" tamano="sm">
-            <ShieldCheck className="size-4" aria-hidden />
-          </Avatar>
-        )}
-        busqueda={textoBusqueda}
-        alBuscar={setTextoBusqueda}
-        // Los roles se borran de verdad (sin borrado suave): no hay estado
-        // "desactivado" que filtrar, así que se oculta ese toggle.
-        incluirInactivos={false}
-        alAlternarInactivos={() => undefined}
-        ocultarToggleInactivos
-        textoVacio="No hay roles que coincidan con la búsqueda."
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={abrirAlta}
-        textoNuevo="Nuevo rol"
-        // El CRUD de roles es especial (sistema no renombra/elimina, con usuarios no
-        // elimina): se ocultan las acciones base y se arman a medida.
-        ocultarAccionesBase
-        alEditar={abrirEdicion}
-        alDesactivar={() => undefined}
-        alReactivar={() => undefined}
-        accionesExtra={(r) => (
-          <AccionesRol rol={r} alEditar={abrirEdicion} alEliminar={setAEliminar} />
-        )}
-        renderAvatarDetalle={(r) => (
-          <Avatar nombre={r.nombre} tono="pt" tamano="lg">
-            <ShieldCheck className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderMeta={(r) => (
-          <>
-            {r.esSistema ? <TipoBadge tono="pt">Sistema</TipoBadge> : null}
-            <Badge variant="secondary">
-              <Users className="size-3.5" aria-hidden />
-              {r.totalUsuarios} usuario{r.totalUsuarios === 1 ? '' : 's'}
-            </Badge>
-          </>
-        )}
-        renderDetalle={(r) => (
-          <>
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Roles y permisos</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Roles del sistema y los permisos que otorga cada uno
+          </p>
+        </div>
+        {puedeAdministrar ? (
+          <Button size="sm" onClick={abrirAlta} data-testid="nuevo-rol">
+            <ShieldCheck aria-hidden />
+            Nuevo rol
+          </Button>
+        ) : null}
+      </header>
+
+      {/* ── Card: filtro + tabla + totales ──────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <Input
+            type="search"
+            className="h-8 w-52 text-sm"
+            placeholder="Buscar rol…"
+            value={textoBusqueda}
+            onChange={(e) => setTextoBusqueda(e.target.value)}
+            data-testid="buscar-rol"
+          />
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {total.toLocaleString('es-MX')} roles
+            </span>
+          </div>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando roles…</p>
+          ) : registros.length === 0 ? (
+            <p className="p-6 text-sm text-muted-foreground" data-testid="rol-vacio">
+              No hay roles que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Rol</TablaDensaHead>
+                  <TablaDensaHead>Usuarios</TablaDensaHead>
+                  <TablaDensaHead>Tipo</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {registros.map((r) => (
+                  <TablaDensaFila
+                    key={r.id}
+                    seleccionada={seleccion?.id === r.id}
+                    className="cursor-pointer"
+                    onClick={() => setSeleccionId(r.id)}
+                    data-testid="fila-rol"
+                  >
+                    <TablaDensaCelda>
+                      <div className="flex items-center gap-2">
+                        <Avatar nombre={r.nombre} tono="pt" tamano="sm">
+                          <ShieldCheck className="size-4" aria-hidden />
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{r.nombre}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {r.descripcion.length > 0 ? r.descripcion : 'Sin descripción'}
+                          </div>
+                        </div>
+                      </div>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <Badge variant="secondary">
+                        <Users className="size-3.5" aria-hidden />
+                        {r.totalUsuarios}
+                      </Badge>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      {r.esSistema ? (
+                        <TipoBadge tono="pt">Sistema</TipoBadge>
+                      ) : (
+                        <span className="text-muted-foreground">Propio</span>
+                      )}
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">Roles</span>
+            <b className="num">{total.toLocaleString('es-MX')}</b>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Cajón de detalle del rol (ancho: el árbol de permisos necesita espacio) ── */}
+      <CajonDetalle
+        className="sm:max-w-2xl lg:max-w-3xl"
+        abierto={seleccionId !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setSeleccionId(null);
+        }}
+        titulo={
+          seleccion !== null ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {seleccion.nombre}
+              {seleccion.esSistema ? <TipoBadge tono="pt">Sistema</TipoBadge> : null}
+              <Badge variant="secondary">
+                <Users className="size-3.5" aria-hidden />
+                {seleccion.totalUsuarios} usuario{seleccion.totalUsuarios === 1 ? '' : 's'}
+              </Badge>
+            </span>
+          ) : (
+            ''
+          )
+        }
+        acciones={
+          seleccion !== null && puedeAdministrar ? (
+            <AccionesRol rol={seleccion} alEditar={abrirEdicion} alEliminar={setAEliminar} />
+          ) : undefined
+        }
+      >
+        {seleccion !== null ? (
+          <div data-testid="detalle-rol">
             <SeccionDetalle titulo="Datos del rol">
               <RejillaCampos>
                 <CampoDetalle icono={ShieldCheck} etiqueta="Nombre">
-                  {r.nombre}
+                  {seleccion.nombre}
                 </CampoDetalle>
                 <CampoDetalle icono={Users} etiqueta="Usuarios con este rol">
-                  {r.totalUsuarios}
+                  {seleccion.totalUsuarios}
                 </CampoDetalle>
                 <CampoDetalle icono={Lock} etiqueta="Descripción" anchoCompleto>
-                  {r.descripcion.length > 0 ? r.descripcion : 'Sin descripción'}
+                  {seleccion.descripcion.length > 0 ? seleccion.descripcion : 'Sin descripción'}
                 </CampoDetalle>
               </RejillaCampos>
             </SeccionDetalle>
 
             {/* El editor se remonta al cambiar de rol (key) → arranca del set del rol. */}
             <EditorPermisos
-              key={r.id}
-              rol={r}
+              key={seleccion.id}
+              rol={seleccion}
               catalogo={catalogo.data}
               cargandoCatalogo={catalogo.isPending}
               errorCatalogo={catalogo.isError ? catalogo.error.message : null}
               puedeAdministrar={puedeAdministrar}
             />
-          </>
-        )}
-      />
+          </div>
+        ) : null}
+      </CajonDetalle>
 
       <DialogoRol abierto={dialogoAbierto} alCambiarAbierto={setDialogoAbierto} rol={enEdicion} />
       <DialogoConfirmacion
@@ -187,7 +285,7 @@ export function RolesPagina(): React.JSX.Element {
         procesando={eliminar.isPending}
         alConfirmar={confirmarEliminar}
       />
-    </>
+    </div>
   );
 }
 

@@ -98,6 +98,9 @@ export {
   esquemaProveedorAdjuntoSubida,
   esquemaProveedorAdjuntoSalida,
   esquemaProveedorAdjuntosLista,
+  esquemaProveedorAvioSalida,
+  esquemaProveedorAviosLista,
+  esquemaProveedorAvioAsignar,
   type DatosProveedorCrear,
   type DatosProveedorEditar,
   type DatosProveedorPatchCuerpo,
@@ -111,6 +114,9 @@ export {
   type ProveedorAdjuntoSubida,
   type ProveedorAdjuntoSalida,
   type ProveedorAdjuntosLista,
+  type ProveedorAvioSalida,
+  type ProveedorAviosLista,
+  type DatosProveedorAvioAsignar,
 } from './esquemas/proveedor.js';
 
 export {

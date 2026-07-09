@@ -77,6 +77,15 @@ export type ProveedorAdjuntoCrear =
 export type ProveedorAdjuntoSubida =
   paths['/api/proveedores/{id}/adjuntos']['post']['responses']['201']['content']['application/json'];
 
+/** Avíos que surte un proveedor (B17, `GET /api/proveedores/{id}/avios`). */
+export type ProveedorAviosLista =
+  paths['/api/proveedores/{id}/avios']['get']['responses']['200']['content']['application/json'];
+/** Un avío que surte el proveedor (con su precio y condiciones). */
+export type ProveedorAvio = ProveedorAviosLista['datos'][number];
+/** Cuerpo para asignar un avío que surte el proveedor (`POST /api/proveedores/{id}/avios`). */
+export type ProveedorAvioAsignar =
+  paths['/api/proveedores/{id}/avios']['post']['requestBody']['content']['application/json'];
+
 // NOTA (fusion de terceros, D12/R15): los tipos de Cortador se eliminaron; el cortador es
 // un Proveedor con el rol `corte` (usa los tipos de Proveedor de arriba).
 

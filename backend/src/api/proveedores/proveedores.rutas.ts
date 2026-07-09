@@ -23,6 +23,8 @@ import {
   esquemaProveedorAdjuntoCrear,
   esquemaProveedorAdjuntosLista,
   esquemaProveedorAdjuntoSubida,
+  esquemaProveedorAvioAsignar,
+  esquemaProveedorAviosLista,
   esquemaProveedorCrear,
   esquemaProveedorPatchCuerpo,
   esquemaProveedoresPagina,
@@ -36,13 +38,16 @@ import { SEGURIDAD_SESION } from '../../openapi.js';
 import {
   actualizarProveedor,
   agregarAdjuntoProveedor,
+  asignarAvioProveedor,
   crearProveedor,
   desactivarProveedor,
   listarAdjuntosProveedor,
+  listarAviosDeProveedor,
   listarProveedores,
   listarRolesProveedor,
   obtenerProveedor,
   quitarAdjuntoProveedor,
+  quitarAvioProveedor,
   type AdjuntoProveedorConUrl,
   type ProveedorConRoles,
   type SubidaAdjuntoProveedor,
@@ -144,6 +149,20 @@ const esquemaParamAdjunto = z.object({
     .positive()
     .describe('Id del proveedor.'),
   idArchivo: z.string({ error: 'El id del archivo es obligatorio' }).describe('Id del adjunto.'),
+});
+
+/** Parámetros `:id` (proveedor) + `:idAvio` (avío) para quitar un avío que surte (B17). */
+const esquemaParamAvio = z.object({
+  id: z.coerce
+    .number({ error: 'El id del proveedor debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del proveedor.'),
+  idAvio: z.coerce
+    .number({ error: 'El id del avío debe ser un número' })
+    .int()
+    .positive()
+    .describe('Id del avío.'),
 });
 
 /** Querystring del selector de roles. */
@@ -350,6 +369,66 @@ export const rutasProveedores: FastifyPluginCallbackZod = (app, _opciones, done)
       const sesion = await exigirSesion(() => request.obtenerSesion());
       await quitarAdjuntoProveedor(sesion, request.params.id, request.params.idArchivo);
       return reply.code(204).send(null);
+    },
+  });
+
+  // ── Avíos que surte el proveedor (B17, R9 — lado proveedor de AvioProveedor) ─
+
+  // Listar los avíos que surte el proveedor (cada uno con su precio/condiciones).
+  app.route({
+    method: 'GET',
+    url: '/proveedores/:id/avios',
+    preHandler: app.conPermiso('proveedores.ver'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Listar los avíos que surte el proveedor (con su precio y condiciones)',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      response: { 200: esquemaProveedorAviosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await listarAviosDeProveedor(sesion, request.params.id);
+      return { datos };
+    },
+  });
+
+  // Asignar un avío que surte el proveedor (crea el vínculo con su precio).
+  app.route({
+    method: 'POST',
+    url: '/proveedores/:id/avios',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Asignar un avío que surte el proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamId,
+      body: esquemaProveedorAvioAsignar,
+      response: { 201: esquemaProveedorAviosLista, ...respuestasError },
+    },
+    handler: async (request, reply) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await asignarAvioProveedor(sesion, request.params.id, request.body);
+      return reply.code(201).send({ datos });
+    },
+  });
+
+  // Quitar un avío que surte el proveedor (borra el vínculo).
+  app.route({
+    method: 'DELETE',
+    url: '/proveedores/:id/avios/:idAvio',
+    preHandler: app.conPermiso('proveedores.administrar'),
+    schema: {
+      tags: ['proveedores'],
+      summary: 'Quitar un avío que surte el proveedor',
+      security: SEGURIDAD_SESION,
+      params: esquemaParamAvio,
+      response: { 200: esquemaProveedorAviosLista, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      const datos = await quitarAvioProveedor(sesion, request.params.id, request.params.idAvio);
+      return { datos };
     },
   });
 

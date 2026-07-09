@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -164,8 +164,9 @@ describe('<ModelosPagina>', () => {
     renderConProveedores(<ModelosPagina />, {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
+    // Tabla-first: el detalle NO se auto-abre; cada modelo sale en su renglón.
     expect(screen.getAllByTestId('fila-modelo')).toHaveLength(2);
-    expect(screen.getAllByText('501').length).toBeGreaterThan(0);
+    expect(screen.getByText('501')).toBeInTheDocument();
     expect(screen.getByText('777')).toBeInTheDocument();
   });
 
@@ -181,6 +182,8 @@ describe('<ModelosPagina>', () => {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
 
+    // Tabla-first: se abre el cajón con clic en el renglón.
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
     const detalle = screen.getByTestId('detalle-modelo');
     expect(within(detalle).getByText('Sudadera')).toBeInTheDocument();
     expect(within(detalle).getByText('$35.00')).toBeInTheDocument();
@@ -197,6 +200,7 @@ describe('<ModelosPagina>', () => {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
 
+    await usuario.click(screen.getByTestId('fila-modelo'));
     // Pestañas presentes; por defecto Telas.
     expect(screen.getByTestId('tab-bom-telas')).toBeInTheDocument();
     expect(screen.getByTestId('tab-bom-avios')).toBeInTheDocument();
@@ -232,6 +236,8 @@ describe('<ModelosPagina>', () => {
     useModelos.mockReturnValue(listaConDatos([m]));
     useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
     renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+    // Abre el cajón (lectura): igual no debe haber acciones de escritura.
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
     expect(screen.queryByTestId('nuevo-modelo')).not.toBeInTheDocument();
     expect(screen.queryByTestId('editar-modelo')).not.toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-modelo')).not.toBeInTheDocument();
@@ -249,9 +255,9 @@ describe('<ModelosPagina>', () => {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
 
+    await usuario.click(screen.getByTestId('fila-modelo'));
     await usuario.click(screen.getByTestId('desactivar-modelo'));
-    const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByText('Descontinuar modelo')).toBeInTheDocument();
+    // El diálogo de confirmación es el que trae `confirmar-accion`.
     await usuario.click(screen.getByTestId('confirmar-accion'));
     expect(descontinuarMutate).toHaveBeenCalledWith(7, expect.anything());
   });
@@ -282,9 +288,10 @@ describe('<ModelosPagina>', () => {
       rutaInicial: { pathname: '/modelos', state: { idModelo: 2 } },
     });
 
-    // El detalle muestra el modelo 777 (el del deep-link), no el primero (501).
+    // El cajón se abre con el modelo 777 (el del deep-link), no el primero (501).
+    // El código va en el TÍTULO del cajón (h2, junto al badge de estado); la descripción, en el cuerpo.
+    expect(await screen.findByRole('heading', { name: /777/ })).toBeInTheDocument();
     const detalle = screen.getByTestId('detalle-modelo');
-    expect(await within(detalle).findByRole('heading', { name: '777' })).toBeInTheDocument();
     expect(within(detalle).getByText('Modelo deep-link')).toBeInTheDocument();
   });
 
@@ -304,15 +311,15 @@ describe('<ModelosPagina>', () => {
       rutaInicial: { pathname: '/modelos', state: { idModelo: 999 } },
     });
 
+    expect(await screen.findByRole('heading', { name: /DEEP-999/ })).toBeInTheDocument();
     const detalle = screen.getByTestId('detalle-modelo');
-    expect(await within(detalle).findByRole('heading', { name: 'DEEP-999' })).toBeInTheDocument();
     expect(within(detalle).getByText('Fuera de página')).toBeInTheDocument();
     // Y aparece como un renglón inyectado en la lista (junto al visible 501): 2 renglones.
     expect(screen.getAllByTestId('fila-modelo')).toHaveLength(2);
     expect(screen.getAllByText('DEEP-999').length).toBeGreaterThan(0);
   });
 
-  it('sin `state.idModelo` selecciona el primero (comportamiento por defecto intacto)', () => {
+  it('sin `state.idModelo` NO auto-abre el cajón; se abre al hacer clic en un renglón', () => {
     useModelos.mockReturnValue(listaConDatos([modelo(1, '501'), modelo(2, '777')]));
     useFichaModelo.mockImplementation((id) =>
       id === undefined
@@ -325,8 +332,10 @@ describe('<ModelosPagina>', () => {
       rutaInicial: '/modelos',
     });
 
-    // Sin deep-link, el detalle muestra el PRIMER modelo (501).
-    const detalle = screen.getByTestId('detalle-modelo');
-    expect(within(detalle).getByRole('heading', { name: '501' })).toBeInTheDocument();
+    // Tabla-first: sin deep-link no hay detalle abierto.
+    expect(screen.queryByTestId('detalle-modelo')).not.toBeInTheDocument();
+    // Al hacer clic en el primer renglón se abre su ficha (501).
+    fireEvent.click(screen.getAllByTestId('fila-modelo')[0] as HTMLElement);
+    expect(screen.getByRole('heading', { name: /501/ })).toBeInTheDocument();
   });
 });

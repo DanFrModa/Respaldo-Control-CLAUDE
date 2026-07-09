@@ -28,10 +28,13 @@
  */
 import {
   esquemaProveedorAdjuntoCrear,
+  esquemaProveedorAvioAsignar,
   esquemaProveedorCrear,
   esquemaProveedorEditar,
   TIPOS_PROVEEDOR,
   type DatosProveedorAdjuntoCrear,
+  type DatosProveedorAvioAsignar,
+  type ProveedorAvioSalida,
 } from '../../contrato/index.js';
 import type { Prisma, Proveedor, ProveedorArchivo, RolProveedor } from '../../datos/index.js';
 import { z } from 'zod';
@@ -791,5 +794,193 @@ export async function quitarAdjuntoProveedor(
       accion: 'MODIFICAR',
       datos: { adjunto: 'quitar', archivo: adjunto.archivo.nombreOriginal },
     });
+  }, bd);
+}
+
+// ── Avíos que surte el proveedor (B17, R9 — lado PROVEEDOR de AvioProveedor) ────
+//
+// El vínculo avío↔proveedor (R1) ya se administra desde el AVÍO (`avios.ts`,
+// `avios.administrar`). B17 abre la MISMA relación desde el PROVEEDOR ("avíos que
+// surte" con asignar/quitar) para la pantalla de Proveedores (proto `drawerProveedor`).
+// Se gobierna con `proveedores.*` (el permiso de la pantalla), SIN permiso nuevo — el
+// avío es un sub-catálogo embebido, mismo criterio que "los proveedores de un avío se
+// gobiernan con `avios.administrar`" (permisos.ts). Cada acción es UNA transacción (A2)
+// con auditoría (A7) sobre la entidad `Proveedor`. La relación es la misma tabla que
+// edita el avío, así que asignar/quitar aquí se refleja allá (y viceversa).
+
+/** Proyecta el include estándar de un avío surtido a la forma de salida (decimales → number). */
+const seleccionAvioSurtido = {
+  idAvio: true,
+  precio: true,
+  condiciones: true,
+  avio: { select: { clave: true, descripcion: true } },
+} satisfies Prisma.AvioProveedorSelect;
+
+/** Fila de `AvioProveedor` con el avío embebido, tal como la trae `seleccionAvioSurtido`. */
+type FilaAvioSurtido = Prisma.AvioProveedorGetPayload<{ select: typeof seleccionAvioSurtido }>;
+
+/** Convierte una fila de avío surtido a la forma de salida del contrato (B17). */
+function aProveedorAvioSalida(fila: FilaAvioSurtido): ProveedorAvioSalida {
+  return {
+    idAvio: fila.idAvio,
+    clave: fila.avio.clave,
+    descripcion: fila.avio.descripcion,
+    precio: fila.precio === null ? null : Number(fila.precio),
+    condiciones: fila.condiciones,
+  };
+}
+
+/**
+ * Exige que el avío exista y esté ACTIVO (no se puede asignar uno desactivado). Devuelve
+ * su clave para los mensajes/bitácora. Lanza `ErrorNoEncontrado` si no existe o
+ * `ErrorValidacion` si está inactivo. Simétrico a `exigirProveedoresValidos` del avío.
+ */
+async function exigirAvioActivo(tx: Tx, idAvio: number): Promise<{ clave: string }> {
+  const avio = await tx.avio.findUnique({
+    where: { id: idAvio },
+    select: { clave: true, activo: true },
+  });
+  if (avio === null) {
+    throw new ErrorNoEncontrado('Avio', idAvio);
+  }
+  if (!avio.activo) {
+    throw new ErrorValidacion(`El avío "${avio.clave}" está desactivado y no se puede asignar.`);
+  }
+  return { clave: avio.clave };
+}
+
+/**
+ * Lista los avíos que surte un proveedor (B17), cada uno con SU precio/condiciones. Requiere
+ * `proveedores.ver`. Exige que el proveedor exista. Ordenado por clave del avío.
+ */
+export async function listarAviosDeProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  bd?: ContextoBd,
+): Promise<ProveedorAvioSalida[]> {
+  verificarPermiso(sesion, 'proveedores.ver');
+  const cliente = clienteLectura(bd);
+  const proveedor = await cliente.proveedor.findUnique({
+    where: { id: idProveedor },
+    select: { id: true },
+  });
+  if (proveedor === null) {
+    throw new ErrorNoEncontrado('Proveedor', idProveedor);
+  }
+  const filas = await cliente.avioProveedor.findMany({
+    where: { idProveedor },
+    select: seleccionAvioSurtido,
+    orderBy: { avio: { clave: 'asc' } },
+  });
+  return filas.map(aProveedorAvioSalida);
+}
+
+/**
+ * Asigna un avío que surte el proveedor (B17): crea el vínculo `AvioProveedor` con su precio y
+ * condiciones, en UNA transacción (A2). Requiere `proveedores.administrar`; el avío debe existir
+ * y estar activo; si el proveedor ya surte ese avío → `ErrorConflicto` (para cambiar el precio se
+ * quita y se re-asigna, o se edita desde el catálogo de avíos). Bitácora sobre `Proveedor` (A7).
+ * Devuelve la lista actualizada de avíos que surte (para refrescar la UI en un viaje).
+ */
+export async function asignarAvioProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  entrada: DatosProveedorAvioAsignar,
+  bd?: ContextoBd,
+): Promise<ProveedorAvioSalida[]> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  const datos = validarEntrada(esquemaProveedorAvioAsignar, entrada);
+
+  try {
+    return await enTransaccion(async (tx) => {
+      await exigirProveedor(tx, idProveedor);
+      const avio = await exigirAvioActivo(tx, datos.idAvio);
+
+      const existente = await tx.avioProveedor.findUnique({
+        where: { idAvio_idProveedor: { idAvio: datos.idAvio, idProveedor } },
+        select: { idAvio: true },
+      });
+      if (existente !== null) {
+        throw new ErrorConflicto(`Este proveedor ya surte el avío "${avio.clave}".`);
+      }
+
+      await tx.avioProveedor.create({
+        data: {
+          idAvio: datos.idAvio,
+          idProveedor,
+          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
+          ...(datos.condiciones === undefined || datos.condiciones === ''
+            ? {}
+            : { condiciones: datos.condiciones }),
+          creadoPorId: sesion.id,
+          modificadoPorId: sesion.id,
+        },
+      });
+
+      await registrarBitacora(tx, sesion, {
+        entidad: 'Proveedor',
+        idEntidad: idProveedor,
+        accion: 'MODIFICAR',
+        datos: {
+          avio: 'asignar',
+          idAvio: datos.idAvio,
+          clave: avio.clave,
+          ...(datos.precio === undefined ? {} : { precio: datos.precio }),
+        },
+      });
+
+      const filas = await tx.avioProveedor.findMany({
+        where: { idProveedor },
+        select: seleccionAvioSurtido,
+        orderBy: { avio: { clave: 'asc' } },
+      });
+      return filas.map(aProveedorAvioSalida);
+    }, bd);
+  } catch (error) {
+    if (codigoErrorPrisma(error) === CODIGO_PRISMA.unicidad) {
+      throw new ErrorConflicto('Este proveedor ya surte ese avío.', { causa: error });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Quita un avío que surte el proveedor (B17): borra el vínculo `AvioProveedor`, en UNA
+ * transacción (A2). Requiere `proveedores.administrar`. Si el proveedor no surte ese avío →
+ * `ErrorNoEncontrado`. Bitácora sobre `Proveedor` (A7). Devuelve la lista actualizada.
+ */
+export async function quitarAvioProveedor(
+  sesion: SesionUsuario,
+  idProveedor: number,
+  idAvio: number,
+  bd?: ContextoBd,
+): Promise<ProveedorAvioSalida[]> {
+  verificarPermiso(sesion, 'proveedores.administrar');
+  return enTransaccion(async (tx) => {
+    const fila = await tx.avioProveedor.findUnique({
+      where: { idAvio_idProveedor: { idAvio, idProveedor } },
+      select: { avio: { select: { clave: true } } },
+    });
+    if (fila === null) {
+      throw new ErrorNoEncontrado('Avío del proveedor', idAvio);
+    }
+
+    await tx.avioProveedor.delete({
+      where: { idAvio_idProveedor: { idAvio, idProveedor } },
+    });
+
+    await registrarBitacora(tx, sesion, {
+      entidad: 'Proveedor',
+      idEntidad: idProveedor,
+      accion: 'MODIFICAR',
+      datos: { avio: 'quitar', idAvio, clave: fila.avio.clave },
+    });
+
+    const filas = await tx.avioProveedor.findMany({
+      where: { idProveedor },
+      select: seleccionAvioSurtido,
+      orderBy: { avio: { clave: 'asc' } },
+    });
+    return filas.map(aProveedorAvioSalida);
   }, bd);
 }

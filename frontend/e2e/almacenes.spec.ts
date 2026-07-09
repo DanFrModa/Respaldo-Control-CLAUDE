@@ -29,8 +29,6 @@ test.describe('CRUD de Almacenes', () => {
       .click();
     await expect(page.getByRole('heading', { name: 'Almacenes' })).toBeVisible();
 
-    const detalle = page.getByTestId('detalle-almacen');
-
     // ── Crear ─────────────────────────────────────────────────────────────────
     await page.getByTestId('nuevo-almacen').click();
     const dialogoAlta = page.getByRole('dialog');
@@ -45,16 +43,12 @@ test.describe('CRUD de Almacenes', () => {
     const filaNueva = page.getByTestId('fila-almacen').filter({ hasText: nombre });
     await expect(filaNueva).toBeVisible();
 
-    // ── Seleccionar → el detalle muestra el almacén (tipo y estado) ────────────
-    await filaNueva.click();
-    await expect(detalle.getByRole('heading', { name: nombre })).toBeVisible();
-    // El tipo "Telas" aparece DOS veces en el detalle (badge del hero + campo
-    // "Tipo"); `.first()` evita el strict-mode de Playwright.
-    await expect(detalle.getByText('Telas').first()).toBeVisible();
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
+    // ── Tabla-first: el renglón muestra el tipo (badge) y el estado ────────────
+    await expect(filaNueva.getByText('Telas')).toBeVisible();
+    await expect(filaNueva.getByText('Activo', { exact: true })).toBeVisible();
 
-    // ── Editar (boton directo del detalle) ─────────────────────────────────────
-    await page.getByTestId('editar-almacen').click();
+    // ── Editar (botón inline del renglón) ──────────────────────────────────────
+    await filaNueva.getByTestId('editar-almacen').click();
     const dialogoEdicion = page.getByRole('dialog');
     await expect(dialogoEdicion.getByRole('heading', { name: 'Editar almacén' })).toBeVisible();
     await expect(dialogoEdicion.getByLabel('Nombre')).toHaveValue(nombre);
@@ -67,9 +61,7 @@ test.describe('CRUD de Almacenes', () => {
     await expect(filaEditada).toBeVisible();
 
     // ── Desactivar (borrado suave) ─────────────────────────────────────────────
-    await filaEditada.click();
-    await expect(detalle.getByRole('heading', { name: nombreEditado })).toBeVisible();
-    await page.getByTestId('desactivar-almacen').click();
+    await filaEditada.getByTestId('desactivar-almacen').click();
     const confirmacion = page.getByRole('dialog');
     await expect(confirmacion.getByRole('heading', { name: 'Desactivar almacén' })).toBeVisible();
     await page.getByTestId('confirmar-accion').click();
@@ -80,21 +72,21 @@ test.describe('CRUD de Almacenes', () => {
       0,
     );
 
-    // ── Mostrar desactivados → seleccionar → el detalle lo marca Inactivo ──────
+    // ── Mostrar desactivados → el renglón lo marca Inactivo ────────────────────
     await page.getByTestId('mostrar-desactivados').click();
     const filaInactiva = page.getByTestId('fila-almacen').filter({ hasText: nombreEditado });
     await expect(filaInactiva).toBeVisible();
-    await filaInactiva.click();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toBeVisible();
+    await expect(filaInactiva.getByText('Inactivo', { exact: true })).toBeVisible();
 
-    // ── Reactivar (boton directo del detalle) ──────────────────────────────────
-    await page.getByTestId('activar-almacen').click();
+    // ── Reactivar (botón inline del renglón) ───────────────────────────────────
+    await filaInactiva.getByTestId('activar-almacen').click();
 
     await expect(page.getByText(`Almacén "${nombreEditado}" activado.`)).toBeVisible();
-    // El detalle ahora lo marca Activo. `exact` evita que "Activo" haga match con
-    // "Inactivo" (substring).
-    await expect(detalle.getByText('Activo', { exact: true })).toBeVisible();
-    await expect(detalle.getByText('Inactivo', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByTestId('fila-almacen').filter({ hasText: nombreEditado }).getByText('Activo', {
+        exact: true,
+      }),
+    ).toBeVisible();
   });
 
   test('la búsqueda filtra la lista por nombre', async ({ page }) => {
