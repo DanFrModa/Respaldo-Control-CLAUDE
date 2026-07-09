@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   CalendarCog,
   CalendarRange,
   FileBarChart,
@@ -76,18 +75,11 @@ export function EdrPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <BarChart3 className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Estado de Resultados</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              El P&amp;L mensual consolidado, valuado a costo actual. Las ventas se proponen desde
-              las entregas a cliente y se ajustan a lo facturado.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-semibold tracking-tight">Estado de Resultados</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          El P&amp;L mensual consolidado, valuado a costo actual. Las ventas se proponen desde las
+          entregas a cliente y se ajustan a lo facturado.
+        </p>
 
         {visibles.length === 0 ? (
           <p className="mt-6 rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">

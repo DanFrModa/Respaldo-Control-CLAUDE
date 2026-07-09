@@ -1,9 +1,11 @@
 import { ArrowRight, Plus, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-import { useConteoAlertasRc } from '@/api/ruta-critica-programacion';
+import { useBandejaRc, useConteoAlertasRc } from '@/api/ruta-critica-programacion';
+import type { TareaRc } from '@/api/tipos';
 import { type Kpi, KpiTiles } from '@/components/dominio/KpiTiles';
 import { filtrarGruposVisibles, ICONOS_MODULO } from '@/modulos/catalogo';
+import { fechaRc, Semaforo } from '@/modulos/ruta-critica/piezas';
 import { useSesion } from '@/sesion/useSesion';
 
 /**
@@ -80,6 +82,7 @@ export function Inicio(): React.JSX.Element {
               </Link>
             </div>
             <KpiTiles kpis={kpisRc} className="mt-2" />
+            <BandejaResumen />
           </section>
         ) : null}
 
@@ -134,6 +137,73 @@ export function Inicio(): React.JSX.Element {
           </section>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Texto de urgencia compacto de una tarea de la bandeja (mismo criterio que Mis pendientes). */
+function textoUrgencia(t: TareaRc): string {
+  const fecha = fechaRc(t.fechaPlaneadaVigente);
+  if (t.urgencia === 'vencida') return `venció ${fecha} · -${String(t.diasAtraso)} d`;
+  if (t.urgencia === 'hoy') return `para hoy · ${fecha}`;
+  if (t.urgencia === 'sinFecha') return 'sin fecha (calculando)';
+  return fecha;
+}
+
+/**
+ * BANDEJA DE RUTA CRITICA del Resumen (proto vResumen `rcItem`): los primeros procesos a capturar
+ * (atrasados/hoy primero) con su SEMAFORO derivado en el servidor, tomados de la bandeja viva
+ * (`useBandejaRc`). Se monta SOLO con `rc.ruta-ver` (el padre lo condiciona), asi el hook no consulta
+ * sin permiso. Cero logica/agregacion en cliente (A1): el orden y el semaforo los da el backend.
+ */
+function BandejaResumen(): React.JSX.Element {
+  const bandeja = useBandejaRc({ pagina: 1, porPagina: 6 });
+  const tareas = bandeja.data?.datos ?? [];
+
+  return (
+    <div className="mt-3 overflow-hidden rounded-xl border bg-card">
+      <div className="flex items-center justify-between gap-3 border-b px-3 py-2">
+        <h3 className="text-sm font-semibold">Bandeja de Ruta Crítica</h3>
+        <Link
+          to="/ruta-critica/pendientes"
+          className="text-xs font-medium text-primary hover:underline"
+        >
+          a capturar
+        </Link>
+      </div>
+      {bandeja.isPending ? (
+        <p className="p-4 text-sm text-muted-foreground">Cargando…</p>
+      ) : tareas.length === 0 ? (
+        <p className="p-4 text-sm text-muted-foreground">Nada pendiente por capturar. ✓</p>
+      ) : (
+        <ul className="divide-y">
+          {tareas.map((t) => (
+            <li key={t.idRutaOrden} className="flex items-center gap-3 px-3 py-2">
+              <Semaforo semaforo={t.semaforo} soloPunto />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">
+                  {t.nombreProceso}{' '}
+                  <span className="font-normal text-muted-foreground">· Orden #{t.folioOrden}</span>
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {t.descripcionModelo ?? t.codigoModelo} · {t.cliente}
+                </span>
+              </span>
+              <span
+                className={`shrink-0 text-xs font-medium ${
+                  t.urgencia === 'vencida'
+                    ? 'text-crit'
+                    : t.urgencia === 'hoy'
+                      ? 'text-warn'
+                      : 'text-muted-foreground'
+                }`}
+              >
+                {textoUrgencia(t)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -3,19 +3,17 @@ import { useSearchParams } from 'react-router-dom';
 
 import { descargarExcelEdr, imprimirEdrMensual, useEdrPorMes } from '@/api/edr';
 import type { EdrCorte } from '@/api/tipos';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
+import { Button } from '@/components/ui/button';
+import { SelectNativo } from '@/components/ui/native-select';
 
 import { etiquetaMes, MESES, moneda } from './comun';
 
@@ -25,9 +23,10 @@ function num(s: string): number {
 }
 
 /**
- * EDR POR MES (F7-E2; doc 06-Costos-y-EDR §4): el resultado del mes (Ventas − Costo − Gastos −
- * Intereses + Bonif ± Otros = Resultado) con corte por empresa y por cliente, y descarga PDF/Excel.
- * Solo lectura (`edr.ver`). El costo es ACTUAL (D1).
+ * EDR POR MES (F7-E2; doc 06-Costos-y-EDR §4; proto `vEdr` — re-vestida R9 a TABLA-FIRST): el resultado
+ * del mes (Ventas − Costo − Gastos − Intereses + Bonif ± Otros = Resultado) con corte por empresa y por
+ * cliente, y descarga PDF/Excel. page-head + KPIs de vistazo (Σ de SERVIDOR) + waterfall del P&L +
+ * TABLAS DENSAS de corte. Solo lectura (`edr.ver`). El costo es ACTUAL (D1).
  */
 export function EdrPorMesPagina(): React.JSX.Element {
   const [params, setParams] = useSearchParams();
@@ -42,136 +41,156 @@ export function EdrPorMesPagina(): React.JSX.Element {
     setParams({ anio: String(a), mes: String(m) });
   }
 
-  return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="edr-por-mes">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <FileBarChart className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">EDR por mes</h1>
-          <p className="text-sm text-muted-foreground">
-            Resultado consolidado de {etiquetaMes(mes, anio)}, valuado a costo actual.
-          </p>
-        </div>
-      </header>
+  const utilidadBruta = edr ? Math.round((edr.ventas - edr.costo) * 100) / 100 : 0;
+  const kpis: Kpi[] = edr
+    ? [
+        { clave: 'ventas', etiqueta: 'Ventas', valor: moneda(edr.ventas), pie: 'del periodo' },
+        { clave: 'costo', etiqueta: 'Costo (actual)', valor: moneda(edr.costo), pie: 'D1' },
+        {
+          clave: 'utilidad',
+          etiqueta: 'Utilidad bruta',
+          valor: moneda(utilidadBruta),
+          pie: 'ventas − costo',
+        },
+        {
+          clave: 'resultado',
+          etiqueta: 'Resultado',
+          valor: moneda(edr.resultado),
+          pie: 'neto del mes',
+          ...(edr.resultado >= 0 ? { tonoPie: 'ok' as const } : { tonoPie: 'crit' as const }),
+        },
+      ]
+    : [];
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <CardTitle>Resultado del mes</CardTitle>
-              <CardDescription>Ventas menos costo, gastos e intereses.</CardDescription>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field className="w-24">
-                <FieldLabel htmlFor="pm-anio">Año</FieldLabel>
-                <Input
-                  id="pm-anio"
-                  type="number"
-                  value={anio}
-                  onChange={(e) => cambiar(num(e.target.value), mes)}
-                  data-testid="pm-anio"
-                />
-              </Field>
-              <Field className="w-36">
-                <FieldLabel htmlFor="pm-mes">Mes</FieldLabel>
-                <SelectNativo
-                  id="pm-mes"
-                  value={mes}
-                  onChange={(e) => cambiar(anio, num(e.target.value))}
-                  data-testid="pm-mes"
-                >
-                  {MESES.map((m, i) => (
-                    <option key={m} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
-              {edr && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => imprimirEdrMensual(edr.encabezado.id)}
-                    data-testid="pm-pdf"
-                  >
-                    <Printer className="mr-2 size-4" aria-hidden />
-                    PDF
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => descargarExcelEdr(edr.encabezado.id)}
-                    data-testid="pm-excel"
-                  >
-                    <Download className="mr-2 size-4" aria-hidden />
-                    Excel
-                  </Button>
-                </>
-              )}
-            </div>
+  return (
+    <div className="h-full overflow-y-auto" data-testid="edr-por-mes">
+      <div className="flex flex-col gap-3 p-4 md:p-5">
+        {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+        <header className="flex shrink-0 flex-wrap items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+          >
+            <FileBarChart className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold">EDR por mes</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              Resultado consolidado de {etiquetaMes(mes, anio)}, valuado a costo actual
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {consulta.error.message}
-            </p>
-          ) : !consulta.data?.existe || !edr ? (
-            <p
-              className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
-              data-testid="pm-no-generado"
-            >
-              El EDR de {etiquetaMes(mes, anio)} aún no se ha generado.
-            </p>
-          ) : (
-            <div className="space-y-6">
+          <SelectNativo
+            className="h-8 w-24 text-sm"
+            value={anio}
+            onChange={(e) => cambiar(num(e.target.value), mes)}
+            aria-label="Año"
+            data-testid="pm-anio"
+          >
+            {Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i).map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </SelectNativo>
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={mes}
+            onChange={(e) => cambiar(anio, num(e.target.value))}
+            aria-label="Mes"
+            data-testid="pm-mes"
+          >
+            {MESES.map((m, i) => (
+              <option key={m} value={i + 1}>
+                {m}
+              </option>
+            ))}
+          </SelectNativo>
+          {edr && (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imprimirEdrMensual(edr.encabezado.id)}
+                data-testid="pm-pdf"
+              >
+                <Printer aria-hidden />
+                PDF
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => descargarExcelEdr(edr.encabezado.id)}
+                data-testid="pm-excel"
+              >
+                <Download aria-hidden />
+                Excel
+              </Button>
+            </>
+          )}
+        </header>
+
+        {consulta.isPending ? (
+          <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+        ) : consulta.isError ? (
+          <p className="p-6 text-sm text-destructive" role="alert">
+            {consulta.error.message}
+          </p>
+        ) : !consulta.data?.existe || !edr ? (
+          <p
+            className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
+            data-testid="pm-no-generado"
+          >
+            El EDR de {etiquetaMes(mes, anio)} aún no se ha generado.
+          </p>
+        ) : (
+          <>
+            {/* ── KPIs ──────────────────────────────────────────────────────── */}
+            <KpiTiles kpis={kpis} className="shrink-0" />
+
+            {/* ── Waterfall del P&L ─────────────────────────────────────────── */}
+            <div className="rounded-xl border bg-card p-4">
+              <h3 className="mb-3 text-sm font-semibold">Resultado del mes</h3>
               <dl className="mx-auto max-w-md space-y-1 text-sm" data-testid="pm-resumen">
                 <Renglon etiqueta="Ventas" valor={moneda(edr.ventas)} />
                 <Renglon etiqueta="(−) Costo (actual)" valor={moneda(edr.costo)} />
-                <Renglon
-                  etiqueta="(=) Utilidad bruta"
-                  valor={moneda(Math.round((edr.ventas - edr.costo) * 100) / 100)}
-                />
+                <Renglon etiqueta="(=) Utilidad bruta" valor={moneda(utilidadBruta)} />
                 <Renglon etiqueta="(−) Gastos" valor={moneda(edr.gastos)} />
                 <Renglon etiqueta="(−) Intereses" valor={moneda(edr.intereses)} />
                 <Renglon etiqueta="(+) Bonificaciones" valor={moneda(edr.bonificaciones)} />
                 <Renglon etiqueta="(±) Otros" valor={moneda(edr.otros)} />
                 <div className="flex items-center justify-between border-t border-primary pt-2 text-base font-semibold">
                   <dt>Resultado</dt>
-                  <dd className="text-primary" data-testid="pm-resultado">
+                  <dd className="num text-primary" data-testid="pm-resultado">
                     {moneda(edr.resultado)}
                   </dd>
                 </div>
               </dl>
-
-              {edr.lineasSinCosto > 0 && (
-                <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                  {edr.lineasSinCosto} línea(s) sin costo (no valuadas). Revisa el costeo de sus
-                  órdenes en Costos.
-                </p>
-              )}
-
-              <CorteTabla
-                titulo="Por empresa"
-                cabecera="Empresa"
-                cortes={edr.cortesEmpresa}
-                testid="pm-empresa"
-              />
-              <CorteTabla
-                titulo="Por cliente"
-                cabecera="Cliente"
-                cortes={edr.cortesCliente}
-                testid="pm-cliente"
-              />
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {edr.lineasSinCosto > 0 && (
+              <p className="rounded-lg border border-crit/40 bg-crit-soft p-3 text-sm text-crit">
+                {edr.lineasSinCosto} línea(s) sin costo (no valuadas). Revisa el costeo de sus
+                órdenes en Costos.
+              </p>
+            )}
+
+            <CorteTabla
+              titulo="Por empresa"
+              cabecera="Empresa"
+              cortes={edr.cortesEmpresa}
+              testid="pm-empresa"
+            />
+            <CorteTabla
+              titulo="Por cliente"
+              cabecera="Cliente"
+              cortes={edr.cortesCliente}
+              testid="pm-cliente"
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -180,7 +199,7 @@ function Renglon(props: { etiqueta: string; valor: string }): React.JSX.Element 
   return (
     <div className="flex items-center justify-between">
       <dt className="text-muted-foreground">{props.etiqueta}</dt>
-      <dd>{props.valor}</dd>
+      <dd className="num">{props.valor}</dd>
     </div>
   );
 }
@@ -192,32 +211,34 @@ function CorteTabla(props: {
   testid: string;
 }): React.JSX.Element {
   return (
-    <div>
-      <h3 className="mb-2 text-sm font-medium">{props.titulo}</h3>
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="border-b px-3 py-2">
+        <h3 className="text-sm font-semibold">{props.titulo}</h3>
+      </div>
       {props.cortes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Sin datos.</p>
+        <p className="p-4 text-sm text-muted-foreground">Sin datos.</p>
       ) : (
         <div className="overflow-x-auto">
-          <Table data-testid={props.testid}>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{props.cabecera}</TableHead>
-                <TableHead className="text-right">Ventas</TableHead>
-                <TableHead className="text-right">Costo</TableHead>
-                <TableHead className="text-right">Utilidad</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <TablaDensa data-testid={props.testid}>
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead>{props.cabecera}</TablaDensaHead>
+                <TablaDensaHead numerica>Ventas</TablaDensaHead>
+                <TablaDensaHead numerica>Costo</TablaDensaHead>
+                <TablaDensaHead numerica>Utilidad</TablaDensaHead>
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
               {props.cortes.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>{c.nombre}</TableCell>
-                  <TableCell className="text-right">{moneda(c.ventas)}</TableCell>
-                  <TableCell className="text-right">{moneda(c.costo)}</TableCell>
-                  <TableCell className="text-right">{moneda(c.utilidadBruta)}</TableCell>
-                </TableRow>
+                <TablaDensaFila key={c.id}>
+                  <TablaDensaCelda>{c.nombre}</TablaDensaCelda>
+                  <TablaDensaCelda numerica>{moneda(c.ventas)}</TablaDensaCelda>
+                  <TablaDensaCelda numerica>{moneda(c.costo)}</TablaDensaCelda>
+                  <TablaDensaCelda numerica>{moneda(c.utilidadBruta)}</TablaDensaCelda>
+                </TablaDensaFila>
               ))}
-            </TableBody>
-          </Table>
+            </TablaDensaCuerpo>
+          </TablaDensa>
         </div>
       )}
     </div>

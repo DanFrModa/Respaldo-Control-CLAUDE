@@ -2,18 +2,18 @@ import { CalendarRange, Printer } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import { imprimirEdrAnual, useEdrPorAnio } from '@/api/edr';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+  TablaDensaPie,
+} from '@/components/dominio/TablaDensa';
+import { Button } from '@/components/ui/button';
+import { SelectNativo } from '@/components/ui/native-select';
 
 import { MESES, moneda } from './comun';
 
@@ -23,8 +23,9 @@ function num(s: string): number {
 }
 
 /**
- * EDR POR AÑO (F7-E2; doc 06-Costos-y-EDR §4 "EDR por año"): comparativo mensual del año (ventas/costo/
- * gastos/resultado) con totales y corte por empresa, y descarga PDF. Solo lectura (`edr.ver`).
+ * EDR POR AÑO (F7-E2; doc 06-Costos-y-EDR §4; proto `vEdr` — re-vestida R9 a TABLA-FIRST): comparativo
+ * mensual del año (ventas/costo/gastos/resultado) con totales de SERVIDOR y corte por empresa, y descarga
+ * PDF. page-head + KPIs de vistazo + TABLA DENSA con barra de totales al pie. Solo lectura (`edr.ver`).
  */
 export function EdrPorAnioPagina(): React.JSX.Element {
   const [params, setParams] = useSearchParams();
@@ -34,135 +35,169 @@ export function EdrPorAnioPagina(): React.JSX.Element {
   const consulta = useEdrPorAnio(anio);
   const datos = consulta.data ?? null;
 
+  const kpis: Kpi[] = datos
+    ? [
+        {
+          clave: 'ventas',
+          etiqueta: 'Ventas',
+          valor: moneda(datos.totalVentas),
+          pie: `${datos.meses.length} mes(es)`,
+        },
+        {
+          clave: 'costo',
+          etiqueta: 'Costo',
+          valor: moneda(datos.totalCosto),
+          pie: 'a costo actual',
+        },
+        {
+          clave: 'resultado',
+          etiqueta: 'Resultado',
+          valor: moneda(datos.totalResultado),
+          pie: `año ${anio}`,
+          ...(datos.totalResultado >= 0
+            ? { tonoPie: 'ok' as const }
+            : { tonoPie: 'crit' as const }),
+        },
+      ]
+    : [];
+
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="edr-por-anio">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <CalendarRange className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">EDR por año</h1>
-          <p className="text-sm text-muted-foreground">
-            Comparativo mensual del año {anio}, a costo actual.
-          </p>
-        </div>
-      </header>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <CardTitle>Comparativo mensual</CardTitle>
-              <CardDescription>
-                {datos
-                  ? `${datos.meses.length} mes(es) · Ventas ${moneda(datos.totalVentas)} · Resultado ${moneda(datos.totalResultado)}`
-                  : ''}
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field className="w-28">
-                <FieldLabel htmlFor="pa-anio">Año</FieldLabel>
-                <Input
-                  id="pa-anio"
-                  type="number"
-                  value={anio}
-                  onChange={(e) => setParams({ anio: e.target.value })}
-                  data-testid="pa-anio"
-                />
-              </Field>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => imprimirEdrAnual(anio)}
-                data-testid="pa-pdf"
-              >
-                <Printer className="mr-2 size-4" aria-hidden />
-                PDF
-              </Button>
-            </div>
+    <div className="h-full overflow-y-auto" data-testid="edr-por-anio">
+      <div className="flex flex-col gap-3 p-4 md:p-5">
+        {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+        <header className="flex shrink-0 flex-wrap items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+          >
+            <CalendarRange className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold">EDR por año</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              Comparativo mensual del año {anio}, a costo actual
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {consulta.error.message}
-            </p>
-          ) : !datos || datos.meses.length === 0 ? (
-            <p
-              className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
-              data-testid="pa-vacio"
-            >
-              No hay meses con EDR generado en {anio}.
-            </p>
-          ) : (
-            <div className="space-y-6">
-              <div className="overflow-x-auto">
-                <Table data-testid="pa-tabla">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mes</TableHead>
-                      <TableHead className="text-right">Ventas</TableHead>
-                      <TableHead className="text-right">Costo</TableHead>
-                      <TableHead className="text-right">Gastos</TableHead>
-                      <TableHead className="text-right">Resultado</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {datos.meses.map((m) => (
-                      <TableRow key={m.idEdr} data-testid={`pa-mes-${m.mes}`}>
-                        <TableCell className="font-medium">{MESES[m.mes - 1] ?? m.mes}</TableCell>
-                        <TableCell className="text-right">{moneda(m.ventas)}</TableCell>
-                        <TableCell className="text-right">{moneda(m.costo)}</TableCell>
-                        <TableCell className="text-right">{moneda(m.gastos)}</TableCell>
-                        <TableCell className="text-right">{moneda(m.resultado)}</TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-semibold">
-                      <TableCell>TOTAL</TableCell>
-                      <TableCell className="text-right">{moneda(datos.totalVentas)}</TableCell>
-                      <TableCell className="text-right">{moneda(datos.totalCosto)}</TableCell>
-                      <TableCell className="text-right">—</TableCell>
-                      <TableCell className="text-right">{moneda(datos.totalResultado)}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
+          <SelectNativo
+            className="h-8 w-24 text-sm"
+            value={anio}
+            onChange={(e) => setParams({ anio: e.target.value })}
+            aria-label="Año"
+            data-testid="pa-anio"
+          >
+            {Array.from({ length: 8 }, (_, i) => hoy.getFullYear() - i).map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </SelectNativo>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => imprimirEdrAnual(anio)}
+            data-testid="pa-pdf"
+          >
+            <Printer aria-hidden />
+            PDF
+          </Button>
+        </header>
 
-              <div>
-                <h3 className="mb-2 text-sm font-medium">Por empresa (año)</h3>
-                {datos.porEmpresa.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Sin datos.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Empresa</TableHead>
-                          <TableHead className="text-right">Ventas</TableHead>
-                          <TableHead className="text-right">Costo</TableHead>
-                          <TableHead className="text-right">Utilidad</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {datos.porEmpresa.map((e) => (
-                          <TableRow key={e.idEmpresa}>
-                            <TableCell>{e.empresa}</TableCell>
-                            <TableCell className="text-right">{moneda(e.ventas)}</TableCell>
-                            <TableCell className="text-right">{moneda(e.costo)}</TableCell>
-                            <TableCell className="text-right">{moneda(e.utilidadBruta)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
+        {consulta.isPending ? (
+          <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+        ) : consulta.isError ? (
+          <p className="p-6 text-sm text-destructive" role="alert">
+            {consulta.error.message}
+          </p>
+        ) : !datos || datos.meses.length === 0 ? (
+          <p
+            className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
+            data-testid="pa-vacio"
+          >
+            No hay meses con EDR generado en {anio}.
+          </p>
+        ) : (
+          <>
+            {/* ── KPIs ──────────────────────────────────────────────────────── */}
+            <KpiTiles kpis={kpis} className="shrink-0" />
+
+            {/* ── Comparativo mensual ───────────────────────────────────────── */}
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <div className="border-b px-3 py-2">
+                <h3 className="text-sm font-semibold">Comparativo mensual</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <TablaDensa data-testid="pa-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Mes</TablaDensaHead>
+                      <TablaDensaHead numerica>Ventas</TablaDensaHead>
+                      <TablaDensaHead numerica>Costo</TablaDensaHead>
+                      <TablaDensaHead numerica>Gastos</TablaDensaHead>
+                      <TablaDensaHead numerica>Resultado</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {datos.meses.map((m) => (
+                      <TablaDensaFila key={m.idEdr} data-testid={`pa-mes-${m.mes}`}>
+                        <TablaDensaCelda className="font-medium">
+                          {MESES[m.mes - 1] ?? m.mes}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.ventas)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.costo)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.gastos)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(m.resultado)}</TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                  <TablaDensaPie>
+                    <TablaDensaFila>
+                      <TablaDensaCelda>TOTAL</TablaDensaCelda>
+                      <TablaDensaCelda numerica>{moneda(datos.totalVentas)}</TablaDensaCelda>
+                      <TablaDensaCelda numerica>{moneda(datos.totalCosto)}</TablaDensaCelda>
+                      <TablaDensaCelda numerica>—</TablaDensaCelda>
+                      <TablaDensaCelda numerica>{moneda(datos.totalResultado)}</TablaDensaCelda>
+                    </TablaDensaFila>
+                  </TablaDensaPie>
+                </TablaDensa>
               </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* ── Por empresa (año) ─────────────────────────────────────────── */}
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <div className="border-b px-3 py-2">
+                <h3 className="text-sm font-semibold">Por empresa (año)</h3>
+              </div>
+              {datos.porEmpresa.length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">Sin datos.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <TablaDensa>
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Empresa</TablaDensaHead>
+                        <TablaDensaHead numerica>Ventas</TablaDensaHead>
+                        <TablaDensaHead numerica>Costo</TablaDensaHead>
+                        <TablaDensaHead numerica>Utilidad</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
+                      {datos.porEmpresa.map((e) => (
+                        <TablaDensaFila key={e.idEmpresa}>
+                          <TablaDensaCelda>{e.empresa}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(e.ventas)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(e.costo)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(e.utilidadBruta)}</TablaDensaCelda>
+                        </TablaDensaFila>
+                      ))}
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

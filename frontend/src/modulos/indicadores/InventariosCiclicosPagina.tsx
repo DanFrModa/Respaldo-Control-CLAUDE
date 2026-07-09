@@ -9,10 +9,18 @@ import {
   useCrearCiclico,
   useInventariosCiclicos,
 } from '@/api/inventario-ciclico';
+import type { Modelo } from '@/api/modelos';
 import type { InventarioCiclicoResumen, InventariosCiclicosQuery } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -24,24 +32,15 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import type { Modelo } from '@/api/modelos';
-
 import { SelectorModelo } from '@/modulos/inventarios/SelectorModelo';
 
 type EstadoFiltro = '' | 'abierto' | 'contado' | 'cerrado' | 'cancelado';
 
 /**
- * INVENTARIOS CÍCLICOS — lista + alta (F7-E5; doc 05 §Almacén). El ALTA congela el teórico (D6); el
- * conteo es CIEGO (otra pantalla) y el ajuste se aplica como MOVIMIENTO de kardex (D3). Bajo
- * `indicadores.ciclicos-*` (el backend re-verifica cada acción, A1).
+ * INVENTARIOS CÍCLICOS — lista + alta (F7-E5; doc 05 §Almacén; re-vestida R9 a TABLA-FIRST). El ALTA
+ * congela el teórico (D6); el conteo es CIEGO (otra pantalla) y el ajuste se aplica como MOVIMIENTO de
+ * kardex (D3). page-head + toolbar (estado) + TABLA DENSA. Bajo `indicadores.ciclicos-*` (el backend
+ * re-verifica cada acción, A1).
  */
 export function InventariosCiclicosPagina(): React.JSX.Element {
   const [estado, setEstado] = useState<EstadoFiltro>('');
@@ -53,99 +52,99 @@ export function InventariosCiclicosPagina(): React.JSX.Element {
   const filas = consulta.data?.datos ?? [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="ciclicos">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <Boxes className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-xl font-semibold">Inventarios cíclicos</h1>
-            <p className="text-sm text-muted-foreground">
-              Conteo físico contra el kardex: el alta congela el teórico y el ajuste es un
-              movimiento.
-            </p>
-          </div>
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="ciclicos">
+      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+        >
+          <Boxes className="size-4.5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-semibold">Inventarios cíclicos</h1>
+          <p className="truncate text-xs text-muted-foreground">
+            Conteo físico contra el kardex: el alta congela el teórico y el ajuste es un movimiento
+          </p>
         </div>
-        <Button type="button" onClick={() => setAlta(true)} data-testid="ic-nuevo">
+        <Button type="button" size="sm" onClick={() => setAlta(true)} data-testid="ic-nuevo">
           Nuevo inventario
         </Button>
       </header>
 
-      <Card>
-        <CardHeader className="flex-row flex-wrap items-end justify-between gap-3">
-          <div>
-            <CardTitle>Inventarios</CardTitle>
-            <CardDescription>Filtra por estado.</CardDescription>
+      {/* ── Card: filtros + tabla ───────────────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={estado}
+            onChange={(e) => setEstado(e.target.value as EstadoFiltro)}
+            aria-label="Filtrar por estado"
+            data-testid="ic-estado"
+          >
+            <option value="">Todos</option>
+            <option value="abierto">Abiertos</option>
+            <option value="contado">Contados</option>
+            <option value="cerrado">Cerrados</option>
+            <option value="cancelado">Cancelados</option>
+          </SelectNativo>
+          <div className="ml-auto">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {filas.length.toLocaleString('es-MX')} inventarios
+            </span>
           </div>
-          <Field className="w-44">
-            <FieldLabel htmlFor="ic-estado">Estado</FieldLabel>
-            <SelectNativo
-              id="ic-estado"
-              value={estado}
-              onChange={(e) => setEstado(e.target.value as EstadoFiltro)}
-              data-testid="ic-estado"
-            >
-              <option value="">Todos</option>
-              <option value="abierto">Abiertos</option>
-              <option value="contado">Contados</option>
-              <option value="cerrado">Cerrados</option>
-              <option value="cancelado">Cancelados</option>
-            </SelectNativo>
-          </Field>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-auto">
           {consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
           ) : filas.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin inventarios cíclicos.</p>
+            <p className="p-6 text-sm text-muted-foreground">Sin inventarios cíclicos.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Folio</TableHead>
-                    <TableHead>Almacén</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Avance</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filas.map((c) => (
-                    <TableRow key={c.id} data-testid={`ic-fila-${c.id}`}>
-                      <TableCell className="font-medium">#{c.folio}</TableCell>
-                      <TableCell>{c.almacen}</TableCell>
-                      <TableCell>{c.fecha}</TableCell>
-                      <TableCell>
-                        <EstadoBadge estado={c.estado} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {c.renglonesContados}/{c.totalRenglones}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Acciones
-                          ciclico={c}
-                          onCancelar={(motivo) =>
-                            cancelar.mutate(
-                              { id: c.id, motivo },
-                              {
-                                onSuccess: () => toast.success('Inventario cíclico cancelado.'),
-                                onError: (err) => toast.error(err.message),
-                              },
-                            )
-                          }
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Folio</TablaDensaHead>
+                  <TablaDensaHead>Almacén</TablaDensaHead>
+                  <TablaDensaHead>Fecha</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                  <TablaDensaHead numerica>Avance</TablaDensaHead>
+                  <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {filas.map((c) => (
+                  <TablaDensaFila key={c.id} data-testid={`ic-fila-${c.id}`}>
+                    <TablaDensaCelda className="font-medium">#{c.folio}</TablaDensaCelda>
+                    <TablaDensaCelda>{c.almacen}</TablaDensaCelda>
+                    <TablaDensaCelda className="text-muted-foreground">{c.fecha}</TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <EstadoBadge estado={c.estado} />
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {c.renglonesContados}/{c.totalRenglones}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="text-right">
+                      <Acciones
+                        ciclico={c}
+                        onCancelar={(motivo) =>
+                          cancelar.mutate(
+                            { id: c.id, motivo },
+                            {
+                              onSuccess: () => toast.success('Inventario cíclico cancelado.'),
+                              onError: (err) => toast.error(err.message),
+                            },
+                          )
+                        }
+                      />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <DialogoAlta abierto={alta} alCerrar={() => setAlta(false)} />
     </div>
@@ -157,10 +156,10 @@ function EstadoBadge({
 }: {
   estado: InventarioCiclicoResumen['estado'];
 }): React.JSX.Element {
-  if (estado === 'cancelado') return <Badge variant="destructive">Cancelado</Badge>;
-  if (estado === 'cerrado') return <Badge variant="secondary">Cerrado (ajustado)</Badge>;
-  if (estado === 'contado') return <Badge variant="outline">Contado</Badge>;
-  return <Badge variant="outline">Abierto</Badge>;
+  if (estado === 'cancelado') return <ChipEstado tono="crit">Cancelado</ChipEstado>;
+  if (estado === 'cerrado') return <ChipEstado tono="ok">Cerrado (ajustado)</ChipEstado>;
+  if (estado === 'contado') return <ChipEstado tono="warn">Contado</ChipEstado>;
+  return <ChipEstado tono="neutro">Abierto</ChipEstado>;
 }
 
 function Acciones({

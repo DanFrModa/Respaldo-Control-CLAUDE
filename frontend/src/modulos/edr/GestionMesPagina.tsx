@@ -4,8 +4,8 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 import { useActualizarEncabezado, useEdrPorMes, useGenerarEdr } from '@/api/edr';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
@@ -20,9 +20,10 @@ function num(s: string): number {
 }
 
 /**
- * GESTIÓN DEL MES (F7-E2; doc 06-Costos-y-EDR §4): crea/selecciona un mes del EDR, captura el
- * encabezado GLOBAL (gastos/intereses/bonificaciones/otros) y GENERA/reconcilia las ventas del mes
- * desde las entregas a cliente. Ver con `edr.ver`; generar/capturar con `edr.capturar`.
+ * GESTIÓN DEL MES (F7-E2; doc 06-Costos-y-EDR §4; re-vestida R9): crea/selecciona un mes del EDR,
+ * captura el encabezado GLOBAL (gastos/intereses/bonificaciones/otros) y GENERA/reconcilia las ventas
+ * del mes desde las entregas a cliente. page-head (periodo + generar) + KPIs de vistazo (Σ de SERVIDOR)
+ * + formulario del encabezado. Ver con `edr.ver`; generar/capturar con `edr.capturar`.
  */
 export function GestionMesPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -91,99 +92,111 @@ export function GestionMesPagina(): React.JSX.Element {
     );
   }
 
+  const kpis: Kpi[] = edr
+    ? [
+        { clave: 'ventas', etiqueta: 'Ventas', valor: moneda(edr.ventas), pie: 'del mes' },
+        { clave: 'costo', etiqueta: 'Costo (actual)', valor: moneda(edr.costo), pie: 'D1' },
+        {
+          clave: 'resultado',
+          etiqueta: 'Resultado',
+          valor: moneda(edr.resultado),
+          pie: 'neto',
+          ...(edr.resultado >= 0 ? { tonoPie: 'ok' as const } : { tonoPie: 'crit' as const }),
+        },
+        {
+          clave: 'lineas',
+          etiqueta: 'Líneas',
+          valor: edr.totalLineas.toLocaleString('es-MX'),
+          pie: `${edr.lineasSinCosto} sin costo`,
+          ...(edr.lineasSinCosto > 0 ? { tonoPie: 'crit' as const } : {}),
+        },
+      ]
+    : [];
+
   return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="edr-gestion-mes">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <CalendarCog className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Gestión del mes</h1>
-          <p className="text-sm text-muted-foreground">
-            Captura el encabezado global y genera las ventas del mes desde las entregas a cliente.
-          </p>
-        </div>
-      </header>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <CardTitle>Periodo</CardTitle>
-              <CardDescription>Elige el mes del estado de resultados.</CardDescription>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field className="w-28">
-                <FieldLabel htmlFor="edr-anio">Año</FieldLabel>
-                <Input
-                  id="edr-anio"
-                  type="number"
-                  value={anio}
-                  onChange={(e) => setAnio(e.target.value)}
-                  data-testid="edr-anio"
-                />
-              </Field>
-              <Field className="w-40">
-                <FieldLabel htmlFor="edr-mes">Mes</FieldLabel>
-                <SelectNativo
-                  id="edr-mes"
-                  value={mes}
-                  onChange={(e) => setMes(e.target.value)}
-                  data-testid="edr-mes"
-                >
-                  {MESES.map((m, i) => (
-                    <option key={m} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
-              {puedeCapturar && (
-                <Button
-                  type="button"
-                  onClick={alGenerar}
-                  disabled={generar.isPending || anioN <= 0}
-                  data-testid="edr-generar"
-                >
-                  <RefreshCw className="mr-2 size-4" aria-hidden />
-                  {generar.isPending
-                    ? 'Generando…'
-                    : consulta.data?.existe
-                      ? 'Re-generar (reconciliar)'
-                      : 'Generar mes'}
-                </Button>
-              )}
-            </div>
+    <div className="h-full overflow-y-auto" data-testid="edr-gestion-mes">
+      <div className="flex flex-col gap-3 p-4 md:p-5">
+        {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+        <header className="flex shrink-0 flex-wrap items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+          >
+            <CalendarCog className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold">Gestión del mes</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              Captura el encabezado global y genera las ventas del mes desde las entregas a cliente
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {consulta.error.message}
-            </p>
-          ) : !consulta.data?.existe ? (
-            <p
-              className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
-              data-testid="edr-no-generado"
+          <SelectNativo
+            className="h-8 w-24 text-sm"
+            value={anio}
+            onChange={(e) => setAnio(e.target.value)}
+            aria-label="Año"
+            data-testid="edr-anio"
+          >
+            {Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i).map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </SelectNativo>
+          <SelectNativo
+            className="h-8 w-auto text-sm"
+            value={mes}
+            onChange={(e) => setMes(e.target.value)}
+            aria-label="Mes"
+            data-testid="edr-mes"
+          >
+            {MESES.map((m, i) => (
+              <option key={m} value={i + 1}>
+                {m}
+              </option>
+            ))}
+          </SelectNativo>
+          {puedeCapturar && (
+            <Button
+              type="button"
+              size="sm"
+              onClick={alGenerar}
+              disabled={generar.isPending || anioN <= 0}
+              data-testid="edr-generar"
             >
-              El EDR de {etiquetaMes(mesN, anioN)} aún no se ha generado.
-              {puedeCapturar ? ' Usa el botón “Generar mes”.' : ''}
-            </p>
-          ) : (
-            edr && (
-              <div className="space-y-6" data-testid="edr-detalle">
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <ResumenDato titulo="Ventas" valor={moneda(edr.ventas)} />
-                  <ResumenDato titulo="Costo (actual)" valor={moneda(edr.costo)} />
-                  <ResumenDato titulo="Resultado" valor={moneda(edr.resultado)} destacar />
-                  <ResumenDato
-                    titulo="Líneas"
-                    valor={`${edr.totalLineas} (${edr.lineasSinCosto} sin costo)`}
-                  />
-                </div>
+              <RefreshCw aria-hidden />
+              {generar.isPending
+                ? 'Generando…'
+                : consulta.data?.existe
+                  ? 'Re-generar'
+                  : 'Generar mes'}
+            </Button>
+          )}
+        </header>
 
+        {consulta.isPending ? (
+          <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+        ) : consulta.isError ? (
+          <p className="p-6 text-sm text-destructive" role="alert">
+            {consulta.error.message}
+          </p>
+        ) : !consulta.data?.existe ? (
+          <p
+            className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground"
+            data-testid="edr-no-generado"
+          >
+            El EDR de {etiquetaMes(mesN, anioN)} aún no se ha generado.
+            {puedeCapturar ? ' Usa el botón “Generar mes”.' : ''}
+          </p>
+        ) : (
+          edr && (
+            <div className="flex flex-col gap-3" data-testid="edr-detalle">
+              {/* ── KPIs ────────────────────────────────────────────────────── */}
+              <KpiTiles kpis={kpis} className="shrink-0" />
+
+              {/* ── Encabezado global del EDR ───────────────────────────────── */}
+              <div className="rounded-xl border bg-card p-4">
+                <h3 className="mb-3 text-sm font-semibold">Encabezado global del mes</h3>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <CampoNumero
                     id="edr-gastos"
@@ -235,7 +248,7 @@ export function GestionMesPagina(): React.JSX.Element {
                   </Field>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3">
                   {puedeCapturar && (
                     <Button
                       type="button"
@@ -257,27 +270,10 @@ export function GestionMesPagina(): React.JSX.Element {
                   </Button>
                 </div>
               </div>
-            )
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function ResumenDato(props: {
-  titulo: string;
-  valor: string;
-  destacar?: boolean;
-}): React.JSX.Element {
-  return (
-    <div className="rounded-lg border bg-card p-3">
-      <p className="text-xs text-muted-foreground">{props.titulo}</p>
-      <p
-        className={props.destacar ? 'text-lg font-semibold text-primary' : 'text-lg font-semibold'}
-      >
-        {props.valor}
-      </p>
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 }

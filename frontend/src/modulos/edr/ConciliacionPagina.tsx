@@ -13,19 +13,20 @@ import {
 } from '@/api/edr';
 import { useEmpresas } from '@/api/empresas';
 import type { EdrLinea, EdrLineasQuery, EdrOrigenLinea } from '@/api/tipos';
+import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { etiquetaMes, etiquetaOrigen, MESES, moneda } from './comun';
@@ -35,11 +36,18 @@ function num(s: string): number {
   return Number.isFinite(v) ? v : 0;
 }
 
+/** Tono del chip por origen de la línea. */
+const TONO_ORIGEN: Record<EdrLinea['origen'], TonoEstado> = {
+  automatica: 'neutro',
+  ajustada: 'warn',
+  manual: 'info',
+};
+
 /**
- * CONCILIACIÓN DE VENTAS (F7-E2; doc 06-Costos-y-EDR §4, D2 #5): las líneas se PROPONEN al generar el
- * mes; aquí el usuario ajusta el precio a lo FACTURADO y las cantidades, agrega/borra líneas manuales,
- * con filtros por empresa/origen. Marca el origen y las líneas "sin costo". Ver con `edr.ver`; editar
- * con `edr.capturar`.
+ * CONCILIACIÓN DE VENTAS (F7-E2; doc 06-Costos-y-EDR §4, D2 #5; re-vestida R9 a TABLA-FIRST): las líneas
+ * se PROPONEN al generar el mes; aquí el usuario ajusta el precio a lo FACTURADO y las cantidades,
+ * agrega/borra líneas manuales, con filtros por empresa/origen. page-head + KPIs de vistazo (Σ de
+ * SERVIDOR) + toolbar + TABLA DENSA con celdas editables. Ver con `edr.ver`; editar con `edr.capturar`.
  */
 export function ConciliacionPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -69,147 +77,173 @@ export function ConciliacionPagina(): React.JSX.Element {
 
   const filas = lineas.data?.lineas ?? [];
 
-  return (
-    <div className="space-y-6 p-4 md:p-6" data-testid="edr-conciliacion">
-      <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <ListChecks className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold">Conciliación de ventas</h1>
-          <p className="text-sm text-muted-foreground">
-            Ajusta el precio facturado y las cantidades de {etiquetaMes(mes, anio)}. El costo es
-            actual (no editable aquí).
-          </p>
-        </div>
-      </header>
+  const kpis: Kpi[] = [
+    {
+      clave: 'lineas',
+      etiqueta: 'Líneas',
+      valor: filas.length.toLocaleString('es-MX'),
+      pie: 'con los filtros',
+    },
+    {
+      clave: 'piezas',
+      etiqueta: 'Piezas',
+      valor: (lineas.data?.totalPiezas ?? 0).toLocaleString('es-MX'),
+      pie: 'vendidas',
+    },
+    {
+      clave: 'ventas',
+      etiqueta: 'Ventas',
+      valor: moneda(lineas.data?.totalVentas ?? 0),
+      pie: 'facturado',
+    },
+    {
+      clave: 'costo',
+      etiqueta: 'Costo',
+      valor: moneda(lineas.data?.totalCosto ?? 0),
+      pie: 'actual',
+    },
+  ];
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <CardTitle>Líneas</CardTitle>
-              <CardDescription>
-                {lineas.data
-                  ? `${filas.length} línea(s) · ${lineas.data.totalPiezas} pzas · Ventas ${moneda(lineas.data.totalVentas)} · Costo ${moneda(lineas.data.totalCosto)}`
-                  : ''}
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <Field className="w-24">
-                <FieldLabel htmlFor="con-anio">Año</FieldLabel>
-                <Input
-                  id="con-anio"
-                  type="number"
-                  value={anio}
-                  onChange={(e) => cambiarPeriodo(num(e.target.value), mes)}
-                  data-testid="con-anio"
-                />
-              </Field>
-              <Field className="w-36">
-                <FieldLabel htmlFor="con-mes">Mes</FieldLabel>
-                <SelectNativo
-                  id="con-mes"
-                  value={mes}
-                  onChange={(e) => cambiarPeriodo(anio, num(e.target.value))}
-                  data-testid="con-mes"
-                >
-                  {MESES.map((m, i) => (
-                    <option key={m} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
-              <Field className="w-40">
-                <FieldLabel htmlFor="con-origen">Origen</FieldLabel>
-                <SelectNativo
-                  id="con-origen"
-                  value={origen}
-                  onChange={(e) => setOrigen(e.target.value)}
-                  data-testid="con-origen"
-                >
-                  <option value="">Todos</option>
-                  <option value="automatica">Automática</option>
-                  <option value="ajustada">Ajustada</option>
-                  <option value="manual">Manual</option>
-                </SelectNativo>
-              </Field>
-              <Field className="w-48">
-                <FieldLabel htmlFor="con-empresa">Empresa</FieldLabel>
-                <SelectNativo
-                  id="con-empresa"
-                  value={idEmpresa}
-                  onChange={(e) => setIdEmpresa(e.target.value)}
-                  data-testid="con-empresa"
-                >
-                  <option value="">Todas</option>
-                  {empresasEdr.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </SelectNativo>
-              </Field>
+  return (
+    <div className="h-full overflow-y-auto" data-testid="edr-conciliacion">
+      <div className="flex flex-col gap-3 p-4 md:p-5">
+        {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+        <header className="flex shrink-0 flex-wrap items-center gap-3">
+          <span
+            aria-hidden
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
+          >
+            <ListChecks className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg font-semibold">Conciliación de ventas</h1>
+            <p className="truncate text-xs text-muted-foreground">
+              Ajusta el precio facturado y las cantidades de {etiquetaMes(mes, anio)} · el costo es
+              actual
+            </p>
+          </div>
+        </header>
+
+        {/* ── KPIs ────────────────────────────────────────────────────────────── */}
+        {porMes.data?.existe ? <KpiTiles kpis={kpis} className="shrink-0" /> : null}
+
+        {/* ── Card: filtros + tabla ───────────────────────────────────────────── */}
+        <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+            <SelectNativo
+              className="h-8 w-24 text-sm"
+              value={anio}
+              onChange={(e) => cambiarPeriodo(num(e.target.value), mes)}
+              aria-label="Año"
+              data-testid="con-anio"
+            >
+              {Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i).map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </SelectNativo>
+            <SelectNativo
+              className="h-8 w-auto text-sm"
+              value={mes}
+              onChange={(e) => cambiarPeriodo(anio, num(e.target.value))}
+              aria-label="Mes"
+              data-testid="con-mes"
+            >
+              {MESES.map((m, i) => (
+                <option key={m} value={i + 1}>
+                  {m}
+                </option>
+              ))}
+            </SelectNativo>
+            <SelectNativo
+              className="h-8 w-auto text-sm"
+              value={origen}
+              onChange={(e) => setOrigen(e.target.value)}
+              aria-label="Origen"
+              data-testid="con-origen"
+            >
+              <option value="">Todo origen</option>
+              <option value="automatica">Automática</option>
+              <option value="ajustada">Ajustada</option>
+              <option value="manual">Manual</option>
+            </SelectNativo>
+            <SelectNativo
+              className="h-8 w-auto text-sm"
+              value={idEmpresa}
+              onChange={(e) => setIdEmpresa(e.target.value)}
+              aria-label="Empresa"
+              data-testid="con-empresa"
+            >
+              <option value="">Todas las empresas</option>
+              {empresasEdr.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.nombre}
+                </option>
+              ))}
+            </SelectNativo>
+            <div className="ml-auto">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {filas.length.toLocaleString('es-MX')} líneas
+              </span>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+
           {porMes.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
+            <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
           ) : !porMes.data?.existe ? (
             <p
-              className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
+              className="p-6 text-center text-sm text-muted-foreground"
               data-testid="con-no-generado"
             >
               El EDR de {etiquetaMes(mes, anio)} aún no se ha generado. Genera el mes primero.
             </p>
           ) : lineas.isError ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="p-6 text-sm text-destructive" role="alert">
               {lineas.error.message}
             </p>
           ) : (
-            <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Orden</TableHead>
-                      <TableHead>Empresa</TableHead>
-                      <TableHead>Cliente</TableHead>
-                      <TableHead>Modelo</TableHead>
-                      <TableHead className="text-right">Cantidad</TableHead>
-                      <TableHead className="text-right">Precio fact.</TableHead>
-                      <TableHead className="text-right">Importe</TableHead>
-                      <TableHead className="text-right">Costo</TableHead>
-                      <TableHead>Origen</TableHead>
-                      {puedeCapturar && <TableHead className="text-right">Acciones</TableHead>}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filas.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={puedeCapturar ? 10 : 9}
-                          className="text-center text-sm text-muted-foreground"
-                        >
-                          Sin líneas para los filtros elegidos.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filas.map((l) => (
-                        <FilaLinea key={l.id} linea={l} puedeCapturar={puedeCapturar} />
-                      ))
+            <div className="overflow-x-auto">
+              <TablaDensa>
+                <TablaDensaEncabezado>
+                  <TablaDensaFila>
+                    <TablaDensaHead>Orden</TablaDensaHead>
+                    <TablaDensaHead>Empresa</TablaDensaHead>
+                    <TablaDensaHead>Cliente</TablaDensaHead>
+                    <TablaDensaHead>Modelo</TablaDensaHead>
+                    <TablaDensaHead numerica>Cantidad</TablaDensaHead>
+                    <TablaDensaHead numerica>Precio fact.</TablaDensaHead>
+                    <TablaDensaHead numerica>Importe</TablaDensaHead>
+                    <TablaDensaHead numerica>Costo</TablaDensaHead>
+                    <TablaDensaHead>Origen</TablaDensaHead>
+                    {puedeCapturar && (
+                      <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
                     )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {puedeCapturar && idEdr !== null && <AgregarManual idEdr={idEdr} />}
-            </>
+                  </TablaDensaFila>
+                </TablaDensaEncabezado>
+                <TablaDensaCuerpo>
+                  {filas.length === 0 ? (
+                    <TablaDensaFila>
+                      <TablaDensaCelda
+                        colSpan={puedeCapturar ? 10 : 9}
+                        className="text-center text-muted-foreground"
+                      >
+                        Sin líneas para los filtros elegidos.
+                      </TablaDensaCelda>
+                    </TablaDensaFila>
+                  ) : (
+                    filas.map((l) => (
+                      <FilaLinea key={l.id} linea={l} puedeCapturar={puedeCapturar} />
+                    ))
+                  )}
+                </TablaDensaCuerpo>
+              </TablaDensa>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {puedeCapturar && porMes.data?.existe && idEdr !== null && <AgregarManual idEdr={idEdr} />}
+      </div>
     </div>
   );
 }
@@ -242,55 +276,57 @@ function FilaLinea(props: { linea: EdrLinea; puedeCapturar: boolean }): React.JS
   }
 
   return (
-    <TableRow data-testid={`con-fila-${linea.id}`}>
-      <TableCell className="font-medium">
+    <TablaDensaFila data-testid={`con-fila-${linea.id}`}>
+      <TablaDensaCelda className="font-medium">
         {linea.folioOrden ? `#${linea.folioOrden}` : '—'}
-      </TableCell>
-      <TableCell>{linea.empresa}</TableCell>
-      <TableCell>{linea.cliente ?? linea.descripcion ?? '—'}</TableCell>
-      <TableCell>{linea.modelo ?? '—'}</TableCell>
-      <TableCell className="text-right">
+      </TablaDensaCelda>
+      <TablaDensaCelda>{linea.empresa}</TablaDensaCelda>
+      <TablaDensaCelda>{linea.cliente ?? linea.descripcion ?? '—'}</TablaDensaCelda>
+      <TablaDensaCelda>{linea.modelo ?? '—'}</TablaDensaCelda>
+      <TablaDensaCelda numerica>
         {puedeCapturar ? (
           <Input
             type="number"
             value={cant}
             onChange={(e) => setCant(e.target.value)}
-            className="ml-auto w-20 text-right"
+            className="ml-auto h-7 w-20 text-right"
             data-testid={`con-cant-${linea.id}`}
           />
         ) : (
           linea.cantVendida
         )}
-      </TableCell>
-      <TableCell className="text-right">
+      </TablaDensaCelda>
+      <TablaDensaCelda numerica>
         {puedeCapturar ? (
           <Input
             type="number"
             step="0.01"
             value={precio}
             onChange={(e) => setPrecio(e.target.value)}
-            className="ml-auto w-24 text-right"
+            className="ml-auto h-7 w-24 text-right"
             data-testid={`con-precio-${linea.id}`}
           />
         ) : (
           moneda(linea.precioVenta)
         )}
-      </TableCell>
-      <TableCell className="text-right">{moneda(importe)}</TableCell>
-      <TableCell className="text-right">
+      </TablaDensaCelda>
+      <TablaDensaCelda numerica>{moneda(importe)}</TablaDensaCelda>
+      <TablaDensaCelda numerica>
         {linea.sinCosto ? (
-          <span className="text-destructive" title="Sin costo (revisa el costeo)">
+          <span className="text-crit" title="Sin costo (revisa el costeo)">
             sin costo
           </span>
         ) : (
           moneda(linea.costoActual)
         )}
-      </TableCell>
-      <TableCell>
-        <span className="rounded bg-muted px-2 py-0.5 text-xs">{etiquetaOrigen(linea.origen)}</span>
-      </TableCell>
+      </TablaDensaCelda>
+      <TablaDensaCelda>
+        <ChipEstado tono={TONO_ORIGEN[linea.origen]} sinPunto>
+          {etiquetaOrigen(linea.origen)}
+        </ChipEstado>
+      </TablaDensaCelda>
       {puedeCapturar && (
-        <TableCell className="text-right">
+        <TablaDensaCelda className="text-right">
           <div className="flex justify-end gap-1">
             <Button
               type="button"
@@ -315,9 +351,9 @@ function FilaLinea(props: { linea: EdrLinea; puedeCapturar: boolean }): React.JS
               </Button>
             )}
           </div>
-        </TableCell>
+        </TablaDensaCelda>
       )}
-    </TableRow>
+    </TablaDensaFila>
   );
 }
 
@@ -365,7 +401,7 @@ function AgregarManual(props: { idEdr: number }): React.JSX.Element {
 
   if (!abierto) {
     return (
-      <div className="mt-4">
+      <div>
         <Button
           type="button"
           variant="outline"
@@ -380,8 +416,8 @@ function AgregarManual(props: { idEdr: number }): React.JSX.Element {
   }
 
   return (
-    <div className="mt-4 rounded-lg border p-4" data-testid="con-form-manual">
-      <h3 className="mb-3 text-sm font-medium">Nueva línea manual</h3>
+    <div className="rounded-xl border bg-card p-4" data-testid="con-form-manual">
+      <h3 className="mb-3 text-sm font-semibold">Nueva línea manual</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Field>
           <FieldLabel htmlFor="man-empresa">Empresa</FieldLabel>
