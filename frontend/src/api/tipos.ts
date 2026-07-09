@@ -35,6 +35,28 @@ export type AlmacenCrear =
 export type AlmacenEditar =
   paths['/api/almacenes/{id}']['patch']['requestBody']['content']['application/json'];
 
+// ── Auditores (catalogo de calidad, rediseño R9 — mismo patron que Almacenes) ─
+
+/** Pagina de auditores (`GET /api/calidad/auditores`). */
+export type AuditoresPagina =
+  paths['/api/calidad/auditores']['get']['responses']['200']['content']['application/json'];
+
+/** Un auditor tal como lo devuelve el API (incluye `numeroAuditorias` derivado). */
+export type Auditor = AuditoresPagina['datos'][number];
+
+/** Parametros de consulta del listado de auditores (querystring). */
+export type AuditoresQuery = NonNullable<
+  paths['/api/calidad/auditores']['get']['parameters']['query']
+>;
+
+/** Cuerpo de alta de auditor (`POST /api/calidad/auditores`). */
+export type AuditorCrear =
+  paths['/api/calidad/auditores']['post']['requestBody']['content']['application/json'];
+
+/** Cuerpo de edicion de auditor (`PATCH /api/calidad/auditores/{id}`). */
+export type AuditorEditar =
+  paths['/api/calidad/auditores/{id}']['patch']['requestBody']['content']['application/json'];
+
 // ── Catalogos F1-E1 (mismo patron que Almacenes) ─────────────────────────────
 
 /** Pagina de proveedores (`GET /api/proveedores`). */

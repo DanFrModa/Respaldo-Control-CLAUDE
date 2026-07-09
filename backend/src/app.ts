@@ -76,6 +76,7 @@ import { rutasAuditorias } from './api/calidad/auditorias.rutas.js';
 import { rutasDefectos } from './api/calidad/defectos.rutas.js';
 import { rutasPlanesAql } from './api/calidad/planes-aql.rutas.js';
 import { rutasTiposProducto } from './api/calidad/tipos-producto.rutas.js';
+import { rutasAuditores } from './api/calidad/auditores.rutas.js';
 import { rutasBandejaRc } from './api/ruta-critica/bandeja.rutas.js';
 import { rutasConcentradoRc } from './api/ruta-critica/concentrado.rutas.js';
 import { rutasAnalisisRc } from './api/ruta-critica/analisis.rutas.js';
@@ -302,6 +303,8 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // (calidad.ver consulta / calidad.administrar-catalogo muta).
   await app.register(rutasDefectos, { prefix: '/api' });
   await app.register(rutasTiposProducto, { prefix: '/api' });
+  // Catálogo de auditores (rediseño R9): CRUD patrón catálogo, reúsa los permisos de calidad.
+  await app.register(rutasAuditores, { prefix: '/api' });
   await app.register(rutasPlanesAql, { prefix: '/api' });
   // Calidad — núcleo de auditorías (F6-E2): alta + captura de resultados + reclasificación + GETs de
   // apoyo. RBAC por ruta (calidad.generar-auditorias el alta; calidad.actualizar-auditorias la captura

@@ -462,15 +462,14 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             permisos: ['calidad.ver'],
             subVista: true,
           },
-          // Hoja aprobada sin pantalla propia todavía → Próximamente.
           {
             clave: 'auditores',
             titulo: 'Auditores',
             descripcion: 'Catálogo de auditores de calidad',
             ruta: '/auditores',
             icono: 'usuarios',
-            permisos: 'autenticado',
-            proximamente: 'Requiere catálogo de auditores (posterior)',
+            permisos: ['calidad.ver'],
+            subVista: true,
           },
           // ── Legados re-colgados (F6) ──
           {

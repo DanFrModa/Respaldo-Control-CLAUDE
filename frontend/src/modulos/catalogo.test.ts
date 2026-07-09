@@ -94,7 +94,6 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta.
     for (const [clave, nota] of [
       ['ventas', 'Llega con Finanzas (F9)'],
-      ['auditores', 'Requiere catálogo de auditores (posterior)'],
       ['cxc', 'Llega con Finanzas (F9)'],
       ['cxp', 'Llega con Finanzas (F9)'],
     ] as const) {
@@ -109,11 +108,11 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Sin permisos solo quedan las hojas de uso general: el resumen, los catálogos que heredaron
     // el gate del hub Catálogos (bordados + galería, telas, avíos, clientes, proveedores, colores,
-    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las 4 «Próximamente».
+    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las 3 «Próximamente».
+    // (Auditores ya NO: es pantalla real gateada por `calidad.ver`, R9.)
     expect(visibles.map((m) => m.clave).sort()).toEqual(
       [
         'almacenes',
-        'auditores',
         'bordados',
         'catalogo-avios',
         'catalogo-telas',
@@ -426,11 +425,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc', 'cxp']);
     // INVENTARIOS: las 4 hojas colapsadas tienen gate → sin permisos, el grupo entero desaparece.
     expect(porClave.get('inventarios')).toBeUndefined();
-    // OPERACIÓN: solo Calidad sobrevive (por su hoja "Auditores", autenticado).
-    const operacion = porClave.get('operacion');
-    expect(operacion?.entradas.map((e) => e.clave)).toEqual(['calidad']);
-    const calidad = operacion?.entradas.find((e) => e.clave === 'calidad');
-    expect(calidad?.hijos?.map((h) => h.clave)).toEqual(['auditores']);
+    // OPERACIÓN: sin permisos ya no sobrevive nada — Auditores ahora exige `calidad.ver` (antes era
+    // "autenticado" y mantenía viva a Calidad/Operación); las dos hojas de Calidad quedan gateadas.
+    expect(porClave.get('operacion')).toBeUndefined();
     // SISTEMA: Catálogos base pierde "Tipos de proceso" (permiso propio); las 2 hojas directas
     // (Procesos y responsables, Usuarios y accesos) desaparecen.
     const sistema = porClave.get('sistema');

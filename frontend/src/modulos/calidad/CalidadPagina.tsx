@@ -5,6 +5,7 @@ import {
   ClipboardList,
   FileSearch,
   Medal,
+  UserCheck,
   type LucideIcon,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -77,6 +78,15 @@ const SUB_VISTAS: readonly SubvistaCalidad[] = [
     ruta: '/calidad/tipos-producto',
     icono: CheckCircle,
     tono: 'avios',
+    permiso: 'calidad.ver',
+  },
+  {
+    clave: 'auditores',
+    titulo: 'Auditores',
+    descripcion: 'Catálogo de auditores AQL: rol, nivel de certificación y auditorías realizadas.',
+    ruta: '/auditores',
+    icono: UserCheck,
+    tono: 'pt',
     permiso: 'calidad.ver',
   },
   {

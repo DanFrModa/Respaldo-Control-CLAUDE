@@ -119,6 +119,38 @@ export const esquemaAlmacenFormulario = z.object({
 /** Datos del formulario de almacen. */
 export type DatosAlmacenFormulario = z.infer<typeof esquemaAlmacenFormulario>;
 
+// ── Auditores (espejo de `esquemaAuditorCrear`/`Editar` del backend) ──────────
+
+/** Roles de auditor (proto `CAT_AUDITORES`: badge Auditor / Sr. Auditor). */
+export const ROLES_AUDITOR = ['Auditor', 'Sr. Auditor'] as const;
+
+/** Clave de rol de auditor. */
+export type RolAuditorClave = (typeof ROLES_AUDITOR)[number];
+
+/** Niveles AQL de certificación de un auditor (texto: 1.0 / 1.5 / 2.5 / 4.0). */
+export const NIVELES_AQL_AUDITOR = ['1.0', '1.5', '2.5', '4.0'] as const;
+
+/** Clave de nivel AQL de auditor. */
+export type NivelAqlAuditorClave = (typeof NIVELES_AQL_AUDITOR)[number];
+
+/**
+ * Captura del formulario de auditor (alta y edicion comparten forma). El backend
+ * distingue alta (POST) de edicion (PATCH); en el formulario el `rol` y el `nivelAql`
+ * siempre se eligen y el `nombre` siempre se captura, asi que los tres son obligatorios.
+ */
+export const esquemaAuditorFormulario = z.object({
+  nombre: z
+    .string({ error: 'El nombre es obligatorio' })
+    .trim()
+    .min(1, { error: 'El nombre es obligatorio' })
+    .max(120, { error: 'El nombre no puede tener más de 120 caracteres' }),
+  rol: z.enum(ROLES_AUDITOR, { error: 'El rol debe ser Auditor o Sr. Auditor' }),
+  nivelAql: z.enum(NIVELES_AQL_AUDITOR, { error: 'El nivel AQL debe ser 1.0, 1.5, 2.5 o 4.0' }),
+});
+
+/** Datos del formulario de auditor. */
+export type DatosAuditorFormulario = z.infer<typeof esquemaAuditorFormulario>;
+
 // ── Proveedores (espejo de `esquemaProveedorCrear`/`Editar` del backend) ──────
 
 /** Tipos de proveedor (clasificacion de negocio). */

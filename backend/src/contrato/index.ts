@@ -1595,6 +1595,24 @@ export {
   type ResolverPlanSalida,
 } from './esquemas/calidad.js';
 
+// ── Calidad: catálogo de auditores (Módulo 8, rediseño R9 — proto `CAT_AUDITORES`) ──
+export {
+  ROLES_AUDITOR,
+  NIVELES_AQL_AUDITOR,
+  esquemaAuditorCrear,
+  esquemaAuditorEditar,
+  esquemaAuditorSalida,
+  esquemaAuditoresQuery,
+  esquemaAuditoresPagina,
+  type RolAuditorClave,
+  type NivelAqlAuditorClave,
+  type DatosAuditorCrear,
+  type DatosAuditorEditar,
+  type AuditorSalida,
+  type AuditoresQuery,
+  type AuditoresPagina,
+} from './esquemas/auditor.js';
+
 // ── Calidad — núcleo de auditorías (F6-E2) ──
 export {
   RESULTADOS_AUDITORIA,
