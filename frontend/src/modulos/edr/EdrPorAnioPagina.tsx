@@ -13,7 +13,7 @@ import {
   TablaDensaPie,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
-import { SelectNativo } from '@/components/ui/native-select';
+import { Input } from '@/components/ui/input';
 
 import { MESES, moneda } from './comun';
 
@@ -78,19 +78,15 @@ export function EdrPorAnioPagina(): React.JSX.Element {
               Comparativo mensual del año {anio}, a costo actual
             </p>
           </div>
-          <SelectNativo
+          <Input
+            type="number"
             className="h-8 w-24 text-sm"
             value={anio}
             onChange={(e) => setParams({ anio: e.target.value })}
+            placeholder="Año"
             aria-label="Año"
             data-testid="pa-anio"
-          >
-            {Array.from({ length: 8 }, (_, i) => hoy.getFullYear() - i).map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </SelectNativo>
+          />
           <Button
             type="button"
             variant="outline"

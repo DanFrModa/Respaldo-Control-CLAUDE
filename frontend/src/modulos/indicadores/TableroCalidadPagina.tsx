@@ -17,6 +17,7 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
 import { MESES, entero, etiquetaMes, porcentaje, selloDatosAl } from './comun';
@@ -57,20 +58,15 @@ export function TableroCalidadPagina(): React.JSX.Element {
               {selloDatosAl(datos?.datosAl)}
             </p>
           </div>
-          <SelectNativo
+          <Input
+            type="number"
             className="h-8 w-24 text-sm"
             value={anio}
             onChange={(e) => setAnio(e.target.value)}
+            placeholder="Año"
             aria-label="Año"
             data-testid="cal-anio"
-          >
-            <option value="">Año</option>
-            {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i).map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </SelectNativo>
+          />
           <SelectNativo
             className="h-8 w-auto text-sm"
             value={mes}

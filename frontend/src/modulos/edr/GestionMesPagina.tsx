@@ -130,19 +130,15 @@ export function GestionMesPagina(): React.JSX.Element {
               Captura el encabezado global y genera las ventas del mes desde las entregas a cliente
             </p>
           </div>
-          <SelectNativo
+          <Input
+            type="number"
             className="h-8 w-24 text-sm"
             value={anio}
             onChange={(e) => setAnio(e.target.value)}
+            placeholder="Año"
             aria-label="Año"
             data-testid="edr-anio"
-          >
-            {Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i).map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </SelectNativo>
+          />
           <SelectNativo
             className="h-8 w-auto text-sm"
             value={mes}

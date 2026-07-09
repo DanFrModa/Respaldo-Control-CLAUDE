@@ -13,6 +13,7 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
 import { etiquetaMes, MESES, moneda } from './comun';
@@ -79,19 +80,15 @@ export function EdrPorMesPagina(): React.JSX.Element {
               Resultado consolidado de {etiquetaMes(mes, anio)}, valuado a costo actual
             </p>
           </div>
-          <SelectNativo
+          <Input
+            type="number"
             className="h-8 w-24 text-sm"
             value={anio}
             onChange={(e) => cambiar(num(e.target.value), mes)}
+            placeholder="Año"
             aria-label="Año"
             data-testid="pm-anio"
-          >
-            {Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i).map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </SelectNativo>
+          />
           <SelectNativo
             className="h-8 w-auto text-sm"
             value={mes}

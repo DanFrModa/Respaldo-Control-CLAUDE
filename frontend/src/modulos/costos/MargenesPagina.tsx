@@ -13,6 +13,7 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
 import { moneda, porcentaje } from './comun';
@@ -119,20 +120,15 @@ export function MargenesPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          <SelectNativo
+          <Input
+            type="number"
             className="h-8 w-24 text-sm"
             value={anio}
             onChange={(e) => setAnio(e.target.value)}
+            placeholder="Año"
             aria-label="Filtrar por año"
             data-testid="mg-anio"
-          >
-            <option value="">Año</option>
-            {Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i).map((a) => (
-              <option key={a} value={a}>
-                {a}
-              </option>
-            ))}
-          </SelectNativo>
+          />
           <SelectNativo
             className="h-8 w-auto text-sm"
             value={mes}

@@ -130,19 +130,15 @@ export function ConciliacionPagina(): React.JSX.Element {
         {/* ── Card: filtros + tabla ───────────────────────────────────────────── */}
         <div className="overflow-hidden rounded-xl border bg-card">
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-            <SelectNativo
+            <Input
+              type="number"
               className="h-8 w-24 text-sm"
               value={anio}
               onChange={(e) => cambiarPeriodo(num(e.target.value), mes)}
+              placeholder="Año"
               aria-label="Año"
               data-testid="con-anio"
-            >
-              {Array.from({ length: 6 }, (_, i) => hoy.getFullYear() - i).map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </SelectNativo>
+            />
             <SelectNativo
               className="h-8 w-auto text-sm"
               value={mes}
