@@ -148,7 +148,7 @@ export interface ModuloMenu {
   subVista?: boolean;
   /**
    * Nota de "Próximamente": la hoja aún no tiene pantalla y su ruta cae en la
-   * página comodín, que muestra esta nota (p. ej. "Llega en R9").
+   * página comodín, que muestra esta nota (p. ej. "Llega con Finanzas (F9)").
    */
   proximamente?: string;
   /** Discriminante: una hoja nunca tiene hijos. */
@@ -470,7 +470,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             ruta: '/auditores',
             icono: 'usuarios',
             permisos: 'autenticado',
-            proximamente: 'Llega en R9',
+            proximamente: 'Requiere catálogo de auditores (posterior)',
           },
           // ── Legados re-colgados (F6) ──
           {
@@ -769,7 +769,7 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
             ruta: '/ventas',
             icono: 'grafica',
             permisos: 'autenticado',
-            proximamente: 'Llega en R9',
+            proximamente: 'Llega con Finanzas (F9)',
           },
         ],
       },

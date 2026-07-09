@@ -81,9 +81,19 @@ beforeEach(() => {
 describe('ConsultaAuditoriasPagina', () => {
   it('lista las auditorías con su folio', () => {
     render();
-    // #2 aparece en la fila de lista y en el detalle del primer registro (auto-seleccionado): ≥1.
-    expect(screen.getAllByText('Auditoría #2').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Auditoría #1').length).toBeGreaterThan(0);
+    // Tabla-first: cada renglón muestra el nº de auditoría como "#N" (el cajón está cerrado al inicio).
+    expect(screen.getAllByTestId('fila-consulta-auditoria')).toHaveLength(2);
+    expect(screen.getByText('#2')).toBeDefined();
+    expect(screen.getByText('#1')).toBeDefined();
+  });
+
+  it('al hacer clic en un renglón abre el cajón con el título de la auditoría', async () => {
+    const user = userEvent.setup();
+    render();
+    // El cajón está cerrado hasta que se elige un renglón (patrón tabla-first + cajón por ID).
+    expect(screen.queryByText('Auditoría #2')).toBeNull();
+    await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
+    expect(screen.getByText('Auditoría #2')).toBeDefined();
   });
 
   it('estado de carga: el armazón (título) se muestra mientras carga', () => {
