@@ -211,7 +211,7 @@ export function RolesPagina(): React.JSX.Element {
       {/* ── Cajón de detalle del rol (ancho: el árbol de permisos necesita espacio) ── */}
       <CajonDetalle
         className="sm:max-w-2xl lg:max-w-3xl"
-        abierto={seleccion !== null}
+        abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccionId(null);
         }}

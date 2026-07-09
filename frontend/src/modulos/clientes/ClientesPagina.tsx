@@ -311,7 +311,7 @@ export function ClientesPagina(): React.JSX.Element {
 
       {/* ── Cajón de detalle del cliente ────────────────────────────────────── */}
       <CajonDetalle
-        abierto={seleccion !== null}
+        abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccionId(null);
         }}

@@ -435,7 +435,7 @@ export function ProveedoresPagina(): React.JSX.Element {
 
       {/* ── Cajón de detalle del proveedor ──────────────────────────────────── */}
       <CajonDetalle
-        abierto={seleccion !== null}
+        abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccionId(null);
         }}

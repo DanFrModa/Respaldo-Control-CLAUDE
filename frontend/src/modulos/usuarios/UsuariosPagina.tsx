@@ -337,7 +337,7 @@ export function UsuariosPagina(): React.JSX.Element {
 
       {/* ── Cajón de detalle del usuario ────────────────────────────────────── */}
       <CajonDetalle
-        abierto={seleccion !== null}
+        abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccionId(null);
         }}
