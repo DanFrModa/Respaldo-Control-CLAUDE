@@ -106,16 +106,42 @@ export const esquemaWipOrdenFila = z
 /** Forma de una fila del tablero WIP. */
 export type WipOrdenFila = z.infer<typeof esquemaWipOrdenFila>;
 
-/** Respuesta paginada del tablero WIP (forma estándar `Pagina<T>`). */
+/**
+ * Agregado por etapa sobre TODO el universo filtrado (no solo la página): Σ de piezas por etapa,
+ * derivada por suma directa de `EtapaMovimientoDet` (D3/D4) — MISMO criterio que las filas y que el
+ * agregado de Indicadores (`kpisWip`), pero bajo el permiso del tablero (`produccion.wip-ver`). Sirve
+ * a los KPIs de vistazo del proto (piezas por etapa). El filtro `soloPendientes` NO afecta este
+ * agregado (una orden sin nada pendiente aporta 0 a cada etapa pendiente).
+ */
+export const esquemaWipTotales = z
+  .object({
+    pedido: z.number().int().describe('Total pedido (Σ de la matriz) del universo filtrado.'),
+    cortado: z.number().int().describe('Total cortado (Σ etapas de corte vivas).'),
+    enviado: z.number().int().describe('Total enviado a maquila (Σ envíos vivos).'),
+    recibido: z.number().int().describe('Total recibido de maquila (Σ recibos vivos).'),
+    recibidoCostura: z.number().int().describe('Recibido de procesos que meten a PT (costura).'),
+    entregado: z.number().int().describe('Total entregado a cliente (Σ entregas vivas).'),
+    porCortar: z.number().int().describe('pedido − cortado (piezas por cortar).'),
+    cortadoPorEnviar: z.number().int().describe('cortado − enviado (piezas por enviar a maquila).'),
+    porRecibir: z.number().int().describe('enviado − recibido (piezas en poder de maquila).'),
+    porEntregar: z.number().int().describe('recibido(costura) − entregado (piezas por entregar).'),
+  })
+  .describe('Agregado de piezas por etapa del universo filtrado (KPIs del tablero WIP).');
+
+/** Forma del agregado por etapa del tablero WIP. */
+export type WipTotales = z.infer<typeof esquemaWipTotales>;
+
+/** Respuesta paginada del tablero WIP (forma estándar `Pagina<T>`) + agregado por etapa. */
 export const esquemaTableroWipPagina = z
   .object({
     datos: z.array(esquemaWipOrdenFila).describe('Órdenes (con avance) de la página.'),
+    totales: esquemaWipTotales.describe('Agregado de piezas por etapa del universo filtrado.'),
     total: z.number().int().describe('Total de órdenes que cumplen el filtro.'),
     pagina: z.number().int().describe('Página devuelta.'),
     porPagina: z.number().int().describe('Renglones por página.'),
     totalPaginas: z.number().int().describe('Total de páginas.'),
   })
-  .describe('Página del tablero WIP (órdenes con su avance).');
+  .describe('Página del tablero WIP (órdenes con su avance) + agregado por etapa.');
 
 /** Forma de la respuesta paginada del tablero WIP. */
 export type TableroWipPagina = z.infer<typeof esquemaTableroWipPagina>;

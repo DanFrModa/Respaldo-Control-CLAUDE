@@ -356,6 +356,13 @@ export const esquemaAuditoriaResumen = z
     resultado: z.enum(RESULTADOS_AUDITORIA).describe('Veredicto manual del auditor.'),
     tamanoMuestra: z.number().int().describe('Tamaño de muestra inspeccionado.'),
     totalFallas: z.number().int().describe('Σ de fallas de todos los defectos (derivado).'),
+    nivelAqlPrincipal: z
+      .number()
+      .nullable()
+      .describe(
+        'AQL de la auditoría (derivado): nivel del defecto con más fallas registradas ' +
+          '(empate → el más estricto); null si la auditoría no registró fallas.',
+      ),
     cancelada: z.boolean().describe('Si la auditoría está cancelada (borrado suave).'),
   })
   .describe('Resumen de una auditoría para el listado.');
@@ -424,6 +431,64 @@ export const esquemaAuditoriasPagina = z
 
 /** Forma de la respuesta paginada de auditorías. */
 export type AuditoriasPagina = z.infer<typeof esquemaAuditoriasPagina>;
+
+// ── Resumen de cabecera (KPIs `vCalidad`, rediseño R9) ─────────────────────────────────
+
+/**
+ * Filtros del resumen de auditorías (querystring). MISMO conjunto de filtros del listado que ACOTAN
+ * el universo (maquilero/resultado/tipo/folio/rango de fecha/canceladas), SIN paginación ni orden:
+ * el resumen agrega sobre TODO lo que cumple el filtro, no una página.
+ */
+export const esquemaResumenAuditoriasQuery = z
+  .object({
+    folioOrden: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Filtra por folio de orden.'),
+    idMaquilero: z.coerce.number().int().positive().optional().describe('Filtra por maquilero.'),
+    resultado: z.enum(RESULTADOS_AUDITORIA).optional().describe('Filtra por resultado.'),
+    tipoAuditoria: z.enum(TIPOS_AUDITORIA).optional().describe('Filtra por tipo de auditoría.'),
+    desde: z.iso.date().optional().describe('Fecha de auditoría mínima (YYYY-MM-DD, inclusive).'),
+    hasta: z.iso.date().optional().describe('Fecha de auditoría máxima (YYYY-MM-DD, inclusive).'),
+    incluirCanceladas: z
+      .stringbool()
+      .default(false)
+      .describe('Incluye las canceladas ("true"/"false").'),
+  })
+  .describe('Filtros del resumen de auditorías (KPIs de cabecera).');
+
+/** Parámetros del resumen de auditorías ya coaccionados desde la URL. */
+export type ResumenAuditoriasQuery = z.infer<typeof esquemaResumenAuditoriasQuery>;
+
+/**
+ * Defecto PRINCIPAL del conjunto filtrado (KPI `vCalidad`): el defecto con MÁS fallas sumadas en las
+ * auditorías que cumplen el filtro. `null` si no hay fallas registradas.
+ */
+export const esquemaDefectoPrincipal = z
+  .object({
+    idDefecto: z.number().int().describe('Id del defecto.'),
+    clave: z.string().describe('Clave del defecto.'),
+    descripcion: z.string().describe('Descripción del defecto.'),
+    totalFallas: z.number().int().describe('Σ de fallas del defecto en el conjunto filtrado.'),
+  })
+  .describe('Defecto más frecuente del conjunto filtrado de auditorías.');
+
+/** Forma del defecto principal. */
+export type DefectoPrincipal = z.infer<typeof esquemaDefectoPrincipal>;
+
+/** Resumen de cabecera de auditorías (KPIs): por ahora, el defecto principal del filtro. */
+export const esquemaResumenAuditorias = z
+  .object({
+    defectoPrincipal: esquemaDefectoPrincipal
+      .nullable()
+      .describe('Defecto con más fallas del conjunto filtrado, o null si no hay fallas.'),
+  })
+  .describe('Resumen de cabecera de auditorías (KPIs).');
+
+/** Forma del resumen de auditorías. */
+export type ResumenAuditorias = z.infer<typeof esquemaResumenAuditorias>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modificar encabezado / cancelar (F6-E3)

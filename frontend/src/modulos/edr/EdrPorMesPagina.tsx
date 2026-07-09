@@ -42,7 +42,8 @@ export function EdrPorMesPagina(): React.JSX.Element {
     setParams({ anio: String(a), mes: String(m) });
   }
 
-  const utilidadBruta = edr ? Math.round((edr.ventas - edr.costo) * 100) / 100 : 0;
+  // Utilidad bruta = ventas − costo, YA calculada EN SERVIDOR (mismo criterio que los cortes; A1).
+  const utilidadBruta = edr?.utilidadBruta ?? 0;
   const kpis: Kpi[] = edr
     ? [
         { clave: 'ventas', etiqueta: 'Ventas', valor: moneda(edr.ventas), pie: 'del periodo' },

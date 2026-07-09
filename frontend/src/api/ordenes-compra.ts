@@ -16,6 +16,8 @@ import type {
   OrdenCompraEditar,
   OrdenesCompraPagina,
   OrdenesCompraQuery,
+  ResumenCompras,
+  ResumenComprasQuery,
 } from './tipos';
 
 /**
@@ -44,6 +46,15 @@ function claveOc(id: number): readonly unknown[] {
 /** Pide una página del listado de OC (búsqueda + filtros + orden + paginación en servidor). */
 async function listarOc(query: OrdenesCompraQuery): Promise<OrdenesCompraPagina> {
   const { data, error } = await api.GET('/api/ordenes-compra', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Resumen de cabecera: # OC abiertas + $ por recibir del universo filtrado (KPIs). */
+async function resumenOc(query: ResumenComprasQuery): Promise<ResumenCompras> {
+  const { data, error } = await api.GET('/api/ordenes-compra/resumen', { params: { query } });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -127,6 +138,17 @@ export function useOrdenesCompra(
   return useQuery({
     queryKey: claveListaOc(query),
     queryFn: () => listarOc(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Resumen de cabecera de OC (KPIs: # abiertas + $ por recibir) bajo el filtro dado. */
+export function useResumenOc(
+  query: ResumenComprasQuery,
+): UseQueryResult<ResumenCompras, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_OC, 'resumen', query],
+    queryFn: () => resumenOc(query),
     placeholderData: keepPreviousData,
   });
 }

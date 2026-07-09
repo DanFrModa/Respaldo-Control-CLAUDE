@@ -54,11 +54,12 @@ function fmt(n: number): string {
  * pie con paginación. Al abrir una orden se ve el drill-down color×talla ("faltan 12 pzas talla 6
  * color rojo"). RESPONSIVE: tabla en escritorio, tarjetas en móvil (las consultas también son móviles).
  *
- * FIDELIDAD vs proto: el proto pinta 4 KPIs de PIEZAS por etapa (Por cortar / En maquila / En estampado
- * / Por recibir) agregadas; el endpoint `/produccion/wip` es POR ORDEN y no devuelve esos totales
- * agregados (el agregado por etapa vive en el módulo Indicadores, `indicadores.ver`, otro permiso). No
- * se pivotea en cliente (A1): por eso los KPIs son Órdenes en piso + Con pendientes (Σ de servidor) y la
- * riqueza va en la tabla (pendientes por etapa por orden) — hueco de endpoint reportado al cerrar el lote.
+ * FIDELIDAD vs proto: los KPIs de PIEZAS por etapa los sirve ahora el propio endpoint `/produccion/wip`
+ * en su `totales` (agregado EN SERVIDOR sobre TODO el universo filtrado, mismo criterio D3/D4 que las
+ * filas y que `kpisWip` de Indicadores — A1, sin pivote en cliente). Se muestran las cuatro etapas
+ * pendientes reales del pipeline (Por cortar / Por enviar / Por recibir / Por entregar) — las mismas que
+ * rotula la tabla; el desglose fino del proto "en maquila vs en estampado" (por TipoProceso) vive en el
+ * drill-down de la orden. Se conserva "Órdenes en piso" para el contexto de conteo.
  *
  * `produccion.wip-ver` gobierna el acceso a la pantalla.
  */
@@ -97,17 +98,8 @@ export function TableroWipPagina(): React.JSX.Element {
   const filas = datos?.datos ?? [];
   const totalPaginas = datos?.totalPaginas ?? 0;
 
-  // Conteo de órdenes CON pendientes bajo el mismo filtro (Σ de servidor, no pivote en cliente).
-  // porPagina:1 basta para leer el `total` sin traer renglones de más.
-  const conteoPendientes = useTableroWip({
-    pagina: 1,
-    porPagina: 1,
-    ordenarPor: 'folio',
-    direccion: 'desc',
-    soloPendientes: 'true',
-    ...filtrosComunes,
-  });
-
+  // Agregado de PIEZAS por etapa (Σ de servidor sobre el universo filtrado; nunca pivote en cliente).
+  const totales = datos?.totales;
   const kpis: Kpi[] = [
     {
       clave: 'ordenes',
@@ -116,10 +108,32 @@ export function TableroWipPagina(): React.JSX.Element {
       pie: 'coinciden con el filtro',
     },
     {
-      clave: 'con-pendientes',
-      etiqueta: 'Con pendientes',
-      valor: fmt(conteoPendientes.data?.total ?? 0),
-      pie: 'falta corte, envío, recibo o entrega',
+      clave: 'por-cortar',
+      etiqueta: 'Por cortar',
+      valor: fmt(totales?.porCortar ?? 0),
+      sufijo: 'pzas',
+      pie: 'pedido − cortado',
+    },
+    {
+      clave: 'por-enviar',
+      etiqueta: 'Por enviar',
+      valor: fmt(totales?.cortadoPorEnviar ?? 0),
+      sufijo: 'pzas',
+      pie: 'cortado − enviado a maquila',
+    },
+    {
+      clave: 'por-recibir',
+      etiqueta: 'Por recibir',
+      valor: fmt(totales?.porRecibir ?? 0),
+      sufijo: 'pzas',
+      pie: 'en poder de maquila',
+    },
+    {
+      clave: 'por-entregar',
+      etiqueta: 'Por entregar',
+      valor: fmt(totales?.porEntregar ?? 0),
+      sufijo: 'pzas',
+      pie: 'recibido − entregado a cliente',
     },
   ];
 

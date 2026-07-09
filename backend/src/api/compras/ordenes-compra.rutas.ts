@@ -32,6 +32,8 @@ import {
   esquemaComprasPagina,
   esquemaErrorApi,
   esquemaListarCompras,
+  esquemaResumenCompras,
+  esquemaResumenComprasQuery,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -43,6 +45,7 @@ import {
   duplicarOC,
   listarOC,
   obtenerOC,
+  resumenOC,
 } from '../../dominio/compras/ordenes-compra.js';
 import { impresoOrdenCompra } from '../../dominio/compras/impresos/impreso-orden-compra.js';
 
@@ -91,6 +94,26 @@ export const rutasOrdenesCompra: FastifyPluginCallbackZod = (app, _opciones, don
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return listarOC(sesion, request.query);
+    },
+  });
+
+  // Resumen de cabecera (KPIs vCompras, R9): # OC abiertas + $ por recibir, sobre el mismo filtro.
+  // Ruta ESTÁTICA antes de la paramétrica `/:id` (Fastify prioriza estáticas; se declara antes por
+  // claridad). Reúsa `compras.ver`.
+  app.route({
+    method: 'GET',
+    url: '/ordenes-compra/resumen',
+    preHandler: app.conPermiso('compras.ver'),
+    schema: {
+      tags: ['compras'],
+      summary: 'Resumen de cabecera de órdenes de compra (OC abiertas + $ por recibir)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaResumenComprasQuery,
+      response: { 200: esquemaResumenCompras, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return resumenOC(sesion, request.query);
     },
   });
 

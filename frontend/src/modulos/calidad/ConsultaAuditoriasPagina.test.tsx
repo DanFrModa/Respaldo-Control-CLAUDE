@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AuditoriaResumen, AuditoriasPagina } from '@/api/tipos';
+import type { AuditoriaResumen, AuditoriasPagina, ResumenAuditorias } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
 import { ConsultaAuditoriasPagina } from './ConsultaAuditoriasPagina';
@@ -12,6 +12,7 @@ const imprimir = vi.fn();
 
 vi.mock('@/api/calidad', () => ({
   useAuditorias: () => auditoriasResult,
+  useResumenAuditorias: () => resumenResult,
   imprimirAuditoria: (id: number) => {
     imprimir(id);
   },
@@ -37,6 +38,7 @@ function fila(numAuditoria: number, extra: Partial<AuditoriaResumen> = {}): Audi
     resultado: 'aprobado',
     tamanoMuestra: 13,
     totalFallas: 0,
+    nivelAqlPrincipal: null,
     cancelada: false,
     ...extra,
   };
@@ -50,6 +52,8 @@ let auditoriasResult: {
   error: { message: string } | null;
   refetch: () => void;
 };
+
+let resumenResult: { data: ResumenAuditorias | undefined };
 
 function pagina(datos: AuditoriaResumen[]): AuditoriasPagina {
   return { datos, total: datos.length, pagina: 1, porPagina: 10, totalPaginas: 1 };
@@ -76,6 +80,7 @@ beforeEach(() => {
     error: null,
     refetch: vi.fn(),
   };
+  resumenResult = { data: { defectoPrincipal: null } };
 });
 
 describe('ConsultaAuditoriasPagina', () => {

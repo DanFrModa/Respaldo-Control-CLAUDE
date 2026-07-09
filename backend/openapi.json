@@ -54931,6 +54931,250 @@
         }
       }
     },
+    "/api/ordenes-compra/resumen": {
+      "get": {
+        "summary": "Resumen de cabecera de órdenes de compra (OC abiertas + $ por recibir)",
+        "tags": [
+          "compras"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar (folio o nombre de proveedor)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idProveedor",
+            "required": false,
+            "description": "Filtra por proveedor."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "fechaDesde",
+            "required": false,
+            "description": "Filtra por fecha de emisión ≥ (YYYY-MM-DD)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "fechaHasta",
+            "required": false,
+            "description": "Filtra por fecha de emisión ≤ (YYYY-MM-DD)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idOrden",
+            "required": false,
+            "description": "Filtra las OC ligadas a una orden de producción (R7)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de cabecera de órdenes de compra (KPIs).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ocAbiertas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "# de OC abiertas (autorizada + recibida_parcial) que cumplen el filtro."
+                    },
+                    "porRecibir": {
+                      "type": "number",
+                      "description": "Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0)."
+                    }
+                  },
+                  "required": [
+                    "ocAbiertas",
+                    "porRecibir"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen de cabecera de órdenes de compra (KPIs)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ordenes-compra/{id}": {
       "get": {
         "summary": "Obtener una orden de compra",
@@ -83500,7 +83744,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Página del tablero WIP (órdenes con su avance).",
+            "description": "Página del tablero WIP (órdenes con su avance) + agregado por etapa.",
             "content": {
               "application/json": {
                 "schema": {
@@ -83661,6 +83905,85 @@
                       },
                       "description": "Órdenes (con avance) de la página."
                     },
+                    "totales": {
+                      "type": "object",
+                      "properties": {
+                        "pedido": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total pedido (Σ de la matriz) del universo filtrado."
+                        },
+                        "cortado": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total cortado (Σ etapas de corte vivas)."
+                        },
+                        "enviado": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total enviado a maquila (Σ envíos vivos)."
+                        },
+                        "recibido": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total recibido de maquila (Σ recibos vivos)."
+                        },
+                        "recibidoCostura": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Recibido de procesos que meten a PT (costura)."
+                        },
+                        "entregado": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Total entregado a cliente (Σ entregas vivas)."
+                        },
+                        "porCortar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "pedido − cortado (piezas por cortar)."
+                        },
+                        "cortadoPorEnviar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "cortado − enviado (piezas por enviar a maquila)."
+                        },
+                        "porRecibir": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "enviado − recibido (piezas en poder de maquila)."
+                        },
+                        "porEntregar": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "recibido(costura) − entregado (piezas por entregar)."
+                        }
+                      },
+                      "required": [
+                        "pedido",
+                        "cortado",
+                        "enviado",
+                        "recibido",
+                        "recibidoCostura",
+                        "entregado",
+                        "porCortar",
+                        "cortadoPorEnviar",
+                        "porRecibir",
+                        "porEntregar"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Agregado de piezas por etapa del universo filtrado."
+                    },
                     "total": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -83688,13 +84011,14 @@
                   },
                   "required": [
                     "datos",
+                    "totales",
                     "total",
                     "pagina",
                     "porPagina",
                     "totalPaginas"
                   ],
                   "additionalProperties": false,
-                  "description": "Página del tablero WIP (órdenes con su avance)."
+                  "description": "Página del tablero WIP (órdenes con su avance) + agregado por etapa."
                 }
               }
             }
@@ -120852,6 +121176,17 @@
                             "maximum": 9007199254740991,
                             "description": "Σ de fallas de todos los defectos (derivado)."
                           },
+                          "nivelAqlPrincipal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "AQL de la auditoría (derivado): nivel del defecto con más fallas registradas (empate → el más estricto); null si la auditoría no registró fallas."
+                          },
                           "cancelada": {
                             "type": "boolean",
                             "description": "Si la auditoría está cancelada (borrado suave)."
@@ -120869,6 +121204,7 @@
                           "resultado",
                           "tamanoMuestra",
                           "totalFallas",
+                          "nivelAqlPrincipal",
                           "cancelada"
                         ],
                         "additionalProperties": false,
@@ -121699,6 +122035,307 @@
         }
       }
     },
+    "/api/calidad/auditorias/resumen": {
+      "get": {
+        "summary": "Resumen de cabecera de auditorías (defecto principal del conjunto filtrado)",
+        "tags": [
+          "calidad"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "folioOrden",
+            "required": false,
+            "description": "Filtra por folio de orden."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idMaquilero",
+            "required": false,
+            "description": "Filtra por maquilero."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "aprobado",
+                "reprobado",
+                "no_calificado"
+              ]
+            },
+            "in": "query",
+            "name": "resultado",
+            "required": false,
+            "description": "Filtra por resultado."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "en_piso",
+                "final",
+                "no_definida"
+              ]
+            },
+            "in": "query",
+            "name": "tipoAuditoria",
+            "required": false,
+            "description": "Filtra por tipo de auditoría."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha de auditoría mínima (YYYY-MM-DD, inclusive)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha de auditoría máxima (YYYY-MM-DD, inclusive)."
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "query",
+            "name": "incluirCanceladas",
+            "required": false,
+            "description": "Incluye las canceladas (\"true\"/\"false\")."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de cabecera de auditorías (KPIs).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "defectoPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "idDefecto": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del defecto."
+                            },
+                            "clave": {
+                              "type": "string",
+                              "description": "Clave del defecto."
+                            },
+                            "descripcion": {
+                              "type": "string",
+                              "description": "Descripción del defecto."
+                            },
+                            "totalFallas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Σ de fallas del defecto en el conjunto filtrado."
+                            }
+                          },
+                          "required": [
+                            "idDefecto",
+                            "clave",
+                            "descripcion",
+                            "totalFallas"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Defecto más frecuente del conjunto filtrado de auditorías."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Defecto con más fallas del conjunto filtrado, o null si no hay fallas."
+                    }
+                  },
+                  "required": [
+                    "defectoPrincipal"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen de cabecera de auditorías (KPIs)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/calidad/auditorias/maquilero/{idMaquilero}": {
       "get": {
         "summary": "Historial de auditorías de un maquilero con su % de aprobación operativo",
@@ -121899,6 +122536,17 @@
                             "maximum": 9007199254740991,
                             "description": "Σ de fallas de todos los defectos (derivado)."
                           },
+                          "nivelAqlPrincipal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "AQL de la auditoría (derivado): nivel del defecto con más fallas registradas (empate → el más estricto); null si la auditoría no registró fallas."
+                          },
                           "cancelada": {
                             "type": "boolean",
                             "description": "Si la auditoría está cancelada (borrado suave)."
@@ -121916,6 +122564,7 @@
                           "resultado",
                           "tamanoMuestra",
                           "totalFallas",
+                          "nivelAqlPrincipal",
                           "cancelada"
                         ],
                         "additionalProperties": false,
@@ -128904,6 +129553,10 @@
                       "type": "number",
                       "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
                     },
+                    "utilidadBruta": {
+                      "type": "number",
+                      "description": "Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes)."
+                    },
                     "gastos": {
                       "type": "number",
                       "description": "Gastos del mes (del encabezado)."
@@ -129027,6 +129680,7 @@
                     "encabezado",
                     "ventas",
                     "costo",
+                    "utilidadBruta",
                     "gastos",
                     "intereses",
                     "bonificaciones",
@@ -129348,6 +130002,10 @@
                               "type": "number",
                               "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
                             },
+                            "utilidadBruta": {
+                              "type": "number",
+                              "description": "Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes)."
+                            },
                             "gastos": {
                               "type": "number",
                               "description": "Gastos del mes (del encabezado)."
@@ -129471,6 +130129,7 @@
                             "encabezado",
                             "ventas",
                             "costo",
+                            "utilidadBruta",
                             "gastos",
                             "intereses",
                             "bonificaciones",
@@ -130852,6 +131511,10 @@
                       "type": "number",
                       "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
                     },
+                    "utilidadBruta": {
+                      "type": "number",
+                      "description": "Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes)."
+                    },
                     "gastos": {
                       "type": "number",
                       "description": "Gastos del mes (del encabezado)."
@@ -130975,6 +131638,7 @@
                     "encabezado",
                     "ventas",
                     "costo",
+                    "utilidadBruta",
                     "gastos",
                     "intereses",
                     "bonificaciones",
@@ -131319,6 +131983,10 @@
                       "type": "number",
                       "description": "Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1)."
                     },
+                    "utilidadBruta": {
+                      "type": "number",
+                      "description": "Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes)."
+                    },
                     "gastos": {
                       "type": "number",
                       "description": "Gastos del mes (del encabezado)."
@@ -131442,6 +132110,7 @@
                     "encabezado",
                     "ventas",
                     "costo",
+                    "utilidadBruta",
                     "gastos",
                     "intereses",
                     "bonificaciones",

@@ -15,7 +15,7 @@ import type {
 } from '../../datos/index.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
-import { autorizarOC, cancelarOC, crearOC } from './ordenes-compra.js';
+import { autorizarOC, cancelarOC, crearOC, resumenOC } from './ordenes-compra.js';
 import { listarRecepcionesDeOC, recibirCompra, reversarRecepcion } from './recepciones.js';
 
 /**
@@ -441,6 +441,74 @@ describe('Recepción (F4-E3) — reverso (D3): inverso visible, nada se borra', 
     await reversarRecepcion(sesion(PERM), rec.id, { motivo: 'devuelta' }, bd());
     const cancelada = await cancelarOC(sesion(PERM_CANCELAR), oc.id, { motivo: 'ya no' }, bd());
     expect(cancelada.estatus).toBe('cancelada');
+  });
+});
+
+describe('Resumen de cabecera (R9) — OC abiertas + $ por recibir', () => {
+  /** Recibe una cantidad de tela contra una línea de OC (helper local). */
+  async function recibir(idOc: number, idLineaOC: number, cantidad: number, fecha: string) {
+    await recibirCompra(
+      sesion(PERM),
+      {
+        idOrdenCompra: idOc,
+        idAlmacen: almacen.id,
+        fecha,
+        lineas: [
+          {
+            idOrdenCompraLinea: idLineaOC,
+            cantidad,
+            lote: { idColor: colorRojo.id, componentes: [{ idTela: telaFelpa.id, cantidad }] },
+          },
+        ],
+      },
+      bd(),
+    );
+  }
+
+  it('cuenta las abiertas y suma (cantidad − recibido) × precio (criterio de recepciones)', async () => {
+    // A: autorizada, 100 @ 5, nada recibido → pendiente 500.
+    await ocTelaAutorizada(100, 5);
+    // B: autorizada, 200 @ 3, recibe 50 → parcial; pendiente 150 × 3 = 450.
+    const ocB = await ocTelaAutorizada(200, 3);
+    await recibir(ocB.id, ocB.lineas[0]!.id, 50, '2026-06-20');
+    // C: borrador (NO autorizada) → no entra en el resumen.
+    await crearOC(
+      sesion(PERM),
+      { idProveedor: proveedor.id, lineas: [{ idTela: telaFelpa.id, cantidad: 999, precio: 9 }] },
+      bd(),
+    );
+
+    const resumen = await resumenOC(sesion(PERM), {}, bd());
+    expect(resumen.ocAbiertas).toBe(2); // autorizada + recibida_parcial
+    expect(resumen.porRecibir).toBe(950); // 500 + 450
+  });
+
+  it('una OC totalmente recibida deja de contar (sin pendiente)', async () => {
+    const oc = await ocTelaAutorizada(100, 4);
+    await recibir(oc.id, oc.lineas[0]!.id, 100, '2026-06-20'); // completa → recibida_total
+    const resumen = await resumenOC(sesion(PERM), {}, bd());
+    expect(resumen.ocAbiertas).toBe(0);
+    expect(resumen.porRecibir).toBe(0);
+  });
+
+  it('el filtro por proveedor acota el universo del resumen', async () => {
+    const otro = await cliente.proveedor.create({ data: { nombre: 'Otro Proveedor' } });
+    await ocTelaAutorizada(100, 5); // proveedor base → pendiente 500
+    // OC autorizada de OTRO proveedor: 10 @ 7 = 70 pendiente.
+    const ocOtro = await crearOC(
+      sesion(PERM),
+      { idProveedor: otro.id, lineas: [{ idTela: telaFelpa.id, cantidad: 10, precio: 7 }] },
+      bd(),
+    );
+    await autorizarOC(sesion(PERM_AUTORIZAR), ocOtro.id, bd());
+
+    const soloOtro = await resumenOC(sesion(PERM), { idProveedor: otro.id }, bd());
+    expect(soloOtro.ocAbiertas).toBe(1);
+    expect(soloOtro.porRecibir).toBe(70);
+
+    const todas = await resumenOC(sesion(PERM), {}, bd());
+    expect(todas.ocAbiertas).toBe(2);
+    expect(todas.porRecibir).toBe(570);
   });
 });
 

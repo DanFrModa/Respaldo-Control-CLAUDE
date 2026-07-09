@@ -434,6 +434,7 @@ export async function calcularEdr(
     encabezado: aEncabezadoSalida(edr),
     ventas,
     costo,
+    utilidadBruta: redondear2(ventas - costo),
     gastos,
     intereses,
     bonificaciones,
