@@ -31,7 +31,12 @@
  */
 import { z } from 'zod';
 
-import type { ExistenciaMaquileroLista, TableroWipPagina, WipOrden } from '../../contrato/index.js';
+import type {
+  ExistenciaMaquileroLista,
+  TableroWipPagina,
+  WipOrden,
+  WipTotales,
+} from '../../contrato/index.js';
 import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 
 import { ErrorNoEncontrado } from '../../comun/errores.js';
@@ -209,6 +214,61 @@ export function tienePendiente(t: TotalesOrden): boolean {
 }
 
 /**
+ * AGREGADO por etapa (piezas) sobre TODO el universo filtrado (no solo la página) — KPIs de vistazo
+ * del proto. Se deriva por suma directa de `EtapaMovimientoDet` (D3/D4) con el MISMO criterio que las
+ * filas del tablero y que `kpisWip` de Indicadores: cada dimensión es UNA agregación en la base
+ * (`_sum`) acotada por el `where` de las órdenes (relación anidada `etapaMov.orden`/`ordenLinea.orden`);
+ * nunca se traen los detalles a memoria. `recibidoCostura` = recibos de procesos que meten a PT
+ * (`generaEntradaPt`), base de "por entregar". Los pendientes se derivan con {@link pendientesDerivados}.
+ *
+ * El filtro `soloPendientes` del listado NO participa aquí: se aplica en memoria sobre las filas y una
+ * orden sin nada pendiente aporta 0 a cada etapa pendiente, por lo que la Σ es idéntica. Así el
+ * agregado refleja exactamente el `where` SQL (empresa/estado/modelo/cliente/búsqueda).
+ */
+async function agregadoWip(
+  cliente: ClienteLectura,
+  where: Prisma.OrdenWhereInput,
+): Promise<WipTotales> {
+  const sumaEtapa = async (
+    tipo: TipoEtapaMovimiento,
+    opciones: { soloEntradaPt?: boolean } = {},
+  ): Promise<number> => {
+    const r = await cliente.etapaMovimientoDet.aggregate({
+      where: {
+        etapaMov: {
+          tipo,
+          canceladoEn: null,
+          orden: where,
+          ...(opciones.soloEntradaPt ? { tipoProceso: { generaEntradaPt: true } } : {}),
+        },
+      },
+      _sum: { cantidad: true },
+    });
+    return r._sum.cantidad ?? 0;
+  };
+  const [pedidoAgg, cortado, enviado, recibido, recibidoCostura, entregado] = await Promise.all([
+    cliente.ordenLineaTalla.aggregate({
+      where: { ordenLinea: { orden: where } },
+      _sum: { cantidad: true },
+    }),
+    sumaEtapa(TipoEtapaMovimiento.corte),
+    sumaEtapa(TipoEtapaMovimiento.envio_maquila),
+    sumaEtapa(TipoEtapaMovimiento.recibo_maquila),
+    sumaEtapa(TipoEtapaMovimiento.recibo_maquila, { soloEntradaPt: true }),
+    sumaEtapa(TipoEtapaMovimiento.entrega_cliente),
+  ]);
+  const t: TotalesOrden = {
+    pedido: pedidoAgg._sum.cantidad ?? 0,
+    cortado,
+    enviado,
+    recibido,
+    recibidoCostura,
+    entregado,
+  };
+  return { ...t, ...pendientesDerivados(t) };
+}
+
+/**
  * TABLERO WIP de la empresa activa (A9): lista LIGERA de órdenes con su avance AGREGADO por etapa
  * (totales por etapa + pendientes derivados, form `Proceso`). Filtros por modelo/cliente/estado +
  * búsqueda combinada (folio, modelo, cliente, valor de referencia D7, reusa `armarBusqueda`).
@@ -258,7 +318,7 @@ export async function consultarWip(
   // Sin `soloPendientes`: paginamos en la base (lo común). Con el filtro: traemos las órdenes que
   // cumplen el WHERE, derivamos y filtramos/paginamos en memoria (el universo vivo es acotado).
   if (!filtros.soloPendientes) {
-    const [total, filas] = await Promise.all([
+    const [total, filas, totalesAgg] = await Promise.all([
       cliente.orden.count({ where }),
       cliente.orden.findMany({
         where,
@@ -267,6 +327,7 @@ export async function consultarWip(
         skip: (paginacion.pagina - 1) * paginacion.porPagina,
         take: paginacion.porPagina,
       }),
+      agregadoWip(cliente, where),
     ]);
     const totales = await totalesDeOrdenes(
       cliente,
@@ -275,6 +336,7 @@ export async function consultarWip(
     const datos = filas.map((f) => aFilaTablero(f, totales.get(f.id) ?? totalesVacios()));
     return {
       datos,
+      totales: totalesAgg,
       total,
       pagina: paginacion.pagina,
       porPagina: paginacion.porPagina,
@@ -282,7 +344,10 @@ export async function consultarWip(
     };
   }
 
-  const filas = await cliente.orden.findMany({ where, orderBy, select: seleccion });
+  const [filas, totalesAgg] = await Promise.all([
+    cliente.orden.findMany({ where, orderBy, select: seleccion }),
+    agregadoWip(cliente, where),
+  ]);
   const totales = await totalesDeOrdenes(
     cliente,
     filas.map((f) => f.id),
@@ -294,6 +359,7 @@ export async function consultarWip(
   const datos = pagina.map((f) => aFilaTablero(f, totales.get(f.id) ?? totalesVacios()));
   return {
     datos,
+    totales: totalesAgg,
     total,
     pagina: paginacion.pagina,
     porPagina: paginacion.porPagina,

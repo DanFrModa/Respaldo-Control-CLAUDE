@@ -39,6 +39,7 @@ import type {
   DatosCompraLineaEntrada,
   CompraSalida,
   CompraLineaSalida,
+  ResumenCompras,
 } from '../../contrato/esquemas/compra.js';
 import type {
   OrdenCompra,
@@ -46,6 +47,7 @@ import type {
   OrdenCompraLineaTalla,
   Prisma,
 } from '../../datos/index.js';
+import { EstatusOrdenCompra } from '../../datos/index.js';
 import { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -839,6 +841,90 @@ export async function listarOC(
 
   const salida = datos.map((o) => aCompraSalida(o as OCConDetalle));
   return armarPagina(salida, total, filtros);
+}
+
+/** Estatus "abiertos" (con material pendiente de recibir) para el resumen de cabecera. */
+const ESTATUS_ABIERTOS: readonly EstatusOrdenCompra[] = [
+  EstatusOrdenCompra.autorizada,
+  EstatusOrdenCompra.recibida_parcial,
+];
+
+/**
+ * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring). Sub-conjunto de los
+ * del listado que ACOTAN el universo de OC abiertas (proveedor/fecha/búsqueda/orden ligada); el
+ * estatus NO entra (el resumen SIEMPRE mira las abiertas).
+ */
+const esquemaResumenOCDominio = z.object({
+  busqueda: z.string().trim().max(200).optional(),
+  idProveedor: z.number().int().positive().optional(),
+  fechaDesde: z.iso.date().optional(),
+  fechaHasta: z.iso.date().optional(),
+  idOrden: z.number().int().positive().optional(),
+});
+
+/** Parámetros del resumen (los reutiliza la ruta REST). */
+export type ParametrosResumenOC = z.input<typeof esquemaResumenOCDominio>;
+
+/**
+ * Resumen de cabecera de OC (KPIs `vCompras`, R9): # OC ABIERTAS (autorizada + recibida_parcial) que
+ * cumplen el filtro, e importe TODAVÍA por recibir. Este último = Σ, sobre las líneas de esas OC, de
+ * `max(0, cantidad − recibido) × precio`, donde `recibido` es la Σ de lo recibido por línea en
+ * recepciones ACTIVAS (reversadaEn = null) — EXACTAMENTE el criterio de `recalcularEstatusOC`
+ * (`recepciones.ts`), no una derivación distinta. El pendiente por línea nunca es negativo (una
+ * línea sobre-recibida aporta 0). Permiso `compras.ver` (A4); todo acotado por empresa activa (A9).
+ */
+export async function resumenOC(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenOC = {},
+  bd?: ContextoBd,
+): Promise<ResumenCompras> {
+  verificarPermiso(sesion, 'compras.ver');
+  const filtros = validarEntrada(esquemaResumenOCDominio, parametros);
+  const cliente = clienteLectura(bd);
+
+  const where: Prisma.OrdenCompraWhereInput = {
+    idEmpresa: sesion.idEmpresaActiva,
+    estatus: { in: [...ESTATUS_ABIERTOS] },
+    ...(filtros.idProveedor === undefined ? {} : { idProveedor: filtros.idProveedor }),
+    ...(filtros.idOrden === undefined
+      ? {}
+      : { ordenesLigadas: { some: { idOrden: filtros.idOrden } } }),
+    ...armarFiltroFecha(filtros.fechaDesde, filtros.fechaHasta),
+    ...armarBusqueda(filtros.busqueda),
+  };
+
+  const abiertas = await cliente.ordenCompra.findMany({
+    where,
+    select: { id: true, lineas: { select: { id: true, cantidad: true, precio: true } } },
+  });
+  const ocAbiertas = abiertas.length;
+  if (ocAbiertas === 0) {
+    return { ocAbiertas: 0, porRecibir: 0 };
+  }
+
+  // Σ recibido por línea de OC en recepciones ACTIVAS (reversadaEn = null): MISMO criterio que
+  // `recalcularEstatusOC`. Un solo groupBy para todas las líneas de las OC abiertas.
+  const idsLinea = abiertas.flatMap((oc) => oc.lineas.map((l) => l.id));
+  const recibidoPorLinea = new Map<number, number>();
+  if (idsLinea.length > 0) {
+    const sumas = await cliente.recepcionCompraLinea.groupBy({
+      by: ['idOrdenCompraLinea'],
+      where: { idOrdenCompraLinea: { in: idsLinea }, recepcionCompra: { reversadaEn: null } },
+      _sum: { cantidadRecibida: true },
+    });
+    for (const s of sumas) {
+      recibidoPorLinea.set(s.idOrdenCompraLinea, Number(s._sum.cantidadRecibida ?? 0));
+    }
+  }
+
+  let porRecibir = 0;
+  for (const oc of abiertas) {
+    for (const l of oc.lineas) {
+      const pendiente = Math.max(0, l.cantidad.toNumber() - (recibidoPorLinea.get(l.id) ?? 0));
+      porRecibir += pendiente * l.precio.toNumber();
+    }
+  }
+  return { ocAbiertas, porRecibir: redondear2(porRecibir) };
 }
 
 /** Arma el `OR` de búsqueda: folio (si es entero) o nombre de proveedor. Vacío → sin OR. */

@@ -13,6 +13,7 @@ const useOrdenesCompraMock = vi.fn();
 
 vi.mock('@/api/ordenes-compra', () => ({
   useOrdenesCompra: (q: unknown) => useOrdenesCompraMock(q) as unknown,
+  useResumenOc: () => ({ data: { ocAbiertas: 0, porRecibir: 0 } }),
   useAutorizarOc: () => ({ mutate: autorizarMutate, isPending: false }),
   useDuplicarOc: () => ({ mutate: duplicarMutate, isPending: false }),
   imprimirOc: vi.fn(),

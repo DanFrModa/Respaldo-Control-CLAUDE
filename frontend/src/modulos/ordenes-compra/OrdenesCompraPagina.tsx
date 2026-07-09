@@ -19,10 +19,22 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-import { imprimirOc, useAutorizarOc, useDuplicarOc, useOrdenesCompra } from '@/api/ordenes-compra';
+import {
+  imprimirOc,
+  useAutorizarOc,
+  useDuplicarOc,
+  useOrdenesCompra,
+  useResumenOc,
+} from '@/api/ordenes-compra';
 import { useProveedores } from '@/api/proveedores';
-import type { EstatusOrdenCompra, OrdenCompra, OrdenesCompraQuery } from '@/api/tipos';
+import type {
+  EstatusOrdenCompra,
+  OrdenCompra,
+  OrdenesCompraQuery,
+  ResumenComprasQuery,
+} from '@/api/tipos';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -67,11 +79,13 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
  * cancelar `compras.cancelar`. Las acciones se ocultan sin permiso; la decisión real la toma el
  * backend (A1). Reemplaza OrdCompraVer / OrdCompra / OrdCompraDet del sistema viejo.
  *
- * FIDELIDAD vs proto: el proto pinta KPIs (OC abiertas · $ por recibir · faltantes MRP · recibido a
- * tiempo) y una barra de "avance de recepción" por OC; el endpoint de la lista NO trae esos agregados
- * ni el `recibido` por OC, así que el estatus (parcial/total) comunica la recepción y no hay KPIs
- * inventados en cliente (hueco reportado). El banner de faltantes del MRP vive en Explosión/Estatus
- * de materiales (donde está el dato).
+ * FIDELIDAD vs proto: los KPIs "OC abiertas" y "$ por recibir" los sirve ahora el resumen de cabecera
+ * (`GET /api/ordenes-compra/resumen`, agregado EN SERVIDOR bajo el mismo filtro — A1, sin pivote en
+ * cliente): `$ por recibir` = Σ (cantidad − recibido) × precio de las líneas de las OC abiertas, con el
+ * MISMO criterio de `recibido` que la recepción. Los otros dos KPIs del proto (faltantes MRP · recibido
+ * a tiempo) viven donde está su dato: el banner de faltantes en Explosión/Estatus de materiales; el
+ * "a tiempo" es de Indicadores. La barra de avance de recepción por OC la comunica el estatus
+ * (parcial/total). Nada se deriva/pivotea en cliente.
  */
 export function OrdenesCompraPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -111,6 +125,30 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   const consulta = useOrdenesCompra(query);
   const autorizar = useAutorizarOc();
   const duplicar = useDuplicarOc();
+
+  // Resumen de cabecera (KPIs): mismo universo por proveedor/fecha/búsqueda, pero SOLO OC abiertas
+  // (el servidor fuerza `autorizada`/`recibida_parcial`); no toma estatus/incluir-canceladas.
+  const resumenQuery: ResumenComprasQuery = {
+    ...(busqueda.length > 0 ? { busqueda } : {}),
+    ...(idProveedor !== null ? { idProveedor } : {}),
+    ...(fechaDesde !== '' ? { fechaDesde } : {}),
+    ...(fechaHasta !== '' ? { fechaHasta } : {}),
+  };
+  const resumen = useResumenOc(resumenQuery);
+  const kpis: Kpi[] = [
+    {
+      clave: 'oc-abiertas',
+      etiqueta: 'OC abiertas',
+      valor: (resumen.data?.ocAbiertas ?? 0).toLocaleString('es-MX'),
+      pie: 'autorizadas o con recepción parcial',
+    },
+    {
+      clave: 'por-recibir',
+      etiqueta: '$ por recibir',
+      valor: formatearMoneda(resumen.data?.porRecibir ?? 0),
+      pie: 'pendiente de recepción (a precio de OC)',
+    },
+  ];
 
   // ── Diálogos + cajón ─────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ oc?: OrdenCompra; soloLectura: boolean } | null>(null);
@@ -189,6 +227,9 @@ export function OrdenesCompraPagina(): React.JSX.Element {
           ) : null}
         </div>
       </header>
+
+      {/* ── KPIs de vistazo (resumen de cabecera, agregado en servidor) ──────── */}
+      <KpiTiles kpis={kpis} className="shrink-0" />
 
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">

@@ -41,6 +41,7 @@ describe('ConciliacionPagina', () => {
         },
         ventas: 0,
         costo: 0,
+        utilidadBruta: 0,
         gastos: 0,
         intereses: 0,
         bonificaciones: 0,

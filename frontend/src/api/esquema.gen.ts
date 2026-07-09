@@ -23131,6 +23131,138 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/ordenes-compra/resumen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resumen de cabecera de órdenes de compra (OC abiertas + $ por recibir) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Texto a buscar (folio o nombre de proveedor). */
+          busqueda?: string;
+          /** @description Filtra por proveedor. */
+          idProveedor?: number;
+          /** @description Filtra por fecha de emisión ≥ (YYYY-MM-DD). */
+          fechaDesde?: string;
+          /** @description Filtra por fecha de emisión ≤ (YYYY-MM-DD). */
+          fechaHasta?: string;
+          /** @description Filtra las OC ligadas a una orden de producción (R7). */
+          idOrden?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumen de cabecera de órdenes de compra (KPIs). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description # de OC abiertas (autorizada + recibida_parcial) que cumplen el filtro. */
+              ocAbiertas: number;
+              /** @description Importe pendiente de recibir (Σ (cantidad − recibido) × precio, ≥ 0). */
+              porRecibir: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ordenes-compra/{id}': {
     parameters: {
       query?: never;
@@ -34612,7 +34744,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Página del tablero WIP (órdenes con su avance). */
+        /** @description Página del tablero WIP (órdenes con su avance) + agregado por etapa. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -34663,6 +34795,29 @@ export interface paths {
                 /** @description recibido(costura) − entregado a cliente (lo que falta entregar). */
                 porEntregar: number;
               }[];
+              /** @description Agregado de piezas por etapa del universo filtrado. */
+              totales: {
+                /** @description Total pedido (Σ de la matriz) del universo filtrado. */
+                pedido: number;
+                /** @description Total cortado (Σ etapas de corte vivas). */
+                cortado: number;
+                /** @description Total enviado a maquila (Σ envíos vivos). */
+                enviado: number;
+                /** @description Total recibido de maquila (Σ recibos vivos). */
+                recibido: number;
+                /** @description Recibido de procesos que meten a PT (costura). */
+                recibidoCostura: number;
+                /** @description Total entregado a cliente (Σ entregas vivas). */
+                entregado: number;
+                /** @description pedido − cortado (piezas por cortar). */
+                porCortar: number;
+                /** @description cortado − enviado (piezas por enviar a maquila). */
+                cortadoPorEnviar: number;
+                /** @description enviado − recibido (piezas en poder de maquila). */
+                porRecibir: number;
+                /** @description recibido(costura) − entregado (piezas por entregar). */
+                porEntregar: number;
+              };
               /** @description Total de órdenes que cumplen el filtro. */
               total: number;
               /** @description Página devuelta. */
@@ -51842,6 +51997,8 @@ export interface paths {
                 tamanoMuestra: number;
                 /** @description Σ de fallas de todos los defectos (derivado). */
                 totalFallas: number;
+                /** @description AQL de la auditoría (derivado): nivel del defecto con más fallas registradas (empate → el más estricto); null si la auditoría no registró fallas. */
+                nivelAqlPrincipal: number | null;
                 /** @description Si la auditoría está cancelada (borrado suave). */
                 cancelada: boolean;
               }[];
@@ -52185,6 +52342,149 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/calidad/auditorias/resumen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resumen de cabecera de auditorías (defecto principal del conjunto filtrado) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Filtra por folio de orden. */
+          folioOrden?: number;
+          /** @description Filtra por maquilero. */
+          idMaquilero?: number;
+          /** @description Filtra por resultado. */
+          resultado?: 'aprobado' | 'reprobado' | 'no_calificado';
+          /** @description Filtra por tipo de auditoría. */
+          tipoAuditoria?: 'en_piso' | 'final' | 'no_definida';
+          /** @description Fecha de auditoría mínima (YYYY-MM-DD, inclusive). */
+          desde?: string;
+          /** @description Fecha de auditoría máxima (YYYY-MM-DD, inclusive). */
+          hasta?: string;
+          /** @description Incluye las canceladas ("true"/"false"). */
+          incluirCanceladas?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumen de cabecera de auditorías (KPIs). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Defecto con más fallas del conjunto filtrado, o null si no hay fallas. */
+              defectoPrincipal: {
+                /** @description Id del defecto. */
+                idDefecto: number;
+                /** @description Clave del defecto. */
+                clave: string;
+                /** @description Descripción del defecto. */
+                descripcion: string;
+                /** @description Σ de fallas del defecto en el conjunto filtrado. */
+                totalFallas: number;
+              } | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/calidad/auditorias/maquilero/{idMaquilero}': {
     parameters: {
       query?: never;
@@ -52264,6 +52564,8 @@ export interface paths {
                 tamanoMuestra: number;
                 /** @description Σ de fallas de todos los defectos (derivado). */
                 totalFallas: number;
+                /** @description AQL de la auditoría (derivado): nivel del defecto con más fallas registradas (empate → el más estricto); null si la auditoría no registró fallas. */
+                nivelAqlPrincipal: number | null;
                 /** @description Si la auditoría está cancelada (borrado suave). */
                 cancelada: boolean;
               }[];
@@ -55167,6 +55469,8 @@ export interface paths {
               ventas: number;
               /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
               costo: number;
+              /** @description Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes). */
+              utilidadBruta: number;
               /** @description Gastos del mes (del encabezado). */
               gastos: number;
               /** @description Intereses del mes. */
@@ -55366,6 +55670,8 @@ export interface paths {
                 ventas: number;
                 /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
                 costo: number;
+                /** @description Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes). */
+                utilidadBruta: number;
                 /** @description Gastos del mes (del encabezado). */
                 gastos: number;
                 /** @description Intereses del mes. */
@@ -56106,6 +56412,8 @@ export interface paths {
               ventas: number;
               /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
               costo: number;
+              /** @description Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes). */
+              utilidadBruta: number;
               /** @description Gastos del mes (del encabezado). */
               gastos: number;
               /** @description Intereses del mes. */
@@ -56300,6 +56608,8 @@ export interface paths {
               ventas: number;
               /** @description Σ(costoUnitActual × cantVendida) a costo ACTUAL (D1). */
               costo: number;
+              /** @description Ventas − Costo del mes (calculado en servidor; mismo criterio que los cortes). */
+              utilidadBruta: number;
               /** @description Gastos del mes (del encabezado). */
               gastos: number;
               /** @description Intereses del mes. */

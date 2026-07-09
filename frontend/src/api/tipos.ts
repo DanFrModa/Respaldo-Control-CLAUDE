@@ -487,6 +487,13 @@ export type OrdenCompraEditar =
 /** Cuerpo de cancelación de OC (`POST /api/ordenes-compra/{id}/cancelar`). */
 export type OrdenCompraCancelar =
   paths['/api/ordenes-compra/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Resumen de cabecera de OC (# OC abiertas + $ por recibir; `GET /api/ordenes-compra/resumen`). */
+export type ResumenCompras =
+  paths['/api/ordenes-compra/resumen']['get']['responses']['200']['content']['application/json'];
+/** Parámetros de consulta del resumen de OC (querystring). */
+export type ResumenComprasQuery = NonNullable<
+  paths['/api/ordenes-compra/resumen']['get']['parameters']['query']
+>;
 
 // ── Notas de salida estructuradas (Módulo 5, F4-E5) ───────────────────────────
 
@@ -1296,6 +1303,15 @@ export type AuditoriaResumen = AuditoriasPagina['datos'][number];
 /** Parámetros de consulta del listado de auditorías (querystring). */
 export type AuditoriasQuery = NonNullable<
   paths['/api/calidad/auditorias']['get']['parameters']['query']
+>;
+/** Resumen de cabecera de auditorías (defecto principal; `GET /api/calidad/auditorias/resumen`). */
+export type ResumenAuditorias =
+  paths['/api/calidad/auditorias/resumen']['get']['responses']['200']['content']['application/json'];
+/** Defecto principal del conjunto filtrado (o null si no hubo fallas). */
+export type DefectoPrincipal = NonNullable<ResumenAuditorias['defectoPrincipal']>;
+/** Parámetros de consulta del resumen de auditorías (querystring). */
+export type ResumenAuditoriasQuery = NonNullable<
+  paths['/api/calidad/auditorias/resumen']['get']['parameters']['query']
 >;
 /** Cuerpo de modificación de encabezado (`PATCH /api/calidad/auditorias/{id}`). */
 export type AuditoriaModificar =

@@ -13,7 +13,7 @@ import {
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { imprimirAuditoria, useAuditorias } from '@/api/calidad';
+import { imprimirAuditoria, useAuditorias, useResumenAuditorias } from '@/api/calidad';
 import {
   ETIQUETAS_RESULTADO_AUDITORIA,
   ETIQUETAS_TIPO_AUDITORIA,
@@ -65,15 +65,16 @@ export function ResultadoBadge({
  * CONSULTA DE AUDITORÍAS (F6-E3; proto `vCalidad` — re-vestida R9 a TABLA-FIRST + CAJÓN). page-head +
  * KPIs de vistazo + card con barra de herramientas (búsqueda por folio de orden + filtros de servidor:
  * maquilero, resultado, tipo, fechas, incluir canceladas) + TABLA DENSA (Auditoría · Orden · Modelo ·
- * Maquilero · Muestra · Defectos · Resultado) + barra de totales al pie con paginación. Al hacer clic en
- * un renglón se abre un CAJÓN con el detalle y las acciones (ver/capturar, imprimir PDF, modificar,
- * cancelar) gateadas por `calidad.modificar-auditorias`. La búsqueda, los filtros y la paginación los
- * hace el SERVIDOR (A1 — jamás pivote en cliente).
+ * Maquilero · Muestra · Defectos · AQL · Resultado) + barra de totales al pie con paginación. Al hacer
+ * clic en un renglón se abre un CAJÓN con el detalle y las acciones (ver/capturar, imprimir PDF,
+ * modificar, cancelar) gateadas por `calidad.modificar-auditorias`. La búsqueda, los filtros y la
+ * paginación los hace el SERVIDOR (A1 — jamás pivote en cliente).
  *
- * FIDELIDAD vs proto: el proto pinta un KPI "Defecto principal" y una columna "AQL" por renglón; NO hay
- * endpoint de frecuencia de defectos ni un AQL escalar por auditoría (el nivel AQL es por-defecto, en la
- * sugerencia). Por eso los KPIs son Auditorías / Aceptación % / Rechazos (Σ de servidor con conteos, sin
- * pivote) y la tabla omite AQL — huecos reportados al cerrar el lote.
+ * FIDELIDAD vs proto: el KPI "Defecto principal" lo sirve el resumen de cabecera
+ * (`GET /api/calidad/auditorias/resumen`, agregado EN SERVIDOR bajo el mismo filtro — un groupBy de
+ * fallas por defecto, top-1); la columna "AQL" es el `nivelAqlPrincipal` que el listado ya trae por fila
+ * (nivel del defecto con más fallas de esa auditoría; empate → el más estricto). Los otros KPIs
+ * (Aceptación % / Auditorías / Rechazos) siguen siendo conteos de servidor. Nada se pivotea en cliente.
  *
  * El cajón guarda el ID (`seleccionId`) y el registro se DERIVA de la lista viva (patrón del rediseño:
  * `abierto` por ID, no por objeto, para no reabrirse solo cuando el renglón sale del filtro).
@@ -155,6 +156,10 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
     resultado: 'reprobado',
   });
 
+  // Defecto principal del mismo universo (agregado en servidor; chip-independiente como los conteos).
+  const resumen = useResumenAuditorias(filtrosBase);
+  const defectoPrincipal = resumen.data?.defectoPrincipal ?? null;
+
   const totalAuditorias = kpiTodas.data?.total ?? 0;
   const aprobadas = kpiAprobadas.data?.total ?? 0;
   const reprobadas = kpiReprobadas.data?.total ?? 0;
@@ -181,6 +186,16 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
       valor: reprobadas.toLocaleString('es-MX'),
       pie: 'requieren reproceso',
       ...(reprobadas > 0 ? { tonoPie: 'crit' as const } : {}),
+    },
+    {
+      clave: 'defecto-principal',
+      etiqueta: 'Defecto principal',
+      valor: defectoPrincipal === null ? '—' : defectoPrincipal.clave,
+      pie:
+        defectoPrincipal === null
+          ? 'sin fallas registradas'
+          : `${defectoPrincipal.descripcion} · ${defectoPrincipal.totalFallas.toLocaleString('es-MX')} fallas`,
+      ...(defectoPrincipal !== null ? { tonoPie: 'crit' as const } : {}),
     },
   ];
 
@@ -350,6 +365,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
                   <TablaDensaHead>Maquilero</TablaDensaHead>
                   <TablaDensaHead numerica>Muestra</TablaDensaHead>
                   <TablaDensaHead numerica>Defectos</TablaDensaHead>
+                  <TablaDensaHead numerica>AQL</TablaDensaHead>
                   <TablaDensaHead>Resultado</TablaDensaHead>
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -378,6 +394,11 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
                       className={a.totalFallas > 0 ? 'font-semibold text-warn' : ''}
                     >
                       {a.totalFallas.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica className="text-muted-foreground">
+                      {a.nivelAqlPrincipal === null
+                        ? '—'
+                        : a.nivelAqlPrincipal.toLocaleString('es-MX')}
                     </TablaDensaCelda>
                     <TablaDensaCelda>
                       {a.cancelada ? (

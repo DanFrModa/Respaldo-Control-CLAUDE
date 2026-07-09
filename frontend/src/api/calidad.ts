@@ -33,6 +33,8 @@ import type {
   PlanesAqlQuery,
   ResolverPlan,
   ResolverPlanQuery,
+  ResumenAuditorias,
+  ResumenAuditoriasQuery,
   TipoProducto,
   TipoProductoCrear,
   TipoProductoEditar,
@@ -524,6 +526,14 @@ async function listarAuditorias(query: AuditoriasQuery): Promise<AuditoriasPagin
   return data;
 }
 
+async function resumenAuditorias(query: ResumenAuditoriasQuery): Promise<ResumenAuditorias> {
+  const { data, error } = await api.GET('/api/calidad/auditorias/resumen', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
 async function obtenerHistorialMaquilero(
   idMaquilero: number,
   query: HistorialMaquileroQuery,
@@ -566,6 +576,17 @@ export function useAuditorias(
   return useQuery({
     queryKey: [...CLAVE_AUDITORIAS, 'lista', query],
     queryFn: () => listarAuditorias(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Resumen de cabecera de auditorías (defecto principal del conjunto filtrado) para el KPI. */
+export function useResumenAuditorias(
+  query: ResumenAuditoriasQuery,
+): UseQueryResult<ResumenAuditorias, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_AUDITORIAS, 'resumen', query],
+    queryFn: () => resumenAuditorias(query),
     placeholderData: keepPreviousData,
   });
 }

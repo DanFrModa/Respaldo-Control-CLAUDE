@@ -569,6 +569,8 @@ export {
   esquemaCompraSalida,
   esquemaListarCompras,
   esquemaComprasPagina,
+  esquemaResumenComprasQuery,
+  esquemaResumenCompras,
   type DatosCompraLineaTallaEntrada,
   type DatosCompraLineaEntrada,
   type DatosCompraCrear,
@@ -580,6 +582,8 @@ export {
   type CompraSalida,
   type ListarCompras,
   type ComprasPagina,
+  type ResumenComprasQuery,
+  type ResumenCompras,
 } from './esquemas/compra.js';
 
 // ── Recepción de compras (Módulo 3, F4-E3; doc 03-Produccion §OC; R7) ─────────
@@ -1343,6 +1347,7 @@ export {
 export {
   esquemaTableroWipQuery,
   esquemaWipOrdenFila,
+  esquemaWipTotales,
   esquemaTableroWipPagina,
   esquemaWipOrden,
   esquemaExistenciaMaquileroQuery,
@@ -1350,6 +1355,7 @@ export {
   esquemaExistenciaMaquileroLista,
   type TableroWipQuery,
   type WipOrdenFila,
+  type WipTotales,
   type TableroWipPagina,
   type WipOrden,
   type ExistenciaMaquileroQuery,
@@ -1639,6 +1645,9 @@ export {
   esquemaAuditoriaCancelarCuerpo,
   esquemaHistorialMaquileroQuery,
   esquemaHistorialMaquileroSalida,
+  esquemaResumenAuditoriasQuery,
+  esquemaDefectoPrincipal,
+  esquemaResumenAuditorias,
   type ResultadoAuditoriaClave,
   type TipoAuditoriaClave,
   type SugerenciaAqlClave,
@@ -1655,6 +1664,9 @@ export {
   type DatosAuditoriaCancelar,
   type HistorialMaquileroQuery,
   type HistorialMaquileroSalida,
+  type ResumenAuditoriasQuery,
+  type DefectoPrincipal,
+  type ResumenAuditorias,
 } from './esquemas/auditorias.js';
 
 // ── Bitácora: consulta del log de auditoría A7 (transversal, F6-E1) ──
