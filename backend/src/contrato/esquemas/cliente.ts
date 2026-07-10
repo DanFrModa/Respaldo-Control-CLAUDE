@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esRfcValido } from './fiscal.js';
+
 /**
  * Contrato Zod de Cliente + ClienteCampo (F1-E2, PIEZA C — Clientes, D7).
  *
@@ -96,7 +98,12 @@ export type ClienteCamposLista = z.infer<typeof esquemaClienteCamposLista>;
 
 // ── Campos de contacto reutilizables (mismas reglas en alta y edición) ────────────
 
-/** Datos de contacto del cliente (todos opcionales). El `email`, si viene, debe ser válido. */
+/**
+ * Datos de contacto y fiscales/comerciales del cliente (todos opcionales). El `email`, si viene, debe
+ * ser válido. El `rfc` (F9-E4, R12) se usa para conciliar el receptor de un CFDI de venta; si viene,
+ * debe tener la forma del RFC mexicano (vacío = sin capturar). `diasCredito` (F9-E4, D15d) es la base
+ * del aging de CxC; null o 0 = contado.
+ */
 const camposContacto = {
   contacto: z
     .string()
@@ -117,6 +124,21 @@ const camposContacto = {
     .trim()
     .max(300, { error: 'La dirección no puede tener más de 300 caracteres' })
     .optional(),
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' })
+    .refine((v) => v === '' || esRfcValido(v), {
+      error: 'El RFC no tiene una forma válida (12 para moral, 13 para física)',
+    })
+    .optional(),
+  diasCredito: z.coerce
+    .number({ error: 'Los días de crédito deben ser un número' })
+    .int({ error: 'Los días de crédito deben ser un entero' })
+    .min(0, { error: 'Los días de crédito no pueden ser negativos' })
+    .max(3650, { error: 'Los días de crédito son demasiado altos' })
+    .optional(),
 } as const;
 
 /**
@@ -130,6 +152,8 @@ const camposContactoEditar = {
   telefono: camposContacto.telefono.nullable(),
   email: camposContacto.email.nullable(),
   direccion: camposContacto.direccion.nullable(),
+  rfc: camposContacto.rfc.nullable(),
+  diasCredito: camposContacto.diasCredito.nullable(),
 } as const;
 
 // ── Cliente ─────────────────────────────────────────────────────────────────────
@@ -187,6 +211,12 @@ export const esquemaClienteSalida = z
     telefono: z.string().nullable().describe('Teléfono, o null.'),
     email: z.string().nullable().describe('Email, o null.'),
     direccion: z.string().nullable().describe('Dirección, o null.'),
+    rfc: z.string().nullable().describe('RFC fiscal del cliente (F9-E4), o null.'),
+    diasCredito: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Días de crédito del cliente (F9-E4); null = contado.'),
     activo: z.boolean().describe('Falso si está desactivado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),

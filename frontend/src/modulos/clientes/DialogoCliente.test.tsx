@@ -26,6 +26,8 @@ function clienteEjemplo(sobre: Partial<Cliente> = {}): Cliente {
     telefono: null,
     email: null,
     direccion: null,
+    rfc: null,
+    diasCredito: null,
     activo: true,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,

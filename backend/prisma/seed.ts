@@ -177,6 +177,10 @@ function definirRoles(): {
     // AdministracionDireccion (mismo reparto que `terceros.administrar`). El `cxp.ver` NO se corta aquí:
     // baja hasta Gerencial (se corta en Ventas, ver abajo).
     'cxp.administrar',
+    // F9-E4 — CxC: capturar/cancelar movimientos e importar CFDI de venta (`cxc.administrar`) queda solo
+    // para Administrador y AdministracionDireccion (mismo reparto que `cxp.administrar`). El `cxc.ver` NO
+    // se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo).
+    'cxc.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
@@ -216,6 +220,9 @@ function definirRoles(): {
     // F9-E2 — CxP: `cxp.ver` (bandeja por pagar + estado de cuenta) es información FINANCIERA; se
     // corta en Ventas hacia abajo, igual que `terceros.ver`.
     'cxp.ver',
+    // F9-E4 — CxC: `cxc.ver` (bandeja por cobrar + estado de cuenta) es información FINANCIERA; se
+    // corta en Ventas hacia abajo, igual que `cxp.ver`.
+    'cxc.ver',
   );
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera

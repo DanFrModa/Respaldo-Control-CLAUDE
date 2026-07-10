@@ -5,8 +5,8 @@
  *
  * Convención (la misma para CxC y CxP — el saldo es neutro al tipo de cuenta):
  *  • CARGO (+): AUMENTA el saldo del tercero en su cuenta. Orígenes: `recibo_maquila`,
- *    `factura_proveedor`, `entrada_sin_factura`. Para un PROVEEDOR (CxP) = "le debemos más"; para un
- *    CLIENTE (CxC) = "nos debe más".
+ *    `factura_proveedor`, `entrada_sin_factura`, `factura_cliente`. Para un PROVEEDOR (CxP) = "le
+ *    debemos más"; para un CLIENTE (CxC) = "nos debe más" (`factura_cliente` = venta a crédito, F9-E4).
  *  • ABONO (−): DISMINUYE el saldo. Orígenes: `nota_credito`, `pago`, `abono`, `descuento`. Las
  *    notas de crédito son un movimiento que BAJA el saldo (propuesta §3.5).
  *
@@ -22,6 +22,7 @@ export const ORIGENES_CARGO: ReadonlySet<OrigenMovimientoTercero> = new Set([
   OrigenMovimientoTercero.recibo_maquila,
   OrigenMovimientoTercero.factura_proveedor,
   OrigenMovimientoTercero.entrada_sin_factura,
+  OrigenMovimientoTercero.factura_cliente,
 ]);
 
 /** Orígenes que son ABONO/reducción (disminuyen el saldo → monto −). */

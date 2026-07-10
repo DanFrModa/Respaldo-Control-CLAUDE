@@ -32,6 +32,9 @@ import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
 import { CxpPagina } from '@/modulos/cxp/CxpPagina';
 import { EstadoCuentaProveedorPagina } from '@/modulos/cxp/EstadoCuentaProveedorPagina';
 import { ImportarCfdiPagina } from '@/modulos/cxp/ImportarCfdiPagina';
+import { CxcPagina } from '@/modulos/cxc/CxcPagina';
+import { EstadoCuentaClientePagina } from '@/modulos/cxc/EstadoCuentaClientePagina';
+import { ImportarCfdiVentaPagina } from '@/modulos/cxc/ImportarCfdiVentaPagina';
 import { EdrPagina } from '@/modulos/edr/EdrPagina';
 import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
 import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
@@ -313,6 +316,13 @@ const router = createBrowserRouter([
           { path: 'cxp/estado-cuenta', element: <EstadoCuentaProveedorPagina /> },
           // CxP · Importar CFDI de proveedor (F9-E3, R11): sube el XML → concilia → cargo fiscal.
           { path: 'cxp/importar-cfdi', element: <ImportarCfdiPagina /> },
+          // CxC — Cuentas por cobrar (Módulo 14, F9-E4): bandeja "por cobrar" con aging (cxc.ver) +
+          // estado de cuenta del cliente con captura/cancelación (cxc.administrar) + importar CFDI de
+          // venta. Rutas estáticas antes del catch-all ":modulo".
+          { path: 'cxc', element: <CxcPagina /> },
+          { path: 'cxc/estado-cuenta', element: <EstadoCuentaClientePagina /> },
+          // CxC · Importar CFDI de venta (F9-E4, R12): sube el XML timbrado → concilia → cargo fiscal.
+          { path: 'cxc/importar-cfdi', element: <ImportarCfdiVentaPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/roles', element: <RolesPagina /> },

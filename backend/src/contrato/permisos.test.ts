@@ -78,6 +78,9 @@ describe('catálogo de permisos', () => {
       // Costos (Módulo 6, F7-E1): costeo real por orden + lista de costos + márgenes (nivel ≤30).
       'costos.capturar',
       'costos.ver',
+      // Cuentas por cobrar (Finanzas, Módulo 14, F9-E4): bandeja/aging/estado de cuenta + captura + CFDI.
+      'cxc.administrar',
+      'cxc.ver',
       // Cuentas por pagar (Finanzas, Módulo 14, F9-E2): bandeja/aging/estado de cuenta + captura.
       'cxp.administrar',
       'cxp.ver',

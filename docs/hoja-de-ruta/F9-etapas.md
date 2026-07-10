@@ -174,7 +174,15 @@
 
 ---
 
-## F9-E4 · CxC — cuentas por cobrar + importación de CFDI de ventas (XML → CxC, R12) — ⬜ pendiente
+## F9-E4 · CxC — cuentas por cobrar + importación de CFDI de ventas (XML → CxC, R12) — ✅ COMPLETA (10-jul-2026; reviewer APROBÓ — 1 DEBE trivial del orden del enum, corregido; pend. verificación de Gabriel en `prueba`)
+
+> **CIERRE (10-jul-2026).** El espejo del lado del cliente, por COMPOSICIÓN sobre el motor E1 y REUTILIZANDO E2/E3:
+> - **Modelo:** `Cliente.diasCredito` + `Cliente.rfc` (migración aditiva `20260710210000`) para aging y match del receptor; **nuevo origen `factura_cliente`** en el enum (migración SEPARADA `20260710200000` con `ADD VALUE … BEFORE 'nota_credito'` — ADD VALUE no comparte tx con otros DDL; orden BD == schema).
+> - **`ServicioCxC`** (`dominio/terceros/cxc/`): cobros/abonos/NC a cliente delegando en el motor; estado de cuenta SIN convivencia EsMa (los clientes no maquilan); bandeja "por cobrar" con aging server-side y **resumen sobre TODA la cartera** (% al corriente honesto: null si no hay cartera). **Comunes EXTRAÍDOS sin duplicar:** `aging-comun.ts` (cubetas/neteo FIFO — CxP quedó como wrapper con su API intacta) y `cfdi/cfdi-comun.ts` (rfcEmpresaActiva/uuidYaImportado).
+> - **CFDI de VENTAS** (`cfdi/cfdi-ventas.ts`, reusa `parsearCfdi` TAL CUAL con roles invertidos): **EMISOR = empresa activa** (vs `Empresa.rfc` de E3: mismatch→rechazo, null→aviso), **RECEPTOR = cliente** (match por RFC; la elección manual SIEMPRE manda); liga a PEDIDO con candidatos por Δtotal sin auto-liga (pedido de otro cliente → ErrorValidacion ANTES de subir/escribir); XML server-side R2-primero→tx (patrón E3); anti-duplicado UUID + backstop P2002. I→`factura_cliente`(+), E→`nota_credito`(−).
+> - **Pantallas espejo de CxP** (kit del rediseño): `/cxc` (bandeja por cobrar), `/cxc/estado-cuenta` (operativa/fiscal + captura de cobros gated `cxc.administrar` + impreso PDF), `/cxc/importar-cfdi`. La hoja "Cuentas por cobrar" del riel dejó de ser placeholder (gated `cxc.ver`).
+> - **RBAC:** permisos NUEVOS `cxc.ver`/`cxc.administrar`, reparto ESPEJO conservador de `cxp.*` (ver hasta Gerencial, se corta en Ventas; administrar solo Admin/AdminDirección). **El deploy a `prueba` requiere `SEED_ON_START=true`.** *Nota de negocio abierta (no bloquea): si Daniel quiere que el rol VENTAS vea la cobranza de clientes, es 1 línea del seed + test — decidirlo con él.*
+> - Tests espejo de E2/E3 (unit aging común, int cxc/cfdi-ventas/api, componente, e2e `cxc.spec.ts`). Reviewer: 1 DEBE trivial (orden del enum en la migración → `BEFORE`) corregido → APROBADO; backend 890/890, front 677/677, contrato sin drift.
 
 **Objetivo:** Lo simétrico del lado del cliente: llevar **lo que te deben** (CxC), alimentado por el **XML ya timbrado** de las ventas propias (emitido por fuera, en SINUBE u otro), **ligado al pedido/cliente**, más cobros, abonos y notas de crédito a clientes.
 

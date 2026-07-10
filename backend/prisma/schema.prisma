@@ -966,6 +966,13 @@ model Cliente {
   telefono  String?
   email     String?
   direccion String?
+  /// RFC fiscal del cliente (F9-E4, R12). Se usa para conciliar el RECEPTOR de un CFDI de VENTA
+  /// importado con el cliente al que se le carga. Validado en Zod si viene (forma del RFC mexicano).
+  /// NULL si no se ha capturado (el match del cliente entonces va por elección manual).
+  rfc         String?
+  /// Días de crédito del cliente (F9-E4, D15d): base del aging de CxC (fecha de la venta + días de
+  /// crédito = vencimiento). NULL o 0 = contado. Espejo de `Proveedor.diasCredito` para CxP.
+  diasCredito Int?    @map("dias_credito")
   activo    Boolean @default(true)
 
   campos                 ClienteCampo[]
@@ -3061,6 +3068,10 @@ enum OrigenMovimientoTercero {
   recibo_maquila
   factura_proveedor
   entrada_sin_factura
+  /// CARGO de CxC por VENTA (F9-E4): nace del CFDI de venta timbrado o de un cargo manual al cliente.
+  /// Aumenta lo que el cliente nos debe (monto +, ver `signoDeOrigen`). Se agregó con una migración
+  /// ADITIVA de enum aparte (ALTER TYPE ... ADD VALUE; en Postgres no convive con otro DDL en la misma tx).
+  factura_cliente
   nota_credito
   pago
   abono

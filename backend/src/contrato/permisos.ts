@@ -55,6 +55,11 @@ export const MODULOS_PERMISO = {
   // pagos/abonos/descuentos/notas de crédito/entradas sin factura. `ver` (consulta, roles que ya ven
   // EsMa/terceros) y `administrar` (captura/cancelación, solo Administración/Dirección).
   cxp: 'Cuentas por pagar (Finanzas)',
+  // Cuentas por cobrar de clientes (Finanzas, Módulo 14, F9-E4) — el uso de negocio del motor de
+  // terceros para el CLIENTE: bandeja "por cobrar" con aging, estado de cuenta e importación de CFDI de
+  // ventas. `ver` (consulta, roles que ya ven EsMa/terceros) y `administrar` (captura/cancelación/
+  // importación de CFDI, solo Administración/Dirección). Espejo de `cxp`, sin convivencia EsMa.
+  cxc: 'Cuentas por cobrar (Finanzas)',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
@@ -1136,6 +1141,26 @@ export const CATALOGO_PERMISOS = [
     modulo: 'cxp',
     descripcion:
       'Capturar y cancelar movimientos de cuentas por pagar (pagos/abonos/descuentos/NC/entradas) (F9-E2)',
+  },
+
+  // ── Cuentas por cobrar (Finanzas, Módulo 14, F9-E4, A4 — D12/D15/R10/R12; doc
+  //    PROPUESTA-Finanzas-y-Proveedores.md §2/§3.1) — permisos NUEVOS de v2. CxC es un uso del motor de
+  //    terceros (F9-E1) para el CLIENTE: `ver` (bandeja "por cobrar" con aging + estado de cuenta, para
+  //    los roles directivos/gerenciales que ya ven terceros/EsMa) y `administrar` (capturar/cancelar
+  //    cobros/abonos/descuentos/NC/cargos + importar el CFDI de venta — solo Administración/Dirección,
+  //    como `cxp.administrar`). Al delegar al motor se exige ADEMÁS `terceros.*` (defensa en profundidad;
+  //    mismo reparto en el seed). Deny-by-default (A4).
+  {
+    clave: 'cxc.ver',
+    modulo: 'cxc',
+    descripcion:
+      'Consultar cuentas por cobrar: bandeja con antigüedad de saldos y estado de cuenta del cliente (F9-E4)',
+  },
+  {
+    clave: 'cxc.administrar',
+    modulo: 'cxc',
+    descripcion:
+      'Capturar/cancelar movimientos de cuentas por cobrar (cobros/abonos/descuentos/NC/cargos) e importar CFDI de venta (F9-E4)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

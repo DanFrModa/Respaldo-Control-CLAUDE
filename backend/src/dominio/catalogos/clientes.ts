@@ -132,8 +132,9 @@ async function exigirClienteActivo(tx: Tx, id: number): Promise<Cliente> {
   return cliente;
 }
 
-/** Campos de contacto editables (clave del payload === clave del modelo). */
-const CAMPOS_CONTACTO_EDITABLES = ['contacto', 'telefono', 'email', 'direccion'] as const;
+/** Campos de texto editables del cliente (clave del payload === clave del modelo). Incluye el `rfc`
+ * fiscal (F9-E4). El `diasCredito` (numérico) se maneja aparte en {@link aplicarContactoEditar}. */
+const CAMPOS_CONTACTO_EDITABLES = ['contacto', 'telefono', 'email', 'direccion', 'rfc'] as const;
 
 /**
  * Aplica los campos de contacto que VENGAN en la edición al `update` y registra qué
@@ -162,6 +163,15 @@ function aplicarContactoEditar(
       detalle[campo] = { de: anterior, a: nuevo };
     }
   }
+  // Días de crédito (F9-E4, numérico): omitir (`undefined`) = no tocar; `null` = vaciar (contado).
+  if (datos.diasCredito !== undefined) {
+    const nuevo = datos.diasCredito;
+    const anterior = actual.diasCredito;
+    if (nuevo !== anterior) {
+      cambios.diasCredito = nuevo;
+      detalle.diasCredito = { de: anterior, a: nuevo };
+    }
+  }
   return detalle;
 }
 
@@ -174,6 +184,9 @@ function datosContactoCrear(
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
   if (datos.email !== undefined) data.email = datos.email;
   if (datos.direccion !== undefined) data.direccion = datos.direccion;
+  // Fiscal/comercial (F9-E4): el RFC vacío ('') se omite (queda null); días de crédito, tal cual.
+  if (datos.rfc !== undefined && datos.rfc !== '') data.rfc = datos.rfc;
+  if (datos.diasCredito !== undefined) data.diasCredito = datos.diasCredito;
   return data;
 }
 
