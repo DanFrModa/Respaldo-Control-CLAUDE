@@ -35,6 +35,12 @@ npx tsx --env-file=.env migracion/cuadre-f6.ts             # F6: cuadre Calidad+
 npx tsx --env-file=.env migracion/etl-costos.ts            # F7: CostoOrd → CostoOrden (D2: regalía FUERA del costo)
 npx tsx --env-file=.env migracion/etl-indicadores.ts       # F7: personal/actividades + productividad IP/almacén + fichas + muestrarios + cíclico histórico (D6)
 npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos + análisis de la regalía D2)
+
+# F9 (Finanzas) — saldos iniciales de terceros + CFDI históricos. ⚠️ NO desde Access: la fuente es
+# el corte de SINUBE / export del contador. Se pasa el archivo/carpeta por flag (tras `--`):
+npx tsx --env-file=.env migracion/etl-terceros-saldos.ts -- --archivo=saldos.csv   # F9: saldos iniciales CxC/CxP (aperturas)
+npx tsx --env-file=.env migracion/etl-cfdi-masivo.ts     -- --dir=./cfdi-historicos # F9: importación masiva de CFDI (XML)
+npx tsx --env-file=.env migracion/cuadre-f9.ts           -- --archivo=saldos.csv    # F9: cuadre (corte vs aperturas cargadas)
 ```
 
 > **F7 (importante):** `etl-costos` y `etl-indicadores` son INDEPENDIENTES (entidades destino
@@ -75,6 +81,47 @@ npx tsx --env-file=.env migracion/cuadre-f7.ts             # F7: cuadre (conteos
 > doble conteo; el `cuadre-f3` lo verifica. Ambos ETL dependen de los mapeos de F1 (Empresa, Almacen:IPT,
 > modelos por código) y del SEED del catálogo de tipos de movimiento + almacenes (`SEED_ON_START=true`).
 
+> **F9 (importante — NO SE CORRE todavía):** la fase Finanzas se seeda desde el corte de **SINUBE /
+> export del contador**, NO desde Access. Los archivos fuente **aún no existen** (Daniel está sacando
+> el corte, decisión **D15c**): los scripts se construyeron y probaron con fixtures, y se ejecutan
+> cuando llegue el corte. Dos ETL + un cuadre, **INDEPENDIENTES** entre sí:
+>
+> - **`etl-terceros-saldos`** carga los **saldos iniciales** de CxC/CxP como movimientos de **APERTURA**
+>   (nunca un saldo editable, D3). El CSV es de **FORMATO FLEXIBLE** (encabezados case-insensitive, ver
+>   abajo). Cada renglón → un movimiento vía el **modo migración** del motor de terceros
+>   (`src/dominio/terceros/migracion.ts`), por **LOTES** (folio en bloque A3 + `createManyAndReturn`).
+>   **Idempotente** por `MapeoMigracion` (`AperturaTercero`) + la unique global del `uuidCfdi`.
+> - **`etl-cfdi-masivo`** recorre una **carpeta de XML**, decide **compra/venta** por el RFC de la
+>   empresa, resuelve el tercero por RFC y **REUSA** los importadores de E3/E4 (`importarCfdi` /
+>   `importarCfdiVenta`) para crear el cargo fiscal + subir el XML a R2. **Idempotente por UUID** (el
+>   comprobante repetido se cuenta como "duplicado", no error). Respeta `R2_SUBIDA_LOCAL`.
+> - **`cuadre-f9`** compara, por tercero, el **saldo esperado del corte** (columna `saldoEsperado`, o Σ
+>   de las aperturas del CSV con su signo) contra el **Σ monto de las aperturas cargadas**. Los
+>   descuadres se **LISTAN**, nunca se fuerzan (§7).
+>
+> **Formato del CSV de `etl-terceros-saldos`** (columnas por nombre, case-insensitive; alias entre
+> paréntesis):
+> - Comunes: **`tipo`** (`cliente`|`proveedor`; acepta `c`/`p`) · **`rfc`** y/o **`nombre`** (para
+>   localizar al tercero: primero por RFC, luego por nombre exacto). Opcionales: **`empresa`** (id o
+>   nombre; default = empresa favorita, o `--empresa`) · **`saldoEsperado`** (para el cuadre).
+> - **Modo DETALLE** (Daniel lo pidió: cada factura pendiente con SU fecha → el aging cuenta desde el
+>   día 1): **`fecha`** (`YYYY-MM-DD` o `DD/MM/YYYY`) + **`importe`** (`monto`/`total`) + (**`uuid`**
+>   y/o **`folio`**). Con `uuid` → cargo **fiscal** (`factura_proveedor`/`factura_cliente`); sin `uuid`
+>   → cargo **no fiscal** (`entrada_sin_factura`, requiere `folio` como clave de idempotencia).
+> - **Modo SALDO NETO**: **`saldo`** (± ; sin desglose). `saldo>0` → cargo (`entrada_sin_factura`);
+>   `saldo<0` → `abono`. `fecha` opcional (default = `--corte` o hoy).
+>
+>   Ejemplo mínimo (`saldos.csv`):
+>   ```csv
+>   tipo,rfc,nombre,fecha,importe,folio,uuid,saldo,saldoEsperado
+>   proveedor,AAA010101AA1,Telas del Norte,2026-01-15,1000,,UUID-DE-LA-FACTURA,,1000
+>   cliente,XAXX010101000,Cliente Uno,,,,,-300,-300
+>   ```
+>
+> El **signo** y el **vencimiento** (aging) NO los pone el ETL: el importe entra POSITIVO y el motor
+> aplica `signoDeOrigen` + `calcularVencimiento` (reusados de `cuenta-terceros.ts`, A1). El módulo
+> completo vive en `docs/modulos/finanzas.md`.
+
 **NO uses `npm run etl:*`.** Esos scripts del `package.json` corren `tsx migracion/...` **sin** `--env-file=.env`, así que `tsx` arranca sin la `DATABASE_URL` del `.env` y truena con un error de conexión / `no DATABASE_URL` **aunque la URL sí esté en el `.env`**.
 
 > ¿Por qué los `npm run` no traen `--env-file=.env`? Porque se romperían en **CI**, donde no existe `.env` (allá la `DATABASE_URL` llega por variable de entorno). Por eso el ETL se invoca a mano con `npx tsx --env-file=.env`.
@@ -101,6 +148,9 @@ La BD destino es **Railway (remota)**: el ETL corre desde tu máquina contra esa
 | `migracion/etl-costos.ts` | **F7: Costos** — `CostoOrd`(2,513)→`CostoOrden` vía `guardarCostoOrden` (D2: regalía FUERA; procesos = maquila+bordado; avíos = habilitación) |
 | `migracion/etl-indicadores.ts` | **F7: Indicadores** — personal/actividades + productividad IP (`IP_Productiv`)/almacén (`Alm_Prd`×`Alm_Prd_Det`) + fichas (`IP_InfConf`, despivota 8→8) + muestrarios (`IP_MuesPend`) + cíclico histórico Proscai (`Alm_InvCic`, D6) |
 | `migracion/cuadre-f7.ts` | **F7: cuadre** (conteos v1/v2 + análisis empírico de la regalía D2: ¿el `Costo` viejo la incluía? + delta esperado) |
+| `migracion/etl-terceros-saldos.ts` | **F9: saldos iniciales** de CxC/CxP (corte SINUBE → aperturas vía modo migración del motor; por lotes; `-- --archivo=<csv>`) |
+| `migracion/etl-cfdi-masivo.ts` | **F9: importación masiva de CFDI** (carpeta de XML → reusa E3/E4; compra/venta por RFC de empresa; `-- --dir=<carpeta>`) |
+| `migracion/cuadre-f9.ts` | **F9: cuadre** (saldo esperado del corte vs Σ aperturas cargadas; descuadres listados; `-- --archivo=<csv>`) |
 | `migracion/cuadre.ts` | Cuadre F1 (conteos v1 CSV vs v2) |
 | `migracion/cuadre-fase.ts` | Cuadre por fase |
 | `migracion/cuadre-f2.ts` | Cuadre F2 en dos niveles (filas/sumas + columnas) + incidencias |

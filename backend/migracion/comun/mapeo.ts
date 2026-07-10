@@ -107,6 +107,9 @@ export const ENTIDAD_MAPEO = {
   muestrario: 'Muestrario',
   /** F7-E6 (indicadores): IdAlm_InvCic viejo → InventarioCiclico.id nuevo (histórico Proscai, D6). */
   inventarioCiclicoHist: 'InventarioCiclicoHist',
+  /** F9-E6: clave natural de una APERTURA de saldo de tercero (folio de origen · UUID · `neto:<tipo>:<id>`)
+   * → MovimientoTercero.id nuevo. Idempotencia del ETL de saldos iniciales (SINUBE). */
+  aperturaTercero: 'AperturaTercero',
 } as const;
 
 /** Una clave de entidad de mapeo. */

@@ -48,8 +48,12 @@ import { esOrigenCargo, signoDeOrigen } from './origen-tercero.js';
 import { exigirTercero, obtenerNombreTercero } from './terceros.js';
 import { aporteEsMaSaldo, proyectarMovimientosEsMa } from './convivencia-esma.js';
 
-/** Clave de la secuencia de folios del motor de terceros (A3, por empresa). */
-const CLAVE_SECUENCIA = 'movimiento-tercero';
+/**
+ * Clave de la secuencia de folios del motor de terceros (A3, por empresa). Se exporta para que el
+ * MODO MIGRACIÓN (F9-E6, `terceros/migracion.ts`) reserve el bloque de folios sobre la MISMA serie
+ * que el alta normal — una sola numeración por empresa, sin series paralelas.
+ */
+export const CLAVE_SECUENCIA_TERCERO = 'movimiento-tercero';
 
 /**
  * Bloqueo por MOVIMIENTO dentro de la transacción de cancelación (concurrencia, D3). Serializa dos
@@ -119,8 +123,11 @@ function aMovimientoSalida(
 /**
  * Fecha de VENCIMIENTO derivada (aging D15d): solo los CARGOS vencen (fecha + días de crédito del
  * tercero). Los ABONOS/pagos no vencen → null. Un tercero de contado (0 días) vence el mismo día.
+ *
+ * Se exporta para que el MODO MIGRACIÓN (F9-E6) derive el vencimiento con la MISMA fórmula que el
+ * alta normal (A1: un solo lugar de verdad del aging — nunca se recalcula en el ETL).
  */
-function calcularVencimiento(
+export function calcularVencimiento(
   origen: OrigenMovimientoTercero,
   fecha: Date,
   diasCredito: number,
@@ -166,7 +173,7 @@ export async function registrarMovimientoTercero(
     // El signo lo pone el origen; el importe llega positivo (validado por Zod).
     const monto = redondear2(signoDeOrigen(origen) * datos.importe);
     const fechaVencimiento = calcularVencimiento(origen, fecha, tercero.diasCredito);
-    const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA);
+    const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_TERCERO);
 
     const fila = await tx.movimientoTercero.create({
       data: {
@@ -266,7 +273,7 @@ export async function cancelarMovimientoTercero(
       throw new ErrorConflicto('Ese movimiento ya está cancelado.');
     }
 
-    const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA);
+    const folio = await siguienteFolio(tx, idEmpresa, CLAVE_SECUENCIA_TERCERO);
     const creado = await tx.movimientoTercero.create({
       data: {
         idEmpresa,

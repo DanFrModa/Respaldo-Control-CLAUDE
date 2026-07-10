@@ -12,7 +12,7 @@
 > **Criterio de salida:** CxC y CxP cuadran por suma de movimientos; un CFDI de proveedor y uno de
 > venta importados, conciliados y ligados a su operación real; el reporte fiscal para el contador
 > sale del libro filtrado por movimientos fiscales.
-> **Estado:** ⬜ pendiente — el desglose se confirma/ajusta al arrancar la fase. **El esquema Prisma
+> **Estado:** ✅ **FASE COMPLETA (6/6, 10-jul-2026)** — construida en un día con las decisiones D15 cerradas de antemano. Pendiente: verificación de Gabriel en `prueba` + correr el ETL cuando Daniel entregue el corte de SINUBE. **El esquema Prisma
 > y el diseño de pantallas se definen AL CONSTRUIR la fase, no aquí** (propuesta §8); este desglose
 > es la hoja de ruta provisional.
 >
@@ -268,7 +268,15 @@
 
 ---
 
-## F9-E6 · ETL de saldos/históricos de terceros + cuadre + docs + cierre de fase — ⬜ pendiente
+## F9-E6 · ETL de saldos/históricos de terceros + cuadre + docs + cierre de fase — ✅ COMPLETA (10-jul-2026; reviewer APROBÓ; **el ETL queda LISTO SIN CORRER** hasta que Daniel entregue el corte de SINUBE — D15c)
+
+> **CIERRE (10-jul-2026) — CIERRA LA FASE F9 (6/6).** El punto de partida de CxC/CxP, construido y probado, en espera de datos:
+> - **ETL de saldos iniciales** (`migracion/etl-terceros-saldos.ts` + loader): CSV FLEXIBLE (encabezados case-insensitive con alias; encoding opcional `cp850` para cortes DOS del contador) con dos modos — **DETALLE** (facturas pendientes con fecha+folio/uuid → cada una un cargo con su fecha real = **aging desde el día 1**, D15c; con uuid → fiscal) y **SALDO NETO** (apertura única ±). Cada renglón = movimiento de APERTURA por el motor (D3, jamás saldo editable); signo y vencimiento REUSADOS del motor (A1). **Por LOTES** (`createManyAndReturn`, folios en BLOQUE atómico vía `reservarBloqueFolios` nuevo en `comun/secuencias.ts` — mismo candado de fila que `siguienteFolio`, misma numeración A3, coexistencia migración↔captura probada con test de secuencia pre-avanzada) e **IDEMPOTENTE ATÓMICO** (movimiento + `MapeoMigracion.AperturaTercero` en la misma tx; clave natural uuid/folio/neto; sin clave → incidencia clara, nunca colisión; re-corrida = 0 nuevos y cero folios quemados). Incidencias por renglón sin abortar; homónimos ambiguos = incidencia.
+> - **Importador masivo de CFDI históricos** (`migracion/etl-cfdi-masivo.ts`): carpeta de XML → `decidirDireccionCfdi` (pura: emisor/receptor vs `Empresa.rfc`; ambiguo → "a mano") y REUSA TAL CUAL `importarCfdi`/`importarCfdiVenta` de E3/E4 (validaciones + XML a R2 + anti-dup UUID = skip contado); reporte importados/duplicados/errores; por lotes.
+> - **Cuadre** (`migracion/cuadre-f9.ts`): saldo esperado del corte vs Σ aperturas v2 (aislado vía el mapeo — no mide el resto del libro); descuadres LISTADOS a incidencia, nunca forzados; tolerancia 1¢.
+> - **`docs/modulos/finanzas.md`** publicada (el módulo completo: motor/dos ejes/dos vistas, CxP+fold EsMa, CFDI, reportes, aging config, ETL) con **pendientes honestos**: correr el ETL cuando llegue el corte (comandos exactos en `migracion/README.md`), timbrado PAC = R14 posterior, desglose de impuestos vive en el XML.
+> - SIN migración de esquema, SIN permisos → SIN `SEED_ON_START`. Backend 916/916; reviewer APROBÓ (1 sugerencia — test de coexistencia de folios — INCLUIDA).
+> - **CRITERIO DE SALIDA DE LA FASE:** el código de los 3 criterios está construido y probado por tests (saldos = Σ movimientos; CFDI de proveedor y de venta importados y conciliados — int tests E3/E4; reporte fiscal del libro filtrado — E5). **La verificación EN PRUEBA con datos reales queda para cuando Daniel entregue el corte y Gabriel capture el RFC + verifique en vivo.**
 
 **Objetivo:** Cargar el **punto de partida** de CxC/CxP (saldos iniciales y los movimientos que se quieran traer desde SINUBE / históricos de CFDI), cuadrarlos, documentar el módulo y demostrar el criterio de salida en `prueba`. A diferencia de las otras fases, estos datos **no viven en Access** (viven en SINUBE/CFDI), así que el ETL es de **saldos iniciales** + importación masiva de CFDI, no del .mdb viejo.
 
