@@ -1,4 +1,4 @@
-import { Banknote, BadgeCheck, Loader2Icon } from 'lucide-react';
+import { BadgeCheck, Loader2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -61,12 +61,11 @@ export function ValidacionCargosPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Banknote className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Validación de cargos de maquila</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Validación de cargos de maquila
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Revisa y valida los cargos a la cuenta del maquilero que proponen los recibos.
           </p>
         </div>

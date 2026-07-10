@@ -1,4 +1,3 @@
-import { Scale } from 'lucide-react';
 import { useState } from 'react';
 
 import { useConciliacionEsMa } from '@/api/esma';
@@ -64,12 +63,11 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="conciliacion-esma">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Scale className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Conciliación de cargos</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Conciliación de cargos
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Lo recibido de maquila contra lo ya cargado a EsMa, por orden, maquilero y proceso.
           </p>
         </div>

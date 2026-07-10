@@ -76,7 +76,8 @@ test.describe('Importador de pedido del cliente (rediseño R8, §4.1)', () => {
 
     // ── Proyecto + 3 desarrollos (con su nº de cliente los dos primeros) ─────────
     await page.goto('/desarrollo');
-    await expect(page.getByRole('heading', { name: 'Desarrollo', exact: true })).toBeVisible();
+    // R9 fidelidad: la lista de proyectos es tabla-first con el título del proto `vPrecosteosLista`.
+    await expect(page.getByRole('heading', { name: 'Pre-costeos', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
     await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });

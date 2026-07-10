@@ -1,4 +1,3 @@
-import { UserCheck } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -6,7 +5,7 @@ import { useAuditores, useDesactivarAuditor, useReactivarAuditor } from '@/api/a
 import type { RolAuditorClave } from '@/api/esquemas';
 import type { Auditor, AuditoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { TipoBadge } from '@/components/dominio/visuales';
 import type { Tono } from '@/lib/tono';
 import { useDebounce } from '@/lib/useDebounce';
 import {
@@ -29,7 +28,7 @@ const TONO_POR_ROL: Record<RolAuditorClave, Tono> = {
 
 /**
  * Pantalla de Auditores (catálogo de Calidad, rediseño R9 — proto `CAT_AUDITORES`): tabla densa con
- * el auditor (avatar + nombre), su rol (badge), su nivel AQL de certificación y el CONTEO de
+ * el auditor, su rol (badge), su nivel AQL de certificación y el CONTEO de
  * auditorías (derivado del histórico, solo lectura), con acciones inline (editar/desactivar/activar).
  * Borrado suave reversible; consciente de permisos: `calidad.ver` gobierna el acceso y
  * `calidad.administrar-catalogo` decide las acciones (A1).
@@ -118,15 +117,11 @@ export function AuditoresPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `CAT_AUDITORES`: renglón plano (sin thumb) — nombre en `cell-strong` + badge de rol.
   const columnas: ColumnaCatalogo<Auditor>[] = [
     {
       encabezado: 'Auditor',
-      render: (a) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={a.nombre} tono={TONO_POR_ROL[a.rol]} tamano="sm" />
-          <span className="font-medium">{a.nombre}</span>
-        </div>
-      ),
+      render: (a) => <span className="font-semibold">{a.nombre}</span>,
     },
     {
       encabezado: 'Rol',
@@ -149,7 +144,6 @@ export function AuditoresPagina(): React.JSX.Element {
         testid="auditor"
         titulo="Auditores"
         descripcion="Control de calidad · auditores AQL"
-        icono={UserCheck}
         unidad="auditores"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}

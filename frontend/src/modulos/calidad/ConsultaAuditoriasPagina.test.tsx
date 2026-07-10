@@ -104,7 +104,8 @@ describe('ConsultaAuditoriasPagina', () => {
   it('estado de carga: el armazón (título) se muestra mientras carga', () => {
     auditoriasResult = { ...auditoriasResult, data: undefined, isPending: true };
     render();
-    expect(screen.getByRole('heading', { name: 'Consulta de auditorías' })).toBeDefined();
+    // R9 fidelidad: el título es el del proto `vCalidad`.
+    expect(screen.getByRole('heading', { name: 'Control de calidad · AQL' })).toBeDefined();
   });
 
   it('estado vacío', () => {

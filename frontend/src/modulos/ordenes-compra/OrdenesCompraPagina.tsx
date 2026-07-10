@@ -60,6 +60,28 @@ import { ETIQUETA_ESTATUS_OC, EstatusOcBadge, fechaCortaOc } from './piezas';
 /** Renglones por página del listado. */
 const POR_PAGINA = 10;
 
+/**
+ * Moneda COMPACTA para el KPI (presentación del proto `kpi('Por recibir','$482','K',…)`): montos
+ * grandes se abrevian a miles/millones con una decimal y el sufijo va como unidad chica del tile.
+ * Solo presentación (el monto lo derivó el servidor, A1); montos chicos se muestran completos.
+ */
+function monedaCompacta(valor: number): { valor: string; sufijo?: string } {
+  const abs = Math.abs(valor);
+  if (abs >= 1_000_000) {
+    return {
+      valor: `$${(valor / 1_000_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })}`,
+      sufijo: 'M',
+    };
+  }
+  if (abs >= 10_000) {
+    return {
+      valor: `$${(valor / 1_000).toLocaleString('es-MX', { maximumFractionDigits: 1 })}`,
+      sufijo: 'K',
+    };
+  }
+  return { valor: formatearMoneda(valor) };
+}
+
 /** Estatus para el filtro (todos los del enum). */
 const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
   'borrador',
@@ -82,7 +104,8 @@ const ESTATUS_FILTRO: readonly EstatusOrdenCompra[] = [
  * FIDELIDAD vs proto: los KPIs "OC abiertas" y "$ por recibir" los sirve ahora el resumen de cabecera
  * (`GET /api/ordenes-compra/resumen`, agregado EN SERVIDOR bajo el mismo filtro — A1, sin pivote en
  * cliente): `$ por recibir` = Σ (cantidad − recibido) × precio de las líneas de las OC abiertas, con el
- * MISMO criterio de `recibido` que la recepción. Los otros dos KPIs del proto (faltantes MRP · recibido
+ * MISMO criterio de `recibido` que la recepción; el monto se abrevia como el proto ($482 K → $151.3 M).
+ * Los otros dos KPIs del proto (faltantes MRP · recibido
  * a tiempo) viven donde está su dato: el banner de faltantes en Explosión/Estatus de materiales; el
  * "a tiempo" es de Indicadores. La barra de avance de recepción por OC la comunica el estatus
  * (parcial/total). Nada se deriva/pivotea en cliente.
@@ -135,6 +158,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
     ...(fechaHasta !== '' ? { fechaHasta } : {}),
   };
   const resumen = useResumenOc(resumenQuery);
+  const porRecibir = monedaCompacta(resumen.data?.porRecibir ?? 0);
   const kpis: Kpi[] = [
     {
       clave: 'oc-abiertas',
@@ -144,8 +168,9 @@ export function OrdenesCompraPagina(): React.JSX.Element {
     },
     {
       clave: 'por-recibir',
-      etiqueta: '$ por recibir',
-      valor: formatearMoneda(resumen.data?.porRecibir ?? 0),
+      etiqueta: 'Por recibir',
+      valor: porRecibir.valor,
+      ...(porRecibir.sufijo === undefined ? {} : { sufijo: porRecibir.sufijo }),
       pie: 'pendiente de recepción (a precio de OC)',
     },
   ];
@@ -200,8 +225,10 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Órdenes de compra</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Órdenes de compra
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Compras a proveedores (make-to-order) · sus renglones, órdenes ligadas y total
           </p>
         </div>
@@ -234,8 +261,10 @@ export function OrdenesCompraPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
+              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-52 h-8 text-sm"
             aria-label="Filtrar por proveedor"
             value={idProveedor === null ? '' : String(idProveedor)}
             onChange={(e) => {
@@ -252,7 +281,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-8 text-sm"
             aria-label="Filtrar por estatus"
             value={estatus}
             onChange={(e) => {
@@ -314,8 +343,9 @@ export function OrdenesCompraPagina(): React.JSX.Element {
             Incluir canceladas
           </label>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} OC
+            {/* Conteo del proto (`.count`): "visibles de total". */}
+            <span className="text-[12px] text-faint">
+              {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')} OC
             </span>
           </div>
         </div>
@@ -359,15 +389,18 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                     onClick={() => setSeleccion(oc)}
                     data-testid="fila-oc"
                   >
-                    <TablaDensaCelda className="num font-medium">OC {oc.numCompra}</TablaDensaCelda>
-                    <TablaDensaCelda className="font-medium">{oc.proveedor}</TablaDensaCelda>
+                    {/* Proto: folio en `cell-code` (mono atenuado); proveedor en `cell-strong`. */}
+                    <TablaDensaCelda className="font-mono text-xs text-muted-foreground">
+                      OC {oc.numCompra}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="font-semibold">{oc.proveedor}</TablaDensaCelda>
                     <TablaDensaCelda className="num text-muted-foreground">
                       {fechaCortaOc(oc.fecha)}
                     </TablaDensaCelda>
                     <TablaDensaCelda className="num text-muted-foreground">
                       {fechaCortaOc(oc.fechaEntrega)}
                     </TablaDensaCelda>
-                    <TablaDensaCelda className="num text-muted-foreground">
+                    <TablaDensaCelda className="font-mono text-xs text-muted-foreground">
                       {oc.ordenesLigadas.length === 0
                         ? '—'
                         : `${oc.ordenesLigadas[0]?.folio ?? ''}${

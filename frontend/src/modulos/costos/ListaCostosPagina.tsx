@@ -1,4 +1,4 @@
-import { ListChecks, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -53,15 +53,11 @@ export function ListaCostosPagina(): React.JSX.Element {
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="lista-costos">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <ListChecks className="size-4.5" aria-hidden />
-        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Lista de costos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Lista de costos
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Órdenes con costo capturado: costo total y unitario por base de prorrateo
           </p>
         </div>
@@ -88,9 +84,7 @@ export function ListaCostosPagina(): React.JSX.Element {
             />
           </div>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} órdenes
-            </span>
+            <span className="text-[12px] text-faint">{total.toLocaleString('es-MX')} órdenes</span>
           </div>
         </div>
 

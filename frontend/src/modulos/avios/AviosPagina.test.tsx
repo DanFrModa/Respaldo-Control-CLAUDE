@@ -218,7 +218,7 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver']),
     });
 
-    expect(screen.getAllByText('Genérico').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Genérico · stock').length).toBeGreaterThan(0);
   });
 
   it('muestra los proveedores y precios del avío al expandir el renglón (R1)', () => {

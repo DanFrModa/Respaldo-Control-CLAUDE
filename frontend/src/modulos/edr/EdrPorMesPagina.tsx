@@ -1,4 +1,4 @@
-import { Download, FileBarChart, Printer } from 'lucide-react';
+import { Download, Printer } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import { descargarExcelEdr, imprimirEdrMensual, useEdrPorMes } from '@/api/edr';
@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
+import { BarraPeso } from '../analisis-rc/piezas';
 import { etiquetaMes, MESES, moneda } from './comun';
 
 function num(s: string): number {
@@ -47,7 +48,12 @@ export function EdrPorMesPagina(): React.JSX.Element {
   const kpis: Kpi[] = edr
     ? [
         { clave: 'ventas', etiqueta: 'Ventas', valor: moneda(edr.ventas), pie: 'del periodo' },
-        { clave: 'costo', etiqueta: 'Costo (actual)', valor: moneda(edr.costo), pie: 'D1' },
+        {
+          clave: 'costo',
+          etiqueta: 'Costo de ventas',
+          valor: moneda(edr.costo),
+          pie: 'a costo actual (D1)',
+        },
         {
           clave: 'utilidad',
           etiqueta: 'Utilidad bruta',
@@ -69,15 +75,9 @@ export function EdrPorMesPagina(): React.JSX.Element {
       <div className="flex flex-col gap-3 p-4 md:p-5">
         {/* ── Encabezado ─────────────────────────────────────────────────────── */}
         <header className="flex shrink-0 flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-          >
-            <FileBarChart className="size-4.5" aria-hidden />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold">EDR por mes</h1>
-            <p className="truncate text-xs text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">EDR por mes</h1>
+            <p className="truncate text-[12.5px] text-muted-foreground">
               Resultado consolidado de {etiquetaMes(mes, anio)}, valuado a costo actual
             </p>
           </div>
@@ -175,15 +175,17 @@ export function EdrPorMesPagina(): React.JSX.Element {
             )}
 
             <CorteTabla
-              titulo="Por empresa"
+              titulo="Resultado por empresa"
               cabecera="Empresa"
               cortes={edr.cortesEmpresa}
+              totales={edr}
               testid="pm-empresa"
             />
             <CorteTabla
-              titulo="Por cliente"
+              titulo="Resultado por cliente"
               cabecera="Cliente"
               cortes={edr.cortesCliente}
+              totales={edr}
               testid="pm-cliente"
             />
           </>
@@ -202,16 +204,28 @@ function Renglon(props: { etiqueta: string; valor: string }): React.JSX.Element 
   );
 }
 
+/**
+ * Margen % de un corte como TEXTO de presentación: razón de dos cifras que el SERVIDOR ya derivó
+ * (`utilidadBruta` / `ventas`); aquí no se agrega ni recalcula negocio (A1), solo se formatea.
+ */
+function margenPct(utilidad: number, ventas: number): string {
+  return ventas > 0 ? `${String(Math.round((utilidad / ventas) * 100))}%` : '—';
+}
+
 function CorteTabla(props: {
   titulo: string;
   cabecera: string;
   cortes: EdrCorte[];
+  /** Totales del MES (escalares del servidor): fila Total + denominador del aporte. */
+  totales: { ventas: number; costo: number; utilidadBruta: number };
   testid: string;
 }): React.JSX.Element {
+  const { totales } = props;
   return (
     <div className="overflow-hidden rounded-xl border bg-card">
-      <div className="border-b px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
         <h3 className="text-sm font-semibold">{props.titulo}</h3>
+        <span className="ml-auto text-xs text-muted-foreground">ventas − costo = utilidad</span>
       </div>
       {props.cortes.length === 0 ? (
         <p className="p-4 text-sm text-muted-foreground">Sin datos.</p>
@@ -224,17 +238,54 @@ function CorteTabla(props: {
                 <TablaDensaHead numerica>Ventas</TablaDensaHead>
                 <TablaDensaHead numerica>Costo</TablaDensaHead>
                 <TablaDensaHead numerica>Utilidad</TablaDensaHead>
+                <TablaDensaHead numerica>Margen</TablaDensaHead>
+                <TablaDensaHead>Aporte</TablaDensaHead>
               </TablaDensaFila>
             </TablaDensaEncabezado>
             <TablaDensaCuerpo>
-              {props.cortes.map((c) => (
-                <TablaDensaFila key={c.id}>
-                  <TablaDensaCelda>{c.nombre}</TablaDensaCelda>
-                  <TablaDensaCelda numerica>{moneda(c.ventas)}</TablaDensaCelda>
-                  <TablaDensaCelda numerica>{moneda(c.costo)}</TablaDensaCelda>
-                  <TablaDensaCelda numerica>{moneda(c.utilidadBruta)}</TablaDensaCelda>
-                </TablaDensaFila>
-              ))}
+              {props.cortes.map((c) => {
+                // Peso visual del corte sobre la utilidad del mes (solo si el mes fue positivo).
+                const aporte =
+                  totales.utilidadBruta > 0 && c.utilidadBruta > 0
+                    ? Math.min(100, Math.round((c.utilidadBruta / totales.utilidadBruta) * 100))
+                    : null;
+                return (
+                  <TablaDensaFila key={c.id}>
+                    <TablaDensaCelda className="font-medium">{c.nombre}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{moneda(c.ventas)}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{moneda(c.costo)}</TablaDensaCelda>
+                    <TablaDensaCelda numerica className="font-semibold text-ok">
+                      {moneda(c.utilidadBruta)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda numerica>
+                      {margenPct(c.utilidadBruta, c.ventas)}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda className="min-w-[110px]">
+                      {aporte === null ? (
+                        <span className="text-xs text-faint">—</span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <BarraPeso pct={aporte} className="w-16" />
+                          <span className="num text-xs text-muted-foreground">{aporte}%</span>
+                        </span>
+                      )}
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                );
+              })}
+              {/* Fila TOTAL con los escalares del MES que ya derivó el servidor (no se suma aquí). */}
+              <TablaDensaFila className="border-t-2 border-border font-semibold">
+                <TablaDensaCelda>Total</TablaDensaCelda>
+                <TablaDensaCelda numerica>{moneda(totales.ventas)}</TablaDensaCelda>
+                <TablaDensaCelda numerica>{moneda(totales.costo)}</TablaDensaCelda>
+                <TablaDensaCelda numerica className="text-ok">
+                  {moneda(totales.utilidadBruta)}
+                </TablaDensaCelda>
+                <TablaDensaCelda numerica>
+                  {margenPct(totales.utilidadBruta, totales.ventas)}
+                </TablaDensaCelda>
+                <TablaDensaCelda />
+              </TablaDensaFila>
             </TablaDensaCuerpo>
           </TablaDensa>
         </div>

@@ -25,7 +25,11 @@ let detalle: ProyectoDetalle | undefined;
 
 vi.mock('@/api/proyectos', () => ({
   useProyectos: (query: Record<string, unknown>) => {
-    ultimaQuery = query;
+    // La página también consulta un CONTEO para el KPI (porPagina:1); aquí interesa la query
+    // del LISTADO (la que refleja búsqueda/filtros), así que el conteo no se registra.
+    if (query['porPagina'] !== 1) {
+      ultimaQuery = query;
+    }
     return useProyectos(query);
   },
   useProyecto: () => ({ data: detalle, isPending: false, isError: false, error: null }),
@@ -40,6 +44,11 @@ vi.mock('@/api/desarrollos', () => ({
   useCrearDesarrollo: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useActualizarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
   useApagarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
+// KPIs de servidor (tablero por estado, F8-E6): inertes en estas pruebas.
+vi.mock('@/api/liga-orden', () => ({
+  useTableroDesarrollos: () => ({ data: undefined, isPending: false, isError: false }),
 }));
 
 // Selectores de los diálogos/filtros: inertes.
@@ -176,15 +185,19 @@ describe('<ProyectosPagina>', () => {
     expect(screen.queryByTestId('agregar-desarrollo')).not.toBeInTheDocument();
   });
 
-  it('muestra el detalle del proyecto seleccionado con sus desarrollos y estado', () => {
+  it('al hacer clic en un renglón abre el proyecto (drill-in) con sus desarrollos y estado', async () => {
+    const usuario = userEvent.setup();
     useProyectos.mockReturnValue(consultaConDatos([proyecto(1, 101, 'Joggers')]));
     renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
 
+    // El drill-in está cerrado hasta elegir un renglón (patrón tabla-first R9).
+    expect(screen.queryByTestId('detalle-proyecto')).not.toBeInTheDocument();
+    await usuario.click(screen.getByTestId('fila-proyecto'));
+
     const panel = screen.getByTestId('detalle-proyecto');
-    expect(within(panel).getByText('Datos del proyecto')).toBeInTheDocument();
-    expect(within(panel).getByTestId('fila-desarrollo')).toBeInTheDocument();
-    expect(within(panel).getByText('A-100')).toBeInTheDocument();
-    expect(within(panel).getByText('En desarrollo')).toBeInTheDocument();
+    const tarjeta = within(panel).getByTestId('fila-desarrollo');
+    expect(within(tarjeta).getAllByText(/A-100/).length).toBeGreaterThan(0);
+    expect(within(tarjeta).getByText('En desarrollo')).toBeInTheDocument();
   });
 
   it('pide confirmación antes de archivar y llama a la mutación al confirmar', async () => {
@@ -192,6 +205,7 @@ describe('<ProyectosPagina>', () => {
     useProyectos.mockReturnValue(consultaConDatos([proyecto(7, 107, 'Joggers')]));
     renderConProveedores(<ProyectosPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
 
+    await usuario.click(screen.getByTestId('fila-proyecto'));
     await usuario.click(screen.getByTestId('desactivar-proyecto'));
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByRole('heading', { name: 'Archivar proyecto' })).toBeInTheDocument();

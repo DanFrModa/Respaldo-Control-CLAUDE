@@ -1,4 +1,4 @@
-import { Download, Printer, RefreshCw, Route } from 'lucide-react';
+import { Download, Printer, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 
 import {
@@ -47,15 +47,11 @@ export function TableroRcPagina(): React.JSX.Element {
       <div className="flex flex-col gap-3 p-4 md:p-5">
         {/* ── Encabezado ─────────────────────────────────────────────────────── */}
         <header className="flex shrink-0 flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-          >
-            <Route className="size-4.5" aria-hidden />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold">KPIs de Ruta Crítica</h1>
-            <p className="truncate text-xs text-muted-foreground" data-testid="rc-datos-al">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              KPIs de Ruta Crítica
+            </h1>
+            <p className="truncate text-[12.5px] text-muted-foreground" data-testid="rc-datos-al">
               {selloDatosAl(datos?.datosAl)}
             </p>
           </div>

@@ -170,8 +170,8 @@ export function CatalogosPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Catálogos</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Catálogos</h1>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
           Datos maestros del sistema. Elige un catálogo para administrarlo.
         </p>
 

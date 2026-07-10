@@ -1,4 +1,3 @@
-import { Scissors } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -123,12 +122,11 @@ export function CapturaCortePagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Scissors className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Captura de corte</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Captura de corte
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Registra el corte de una orden por color × talla. El sobre-corte se permite (solo
             avisa).
           </p>

@@ -64,8 +64,10 @@ export function ConfiguracionRcPagina(): React.JSX.Element {
       <header className="flex items-center gap-3">
         <CalendarDays className="size-6 text-primary" aria-hidden />
         <div>
-          <h1 className="text-lg font-semibold">Configuración de la Ruta Crítica</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Configuración de la Ruta Crítica
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Colchón de costura, calendario laboral y festivos por empresa.
           </p>
         </div>

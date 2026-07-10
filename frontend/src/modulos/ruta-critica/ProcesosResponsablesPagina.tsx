@@ -1,4 +1,4 @@
-import { ChevronRight, ListChecks, Pencil, Plus, X } from 'lucide-react';
+import { ChevronRight, Pencil, Plus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -80,14 +80,13 @@ export function ProcesosResponsablesPagina(): React.JSX.Element {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
         <div className="flex flex-wrap items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <ListChecks className="size-5" aria-hidden />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold">Procesos y responsables</h1>
-            <p className="text-sm text-muted-foreground">
-              Catálogo de procesos de la Ruta Crítica · responsables · tiempos · dependencias ·
-              auto-completado.
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Procesos y responsables
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
+              Catálogo de procesos de la Ruta Crítica · responsable · tiempo por operación (la
+              costura, por # de operaciones) · variables · auto-completado
             </p>
           </div>
           {puedeAdministrar ? (
@@ -131,11 +130,15 @@ export function ProcesosResponsablesPagina(): React.JSX.Element {
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
         <p className="mb-4 rounded-lg border bg-secondary/50 p-3 text-sm text-muted-foreground">
-          La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se agregan
-          o quitan (en la ruta de cada orden). Cada proceso tiene su <b>responsable</b> y su{' '}
-          <b>tiempo</b>, que puede variar por la <b>dificultad de la prenda</b> (derivada del # de
-          operaciones del modelo → tabla de abajo) o depender de un catálogo (la velocidad de
-          recepción de la tela). Los tiempos alimentan la ruta <b>hacia atrás</b>. Abre cada renglón
+          La <b>mayoría de las prendas</b> llevan estos procesos; por <b>orden/prenda</b> se{' '}
+          <b>agregan o quitan</b>. Cada proceso tiene su <b>responsable</b> y su <b>tiempo</b>, que
+          puede variar por la{' '}
+          <b>
+            dificultad de la prenda (que se DERIVA del # de operaciones definido en el desarrollo
+            del modelo → impacta sobre todo la costura, ver tabla abajo)
+          </b>{' '}
+          o depender de un catálogo (ej. <b>velocidad de recepción de la tela</b>). Los tiempos
+          alimentan la ruta <b>hacia atrás</b>. Casi todos se marcan <b>solos</b>. Abre cada renglón
           (▸) para el detalle.
         </p>
 
@@ -151,9 +154,7 @@ export function ProcesosResponsablesPagina(): React.JSX.Element {
           <section className="overflow-hidden rounded-lg border bg-card" data-testid="pyr-tabla">
             <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
               <h2 className="text-sm font-semibold">Secuencia de procesos</h2>
-              <Badge variant="secondary" className="tabular-nums">
-                {procesos.length}
-              </Badge>
+              <span className="text-xs text-faint tabular-nums">{procesos.length}</span>
               <span className="ml-auto text-xs text-muted-foreground">
                 {nAuto} automáticos · {procesos.length - nAuto} manuales
               </span>
@@ -610,9 +611,7 @@ function CardTablaDificultad({
     >
       <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
         <h2 className="text-sm font-semibold">Tabla de dificultad por # de operaciones</h2>
-        <Badge variant="secondary" className="tabular-nums">
-          {consulta.data?.length ?? 0} rangos
-        </Badge>
+        <span className="text-xs text-faint tabular-nums">{consulta.data?.length ?? 0} rangos</span>
         {puedeAdministrar ? (
           <Button
             variant="outline"

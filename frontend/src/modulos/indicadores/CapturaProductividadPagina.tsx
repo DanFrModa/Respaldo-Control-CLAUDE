@@ -1,4 +1,4 @@
-import { Ban, ClipboardList } from 'lucide-react';
+import { Ban } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -98,15 +98,11 @@ export function CapturaProductividadPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="captura-productividad">
       <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <ClipboardList className="size-4.5" aria-hidden />
-        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Captura de productividad</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Captura de productividad
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Ingeniería del Producto y Almacén, en una sola pantalla
           </p>
         </div>

@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -87,12 +87,12 @@ export function Inicio(): React.JSX.Element {
       etiqueta: 'Cortado esta semana',
       valor: fmt(datos.cortadoSemana.piezas),
       sufijo: 'pzas',
-      pie: (
-        <PieTendencia
-          delta={datos.cortadoSemana.deltaPct}
-          formato={(d) => `${d > 0 ? '+' : ''}${fmt1(d)}%`}
-          contexto="vs. sem. pasada"
-        />
+      // Tendencia del kit (proto `.trend`); si el delta no es derivable (null)
+      // solo queda el contexto atenuado — NUNCA se inventa una cifra.
+      ...tendenciaOPie(
+        datos.cortadoSemana.deltaPct,
+        (d) => `${d > 0 ? '+' : ''}${fmt1(d)}%`,
+        'vs. sem. pasada',
       ),
     });
   }
@@ -105,12 +105,10 @@ export function Inicio(): React.JSX.Element {
           ? '—'
           : fmt1(datos.entregasATiempo.porcentaje * 100),
       sufijo: '%',
-      pie: (
-        <PieTendencia
-          delta={datos.entregasATiempo.deltaPuntos}
-          formato={(d) => `${d > 0 ? '+' : ''}${fmt1(d)}`}
-          contexto="RC · últimos 30 d"
-        />
+      ...tendenciaOPie(
+        datos.entregasATiempo.deltaPuntos,
+        (d) => `${d > 0 ? '+' : ''}${fmt1(d)}`,
+        'RC · últimos 30 d',
       ),
     });
   }
@@ -130,8 +128,10 @@ export function Inicio(): React.JSX.Element {
         {/* ── Encabezado (proto .page-head) ─────────────────────────────────── */}
         <header className="mb-4 flex flex-wrap items-end gap-4">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Resumen operativo</h1>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Resumen operativo
+            </h1>
+            <p className="mt-0.5 text-[12.5px] text-muted-foreground">
               Semana {semana.numero} · del {semana.rango} ·{' '}
               {textoActualizado(resumen.dataUpdatedAt, resumen.isFetching)}
             </p>
@@ -260,36 +260,25 @@ function textoActualizado(dataUpdatedAt: number, cargando: boolean): string {
 }
 
 /**
- * Pie de KPI con TENDENCIA (proto `.trend`): flecha + delta coloreados (verde sube / rojo baja) y
- * el contexto atenuado. Si el delta no es derivable (null) solo muestra el contexto — NUNCA se
- * inventa una cifra.
+ * TENDENCIA de un KPI con el prop del kit (`KpiTiles` → proto `.trend`): flecha + delta coloreados
+ * (verde sube / rojo baja) y el contexto atenuado. Si el delta no es derivable (null) cae a un
+ * `pie` con solo el contexto — NUNCA se inventa una cifra.
  */
-function PieTendencia({
-  delta,
-  formato,
-  contexto,
-}: {
-  delta: number | null;
-  formato: (delta: number) => string;
-  contexto: string;
-}): React.JSX.Element {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {delta === null ? null : (
-        <span
-          className={`inline-flex items-center gap-0.5 font-semibold ${delta >= 0 ? 'text-ok' : 'text-crit'}`}
-        >
-          {delta >= 0 ? (
-            <ArrowUp className="size-3" aria-hidden />
-          ) : (
-            <ArrowDown className="size-3" aria-hidden />
-          )}
-          {formato(delta)}
-        </span>
-      )}
-      <span className="text-faint">{contexto}</span>
-    </span>
-  );
+function tendenciaOPie(
+  delta: number | null,
+  formato: (delta: number) => string,
+  contexto: string,
+): Pick<Kpi, 'tendencia' | 'pie'> {
+  if (delta === null) {
+    return { pie: <span className="text-faint">{contexto}</span> };
+  }
+  return {
+    tendencia: {
+      direccion: delta >= 0 ? 'sube' : 'baja',
+      delta: formato(delta),
+      contexto,
+    },
+  };
 }
 
 // ── Órdenes por vencer (tabla izquierda) ──────────────────────────────────────────────────────────

@@ -1,11 +1,9 @@
-import { CalendarRange } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useDesactivarTemporada, useReactivarTemporada, useTemporadas } from '@/api/temporadas';
 import type { Temporada, TemporadasQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
 import {
   TablaCatalogo,
@@ -111,17 +109,11 @@ export function TemporadasPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `vCat` temporadas: renglón plano (sin thumb) — solo el nombre en `cell-strong`.
   const columnas: ColumnaCatalogo<Temporada>[] = [
     {
       encabezado: 'Temporada',
-      render: (t) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={t.nombre} tono="pt" tamano="sm">
-            <CalendarRange className="size-4" aria-hidden />
-          </Avatar>
-          <span className="font-medium">{t.nombre}</span>
-        </div>
-      ),
+      render: (t) => <span className="font-semibold">{t.nombre}</span>,
     },
   ];
 
@@ -131,7 +123,6 @@ export function TemporadasPagina(): React.JSX.Element {
         testid="temporada"
         titulo="Temporadas"
         descripcion="Catálogo base · ciclos comerciales del año"
-        icono={CalendarRange}
         unidad="temporadas"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}

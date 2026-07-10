@@ -1,4 +1,4 @@
-import { CalendarRange, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
 import { imprimirEdrAnual, useEdrPorAnio } from '@/api/edr';
@@ -66,15 +66,9 @@ export function EdrPorAnioPagina(): React.JSX.Element {
       <div className="flex flex-col gap-3 p-4 md:p-5">
         {/* ── Encabezado ─────────────────────────────────────────────────────── */}
         <header className="flex shrink-0 flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-          >
-            <CalendarRange className="size-4.5" aria-hidden />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold">EDR por año</h1>
-            <p className="truncate text-xs text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">EDR por año</h1>
+            <p className="truncate text-[12.5px] text-muted-foreground">
               Comparativo mensual del año {anio}, a costo actual
             </p>
           </div>

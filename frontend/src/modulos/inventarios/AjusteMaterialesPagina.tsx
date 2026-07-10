@@ -221,8 +221,10 @@ export function AjusteMaterialesPagina(): React.JSX.Element {
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Ajuste / inventario físico</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Ajuste / inventario físico
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Toda corrección es un movimiento auditado (nunca se edita la existencia) · el motivo es
             obligatorio
           </p>

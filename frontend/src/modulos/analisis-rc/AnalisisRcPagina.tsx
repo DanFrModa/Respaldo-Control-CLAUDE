@@ -1,4 +1,4 @@
-import { AlertTriangle, FileSpreadsheet, LineChart, Sparkles } from 'lucide-react';
+import { AlertTriangle, FileSpreadsheet, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAnalisisRc, useDesempenoRc, urlEvaluacionSemanalExcel } from '@/api/analisis-rc';
@@ -12,7 +12,7 @@ import type {
   PersonaDesempeno,
   RiesgoCliente,
 } from '@/api/tipos';
-import { ChipEstado, Semaforo, type TonoEstado } from '@/components/dominio/ChipEstado';
+import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
   TablaDensa,
@@ -41,6 +41,13 @@ export function AnalisisRcPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeGestion = tienePermiso('rc.programar');
 
+  // "hoy 6 jul 2026" del proto: solo presentación (ancla temporal del tablero).
+  const hoy = new Date().toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+
   const consulta = useAnalisisRc();
   const desempeno = useDesempenoRc({ habilitado: puedeGestion });
 
@@ -52,13 +59,12 @@ export function AnalisisRcPagina(): React.JSX.Element {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <LineChart className="size-5" aria-hidden />
-          </span>
           <div>
-            <h1 className="text-xl font-semibold">Análisis de Ruta Crítica</h1>
-            <p className="text-sm text-muted-foreground">
-              Salud de las órdenes · desempeño del equipo · cuellos de botella.
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Análisis de Ruta Crítica
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
+              Salud de las órdenes · desempeño del equipo · cuellos de botella · hoy <b>{hoy}</b>
             </p>
           </div>
         </div>
@@ -144,6 +150,7 @@ function kpisSalud(salud: AnalisisSalud): Kpi[] {
 function Tarjeta({
   titulo,
   icono,
+  contador,
   meta,
   acciones,
   acento,
@@ -151,6 +158,8 @@ function Tarjeta({
 }: {
   titulo: React.ReactNode;
   icono?: React.ReactNode;
+  /** Conteo junto al título (proto `.count`: texto faint, no pastilla). */
+  contador?: number;
   meta?: React.ReactNode;
   acciones?: React.ReactNode;
   /** Barra de acento a la izquierda del encabezado (crit/warn). */
@@ -172,6 +181,9 @@ function Tarjeta({
           {icono}
           {titulo}
         </div>
+        {contador === undefined ? null : (
+          <span className="text-xs text-faint tabular-nums">{contador}</span>
+        )}
         {meta === undefined ? null : (
           <span className="ml-auto text-xs text-muted-foreground">{meta}</span>
         )}
@@ -233,11 +245,7 @@ function EntregaCicloCard({ entrega }: { entrega: EntregaCiclo }): React.JSX.Ele
             {entrega.onTimeATiempo} de {entrega.onTimeMedibles} órdenes entregadas (últimas 4
             semanas)
           </div>
-          <Sparkline
-            valores={entrega.tendenciaSemanas}
-            sufijo="%"
-            className={delta >= 0 ? 'text-ok' : 'text-crit'}
-          />
+          <Sparkline valores={entrega.tendenciaSemanas} sufijo="%" />
         </div>
         <div className="border-l pl-8">
           <div className="text-xs text-muted-foreground">
@@ -292,7 +300,8 @@ function AtencionCard({
       titulo="Órdenes que requieren atención"
       icono={<AlertTriangle className="size-4" aria-hidden />}
       acento="crit"
-      meta={`${filas.length} · ordenadas por urgencia · clic para ver la ruta`}
+      contador={filas.length}
+      meta="ordenadas por urgencia · clic para ver la ruta"
     >
       <TablaScroll>
         <TablaDensa>
@@ -310,7 +319,7 @@ function AtencionCard({
           </TablaDensaEncabezado>
           <TablaDensaCuerpo>
             {filas.length === 0 ? (
-              <FilaVacia colSpan={8}>Ninguna orden en riesgo ni atrasada.</FilaVacia>
+              <FilaVacia colSpan={8}>Ninguna orden en riesgo ni atrasada 🎉</FilaVacia>
             ) : (
               filas.map((f) => (
                 <TablaDensaFila
@@ -355,7 +364,8 @@ function AlertasCard({
       titulo="Alertas predictivas — van a atrasarse"
       icono={<Sparkles className="size-4" aria-hidden />}
       acento="warn"
-      meta={`${filas.length} · hoy se ven bien, pero el colchón no alcanza`}
+      contador={filas.length}
+      meta="hoy se ven bien, pero el colchón no alcanza"
     >
       <TablaScroll>
         <TablaDensa>
@@ -372,7 +382,7 @@ function AlertasCard({
           <TablaDensaCuerpo>
             {filas.length === 0 ? (
               <FilaVacia colSpan={6}>
-                Ninguna orden en riesgo de atrasarse por proyección.
+                Ninguna orden en riesgo de atrasarse por proyección 🎉
               </FilaVacia>
             ) : (
               filas.map((f) => (
@@ -415,7 +425,7 @@ function RiesgoClienteCard({ filas }: { filas: RiesgoCliente[] }): React.JSX.Ele
     ok: 'OK',
   };
   return (
-    <Tarjeta titulo="Riesgo por cliente" meta={`${filas.length} · a quién avisar / priorizar`}>
+    <Tarjeta titulo="Riesgo por cliente" contador={filas.length} meta="a quién avisar / priorizar">
       <TablaScroll>
         <TablaDensa>
           <TablaDensaEncabezado>
@@ -442,10 +452,7 @@ function RiesgoClienteCard({ filas }: { filas: RiesgoCliente[] }): React.JSX.Ele
                     {c.atrasadas}
                   </TablaDensaCelda>
                   <TablaDensaCelda>
-                    <Semaforo tono={c.semaforo} etiqueta={etiqueta[c.semaforo]} />
-                    <span className="ml-1.5 align-middle text-xs text-muted-foreground">
-                      {etiqueta[c.semaforo]}
-                    </span>
+                    <ChipEstado tono={c.semaforo}>{etiqueta[c.semaforo]}</ChipEstado>
                   </TablaDensaCelda>
                 </TablaDensaFila>
               ))
@@ -491,10 +498,10 @@ function DesempenoCard({
   return (
     <Tarjeta
       titulo="Desempeño del equipo (RC)"
-      meta={`${personas.length} · ${conBono} con bono esta semana`}
+      contador={personas.length}
+      meta={`${conBono} con bono esta semana`}
       acciones={
         <Button
-          variant="outline"
           size="sm"
           onClick={() => window.open(urlEvaluacionSemanalExcel(), '_blank', 'noopener')}
           data-testid="desempeno-excel"
@@ -582,8 +589,10 @@ function DesempenoCard({
       </TablaScroll>
       <p className="border-t px-4 py-2.5 text-xs text-muted-foreground">
         La <b>calificación</b> = % de procesos entregados en tiempo, penalizado por los vencidos que
-        trae hoy. <b>Bono semanal</b> = calificación ≥ 90 y 0 vencidos. La <b>reacción</b> = tiempo
-        promedio en atender un proceso desde que cae en su cancha. Umbrales configurables.
+        trae hoy. <b>Bono semanal</b> = calificación ≥ 90 y <b>0 vencidos</b>. La <b>reacción</b> =
+        tiempo promedio en atender un proceso desde que cae en su cancha. <b>Carga vs desempeño:</b>{' '}
+        a quien trae mucha carga se le marca <b>sobrecarga</b> — un score bajo con carga alta puede
+        ser sobrecarga y no descuido (para que el bono sea justo). Umbrales configurables.
       </p>
     </Tarjeta>
   );
@@ -596,7 +605,8 @@ function CuellosCard({ filas }: { filas: CuelloProceso[] }): React.JSX.Element {
   return (
     <Tarjeta
       titulo="Cuellos de botella por proceso"
-      meta={`${filas.length} · dónde se atoran más las órdenes (sistémico, no de personas)`}
+      contador={filas.length}
+      meta="dónde se atoran más las órdenes (sistémico, no de personas)"
     >
       <TablaScroll>
         <TablaDensa>

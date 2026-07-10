@@ -1,4 +1,4 @@
-import { CalendarClock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { usePagosSemanales } from '@/api/esma';
@@ -37,12 +37,11 @@ export function PagosSemanalesPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="pagos-semanales">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <CalendarClock className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pagos semanales</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pagos semanales
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Los pagos a maquileros de la semana, con su total.
           </p>
         </div>

@@ -1,4 +1,3 @@
-import { Shirt } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -43,12 +42,11 @@ export function PreCostoPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="pre-costo">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Shirt className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pre-costo por modelo</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pre-costo por modelo
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Costo estimado del modelo (receta × precios de catálogo + maquila) y precio sugerido.
           </p>
         </div>

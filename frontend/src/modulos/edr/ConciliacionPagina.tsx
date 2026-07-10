@@ -1,4 +1,4 @@
-import { ListChecks, Plus, Save, Trash2 } from 'lucide-react';
+import { Plus, Save, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -109,15 +109,11 @@ export function ConciliacionPagina(): React.JSX.Element {
       <div className="flex flex-col gap-3 p-4 md:p-5">
         {/* ── Encabezado ─────────────────────────────────────────────────────── */}
         <header className="flex shrink-0 flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-          >
-            <ListChecks className="size-4.5" aria-hidden />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold">Conciliación de ventas</h1>
-            <p className="truncate text-xs text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Conciliación de ventas
+            </h1>
+            <p className="truncate text-[12.5px] text-muted-foreground">
               Ajusta el precio facturado y las cantidades de {etiquetaMes(mes, anio)} · el costo es
               actual
             </p>
@@ -179,7 +175,7 @@ export function ConciliacionPagina(): React.JSX.Element {
               ))}
             </SelectNativo>
             <div className="ml-auto">
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              <span className="text-[12px] text-faint">
                 {filas.length.toLocaleString('es-MX')} líneas
               </span>
             </div>

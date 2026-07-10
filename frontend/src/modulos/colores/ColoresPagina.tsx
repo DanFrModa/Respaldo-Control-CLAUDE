@@ -1,11 +1,10 @@
-import { MergeIcon, Palette } from 'lucide-react';
+import { MergeIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useColores, useDesactivarColor, useReactivarColor } from '@/api/colores';
 import type { Color, ColoresQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/lib/useDebounce';
 import {
@@ -114,17 +113,11 @@ export function ColoresPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `vCat` colores: renglón plano (sin thumb) — solo el nombre en `cell-strong`.
   const columnas: ColumnaCatalogo<Color>[] = [
     {
       encabezado: 'Color',
-      render: (c) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
-            <Palette className="size-4" aria-hidden />
-          </Avatar>
-          <span className="font-medium">{c.nombre}</span>
-        </div>
-      ),
+      render: (c) => <span className="font-semibold">{c.nombre}</span>,
     },
   ];
 
@@ -134,7 +127,6 @@ export function ColoresPagina(): React.JSX.Element {
         testid="color"
         titulo="Colores"
         descripcion="Catálogo base · global (A9)"
-        icono={Palette}
         unidad="colores"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}

@@ -1,4 +1,4 @@
-import { Factory, FileText, Printer, Search } from 'lucide-react';
+import { FileText, Printer, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -150,15 +150,11 @@ export function ConsultaOrdenesPagina(): React.JSX.Element {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6">
         {/* Encabezado */}
         <div className="flex flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-          >
-            <Factory className="size-5" />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold tracking-tight">Consulta de órdenes</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Consulta de órdenes
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
               Localiza, imprime y salta a las órdenes de producción.
             </p>
           </div>

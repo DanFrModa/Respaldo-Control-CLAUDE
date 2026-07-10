@@ -50,7 +50,11 @@ export interface PropsListaDetalle<T> {
   /** Encabezado de la pantalla. */
   titulo: string;
   descripcion: string;
-  icono: LucideIcon;
+  /**
+   * OBSOLETO (pasada global R9): el proto no pinta icono en el page-head, asi
+   * que ya NO se renderiza. Se acepta para no tocar a todos los llamadores.
+   */
+  icono?: LucideIcon;
 
   // ── Datos ──────────────────────────────────────────────────────────────────
   registros: readonly T[];
@@ -138,7 +142,6 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
     testid,
     titulo,
     descripcion,
-    icono: Icono,
     registros,
     cargando,
     error,
@@ -232,15 +235,9 @@ export function ListaDetalle<T>(props: PropsListaDetalle<T>): React.JSX.Element 
       {/* Encabezado (denso, R1). */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 lg:px-5">
         <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-          >
-            <Icono className="size-4.5" aria-hidden />
-          </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">{titulo}</h1>
-            <p className="text-xs text-muted-foreground">{descripcion}</p>
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">{titulo}</h1>
+            <p className="text-[12.5px] text-muted-foreground">{descripcion}</p>
           </div>
         </div>
         {puedeAdministrar ? (

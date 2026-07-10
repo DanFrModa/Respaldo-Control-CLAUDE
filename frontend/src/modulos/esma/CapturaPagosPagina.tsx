@@ -1,4 +1,4 @@
-import { Loader2Icon, Printer, Wallet } from 'lucide-react';
+import { Loader2Icon, Printer } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -123,12 +123,11 @@ export function CapturaPagosPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="captura-pagos">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Wallet className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Pagos a maquileros</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Pagos a maquileros
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Paga cargos validados (prendas por pagar) e imprime el recibo del pago.
           </p>
         </div>
