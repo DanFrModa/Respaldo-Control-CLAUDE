@@ -1633,3 +1633,22 @@ export type CxpOrigen = CxpMovimientoCrear['origen'];
 /** Cancelación de un movimiento de CxP (`POST /api/cxp/movimientos/{id}/cancelar`). */
 export type CxpMovimientoCancelar =
   paths['/api/cxp/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+
+// ── Importación de CFDI de proveedores (Módulo 14, F9-E3; R11) ──────────────────
+/** Previsualización de un CFDI (`POST /api/terceros/cfdi/previsualizar`). */
+export type CfdiPrevisualizacion =
+  paths['/api/terceros/cfdi/previsualizar']['post']['responses']['200']['content']['application/json'];
+/** Datos fiscales extraídos de un CFDI. */
+export type CfdiDatos = CfdiPrevisualizacion['datos'];
+/** Un concepto (renglón) del CFDI. */
+export type CfdiConcepto = CfdiDatos['conceptos'][number];
+/** Proveedor candidato (match por RFC del emisor). */
+export type CfdiCandidatoProveedor = NonNullable<CfdiPrevisualizacion['candidatoProveedor']>;
+/** Orden de compra candidata para conciliar. */
+export type CfdiCandidatoOc = CfdiPrevisualizacion['candidatosOc'][number];
+/** Resultado de importar un CFDI (`POST /api/terceros/cfdi/importar`). */
+export type CfdiImportarSalida =
+  paths['/api/terceros/cfdi/importar']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de la importación de un CFDI. */
+export type CfdiImportarEntrada =
+  paths['/api/terceros/cfdi/importar']['post']['requestBody']['content']['application/json'];

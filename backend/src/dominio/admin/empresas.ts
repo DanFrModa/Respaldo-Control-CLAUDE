@@ -27,10 +27,19 @@ import {
   type Tx,
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
+import { esRfcValido } from '../../contrato/esquemas/fiscal.js';
 
 const esquemaCrearEmpresa = z.object({
   nombre: z.string().trim().min(1, 'El nombre es obligatorio.').max(100),
   razonSocial: z.string().trim().max(200).optional(),
+  /** RFC fiscal (F9-E3): valida la forma del RFC mexicano si viene; '' = no capturado. */
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13)
+    .refine((v) => v === '' || esRfcValido(v), 'El RFC no tiene una forma válida.')
+    .optional(),
   /** Identificador corto para folios e impresos (viejo: `Identificador`). */
   identificador: z.string().trim().max(20).optional(),
   favorita: z.boolean().default(false),
@@ -126,6 +135,7 @@ export async function crearEmpresa(
         data: {
           nombre: datos.nombre,
           razonSocial: datos.razonSocial ?? null,
+          rfc: datos.rfc === undefined || datos.rfc === '' ? null : datos.rfc,
           identificador: datos.identificador ?? null,
           favorita: datos.favorita,
           paraIpt: datos.paraIpt,
@@ -191,6 +201,7 @@ export async function actualizarEmpresa(
         data: {
           ...(datos.nombre === undefined ? {} : { nombre: datos.nombre }),
           ...(datos.razonSocial === undefined ? {} : { razonSocial: datos.razonSocial }),
+          ...(datos.rfc === undefined ? {} : { rfc: datos.rfc === '' ? null : datos.rfc }),
           ...(datos.identificador === undefined ? {} : { identificador: datos.identificador }),
           ...(datos.favorita === undefined ? {} : { favorita: datos.favorita }),
           ...(datos.paraIpt === undefined ? {} : { paraIpt: datos.paraIpt }),

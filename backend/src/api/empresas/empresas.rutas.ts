@@ -46,6 +46,7 @@ function aEmpresaSalida(empresa: Empresa): z.infer<typeof esquemaEmpresaSalida> 
     id: empresa.id,
     nombre: empresa.nombre,
     razonSocial: empresa.razonSocial,
+    rfc: empresa.rfc,
     identificador: empresa.identificador,
     favorita: empresa.favorita,
     paraIpt: empresa.paraIpt,

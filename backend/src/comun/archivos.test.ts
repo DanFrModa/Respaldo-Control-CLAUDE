@@ -5,6 +5,7 @@ import {
   configR2DesdeEnv,
   crearClienteR2,
   crearServicioArchivos,
+  decidirArranqueSubidaLocal,
   EXPIRACION_SUBIDA_SEGUNDOS,
   sanearNombreArchivo,
   TAMANO_MAXIMO_BYTES,
@@ -177,6 +178,92 @@ describe('solicitarSubida', () => {
         carpeta: '../otra',
       }),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('subirContenido (server-side)', () => {
+  /** Servicio en modo LOCAL: la subida NO toca R2 (como en dev/CI con R2 dummy). */
+  function servicioLocal() {
+    const config = configR2DesdeEnv(ENV_COMPLETA);
+    return crearServicioArchivos({
+      cliente: crearClienteR2(config),
+      bucket: config.bucket,
+      subidaLocal: true,
+    });
+  }
+
+  it('en modo local devuelve bucket/key/metadatos sin contactar a R2', async () => {
+    const res = await servicioLocal().subirContenido({
+      nombreOriginal: 'CFDI Factura.xml',
+      tipoMime: 'application/xml',
+      carpeta: 'cfdi/proveedores/2026',
+      contenido: Buffer.from('<cfdi/>', 'utf8'),
+    });
+    expect(res.bucket).toBe('control-v2-prueba');
+    // Key: carpeta/uuid/nombre-saneado (mismo criterio que el presigned).
+    expect(res.key).toMatch(/^cfdi\/proveedores\/2026\/[0-9a-f-]{36}\/cfdi-factura\.xml$/);
+    expect(res.tipoMime).toBe('application/xml');
+    expect(res.tamanoBytes).toBe(Buffer.byteLength('<cfdi/>', 'utf8'));
+  });
+
+  it('valida carpeta/tamaño igual que el presigned (reusa el mismo esquema)', async () => {
+    await expect(
+      servicioLocal().subirContenido({
+        nombreOriginal: 'x.xml',
+        tipoMime: 'application/xml',
+        carpeta: '../otra', // carpeta inválida
+        contenido: Buffer.from('x'),
+      }),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('decidirArranqueSubidaLocal (guard de R2_SUBIDA_LOCAL)', () => {
+  // Credenciales R2 REALES (no dummy): un access-key/secret que no son placeholders.
+  const CREDS_REALES = {
+    R2_ACCESS_KEY_ID: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+    R2_SECRET_ACCESS_KEY: 'f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f',
+  };
+
+  it("con el flag apagado → 'ok', sin mensaje (subida real, sin ruido)", () => {
+    expect(decidirArranqueSubidaLocal({})).toEqual({ accion: 'ok' });
+    expect(decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'false' })).toEqual({ accion: 'ok' });
+    // Aunque haya credenciales reales y NODE_ENV=production: sin el flag, arranca normal.
+    expect(decidirArranqueSubidaLocal({ NODE_ENV: 'production', ...CREDS_REALES })).toEqual({
+      accion: 'ok',
+    });
+  });
+
+  it("con el flag + credenciales R2 DUMMY (dev/CI) → 'avisar' ruidoso (no arranca mudo)", () => {
+    const d = decidirArranqueSubidaLocal({
+      R2_SUBIDA_LOCAL: 'true',
+      R2_ACCESS_KEY_ID: 'dev',
+      R2_SECRET_ACCESS_KEY: 'dev',
+    });
+    expect(d.accion).toBe('avisar');
+    expect(d.mensaje).toMatch(/R2_SUBIDA_LOCAL/);
+  });
+
+  it("REGRESIÓN e2e: flag + NODE_ENV=production + creds DUMMY → 'avisar' (NO aborta)", () => {
+    // El stack de e2e corre la imagen de producción (NODE_ENV=production) con el flag y R2 dummy: NO
+    // debe abortar (antes lo hacía por NODE_ENV → backend unhealthy).
+    const d = decidirArranqueSubidaLocal({
+      R2_SUBIDA_LOCAL: 'true',
+      NODE_ENV: 'production',
+      R2_ACCESS_KEY_ID: 'dev',
+      R2_SECRET_ACCESS_KEY: 'dev',
+    });
+    expect(d.accion).toBe('avisar');
+  });
+
+  it("con el flag + credenciales R2 vacías (aún dummy) → 'avisar'", () => {
+    expect(decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true' }).accion).toBe('avisar');
+  });
+
+  it("con el flag + credenciales R2 REALES → 'abortar' (no-op peligroso con R2 disponible)", () => {
+    const d = decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true', ...CREDS_REALES });
+    expect(d.accion).toBe('abortar');
+    expect(d.mensaje).toMatch(/reales/i);
   });
 });
 

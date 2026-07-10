@@ -111,6 +111,14 @@ export function crearClienteR2(config: ConfigR2): S3Client {
 export interface DepsArchivos {
   cliente: S3Client;
   bucket: string;
+  /**
+   * Modo LOCAL de la subida SERVER-SIDE (`subirContenido`): NO contacta a R2, devuelve la key como si
+   * hubiera subido. Solo para dev/CI, donde R2 es DUMMY (`R2_*=dev`): el firmado de las URLs
+   * prefirmadas ya es 100 % local, y esto extiende ese mismo criterio a la subida server-side (que sí
+   * necesitaría red) para que el stack de e2e no requiera un R2 real. En prod queda en `false` (subida
+   * real a R2). El registro `Archivo` se crea igual (lo hace el llamador en su transacción).
+   */
+  subidaLocal?: boolean;
 }
 
 /** Solicitud de subida de un adjunto. */
@@ -143,6 +151,33 @@ const esquemaSolicitudSubida = z.object({
 });
 
 export type SolicitudSubida = z.input<typeof esquemaSolicitudSubida>;
+
+/**
+ * Solicitud de subida SERVER-SIDE: el servidor YA tiene los bytes (los recibió y procesó, p. ej. el XML
+ * de un CFDI) y los sube él mismo a R2. Se usa cuando NO conviene el flujo presigned del navegador —
+ * porque el objeto DEBE existir sí o sí antes de referenciarlo (un cargo fiscal sin su XML sería
+ * irrecuperable). Mismo `nombreOriginal`/`tipoMime`/`carpeta` que el presigned; el tamaño se toma de
+ * `contenido` (no se pasa aparte).
+ */
+export interface SolicitudSubidaContenido {
+  nombreOriginal: string;
+  tipoMime: string;
+  carpeta?: string;
+  contenido: Buffer;
+}
+
+/**
+ * Resultado de `subirContenido`: los metadatos del objeto YA en R2, para que el llamador cree el
+ * registro `Archivo` DENTRO de su transacción (A2). No incluye el registro: el objeto vive en R2 y su
+ * fila en BD la crea el módulo, atado a su entidad y en la misma tx que el resto de la operación.
+ */
+export interface ContenidoSubido {
+  bucket: string;
+  key: string;
+  nombreOriginal: string;
+  tipoMime: string;
+  tamanoBytes: number;
+}
 
 /** Resultado de `solicitarSubida`. */
 export interface SubidaPreparada {
@@ -199,6 +234,24 @@ export interface ServicioArchivos {
     sesion: SesionUsuario,
     solicitud: SolicitudSubida,
   ): Promise<SubidaPreparada>;
+
+  /**
+   * Sube contenido a R2 SERVER-SIDE (el servidor ya tiene los bytes) y devuelve la key + metadatos
+   * para persistir el `Archivo`. NO crea el registro ni abre transacción: el llamador debe crear el
+   * `Archivo` DENTRO de su transacción DESPUÉS de que esto resuelva.
+   *
+   * ORDEN SEGURO (por qué server-side y no presigned): el objeto se sube ANTES de la transacción; si la
+   * tx falla luego, el objeto queda huérfano en R2 (inocuo — trade-off ya aceptado en el repo). Al
+   * revés sería fatal: un registro/cargo que referencia un objeto que el navegador nunca subió.
+   *
+   * @example
+   * const subido = await servicio.subirContenido({
+   *   nombreOriginal: "cfdi-<uuid>.xml", tipoMime: "application/xml",
+   *   carpeta: "cfdi/proveedores/2026", contenido: Buffer.from(xml, "utf8"),
+   * });
+   * // luego, dentro de la tx:  tx.archivo.create({ data: { bucket: subido.bucket, key: subido.key, … } })
+   */
+  subirContenido(solicitud: SolicitudSubidaContenido): Promise<ContenidoSubido>;
 
   /**
    * URL GET prefirmada y de vida corta para ver/descargar la key. Se genera
@@ -271,6 +324,41 @@ export function crearServicioArchivos(deps: DepsArchivos): ServicioArchivos {
       return { archivo, urlSubida, expiraEnSegundos: EXPIRACION_SUBIDA_SEGUNDOS };
     },
 
+    async subirContenido(solicitud) {
+      const tamanoBytes = solicitud.contenido.byteLength;
+      // Reutiliza la MISMA validación del presigned (nombre/mime/carpeta/tamaño); el tamaño real lo da
+      // el buffer, no lo reporta el navegador.
+      const datos = validarEntrada(esquemaSolicitudSubida, {
+        nombreOriginal: solicitud.nombreOriginal,
+        tipoMime: solicitud.tipoMime,
+        tamanoBytes,
+        carpeta: solicitud.carpeta,
+      });
+
+      const key = `${datos.carpeta}/${randomUUID()}/${sanearNombreArchivo(datos.nombreOriginal)}`;
+
+      // Modo local (dev/CI): NO contacta a R2 (credenciales dummy) — la "subida" es un no-op y solo se
+      // devuelve la key. En prod (subidaLocal=false) sube de verdad con PutObject (Body = los bytes).
+      if (deps.subidaLocal !== true) {
+        await deps.cliente.send(
+          new PutObjectCommand({
+            Bucket: deps.bucket,
+            Key: key,
+            Body: solicitud.contenido,
+            ContentType: datos.tipoMime,
+          }),
+        );
+      }
+
+      return {
+        bucket: deps.bucket,
+        key,
+        nombreOriginal: datos.nombreOriginal,
+        tipoMime: datos.tipoMime,
+        tamanoBytes,
+      };
+    },
+
     async urlDescarga(key, opciones) {
       if (key.trim() === '') {
         throw new ErrorValidacion('La key del archivo es obligatoria.');
@@ -311,7 +399,70 @@ export function servicioArchivos(): ServicioArchivos {
     servicioDesdeEnv = crearServicioArchivos({
       cliente: crearClienteR2(config),
       bucket: config.bucket,
+      // Solo dev/CI (R2 dummy) lo activa por env; prod (Railway) no lo setea → subida server-side real.
+      subidaLocal: process.env.R2_SUBIDA_LOCAL === 'true',
     });
   }
   return servicioDesdeEnv;
+}
+
+/**
+ * Decisión de arranque ante `R2_SUBIDA_LOCAL`. Un modo que descarta subidas (XML fiscales de CFDI y
+ * adjuntos) en un no-op NO puede embarcar mudo: `avisar` (warn RUIDOSO) cuando el R2 es DUMMY (dev/CI,
+ * donde el no-op es lo esperado) y `abortar` (rehúsa arrancar) cuando hay un R2 REAL disponible (ahí el
+ * no-op sí es peligroso: se descartarían documentos teniendo dónde guardarlos). `ok` = flag apagado.
+ */
+export interface DecisionArranqueSubidaLocal {
+  accion: 'ok' | 'avisar' | 'abortar';
+  /** Mensaje para loguear (avisar) o con el que abortar. Vacío cuando `accion === 'ok'`. */
+  mensaje?: string;
+}
+
+/**
+ * Valores PLACEHOLDER de credenciales R2: no son un R2 real (los del `docker-compose.yml` son `dev`).
+ * El vacío también cuenta como dummy. Si el access-key o el secret son uno de estos, NO hay un R2 real
+ * donde escribir → el no-op de la subida local es inofensivo.
+ */
+const CREDENCIALES_R2_DUMMY = new Set(['', 'dev', 'dummy', 'local', 'test']);
+
+/**
+ * ¿Las credenciales R2 del entorno son placeholders (dev/CI) y no un R2 real? Se mira el access-key y el
+ * secret: si CUALQUIERA es dummy/vacío, no hay un R2 real disponible. (Criterio propio: el presign
+ * nunca necesitó distinguirlos porque firmar es local; la subida server-side sí lo requiere.)
+ */
+function credencialesR2SonDummy(env: Record<string, string | undefined>): boolean {
+  const accessKey = (env.R2_ACCESS_KEY_ID ?? '').trim().toLowerCase();
+  const secret = (env.R2_SECRET_ACCESS_KEY ?? '').trim().toLowerCase();
+  return CREDENCIALES_R2_DUMMY.has(accessKey) || CREDENCIALES_R2_DUMMY.has(secret);
+}
+
+/**
+ * Decide qué hacer con `R2_SUBIDA_LOCAL` al arrancar. Función PURA (recibe el env, no toca nada): el
+ * llamador (`servidor.ts`) ejecuta el efecto (log.warn o exit≠0). Testeable en aislamiento.
+ *
+ * La señal de peligro NO es `NODE_ENV` (la imagen de producción se usa TAMBIÉN en e2e, que corre con el
+ * flag encendido a propósito), sino "hay un R2 REAL y aun así se pide no-op": flag + credenciales reales
+ * → `abortar`; flag + credenciales dummy (dev/CI) → `avisar`; flag apagado → `ok`.
+ */
+export function decidirArranqueSubidaLocal(
+  env: Record<string, string | undefined> = process.env,
+): DecisionArranqueSubidaLocal {
+  if (env.R2_SUBIDA_LOCAL !== 'true') {
+    return { accion: 'ok' };
+  }
+  if (credencialesR2SonDummy(env)) {
+    return {
+      accion: 'avisar',
+      mensaje:
+        '⚠️ R2_SUBIDA_LOCAL=true con credenciales R2 DUMMY — la subida server-side a R2 es NO-OP (solo ' +
+        'dev/CI). Con un R2 real, los XML de CFDI y adjuntos NO se guardarían.',
+    };
+  }
+  return {
+    accion: 'abortar',
+    mensaje:
+      'R2_SUBIDA_LOCAL=true con credenciales R2 REALES: la subida server-side sería NO-OP y descartaría ' +
+      'los XML de CFDI / adjuntos teniendo un R2 disponible. Es un modo SOLO para dev/CI — quita ' +
+      'R2_SUBIDA_LOCAL y reinicia.',
+  };
 }

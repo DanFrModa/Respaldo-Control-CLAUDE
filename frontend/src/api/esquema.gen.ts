@@ -41122,6 +41122,409 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/terceros/cfdi/previsualizar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Previsualizar un CFDI de proveedor (datos extraídos + candidatos de conciliación) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description XML de un CFDI. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Contenido del XML del CFDI (texto). */
+            xml: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Previsualización de un CFDI antes de importarlo. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Datos fiscales extraídos del XML. */
+              datos: {
+                /** @description Versión del CFDI (siempre 4.0). */
+                version: string;
+                /**
+                 * @description I = ingreso · E = egreso.
+                 * @enum {string}
+                 */
+                tipoComprobante: 'I' | 'E';
+                /**
+                 * @description Origen de CxP derivado del tipo: I→factura_proveedor (+), E→nota_credito (−).
+                 * @enum {string}
+                 */
+                origen: 'factura_proveedor' | 'nota_credito';
+                /** @description UUID (folio fiscal) del Timbre Fiscal Digital. */
+                uuid: string;
+                /** @description Fecha de emisión (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Fecha del timbrado (ISO) o null. */
+                fechaTimbrado: string | null;
+                /** @description RFC del emisor (el proveedor). */
+                emisorRfc: string;
+                /** @description Razón social del emisor o null. */
+                emisorNombre: string | null;
+                /** @description RFC del receptor (debe ser la empresa activa). */
+                receptorRfc: string;
+                /** @description Razón social del receptor o null. */
+                receptorNombre: string | null;
+                /** @description Moneda del comprobante. */
+                moneda: string;
+                /** @description Subtotal (antes de impuestos). */
+                subtotal: number;
+                /** @description Total del comprobante (por este monto entra el cargo). */
+                total: number;
+                /** @description IVA trasladado total. */
+                ivaTrasladado: number;
+                /** @description ISR retenido total. */
+                isrRetenido: number;
+                /** @description IVA retenido total. */
+                ivaRetenido: number;
+                /** @description Conceptos (renglones). */
+                conceptos: {
+                  /** @description Descripción del concepto. */
+                  descripcion: string;
+                  /** @description Cantidad. */
+                  cantidad: number;
+                  /** @description Valor unitario. */
+                  valorUnitario: number;
+                  /** @description Importe del renglón. */
+                  importe: number;
+                }[];
+              };
+              /** @description Proveedor sugerido por RFC del emisor, o null si ninguno coincide. */
+              candidatoProveedor: {
+                /** @description Id del proveedor. */
+                idProveedor: number;
+                /** @description Nombre del proveedor. */
+                nombre: string;
+                /** @description RFC del proveedor (catálogo R15). */
+                rfc: string | null;
+                /** @description Clave corta del proveedor. */
+                corto: string | null;
+              } | null;
+              /** @description Órdenes de compra candidatas (mismo proveedor, total cercano), por cercanía. */
+              candidatosOc: {
+                /** @description Id de la OC. */
+                idOrdenCompra: number;
+                /** @description Folio de la OC (por empresa). */
+                numCompra: number;
+                /** @description Fecha de emisión de la OC o null. */
+                fecha: string | null;
+                /** @description Estatus de la OC. */
+                estatus: string;
+                /** @description Total de la OC (derivado; null si se ocultan importes). */
+                total: number | null;
+                /** @description |total OC − total CFDI| (null si se ocultan importes). */
+                diferencia: number | null;
+                /** @description Diferencia relativa 0..1 respecto al total del CFDI (null si se ocultan importes). */
+                diferenciaRelativa: number | null;
+              }[];
+              /** @description ¿El UUID ya está importado? (chequeo previo; el import lo rechazaría de todos modos). */
+              yaImportado: boolean;
+              /** @description Avisos para revisión (receptor, sin OC, diferencias…). */
+              avisos: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/terceros/cfdi/importar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Importar un CFDI de proveedor a CxP (cargo fiscal por el total del CFDI, A2) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      /** @description Importación de un CFDI de proveedor a CxP. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Contenido del XML del CFDI (texto). */
+            xml: string;
+            /** @description Proveedor al que se le carga el CFDI (elegido a mano). */
+            idProveedor: number;
+            /**
+             * @description Tipo de operación real a ligar (orden-compra/recepcion). Con refId o ninguno.
+             * @enum {string}
+             */
+            refTipo?: 'orden-compra' | 'recepcion';
+            /** @description Id de la operación real ligada (según refTipo). */
+            refId?: number;
+            /** @description Observaciones opcionales. */
+            observaciones?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Resultado de importar un CFDI de proveedor. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description El cargo/NC fiscal creado en CxP. */
+              movimiento: {
+                /**
+                 * @description Origen del renglón: motor nuevo o EsMa.
+                 * @enum {string}
+                 */
+                fuente: 'motor' | 'esma';
+                /** @description Id del renglón en su tabla de origen. */
+                id: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Folio A3 (solo motor; null en EsMa). */
+                folio: number | null;
+                /**
+                 * @description Tipo de tercero.
+                 * @enum {string}
+                 */
+                tipoTercero: 'cliente' | 'proveedor';
+                /** @description Id del cliente o proveedor. */
+                idTercero: number;
+                /** @description Nombre del tercero. */
+                tercero: string;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Origen/concepto del movimiento (etiqueta estable). */
+                origen: string;
+                /** @description Importe CON SIGNO (Σ = saldo); null si se ocultan importes. */
+                monto: number | null;
+                /** @description Fecha de vencimiento derivada (aging D15d) o null. */
+                fechaVencimiento: string | null;
+                /** @description ¿Movimiento fiscal (con CFDI)? */
+                esFiscal: boolean;
+                /** @description UUID del CFDI o null. */
+                uuidCfdi: string | null;
+                /** @description RFC del tercero o null. */
+                rfcTercero: string | null;
+                /** @description Id del Archivo R2 del CFDI o null. */
+                idArchivoCfdi: string | null;
+                /** @description Discriminador de la operación ligada o null. */
+                refTipo: string | null;
+                /** @description Id de la operación ligada o null. */
+                refId: number | null;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+                cancelado: boolean;
+                /** @description ¿Es un movimiento inverso de cancelación? */
+                esInverso: boolean;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se registró (ISO).
+                 */
+                creadoEn: string;
+                /** @description Id de quien lo registró o null. */
+                creadoPorId: string | null;
+              };
+              /** @description Avisos (sin OC, diferencia con la OC, RFC del proveedor…). */
+              avisos: string[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/ruta-critica/procesos': {
     parameters: {
       query?: never;
@@ -77687,6 +78090,8 @@ export interface paths {
               nombre: string;
               /** @description Razón social, o null. */
               razonSocial: string | null;
+              /** @description RFC fiscal de la empresa (F9-E3), o null. */
+              rfc: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -77810,6 +78215,7 @@ export interface paths {
           'application/json': {
             nombre: string;
             razonSocial?: string;
+            rfc?: string;
             identificador?: string;
             /** @default false */
             favorita?: boolean;
@@ -77834,6 +78240,8 @@ export interface paths {
               nombre: string;
               /** @description Razón social, o null. */
               razonSocial: string | null;
+              /** @description RFC fiscal de la empresa (F9-E3), o null. */
+              rfc: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -77982,6 +78390,8 @@ export interface paths {
               nombre: string;
               /** @description Razón social, o null. */
               razonSocial: string | null;
+              /** @description RFC fiscal de la empresa (F9-E3), o null. */
+              rfc: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -78119,6 +78529,8 @@ export interface paths {
               nombre: string;
               /** @description Razón social, o null. */
               razonSocial: string | null;
+              /** @description RFC fiscal de la empresa (F9-E3), o null. */
+              rfc: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */
@@ -78246,6 +78658,7 @@ export interface paths {
           'application/json': {
             nombre?: string;
             razonSocial?: string;
+            rfc?: string;
             identificador?: string;
             favorita?: boolean;
             paraIpt?: boolean;
@@ -78268,6 +78681,8 @@ export interface paths {
               nombre: string;
               /** @description Razón social, o null. */
               razonSocial: string | null;
+              /** @description RFC fiscal de la empresa (F9-E3), o null. */
+              rfc: string | null;
               /** @description Identificador corto para folios, o null. */
               identificador: string | null;
               /** @description Empresa propuesta por defecto al iniciar sesión. */

@@ -15,6 +15,7 @@ import {
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
+import { useSesion } from '@/sesion/useSesion';
 
 import { celdaAging, moneda } from './comun';
 
@@ -36,6 +37,8 @@ const CHIPS: OpcionChip<'con-saldo' | 'todos'>[] = [
  */
 export function CxpPagina(): React.JSX.Element {
   const navigate = useNavigate();
+  const { tienePermiso } = useSesion();
+  const puedeAdministrar = tienePermiso('cxp.administrar');
   const [filtro, setFiltro] = useState<'con-saldo' | 'todos'>('con-saldo');
   const [busqueda, setBusqueda] = useState('');
   const [pagina, setPagina] = useState(1);
@@ -103,6 +106,17 @@ export function CxpPagina(): React.JSX.Element {
             Finanzas · cuenta corriente de proveedores (D12) · generaliza EsMa
           </p>
         </div>
+        {puedeAdministrar ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void navigate('/cxp/importar-cfdi')}
+            data-testid="cxp-ir-importar-cfdi"
+          >
+            Importar CFDI
+          </Button>
+        ) : null}
         <Button
           type="button"
           size="sm"

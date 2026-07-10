@@ -57,6 +57,15 @@ describe('administración de empresas (doc 10 §5, A9)', () => {
     ).resolves.toBeTruthy();
   });
 
+  it('guarda y edita el RFC fiscal (F9-E3): se normaliza a mayúsculas; "" lo limpia', async () => {
+    const sesion = sesionAdmin();
+    const empresa = await crearEmpresa(sesion, { nombre: 'Con RFC', rfc: 'xaxx010101000' }, bd());
+    expect(empresa.rfc).toBe('XAXX010101000'); // normalizado a mayúsculas
+
+    const limpiada = await actualizarEmpresa(sesion, empresa.id, { rfc: '' }, bd());
+    expect(limpiada.rfc).toBeNull();
+  });
+
   it('nombre duplicado → ErrorConflicto; sin permiso → ErrorPermiso', async () => {
     await crearEmpresa(sesionAdmin(), { nombre: 'FR Moda' }, bd());
     await expect(crearEmpresa(sesionAdmin(), { nombre: 'fr moda' }, bd())).rejects.toBeInstanceOf(

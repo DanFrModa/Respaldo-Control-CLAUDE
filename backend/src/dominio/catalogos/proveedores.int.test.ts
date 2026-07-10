@@ -90,6 +90,11 @@ function archivosFalsos(): ServicioArchivos {
       });
       return { archivo, urlSubida: `https://r2.fake/put/${key}`, expiraEnSegundos: 900 };
     },
+    subirContenido() {
+      throw new Error(
+        'Este flujo usa solicitarSubida (presigned), no subirContenido (server-side).',
+      );
+    },
     urlDescarga(key) {
       return Promise.resolve(`https://r2.fake/get/${key}`);
     },

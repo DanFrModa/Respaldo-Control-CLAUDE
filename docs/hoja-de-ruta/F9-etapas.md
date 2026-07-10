@@ -126,7 +126,15 @@
 
 ---
 
-## F9-E3 · Importación de CFDI de proveedores (XML → CxP, R11) — ⬜ pendiente
+## F9-E3 · Importación de CFDI de proveedores (XML → CxP, R11) — ✅ COMPLETA (10-jul-2026; reviewer APROBÓ tras 3 rondas; pend. verificación de Gabriel en `prueba`)
+
+> **CIERRE (10-jul-2026).** CONTROL ya jala el XML sellado del proveedor y lo concilia en CxP:
+> - **Parser CFDI 4.0 PURO** (`dominio/terceros/cfdi/parser-cfdi.ts`, `fast-xml-parser@5.9.3` exacta): extrae versión/UUID del timbre/emisor/receptor/conceptos/IVA-retenciones/total; rechazos limpios (malformado, ≠4.0, sin timbre, tipo P/N/T, total ≤0, importes no numéricos); **endurecido para XML no confiable** (`processEntities:false` + rechazo explícito de `<!DOCTYPE`, tope 2 MB). I→`factura_proveedor` (+), E→`nota_credito` (−). Fixtures sintéticos en `pruebas/cfdi-fixtures.ts`.
+> - **Importación por COMPOSICIÓN sobre el motor E1** (`cfdi-proveedor.ts`): el cargo = **TOTAL del CFDI** (la verdad fiscal); diferencias contra la OC → `avisos[]` (no se fuerzan). **El XML se sube SERVER-SIDE** (`subirContenido` nuevo en el motor de archivos; hallazgo DEBE del reviewer — el presigned dejaba cargos fiscales sin su XML, irrecuperables por el UUID único): orden seguro **R2 primero → tx después** (Archivo + movimiento fiscal en A2; huérfano de R2 inocuo si la tx falla). **Anti-duplicado por UUID** (pre-check + backstop P2002 de la unique de E1). La OC ligada se valida contra el proveedor elegido (ErrorValidacion) además de A9.
+> - **Receptor validado contra `Empresa.rfc`** (columna NUEVA, migración aditiva `20260710190000_f9_e3_empresa_rfc`; el campo se captura en Administración › Empresas — de paso se corrigió la etiqueta engañosa del `identificador`): RFC capturado y no coincide → rechazo; sin capturar → aviso y entra. La misma columna servirá a E4 (emisor del CFDI de ventas).
+> - **Candidatos honestos, sin auto-liga**: proveedor por RFC del emisor; OCs del proveedor (autorizada/recibida) ordenadas por |Δtotal| top 8 — se ELIGEN a mano en la pantalla `/cxp/importar-cfdi` (subir XML → previsualizar → conciliar → confirmar; gated `cxp.administrar`).
+> - **Guard del modo local**: `R2_SUBIDA_LOCAL` (no-op de subida, SOLO para e2e/CI sin R2 real) ahora AVISA ruidoso al boot y **rehúsa arrancar en production** (`decidirArranqueSubidaLocal` pura + test) — un modo que descartaría documentos fiscales no embarca mudo.
+> - **RBAC:** reúsa `cxp.administrar` + defensa en profundidad `terceros.administrar` — **SIN permisos nuevos → SIN `SEED_ON_START`**; la migración de `empresa.rfc` se auto-aplica. Tests: unit parser/receptor/guard + int (cargo fiscal ligado + XML, UUID duplicado, sin-OC con aviso, NC baja saldo, OC↔proveedor, A9, deny A4) + componente + e2e `cfdi.spec.ts`. Reviewer: 1 DEBE (server-side) + 1 DEBE-small (guard) + S1/S2 — TODO corregido → APROBADO; backend 881/881, front 671/671.
 
 **Objetivo:** Que CONTROL **jale el XML ya sellado** que manda el proveedor, lo valide, lo **ligue a la OC/entrada** y **concilie** el cargo en CxP marcándolo fiscal — alimentando de paso costos e inventario. Es importación, **no emisión** (el timbrado nativo vía PAC es R14, posterior).
 
