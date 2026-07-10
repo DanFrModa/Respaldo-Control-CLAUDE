@@ -62,6 +62,7 @@ import { rutasMovimientosEsMa } from './api/esma/movimientos.rutas.js';
 import { rutasPagosEsMa } from './api/esma/pagos.rutas.js';
 import { rutasCuentaEsMa } from './api/esma/cuenta.rutas.js';
 import { rutasEstadoCuentaEsMa } from './api/esma/estado-cuenta.rutas.js';
+import { rutasTerceros } from './api/terceros/movimientos.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
@@ -273,6 +274,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // saldos de todos, pagos/recibos semanales, selector de maquileros y revisión de partidas. Consulta
   // con esma.ver-pagos; revisar con esma.modificar. Importes ocultos sin consultas.ver-importes.
   await app.register(rutasEstadoCuentaEsMa, { prefix: '/api' });
+  // FINANZAS (Módulo 14, F9-E1) — MOTOR único de cuenta corriente de terceros (CxC/CxP) que
+  // generaliza EsMa (D12/D15/R10): registrar/cancelar movimientos (terceros.administrar), saldo
+  // derivado (D3) y estado de cuenta con vista operativa/fiscal (terceros.ver; la fiscal exige
+  // terceros.fiscal). Para un proveedor, saldo/estado de cuenta INCLUYEN EsMa por convivencia.
+  await app.register(rutasTerceros, { prefix: '/api' });
   // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
   // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
   // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias

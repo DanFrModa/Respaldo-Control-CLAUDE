@@ -166,6 +166,13 @@ function definirRoles(): {
     // maestros). `rc.catalogo-ver` y el motor de RC cascadean. (Fix de pentest: antes se colaba a
     // roles clericales.)
     'rc.catalogo-administrar',
+    // F9-E1 — cuenta corriente de terceros (Finanzas, D12/D15): CAPTURAR/CANCELAR movimientos
+    // (`terceros.administrar`) y la VISTA FISCAL (`terceros.fiscal`) quedan solo para Administrador
+    // y AdministracionDireccion (mismo reparto que los catálogos maestros y por prudencia
+    // financiera; sé conservador como el fix de pentest de los `*.administrar`). El `terceros.ver`
+    // NO se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo), como EsMa.
+    'terceros.administrar',
+    'terceros.fiscal',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
@@ -198,6 +205,10 @@ function definirRoles(): {
     // F8-E5 — negociar/mover estados de lista es del dueño y el gerente comercial (decisión (h)):
     // Ventas NO negocia. Conserva desarrollo.* (pre-venta) y listas.ver/.administrar.
     'listas.negociar',
+    // F9-E1 — la cuenta corriente de terceros (CxC/CxP) es información FINANCIERA: `terceros.ver`
+    // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
+    // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.
+    'terceros.ver',
   );
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera

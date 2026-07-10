@@ -45,6 +45,11 @@ export const MODULOS_PERMISO = {
   // propio (ex nivel ≤30, menú 6.2), separado de `costos` porque tiene su propio flujo (generar mes
   // + conciliar ventas). Se reparte a los MISMOS roles que `costos` (directivo/dirección/admin).
   edr: 'Estado de resultados',
+  // Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1) — el motor único de CxC/CxP que
+  // generaliza EsMa (D12/D15/R10). `ver` (estados de cuenta/saldos, roles directivos que ya ven
+  // EsMa), `administrar` (capturar/cancelar movimientos) y `fiscal` (la vista/reporte fiscal para el
+  // contador). Administrar/fiscal solo Administración/Dirección; sin equivalente granular en el viejo.
+  terceros: 'Cuenta corriente de terceros (Finanzas)',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
@@ -1073,6 +1078,39 @@ export const CATALOGO_PERMISOS = [
     modulo: 'listas',
     descripcion:
       'Negociar por versiones (rondas + acuerdos) y mover el estado de la lista (dueño y gerente comercial, decisión (h)) (R20b)',
+  },
+
+  // ── Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1, A4 — D12/D15/R10; doc
+  //    PROPUESTA-Finanzas-y-Proveedores.md §3) — permisos NUEVOS de v2 (sin equivalente granular
+  //    en el viejo: EsMa lo regía `esma.ver-pagos`/`esma.modificar`, y CxC/CxP no existían). El
+  //    motor único de CxC/CxP: `ver` (estados de cuenta y saldos operativos — para los roles
+  //    directivos/gerenciales que ya ven EsMa), `administrar` (capturar/cancelar movimientos —
+  //    solo Administración/Dirección, como los catálogos maestros y por prudencia financiera) y
+  //    `fiscal` (la VISTA/REPORTE fiscal para el contador — también solo Administración/Dirección).
+  //    Deny-by-default (A4): un rol sin `terceros.ver` no ve el módulo.
+  {
+    clave: 'terceros.ver',
+    modulo: 'terceros',
+    descripcion:
+      'Consultar estados de cuenta y saldos de terceros (CxC/CxP), vista operativa (F9-E1)',
+  },
+  {
+    clave: 'terceros.administrar',
+    modulo: 'terceros',
+    descripcion:
+      'Capturar y cancelar (inverso auditado) movimientos de cuenta corriente de terceros (F9-E1)',
+  },
+  {
+    clave: 'terceros.fiscal',
+    modulo: 'terceros',
+    // Alcance (decisión D12, opción b): este permiso gatea el REPORTE fiscal pre-filtrado del
+    // contador (la vista `fiscal` = solo movimientos con CFDI). NO gatea los ATRIBUTOS fiscales por
+    // movimiento (esFiscal/uuidCfdi/rfcTercero/saldoFiscal), que son visibles con `terceros.ver` a
+    // propósito: "dos vistas = dos filtros del mismo libro", igual que en EsMa/F6 la distinción
+    // con/sin factura siempre fue visible en el estado de cuenta operativo (y el RFC ya se ve en el
+    // catálogo de proveedores). Si se requiere enmascarar, se ajusta en E3 antes de datos reales.
+    descripcion:
+      'Ver la vista/reporte FISCAL de terceros (solo movimientos con CFDI, para el contador) (F9-E1)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

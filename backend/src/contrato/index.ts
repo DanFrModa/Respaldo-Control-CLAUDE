@@ -1136,6 +1136,31 @@ export {
   type RevisionSalida,
 } from './esquemas/esma.js';
 
+// ── Motor de cuenta corriente de terceros (Módulo 14, F9-E1; D12/D15/R10) ──
+export {
+  TIPOS_TERCERO,
+  ORIGENES_MOVIMIENTO_TERCERO,
+  ETIQUETAS_ORIGEN_MOVIMIENTO_TERCERO,
+  VISTAS_TERCERO,
+  FUENTES_MOVIMIENTO_TERCERO,
+  esquemaMovimientoTerceroCrear,
+  esquemaMovimientoTerceroCancelar,
+  esquemaMovimientoTerceroSalida,
+  esquemaSaldoTerceroSalida,
+  esquemaEstadoCuentaTerceroQuery,
+  esquemaEstadoCuentaTerceroSalida,
+  type TipoTerceroClave,
+  type OrigenMovimientoTerceroClave,
+  type VistaTerceroClave,
+  type FuenteMovimientoTerceroClave,
+  type DatosMovimientoTerceroCrear,
+  type DatosMovimientoTerceroCancelar,
+  type MovimientoTerceroSalida,
+  type SaldoTerceroSalida,
+  type EstadoCuentaTerceroQuery,
+  type EstadoCuentaTerceroSalida,
+} from './esquemas/terceros.js';
+
 // ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
 export {
   esquemaEntregaClienteCrear,
