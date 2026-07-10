@@ -219,23 +219,51 @@ describe('subirContenido (server-side)', () => {
 });
 
 describe('decidirArranqueSubidaLocal (guard de R2_SUBIDA_LOCAL)', () => {
+  // Credenciales R2 REALES (no dummy): un access-key/secret que no son placeholders.
+  const CREDS_REALES = {
+    R2_ACCESS_KEY_ID: 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4',
+    R2_SECRET_ACCESS_KEY: 'f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f',
+  };
+
   it("con el flag apagado → 'ok', sin mensaje (subida real, sin ruido)", () => {
     expect(decidirArranqueSubidaLocal({})).toEqual({ accion: 'ok' });
     expect(decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'false' })).toEqual({ accion: 'ok' });
-    // Incluso en producción, si el flag no está, arranca normal.
-    expect(decidirArranqueSubidaLocal({ NODE_ENV: 'production' })).toEqual({ accion: 'ok' });
+    // Aunque haya credenciales reales y NODE_ENV=production: sin el flag, arranca normal.
+    expect(decidirArranqueSubidaLocal({ NODE_ENV: 'production', ...CREDS_REALES })).toEqual({
+      accion: 'ok',
+    });
   });
 
-  it("con el flag en dev/CI → 'avisar' con mensaje ruidoso (no arranca mudo)", () => {
-    const d = decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true' });
+  it("con el flag + credenciales R2 DUMMY (dev/CI) → 'avisar' ruidoso (no arranca mudo)", () => {
+    const d = decidirArranqueSubidaLocal({
+      R2_SUBIDA_LOCAL: 'true',
+      R2_ACCESS_KEY_ID: 'dev',
+      R2_SECRET_ACCESS_KEY: 'dev',
+    });
     expect(d.accion).toBe('avisar');
     expect(d.mensaje).toMatch(/R2_SUBIDA_LOCAL/);
   });
 
-  it("con el flag Y NODE_ENV=production → 'abortar' (rehúsa arrancar)", () => {
-    const d = decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true', NODE_ENV: 'production' });
+  it("REGRESIÓN e2e: flag + NODE_ENV=production + creds DUMMY → 'avisar' (NO aborta)", () => {
+    // El stack de e2e corre la imagen de producción (NODE_ENV=production) con el flag y R2 dummy: NO
+    // debe abortar (antes lo hacía por NODE_ENV → backend unhealthy).
+    const d = decidirArranqueSubidaLocal({
+      R2_SUBIDA_LOCAL: 'true',
+      NODE_ENV: 'production',
+      R2_ACCESS_KEY_ID: 'dev',
+      R2_SECRET_ACCESS_KEY: 'dev',
+    });
+    expect(d.accion).toBe('avisar');
+  });
+
+  it("con el flag + credenciales R2 vacías (aún dummy) → 'avisar'", () => {
+    expect(decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true' }).accion).toBe('avisar');
+  });
+
+  it("con el flag + credenciales R2 REALES → 'abortar' (no-op peligroso con R2 disponible)", () => {
+    const d = decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true', ...CREDS_REALES });
     expect(d.accion).toBe('abortar');
-    expect(d.mensaje).toMatch(/producción/i);
+    expect(d.mensaje).toMatch(/reales/i);
   });
 });
 

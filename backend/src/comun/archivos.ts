@@ -408,8 +408,9 @@ export function servicioArchivos(): ServicioArchivos {
 
 /**
  * Decisión de arranque ante `R2_SUBIDA_LOCAL`. Un modo que descarta subidas (XML fiscales de CFDI y
- * adjuntos) en un no-op NO puede embarcar mudo: `avisar` en dev/CI (warn RUIDOSO) y `abortar` en
- * producción (rehúsa arrancar). `ok` = flag apagado → subida real, sin ruido.
+ * adjuntos) en un no-op NO puede embarcar mudo: `avisar` (warn RUIDOSO) cuando el R2 es DUMMY (dev/CI,
+ * donde el no-op es lo esperado) y `abortar` (rehúsa arrancar) cuando hay un R2 REAL disponible (ahí el
+ * no-op sí es peligroso: se descartarían documentos teniendo dónde guardarlos). `ok` = flag apagado.
  */
 export interface DecisionArranqueSubidaLocal {
   accion: 'ok' | 'avisar' | 'abortar';
@@ -418,8 +419,30 @@ export interface DecisionArranqueSubidaLocal {
 }
 
 /**
+ * Valores PLACEHOLDER de credenciales R2: no son un R2 real (los del `docker-compose.yml` son `dev`).
+ * El vacío también cuenta como dummy. Si el access-key o el secret son uno de estos, NO hay un R2 real
+ * donde escribir → el no-op de la subida local es inofensivo.
+ */
+const CREDENCIALES_R2_DUMMY = new Set(['', 'dev', 'dummy', 'local', 'test']);
+
+/**
+ * ¿Las credenciales R2 del entorno son placeholders (dev/CI) y no un R2 real? Se mira el access-key y el
+ * secret: si CUALQUIERA es dummy/vacío, no hay un R2 real disponible. (Criterio propio: el presign
+ * nunca necesitó distinguirlos porque firmar es local; la subida server-side sí lo requiere.)
+ */
+function credencialesR2SonDummy(env: Record<string, string | undefined>): boolean {
+  const accessKey = (env.R2_ACCESS_KEY_ID ?? '').trim().toLowerCase();
+  const secret = (env.R2_SECRET_ACCESS_KEY ?? '').trim().toLowerCase();
+  return CREDENCIALES_R2_DUMMY.has(accessKey) || CREDENCIALES_R2_DUMMY.has(secret);
+}
+
+/**
  * Decide qué hacer con `R2_SUBIDA_LOCAL` al arrancar. Función PURA (recibe el env, no toca nada): el
  * llamador (`servidor.ts`) ejecuta el efecto (log.warn o exit≠0). Testeable en aislamiento.
+ *
+ * La señal de peligro NO es `NODE_ENV` (la imagen de producción se usa TAMBIÉN en e2e, que corre con el
+ * flag encendido a propósito), sino "hay un R2 REAL y aun así se pide no-op": flag + credenciales reales
+ * → `abortar`; flag + credenciales dummy (dev/CI) → `avisar`; flag apagado → `ok`.
  */
 export function decidirArranqueSubidaLocal(
   env: Record<string, string | undefined> = process.env,
@@ -427,19 +450,19 @@ export function decidirArranqueSubidaLocal(
   if (env.R2_SUBIDA_LOCAL !== 'true') {
     return { accion: 'ok' };
   }
-  if (env.NODE_ENV === 'production') {
+  if (credencialesR2SonDummy(env)) {
     return {
-      accion: 'abortar',
+      accion: 'avisar',
       mensaje:
-        'R2_SUBIDA_LOCAL=true con NODE_ENV=production: la subida server-side a R2 sería NO-OP y los ' +
-        'XML de CFDI / adjuntos NO se guardarían. Es un modo SOLO para dev/CI — quita la variable en ' +
-        'producción y reinicia.',
+        '⚠️ R2_SUBIDA_LOCAL=true con credenciales R2 DUMMY — la subida server-side a R2 es NO-OP (solo ' +
+        'dev/CI). Con un R2 real, los XML de CFDI y adjuntos NO se guardarían.',
     };
   }
   return {
-    accion: 'avisar',
+    accion: 'abortar',
     mensaje:
-      '⚠️ R2_SUBIDA_LOCAL=true — la subida server-side a R2 es NO-OP (solo dev/CI). En producción los ' +
-      'XML de CFDI y adjuntos NO se guardarían.',
+      'R2_SUBIDA_LOCAL=true con credenciales R2 REALES: la subida server-side sería NO-OP y descartaría ' +
+      'los XML de CFDI / adjuntos teniendo un R2 disponible. Es un modo SOLO para dev/CI — quita ' +
+      'R2_SUBIDA_LOCAL y reinicia.',
   };
 }
