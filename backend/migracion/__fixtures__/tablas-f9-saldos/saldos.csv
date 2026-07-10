@@ -1,0 +1,8 @@
+tipo,rfc,nombre,fecha,importe,folio,uuid,saldo,saldoEsperado,observaciones
+proveedor,AAA010101AA1,Telas del Norte,2026-01-15,1000,,U1,,1750,Factura enero
+proveedor,AAA010101AA1,Telas del Norte,2026-01-18,500,,U2,,,Factura enero 2
+proveedor,AAA010101AA1,Telas del Norte,2026-01-20,250,F1,,,,Nota sin factura
+cliente,XAXX010101000,Cliente Uno,2026-02-01,800,,U3,,500,Venta febrero
+cliente,XAXX010101000,Cliente Uno,,,,,-300,,Anticipo del cliente
+proveedor,BBB020202BB2,Proveedor Dos,,,,,2000,2000,Saldo neto de apertura
+proveedor,ZZZ990909ZZ9,Proveedor Fantasma,2026-01-10,999,F9,,,,No esta en el catalogo
