@@ -1180,6 +1180,30 @@ export {
   type BandejaCxpSalida,
 } from './esquemas/cxp.js';
 
+// ── Importación de CFDI de proveedores (Módulo 14, F9-E3; D12/R11) ──
+export {
+  TIPOS_COMPROBANTE_CFDI,
+  ETIQUETAS_TIPO_COMPROBANTE_CFDI,
+  REF_TIPOS_CFDI,
+  esquemaCfdiConcepto,
+  esquemaCfdiDatos,
+  esquemaCfdiCandidatoProveedor,
+  esquemaCfdiCandidatoOc,
+  esquemaCfdiXml,
+  esquemaCfdiPrevisualizacion,
+  esquemaCfdiImportarEntrada,
+  esquemaCfdiImportarSalida,
+  type TipoComprobanteCfdiClave,
+  type RefTipoCfdiClave,
+  type CfdiDatos,
+  type CfdiCandidatoProveedor,
+  type CfdiCandidatoOc,
+  type DatosCfdiXml,
+  type CfdiPrevisualizacion,
+  type DatosCfdiImportar,
+  type CfdiImportarSalida,
+} from './esquemas/cfdi.js';
+
 // ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
 export {
   esquemaEntregaClienteCrear,

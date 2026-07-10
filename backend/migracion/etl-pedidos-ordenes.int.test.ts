@@ -45,6 +45,9 @@ const archivosStub: ServicioArchivos = {
   solicitarSubida() {
     throw new Error('archivosStub.solicitarSubida no debe llamarse en este test');
   },
+  subirContenido() {
+    throw new Error('archivosStub.subirContenido no debe llamarse en este test');
+  },
   urlDescarga() {
     throw new Error('archivosStub.urlDescarga no debe llamarse en este test');
   },

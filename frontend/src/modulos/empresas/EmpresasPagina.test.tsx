@@ -39,6 +39,7 @@ function empresa(id: number, nombre: string, sobre: Partial<Empresa> = {}): Empr
     id,
     nombre,
     razonSocial: null,
+    rfc: null,
     identificador: null,
     favorita: false,
     paraIpt: false,
@@ -207,7 +208,7 @@ describe('<EmpresasPagina>', () => {
     await u.click(screen.getByTestId('editar-empresa'));
 
     const dialogo = await screen.findByRole('dialog');
-    const identificador = within(dialogo).getByLabelText('Identificador (RFC)');
+    const identificador = within(dialogo).getByLabelText('Identificador (folios)');
     expect(identificador).toHaveValue('MS-01');
 
     await u.clear(identificador);
@@ -220,5 +221,23 @@ describe('<EmpresasPagina>', () => {
     ];
     expect(args.id).toBe(3);
     expect(args.cuerpo.identificador).toBe('MS-02');
+  });
+
+  it('captura el RFC fiscal (F9-E3) y lo envía en el cuerpo del PATCH', async () => {
+    const u = userEvent.setup();
+    useEmpresas.mockReturnValue(consultaConDatos([empresa(4, 'Fiscal SA', { rfc: null })]));
+    renderConProveedores(<EmpresasPagina />, { sesion: estadoSesionDePrueba([...ADMIN]) });
+
+    await u.click(screen.getByTestId('fila-empresa'));
+    await u.click(screen.getByTestId('editar-empresa'));
+
+    const dialogo = await screen.findByRole('dialog');
+    const rfc = within(dialogo).getByLabelText('RFC');
+    await u.type(rfc, 'XAXX010101000');
+    await u.click(screen.getByTestId('guardar-empresa'));
+
+    const [args] = actualizarMutate.mock.calls[0] as [{ id: number; cuerpo: { rfc?: string } }];
+    expect(args.id).toBe(4);
+    expect(args.cuerpo.rfc).toBe('XAXX010101000');
   });
 });

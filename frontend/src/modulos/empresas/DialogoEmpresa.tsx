@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 const VALORES_INICIALES: DatosEmpresaFormulario = {
   nombre: '',
   razonSocial: '',
+  rfc: '',
   identificador: '',
 };
 
@@ -42,7 +43,7 @@ function texto(valor: string | null): string {
 
 /**
  * Dialogo de alta y edicion de empresa (react-hook-form + Zod). Captura nombre,
- * razon social, identificador (RFC) y las banderas
+ * razon social, RFC (fiscal, F9-E3), identificador (folios) y las banderas
  * favorita/IPT/EDR. Si recibe una `empresa` edita (PATCH); si no, da de alta
  * (POST). La validacion de captura es solo UX: el backend re-valida y es la
  * autoridad (A1).
@@ -78,6 +79,7 @@ export function DialogoEmpresa({
       formulario.reset({
         nombre: empresa.nombre,
         razonSocial: texto(empresa.razonSocial),
+        rfc: texto(empresa.rfc),
         identificador: texto(empresa.identificador),
       });
       setBanderas({
@@ -100,6 +102,9 @@ export function DialogoEmpresa({
     };
     if (datos.razonSocial.length > 0) {
       cuerpo.razonSocial = datos.razonSocial;
+    }
+    if (datos.rfc.length > 0) {
+      cuerpo.rfc = datos.rfc;
     }
     if (datos.identificador.length > 0) {
       cuerpo.identificador = datos.identificador;
@@ -174,8 +179,20 @@ export function DialogoEmpresa({
               <FieldError errors={[errors.razonSocial]} />
             </Field>
 
+            <Field data-invalid={Boolean(errors.rfc)}>
+              <FieldLabel htmlFor="empresa-rfc">RFC</FieldLabel>
+              <Input
+                id="empresa-rfc"
+                aria-invalid={Boolean(errors.rfc)}
+                disabled={guardando}
+                placeholder="XAXX010101000"
+                {...formulario.register('rfc')}
+              />
+              <FieldError errors={[errors.rfc]} />
+            </Field>
+
             <Field data-invalid={Boolean(errors.identificador)}>
-              <FieldLabel htmlFor="empresa-identificador">Identificador (RFC)</FieldLabel>
+              <FieldLabel htmlFor="empresa-identificador">Identificador (folios)</FieldLabel>
               <Input
                 id="empresa-identificador"
                 aria-invalid={Boolean(errors.identificador)}

@@ -160,6 +160,9 @@ describe('dominio Adjuntos de orden (F8-E6) — borrado físico R2 best-effort',
       solicitarSubida: () => {
         throw new Error('no debe llamarse');
       },
+      subirContenido: () => {
+        throw new Error('no debe llamarse');
+      },
       urlDescarga: () => Promise.reject(new Error('no debe llamarse')),
       eliminarObjeto,
     };
@@ -175,6 +178,9 @@ describe('dominio Adjuntos de orden (F8-E6) — borrado físico R2 best-effort',
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const archivos: ServicioArchivos = {
       solicitarSubida: () => {
+        throw new Error('no debe llamarse');
+      },
+      subirContenido: () => {
         throw new Error('no debe llamarse');
       },
       urlDescarga: () => Promise.reject(new Error('no debe llamarse')),

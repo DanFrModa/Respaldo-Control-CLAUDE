@@ -98066,6 +98066,949 @@
         }
       }
     },
+    "/api/terceros/cfdi/previsualizar": {
+      "post": {
+        "summary": "Previsualizar un CFDI de proveedor (datos extraídos + candidatos de conciliación)",
+        "tags": [
+          "cxp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "xml": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000000,
+                    "description": "Contenido del XML del CFDI (texto)."
+                  }
+                },
+                "required": [
+                  "xml"
+                ],
+                "description": "XML de un CFDI."
+              }
+            }
+          },
+          "description": "XML de un CFDI."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Previsualización de un CFDI antes de importarlo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "string",
+                          "description": "Versión del CFDI (siempre 4.0)."
+                        },
+                        "tipoComprobante": {
+                          "type": "string",
+                          "enum": [
+                            "I",
+                            "E"
+                          ],
+                          "description": "I = ingreso · E = egreso."
+                        },
+                        "origen": {
+                          "type": "string",
+                          "enum": [
+                            "factura_proveedor",
+                            "nota_credito"
+                          ],
+                          "description": "Origen de CxP derivado del tipo: I→factura_proveedor (+), E→nota_credito (−)."
+                        },
+                        "uuid": {
+                          "type": "string",
+                          "description": "UUID (folio fiscal) del Timbre Fiscal Digital."
+                        },
+                        "fecha": {
+                          "type": "string",
+                          "description": "Fecha de emisión (YYYY-MM-DD)."
+                        },
+                        "fechaTimbrado": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha del timbrado (ISO) o null."
+                        },
+                        "emisorRfc": {
+                          "type": "string",
+                          "description": "RFC del emisor (el proveedor)."
+                        },
+                        "emisorNombre": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Razón social del emisor o null."
+                        },
+                        "receptorRfc": {
+                          "type": "string",
+                          "description": "RFC del receptor (debe ser la empresa activa)."
+                        },
+                        "receptorNombre": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Razón social del receptor o null."
+                        },
+                        "moneda": {
+                          "type": "string",
+                          "description": "Moneda del comprobante."
+                        },
+                        "subtotal": {
+                          "type": "number",
+                          "description": "Subtotal (antes de impuestos)."
+                        },
+                        "total": {
+                          "type": "number",
+                          "description": "Total del comprobante (por este monto entra el cargo)."
+                        },
+                        "ivaTrasladado": {
+                          "type": "number",
+                          "description": "IVA trasladado total."
+                        },
+                        "isrRetenido": {
+                          "type": "number",
+                          "description": "ISR retenido total."
+                        },
+                        "ivaRetenido": {
+                          "type": "number",
+                          "description": "IVA retenido total."
+                        },
+                        "conceptos": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "descripcion": {
+                                "type": "string",
+                                "description": "Descripción del concepto."
+                              },
+                              "cantidad": {
+                                "type": "number",
+                                "description": "Cantidad."
+                              },
+                              "valorUnitario": {
+                                "type": "number",
+                                "description": "Valor unitario."
+                              },
+                              "importe": {
+                                "type": "number",
+                                "description": "Importe del renglón."
+                              }
+                            },
+                            "required": [
+                              "descripcion",
+                              "cantidad",
+                              "valorUnitario",
+                              "importe"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Concepto (renglón) de un CFDI."
+                          },
+                          "description": "Conceptos (renglones)."
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "tipoComprobante",
+                        "origen",
+                        "uuid",
+                        "fecha",
+                        "fechaTimbrado",
+                        "emisorRfc",
+                        "emisorNombre",
+                        "receptorRfc",
+                        "receptorNombre",
+                        "moneda",
+                        "subtotal",
+                        "total",
+                        "ivaTrasladado",
+                        "isrRetenido",
+                        "ivaRetenido",
+                        "conceptos"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Datos fiscales extraídos del XML."
+                    },
+                    "candidatoProveedor": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "idProveedor": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del proveedor."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del proveedor."
+                            },
+                            "rfc": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "RFC del proveedor (catálogo R15)."
+                            },
+                            "corto": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Clave corta del proveedor."
+                            }
+                          },
+                          "required": [
+                            "idProveedor",
+                            "nombre",
+                            "rfc",
+                            "corto"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Proveedor candidato por RFC."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Proveedor sugerido por RFC del emisor, o null si ninguno coincide."
+                    },
+                    "candidatosOc": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idOrdenCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la OC."
+                          },
+                          "numCompra": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio de la OC (por empresa)."
+                          },
+                          "fecha": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de emisión de la OC o null."
+                          },
+                          "estatus": {
+                            "type": "string",
+                            "description": "Estatus de la OC."
+                          },
+                          "total": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total de la OC (derivado; null si se ocultan importes)."
+                          },
+                          "diferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "|total OC − total CFDI| (null si se ocultan importes)."
+                          },
+                          "diferenciaRelativa": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Diferencia relativa 0..1 respecto al total del CFDI (null si se ocultan importes)."
+                          }
+                        },
+                        "required": [
+                          "idOrdenCompra",
+                          "numCompra",
+                          "fecha",
+                          "estatus",
+                          "total",
+                          "diferencia",
+                          "diferenciaRelativa"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Orden de compra candidata para conciliar."
+                      },
+                      "description": "Órdenes de compra candidatas (mismo proveedor, total cercano), por cercanía."
+                    },
+                    "yaImportado": {
+                      "type": "boolean",
+                      "description": "¿El UUID ya está importado? (chequeo previo; el import lo rechazaría de todos modos)."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos para revisión (receptor, sin OC, diferencias…)."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "candidatoProveedor",
+                    "candidatosOc",
+                    "yaImportado",
+                    "avisos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Previsualización de un CFDI antes de importarlo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terceros/cfdi/importar": {
+      "post": {
+        "summary": "Importar un CFDI de proveedor a CxP (cargo fiscal por el total del CFDI, A2)",
+        "tags": [
+          "cxp"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "xml": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000000,
+                    "description": "Contenido del XML del CFDI (texto)."
+                  },
+                  "idProveedor": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Proveedor al que se le carga el CFDI (elegido a mano)."
+                  },
+                  "refTipo": {
+                    "description": "Tipo de operación real a ligar (orden-compra/recepcion). Con refId o ninguno.",
+                    "type": "string",
+                    "enum": [
+                      "orden-compra",
+                      "recepcion"
+                    ]
+                  },
+                  "refId": {
+                    "description": "Id de la operación real ligada (según refTipo).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "observaciones": {
+                    "description": "Observaciones opcionales.",
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "xml",
+                  "idProveedor"
+                ],
+                "description": "Importación de un CFDI de proveedor a CxP."
+              }
+            }
+          },
+          "description": "Importación de un CFDI de proveedor a CxP."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de importar un CFDI de proveedor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "movimiento": {
+                      "type": "object",
+                      "properties": {
+                        "fuente": {
+                          "type": "string",
+                          "enum": [
+                            "motor",
+                            "esma"
+                          ],
+                          "description": "Origen del renglón: motor nuevo o EsMa."
+                        },
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del renglón en su tabla de origen."
+                        },
+                        "idEmpresa": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Empresa dueña (A9)."
+                        },
+                        "folio": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Folio A3 (solo motor; null en EsMa)."
+                        },
+                        "tipoTercero": {
+                          "type": "string",
+                          "enum": [
+                            "cliente",
+                            "proveedor"
+                          ],
+                          "description": "Tipo de tercero."
+                        },
+                        "idTercero": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del cliente o proveedor."
+                        },
+                        "tercero": {
+                          "type": "string",
+                          "description": "Nombre del tercero."
+                        },
+                        "fecha": {
+                          "type": "string",
+                          "description": "Fecha del movimiento (YYYY-MM-DD)."
+                        },
+                        "origen": {
+                          "type": "string",
+                          "description": "Origen/concepto del movimiento (etiqueta estable)."
+                        },
+                        "monto": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                        },
+                        "fechaVencimiento": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                        },
+                        "esFiscal": {
+                          "type": "boolean",
+                          "description": "¿Movimiento fiscal (con CFDI)?"
+                        },
+                        "uuidCfdi": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "UUID del CFDI o null."
+                        },
+                        "rfcTercero": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "RFC del tercero o null."
+                        },
+                        "idArchivoCfdi": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del Archivo R2 del CFDI o null."
+                        },
+                        "refTipo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Discriminador de la operación ligada o null."
+                        },
+                        "refId": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de la operación ligada o null."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones o null."
+                        },
+                        "cancelado": {
+                          "type": "boolean",
+                          "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                        },
+                        "esInverso": {
+                          "type": "boolean",
+                          "description": "¿Es un movimiento inverso de cancelación?"
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Cuándo se registró (ISO)."
+                        },
+                        "creadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de quien lo registró o null."
+                        }
+                      },
+                      "required": [
+                        "fuente",
+                        "id",
+                        "idEmpresa",
+                        "folio",
+                        "tipoTercero",
+                        "idTercero",
+                        "tercero",
+                        "fecha",
+                        "origen",
+                        "monto",
+                        "fechaVencimiento",
+                        "esFiscal",
+                        "uuidCfdi",
+                        "rfcTercero",
+                        "idArchivoCfdi",
+                        "refTipo",
+                        "refId",
+                        "observaciones",
+                        "cancelado",
+                        "esInverso",
+                        "creadoEn",
+                        "creadoPorId"
+                      ],
+                      "additionalProperties": false,
+                      "description": "El cargo/NC fiscal creado en CxP."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos (sin OC, diferencia con la OC, RFC del proveedor…)."
+                    }
+                  },
+                  "required": [
+                    "movimiento",
+                    "avisos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de importar un CFDI de proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ruta-critica/procesos": {
       "get": {
         "summary": "Listar procesos de la Ruta Crítica",
@@ -179793,6 +180736,17 @@
                         ],
                         "description": "Razón social, o null."
                       },
+                      "rfc": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "description": "RFC fiscal de la empresa (F9-E3), o null."
+                      },
                       "identificador": {
                         "anyOf": [
                           {
@@ -179859,6 +180813,7 @@
                       "id",
                       "nombre",
                       "razonSocial",
+                      "rfc",
                       "identificador",
                       "favorita",
                       "paraIpt",
@@ -180044,6 +180999,10 @@
                     "type": "string",
                     "maxLength": 200
                   },
+                  "rfc": {
+                    "type": "string",
+                    "maxLength": 13
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -180101,6 +181060,17 @@
                         }
                       ],
                       "description": "Razón social, o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal de la empresa (F9-E3), o null."
                     },
                     "identificador": {
                       "anyOf": [
@@ -180168,6 +181138,7 @@
                     "id",
                     "nombre",
                     "razonSocial",
+                    "rfc",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -180385,6 +181356,17 @@
                       ],
                       "description": "Razón social, o null."
                     },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal de la empresa (F9-E3), o null."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -180451,6 +181433,7 @@
                     "id",
                     "nombre",
                     "razonSocial",
+                    "rfc",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -180635,6 +181618,10 @@
                     "type": "string",
                     "maxLength": 200
                   },
+                  "rfc": {
+                    "type": "string",
+                    "maxLength": 13
+                  },
                   "identificador": {
                     "type": "string",
                     "maxLength": 20
@@ -180703,6 +181690,17 @@
                       ],
                       "description": "Razón social, o null."
                     },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal de la empresa (F9-E3), o null."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -180769,6 +181767,7 @@
                     "id",
                     "nombre",
                     "razonSocial",
+                    "rfc",
                     "identificador",
                     "favorita",
                     "paraIpt",
@@ -180984,6 +181983,17 @@
                       ],
                       "description": "Razón social, o null."
                     },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal de la empresa (F9-E3), o null."
+                    },
                     "identificador": {
                       "anyOf": [
                         {
@@ -181050,6 +182060,7 @@
                     "id",
                     "nombre",
                     "razonSocial",
+                    "rfc",
                     "identificador",
                     "favorita",
                     "paraIpt",

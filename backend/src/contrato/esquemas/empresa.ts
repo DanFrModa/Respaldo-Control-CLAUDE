@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esRfcValido } from './fiscal.js';
+
 /**
  * Esquemas del contrato de Empresas y su configuración (Administración, F1-E1
  * PIEZA C). Reflejan 1:1 lo que aceptan los servicios de dominio
@@ -24,6 +26,20 @@ export const esquemaEmpresaCrear = z.object({
     .string()
     .trim()
     .max(200, { error: 'La razón social no puede tener más de 200 caracteres' })
+    .optional(),
+  /**
+   * RFC fiscal de la empresa (F9-E3, R11). Se usa para validar el RECEPTOR de los CFDI de proveedores
+   * importados (A9) y como EMISOR de los CFDI de ventas (F9-E4). Se acepta vacío ('') para no
+   * capturarlo / limpiarlo; si viene, debe tener la forma del RFC mexicano.
+   */
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' })
+    .refine((v) => v === '' || esRfcValido(v), {
+      error: 'El RFC no tiene una forma válida (12 para moral, 13 para física)',
+    })
     .optional(),
   identificador: z
     .string()
@@ -67,6 +83,7 @@ export const esquemaEmpresaSalida = z
     id: z.number().int().describe('Id de la empresa.'),
     nombre: z.string().describe('Nombre corto de uso diario.'),
     razonSocial: z.string().nullable().describe('Razón social, o null.'),
+    rfc: z.string().nullable().describe('RFC fiscal de la empresa (F9-E3), o null.'),
     identificador: z.string().nullable().describe('Identificador corto para folios, o null.'),
     favorita: z.boolean().describe('Empresa propuesta por defecto al iniciar sesión.'),
     paraIpt: z.boolean().describe('Participa en el inventario de producto terminado.'),

@@ -48,6 +48,11 @@ model Empresa {
   /// Nombre corto de uso diario (viejo: `Empresas.Empresa`). Único para evitar duplicados de captura.
   nombre        String  @unique
   razonSocial   String? @map("razon_social")
+  /// RFC fiscal de la empresa. Se usa para validar que el RECEPTOR de un CFDI de proveedor importado
+  /// sea esta empresa (F9-E3, A9) y como EMISOR en los CFDI de ventas (F9-E4). Validado en Zod si
+  /// viene (forma del RFC mexicano). NULL si no se ha capturado (la validación del receptor entonces
+  /// solo AVISA, no rechaza).
+  rfc           String?
   /// Identificador corto usado en folios e impresos (viejo: `Identificador`).
   identificador String?
   /// Empresa propuesta por defecto al iniciar sesión (viejo: `Importancia = 1`).

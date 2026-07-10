@@ -31,6 +31,7 @@ import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
 import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
 import { CxpPagina } from '@/modulos/cxp/CxpPagina';
 import { EstadoCuentaProveedorPagina } from '@/modulos/cxp/EstadoCuentaProveedorPagina';
+import { ImportarCfdiPagina } from '@/modulos/cxp/ImportarCfdiPagina';
 import { EdrPagina } from '@/modulos/edr/EdrPagina';
 import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
 import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
@@ -310,6 +311,8 @@ const router = createBrowserRouter([
           // antes del catch-all ":modulo".
           { path: 'cxp', element: <CxpPagina /> },
           { path: 'cxp/estado-cuenta', element: <EstadoCuentaProveedorPagina /> },
+          // CxP · Importar CFDI de proveedor (F9-E3, R11): sube el XML → concilia → cargo fiscal.
+          { path: 'cxp/importar-cfdi', element: <ImportarCfdiPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/roles', element: <RolesPagina /> },

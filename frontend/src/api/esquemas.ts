@@ -560,9 +560,9 @@ export type DatosContrasena = z.infer<typeof esquemaContrasena>;
 
 /**
  * Captura del formulario de empresa (alta y edicion comparten forma). Solo el
- * `nombre` es obligatorio; razon social e identificador (RFC) son opcionales. Las
+ * `nombre` es obligatorio; razon social, RFC e identificador son opcionales. Las
  * banderas (favorita, paraIpt, paraEdr) se capturan como checkbox y no van en este
- * schema de texto.
+ * schema de texto. El RFC (F9-E3) valida su forma en el backend (A1); aquí solo el largo.
  */
 export const esquemaEmpresaFormulario = z.object({
   nombre: z
@@ -574,6 +574,11 @@ export const esquemaEmpresaFormulario = z.object({
     .string()
     .trim()
     .max(200, { error: 'La razón social no puede tener más de 200 caracteres' }),
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' }),
   identificador: z
     .string()
     .trim()

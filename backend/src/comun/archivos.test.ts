@@ -5,6 +5,7 @@ import {
   configR2DesdeEnv,
   crearClienteR2,
   crearServicioArchivos,
+  decidirArranqueSubidaLocal,
   EXPIRACION_SUBIDA_SEGUNDOS,
   sanearNombreArchivo,
   TAMANO_MAXIMO_BYTES,
@@ -177,6 +178,64 @@ describe('solicitarSubida', () => {
         carpeta: '../otra',
       }),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('subirContenido (server-side)', () => {
+  /** Servicio en modo LOCAL: la subida NO toca R2 (como en dev/CI con R2 dummy). */
+  function servicioLocal() {
+    const config = configR2DesdeEnv(ENV_COMPLETA);
+    return crearServicioArchivos({
+      cliente: crearClienteR2(config),
+      bucket: config.bucket,
+      subidaLocal: true,
+    });
+  }
+
+  it('en modo local devuelve bucket/key/metadatos sin contactar a R2', async () => {
+    const res = await servicioLocal().subirContenido({
+      nombreOriginal: 'CFDI Factura.xml',
+      tipoMime: 'application/xml',
+      carpeta: 'cfdi/proveedores/2026',
+      contenido: Buffer.from('<cfdi/>', 'utf8'),
+    });
+    expect(res.bucket).toBe('control-v2-prueba');
+    // Key: carpeta/uuid/nombre-saneado (mismo criterio que el presigned).
+    expect(res.key).toMatch(/^cfdi\/proveedores\/2026\/[0-9a-f-]{36}\/cfdi-factura\.xml$/);
+    expect(res.tipoMime).toBe('application/xml');
+    expect(res.tamanoBytes).toBe(Buffer.byteLength('<cfdi/>', 'utf8'));
+  });
+
+  it('valida carpeta/tamaño igual que el presigned (reusa el mismo esquema)', async () => {
+    await expect(
+      servicioLocal().subirContenido({
+        nombreOriginal: 'x.xml',
+        tipoMime: 'application/xml',
+        carpeta: '../otra', // carpeta inválida
+        contenido: Buffer.from('x'),
+      }),
+    ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('decidirArranqueSubidaLocal (guard de R2_SUBIDA_LOCAL)', () => {
+  it("con el flag apagado → 'ok', sin mensaje (subida real, sin ruido)", () => {
+    expect(decidirArranqueSubidaLocal({})).toEqual({ accion: 'ok' });
+    expect(decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'false' })).toEqual({ accion: 'ok' });
+    // Incluso en producción, si el flag no está, arranca normal.
+    expect(decidirArranqueSubidaLocal({ NODE_ENV: 'production' })).toEqual({ accion: 'ok' });
+  });
+
+  it("con el flag en dev/CI → 'avisar' con mensaje ruidoso (no arranca mudo)", () => {
+    const d = decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true' });
+    expect(d.accion).toBe('avisar');
+    expect(d.mensaje).toMatch(/R2_SUBIDA_LOCAL/);
+  });
+
+  it("con el flag Y NODE_ENV=production → 'abortar' (rehúsa arrancar)", () => {
+    const d = decidirArranqueSubidaLocal({ R2_SUBIDA_LOCAL: 'true', NODE_ENV: 'production' });
+    expect(d.accion).toBe('abortar');
+    expect(d.mensaje).toMatch(/producción/i);
   });
 });
 

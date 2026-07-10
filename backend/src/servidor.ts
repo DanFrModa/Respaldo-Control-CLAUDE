@@ -1,4 +1,5 @@
 import { construirApp } from './app.js';
+import { decidirArranqueSubidaLocal } from './comun/archivos.js';
 import { detenerColaEventos, iniciarColaEventos } from './comun/cola-eventos.js';
 import { detenerMotorJobs, iniciarMotorJobs } from './comun/jobs/index.js';
 import { registrarHandlerCpm } from './dominio/ruta-critica/cpm-job.js';
@@ -24,6 +25,17 @@ const PUERTO = Number(process.env.PORT ?? 3000);
 const HOST = '::';
 
 const app = await construirApp({ logBonito: process.env.NODE_ENV !== 'production' });
+
+// GUARD de R2_SUBIDA_LOCAL (antes de arrancar nada): un modo que descarta subidas (XML fiscales de CFDI
+// y adjuntos) en un no-op no puede arrancar mudo → avisa RUIDOSO en dev/CI y REHÚSA arrancar en
+// producción (exit≠0, mismo espíritu que los guards del entrypoint). La decisión es una función pura.
+const guardSubidaLocal = decidirArranqueSubidaLocal();
+if (guardSubidaLocal.accion === 'abortar') {
+  app.log.fatal(guardSubidaLocal.mensaje);
+  process.exit(1);
+} else if (guardSubidaLocal.accion === 'avisar') {
+  app.log.warn(guardSubidaLocal.mensaje);
+}
 
 // RED DE SEGURIDAD GLOBAL (defensa en profundidad, coherente con el "best-effort, la app sigue"
 // del resto del archivo). Las tareas de fondo (relay del outbox, motor de jobs) corren
