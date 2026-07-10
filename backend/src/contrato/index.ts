@@ -1204,6 +1204,43 @@ export {
   type CfdiImportarSalida,
 } from './esquemas/cfdi.js';
 
+// ── CxC: cuentas por cobrar de clientes (Módulo 14, F9-E4; D12/D15/R10/R12) ──
+export {
+  ORIGENES_MOVIMIENTO_CXC,
+  ETIQUETAS_ORIGEN_CXC,
+  FILTROS_BANDEJA_CXC,
+  esquemaMovimientoCxcCrear,
+  esquemaBandejaCxcQuery,
+  esquemaBandejaCxcFila,
+  esquemaResumenCxcSalida,
+  esquemaBandejaCxcSalida,
+  type OrigenMovimientoCxcClave,
+  type FiltroBandejaCxcClave,
+  type DatosMovimientoCxcCrear,
+  type BandejaCxcQuery,
+  type BandejaCxcFila,
+  type ResumenCxcSalida,
+  type BandejaCxcSalida,
+} from './esquemas/cxc.js';
+
+// ── Importación de CFDI de ventas (Módulo 14, F9-E4; D12/R12) ──
+export {
+  REF_TIPOS_CFDI_VENTA,
+  esquemaCfdiVentaDatos,
+  esquemaCfdiCandidatoCliente,
+  esquemaCfdiCandidatoPedido,
+  esquemaCfdiVentaPrevisualizacion,
+  esquemaCfdiVentaImportarEntrada,
+  esquemaCfdiVentaImportarSalida,
+  type RefTipoCfdiVentaClave,
+  type CfdiVentaDatos,
+  type CfdiCandidatoCliente,
+  type CfdiCandidatoPedido,
+  type CfdiVentaPrevisualizacion,
+  type DatosCfdiVentaImportar,
+  type CfdiVentaImportarSalida,
+} from './esquemas/cfdi-ventas.js';
+
 // ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
 export {
   esquemaEntregaClienteCrear,

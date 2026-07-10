@@ -42,6 +42,7 @@ import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma, type EstatusOrdenCompra } from '../../../datos/index.js';
 
 import { registrarMovimientoTercero } from '../cuenta-terceros.js';
+import { rfcEmpresaActiva, uuidYaImportado } from './cfdi-comun.js';
 import {
   parsearCfdi,
   origenDeTipoComprobante,
@@ -73,23 +74,6 @@ function redondear2(n: number): number {
 /** Redondeo a 4 decimales (para la diferencia relativa). */
 function redondear4(n: number): number {
   return Math.round(n * 10_000) / 10_000;
-}
-
-/**
- * RFC de la EMPRESA ACTIVA (A9), contra el que se valida el RECEPTOR del CFDI. Es un dato por empresa
- * (columna `Empresa.rfc`, F9-E3), NO un global: un env no distingue empresas y F9-E4 lo reusará como
- * EMISOR de las ventas. NULL si la empresa aún no capturó su RFC (→ el receptor solo se AVISA).
- */
-async function rfcEmpresaActiva(
-  cliente: ReturnType<typeof clienteLectura>,
-  idEmpresa: number,
-): Promise<string | null> {
-  const empresa = await cliente.empresa.findUnique({
-    where: { id: idEmpresa },
-    select: { rfc: true },
-  });
-  const rfc = empresa?.rfc ?? null;
-  return rfc !== null && rfc.trim() !== '' ? rfc : null;
 }
 
 /**
@@ -200,18 +184,6 @@ async function matchOcs(
       diferencia: puedeVerImportes ? diferencia : null,
       diferenciaRelativa: puedeVerImportes ? diferenciaRelativa : null,
     }));
-}
-
-/** ¿Ya se importó ese UUID? (chequeo previo para error limpio; la unique de E1 es el backstop). */
-async function uuidYaImportado(
-  cliente: ReturnType<typeof clienteLectura>,
-  uuid: string,
-): Promise<boolean> {
-  const existente = await cliente.movimientoTercero.findFirst({
-    where: { uuidCfdi: uuid },
-    select: { id: true },
-  });
-  return existente !== null;
 }
 
 // ── Previsualización ─────────────────────────────────────────────────────────────────────────────

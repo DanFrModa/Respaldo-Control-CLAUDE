@@ -48,6 +48,19 @@ const esquemaClienteFormulario = z.object({
     .string()
     .trim()
     .max(300, { error: 'La dirección no puede tener más de 300 caracteres' }),
+  // Fiscal/comercial (F9-E4): el RFC valida su FORMA en el backend (A1); aquí solo el largo. Los días
+  // de crédito son un entero opcional (vacío = contado).
+  rfc: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .max(13, { error: 'El RFC no puede tener más de 13 caracteres' }),
+  diasCredito: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || (/^\d+$/.test(v) && Number(v) <= 3650), {
+      error: 'Los días de crédito deben ser un entero entre 0 y 3650',
+    }),
 });
 
 /** Datos del formulario de cliente (todo texto; vacío = sin capturar). */
@@ -60,6 +73,8 @@ const VALORES_INICIALES: DatosClienteFormulario = {
   telefono: '',
   email: '',
   direccion: '',
+  rfc: '',
+  diasCredito: '',
 };
 
 /** Lee un campo de texto opcional del cliente para el formulario (`null` -> ''). */
@@ -67,9 +82,19 @@ function texto(valor: string | null): string {
   return valor ?? '';
 }
 
+/** Lee un campo numérico opcional del cliente como texto del `<input>` (`null` -> ''). */
+function numeroTexto(valor: number | null): string {
+  return valor === null ? '' : String(valor);
+}
+
 /** Texto opcional para EDICION: vacío -> `null` (BORRA el dato); con valor -> el texto. */
 function textoONull(valor: string): string | null {
   return valor.length > 0 ? valor : null;
+}
+
+/** Número opcional para EDICION: vacío -> `null` (BORRA el dato); con valor -> el número. */
+function numeroONull(valor: string): number | null {
+  return valor.trim() === '' ? null : Number(valor);
 }
 
 /**
@@ -116,6 +141,8 @@ export function DialogoCliente({
         telefono: texto(cliente.telefono),
         email: texto(cliente.email),
         direccion: texto(cliente.direccion),
+        rfc: texto(cliente.rfc),
+        diasCredito: numeroTexto(cliente.diasCredito),
       });
     } else {
       formulario.reset(VALORES_INICIALES);
@@ -131,6 +158,8 @@ export function DialogoCliente({
         telefono: textoONull(datos.telefono),
         email: textoONull(datos.email),
         direccion: textoONull(datos.direccion),
+        rfc: textoONull(datos.rfc),
+        diasCredito: numeroONull(datos.diasCredito),
       };
       actualizar.mutate(
         { id: cliente.id, cuerpo },
@@ -151,6 +180,8 @@ export function DialogoCliente({
     if (datos.telefono.length > 0) cuerpo.telefono = datos.telefono;
     if (datos.email.length > 0) cuerpo.email = datos.email;
     if (datos.direccion.length > 0) cuerpo.direccion = datos.direccion;
+    if (datos.rfc.length > 0) cuerpo.rfc = datos.rfc;
+    if (datos.diasCredito.trim().length > 0) cuerpo.diasCredito = Number(datos.diasCredito);
     crear.mutate(cuerpo, {
       onSuccess: (resultado) => {
         toast.success(`Cliente "${resultado.nombre}" creado.`);
@@ -233,6 +264,33 @@ export function DialogoCliente({
                   {...registrar('direccion')}
                 />
                 <FieldError errors={[errors.direccion]} />
+              </Field>
+
+              <Field data-invalid={Boolean(errors.rfc)}>
+                <FieldLabel htmlFor="cliente-rfc">RFC</FieldLabel>
+                <Input
+                  id="cliente-rfc"
+                  aria-invalid={Boolean(errors.rfc)}
+                  disabled={guardando}
+                  placeholder="Para conciliar el CFDI de venta (F9)"
+                  {...registrar('rfc')}
+                />
+                <FieldError errors={[errors.rfc]} />
+              </Field>
+
+              <Field data-invalid={Boolean(errors.diasCredito)}>
+                <FieldLabel htmlFor="cliente-dias-credito">Días de crédito</FieldLabel>
+                <Input
+                  id="cliente-dias-credito"
+                  type="number"
+                  min="0"
+                  step="1"
+                  aria-invalid={Boolean(errors.diasCredito)}
+                  disabled={guardando}
+                  placeholder="Vacío = contado"
+                  {...registrar('diasCredito')}
+                />
+                <FieldError errors={[errors.diasCredito]} />
               </Field>
             </FieldGroup>
           </div>

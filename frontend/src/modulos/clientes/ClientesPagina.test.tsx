@@ -56,6 +56,8 @@ function cliente(id: number, nombre: string, activo = true): Cliente {
     telefono: null,
     email: null,
     direccion: null,
+    rfc: null,
+    diasCredito: null,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,

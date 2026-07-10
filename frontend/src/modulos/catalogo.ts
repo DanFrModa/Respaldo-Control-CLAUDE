@@ -795,11 +795,11 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
       {
         clave: 'cxc',
         titulo: 'Cuentas por cobrar',
-        descripcion: 'Cuenta corriente de clientes: facturas, pagos y saldos (D12)',
+        descripcion:
+          'Cuenta corriente de clientes: bandeja por cobrar con antigüedad de saldos, estado de cuenta, cobros e importación de CFDI de venta (D12, F9-E4)',
         ruta: '/cxc',
         icono: 'billete',
-        permisos: 'autenticado',
-        proximamente: 'Llega con Finanzas (F9)',
+        permisos: ['cxc.ver'],
       },
       {
         clave: 'cxp',

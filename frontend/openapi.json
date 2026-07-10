@@ -203,7 +203,9 @@
                           "terceros.administrar",
                           "terceros.fiscal",
                           "cxp.ver",
-                          "cxp.administrar"
+                          "cxp.administrar",
+                          "cxc.ver",
+                          "cxc.administrar"
                         ]
                       },
                       "description": "Claves de permiso efectivas del usuario (unión de sus roles)."
@@ -14879,6 +14881,30 @@
                             ],
                             "description": "Dirección, o null."
                           },
+                          "rfc": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "RFC fiscal del cliente (F9-E4), o null."
+                          },
+                          "diasCredito": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Días de crédito del cliente (F9-E4); null = contado."
+                          },
                           "activo": {
                             "type": "boolean",
                             "description": "Falso si está desactivado (borrado suave)."
@@ -15017,6 +15043,8 @@
                           "telefono",
                           "email",
                           "direccion",
+                          "rfc",
+                          "diasCredito",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -15248,6 +15276,15 @@
                   "direccion": {
                     "type": "string",
                     "maxLength": 300
+                  },
+                  "rfc": {
+                    "type": "string",
+                    "maxLength": 13
+                  },
+                  "diasCredito": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3650
                   }
                 },
                 "required": [
@@ -15323,6 +15360,30 @@
                         }
                       ],
                       "description": "Dirección, o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal del cliente (F9-E4), o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito del cliente (F9-E4); null = contado."
                     },
                     "activo": {
                       "type": "boolean",
@@ -15462,6 +15523,8 @@
                     "telefono",
                     "email",
                     "direccion",
+                    "rfc",
+                    "diasCredito",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -15709,6 +15772,30 @@
                       ],
                       "description": "Dirección, o null."
                     },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal del cliente (F9-E4), o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito del cliente (F9-E4); null = contado."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -15847,6 +15934,8 @@
                     "telefono",
                     "email",
                     "direccion",
+                    "rfc",
+                    "diasCredito",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -16070,6 +16159,29 @@
                       }
                     ]
                   },
+                  "rfc": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 13
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "diasCredito": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 3650
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "activo": {
                     "type": "boolean"
                   }
@@ -16157,6 +16269,30 @@
                         }
                       ],
                       "description": "Dirección, o null."
+                    },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal del cliente (F9-E4), o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito del cliente (F9-E4); null = contado."
                     },
                     "activo": {
                       "type": "boolean",
@@ -16296,6 +16432,8 @@
                     "telefono",
                     "email",
                     "direccion",
+                    "rfc",
+                    "diasCredito",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -16541,6 +16679,30 @@
                       ],
                       "description": "Dirección, o null."
                     },
+                    "rfc": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC fiscal del cliente (F9-E4), o null."
+                    },
+                    "diasCredito": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Días de crédito del cliente (F9-E4); null = contado."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está desactivado (borrado suave)."
@@ -16679,6 +16841,8 @@
                     "telefono",
                     "email",
                     "direccion",
+                    "rfc",
+                    "diasCredito",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -94091,6 +94255,7 @@
                       "recibo_maquila",
                       "factura_proveedor",
                       "entrada_sin_factura",
+                      "factura_cliente",
                       "nota_credito",
                       "pago",
                       "abono",
@@ -95270,6 +95435,7 @@
                 "recibo_maquila",
                 "factura_proveedor",
                 "entrada_sin_factura",
+                "factura_cliente",
                 "nota_credito",
                 "pago",
                 "abono",
@@ -96366,6 +96532,7 @@
                 "recibo_maquila",
                 "factura_proveedor",
                 "entrada_sin_factura",
+                "factura_cliente",
                 "nota_credito",
                 "pago",
                 "abono",
@@ -97013,6 +97180,7 @@
                 "recibo_maquila",
                 "factura_proveedor",
                 "entrada_sin_factura",
+                "factura_cliente",
                 "nota_credito",
                 "pago",
                 "abono",
@@ -98857,6 +99025,3105 @@
                   ],
                   "additionalProperties": false,
                   "description": "Resultado de importar un CFDI de proveedor."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxc/por-cobrar": {
+      "get": {
+        "summary": "Clientes por cobrar con su antigüedad de saldos (aging) + resumen",
+        "tags": [
+          "cxc"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "default": "con-saldo",
+              "type": "string",
+              "enum": [
+                "con-saldo",
+                "todos"
+              ]
+            },
+            "in": "query",
+            "name": "filtro",
+            "required": false,
+            "description": "con-saldo (saldo ≠ 0) | todos (con movimientos)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Filtra por nombre del cliente (sin acentos ni mayúsculas)."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bandeja de cuentas por cobrar (clientes con aging + resumen).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idCliente": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del cliente."
+                          },
+                          "cliente": {
+                            "type": "string",
+                            "description": "Nombre del cliente."
+                          },
+                          "diasCredito": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Días de crédito del cliente (0 = contado)."
+                          },
+                          "saldo": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Saldo por cobrar (Σ movimientos del cliente)."
+                          },
+                          "corriente": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "No vencido (neto de cobros)."
+                          },
+                          "d1a30": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Vencido 1–30 días."
+                          },
+                          "d31a60": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Vencido 31–60 días."
+                          },
+                          "mas60": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Vencido +60 días."
+                          }
+                        },
+                        "required": [
+                          "idCliente",
+                          "cliente",
+                          "diasCredito",
+                          "saldo",
+                          "corriente",
+                          "d1a30",
+                          "d31a60",
+                          "mas60"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón de la bandeja de cuentas por cobrar (cliente + saldo + aging)."
+                      },
+                      "description": "Renglones de la página (saldo desc)."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de clientes que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página solicitada (1-based)."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    },
+                    "resumen": {
+                      "type": "object",
+                      "properties": {
+                        "carteraTotal": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Cartera total por cobrar (Σ saldos)."
+                        },
+                        "vencido": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Total vencido (Σ cubetas 1–30/31–60/+60)."
+                        },
+                        "alCorrientePct": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "% al corriente = (cartera − vencido) ÷ cartera (0–100); null si no hay cartera."
+                        },
+                        "clientesConSaldo": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Clientes con saldo ≠ 0."
+                        }
+                      },
+                      "required": [
+                        "carteraTotal",
+                        "vencido",
+                        "alCorrientePct",
+                        "clientesConSaldo"
+                      ],
+                      "additionalProperties": false,
+                      "description": "KPIs sobre toda la cartera con saldo."
+                    }
+                  },
+                  "required": [
+                    "filas",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas",
+                    "resumen"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Bandeja de cuentas por cobrar (clientes con aging + resumen)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxc/clientes/{id}/estado-cuenta": {
+      "get": {
+        "summary": "Estado de cuenta de un cliente (saldo + movimientos; vista operativa/fiscal)",
+        "tags": [
+          "cxc"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha inicial (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha final (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recibo_maquila",
+                "factura_proveedor",
+                "entrada_sin_factura",
+                "factura_cliente",
+                "nota_credito",
+                "pago",
+                "abono",
+                "descuento"
+              ]
+            },
+            "in": "query",
+            "name": "origen",
+            "required": false,
+            "description": "Filtra por un origen concreto (solo motor)."
+          },
+          {
+            "schema": {
+              "default": "operativa",
+              "type": "string",
+              "enum": [
+                "operativa",
+                "fiscal"
+              ]
+            },
+            "in": "query",
+            "name": "vista",
+            "required": false,
+            "description": "operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del cliente."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado de cuenta de un tercero (saldo + movimientos paginados).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "tipoTercero": {
+                      "type": "string",
+                      "enum": [
+                        "cliente",
+                        "proveedor"
+                      ],
+                      "description": "Tipo de tercero."
+                    },
+                    "idTercero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cliente o proveedor."
+                    },
+                    "tercero": {
+                      "type": "string",
+                      "description": "Nombre del tercero."
+                    },
+                    "vista": {
+                      "type": "string",
+                      "enum": [
+                        "operativa",
+                        "fiscal"
+                      ],
+                      "description": "Vista aplicada (operativa/fiscal)."
+                    },
+                    "desde": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha inicial del filtro o null."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha final del filtro o null."
+                    },
+                    "saldo": {
+                      "type": "object",
+                      "properties": {
+                        "tipoTercero": {
+                          "type": "string",
+                          "enum": [
+                            "cliente",
+                            "proveedor"
+                          ],
+                          "description": "Tipo de tercero."
+                        },
+                        "idTercero": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del cliente o proveedor."
+                        },
+                        "tercero": {
+                          "type": "string",
+                          "description": "Nombre del tercero."
+                        },
+                        "saldo": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Saldo OPERATIVO total (motor + EsMa)."
+                        },
+                        "saldoFiscal": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Saldo FISCAL total (solo movimientos con CFDI)."
+                        },
+                        "saldoMovimientos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Aporte del motor nuevo al saldo operativo."
+                        },
+                        "saldoEsMa": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Aporte de EsMa (F6) al saldo operativo; 0 en clientes."
+                        },
+                        "incluyeEsMa": {
+                          "type": "boolean",
+                          "description": "¿El saldo incluye movimientos de EsMa (proveedor)?"
+                        }
+                      },
+                      "required": [
+                        "tipoTercero",
+                        "idTercero",
+                        "tercero",
+                        "saldo",
+                        "saldoFiscal",
+                        "saldoMovimientos",
+                        "saldoEsMa",
+                        "incluyeEsMa"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Saldo derivado (all-time, no depende del periodo)."
+                    },
+                    "movimientos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fuente": {
+                            "type": "string",
+                            "enum": [
+                              "motor",
+                              "esma"
+                            ],
+                            "description": "Origen del renglón: motor nuevo o EsMa."
+                          },
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del renglón en su tabla de origen."
+                          },
+                          "idEmpresa": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Empresa dueña (A9)."
+                          },
+                          "folio": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Folio A3 (solo motor; null en EsMa)."
+                          },
+                          "tipoTercero": {
+                            "type": "string",
+                            "enum": [
+                              "cliente",
+                              "proveedor"
+                            ],
+                            "description": "Tipo de tercero."
+                          },
+                          "idTercero": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del cliente o proveedor."
+                          },
+                          "tercero": {
+                            "type": "string",
+                            "description": "Nombre del tercero."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "description": "Fecha del movimiento (YYYY-MM-DD)."
+                          },
+                          "origen": {
+                            "type": "string",
+                            "description": "Origen/concepto del movimiento (etiqueta estable)."
+                          },
+                          "monto": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                          },
+                          "fechaVencimiento": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                          },
+                          "esFiscal": {
+                            "type": "boolean",
+                            "description": "¿Movimiento fiscal (con CFDI)?"
+                          },
+                          "uuidCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "UUID del CFDI o null."
+                          },
+                          "rfcTercero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "RFC del tercero o null."
+                          },
+                          "idArchivoCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id del Archivo R2 del CFDI o null."
+                          },
+                          "refTipo": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Discriminador de la operación ligada o null."
+                          },
+                          "refId": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de la operación ligada o null."
+                          },
+                          "observaciones": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Observaciones o null."
+                          },
+                          "cancelado": {
+                            "type": "boolean",
+                            "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                          },
+                          "esInverso": {
+                            "type": "boolean",
+                            "description": "¿Es un movimiento inverso de cancelación?"
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                            "description": "Cuándo se registró (ISO)."
+                          },
+                          "creadoPorId": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Id de quien lo registró o null."
+                          }
+                        },
+                        "required": [
+                          "fuente",
+                          "id",
+                          "idEmpresa",
+                          "folio",
+                          "tipoTercero",
+                          "idTercero",
+                          "tercero",
+                          "fecha",
+                          "origen",
+                          "monto",
+                          "fechaVencimiento",
+                          "esFiscal",
+                          "uuidCfdi",
+                          "rfcTercero",
+                          "idArchivoCfdi",
+                          "refTipo",
+                          "refId",
+                          "observaciones",
+                          "cancelado",
+                          "esInverso",
+                          "creadoEn",
+                          "creadoPorId"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón del estado de cuenta de un tercero."
+                      },
+                      "description": "Renglones de la página (motor + EsMa), por fecha desc."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de renglones que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página solicitada (1-based)."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    }
+                  },
+                  "required": [
+                    "tipoTercero",
+                    "idTercero",
+                    "tercero",
+                    "vista",
+                    "desde",
+                    "hasta",
+                    "saldo",
+                    "movimientos",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Estado de cuenta de un tercero (saldo + movimientos paginados)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxc/clientes/{id}/estado-cuenta/impreso": {
+      "get": {
+        "summary": "Estado de cuenta del cliente (PDF, R9)",
+        "tags": [
+          "cxc"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha inicial (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha final (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recibo_maquila",
+                "factura_proveedor",
+                "entrada_sin_factura",
+                "factura_cliente",
+                "nota_credito",
+                "pago",
+                "abono",
+                "descuento"
+              ]
+            },
+            "in": "query",
+            "name": "origen",
+            "required": false,
+            "description": "Filtra por un origen concreto (solo motor)."
+          },
+          {
+            "schema": {
+              "default": "operativa",
+              "type": "string",
+              "enum": [
+                "operativa",
+                "fiscal"
+              ]
+            },
+            "in": "query",
+            "name": "vista",
+            "required": false,
+            "description": "operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del cliente."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxc/clientes/{id}/movimientos": {
+      "post": {
+        "summary": "Capturar un movimiento de CxC de un cliente (cobro/abono/descuento/NC/cargo)",
+        "tags": [
+          "cxc"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fecha": {
+                    "type": "string",
+                    "format": "date",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+                    "description": "Fecha del movimiento (YYYY-MM-DD)."
+                  },
+                  "origen": {
+                    "type": "string",
+                    "enum": [
+                      "entrada_sin_factura",
+                      "nota_credito",
+                      "pago",
+                      "abono",
+                      "descuento"
+                    ],
+                    "description": "Origen del movimiento (determina el signo del monto)."
+                  },
+                  "importe": {
+                    "type": "number",
+                    "minimum": 0.01,
+                    "description": "Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen)."
+                  },
+                  "esFiscal": {
+                    "default": false,
+                    "description": "¿Movimiento fiscal (con CFDI)? El cargo sin factura lo deja en false.",
+                    "type": "boolean"
+                  },
+                  "refTipo": {
+                    "description": "Discriminador de la operación real ligada (p. ej. \"pedido\").",
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "refId": {
+                    "description": "Id de la operación real ligada (según refTipo).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "observaciones": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "fecha",
+                  "origen",
+                  "importe"
+                ],
+                "description": "Alta de un movimiento de cuenta corriente de un cliente (CxC)."
+              }
+            }
+          },
+          "description": "Alta de un movimiento de cuenta corriente de un cliente (CxC)."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del cliente."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Renglón del estado de cuenta de un tercero.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fuente": {
+                      "type": "string",
+                      "enum": [
+                        "motor",
+                        "esma"
+                      ],
+                      "description": "Origen del renglón: motor nuevo o EsMa."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del renglón en su tabla de origen."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "folio": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio A3 (solo motor; null en EsMa)."
+                    },
+                    "tipoTercero": {
+                      "type": "string",
+                      "enum": [
+                        "cliente",
+                        "proveedor"
+                      ],
+                      "description": "Tipo de tercero."
+                    },
+                    "idTercero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cliente o proveedor."
+                    },
+                    "tercero": {
+                      "type": "string",
+                      "description": "Nombre del tercero."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha del movimiento (YYYY-MM-DD)."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "description": "Origen/concepto del movimiento (etiqueta estable)."
+                    },
+                    "monto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                    },
+                    "fechaVencimiento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                    },
+                    "esFiscal": {
+                      "type": "boolean",
+                      "description": "¿Movimiento fiscal (con CFDI)?"
+                    },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI o null."
+                    },
+                    "rfcTercero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC del tercero o null."
+                    },
+                    "idArchivoCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del Archivo R2 del CFDI o null."
+                    },
+                    "refTipo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Discriminador de la operación ligada o null."
+                    },
+                    "refId": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la operación ligada o null."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones o null."
+                    },
+                    "cancelado": {
+                      "type": "boolean",
+                      "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                    },
+                    "esInverso": {
+                      "type": "boolean",
+                      "description": "¿Es un movimiento inverso de cancelación?"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se registró (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien lo registró o null."
+                    }
+                  },
+                  "required": [
+                    "fuente",
+                    "id",
+                    "idEmpresa",
+                    "folio",
+                    "tipoTercero",
+                    "idTercero",
+                    "tercero",
+                    "fecha",
+                    "origen",
+                    "monto",
+                    "fechaVencimiento",
+                    "esFiscal",
+                    "uuidCfdi",
+                    "rfcTercero",
+                    "idArchivoCfdi",
+                    "refTipo",
+                    "refId",
+                    "observaciones",
+                    "cancelado",
+                    "esInverso",
+                    "creadoEn",
+                    "creadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Renglón del estado de cuenta de un tercero."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cxc/movimientos/{id}/cancelar": {
+      "post": {
+        "summary": "Cancelar un movimiento de CxC por su inverso auditado (D3, nunca borrado)",
+        "tags": [
+          "cxc"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "motivo": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000,
+                    "description": "Motivo de la cancelación (queda en la bitácora y el inverso)."
+                  }
+                },
+                "required": [
+                  "motivo"
+                ],
+                "description": "Cancelación (por inverso auditado) de un movimiento de terceros."
+              }
+            }
+          },
+          "description": "Cancelación (por inverso auditado) de un movimiento de terceros."
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "description": "Id del movimiento."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Renglón del estado de cuenta de un tercero.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fuente": {
+                      "type": "string",
+                      "enum": [
+                        "motor",
+                        "esma"
+                      ],
+                      "description": "Origen del renglón: motor nuevo o EsMa."
+                    },
+                    "id": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del renglón en su tabla de origen."
+                    },
+                    "idEmpresa": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Empresa dueña (A9)."
+                    },
+                    "folio": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Folio A3 (solo motor; null en EsMa)."
+                    },
+                    "tipoTercero": {
+                      "type": "string",
+                      "enum": [
+                        "cliente",
+                        "proveedor"
+                      ],
+                      "description": "Tipo de tercero."
+                    },
+                    "idTercero": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Id del cliente o proveedor."
+                    },
+                    "tercero": {
+                      "type": "string",
+                      "description": "Nombre del tercero."
+                    },
+                    "fecha": {
+                      "type": "string",
+                      "description": "Fecha del movimiento (YYYY-MM-DD)."
+                    },
+                    "origen": {
+                      "type": "string",
+                      "description": "Origen/concepto del movimiento (etiqueta estable)."
+                    },
+                    "monto": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                    },
+                    "fechaVencimiento": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                    },
+                    "esFiscal": {
+                      "type": "boolean",
+                      "description": "¿Movimiento fiscal (con CFDI)?"
+                    },
+                    "uuidCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "UUID del CFDI o null."
+                    },
+                    "rfcTercero": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "RFC del tercero o null."
+                    },
+                    "idArchivoCfdi": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id del Archivo R2 del CFDI o null."
+                    },
+                    "refTipo": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Discriminador de la operación ligada o null."
+                    },
+                    "refId": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de la operación ligada o null."
+                    },
+                    "observaciones": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Observaciones o null."
+                    },
+                    "cancelado": {
+                      "type": "boolean",
+                      "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                    },
+                    "esInverso": {
+                      "type": "boolean",
+                      "description": "¿Es un movimiento inverso de cancelación?"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                      "description": "Cuándo se registró (ISO)."
+                    },
+                    "creadoPorId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Id de quien lo registró o null."
+                    }
+                  },
+                  "required": [
+                    "fuente",
+                    "id",
+                    "idEmpresa",
+                    "folio",
+                    "tipoTercero",
+                    "idTercero",
+                    "tercero",
+                    "fecha",
+                    "origen",
+                    "monto",
+                    "fechaVencimiento",
+                    "esFiscal",
+                    "uuidCfdi",
+                    "rfcTercero",
+                    "idArchivoCfdi",
+                    "refTipo",
+                    "refId",
+                    "observaciones",
+                    "cancelado",
+                    "esInverso",
+                    "creadoEn",
+                    "creadoPorId"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Renglón del estado de cuenta de un tercero."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terceros/cfdi-ventas/previsualizar": {
+      "post": {
+        "summary": "Previsualizar un CFDI de venta (datos extraídos + candidatos de conciliación)",
+        "tags": [
+          "cxc"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "xml": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000000,
+                    "description": "Contenido del XML del CFDI (texto)."
+                  }
+                },
+                "required": [
+                  "xml"
+                ],
+                "description": "XML de un CFDI."
+              }
+            }
+          },
+          "description": "XML de un CFDI."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Previsualización de un CFDI de venta antes de importarlo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "object",
+                      "properties": {
+                        "version": {
+                          "type": "string",
+                          "description": "Versión del CFDI (siempre 4.0)."
+                        },
+                        "tipoComprobante": {
+                          "type": "string",
+                          "enum": [
+                            "I",
+                            "E"
+                          ],
+                          "description": "I = ingreso · E = egreso."
+                        },
+                        "uuid": {
+                          "type": "string",
+                          "description": "UUID (folio fiscal) del Timbre Fiscal Digital."
+                        },
+                        "fecha": {
+                          "type": "string",
+                          "description": "Fecha de emisión (YYYY-MM-DD)."
+                        },
+                        "fechaTimbrado": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha del timbrado (ISO) o null."
+                        },
+                        "emisorRfc": {
+                          "type": "string",
+                          "description": "RFC del emisor (el proveedor)."
+                        },
+                        "emisorNombre": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Razón social del emisor o null."
+                        },
+                        "receptorRfc": {
+                          "type": "string",
+                          "description": "RFC del receptor (debe ser la empresa activa)."
+                        },
+                        "receptorNombre": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Razón social del receptor o null."
+                        },
+                        "moneda": {
+                          "type": "string",
+                          "description": "Moneda del comprobante."
+                        },
+                        "subtotal": {
+                          "type": "number",
+                          "description": "Subtotal (antes de impuestos)."
+                        },
+                        "total": {
+                          "type": "number",
+                          "description": "Total del comprobante (por este monto entra el cargo)."
+                        },
+                        "ivaTrasladado": {
+                          "type": "number",
+                          "description": "IVA trasladado total."
+                        },
+                        "isrRetenido": {
+                          "type": "number",
+                          "description": "ISR retenido total."
+                        },
+                        "ivaRetenido": {
+                          "type": "number",
+                          "description": "IVA retenido total."
+                        },
+                        "conceptos": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "descripcion": {
+                                "type": "string",
+                                "description": "Descripción del concepto."
+                              },
+                              "cantidad": {
+                                "type": "number",
+                                "description": "Cantidad."
+                              },
+                              "valorUnitario": {
+                                "type": "number",
+                                "description": "Valor unitario."
+                              },
+                              "importe": {
+                                "type": "number",
+                                "description": "Importe del renglón."
+                              }
+                            },
+                            "required": [
+                              "descripcion",
+                              "cantidad",
+                              "valorUnitario",
+                              "importe"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Concepto (renglón) de un CFDI."
+                          },
+                          "description": "Conceptos (renglones)."
+                        },
+                        "origen": {
+                          "type": "string",
+                          "enum": [
+                            "factura_cliente",
+                            "nota_credito"
+                          ],
+                          "description": "Origen de CxC derivado del tipo: I→factura_cliente (+), E→nota_credito (−)."
+                        }
+                      },
+                      "required": [
+                        "version",
+                        "tipoComprobante",
+                        "uuid",
+                        "fecha",
+                        "fechaTimbrado",
+                        "emisorRfc",
+                        "emisorNombre",
+                        "receptorRfc",
+                        "receptorNombre",
+                        "moneda",
+                        "subtotal",
+                        "total",
+                        "ivaTrasladado",
+                        "isrRetenido",
+                        "ivaRetenido",
+                        "conceptos",
+                        "origen"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Datos fiscales extraídos del XML."
+                    },
+                    "candidatoCliente": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "idCliente": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Id del cliente."
+                            },
+                            "nombre": {
+                              "type": "string",
+                              "description": "Nombre del cliente."
+                            },
+                            "rfc": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "RFC del cliente (catálogo, F9-E4)."
+                            }
+                          },
+                          "required": [
+                            "idCliente",
+                            "nombre",
+                            "rfc"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Cliente candidato por RFC."
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cliente sugerido por RFC del receptor, o null si ninguno coincide."
+                    },
+                    "candidatosPedido": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idPedido": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del pedido."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio del pedido (por empresa)."
+                          },
+                          "fecha": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Fecha del pedido o null."
+                          },
+                          "ocCliente": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "OC del cliente ligada al pedido, o null."
+                          },
+                          "total": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total del pedido (derivado; null si se ocultan importes)."
+                          },
+                          "diferencia": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "|total pedido − total CFDI| (null si se ocultan importes)."
+                          },
+                          "diferenciaRelativa": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Diferencia relativa 0..1 respecto al total del CFDI (null si se ocultan importes)."
+                          }
+                        },
+                        "required": [
+                          "idPedido",
+                          "folio",
+                          "fecha",
+                          "ocCliente",
+                          "total",
+                          "diferencia",
+                          "diferenciaRelativa"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Pedido candidato para conciliar."
+                      },
+                      "description": "Pedidos candidatos (mismo cliente, total cercano), por cercanía."
+                    },
+                    "yaImportado": {
+                      "type": "boolean",
+                      "description": "¿El UUID ya está importado? (chequeo previo; el import lo rechazaría de todos modos)."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos para revisión (emisor, sin pedido, diferencias…)."
+                    }
+                  },
+                  "required": [
+                    "datos",
+                    "candidatoCliente",
+                    "candidatosPedido",
+                    "yaImportado",
+                    "avisos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Previsualización de un CFDI de venta antes de importarlo."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/terceros/cfdi-ventas/importar": {
+      "post": {
+        "summary": "Importar un CFDI de venta a CxC (cargo fiscal por el total del CFDI, A2)",
+        "tags": [
+          "cxc"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "xml": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000000,
+                    "description": "Contenido del XML del CFDI (texto)."
+                  },
+                  "idCliente": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Cliente al que se le carga el CFDI (elegido a mano)."
+                  },
+                  "refTipo": {
+                    "description": "Tipo de operación real a ligar (pedido). Con refId o ninguno.",
+                    "type": "string",
+                    "enum": [
+                      "pedido"
+                    ]
+                  },
+                  "refId": {
+                    "description": "Id de la operación real ligada (según refTipo).",
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "observaciones": {
+                    "description": "Observaciones opcionales.",
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": [
+                  "xml",
+                  "idCliente"
+                ],
+                "description": "Importación de un CFDI de venta a CxC."
+              }
+            }
+          },
+          "description": "Importación de un CFDI de venta a CxC."
+        },
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado de importar un CFDI de venta.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "movimiento": {
+                      "type": "object",
+                      "properties": {
+                        "fuente": {
+                          "type": "string",
+                          "enum": [
+                            "motor",
+                            "esma"
+                          ],
+                          "description": "Origen del renglón: motor nuevo o EsMa."
+                        },
+                        "id": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del renglón en su tabla de origen."
+                        },
+                        "idEmpresa": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Empresa dueña (A9)."
+                        },
+                        "folio": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Folio A3 (solo motor; null en EsMa)."
+                        },
+                        "tipoTercero": {
+                          "type": "string",
+                          "enum": [
+                            "cliente",
+                            "proveedor"
+                          ],
+                          "description": "Tipo de tercero."
+                        },
+                        "idTercero": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Id del cliente o proveedor."
+                        },
+                        "tercero": {
+                          "type": "string",
+                          "description": "Nombre del tercero."
+                        },
+                        "fecha": {
+                          "type": "string",
+                          "description": "Fecha del movimiento (YYYY-MM-DD)."
+                        },
+                        "origen": {
+                          "type": "string",
+                          "description": "Origen/concepto del movimiento (etiqueta estable)."
+                        },
+                        "monto": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Importe CON SIGNO (Σ = saldo); null si se ocultan importes."
+                        },
+                        "fechaVencimiento": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Fecha de vencimiento derivada (aging D15d) o null."
+                        },
+                        "esFiscal": {
+                          "type": "boolean",
+                          "description": "¿Movimiento fiscal (con CFDI)?"
+                        },
+                        "uuidCfdi": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "UUID del CFDI o null."
+                        },
+                        "rfcTercero": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "RFC del tercero o null."
+                        },
+                        "idArchivoCfdi": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id del Archivo R2 del CFDI o null."
+                        },
+                        "refTipo": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Discriminador de la operación ligada o null."
+                        },
+                        "refId": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de la operación ligada o null."
+                        },
+                        "observaciones": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Observaciones o null."
+                        },
+                        "cancelado": {
+                          "type": "boolean",
+                          "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                        },
+                        "esInverso": {
+                          "type": "boolean",
+                          "description": "¿Es un movimiento inverso de cancelación?"
+                        },
+                        "creadoEn": {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$",
+                          "description": "Cuándo se registró (ISO)."
+                        },
+                        "creadoPorId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Id de quien lo registró o null."
+                        }
+                      },
+                      "required": [
+                        "fuente",
+                        "id",
+                        "idEmpresa",
+                        "folio",
+                        "tipoTercero",
+                        "idTercero",
+                        "tercero",
+                        "fecha",
+                        "origen",
+                        "monto",
+                        "fechaVencimiento",
+                        "esFiscal",
+                        "uuidCfdi",
+                        "rfcTercero",
+                        "idArchivoCfdi",
+                        "refTipo",
+                        "refId",
+                        "observaciones",
+                        "cancelado",
+                        "esInverso",
+                        "creadoEn",
+                        "creadoPorId"
+                      ],
+                      "additionalProperties": false,
+                      "description": "El cargo/NC fiscal creado en CxC."
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos (sin pedido, diferencia con el pedido, RFC del cliente…)."
+                    }
+                  },
+                  "required": [
+                    "movimiento",
+                    "avisos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resultado de importar un CFDI de venta."
                 }
               }
             }

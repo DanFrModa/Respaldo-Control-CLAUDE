@@ -74,6 +74,8 @@ function aClienteSalida(cliente: ClienteConCampos): z.infer<typeof esquemaClient
     telefono: cliente.telefono,
     email: cliente.email,
     direccion: cliente.direccion,
+    rfc: cliente.rfc,
+    diasCredito: cliente.diasCredito,
     activo: cliente.activo,
     creadoEn: cliente.creadoEn.toISOString(),
     creadoPorId: cliente.creadoPorId,

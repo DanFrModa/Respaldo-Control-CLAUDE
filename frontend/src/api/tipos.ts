@@ -1652,3 +1652,56 @@ export type CfdiImportarSalida =
 /** Cuerpo de la importación de un CFDI. */
 export type CfdiImportarEntrada =
   paths['/api/terceros/cfdi/importar']['post']['requestBody']['content']['application/json'];
+
+// ── CxC: cuentas por cobrar de clientes (Módulo 14, F9-E4) ────────────────────
+
+/** Bandeja "por cobrar" con aging + resumen (`GET /api/cxc/por-cobrar`). */
+export type CxcBandeja =
+  paths['/api/cxc/por-cobrar']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la bandeja (cliente + saldo + cubetas de aging). */
+export type CxcBandejaFila = CxcBandeja['filas'][number];
+/** Resumen (KPIs) de la bandeja de CxC. */
+export type CxcResumen = CxcBandeja['resumen'];
+/** Parámetros de la bandeja (querystring). */
+export type CxcBandejaQuery = NonNullable<
+  paths['/api/cxc/por-cobrar']['get']['parameters']['query']
+>;
+
+/** Estado de cuenta de un cliente (`GET /api/cxc/clientes/{id}/estado-cuenta`). */
+export type CxcEstadoCuenta =
+  paths['/api/cxc/clientes/{id}/estado-cuenta']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del estado de cuenta del cliente. */
+export type CxcEstadoCuentaMovimiento = CxcEstadoCuenta['movimientos'][number];
+/** Parámetros del estado de cuenta (querystring). */
+export type CxcEstadoCuentaQuery = NonNullable<
+  paths['/api/cxc/clientes/{id}/estado-cuenta']['get']['parameters']['query']
+>;
+
+/** Alta de un movimiento de CxC (`POST /api/cxc/clientes/{id}/movimientos`). */
+export type CxcMovimientoCrear =
+  paths['/api/cxc/clientes/{id}/movimientos']['post']['requestBody']['content']['application/json'];
+/** Movimiento devuelto por el alta/cancelación de CxC (renglón del libro de terceros). */
+export type CxcMovimientoSalida =
+  paths['/api/cxc/clientes/{id}/movimientos']['post']['responses']['201']['content']['application/json'];
+/** Origen de un movimiento de CxC capturable. */
+export type CxcOrigen = CxcMovimientoCrear['origen'];
+/** Cancelación de un movimiento de CxC (`POST /api/cxc/movimientos/{id}/cancelar`). */
+export type CxcMovimientoCancelar =
+  paths['/api/cxc/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+
+// ── Importación de CFDI de ventas (Módulo 14, F9-E4; R12) ───────────────────────
+/** Previsualización de un CFDI de venta (`POST /api/terceros/cfdi-ventas/previsualizar`). */
+export type CfdiVentaPrevisualizacion =
+  paths['/api/terceros/cfdi-ventas/previsualizar']['post']['responses']['200']['content']['application/json'];
+/** Datos fiscales extraídos de un CFDI de venta. */
+export type CfdiVentaDatos = CfdiVentaPrevisualizacion['datos'];
+/** Cliente candidato (match por RFC del receptor). */
+export type CfdiCandidatoCliente = NonNullable<CfdiVentaPrevisualizacion['candidatoCliente']>;
+/** Pedido candidato para conciliar. */
+export type CfdiCandidatoPedido = CfdiVentaPrevisualizacion['candidatosPedido'][number];
+/** Resultado de importar un CFDI de venta (`POST /api/terceros/cfdi-ventas/importar`). */
+export type CfdiVentaImportarSalida =
+  paths['/api/terceros/cfdi-ventas/importar']['post']['responses']['201']['content']['application/json'];
+/** Cuerpo de la importación de un CFDI de venta. */
+export type CfdiVentaImportarEntrada =
+  paths['/api/terceros/cfdi-ventas/importar']['post']['requestBody']['content']['application/json'];

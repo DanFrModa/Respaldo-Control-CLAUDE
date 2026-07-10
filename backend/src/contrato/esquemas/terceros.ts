@@ -21,14 +21,15 @@ export const TIPOS_TERCERO = ['cliente', 'proveedor'] as const;
 export type TipoTerceroClave = (typeof TIPOS_TERCERO)[number];
 
 /**
- * Orígenes de un movimiento de terceros (eje 1). Los tres primeros son CARGOS (+); los cuatro
- * últimos, ABONOS/reducciones (−). El orden refleja esa agrupación. EXTENSIBLE: E4 (CxC) agregará
- * los orígenes de venta/cobro; el signo lo fija el dominio (`signoDeOrigen`), no un CHECK de BD.
+ * Orígenes de un movimiento de terceros (eje 1). Los CUATRO primeros son CARGOS (+); los cuatro
+ * últimos, ABONOS/reducciones (−). El orden refleja esa agrupación. `factura_cliente` (F9-E4) es el
+ * cargo de CxC por VENTA. EXTENSIBLE: el signo lo fija el dominio (`signoDeOrigen`), no un CHECK de BD.
  */
 export const ORIGENES_MOVIMIENTO_TERCERO = [
   'recibo_maquila',
   'factura_proveedor',
   'entrada_sin_factura',
+  'factura_cliente',
   'nota_credito',
   'pago',
   'abono',
@@ -42,6 +43,7 @@ export const ETIQUETAS_ORIGEN_MOVIMIENTO_TERCERO: Record<OrigenMovimientoTercero
   recibo_maquila: 'Recibo de maquila',
   factura_proveedor: 'Factura de proveedor',
   entrada_sin_factura: 'Entrada sin factura',
+  factura_cliente: 'Factura de venta',
   nota_credito: 'Nota de crédito',
   pago: 'Pago',
   abono: 'Abono',

@@ -93,10 +93,7 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
 
   it('las hojas sin pantalla llevan su nota de "Proximamente" y ruta de un segmento', () => {
     // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta.
-    for (const [clave, nota] of [
-      ['ventas', 'Llega con Finanzas (F9)'],
-      ['cxc', 'Llega con Finanzas (F9)'],
-    ] as const) {
+    for (const [clave, nota] of [['ventas', 'Llega con Finanzas (F9)']] as const) {
       const hoja = MODULOS_MENU.find((m) => m.clave === clave);
       expect(hoja, clave).toBeDefined();
       expect(hoja?.proximamente).toBe(nota);
@@ -108,8 +105,8 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Sin permisos solo quedan las hojas de uso general: el resumen, los catálogos que heredaron
     // el gate del hub Catálogos (bordados + galería, telas, avíos, clientes, proveedores, colores,
-    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las 3 «Próximamente».
-    // (Auditores ya NO: es pantalla real gateada por `calidad.ver`, R9.)
+    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las «Próximamente» (ventas).
+    // (CxC ya NO: es pantalla real gateada por `cxc.ver`, F9-E4. Auditores tampoco: `calidad.ver`, R9.)
     expect(visibles.map((m) => m.clave).sort()).toEqual(
       [
         'almacenes',
@@ -118,7 +115,6 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
         'catalogo-telas',
         'clientes-catalogo',
         'colores',
-        'cxc',
         'documental',
         'etiquetas-marca',
         'galeria-bordados',
@@ -420,8 +416,9 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     const grupos = filtrarGruposVisibles(permisos());
     const porClave = new Map(grupos.map((g) => [g.clave, g]));
 
-    // FINANZAS: queda CxC (autenticado); CxP (gate `cxp.ver`, F9-E2) y EsMa (gate) desaparecen.
-    expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc']);
+    // FINANZAS: sin permisos, el grupo entero desaparece — CxC (gate `cxc.ver`, F9-E4), CxP (gate
+    // `cxp.ver`, F9-E2) y EsMa (gate) están todos gateados; no queda ninguna hoja "autenticado".
+    expect(porClave.get('finanzas')).toBeUndefined();
     // INVENTARIOS: las 4 hojas colapsadas tienen gate → sin permisos, el grupo entero desaparece.
     expect(porClave.get('inventarios')).toBeUndefined();
     // OPERACIÓN: sin permisos ya no sobrevive nada — Auditores ahora exige `calidad.ver` (antes era
