@@ -22,6 +22,7 @@ import { type Tx } from '../../comun/transaccion.js';
 import type { PrismaClient } from '../../datos/index.js';
 
 import { calcularSaldoMaquilero, type SaldoMaquileroCalculado } from '../esma/saldos.js';
+import { saldosEsMaPorMaquilero } from '../esma/saldos-todos.js';
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
 function aDateColumna(valor: string): Date {
@@ -87,6 +88,20 @@ export async function aporteEsMaSaldo(
     soloFiscal ? 'con' : undefined,
   );
   return desglose.saldo;
+}
+
+/**
+ * APORTE EsMa al saldo de CADA proveedor con movimientos EsMa, en UN agregado (NUNCA N+1) — la versión
+ * EN LOTE de {@link aporteEsMaSaldo}, para la BANDEJA de CxP (F9-E2). Reusa {@link saldosEsMaPorMaquilero}
+ * (misma fórmula de F6 → no-regresión). Devuelve un Map idProveedor→saldo EsMa (solo ≠ 0), vista
+ * operativa. Es el aporte que la bandeja muestra como cubeta "Maquila" (sin antigüedad: los cargos EsMa
+ * no traen fecha de vencimiento por ítem — el aging fino llega cuando EsMa registre por el motor).
+ */
+export async function aportesEsMaSaldoLote(
+  cliente: Tx | PrismaClient,
+  idEmpresa: number,
+): Promise<Map<number, number>> {
+  return saldosEsMaPorMaquilero(cliente, idEmpresa);
 }
 
 /** Opciones de la proyección del detalle EsMa. */

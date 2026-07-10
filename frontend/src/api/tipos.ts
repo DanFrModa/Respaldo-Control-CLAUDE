@@ -1597,3 +1597,39 @@ export type ExactitudCiclico =
   paths['/api/indicadores/ciclicos/{id}/exactitud']['get']['responses']['200']['content']['application/json'];
 /** Un renglón de exactitud (teórico vs real). */
 export type ExactitudCiclicoRenglon = ExactitudCiclico['renglones'][number];
+
+// ── CxP: cuentas por pagar de proveedores (Módulo 14, F9-E2) ──────────────────
+
+/** Bandeja "por pagar" con aging + resumen (`GET /api/cxp/por-pagar`). */
+export type CxpBandeja =
+  paths['/api/cxp/por-pagar']['get']['responses']['200']['content']['application/json'];
+/** Un renglón de la bandeja (proveedor + saldo + cubetas de aging). */
+export type CxpBandejaFila = CxpBandeja['filas'][number];
+/** Resumen (KPIs) de la bandeja de CxP. */
+export type CxpResumen = CxpBandeja['resumen'];
+/** Parámetros de la bandeja (querystring). */
+export type CxpBandejaQuery = NonNullable<
+  paths['/api/cxp/por-pagar']['get']['parameters']['query']
+>;
+
+/** Estado de cuenta de un proveedor (`GET /api/cxp/proveedores/{id}/estado-cuenta`). */
+export type CxpEstadoCuenta =
+  paths['/api/cxp/proveedores/{id}/estado-cuenta']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del estado de cuenta del proveedor. */
+export type CxpEstadoCuentaMovimiento = CxpEstadoCuenta['movimientos'][number];
+/** Parámetros del estado de cuenta (querystring). */
+export type CxpEstadoCuentaQuery = NonNullable<
+  paths['/api/cxp/proveedores/{id}/estado-cuenta']['get']['parameters']['query']
+>;
+
+/** Alta de un movimiento de CxP (`POST /api/cxp/proveedores/{id}/movimientos`). */
+export type CxpMovimientoCrear =
+  paths['/api/cxp/proveedores/{id}/movimientos']['post']['requestBody']['content']['application/json'];
+/** Movimiento devuelto por el alta/cancelación de CxP (renglón del libro de terceros). */
+export type CxpMovimientoSalida =
+  paths['/api/cxp/proveedores/{id}/movimientos']['post']['responses']['201']['content']['application/json'];
+/** Origen de un movimiento de CxP capturable. */
+export type CxpOrigen = CxpMovimientoCrear['origen'];
+/** Cancelación de un movimiento de CxP (`POST /api/cxp/movimientos/{id}/cancelar`). */
+export type CxpMovimientoCancelar =
+  paths['/api/cxp/movimientos/{id}/cancelar']['post']['requestBody']['content']['application/json'];

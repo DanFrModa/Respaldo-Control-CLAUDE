@@ -96,7 +96,6 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     for (const [clave, nota] of [
       ['ventas', 'Llega con Finanzas (F9)'],
       ['cxc', 'Llega con Finanzas (F9)'],
-      ['cxp', 'Llega con Finanzas (F9)'],
     ] as const) {
       const hoja = MODULOS_MENU.find((m) => m.clave === clave);
       expect(hoja, clave).toBeDefined();
@@ -120,7 +119,6 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
         'clientes-catalogo',
         'colores',
         'cxc',
-        'cxp',
         'documental',
         'etiquetas-marca',
         'galeria-bordados',
@@ -422,8 +420,8 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
     const grupos = filtrarGruposVisibles(permisos());
     const porClave = new Map(grupos.map((g) => [g.clave, g]));
 
-    // FINANZAS: quedan CxC/CxP (autenticado); EsMa (gate por permisos) desaparece.
-    expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc', 'cxp']);
+    // FINANZAS: queda CxC (autenticado); CxP (gate `cxp.ver`, F9-E2) y EsMa (gate) desaparecen.
+    expect(porClave.get('finanzas')?.entradas.map((e) => e.clave)).toEqual(['cxc']);
     // INVENTARIOS: las 4 hojas colapsadas tienen gate → sin permisos, el grupo entero desaparece.
     expect(porClave.get('inventarios')).toBeUndefined();
     // OPERACIÓN: sin permisos ya no sobrevive nada — Auditores ahora exige `calidad.ver` (antes era

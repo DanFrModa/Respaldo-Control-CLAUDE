@@ -197,6 +197,8 @@ export interface paths {
                 | 'terceros.ver'
                 | 'terceros.administrar'
                 | 'terceros.fiscal'
+                | 'cxp.ver'
+                | 'cxp.administrar'
               )[];
             };
           };
@@ -40188,6 +40190,932 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/por-pagar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Proveedores por pagar con su antigüedad de saldos (aging) + resumen */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description con-saldo (saldo ≠ 0) | todos (con movimientos). */
+          filtro?: 'con-saldo' | 'todos';
+          /** @description Filtra por nombre/clave del proveedor (sin acentos ni mayúsculas). */
+          busqueda?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Bandeja de cuentas por pagar (proveedores con aging + resumen). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Renglones de la página (saldo desc). */
+              filas: {
+                /** @description Id del proveedor. */
+                idProveedor: number;
+                /** @description Nombre del proveedor. */
+                proveedor: string;
+                /** @description Clave corta del proveedor (o null). */
+                corto: string | null;
+                /** @description Días de crédito del proveedor (0 = contado). */
+                diasCredito: number;
+                /** @description Saldo por pagar combinado (motor + maquila EsMa). */
+                saldo: number | null;
+                /** @description No vencido (neto de abonos). */
+                corriente: number | null;
+                /** @description Vencido 1–30 días. */
+                d1a30: number | null;
+                /** @description Vencido 31–60 días. */
+                d31a60: number | null;
+                /** @description Vencido +60 días. */
+                mas60: number | null;
+                /** @description Saldo de maquila (EsMa) SIN antigüedad (cubeta aparte). */
+                maquila: number | null;
+              }[];
+              /** @description Total de proveedores que cumplen el filtro. */
+              total: number;
+              /** @description Página solicitada (1-based). */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+              /** @description KPIs sobre toda la cartera con saldo. */
+              resumen: {
+                /** @description Cartera total por pagar (Σ saldos combinados: motor + maquila). */
+                carteraTotal: number | null;
+                /** @description Total vencido del motor (Σ cubetas 1–30/31–60/+60). */
+                vencido: number | null;
+                /** @description Saldo de maquila (EsMa) SIN antigüedad, agregado (aparte del %). */
+                maquilaTotal: number | null;
+                /** @description % al corriente = (carteraMotor − vencido) ÷ carteraMotor (0–100); null si no hay cartera del motor. */
+                alCorrientePct: number | null;
+                /** @description Proveedores con saldo ≠ 0. */
+                proveedoresConSaldo: number;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/proveedores/{id}/estado-cuenta': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Estado de cuenta de un proveedor (saldo + movimientos; vista operativa/fiscal) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Filtra por un origen concreto (solo motor). */
+          origen?:
+            | 'recibo_maquila'
+            | 'factura_proveedor'
+            | 'entrada_sin_factura'
+            | 'nota_credito'
+            | 'pago'
+            | 'abono'
+            | 'descuento';
+          /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
+          vista?: 'operativa' | 'fiscal';
+        };
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Estado de cuenta de un tercero (saldo + movimientos paginados). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Tipo de tercero.
+               * @enum {string}
+               */
+              tipoTercero: 'cliente' | 'proveedor';
+              /** @description Id del cliente o proveedor. */
+              idTercero: number;
+              /** @description Nombre del tercero. */
+              tercero: string;
+              /**
+               * @description Vista aplicada (operativa/fiscal).
+               * @enum {string}
+               */
+              vista: 'operativa' | 'fiscal';
+              /** @description Fecha inicial del filtro o null. */
+              desde: string | null;
+              /** @description Fecha final del filtro o null. */
+              hasta: string | null;
+              /** @description Saldo derivado (all-time, no depende del periodo). */
+              saldo: {
+                /**
+                 * @description Tipo de tercero.
+                 * @enum {string}
+                 */
+                tipoTercero: 'cliente' | 'proveedor';
+                /** @description Id del cliente o proveedor. */
+                idTercero: number;
+                /** @description Nombre del tercero. */
+                tercero: string;
+                /** @description Saldo OPERATIVO total (motor + EsMa). */
+                saldo: number | null;
+                /** @description Saldo FISCAL total (solo movimientos con CFDI). */
+                saldoFiscal: number | null;
+                /** @description Aporte del motor nuevo al saldo operativo. */
+                saldoMovimientos: number | null;
+                /** @description Aporte de EsMa (F6) al saldo operativo; 0 en clientes. */
+                saldoEsMa: number | null;
+                /** @description ¿El saldo incluye movimientos de EsMa (proveedor)? */
+                incluyeEsMa: boolean;
+              };
+              /** @description Renglones de la página (motor + EsMa), por fecha desc. */
+              movimientos: {
+                /**
+                 * @description Origen del renglón: motor nuevo o EsMa.
+                 * @enum {string}
+                 */
+                fuente: 'motor' | 'esma';
+                /** @description Id del renglón en su tabla de origen. */
+                id: number;
+                /** @description Empresa dueña (A9). */
+                idEmpresa: number;
+                /** @description Folio A3 (solo motor; null en EsMa). */
+                folio: number | null;
+                /**
+                 * @description Tipo de tercero.
+                 * @enum {string}
+                 */
+                tipoTercero: 'cliente' | 'proveedor';
+                /** @description Id del cliente o proveedor. */
+                idTercero: number;
+                /** @description Nombre del tercero. */
+                tercero: string;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /** @description Origen/concepto del movimiento (etiqueta estable). */
+                origen: string;
+                /** @description Importe CON SIGNO (Σ = saldo); null si se ocultan importes. */
+                monto: number | null;
+                /** @description Fecha de vencimiento derivada (aging D15d) o null. */
+                fechaVencimiento: string | null;
+                /** @description ¿Movimiento fiscal (con CFDI)? */
+                esFiscal: boolean;
+                /** @description UUID del CFDI o null. */
+                uuidCfdi: string | null;
+                /** @description RFC del tercero o null. */
+                rfcTercero: string | null;
+                /** @description Id del Archivo R2 del CFDI o null. */
+                idArchivoCfdi: string | null;
+                /** @description Discriminador de la operación ligada o null. */
+                refTipo: string | null;
+                /** @description Id de la operación ligada o null. */
+                refId: number | null;
+                /** @description Observaciones o null. */
+                observaciones: string | null;
+                /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+                cancelado: boolean;
+                /** @description ¿Es un movimiento inverso de cancelación? */
+                esInverso: boolean;
+                /**
+                 * Format: date-time
+                 * @description Cuándo se registró (ISO).
+                 */
+                creadoEn: string;
+                /** @description Id de quien lo registró o null. */
+                creadoPorId: string | null;
+              }[];
+              /** @description Total de renglones que cumplen el filtro. */
+              total: number;
+              /** @description Página solicitada (1-based). */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/proveedores/{id}/estado-cuenta/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Estado de cuenta del proveedor (PDF, R9) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Filtra por un origen concreto (solo motor). */
+          origen?:
+            | 'recibo_maquila'
+            | 'factura_proveedor'
+            | 'entrada_sin_factura'
+            | 'nota_credito'
+            | 'pago'
+            | 'abono'
+            | 'descuento';
+          /** @description operativa (todo) | fiscal (solo CFDI; exige terceros.fiscal). */
+          vista?: 'operativa' | 'fiscal';
+        };
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/proveedores/{id}/movimientos': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Capturar un movimiento de CxP de un proveedor (pago/abono/descuento/NC/entrada) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del proveedor. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Alta de un movimiento de cuenta corriente de un proveedor (CxP). */
+      requestBody: {
+        content: {
+          'application/json': {
+            /**
+             * Format: date
+             * @description Fecha del movimiento (YYYY-MM-DD).
+             */
+            fecha: string;
+            /**
+             * @description Origen del movimiento (determina el signo del monto).
+             * @enum {string}
+             */
+            origen: 'entrada_sin_factura' | 'nota_credito' | 'pago' | 'abono' | 'descuento';
+            /** @description Importe POSITIVO (≥ 0.01; el servidor le pone el signo según el origen). */
+            importe: number;
+            /**
+             * @description ¿Movimiento fiscal (con CFDI)? El proveedor informal lo deja en false.
+             * @default false
+             */
+            esFiscal?: boolean;
+            /** @description Discriminador de la operación real ligada (p. ej. "orden-compra"). */
+            refTipo?: string;
+            /** @description Id de la operación real ligada (según refTipo). */
+            refId?: number;
+            observaciones?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renglón del estado de cuenta de un tercero. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Origen del renglón: motor nuevo o EsMa.
+               * @enum {string}
+               */
+              fuente: 'motor' | 'esma';
+              /** @description Id del renglón en su tabla de origen. */
+              id: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Folio A3 (solo motor; null en EsMa). */
+              folio: number | null;
+              /**
+               * @description Tipo de tercero.
+               * @enum {string}
+               */
+              tipoTercero: 'cliente' | 'proveedor';
+              /** @description Id del cliente o proveedor. */
+              idTercero: number;
+              /** @description Nombre del tercero. */
+              tercero: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Origen/concepto del movimiento (etiqueta estable). */
+              origen: string;
+              /** @description Importe CON SIGNO (Σ = saldo); null si se ocultan importes. */
+              monto: number | null;
+              /** @description Fecha de vencimiento derivada (aging D15d) o null. */
+              fechaVencimiento: string | null;
+              /** @description ¿Movimiento fiscal (con CFDI)? */
+              esFiscal: boolean;
+              /** @description UUID del CFDI o null. */
+              uuidCfdi: string | null;
+              /** @description RFC del tercero o null. */
+              rfcTercero: string | null;
+              /** @description Id del Archivo R2 del CFDI o null. */
+              idArchivoCfdi: string | null;
+              /** @description Discriminador de la operación ligada o null. */
+              refTipo: string | null;
+              /** @description Id de la operación ligada o null. */
+              refId: number | null;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+              cancelado: boolean;
+              /** @description ¿Es un movimiento inverso de cancelación? */
+              esInverso: boolean;
+              /**
+               * Format: date-time
+               * @description Cuándo se registró (ISO).
+               */
+              creadoEn: string;
+              /** @description Id de quien lo registró o null. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/cxp/movimientos/{id}/cancelar': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancelar un movimiento de CxP por su inverso auditado (D3, nunca borrado) */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          /** @description Id del movimiento. */
+          id: number;
+        };
+        cookie?: never;
+      };
+      /** @description Cancelación (por inverso auditado) de un movimiento de terceros. */
+      requestBody: {
+        content: {
+          'application/json': {
+            /** @description Motivo de la cancelación (queda en la bitácora y el inverso). */
+            motivo: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Renglón del estado de cuenta de un tercero. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /**
+               * @description Origen del renglón: motor nuevo o EsMa.
+               * @enum {string}
+               */
+              fuente: 'motor' | 'esma';
+              /** @description Id del renglón en su tabla de origen. */
+              id: number;
+              /** @description Empresa dueña (A9). */
+              idEmpresa: number;
+              /** @description Folio A3 (solo motor; null en EsMa). */
+              folio: number | null;
+              /**
+               * @description Tipo de tercero.
+               * @enum {string}
+               */
+              tipoTercero: 'cliente' | 'proveedor';
+              /** @description Id del cliente o proveedor. */
+              idTercero: number;
+              /** @description Nombre del tercero. */
+              tercero: string;
+              /** @description Fecha del movimiento (YYYY-MM-DD). */
+              fecha: string;
+              /** @description Origen/concepto del movimiento (etiqueta estable). */
+              origen: string;
+              /** @description Importe CON SIGNO (Σ = saldo); null si se ocultan importes. */
+              monto: number | null;
+              /** @description Fecha de vencimiento derivada (aging D15d) o null. */
+              fechaVencimiento: string | null;
+              /** @description ¿Movimiento fiscal (con CFDI)? */
+              esFiscal: boolean;
+              /** @description UUID del CFDI o null. */
+              uuidCfdi: string | null;
+              /** @description RFC del tercero o null. */
+              rfcTercero: string | null;
+              /** @description Id del Archivo R2 del CFDI o null. */
+              idArchivoCfdi: string | null;
+              /** @description Discriminador de la operación ligada o null. */
+              refTipo: string | null;
+              /** @description Id de la operación ligada o null. */
+              refId: number | null;
+              /** @description Observaciones o null. */
+              observaciones: string | null;
+              /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+              cancelado: boolean;
+              /** @description ¿Es un movimiento inverso de cancelación? */
+              esInverso: boolean;
+              /**
+               * Format: date-time
+               * @description Cuándo se registró (ISO).
+               */
+              creadoEn: string;
+              /** @description Id de quien lo registró o null. */
+              creadoPorId: string | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;

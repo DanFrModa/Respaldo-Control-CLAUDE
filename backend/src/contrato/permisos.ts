@@ -50,6 +50,11 @@ export const MODULOS_PERMISO = {
   // EsMa), `administrar` (capturar/cancelar movimientos) y `fiscal` (la vista/reporte fiscal para el
   // contador). Administrar/fiscal solo Administración/Dirección; sin equivalente granular en el viejo.
   terceros: 'Cuenta corriente de terceros (Finanzas)',
+  // Cuentas por pagar de proveedores (Finanzas, Módulo 14, F9-E2) — el uso de negocio del motor de
+  // terceros para el PROVEEDOR: bandeja "por pagar" con aging, estado de cuenta y captura de
+  // pagos/abonos/descuentos/notas de crédito/entradas sin factura. `ver` (consulta, roles que ya ven
+  // EsMa/terceros) y `administrar` (captura/cancelación, solo Administración/Dirección).
+  cxp: 'Cuentas por pagar (Finanzas)',
   indicadores: 'Indicadores',
   consultas: 'Consultas transversales',
   usuarios: 'Administración de usuarios',
@@ -1111,6 +1116,26 @@ export const CATALOGO_PERMISOS = [
     // catálogo de proveedores). Si se requiere enmascarar, se ajusta en E3 antes de datos reales.
     descripcion:
       'Ver la vista/reporte FISCAL de terceros (solo movimientos con CFDI, para el contador) (F9-E1)',
+  },
+
+  // ── Cuentas por pagar (Finanzas, Módulo 14, F9-E2, A4 — D12/D15/R10; doc
+  //    PROPUESTA-Finanzas-y-Proveedores.md §3.2/§3.4) — permisos NUEVOS de v2. CxP es un uso del motor
+  //    de terceros (F9-E1) para el PROVEEDOR: `ver` (bandeja "por pagar" con aging + estado de cuenta,
+  //    para los roles directivos/gerenciales que ya ven terceros/EsMa) y `administrar` (capturar/cancelar
+  //    pagos/abonos/descuentos/NC/entradas — solo Administración/Dirección, como `terceros.administrar`).
+  //    Al delegar al motor se exige ADEMÁS `terceros.*` (defensa en profundidad; mismo reparto en el seed).
+  //    Deny-by-default (A4).
+  {
+    clave: 'cxp.ver',
+    modulo: 'cxp',
+    descripcion:
+      'Consultar cuentas por pagar: bandeja con antigüedad de saldos y estado de cuenta del proveedor (F9-E2)',
+  },
+  {
+    clave: 'cxp.administrar',
+    modulo: 'cxp',
+    descripcion:
+      'Capturar y cancelar movimientos de cuentas por pagar (pagos/abonos/descuentos/NC/entradas) (F9-E2)',
   },
 ] as const satisfies readonly DefinicionPermiso[];
 

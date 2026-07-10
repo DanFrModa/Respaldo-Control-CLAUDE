@@ -1161,6 +1161,25 @@ export {
   type EstadoCuentaTerceroSalida,
 } from './esquemas/terceros.js';
 
+// ── CxP: cuentas por pagar de proveedores (Módulo 14, F9-E2; D12/D15/R10) ──
+export {
+  ORIGENES_MOVIMIENTO_CXP,
+  ETIQUETAS_ORIGEN_CXP,
+  FILTROS_BANDEJA_CXP,
+  esquemaMovimientoCxpCrear,
+  esquemaBandejaCxpQuery,
+  esquemaBandejaCxpFila,
+  esquemaResumenCxpSalida,
+  esquemaBandejaCxpSalida,
+  type OrigenMovimientoCxpClave,
+  type FiltroBandejaCxpClave,
+  type DatosMovimientoCxpCrear,
+  type BandejaCxpQuery,
+  type BandejaCxpFila,
+  type ResumenCxpSalida,
+  type BandejaCxpSalida,
+} from './esquemas/cxp.js';
+
 // ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
 export {
   esquemaEntregaClienteCrear,
