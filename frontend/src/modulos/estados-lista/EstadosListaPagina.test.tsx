@@ -93,14 +93,15 @@ describe('<EstadosListaPagina>', () => {
     expect(screen.queryByTestId('editar-estado-lista')).not.toBeInTheDocument();
   });
 
-  it('marca los estados de cierre en el detalle', () => {
+  it('marca los estados de cierre en su renglón', () => {
+    // Tabla-first (R9): la bandera `esCierre` se pinta como badge en la columna Ciclo.
     useEstadosLista.mockReturnValue(consultaConDatos([estado(2, 'cerrada', 'Cerrada', true)]));
     renderConProveedores(<EstadosListaPagina />, {
       sesion: estadoSesionDePrueba(['estado-lista.ver', 'estado-lista.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-estado-lista');
-    expect(within(detalle).getByText('Sí (bloquea nuevas rondas/ediciones)')).toBeInTheDocument();
+    const fila = screen.getByTestId('fila-estado-lista');
+    expect(within(fila).getByText('Cierre')).toBeInTheDocument();
   });
 
   it('un admin puede marcar "es de cierre" al dar de alta', async () => {

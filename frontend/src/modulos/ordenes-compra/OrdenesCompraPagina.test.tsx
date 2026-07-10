@@ -10,10 +10,12 @@ import { ocDePrueba } from './fixtures';
 const autorizarMutate = vi.fn();
 const duplicarMutate = vi.fn();
 const useOrdenesCompraMock = vi.fn();
+// Resumen de cabecera (KPIs): cada test lo puede POBLAR; default = vacío.
+let resumenOc: { data: { ocAbiertas: number; porRecibir: number } | undefined };
 
 vi.mock('@/api/ordenes-compra', () => ({
   useOrdenesCompra: (q: unknown) => useOrdenesCompraMock(q) as unknown,
-  useResumenOc: () => ({ data: { ocAbiertas: 0, porRecibir: 0 } }),
+  useResumenOc: () => resumenOc,
   useAutorizarOc: () => ({ mutate: autorizarMutate, isPending: false }),
   useDuplicarOc: () => ({ mutate: duplicarMutate, isPending: false }),
   imprimirOc: vi.fn(),
@@ -49,6 +51,7 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     autorizarMutate.mockReset();
     duplicarMutate.mockReset();
     useOrdenesCompraMock.mockReset();
+    resumenOc = { data: { ocAbiertas: 0, porRecibir: 0 } };
   });
 
   it('lista las OC y muestra su folio, proveedor y total', () => {
@@ -58,6 +61,23 @@ describe('OrdenesCompraPagina (F4-E2)', () => {
     });
     expect(screen.getAllByText('OC 1001').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Telas del Norte').length).toBeGreaterThan(0);
+  });
+
+  it('KPIs con datos: pinta el conteo de OC abiertas y el monto por recibir compacto con sufijo', () => {
+    // Fixture POBLADO (antes solo se cubría el resumen vacío ocAbiertas:0 / porRecibir:0).
+    paginaConUna();
+    resumenOc = { data: { ocAbiertas: 12, porRecibir: 482_500 } };
+    renderConProveedores(<OrdenesCompraPagina />, {
+      sesion: estadoSesionDePrueba(['compras.ver']),
+    });
+
+    const abiertas = screen.getByTestId('kpi-oc-abiertas');
+    expect(within(abiertas).getByText('12')).toBeInTheDocument();
+
+    // $482,500 → moneda COMPACTA del tile: "$482.5" con el sufijo "K" como unidad chica.
+    const porRecibir = screen.getByTestId('kpi-por-recibir');
+    expect(within(porRecibir).getByText('$482.5')).toBeInTheDocument();
+    expect(within(porRecibir).getByText('K')).toBeInTheDocument();
   });
 
   it('muestra el estado VACÍO cuando no hay OC', () => {

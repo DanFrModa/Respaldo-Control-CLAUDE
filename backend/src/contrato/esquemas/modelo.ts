@@ -426,6 +426,35 @@ export const esquemaModeloSalida = z
       .string()
       .nullable()
       .describe('URL prefirmada de la foto principal del modelo, o null si no tiene fotos.'),
+    /**
+     * Nombre de la TELA PRINCIPAL del modelo = el PRIMER renglón del BOM de telas (mismo orden
+     * que la ficha: por nombre de tela). Solo el LISTADO lo resuelve (columna del proto
+     * `vModelos`, sin N+1); en las demás salidas viene `null` (igual que `urlFotoPrincipal`).
+     */
+    telaPrincipal: z
+      .string()
+      .nullable()
+      .describe('Nombre de la tela principal (primer renglón del BOM), o null.'),
+    /**
+     * Existencia TOTAL de PT del modelo en la EMPRESA ACTIVA (Σ de movimientos de kardex, D3,
+     * vía la vista `existencia_pt`; suma de todos los almacenes/órdenes). Solo el LISTADO lo
+     * resuelve; en las demás salidas viene `null` (la ficha usa la consulta de existencias).
+     */
+    stockPt: z
+      .number()
+      .int()
+      .nullable()
+      .describe('Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado.'),
+    /**
+     * Costo UNITARIO del ÚLTIMO costeo (F7) de una orden del modelo en la empresa activa =
+     * `costoTotal / cantidadDeBase(baseProrrateo)` — EXACTAMENTE el criterio de la Lista de
+     * costos. `null` si el modelo no tiene costeo guardado, si la base de prorrateo es 0, si la
+     * sesión no tiene `consultas.ver-importes` (mismo candado que Costos) o fuera del listado.
+     */
+    costoActual: z
+      .number()
+      .nullable()
+      .describe('Costo unitario del último costeo del modelo (F7), o null.'),
     activo: z.boolean().describe('Falso si está descontinuado (borrado suave).'),
     creadoEn: z.iso.datetime().describe('Fecha de alta (ISO 8601).'),
     creadoPorId: z.string().nullable().describe('Id del usuario que lo creó.'),

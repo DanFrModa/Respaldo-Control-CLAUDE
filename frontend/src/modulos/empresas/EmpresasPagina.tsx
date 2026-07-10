@@ -1,14 +1,34 @@
-import { Building2, FileText, ScrollText, SettingsIcon, StarIcon } from 'lucide-react';
+import {
+  Building2,
+  FileText,
+  Pencil,
+  Plus,
+  RotateCcw,
+  ScrollText,
+  SettingsIcon,
+  StarIcon,
+  Trash2,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useDesactivarEmpresa, useEmpresas, useReactivarEmpresa } from '@/api/empresas';
 import type { Empresa } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
+import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
+import { Avatar, EstadoBadge, TipoBadge } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle } from '@/modulos/ListaDetalle';
 import {
   CampoDetalle,
   Historial,
@@ -42,17 +62,15 @@ function coincide(empresa: Empresa, texto: string): boolean {
 }
 
 /**
- * Pantalla de Empresas — administracion de empresas (multi-empresa A9) sobre el
- * motor LISTA + DETALLE (rediseño "Teal fresco"). A diferencia de los catalogos,
- * la lista NO viene paginada del servidor (array plano, favorita primero), asi que
- * la busqueda y el filtro de inactivas se hacen EN CLIENTE y se le pasan al motor
- * los registros ya filtrados (sin `paginacion`). El detalle muestra los datos de
- * la empresa y sus banderas (favorita/IPT/EDR); ofrece editar / desactivar /
- * reactivar y la accion extra "Configurar" (parametros de costeo e inventario).
+ * Pantalla de Empresas (multi-empresa A9) — re-vestida R9 a TABLA-FIRST + CAJÓN, hermana de
+ * Usuarios/Roles (el proto no tiene vista propia de empresas): page-head + toolbar (chips
+ * Activas/Todas + buscador + conteo) + TABLA DENSA (Empresa · Identificador · Banderas · Estado) +
+ * barra de totales al pie. Al hacer clic en un renglón se abre un CAJÓN con los datos de la empresa
+ * y sus acciones (editar · desactivar/activar · configurar parámetros de costeo e inventario).
  *
- * Todo va gobernado por `empresas.administrar`. La decision real la toma el
- * backend en cada ruta (A1). OJO: aqui el flag de borrado suave es `activa`
- * (femenino), por eso `obtenerActivo={(e) => e.activa}`.
+ * La lista NO viene paginada del servidor (array plano, favorita primero): búsqueda y filtro de
+ * inactivas EN CLIENTE. Todo va gobernado por `empresas.administrar`; la decisión real la toma el
+ * backend en cada ruta (A1). OJO: el flag de borrado suave aquí es `activa` (femenino).
  */
 export function EmpresasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -66,6 +84,9 @@ export function EmpresasPagina(): React.JSX.Element {
   const [textoBusqueda, setTextoBusqueda] = useState('');
   const busqueda = useDebounce(textoBusqueda.trim().toLowerCase(), 300);
   const [incluirInactivas, setIncluirInactivas] = useState(false);
+  // El cajón guarda el ID; la empresa mostrada se DERIVA de la lista viva (estado
+  // fresco al activar/desactivar/editar).
+  const [seleccionId, setSeleccionId] = useState<number | null>(null);
 
   // ── Dialogos ───────────────────────────────────────────────────────────────
   const [dialogoAbierto, setDialogoAbierto] = useState(false);
@@ -114,82 +135,235 @@ export function EmpresasPagina(): React.JSX.Element {
     );
   }, [consulta.data, incluirInactivas, busqueda]);
 
+  const total = empresas.length;
+  const seleccion = empresas.find((e) => e.id === seleccionId) ?? null;
+
   return (
-    <>
-      <ListaDetalle<Empresa>
-        testid="empresa"
-        titulo="Empresas"
-        descripcion="Empresas del grupo y su configuración de costeo e inventario."
-        icono={Building2}
-        registros={empresas}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(e) => e.id}
-        obtenerTitulo={(e) => e.nombre}
-        obtenerActivo={(e) => e.activa}
-        obtenerSecundaria={(e) => e.identificador ?? e.razonSocial ?? undefined}
-        renderAvatarLista={(e) => (
-          <Avatar nombre={e.nombre} tono="pt" tamano="sm">
-            <Building2 className="size-4" aria-hidden />
-          </Avatar>
-        )}
-        busqueda={textoBusqueda}
-        alBuscar={setTextoBusqueda}
-        incluirInactivos={incluirInactivas}
-        alAlternarInactivos={() => setIncluirInactivas((v) => !v)}
-        textoVacio="No hay empresas que coincidan con la búsqueda."
-        puedeAdministrar={puedeAdministrar}
-        alNuevo={abrirAlta}
-        textoNuevo="Nueva empresa"
-        alEditar={abrirEdicion}
-        alDesactivar={setADesactivar}
-        alReactivar={reactivarEmpresa}
-        renderAvatarDetalle={(e) => (
-          <Avatar nombre={e.nombre} tono="pt" tamano="lg">
-            <Building2 className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderMeta={(e) => (e.favorita ? <BadgeFavorita /> : null)}
-        accionesExtra={(e) => (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setAConfigurar(e)}
-            data-testid="configurar-empresa"
-          >
-            <SettingsIcon aria-hidden />
-            Configurar
+    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
+      {/* ── Encabezado (proto .page-head) ────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Empresas</h1>
+          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
+            Empresas del grupo y su configuración de costeo e inventario
+          </p>
+        </div>
+        {puedeAdministrar ? (
+          <Button size="sm" onClick={abrirAlta} data-testid="nuevo-empresa">
+            <Plus aria-hidden />
+            Nueva empresa
           </Button>
-        )}
-        renderDetalle={(e) => (
-          <>
+        ) : null}
+      </header>
+
+      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          <ChipsFiltro
+            etiqueta="Filtrar por estado"
+            opciones={[
+              { valor: 'activas', etiqueta: 'Activas' },
+              { valor: 'todas', etiqueta: 'Todas', testid: 'mostrar-desactivados' },
+            ]}
+            valor={incluirInactivas ? 'todas' : 'activas'}
+            alCambiar={(valor) => setIncluirInactivas(valor === 'todas')}
+          />
+          <BuscadorToolbar
+            valor={textoBusqueda}
+            alCambiar={setTextoBusqueda}
+            placeholder="Buscar empresa…"
+            etiqueta="Buscar empresa"
+            testid="buscar-empresa"
+          />
+          <span className="ml-auto text-xs text-faint">
+            {total.toLocaleString('es-MX')} registros
+          </span>
+        </div>
+
+        {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          {consulta.isError ? (
+            <div className="space-y-2 p-6">
+              <p className="text-sm text-destructive" role="alert">
+                {consulta.error.message}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => void consulta.refetch()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : consulta.isPending ? (
+            <p className="p-6 text-sm text-muted-foreground">Cargando empresas…</p>
+          ) : empresas.length === 0 ? (
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="empresa-vacio"
+            >
+              No hay empresas que coincidan con la búsqueda.
+            </p>
+          ) : (
+            <TablaDensa>
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Empresa</TablaDensaHead>
+                  <TablaDensaHead>Identificador (RFC)</TablaDensaHead>
+                  <TablaDensaHead>Banderas</TablaDensaHead>
+                  <TablaDensaHead>Estado</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
+                {empresas.map((e) => (
+                  <TablaDensaFila
+                    key={e.id}
+                    seleccionada={seleccion?.id === e.id}
+                    className="cursor-pointer"
+                    onClick={() => setSeleccionId(e.id)}
+                    data-testid="fila-empresa"
+                  >
+                    <TablaDensaCelda>
+                      <div className="flex items-center gap-2">
+                        <Avatar nombre={e.nombre} tono="pt" tamano="sm">
+                          <Building2 className="size-4" aria-hidden />
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="truncate font-semibold">{e.nombre}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {e.razonSocial ?? 'Sin razón social'}
+                          </div>
+                        </div>
+                      </div>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      {e.identificador !== null && e.identificador !== undefined ? (
+                        <span className="num">{e.identificador}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {e.favorita ? <BadgeFavorita /> : null}
+                        {e.paraIpt ? <TipoBadge tono="pt">IPT</TipoBadge> : null}
+                        {e.paraEdr ? <TipoBadge tono="avios">EDR</TipoBadge> : null}
+                        {!e.favorita && !e.paraIpt && !e.paraEdr ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : null}
+                      </div>
+                    </TablaDensaCelda>
+                    <TablaDensaCelda>
+                      <EstadoBadge activo={e.activa} />
+                    </TablaDensaCelda>
+                  </TablaDensaFila>
+                ))}
+              </TablaDensaCuerpo>
+            </TablaDensa>
+          )}
+        </div>
+
+        {/* ── Barra de totales al pie ────────────────────────────────────── */}
+        <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs">
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-[10.5px] font-medium text-faint uppercase">
+              Empresas (filtro)
+            </span>
+            <b className="num">{total.toLocaleString('es-MX')}</b>
+          </span>
+        </div>
+      </div>
+
+      {/* ── Cajón de detalle de la empresa ──────────────────────────────────── */}
+      <CajonDetalle
+        abierto={seleccionId !== null}
+        alCambiarAbierto={(abierto) => {
+          if (!abierto) setSeleccionId(null);
+        }}
+        titulo={
+          seleccion !== null ? (
+            <span className="flex flex-wrap items-center gap-2">
+              {seleccion.nombre}
+              <EstadoBadge activo={seleccion.activa} />
+              {seleccion.favorita ? <BadgeFavorita /> : null}
+            </span>
+          ) : (
+            ''
+          )
+        }
+        subtitulo={seleccion !== null ? (seleccion.identificador ?? undefined) : undefined}
+        acciones={
+          seleccion !== null && puedeAdministrar ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => abrirEdicion(seleccion)}
+                data-testid="editar-empresa"
+              >
+                <Pencil aria-hidden />
+                Editar
+              </Button>
+              {seleccion.activa ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setADesactivar(seleccion)}
+                  data-testid="desactivar-empresa"
+                >
+                  <Trash2 aria-hidden />
+                  Desactivar
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => reactivarEmpresa(seleccion)}
+                  data-testid="activar-empresa"
+                >
+                  <RotateCcw aria-hidden />
+                  Activar
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAConfigurar(seleccion)}
+                data-testid="configurar-empresa"
+              >
+                <SettingsIcon aria-hidden />
+                Configurar
+              </Button>
+            </>
+          ) : undefined
+        }
+      >
+        {seleccion !== null ? (
+          <div data-testid="detalle-empresa">
             <SeccionDetalle titulo="Datos de la empresa">
               <RejillaCampos>
                 <CampoDetalle icono={ScrollText} etiqueta="Razón social" anchoCompleto>
-                  {e.razonSocial ?? <ValorVacio />}
+                  {seleccion.razonSocial ?? <ValorVacio />}
                 </CampoDetalle>
                 <CampoDetalle icono={FileText} etiqueta="Identificador (RFC)">
-                  {e.identificador ?? <ValorVacio />}
+                  {seleccion.identificador ?? <ValorVacio />}
                 </CampoDetalle>
               </RejillaCampos>
             </SeccionDetalle>
 
             <SeccionDetalle titulo="Banderas">
               <div className="flex flex-wrap gap-1.5">
-                {e.favorita ? <BadgeFavorita /> : null}
-                {e.paraIpt ? <TipoBadge tono="pt">Inventario PT (IPT)</TipoBadge> : null}
-                {e.paraEdr ? <TipoBadge tono="avios">Estado de resultados (EDR)</TipoBadge> : null}
-                {!e.favorita && !e.paraIpt && !e.paraEdr ? (
+                {seleccion.favorita ? <BadgeFavorita /> : null}
+                {seleccion.paraIpt ? <TipoBadge tono="pt">Inventario PT (IPT)</TipoBadge> : null}
+                {seleccion.paraEdr ? (
+                  <TipoBadge tono="avios">Estado de resultados (EDR)</TipoBadge>
+                ) : null}
+                {!seleccion.favorita && !seleccion.paraIpt && !seleccion.paraEdr ? (
                   <span className="text-sm text-muted-foreground">Sin banderas activas.</span>
                 ) : null}
               </div>
             </SeccionDetalle>
 
-            <Historial creadoEn={e.creadoEn} modificadoEn={e.modificadoEn} />
-          </>
-        )}
-      />
+            <Historial creadoEn={seleccion.creadoEn} modificadoEn={seleccion.modificadoEn} />
+          </div>
+        ) : null}
+      </CajonDetalle>
 
       {/* Dialogos */}
       <DialogoEmpresa
@@ -218,6 +392,6 @@ export function EmpresasPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </>
+    </div>
   );
 }

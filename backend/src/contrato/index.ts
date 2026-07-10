@@ -614,6 +614,8 @@ export {
   esquemaNotaSalidaSalida,
   esquemaNotasSalidaQuery,
   esquemaNotasSalidaPagina,
+  esquemaResumenNotasQuery,
+  esquemaResumenNotasSalida,
   type DatosNotaSalidaLineaEntrada,
   type DatosNotaSalidaCrear,
   type DatosNotaSalidaEditar,
@@ -622,6 +624,8 @@ export {
   type NotaSalidaSalida,
   type NotasSalidaQuery,
   type NotasSalidaPagina,
+  type ResumenNotasQuery,
+  type ResumenNotasSalida,
 } from './esquemas/nota-salida.js';
 
 // ── Explosión MRP / requerimiento de materiales por orden (Módulo 3, F4-E4; R3/R7) ──
@@ -940,6 +944,7 @@ export {
   type TraspasoPtSalida,
   type ExistenciasPtQuery,
   type ExistenciaPtFila,
+  type ExistenciaPtCelda,
   type ExistenciasPtLista,
   type KardexPtQuery,
   type KardexPtRenglon,

@@ -95,17 +95,16 @@ describe('<ConceptosCostoPagina>', () => {
   });
 
   it('un concepto FIJO no se puede desactivar: el botón se muestra deshabilitado', () => {
-    // El primero (auto-seleccionado en el detalle) es FIJO.
+    // Tabla-first (R9): las acciones van inline en el renglón del concepto.
     useConceptosCosto.mockReturnValue(consultaConDatos([concepto(1, 'tela', 'Tela', true)]));
     renderConProveedores(<ConceptosCostoPagina />, {
       sesion: estadoSesionDePrueba(['concepto-costo.ver', 'concepto-costo.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-concepto-costo');
-    const desactivar = within(detalle).getByTestId('desactivar-concepto-costo');
-    expect(desactivar).toBeDisabled();
+    const fila = screen.getByTestId('fila-concepto-costo');
+    expect(within(fila).getByTestId('desactivar-concepto-costo')).toBeDisabled();
     // Editar sí está disponible (se puede renombrar/reordenar un fijo).
-    expect(within(detalle).getByTestId('editar-concepto-costo')).toBeEnabled();
+    expect(within(fila).getByTestId('editar-concepto-costo')).toBeEnabled();
   });
 
   it('un concepto ABIERTO sí ofrece Desactivar habilitado', () => {
@@ -114,8 +113,8 @@ describe('<ConceptosCostoPagina>', () => {
       sesion: estadoSesionDePrueba(['concepto-costo.ver', 'concepto-costo.administrar']),
     });
 
-    const detalle = screen.getByTestId('detalle-concepto-costo');
-    expect(within(detalle).getByTestId('desactivar-concepto-costo')).toBeEnabled();
+    const fila = screen.getByTestId('fila-concepto-costo');
+    expect(within(fila).getByTestId('desactivar-concepto-costo')).toBeEnabled();
   });
 
   it('muestra el estado de error con reintentar', () => {

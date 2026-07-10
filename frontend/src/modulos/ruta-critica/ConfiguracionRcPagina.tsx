@@ -1,4 +1,4 @@
-import { CalendarDays, Loader2Icon, Plus, Power, RotateCcw, Save } from 'lucide-react';
+import { Loader2Icon, Plus, Power, RotateCcw, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -61,16 +61,14 @@ export function ConfiguracionRcPagina(): React.JSX.Element {
 
   return (
     <div className="flex flex-col gap-5 p-4" data-testid="config-rc-pagina">
-      <header className="flex items-center gap-3">
-        <CalendarDays className="size-6 text-primary" aria-hidden />
-        <div>
-          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
-            Configuración de la Ruta Crítica
-          </h1>
-          <p className="text-[12.5px] text-muted-foreground">
-            Colchón de costura, calendario laboral y festivos por empresa.
-          </p>
-        </div>
+      {/* page-head del proto: título + sub, SIN icono. */}
+      <header>
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+          Configuración de la Ruta Crítica
+        </h1>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+          Colchón de costura, calendario laboral y festivos por empresa
+        </p>
       </header>
 
       <Field className="max-w-xs">

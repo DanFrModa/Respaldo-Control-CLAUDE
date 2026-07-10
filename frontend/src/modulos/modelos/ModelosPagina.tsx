@@ -30,7 +30,7 @@ import {
   type ModelosQuery,
 } from '@/api/modelos';
 import { useTemporadas } from '@/api/temporadas';
-import type { ExistenciaPtFila } from '@/api/tipos';
+import type { ExistenciaPtCelda } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
@@ -112,19 +112,18 @@ function conDeepLinkInyectado(
  * page-head con conteo vivo («… · N modelos · M mostrados») + «Nuevo modelo»; toolbar con
  * buscador (código/nombre), chips de estado (Activos | Todos), filtro por temporada, el conteo
  * plano «M de N» y el SEGMENTADO Tabla | Galería (proto `.seg`); TABLA DENSA con las columnas
- * del proto que el payload alcanza (Modelo con MINIATURA de foto real + nombre/código ·
- * Temporada como badge neutral con punto · Tallas · Estado) y paginación de SERVIDOR al pie.
- * Al hacer clic en un renglón se abre el CAJÓN (proto `drawerModelo`): encabezado con foto
- * hero 46px + nombre + estado + línea `código · Temporada`; secciones Ficha (tela principal,
- * rango de tallas, maquila base, existencia PT), Receta / BOM (editor de 3 pestañas + copiar),
- * MATRIZ color × talla · existencia (agregado real del kardex, `inventario-pt.ver`), Fotos y
- * el historial. Conserva el DEEP-LINK (`state.idModelo`) que abre directo la ficha.
+ * del proto (Modelo con MINIATURA de foto real + nombre/código · Temporada como badge neutral
+ * con punto · Tela principal · Tallas · Stock PT · Costo · Estado — los agregados los sirve el
+ * LISTADO del backend por fila, sin N+1) y paginación de SERVIDOR al pie. Al hacer clic en un
+ * renglón se abre el CAJÓN (proto `drawerModelo`): encabezado con foto hero 46px + nombre +
+ * estado + línea `código · Temporada`; secciones Ficha (tela principal, rango de tallas,
+ * maquila base, existencia PT), Receta / BOM (editor de 3 pestañas + copiar), MATRIZ color ×
+ * talla · existencia (rollup `porColorTalla` YA sumado en servidor a través de almacenes, A1;
+ * `inventario-pt.ver`), Fotos y el historial. Conserva el DEEP-LINK (`state.idModelo`).
  *
- * FIDELIDAD vs proto — huecos que SÍ requieren backend (reportados, no inventados): columnas
- * «Tela principal», «Colores» (swatches), «Stock PT» y «Costo» del LISTADO (pedirían agregados
- * por fila en `GET /api/modelos`); botón «Exportar» (sin endpoint); filtro por tela; «Ficha
- * PDF» del cajón. En el CAJÓN la tela principal/existencia/matriz sí se cierran porque su dato
- * viene de la ficha ya cargada o de UNA consulta de existencias por modelo (sin N+1).
+ * FIDELIDAD vs proto — huecos restantes (reportados, no inventados): columna «Colores»
+ * (swatches) NO va (decisión D14 de Daniel: los colores no son atributo del modelo); botón
+ * «Exportar» (sin endpoint); filtro por tela; «Ficha PDF» del cajón.
  *
  * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1).
  */
@@ -347,7 +346,10 @@ export function ModelosPagina(): React.JSX.Element {
                 <TablaDensaFila>
                   <TablaDensaHead>Modelo</TablaDensaHead>
                   <TablaDensaHead>Temporada</TablaDensaHead>
+                  <TablaDensaHead>Tela principal</TablaDensaHead>
                   <TablaDensaHead>Tallas</TablaDensaHead>
+                  <TablaDensaHead numerica>Stock PT</TablaDensaHead>
+                  <TablaDensaHead numerica>Costo</TablaDensaHead>
                   <TablaDensaHead>Estado</TablaDensaHead>
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -382,7 +384,19 @@ export function ModelosPagina(): React.JSX.Element {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TablaDensaCelda>
+                    <TablaDensaCelda>{m.telaPrincipal ?? '—'}</TablaDensaCelda>
                     <TablaDensaCelda>{m.curvaTalla ?? '—'}</TablaDensaCelda>
+                    {/* Proto: stock en 0 se atenúa (`.cell-sub`); el dato lo agrega el backend. */}
+                    <TablaDensaCelda
+                      numerica
+                      className={m.stockPt === 0 ? 'text-muted-foreground' : undefined}
+                    >
+                      {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
+                    </TablaDensaCelda>
+                    {/* Costo del último costeo (F7); null (sin costeo o sin permiso) → "—". */}
+                    <TablaDensaCelda numerica className="mono">
+                      {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                    </TablaDensaCelda>
                     <TablaDensaCelda>
                       <EstadoBadge activo={m.activo} />
                     </TablaDensaCelda>
@@ -560,35 +574,30 @@ function MiniaturaModelo({
   );
 }
 
-/** Suma de existencia por llave (color o color×talla) a partir de las filas del endpoint. */
-function sumarPor(filas: readonly ExistenciaPtFila[], llave: (f: ExistenciaPtFila) => string) {
-  const sumas = new Map<string, number>();
-  for (const f of filas) {
-    const k = llave(f);
-    sumas.set(k, (sumas.get(k) ?? 0) + f.existencia);
-  }
-  return sumas;
-}
-
 /**
- * Matriz color × talla · existencia (proto `drawerModelo` `.matrix`): pivote de PRESENTACIÓN de
- * las filas que YA agregó el servidor (existencia por modelo×color×talla×almacén, D3); aquí solo
- * se suman los almacenes de cada celda. Columnas ordenadas por el orden del catálogo de tallas.
+ * Matriz color × talla · existencia (proto `drawerModelo` `.matrix`): pinta el rollup
+ * `porColorTalla` que el SERVIDOR ya agregó (existencia por color×talla sumada a través de
+ * almacenes/órdenes — `agrupar=color-talla`, A1). Aquí ya no se pivota nada: solo se acomoda la
+ * rejilla (columnas por el orden del catálogo de tallas) y el Σ del renglón para mostrar.
  */
 function MatrizExistenciaModelo({
-  filas,
+  celdas,
 }: {
-  filas: readonly ExistenciaPtFila[];
+  celdas: readonly ExistenciaPtCelda[];
 }): React.JSX.Element {
   // Tallas presentes (columnas), por el orden del catálogo; colores presentes (renglones).
-  const tallas = [...new Map(filas.map((f) => [f.idTalla, f])).values()].sort(
+  const tallas = [...new Map(celdas.map((c) => [c.idTalla, c])).values()].sort(
     (a, b) => a.ordenTalla - b.ordenTalla || a.etiquetaTalla.localeCompare(b.etiquetaTalla),
   );
-  const colores = [...new Map(filas.map((f) => [f.idColor, f])).values()].sort((a, b) =>
+  const colores = [...new Map(celdas.map((c) => [c.idColor, c])).values()].sort((a, b) =>
     a.color.localeCompare(b.color),
   );
-  const celdas = sumarPor(filas, (f) => `${f.idColor}:${f.idTalla}`);
-  const porColor = sumarPor(filas, (f) => String(f.idColor));
+  const porCelda = new Map(celdas.map((c) => [`${c.idColor}:${c.idTalla}`, c.existencia]));
+  // Σ del renglón (total del color): suma de las celdas YA agregadas por el servidor.
+  const porColor = new Map<number, number>();
+  for (const c of celdas) {
+    porColor.set(c.idColor, (porColor.get(c.idColor) ?? 0) + c.existencia);
+  }
 
   return (
     <div className="overflow-x-auto rounded-[9px] border">
@@ -616,7 +625,7 @@ function MatrizExistenciaModelo({
             <tr key={c.idColor} className="last:[&>td]:border-b-0">
               <td className="border-b bg-secondary px-2 py-1.5 text-left">{c.color}</td>
               {tallas.map((t) => {
-                const v = celdas.get(`${c.idColor}:${t.idTalla}`) ?? 0;
+                const v = porCelda.get(`${c.idColor}:${t.idTalla}`) ?? 0;
                 return (
                   <td
                     key={t.idTalla}
@@ -630,7 +639,7 @@ function MatrizExistenciaModelo({
                 );
               })}
               <td className="num border-b border-l px-2 py-1.5 text-center font-bold">
-                {(porColor.get(String(c.idColor)) ?? 0).toLocaleString('es-MX')}
+                {(porColor.get(c.idColor) ?? 0).toLocaleString('es-MX')}
               </td>
             </tr>
           ))}
@@ -658,9 +667,13 @@ function DetalleModelo({
   const ficha = useFichaModelo(modelo.id);
   // Existencia PT del modelo (suma de kardex, D3). Solo si tiene el permiso del módulo de
   // inventarios; si no, la consulta ni se dispara y las piezas de existencia no se muestran.
+  // `agrupar=color-talla` pide además el rollup de la matriz YA sumado en servidor (A1).
   const puedeVerInventario = tienePermiso('inventario-pt.ver');
-  const existencias = useExistenciasPt({ idModelo: modelo.id }, puedeVerInventario);
-  const filasExistencia = existencias.data?.filas ?? [];
+  const existencias = useExistenciasPt(
+    { idModelo: modelo.id, agrupar: 'color-talla' },
+    puedeVerInventario,
+  );
+  const celdasExistencia = existencias.data?.porColorTalla ?? [];
 
   // Tela principal (proto): el primer renglón de tela del BOM (el modelo viejo la lista primero).
   const telaPrincipal = ficha.data?.telas[0]?.nombre ?? null;
@@ -712,9 +725,9 @@ function DetalleModelo({
         ) : null}
       </SeccionDetalle>
 
-      {puedeVerInventario && filasExistencia.length > 0 ? (
+      {puedeVerInventario && celdasExistencia.length > 0 ? (
         <SeccionDetalle titulo="Matriz color × talla · existencia" icono={Grid3x3}>
-          <MatrizExistenciaModelo filas={filasExistencia} />
+          <MatrizExistenciaModelo celdas={celdasExistencia} />
         </SeccionDetalle>
       ) : null}
 

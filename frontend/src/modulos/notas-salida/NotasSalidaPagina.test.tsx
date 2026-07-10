@@ -9,9 +9,11 @@ import { notaDePrueba } from './fixtures';
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
 const confirmarMutate = vi.fn();
 const useNotasSalidaMock = vi.fn();
+const useResumenNotasMock = vi.fn();
 
 vi.mock('@/api/notas-salida', () => ({
   useNotasSalida: (q: unknown) => useNotasSalidaMock(q) as unknown,
+  useResumenNotas: (q: unknown) => useResumenNotasMock(q) as unknown,
   useConfirmarNota: () => ({ mutate: confirmarMutate, isPending: false }),
   imprimirNota: vi.fn(),
 }));
@@ -55,6 +57,38 @@ describe('NotasSalidaPagina (F4-E5, re-vestida R9)', () => {
   beforeEach(() => {
     confirmarMutate.mockReset();
     useNotasSalidaMock.mockReset();
+    useResumenNotasMock.mockReset();
+    // Resumen de cabecera por defecto (los tests de KPIs lo sobreescriben).
+    useResumenNotasMock.mockReturnValue({
+      data: { notas: 0, borradores: 0, confirmadas: 0, ordenesSurtidas: 0 },
+      isPending: false,
+      isError: false,
+    });
+  });
+
+  it('pinta los KPIs del resumen de cabecera (agregado en servidor, sin pivote en cliente)', () => {
+    paginaConUna();
+    useResumenNotasMock.mockReturnValue({
+      data: { notas: 12, borradores: 3, confirmadas: 8, ordenesSurtidas: 5 },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver']),
+    });
+    expect(within(screen.getByTestId('kpi-notas')).getByText('12')).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-borradores')).getByText('3')).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-confirmadas')).getByText('8')).toBeInTheDocument();
+    expect(within(screen.getByTestId('kpi-ordenes-surtidas')).getByText('5')).toBeInTheDocument();
+  });
+
+  it('el resumen viaja con el MISMO universo del listado (maquilero), sin estatus', () => {
+    paginaConUna();
+    renderConProveedores(<NotasSalidaPagina />, {
+      sesion: estadoSesionDePrueba(['notas.ver']),
+    });
+    fireEvent.change(screen.getByTestId('filtro-maquilero-nota'), { target: { value: '9' } });
+    expect(useResumenNotasMock).toHaveBeenLastCalledWith({ idMaquilero: 9 });
   });
 
   it('lista las notas y muestra su folio, maquilero y empresa', () => {

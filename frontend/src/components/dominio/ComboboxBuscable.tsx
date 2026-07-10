@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Loader2Icon, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2Icon, Search, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,11 @@ import { cn } from '@/lib/utils';
  * búsqueda por teclado para listas con HOMÓNIMOS (Óscar Jiménez / Óscar Hernández / Óscar López).
  * Escribir "óscar" muestra los tres; "her" deja solo a Hernández. La búsqueda IGNORA acentos y
  * mayúsculas ({@link normalizarTexto}).
+ *
+ * Es el ÚNICO typeahead del kit (R9 absorbió al `ComboboxEntidad` de inventarios): además del
+ * modo clásico con filtro local admite el modo {@link PropsComboboxBuscable.busquedaServidor}
+ * de los selectores de entidad (modelo/tela/avío/orden), con opción rica ({@link OpcionRica}),
+ * error de consulta en el popover y anti-carrera estricta mientras la búsqueda no resuelve.
  *
  * SOLO se elige de la lista (default del proyecto: NO texto libre — el proveedor nuevo se da de
  * alta en su catálogo; cuando exista un alta rápida se conectará vía `accionCrear`).
@@ -22,7 +27,8 @@ import { cn } from '@/lib/utils';
  * - La etiqueta de la selección se persiste APARTE de `opciones`: con typeahead server-side la
  *   página filtrada puede dejar fuera a la opción elegida sin que el input se rompa.
  *
- * Presentación PURA (A1): no conoce proveedores ni ninguna entidad; trabaja con `{ id, nombre }`.
+ * Presentación PURA (A1): no conoce proveedores ni ninguna entidad; trabaja con `{ id, nombre }`
+ * (los selectores de entidad extienden la opción con sus campos y la pintan vía `renderOpcion`).
  */
 
 /** Una opción del combobox. */
@@ -37,10 +43,10 @@ export function normalizarTexto(texto: string): string {
 }
 
 /** Filtra opciones por texto normalizado (contiene, sin acentos ni mayúsculas). */
-export function filtrarOpciones(
-  opciones: readonly OpcionCombobox[],
+export function filtrarOpciones<O extends OpcionCombobox>(
+  opciones: readonly O[],
   texto: string,
-): OpcionCombobox[] {
+): O[] {
   const consulta = normalizarTexto(texto.trim());
   if (consulta === '') {
     return [...opciones];
@@ -48,10 +54,39 @@ export function filtrarOpciones(
   return opciones.filter((opcion) => normalizarTexto(opcion.nombre).includes(consulta));
 }
 
+/**
+ * Contenido RICO de una opción (línea principal + secundaria atenuada + adorno a la derecha):
+ * el markup que usaban las opciones del `ComboboxEntidad` (código/clave arriba, descripción
+ * abajo, badge "Genérico"…). Se pasa desde `renderOpcion` de los selectores de entidad.
+ */
+export function OpcionRica({
+  principal,
+  secundario,
+  extra,
+}: {
+  principal: string;
+  /** Texto secundario atenuado (descripción), si lo hay. */
+  secundario?: string | null | undefined;
+  /** Adorno opcional a la derecha (p. ej. badge "Genérico"). */
+  extra?: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <>
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium">{principal}</span>
+        {secundario != null ? (
+          <span className="truncate text-xs text-muted-foreground">{secundario}</span>
+        ) : null}
+      </span>
+      {extra ?? null}
+    </>
+  );
+}
+
 /** Props de {@link ComboboxBuscable}. */
-export interface PropsComboboxBuscable {
+export interface PropsComboboxBuscable<O extends OpcionCombobox = OpcionCombobox> {
   /** Opciones disponibles (el padre las trae del API). */
-  opciones: readonly OpcionCombobox[];
+  opciones: readonly O[];
   /** Id seleccionado, o null si no hay selección. Controlado por el padre. */
   valor: number | null;
   /** Emite el id elegido (o null al limpiar). */
@@ -62,13 +97,38 @@ export interface PropsComboboxBuscable {
    * alcance TODO el catálogo, no solo la página cargada (§4.4.1 — hay >1,700 proveedores reales).
    */
   alCambiarTexto?: (texto: string) => void;
+  /**
+   * MODO SERVIDOR (selectores de entidad, ex-`ComboboxEntidad`): las opciones ya vienen filtradas
+   * por el API del padre (que busca en campos que la opción ni muestra, p. ej. la descripción) →
+   * NO se re-filtran en cliente, y mientras `cargando` NO se ofrece NINGUNA — ni por clic ni por
+   * teclado. Sin esto hay una CARRERA real: al teclear y elegir rápido, la lista vieja del
+   * catálogo general seguía clickeable y se seleccionaba la entidad equivocada (lo cazó el e2e
+   * de inventario PT en CI). Default false = filtro local del kit (ahí las opciones viejas
+   * siguen siendo válidas porque el filtro local las acota a lo tecleado).
+   */
+  busquedaServidor?: boolean;
+  /**
+   * Render RICO del contenido de la opción ({@link OpcionRica}); el default pinta `nombre`
+   * truncado. La palomita de la opción seleccionada la pone el combobox en ambos casos.
+   */
+  renderOpcion?: ((opcion: O) => React.ReactNode) | undefined;
+  /** Error de la consulta del padre: se pinta dentro del popover (role="alert"). */
+  mensajeError?: string | undefined;
+  /** Lupa a la izquierda del input (el look de los selectores de entidad). */
+  conLupa?: boolean;
+  /**
+   * false = campo REQUERIDO: sin botón ✕ y borrar el texto NO limpia la selección (el blur la
+   * restaura) — el uso del selector de orden de producción. Default true (ciclo del kit).
+   */
+  permitirLimpiar?: boolean;
   /** Placeholder del input. */
   placeholder?: string;
   /** Texto cuando el filtro no encuentra nada. */
   textoVacio?: string;
   /**
    * Señal de carga del catálogo (típicamente `isFetching` del query del padre): pinta un spinner
-   * discreto y evita el "Sin coincidencias" en falso mientras la respuesta viene en camino.
+   * discreto y evita el "Sin coincidencias" en falso mientras la respuesta viene en camino. En
+   * modo `busquedaServidor` además OCULTA las opciones viejas (anti-carrera, ver arriba).
    */
   cargando?: boolean;
   /**
@@ -79,6 +139,11 @@ export interface PropsComboboxBuscable {
   deshabilitado?: boolean;
   /** Base de los `data-testid` (default "combobox"). */
   testid?: string;
+  /**
+   * data-testid del INPUT (default `${testid}-input`). Los selectores de entidad históricos
+   * exponen `${testid}-busqueda` — los e2e de inventarios/producción lo usan tal cual.
+   */
+  testidInput?: string;
   /** Etiqueta accesible del input. */
   etiqueta?: string;
 }
@@ -86,21 +151,27 @@ export interface PropsComboboxBuscable {
 /**
  * Combobox con búsqueda por teclado: abre al enfocar/teclear, filtra sin acentos, navega con
  * ↑/↓/Enter/Esc y solo acepta opciones de la lista. Con selección muestra el nombre y un botón ✕
- * para limpiar; borrar el texto a vacío también limpia.
+ * para limpiar; borrar el texto a vacío también limpia (salvo `permitirLimpiar: false`).
  */
-export function ComboboxBuscable({
+export function ComboboxBuscable<O extends OpcionCombobox = OpcionCombobox>({
   opciones,
   valor,
   onChange,
   alCambiarTexto,
+  busquedaServidor = false,
+  renderOpcion,
+  mensajeError,
+  conLupa = false,
+  permitirLimpiar = true,
   placeholder = 'Escribe para buscar…',
   textoVacio = 'Sin coincidencias.',
   cargando = false,
   accionCrear,
   deshabilitado = false,
   testid = 'combobox',
+  testidInput,
   etiqueta,
-}: PropsComboboxBuscable): React.JSX.Element {
+}: PropsComboboxBuscable<O>): React.JSX.Element {
   const contenedorRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const idLista = useId();
@@ -142,7 +213,17 @@ export function ComboboxBuscable({
   // Con selección y texto == etiqueta, el texto NO es una búsqueda (es la etiqueta): se lista el
   // catálogo completo para poder cambiar de opción sin borrar primero.
   const consulta = valor !== null && texto === etiquetaValor ? '' : texto;
-  const filtradas = useMemo(() => filtrarOpciones(opciones, consulta), [opciones, consulta]);
+  const filtradas = useMemo(
+    () =>
+      busquedaServidor
+        ? // Búsqueda sin resolver: las opciones viejas NO son elegibles (anti-carrera) — la lista
+          // efectiva queda vacía y el popover pinta "Buscando…" hasta que lleguen las reales.
+          cargando
+          ? []
+          : [...opciones]
+        : filtrarOpciones(opciones, consulta),
+    [busquedaServidor, cargando, opciones, consulta],
+  );
   const activoSeguro = filtradas.length === 0 ? 0 : Math.min(activo, filtradas.length - 1);
 
   // Clic fuera: cierra VÍA blur (una sola ruta de salida) — cubre overlays que hacen
@@ -157,7 +238,7 @@ export function ComboboxBuscable({
     return () => document.removeEventListener('mousedown', alClicFuera);
   }, []);
 
-  function elegir(opcion: OpcionCombobox): void {
+  function elegir(opcion: O): void {
     onChange(opcion.id);
     setEtiquetaValor(opcion.nombre);
     setTexto(opcion.nombre);
@@ -219,6 +300,12 @@ export function ComboboxBuscable({
 
   return (
     <div ref={contenedorRef} className="relative" data-testid={testid}>
+      {conLupa ? (
+        <Search
+          className="pointer-events-none absolute top-1/2 left-2.5 z-10 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+      ) : null}
       <Input
         ref={inputRef}
         type="text"
@@ -233,7 +320,7 @@ export function ComboboxBuscable({
           setActivo(0);
           // Borrar TODO el texto borra también la selección (el filtro vuelve a "Todos"): antes
           // quedaba pegada y el texto borrado reaparecía al llegar la respuesta del server.
-          if (nuevo === '' && valor !== null) {
+          if (nuevo === '' && valor !== null && permitirLimpiar) {
             onChange(null);
           }
         }}
@@ -270,10 +357,10 @@ export function ComboboxBuscable({
         aria-expanded={abierto}
         aria-controls={idLista}
         autoComplete="off"
-        className={cn('pr-8', valor !== null && 'font-medium')}
-        data-testid={`${testid}-input`}
+        className={cn('pr-8', conLupa && 'pl-8', valor !== null && 'font-medium')}
+        data-testid={testidInput ?? `${testid}-input`}
       />
-      {valor !== null && !deshabilitado ? (
+      {valor !== null && !deshabilitado && permitirLimpiar ? (
         <button
           type="button"
           // mousedown-preventDefault: no le roba el foco al input (no dispara su blur).
@@ -302,10 +389,14 @@ export function ComboboxBuscable({
         <div
           id={idLista}
           role="listbox"
-          className="absolute top-full left-0 z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border bg-popover p-1 shadow-md"
+          className="absolute top-full left-0 z-50 mt-1 max-h-64 w-full min-w-56 overflow-y-auto rounded-lg border bg-popover p-1 shadow-md"
           data-testid={`${testid}-lista`}
         >
-          {filtradas.length === 0 ? (
+          {mensajeError !== undefined ? (
+            <p className="px-3 py-2 text-sm text-destructive" role="alert">
+              {mensajeError}
+            </p>
+          ) : filtradas.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">
               {cargando ? 'Buscando…' : textoVacio}
             </p>
@@ -330,7 +421,11 @@ export function ComboboxBuscable({
                     : 'hover:bg-accent/60',
                 )}
               >
-                <span className="min-w-0 truncate">{opcion.nombre}</span>
+                {renderOpcion !== undefined ? (
+                  renderOpcion(opcion)
+                ) : (
+                  <span className="min-w-0 truncate">{opcion.nombre}</span>
+                )}
                 {opcion.id === valor ? (
                   <Check className="size-3.5 shrink-0 text-primary" aria-hidden />
                 ) : null}

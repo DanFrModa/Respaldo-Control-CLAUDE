@@ -68,6 +68,18 @@ vi.mock('@/api/modelos', () => ({
   useCopiarBom: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// Existencias PT del cajón (matriz color×talla): mock con rollup vacío por defecto; los tests
+// de la matriz lo sobreescriben. La página lo consulta SOLO con `inventario-pt.ver`.
+const useExistenciasPtMock = vi.fn<(query: unknown, habilitado?: boolean) => unknown>(() => ({
+  data: undefined,
+  isPending: false,
+  isError: false,
+}));
+vi.mock('@/api/inventarios', () => ({
+  useExistenciasPt: (query: unknown, habilitado?: boolean) =>
+    useExistenciasPtMock(query, habilitado),
+}));
+
 // Catálogos para los selectores (no se ejercita su red aquí).
 vi.mock('@/api/temporadas', () => ({
   useTemporadas: () => ({ data: { datos: [{ id: 2, nombre: 'Verano 25', activo: true }] } }),
@@ -107,6 +119,9 @@ function modelo(id: number, codigo: string, activo = true, extra: Partial<Modelo
     idMaquileroCotizado: null,
     maquileroCotizado: null,
     secuenciaEstampado: 'antes',
+    telaPrincipal: null,
+    stockPt: null,
+    costoActual: null,
     activo,
     creadoEn: '2026-01-01T00:00:00.000Z',
     creadoPorId: null,
@@ -147,6 +162,8 @@ describe('<ModelosPagina>', () => {
     useModelos.mockReset();
     useFichaModelo.mockReset();
     useFotosModelo.mockReset();
+    useExistenciasPtMock.mockReset();
+    useExistenciasPtMock.mockReturnValue({ data: undefined, isPending: false, isError: false });
     descontinuarMutate.mockReset();
     reactivarMutate.mockReset();
     ultimaQuery = undefined;
@@ -209,6 +226,73 @@ describe('<ModelosPagina>', () => {
 
     await usuario.click(screen.getByTestId('tab-bom-bordados'));
     expect(screen.getByTestId('seccion-bom-bordados')).toBeInTheDocument();
+  });
+
+  it('pinta las columnas Tela principal, Stock PT y Costo con los agregados del listado', () => {
+    useModelos.mockReturnValue(
+      listaConDatos([
+        modelo(1, '501', true, { telaPrincipal: 'Felpa premium', stockPt: 1240, costoActual: 118 }),
+        // Sin BOM/costeo (o sin permiso de importes): guiones; stock 0 se pinta atenuado.
+        modelo(2, '777', true, { telaPrincipal: null, stockPt: 0, costoActual: null }),
+      ]),
+    );
+    renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
+
+    expect(screen.getByText('Felpa premium')).toBeInTheDocument();
+    expect(screen.getByText('1,240')).toBeInTheDocument();
+    expect(screen.getByText('$118.00')).toBeInTheDocument();
+    // El segundo renglón trae el stock en 0 y los guiones de tela/costo.
+    const filas = screen.getAllByTestId('fila-modelo');
+    expect(within(filas[1] as HTMLElement).getByText('0')).toBeInTheDocument();
+    expect(within(filas[1] as HTMLElement).getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('la matriz del cajón consume el rollup `porColorTalla` del servidor (sin pivote local)', () => {
+    const m = modelo(1, '501');
+    useModelos.mockReturnValue(listaConDatos([m]));
+    useFichaModelo.mockReturnValue(fichaCargada(ficha(m)));
+    useExistenciasPtMock.mockReturnValue({
+      data: {
+        filas: [],
+        totalExistencia: 55,
+        porColorTalla: [
+          {
+            idColor: 1,
+            color: 'Rojo',
+            idTalla: 1,
+            etiquetaTalla: 'CH',
+            ordenTalla: 1,
+            existencia: 50,
+          },
+          {
+            idColor: 1,
+            color: 'Rojo',
+            idTalla: 2,
+            etiquetaTalla: 'M',
+            ordenTalla: 2,
+            existencia: 5,
+          },
+        ],
+      },
+      isPending: false,
+      isError: false,
+    });
+    renderConProveedores(<ModelosPagina />, {
+      sesion: estadoSesionDePrueba(['modelos.ver', 'inventario-pt.ver']),
+    });
+
+    fireEvent.click(screen.getByTestId('fila-modelo'));
+    // La consulta pide el rollup al servidor (agrupar=color-talla) para ESTE modelo.
+    expect(useExistenciasPtMock).toHaveBeenLastCalledWith(
+      { idModelo: 1, agrupar: 'color-talla' },
+      true,
+    );
+    const matriz = screen.getByTestId('matriz-existencia-modelo');
+    expect(within(matriz).getByText('Rojo')).toBeInTheDocument();
+    expect(within(matriz).getByText('50')).toBeInTheDocument();
+    expect(within(matriz).getByText('5')).toBeInTheDocument();
+    // Σ del renglón = 55 (las celdas ya vienen sumadas del servidor).
+    expect(within(matriz).getByText('55')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay resultados', () => {

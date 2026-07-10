@@ -215,6 +215,14 @@ export const esquemaExistenciasPtQuery = z
       .stringbool()
       .default(false)
       .describe('Incluye filas con existencia 0 ("true"/"false"). Por defecto se omiten.'),
+    agrupar: z
+      .enum(['color-talla'])
+      .optional()
+      .describe(
+        'Con "color-talla" la respuesta incluye además `porColorTalla`: la existencia del ' +
+          'modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, ' +
+          'para la matriz del cajón). Requiere `idModelo`.',
+      ),
   })
   .describe('Filtros de la consulta de existencias de PT.');
 
@@ -250,11 +258,38 @@ const esquemaExistenciaPtFila = z.object({
 /** Una fila de existencia tal como la devuelve la API. */
 export type ExistenciaPtFila = z.infer<typeof esquemaExistenciaPtFila>;
 
+/**
+ * Una CELDA del rollup color×talla (con `agrupar=color-talla`): la existencia del modelo en ese
+ * color×talla YA sumada en servidor a través de almacenes/órdenes (A1 — la matriz del cajón de
+ * Modelos no pivota en cliente).
+ */
+const esquemaExistenciaPtCelda = z.object({
+  idColor: z.number().int().describe('Id del color.'),
+  color: z.string().describe('Nombre del color.'),
+  idTalla: z.number().int().describe('Id de la talla.'),
+  etiquetaTalla: z.string().describe('Etiqueta visible de la talla.'),
+  ordenTalla: z.number().int().describe('Orden del catálogo de la talla (para ordenar columnas).'),
+  existencia: z
+    .number()
+    .int()
+    .describe('Existencia del color×talla sumada a través de almacenes/órdenes (Σ kardex, D3).'),
+});
+
+/** Una celda del rollup color×talla tal como la devuelve la API. */
+export type ExistenciaPtCelda = z.infer<typeof esquemaExistenciaPtCelda>;
+
 /** Respuesta de la consulta de existencias (filas + total general derivado). */
 export const esquemaExistenciasPtLista = z
   .object({
     filas: z.array(esquemaExistenciaPtFila).describe('Existencias por modelo×color×talla×almacén.'),
     totalExistencia: z.number().int().describe('Suma de la existencia de todas las filas.'),
+    porColorTalla: z
+      .array(esquemaExistenciaPtCelda)
+      .optional()
+      .describe(
+        'Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada ' +
+          'en servidor a través de almacenes/órdenes.',
+      ),
   })
   .describe('Existencias de producto terminado (consulta de solo lectura, D3).');
 

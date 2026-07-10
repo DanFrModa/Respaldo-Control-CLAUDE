@@ -17,6 +17,8 @@ import type {
   NotaSalidaEditar,
   NotasSalidaPagina,
   NotasSalidaQuery,
+  ResumenNotas,
+  ResumenNotasQuery,
 } from './tipos';
 
 /**
@@ -46,6 +48,15 @@ function claveNota(id: number): readonly unknown[] {
 /** Pide una página del listado de notas (búsqueda + filtros + orden + paginación en servidor). */
 async function listarNotas(query: NotasSalidaQuery): Promise<NotasSalidaPagina> {
   const { data, error } = await api.GET('/api/notas-salida', { params: { query } });
+  if (!data) {
+    throw new ErrorDeApi(error);
+  }
+  return data;
+}
+
+/** Resumen de cabecera: conteos por estatus + órdenes surtidas del universo filtrado (KPIs). */
+async function resumenNotas(query: ResumenNotasQuery): Promise<ResumenNotas> {
+  const { data, error } = await api.GET('/api/notas-salida/resumen', { params: { query } });
   if (!data) {
     throw new ErrorDeApi(error);
   }
@@ -118,6 +129,17 @@ export function useNotasSalida(
   return useQuery({
     queryKey: claveLista(query),
     queryFn: () => listarNotas(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Resumen de cabecera de notas (KPIs: conteos por estatus + órdenes surtidas) bajo el filtro dado. */
+export function useResumenNotas(
+  query: ResumenNotasQuery,
+): UseQueryResult<ResumenNotas, ErrorDeApi> {
+  return useQuery({
+    queryKey: [...CLAVE_NOTAS, 'resumen', query],
+    queryFn: () => resumenNotas(query),
     placeholderData: keepPreviousData,
   });
 }

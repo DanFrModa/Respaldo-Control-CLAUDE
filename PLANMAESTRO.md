@@ -263,7 +263,7 @@ La **regalía queda FUERA del costo** (D2): es factor de la lista. La lista **NO
 |---|---|---|---|
 | 1 | **Catálogos** | Clientes (+campos D7), maquileros, proveedores (+roles y campos fiscales/pago R15), cortadores, telas, avíos (R1), bordados, tallas/curvas, colores, almacenes, temporadas, etiquetas | 01/03/04 |
 | 2 | **Modelos** | Catálogo + fotos (R2/bucket) + BOM completo (telas, avíos R2, bordados) | 01 |
-| 3 | **Pedidos** | Pedido interno (forecast) + Pedido Real (por CEDIS) — modelo se conserva; copiado múltiple en un clic | 02 |
+| 3 | **Pedidos** | Pedido interno (forecast) + Pedido Real (por CEDIS) — modelo se conserva; copiado múltiple en un clic. **+ Importador de pedido del cliente** (nació en el rediseño, jul-2026: plantilla de mapeo Excel por cliente → alta transaccional pedido+OPs+RC; ver R8 de REQUISITOS-NUEVOS — la variante PDF/IA queda futura) | 02 |
 | 4 | **Producción** | Órdenes (color×talla D4), corte, maquila unificada, recibos, entregas a cliente, **WIP** (avance + pendientes por etapa) | 03 |
 | 5 | **Compras y Materiales (MRP)** | OC con autorización (se conserva), explosión por orden R3 (avíos Y telas, Make-to-Order), recepción con estatus automático R7, notas de salida **estructuradas** que descuentan avíos | 03 + R1–R7 |
 | 6 | **Inventarios** | Motor kardex único: PT (modelo×color×talla×almacén), telas (por lote, N componentes D5), avíos (R4); cíclico contra sí mismo (D6) | 04 |

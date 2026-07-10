@@ -1,16 +1,15 @@
 import { useState } from 'react';
 
 import { useModelos, type Modelo } from '@/api/modelos';
+import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { useDebounce } from '@/lib/useDebounce';
-
-import { ComboboxEntidad } from './ComboboxEntidad';
 
 /**
  * SELECTOR DE MODELO reutilizable (F3-E3, pulido R9): combobox con búsqueda server-side por código
  * o descripción; al elegir emite el modelo completo. Lo usan las pantallas de movimientos,
- * traspasos, kardex y existencias para fijar el modelo sobre el que se opera. La lista vive en un
- * POPOVER ({@link ComboboxEntidad}) — abre al enfocar/teclear, no infla el layout del toolbar.
- * Presentación pura (A1): solo consulta y emite.
+ * traspasos, kardex y existencias para fijar el modelo sobre el que se opera. La lista vive en el
+ * POPOVER del {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera,
+ * no infla el layout del toolbar). Presentación pura (A1): solo consulta y emite.
  */
 export function SelectorModelo({
   idSeleccionado,
@@ -35,29 +34,36 @@ export function SelectorModelo({
   });
 
   const modelos = consulta.data?.datos ?? [];
-  const seleccionado = modelos.find((m) => m.id === idSeleccionado);
   // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
   // ofrecer las opciones viejas — clickearlas seleccionaba el modelo EQUIVOCADO (carrera del e2e).
   const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
   return (
-    <ComboboxEntidad
-      opciones={modelos}
-      obtenerId={(m) => m.id}
-      principal={(m) => m.codigo}
-      secundario={(m) => m.descripcion}
-      idSeleccionado={idSeleccionado}
-      // Si el modelo elegido ya no está en la página consultada, el texto tecleado se conserva.
-      etiquetaSeleccion={idSeleccionado !== undefined ? (seleccionado?.codigo ?? texto) : undefined}
-      alSeleccionar={alSeleccionar}
-      alLimpiar={alLimpiar}
+    <ComboboxBuscable
+      opciones={modelos.map((m) => ({ ...m, nombre: m.codigo }))}
+      valor={idSeleccionado ?? null}
+      onChange={(id) => {
+        if (id === null) {
+          alLimpiar?.();
+          return;
+        }
+        const modelo = modelos.find((m) => m.id === id);
+        if (modelo !== undefined) {
+          alSeleccionar(modelo);
+        }
+      }}
       alCambiarTexto={setTexto}
-      cargando={resolviendo}
+      busquedaServidor
+      renderOpcion={(o) => <OpcionRica principal={o.codigo} secundario={o.descripcion} />}
       mensajeError={consulta.isError ? consulta.error.message : undefined}
+      conLupa
+      permitirLimpiar={alLimpiar !== undefined}
+      cargando={resolviendo}
       placeholder="Buscar modelo por código o descripción…"
       etiqueta="Buscar modelo"
       textoVacio="No hay modelos que coincidan."
       testid={testid}
+      testidInput={`${testid}-busqueda`}
     />
   );
 }

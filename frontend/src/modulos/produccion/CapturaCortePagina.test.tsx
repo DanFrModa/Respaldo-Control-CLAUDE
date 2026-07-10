@@ -103,8 +103,9 @@ const pendientes: PendientesOrden = {
 const sesion = () =>
   estadoSesionDePrueba(['produccion.corte', 'produccion.wip-ver', 'produccion.cancelar']);
 
-/** Selecciona la orden de prueba (clic en la opción del selector). */
+/** Selecciona la orden de prueba (abre el popover del selector y clic en la opción). */
 async function elegirOrden(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await usuario.click(screen.getByTestId('selector-orden-busqueda'));
   await usuario.click(screen.getByTestId('selector-orden-opcion'));
 }
 

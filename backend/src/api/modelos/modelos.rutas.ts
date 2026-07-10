@@ -101,6 +101,11 @@ function aModeloBase(modelo: ModeloConRelaciones): z.infer<typeof esquemaModeloS
     cantidadFotos: modelo._count.fotos,
     // Solo el LISTADO resuelve la foto principal (sin N+1); en alta/edición/ficha viene `null`.
     urlFotoPrincipal: modelo.urlFotoPrincipal ?? null,
+    // Agregados del listado (proto vModelos, R9): tela principal, stock PT y costo del último
+    // costeo. Solo el LISTADO los resuelve; en alta/edición/ficha vienen `null` (no aplican).
+    telaPrincipal: modelo.telaPrincipal ?? null,
+    stockPt: modelo.stockPt ?? null,
+    costoActual: modelo.costoActual ?? null,
     activo: modelo.activo,
     creadoEn: modelo.creadoEn.toISOString(),
     creadoPorId: modelo.creadoPorId,

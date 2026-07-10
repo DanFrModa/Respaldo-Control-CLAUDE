@@ -44,6 +44,7 @@ import {
   type NotaSalidaSalida,
   type NotaSalidaLineaSalida,
   type NotasSalidaPagina,
+  type ResumenNotasSalida,
 } from '../../contrato/index.js';
 import { EstatusNotaSalida, type Prisma } from '../../datos/index.js';
 import { z } from 'zod';
@@ -824,15 +825,11 @@ export async function listarNotasSalida(
   const filtros = validarEntrada(esquemaListarNotasDominio, parametros);
 
   const where: Prisma.NotaSalidaWhereInput = {
-    idEmpresa: sesion.idEmpresaActiva,
+    ...armarWhereNotas(sesion.idEmpresaActiva, filtros),
     ...(filtros.estatus === undefined ? {} : { estatus: filtros.estatus }),
     ...(filtros.estatus === undefined && !filtros.incluirCanceladas
       ? { estatus: { not: EstatusNotaSalida.cancelada } }
       : {}),
-    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
-    // Notas ligadas a una orden de PRODUCCIÓN (consulta "Notas por orden"): vía sus renglones.
-    ...(filtros.idOrden === undefined ? {} : { lineas: { some: { idOrden: filtros.idOrden } } }),
-    ...armarBusqueda(filtros.busqueda),
   };
 
   const cliente = clienteLectura(bd);
@@ -867,6 +864,88 @@ function armarBusqueda(busqueda: string | undefined): Prisma.NotaSalidaWhereInpu
     }
   }
   return { OR: or };
+}
+
+/**
+ * Arma el `where` del UNIVERSO de notas de la EMPRESA ACTIVA (A9) con los filtros comunes
+ * (búsqueda/maquilero/orden). Compartido por el listado y el resumen de cabecera para no derivar
+ * el mismo universo de dos maneras distintas (mismo patrón que `armarWhereAuditorias`). El
+ * ESTATUS no entra aquí: el listado lo agrega encima y el resumen desglosa por estatus él mismo.
+ */
+function armarWhereNotas(
+  idEmpresa: number,
+  filtros: {
+    busqueda?: string | undefined;
+    idMaquilero?: number | undefined;
+    idOrden?: number | undefined;
+  },
+): Prisma.NotaSalidaWhereInput {
+  return {
+    idEmpresa,
+    ...(filtros.idMaquilero === undefined ? {} : { idMaquilero: filtros.idMaquilero }),
+    // Notas ligadas a una orden de PRODUCCIÓN (consulta "Notas por orden"): vía sus renglones.
+    ...(filtros.idOrden === undefined ? {} : { lineas: { some: { idOrden: filtros.idOrden } } }),
+    ...armarBusqueda(filtros.busqueda),
+  };
+}
+
+/**
+ * Filtros del resumen con tipos NATIVOS (la ruta ya coaccionó la querystring). Sub-conjunto de los
+ * del listado que ACOTA el universo (búsqueda/maquilero/orden); el estatus NO entra (el resumen
+ * desglosa por estatus él mismo — mismo criterio que el resumen de OC).
+ */
+const esquemaResumenNotasDominio = z.object({
+  busqueda: z.string().trim().max(200).optional(),
+  idMaquilero: z.number().int().positive().optional(),
+  idOrden: z.number().int().positive().optional(),
+});
+
+/** Parámetros del resumen (los reutiliza la ruta REST). */
+export type ParametrosResumenNotas = z.input<typeof esquemaResumenNotasDominio>;
+
+/**
+ * Resumen de cabecera de notas de salida (KPIs `vNotasSalida`, R9), agregado EN SERVIDOR (A1)
+ * sobre el MISMO universo del listado (`armarWhereNotas` — no una derivación distinta):
+ *  • `notas` — TODAS las del filtro (borradores + confirmadas + canceladas; el desglose aclara).
+ *  • `borradores` / `confirmadas` — conteo por estatus (UN groupBy).
+ *  • `ordenesSurtidas` — órdenes de producción DISTINTAS en renglones de notas CONFIRMADAS del
+ *    universo (las canceladas ya devolvieron el material y los borradores aún no descuentan).
+ * Permiso `notas.ver` (REUSADO — el resumen no muestra nada que el listado no muestre); todo
+ * acotado por la empresa activa (A9).
+ */
+export async function resumenNotasSalida(
+  sesion: SesionUsuario,
+  parametros: ParametrosResumenNotas = {},
+  bd?: ContextoBd,
+): Promise<ResumenNotasSalida> {
+  verificarPermiso(sesion, 'notas.ver');
+  const filtros = validarEntrada(esquemaResumenNotasDominio, parametros);
+  const cliente = clienteLectura(bd);
+  const whereNotas = armarWhereNotas(sesion.idEmpresaActiva, filtros);
+
+  const [porEstatus, ordenesDistintas] = await Promise.all([
+    cliente.notaSalida.groupBy({
+      by: ['estatus'],
+      where: whereNotas,
+      _count: { _all: true },
+    }),
+    // Una fila por orden DISTINTA con renglones en notas confirmadas del universo.
+    cliente.notaSalidaLinea.groupBy({
+      by: ['idOrden'],
+      where: { notaSalida: { ...whereNotas, estatus: EstatusNotaSalida.confirmada } },
+    }),
+  ]);
+
+  let notas = 0;
+  let borradores = 0;
+  let confirmadas = 0;
+  for (const g of porEstatus) {
+    notas += g._count._all;
+    if (g.estatus === EstatusNotaSalida.borrador) borradores = g._count._all;
+    if (g.estatus === EstatusNotaSalida.confirmada) confirmadas = g._count._all;
+  }
+
+  return { notas, borradores, confirmadas, ordenesSurtidas: ordenesDistintas.length };
 }
 
 // Re-export para que el reviewer/tests vean el helper de tipo de renglón sin re-implementarlo.

@@ -144,6 +144,8 @@ const sesion = () =>
   estadoSesionDePrueba(['produccion.recibo', 'produccion.wip-ver', 'produccion.cancelar']);
 
 async function elegirOrden(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+  // El selector es un combobox popover: se abre (foco) y se elige la opción.
+  await usuario.click(screen.getByTestId('recibo-selector-orden-busqueda'));
   await usuario.click(screen.getByTestId('recibo-selector-orden-opcion'));
 }
 
