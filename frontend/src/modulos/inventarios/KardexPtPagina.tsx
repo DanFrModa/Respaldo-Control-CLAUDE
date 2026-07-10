@@ -91,8 +91,13 @@ function KardexPorModelo(): React.JSX.Element {
             alLimpiar={() => setModelo(undefined)}
           />
         </div>
-        {modelo?.descripcion != null ? (
-          <span className="truncate text-xs text-muted-foreground">{modelo.descripcion}</span>
+        {/* Identidad VISIBLE del modelo consultado: código + descripción (el value del input no
+            es un nodo de texto; el kardex debe decir de QUÉ modelo es). */}
+        {modelo !== undefined ? (
+          <span className="truncate text-xs text-muted-foreground" data-testid="kardex-modelo-sel">
+            <span className="num font-medium text-foreground">{modelo.codigo}</span>
+            {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
+          </span>
         ) : null}
         {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
         {modelo !== undefined ? (

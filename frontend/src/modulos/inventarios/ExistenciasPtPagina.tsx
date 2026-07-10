@@ -159,6 +159,14 @@ export function ExistenciasPtPagina(): React.JSX.Element {
               alLimpiar={() => setModelo(undefined)}
             />
           </div>
+          {/* Identidad VISIBLE del modelo consultado (el value del input no es un nodo de texto):
+              código + descripción como contexto de la consulta. */}
+          {modelo !== undefined ? (
+            <span className="truncate text-xs text-muted-foreground" data-testid="exist-modelo-sel">
+              <span className="num font-medium text-foreground">{modelo.codigo}</span>
+              {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
+            </span>
+          ) : null}
           {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
               w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
               queda huérfano a la derecha). */}

@@ -139,8 +139,13 @@ export function MovimientosPtPagina(): React.JSX.Element {
               alLimpiar={() => setModelo(undefined)}
             />
           </div>
-          {modelo?.descripcion != null ? (
-            <span className="truncate text-xs text-muted-foreground">{modelo.descripcion}</span>
+          {/* Identidad VISIBLE del modelo elegido: código + descripción (el value del input no
+              es un nodo de texto). */}
+          {modelo !== undefined ? (
+            <span className="truncate text-xs text-muted-foreground" data-testid="mov-modelo-sel">
+              <span className="num font-medium text-foreground">{modelo.codigo}</span>
+              {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
+            </span>
           ) : null}
         </div>
 

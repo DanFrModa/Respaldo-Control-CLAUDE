@@ -107,6 +107,14 @@ function KardexTela(): React.JSX.Element {
             alLimpiar={() => setTela(undefined)}
           />
         </div>
+        {/* Identidad VISIBLE de la tela consultada: nombre + descripción (el value del input no
+            es un nodo de texto; el kardex debe decir de QUÉ tela es). */}
+        {tela !== undefined ? (
+          <span className="truncate text-xs text-muted-foreground" data-testid="kardex-tela-sel">
+            <span className="font-medium text-foreground">{tela.nombre}</span>
+            {tela.descripcion !== null ? <> — {tela.descripcion}</> : null}
+          </span>
+        ) : null}
         {tela !== undefined ? (
           <span className="ml-auto text-xs text-faint">
             {renglones.length.toLocaleString('es-MX')} renglones
@@ -261,6 +269,14 @@ function KardexAvio(): React.JSX.Element {
             alLimpiar={() => setAvio(undefined)}
           />
         </div>
+        {/* Identidad VISIBLE del avío consultado: clave + descripción (el value del input no
+            es un nodo de texto; el kardex debe decir de QUÉ avío es). */}
+        {avio !== undefined ? (
+          <span className="truncate text-xs text-muted-foreground" data-testid="kardex-avio-sel">
+            <span className="num font-medium text-foreground">{avio.clave}</span> —{' '}
+            {avio.descripcion}
+          </span>
+        ) : null}
         {avio !== undefined ? (
           <span className="ml-auto text-xs text-faint">
             {renglones.length.toLocaleString('es-MX')} renglones
