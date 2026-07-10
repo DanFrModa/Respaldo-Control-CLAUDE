@@ -114,6 +114,8 @@ model Empresa {
   proyectos              Proyecto[]
   /// Listas de precios por cliente de esta empresa (F8-E1/E4, A9 — folio por empresa). Restrict.
   listasPrecios          ListaPrecios[]
+  /// Movimientos de cuenta corriente de terceros (CxC/CxP, F9-E1, A9 — folio por empresa). Restrict.
+  movimientosTerceros    MovimientoTercero[]
 
   @@map("empresas")
 }
@@ -450,22 +452,25 @@ model Archivo {
 
   /// Adjunto de proveedor que apunta a este archivo (F1-E1B), si lo hay. Relación
   /// inversa exigida por Prisma; en la práctica es 0 o 1 (un archivo se adjunta una vez).
-  proveedorArchivo  ProveedorArchivo?
+  proveedorArchivo       ProveedorArchivo?
   /// Bordado cuya foto es este archivo (F1-E3), si lo hay. Inversa de `Bordado.archivoFoto`;
   /// 0 o 1 (un archivo es la foto de un solo bordado).
-  bordado           Bordado?
+  bordado                Bordado?
   /// Foto de modelo que apunta a este archivo (F1-E4), si la hay. Inversa de
   /// `ModeloFoto.archivo`; 0 o 1 (un archivo es UNA foto de UN modelo — Cascade en ambos).
-  modeloFoto        ModeloFoto?
+  modeloFoto             ModeloFoto?
   /// Adjunto de orden de producción que apunta a este archivo (F8-E6, R6), si lo hay. Inversa de
   /// `OrdenArchivo.archivo`; 0 o 1 (un archivo se adjunta a UNA sola orden — Cascade en ambos).
-  ordenArchivo      OrdenArchivo?
+  ordenArchivo           OrdenArchivo?
   /// Adjunto de pedido interno que apunta a este archivo (rediseño R3, B3), si lo hay. Inversa de
   /// `PedidoArchivo.archivo`; 0 o 1 (un archivo se adjunta a UN solo pedido — Cascade en ambos).
-  pedidoArchivo     PedidoArchivo?
+  pedidoArchivo          PedidoArchivo?
   /// Adjunto de desarrollo (tech pack) que apunta a este archivo (rediseño R5, B16), si lo hay.
   /// Inversa de `DesarrolloArchivo.archivo`; 0 o 1 (un archivo se adjunta a UN solo desarrollo).
-  desarrolloArchivo DesarrolloArchivo?
+  desarrolloArchivo      DesarrolloArchivo?
+  /// Movimientos de terceros cuyo CFDI (XML/PDF) es este archivo (F9-E1), si los hay. Inversa de
+  /// `MovimientoTercero.archivoCfdi`; Restrict — no se borra el XML de un movimiento vivo.
+  movimientosTerceroCfdi MovimientoTercero[]
 
   @@map("archivos")
 }
@@ -628,6 +633,8 @@ model Proveedor {
   ordenPrecioEventos      OrdenPrecioEvento[]
   /// Modelos que lo cotizaron como MAQUILERO de costura en su desarrollo (rediseño R5, B9). Restrict.
   modelosCotizados        Modelo[]             @relation("ModeloMaquileroCotizado")
+  /// Movimientos de cuenta corriente (CxP/EsMa) de este proveedor (F9-E1). Restrict.
+  movimientosTerceros     MovimientoTercero[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -977,6 +984,8 @@ model Cliente {
   listasPrecios          ListaPrecios[]
   /// Plantillas de importación del pedido del cliente (rediseño R8, B15 — mapeo de su Excel). Restrict.
   plantillasImportacion  PlantillaImportacion[]
+  /// Movimientos de cuenta corriente (CxC) de este cliente (F9-E1). Restrict.
+  movimientosTerceros    MovimientoTercero[]
 
   creadoEn        DateTime @default(now()) @map("creado_en")
   creadoPorId     String?  @map("creado_por_id")
@@ -3014,6 +3023,134 @@ model PagoAplicacion {
   @@id([idPago, idCargo])
   @@index([idCargo])
   @@map("pago_aplicacion")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FINANZAS — Cuenta corriente ÚNICA de terceros (Módulo 14, F9-E1; D12/D15/R10; doc
+// `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §3). Generaliza el motor EsMa (F6):
+// UN SOLO libro de movimientos por tercero del que cuelgan CxC (clientes), CxP (proveedores) y
+// —por lectura/convivencia, sin migrar datos— el propio EsMa. El SALDO NUNCA se persiste
+// editable: es la suma de los movimientos (D3), igual que el kardex y que EsMa.
+// Modelo del tercero (D15a, ADR-0017): el movimiento REFERENCIA a Cliente o Proveedor existentes
+// por tipo+id (dos FKs reales nullable + CHECK de exclusividad en la migración), SIN tabla
+// `Tercero` polimórfica nueva — el Proveedor ya unifica maquilero/estampador vía roles (R15), así
+// que un proveedor que maquila tiene UNA sola cuenta.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Tipo de tercero al que apunta un `MovimientoTercero` (D15a). Discrimina cuál de las dos FKs
+/// nullable (`idCliente`/`idProveedor`) está poblada; la exclusividad se blinda con un CHECK.
+enum TipoTercero {
+  cliente
+  proveedor
+
+  @@map("tipo_tercero")
+}
+
+/// ORIGEN de un movimiento de cuenta de terceros (eje 1, propuesta §3.3). Determina de dónde NACE
+/// el movimiento y —vía el dominio `signoDeOrigen`— su DIRECCIÓN contable: los CARGOS
+/// (`recibo_maquila`, `factura_proveedor`, `entrada_sin_factura`) AUMENTAN el saldo del tercero
+/// (monto +); los ABONOS (`nota_credito`, `pago`, `abono`, `descuento`) lo DISMINUYEN (monto −).
+/// Las notas de crédito son un movimiento más que baja el saldo (propuesta §3.5). EXTENSIBLE: E4
+/// (CxC) agregará los orígenes de venta/cobro; el signo lo fija el dominio, no un CHECK.
+enum OrigenMovimientoTercero {
+  recibo_maquila
+  factura_proveedor
+  entrada_sin_factura
+  nota_credito
+  pago
+  abono
+  descuento
+
+  @@map("origen_movimiento_tercero")
+}
+
+/// Movimiento de la cuenta corriente de un tercero (F9-E1, D12/D15/R10). Es el ladrillo del que
+/// se derivan CxC/CxP: `saldo(tercero) = Σ monto` (nunca una columna editable — D3). Dos ejes por
+/// movimiento: `origen` (de dónde nace + su dirección) y `esFiscal` (si entra al reporte del
+/// contador). Dos vistas = dos FILTROS del mismo libro (operativa = todo; fiscal = `esFiscal`),
+/// NO dos libros. Multi-empresa (A9), folio por secuencia atómica (A3) y auditoría A7. La
+/// cancelación es por movimiento INVERSO auditado (D3/A7), NUNCA edición/borrado.
+model MovimientoTercero {
+  id        Int     @id @default(autoincrement())
+  /// Empresa dueña del movimiento y de su folio (A9, multi-empresa: CxC/CxP por empresa). Restrict.
+  idEmpresa Int     @map("id_empresa")
+  empresa   Empresa @relation(fields: [idEmpresa], references: [id], onDelete: Restrict)
+  /// Folio consecutivo POR EMPRESA (A3 — secuencia "movimiento-tercero"). Unique (idEmpresa, folio).
+  folio     BigInt
+
+  /// Tipo de tercero (D15a): discrimina cuál FK está poblada. Ver el CHECK de exclusividad.
+  tipoTercero TipoTercero @map("tipo_tercero")
+  /// Cliente al que pertenece el movimiento (CxC), o NULL si es de proveedor. Restrict.
+  idCliente   Int?        @map("id_cliente")
+  cliente     Cliente?    @relation(fields: [idCliente], references: [id], onDelete: Restrict)
+  /// Proveedor al que pertenece el movimiento (CxP/EsMa), o NULL si es de cliente. Restrict.
+  idProveedor Int?        @map("id_proveedor")
+  proveedor   Proveedor?  @relation(fields: [idProveedor], references: [id], onDelete: Restrict)
+
+  /// Fecha del movimiento (date-only).
+  fecha  DateTime                @db.Date
+  /// Origen del movimiento (eje 1): determina su dirección contable (ver enum). El dominio valida
+  /// que el signo del `monto` sea coherente con el origen (`signoDeOrigen`, único lugar de verdad).
+  origen OrigenMovimientoTercero
+  /// Importe CON SIGNO (D3): cargo + / abono − (convención en el dominio `signoDeOrigen`). El SALDO
+  /// del tercero = Σ monto. Decimal(14,2). CHECK `monto <> 0` (un movimiento en cero no tiene sentido).
+  monto  Decimal                 @db.Decimal(14, 2)
+
+  /// Fecha de VENCIMIENTO derivada (aging D15d): fecha + días de crédito del tercero. Persistida
+  /// para que el aging (E5) la lea directo; NULL para movimientos que no vencen (pagos/abonos) o
+  /// terceros de contado. Se recalcula si cambia la fecha; nunca se edita suelta.
+  fechaVencimiento DateTime? @map("fecha_vencimiento") @db.Date
+
+  // ── Eje 2: naturaleza FISCAL (propuesta §3.2/§3.3) — lo fino (parser CFDI) llega en E3 ──
+  /// ¿Es un movimiento FISCAL (con CFDI)? Filtra la vista fiscal (para el contador) de la operativa.
+  esFiscal      Boolean  @default(false) @map("es_fiscal")
+  /// UUID (folio fiscal) del CFDI, si es fiscal. Único global cuando existe (evita CFDI duplicados,
+  /// base de la conciliación de E3/E4). NULL en movimientos no fiscales.
+  uuidCfdi      String?  @map("uuid_cfdi")
+  /// RFC del emisor (proveedor) o receptor (cliente) del CFDI. NULL si no es fiscal.
+  rfcTercero    String?  @map("rfc_tercero")
+  /// Archivo R2 del XML/PDF del CFDI (motor de F0). NULL hasta que E3/E4 adjunten el comprobante.
+  idArchivoCfdi String?  @map("id_archivo_cfdi")
+  archivoCfdi   Archivo? @relation(fields: [idArchivoCfdi], references: [id], onDelete: Restrict)
+
+  /// Referencia POLIMÓRFICA a la operación real que originó el movimiento (recibo de maquila, OC,
+  /// recepción, pedido…): `refTipo` discrimina y `refId` es el id de esa fila. SIN FK física (el
+  /// origen es de varias tablas; el dominio garantiza la consistencia — mismo criterio que la
+  /// Bitácora y el kardex, ADR-0005/ADR-0010). NULL en movimientos capturados a mano. E2–E4 la pueblan.
+  refTipo String? @map("ref_tipo")
+  refId   Int?    @map("ref_id")
+
+  observaciones String? @db.Text
+
+  /// Cancelación SUAVE = movimiento INVERSO auditado, NUNCA edición/borrado (D3/A7, patrón kardex).
+  /// `cancelado` marca el original ya anulado; `idMovimientoInverso` apunta (en el inverso) al
+  /// original; `anuladoPor` es la relación inversa. Autorreferencia Restrict.
+  cancelado           Boolean             @default(false)
+  idMovimientoInverso Int?                @map("id_movimiento_inverso")
+  movimientoOriginal  MovimientoTercero?  @relation("MovimientoTerceroInverso", fields: [idMovimientoInverso], references: [id], onDelete: Restrict)
+  anuladoPor          MovimientoTercero[] @relation("MovimientoTerceroInverso")
+
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  creadoPorId     String?  @map("creado_por_id")
+  modificadoEn    DateTime @updatedAt @map("modificado_en")
+  modificadoPorId String?  @map("modificado_por_id")
+
+  @@unique([idEmpresa, folio])
+  @@unique([uuidCfdi])
+  /// UN SOLO inverso por original (defensa en profundidad D3): en PostgreSQL los NULL son DISTINTOS,
+  /// así que este unique deja pasar las N filas normales (idMovimientoInverso NULL) pero impide dos
+  /// inversos apuntando al mismo original — dos cancelaciones concurrentes no pueden duplicar el inverso.
+  @@unique([idMovimientoInverso])
+  @@index([idEmpresa])
+  @@index([tipoTercero])
+  @@index([idCliente])
+  @@index([idProveedor])
+  @@index([origen])
+  @@index([esFiscal])
+  @@index([idArchivoCfdi])
+  @@index([idEmpresa, tipoTercero, idProveedor])
+  @@index([idEmpresa, tipoTercero, idCliente])
+  @@map("movimientos_tercero")
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

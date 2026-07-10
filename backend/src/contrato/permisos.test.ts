@@ -152,6 +152,10 @@ describe('catálogo de permisos', () => {
       'telas.ver',
       'temporadas.administrar',
       'temporadas.ver',
+      // Cuenta corriente de terceros (Finanzas, Módulo 14, F9-E1, D12/D15): ver/administrar/fiscal.
+      'terceros.administrar',
+      'terceros.fiscal',
+      'terceros.ver',
       // Tipos de proceso de maquila (Módulo 4, F3-E1): catálogo CRUD (nuevos de v2).
       'tipos-proceso.administrar',
       'tipos-proceso.ver',
