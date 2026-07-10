@@ -52,6 +52,9 @@ export function CxpPagina(): React.JSX.Element {
   const datos = consulta.data;
   const filas = datos?.filas ?? [];
   const resumen = datos?.resumen;
+  // Cabeceras de aging DINÁMICAS según los límites configurables de la empresa (F9-E5/D15d).
+  const l1 = datos?.limitesAging.limite1 ?? 30;
+  const l2 = datos?.limitesAging.limite2 ?? 60;
 
   function verEstadoCuenta(idProveedor: number): void {
     void navigate('/cxp/estado-cuenta', { state: { idProveedor } });
@@ -177,9 +180,11 @@ export function CxpPagina(): React.JSX.Element {
                   <TablaDensaHead>Proveedor</TablaDensaHead>
                   <TablaDensaHead numerica>Saldo</TablaDensaHead>
                   <TablaDensaHead numerica>Corriente</TablaDensaHead>
-                  <TablaDensaHead numerica>1–30 d</TablaDensaHead>
-                  <TablaDensaHead numerica>31–60 d</TablaDensaHead>
-                  <TablaDensaHead numerica>+60 d</TablaDensaHead>
+                  <TablaDensaHead numerica>1–{l1} d</TablaDensaHead>
+                  <TablaDensaHead numerica>
+                    {l1 + 1}–{l2} d
+                  </TablaDensaHead>
+                  <TablaDensaHead numerica>+{l2} d</TablaDensaHead>
                   <TablaDensaHead numerica title="Saldo de maquila (EsMa), sin antigüedad">
                     Maquila
                   </TablaDensaHead>

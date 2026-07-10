@@ -45,12 +45,9 @@ import {
   estadoDeCuentaTercero,
 } from '../cuenta-terceros.js';
 import { aportesEsMaSaldoLote } from '../convivencia-esma.js';
-import {
-  LIMITES_AGING_CXP,
-  netearCubetas,
-  type CubetasAging,
-  type CubetasBrutas,
-} from './aging.js';
+import { leerLimitesAging } from '../config-aging.js';
+import { type LimitesAging } from '../aging-comun.js';
+import { netearCubetas, type CubetasAging, type CubetasBrutas } from './aging.js';
 
 /** Redondeo monetario a 2 decimales. */
 function redondear2(n: number): number {
@@ -217,16 +214,18 @@ interface FilaNeta extends CubetasAging {
 /**
  * Agrega, por proveedor, sus movimientos del motor en las cuatro cubetas de aging (BRUTAS) + los
  * créditos, por la empresa activa (A9). Cubetas por días de atraso sobre `fecha_vencimiento`
- * (`CURRENT_DATE − fecha_vencimiento`); los límites vienen de {@link LIMITES_AGING_CXP} (un solo
- * lugar). Filtrar por `id_proveedor IS NOT NULL` equivale a `tipo_tercero='proveedor'` (CHECK de
- * exclusividad D15a) y evita castear el enum en crudo. Los subtotales viajan en `::numeric` (Decimal)
- * para CERO-DRIFT contra el `saldo` del detalle (que suma `monto` Decimal vía Prisma `_sum`).
+ * (`CURRENT_DATE − fecha_vencimiento`); los límites llegan como parámetro (F9-E5/D15d: configurables
+ * por empresa, `leerLimitesAging`). Filtrar por `id_proveedor IS NOT NULL` equivale a
+ * `tipo_tercero='proveedor'` (CHECK de exclusividad D15a) y evita castear el enum en crudo. Los
+ * subtotales viajan en `::numeric` (Decimal) para CERO-DRIFT contra el `saldo` del detalle (que suma
+ * `monto` Decimal vía Prisma `_sum`).
  */
 async function agregarPorProveedor(
   cliente: ReturnType<typeof clienteLectura>,
   idEmpresa: number,
+  limites: LimitesAging,
 ): Promise<FilaAgregadoCxp[]> {
-  const { d30, d60 } = LIMITES_AGING_CXP;
+  const { d30, d60 } = limites;
   const crudas = await cliente.$queryRaw<FilaAgregadoCxpCruda[]>(Prisma.sql`
     SELECT
       m.id_proveedor AS "idProveedor",
@@ -353,8 +352,10 @@ export async function bandejaPorPagar(
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const oculto = (v: number): number | null => (puedeVerImportes ? v : null);
 
+  // Límites de aging vigentes de la empresa (F9-E5/D15d: configurables); default 30/60.
+  const limites = await leerLimitesAging(cliente, idEmpresa);
   // Motor: aging por proveedor. EsMa: aporte de maquila por proveedor (ambos en UN agregado c/u).
-  const crudas = await agregarPorProveedor(cliente, idEmpresa);
+  const crudas = await agregarPorProveedor(cliente, idEmpresa, limites);
   const aportesEsMa = await aportesEsMaSaldoLote(cliente, idEmpresa);
 
   // Combinar por proveedor: netear el aging del motor y sumar la cubeta de maquila. Los proveedores
@@ -438,5 +439,6 @@ export async function bandejaPorPagar(
     porPagina: filtros.porPagina,
     totalPaginas: Math.max(1, Math.ceil(total / filtros.porPagina)),
     resumen,
+    limitesAging: { limite1: limites.d30, limite2: limites.d60 },
   };
 }

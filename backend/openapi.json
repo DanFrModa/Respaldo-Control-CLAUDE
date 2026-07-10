@@ -96308,6 +96308,29 @@
                       ],
                       "additionalProperties": false,
                       "description": "KPIs sobre toda la cartera con saldo."
+                    },
+                    "limitesAging": {
+                      "type": "object",
+                      "properties": {
+                        "limite1": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Fin de la 1ª cubeta vencida (días de atraso)."
+                        },
+                        "limite2": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Fin de la 2ª cubeta vencida (días de atraso)."
+                        }
+                      },
+                      "required": [
+                        "limite1",
+                        "limite2"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas."
                     }
                   },
                   "required": [
@@ -96316,7 +96339,8 @@
                     "pagina",
                     "porPagina",
                     "totalPaginas",
-                    "resumen"
+                    "resumen",
+                    "limitesAging"
                   ],
                   "additionalProperties": false,
                   "description": "Bandeja de cuentas por pagar (proveedores con aging + resumen)."
@@ -99413,6 +99437,29 @@
                       ],
                       "additionalProperties": false,
                       "description": "KPIs sobre toda la cartera con saldo."
+                    },
+                    "limitesAging": {
+                      "type": "object",
+                      "properties": {
+                        "limite1": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Fin de la 1ª cubeta vencida (días de atraso)."
+                        },
+                        "limite2": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Fin de la 2ª cubeta vencida (días de atraso)."
+                        }
+                      },
+                      "required": [
+                        "limite1",
+                        "limite2"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas."
                     }
                   },
                   "required": [
@@ -99421,7 +99468,8 @@
                     "pagina",
                     "porPagina",
                     "totalPaginas",
-                    "resumen"
+                    "resumen",
+                    "limitesAging"
                   ],
                   "additionalProperties": false,
                   "description": "Bandeja de cuentas por cobrar (clientes con aging + resumen)."
@@ -102128,6 +102176,1353 @@
               }
             }
           },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reportes-fiscales": {
+      "get": {
+        "summary": "Reporte fiscal del contador: movimientos fiscales (CxP + CxC) con CFDI + totales",
+        "tags": [
+          "reportes-fiscales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha inicial (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha final (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cliente",
+                "proveedor"
+              ]
+            },
+            "in": "query",
+            "name": "tipoTercero",
+            "required": false,
+            "description": "Filtra a proveedores (CxP) o clientes (CxC); ambos si se omite."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idTercero",
+            "required": false,
+            "description": "Filtra a un tercero concreto (según tipoTercero)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cargos",
+                "abonos"
+              ]
+            },
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "description": "cargos (monto > 0) | abonos (monto < 0); ambos si se omite."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "cfdi",
+            "required": false,
+            "description": "con (tiene UUID) | sin (pendiente de CFDI); ambos si se omite."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte fiscal del contador (movimientos fiscales paginados + totales).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "desde": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha inicial del filtro o null."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha final del filtro o null."
+                    },
+                    "filas": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del movimiento."
+                          },
+                          "folio": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Folio A3 del movimiento."
+                          },
+                          "fecha": {
+                            "type": "string",
+                            "description": "Fecha del movimiento (YYYY-MM-DD)."
+                          },
+                          "tipoTercero": {
+                            "type": "string",
+                            "enum": [
+                              "cliente",
+                              "proveedor"
+                            ],
+                            "description": "Cliente (CxC) o proveedor (CxP)."
+                          },
+                          "idTercero": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del cliente o proveedor."
+                          },
+                          "tercero": {
+                            "type": "string",
+                            "description": "Nombre del tercero."
+                          },
+                          "rfcTercero": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "RFC del tercero en el CFDI, o null."
+                          },
+                          "origen": {
+                            "type": "string",
+                            "description": "Origen/concepto del movimiento (etiqueta estable)."
+                          },
+                          "uuidCfdi": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "UUID (folio fiscal) del CFDI, o null si pendiente."
+                          },
+                          "tieneXml": {
+                            "type": "boolean",
+                            "description": "¿El XML del CFDI está guardado en R2 (idArchivoCfdi)?"
+                          },
+                          "monto": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Total del CFDI CON SIGNO (Σ = neto), o null si se oculta."
+                          },
+                          "esCargo": {
+                            "type": "boolean",
+                            "description": "¿Es un cargo (monto > 0)? false = abono/nota de crédito."
+                          },
+                          "cancelado": {
+                            "type": "boolean",
+                            "description": "¿El movimiento fue cancelado (existe su inverso)?"
+                          },
+                          "esInverso": {
+                            "type": "boolean",
+                            "description": "¿Es un movimiento inverso de cancelación?"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "folio",
+                          "fecha",
+                          "tipoTercero",
+                          "idTercero",
+                          "tercero",
+                          "rfcTercero",
+                          "origen",
+                          "uuidCfdi",
+                          "tieneXml",
+                          "monto",
+                          "esCargo",
+                          "cancelado",
+                          "esInverso"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Renglón del reporte fiscal (movimiento fiscal + detalle CFDI)."
+                      },
+                      "description": "Renglones de la página (por fecha desc)."
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de movimientos que cumplen el filtro."
+                    },
+                    "pagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Página solicitada (1-based)."
+                    },
+                    "porPagina": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Renglones por página."
+                    },
+                    "totalPaginas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de páginas."
+                    },
+                    "totales": {
+                      "type": "object",
+                      "properties": {
+                        "cargos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ de los cargos (monto > 0) del filtro."
+                        },
+                        "abonos": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Σ de los abonos (monto < 0), en positivo, del filtro."
+                        },
+                        "neto": {
+                          "anyOf": [
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Neto = cargos − abonos (Σ monto con signo)."
+                        },
+                        "movimientos": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Cuántos movimientos cumplen el filtro."
+                        }
+                      },
+                      "required": [
+                        "cargos",
+                        "abonos",
+                        "neto",
+                        "movimientos"
+                      ],
+                      "additionalProperties": false,
+                      "description": "Totales del periodo (todo el filtro)."
+                    }
+                  },
+                  "required": [
+                    "desde",
+                    "hasta",
+                    "filas",
+                    "total",
+                    "pagina",
+                    "porPagina",
+                    "totalPaginas",
+                    "totales"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Reporte fiscal del contador (movimientos fiscales paginados + totales)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reportes-fiscales/salud": {
+      "get": {
+        "summary": "Salud fiscal: % conciliado, pendientes de CFDI/XML y saldos fiscales por tercero",
+        "tags": [
+          "reportes-fiscales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha inicial (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha final (YYYY-MM-DD), inclusiva."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tablero de salud fiscal (conciliación consolidada + saldos por tercero).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "desde": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha inicial del filtro o null."
+                    },
+                    "hasta": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Fecha final del filtro o null."
+                    },
+                    "totalFiscales": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Movimientos marcados fiscales en el periodo."
+                    },
+                    "conCfdi": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "De ésos, cuántos tienen UUID (CFDI conciliado)."
+                    },
+                    "sinCfdi": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Marcados fiscales SIN UUID (pendientes de CFDI)."
+                    },
+                    "conXml": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos tienen el XML guardado en R2 (idArchivoCfdi)."
+                    },
+                    "sinXml": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Cuántos NO tienen el XML guardado en R2."
+                    },
+                    "pctConciliado": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "% conciliado = conCfdi ÷ totalFiscales (0–100); null si no hay fiscales."
+                    },
+                    "saldos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tipoTercero": {
+                            "type": "string",
+                            "enum": [
+                              "cliente",
+                              "proveedor"
+                            ],
+                            "description": "Cliente (CxC) o proveedor (CxP)."
+                          },
+                          "idTercero": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del cliente o proveedor."
+                          },
+                          "tercero": {
+                            "type": "string",
+                            "description": "Nombre del tercero."
+                          },
+                          "rfc": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "RFC del tercero (catálogo), o null."
+                          },
+                          "saldoFiscal": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Σ monto de sus movimientos fiscales, o null."
+                          },
+                          "movimientos": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Cuántos movimientos fiscales tiene en el periodo."
+                          }
+                        },
+                        "required": [
+                          "tipoTercero",
+                          "idTercero",
+                          "tercero",
+                          "rfc",
+                          "saldoFiscal",
+                          "movimientos"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Saldo fiscal agregado de un tercero."
+                      },
+                      "description": "Saldos fiscales por tercero (|saldo| desc)."
+                    }
+                  },
+                  "required": [
+                    "desde",
+                    "hasta",
+                    "totalFiscales",
+                    "conCfdi",
+                    "sinCfdi",
+                    "conXml",
+                    "sinXml",
+                    "pctConciliado",
+                    "saldos"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Tablero de salud fiscal (conciliación consolidada + saldos por tercero)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reportes-fiscales/excel": {
+      "get": {
+        "summary": "Reporte fiscal en Excel (.xlsx): mismo resultado que la pantalla",
+        "tags": [
+          "reportes-fiscales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha inicial (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha final (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cliente",
+                "proveedor"
+              ]
+            },
+            "in": "query",
+            "name": "tipoTercero",
+            "required": false,
+            "description": "Filtra a proveedores (CxP) o clientes (CxC); ambos si se omite."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idTercero",
+            "required": false,
+            "description": "Filtra a un tercero concreto (según tipoTercero)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cargos",
+                "abonos"
+              ]
+            },
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "description": "cargos (monto > 0) | abonos (monto < 0); ambos si se omite."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "cfdi",
+            "required": false,
+            "description": "con (tiene UUID) | sin (pendiente de CFDI); ambos si se omite."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reportes-fiscales/impreso": {
+      "get": {
+        "summary": "Reporte fiscal en PDF (R9): mismo resultado que la pantalla",
+        "tags": [
+          "reportes-fiscales"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "pagina",
+            "required": false,
+            "description": "Página (1-based)."
+          },
+          {
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "in": "query",
+            "name": "porPagina",
+            "required": false,
+            "description": "Renglones por página (máx 100)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "description": "Fecha inicial (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+            },
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "description": "Fecha final (YYYY-MM-DD), inclusiva."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cliente",
+                "proveedor"
+              ]
+            },
+            "in": "query",
+            "name": "tipoTercero",
+            "required": false,
+            "description": "Filtra a proveedores (CxP) o clientes (CxC); ambos si se omite."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idTercero",
+            "required": false,
+            "description": "Filtra a un tercero concreto (según tipoTercero)."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "cargos",
+                "abonos"
+              ]
+            },
+            "in": "query",
+            "name": "tipo",
+            "required": false,
+            "description": "cargos (monto > 0) | abonos (monto < 0); ambos si se omite."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "con",
+                "sin"
+              ]
+            },
+            "in": "query",
+            "name": "cfdi",
+            "required": false,
+            "description": "con (tiene UUID) | sin (pendiente de CFDI); ambos si se omite."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
           "400": {
             "description": "Respuesta de error de la API.",
             "content": {
@@ -185565,6 +186960,18 @@
                       ],
                       "description": "Días de colchón de costura, o null."
                     },
+                    "agingLimite1": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Fin de la primera cubeta de aging (días, F9-E5/D15d). Siempre presente (default 30)."
+                    },
+                    "agingLimite2": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60)."
+                    },
                     "fechaInventarioTelas": {
                       "anyOf": [
                         {
@@ -185622,6 +187029,8 @@
                     "utilidadSugerida",
                     "regaliasBase",
                     "colchonCostura",
+                    "agingLimite1",
+                    "agingLimite2",
                     "fechaInventarioTelas",
                     "fechaInventarioPt",
                     "idAlmacenPtDefault",
@@ -185832,6 +187241,18 @@
                       }
                     ]
                   },
+                  "agingLimite1": {
+                    "description": "Fin de la primera cubeta de aging (días de atraso, F9-E5/D15d). Default 30.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3650
+                  },
+                  "agingLimite2": {
+                    "description": "Fin de la segunda cubeta de aging (días de atraso, F9-E5/D15d). Default 60.",
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3650
+                  },
                   "fechaInventarioTelas": {
                     "description": "Fecha del último inventario físico de telas (ISO 8601).",
                     "anyOf": [
@@ -185943,6 +187364,18 @@
                       ],
                       "description": "Días de colchón de costura, o null."
                     },
+                    "agingLimite1": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Fin de la primera cubeta de aging (días, F9-E5/D15d). Siempre presente (default 30)."
+                    },
+                    "agingLimite2": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60)."
+                    },
                     "fechaInventarioTelas": {
                       "anyOf": [
                         {
@@ -186000,6 +187433,8 @@
                     "utilidadSugerida",
                     "regaliasBase",
                     "colchonCostura",
+                    "agingLimite1",
+                    "agingLimite2",
                     "fechaInventarioTelas",
                     "fechaInventarioPt",
                     "idAlmacenPtDefault",

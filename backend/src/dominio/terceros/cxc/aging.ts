@@ -1,8 +1,9 @@
 /**
  * ANTIGÜEDAD DE SALDOS (aging) de CxC (F9-E4; D15d) — la MECÁNICA pura vive en `../aging-comun.ts`
  * (compartida con CxP/F9-E2, SIN copiar-pegar); aquí solo se fijan los LÍMITES de las cubetas de CxC y
- * se re-exporta la mecánica con esos límites. E4 deja los límites fijos (30/60); E5 los hará
- * configurables por empresa. A diferencia de CxP, CxC no tiene cubeta "maquila" (los clientes no maquilan).
+ * se re-exporta la mecánica con esos límites. Los límites VIVOS son configurables por empresa desde
+ * F9-E5 (`config-aging.ts`); este `LIMITES_AGING_CXC` es solo el DEFAULT (30/60) que aún usan la pieza
+ * pura re-exportada y sus tests. A diferencia de CxP, CxC no tiene cubeta "maquila" (los clientes no maquilan).
  */
 import {
   LIMITES_AGING_DEFECTO,

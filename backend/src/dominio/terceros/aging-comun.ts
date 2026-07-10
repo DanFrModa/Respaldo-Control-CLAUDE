@@ -24,7 +24,11 @@ export interface LimitesAging {
   readonly d60: number;
 }
 
-/** Límites por defecto de las cubetas de aging (E5 los hará configurables por empresa). */
+/**
+ * Límites por DEFECTO de las cubetas de aging (30/60). Desde F9-E5 (D15d) los límites vivos son
+ * configurables por empresa (`ConfiguracionEmpresa.agingLimite1/2`, leídos por `config-aging.ts`);
+ * este default se usa cuando la empresa no tiene configuración o para tests puros.
+ */
 export const LIMITES_AGING_DEFECTO: LimitesAging = { d30: 30, d60: 60 };
 
 /** Las cuatro cubetas de antigüedad de un tercero (importes con signo, netos de créditos). */

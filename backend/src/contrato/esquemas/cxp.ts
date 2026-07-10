@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { esquemaLimitesAging } from './terceros.js';
+
 /**
  * Esquemas Zod de CxP — CUENTAS POR PAGAR de proveedores (Módulo 14, F9-E2; D12/D15/R10; doc
  * `Documentacion_MJD/PROPUESTA-Finanzas-y-Proveedores.md` §3.2/§3.4). CxP es un USO del motor de
@@ -194,6 +196,9 @@ export const esquemaBandejaCxpSalida = z
     porPagina: z.number().int().describe('Renglones por página.'),
     totalPaginas: z.number().int().describe('Total de páginas.'),
     resumen: esquemaResumenCxpSalida.describe('KPIs sobre toda la cartera con saldo.'),
+    limitesAging: esquemaLimitesAging.describe(
+      'Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas.',
+    ),
   })
   .describe('Bandeja de cuentas por pagar (proveedores con aging + resumen).');
 

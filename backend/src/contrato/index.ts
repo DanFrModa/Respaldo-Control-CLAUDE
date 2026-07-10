@@ -1143,6 +1143,7 @@ export {
   ETIQUETAS_ORIGEN_MOVIMIENTO_TERCERO,
   VISTAS_TERCERO,
   FUENTES_MOVIMIENTO_TERCERO,
+  esquemaLimitesAging,
   esquemaMovimientoTerceroCrear,
   esquemaMovimientoTerceroCancelar,
   esquemaMovimientoTerceroSalida,
@@ -1153,6 +1154,7 @@ export {
   type OrigenMovimientoTerceroClave,
   type VistaTerceroClave,
   type FuenteMovimientoTerceroClave,
+  type LimitesAgingSalida,
   type DatosMovimientoTerceroCrear,
   type DatosMovimientoTerceroCancelar,
   type MovimientoTerceroSalida,
@@ -1240,6 +1242,28 @@ export {
   type DatosCfdiVentaImportar,
   type CfdiVentaImportarSalida,
 } from './esquemas/cfdi-ventas.js';
+
+// ── Reportes fiscales para el contador (Módulo 14, F9-E5; D12/R13) ──
+export {
+  TIPOS_MOVIMIENTO_FISCAL,
+  FILTROS_CFDI,
+  esquemaReporteFiscalQuery,
+  esquemaReporteFiscalFila,
+  esquemaTotalesFiscales,
+  esquemaReporteFiscalSalida,
+  esquemaSaludFiscalQuery,
+  esquemaSaldoFiscalTercero,
+  esquemaSaludFiscalSalida,
+  type TipoMovimientoFiscalClave,
+  type FiltroCfdiClave,
+  type ReporteFiscalQuery,
+  type ReporteFiscalFila,
+  type TotalesFiscales,
+  type ReporteFiscalSalida,
+  type SaludFiscalQuery,
+  type SaldoFiscalTercero,
+  type SaludFiscalSalida,
+} from './esquemas/reportes-fiscales.js';
 
 // ── Entrega a cliente: cierre del ciclo de la orden (F3-E5; doc 03-Produccion) ──
 export {

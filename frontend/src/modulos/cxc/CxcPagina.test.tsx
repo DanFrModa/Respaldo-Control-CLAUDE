@@ -37,6 +37,7 @@ const conCartera: CxcBandeja = {
     alCorrientePct: 46,
     clientesConSaldo: 1,
   },
+  limitesAging: { limite1: 30, limite2: 60 },
 };
 
 describe('CxcPagina (F9-E4)', () => {

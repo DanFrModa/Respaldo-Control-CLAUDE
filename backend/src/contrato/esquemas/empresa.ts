@@ -127,6 +127,20 @@ export const esquemaConfiguracionEmpresaActualizar = z.object({
     .nullable()
     .optional()
     .describe('Días de colchón que la Ruta Crítica suma a la costura.'),
+  agingLimite1: z
+    .number({ error: 'El primer límite de antigüedad debe ser un número' })
+    .int()
+    .min(1)
+    .max(3650)
+    .optional()
+    .describe('Fin de la primera cubeta de aging (días de atraso, F9-E5/D15d). Default 30.'),
+  agingLimite2: z
+    .number({ error: 'El segundo límite de antigüedad debe ser un número' })
+    .int()
+    .min(1)
+    .max(3650)
+    .optional()
+    .describe('Fin de la segunda cubeta de aging (días de atraso, F9-E5/D15d). Default 60.'),
   fechaInventarioTelas: z.iso
     .datetime()
     .nullable()
@@ -161,6 +175,18 @@ export const esquemaConfiguracionEmpresaSalida = z
     utilidadSugerida: z.number().nullable().describe('Utilidad sugerida (porcentaje), o null.'),
     regaliasBase: z.number().nullable().describe('Porcentaje base de regalías, o null.'),
     colchonCostura: z.number().int().nullable().describe('Días de colchón de costura, o null.'),
+    agingLimite1: z
+      .number()
+      .int()
+      .describe(
+        'Fin de la primera cubeta de aging (días, F9-E5/D15d). Siempre presente (default 30).',
+      ),
+    agingLimite2: z
+      .number()
+      .int()
+      .describe(
+        'Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60).',
+      ),
     fechaInventarioTelas: z.iso
       .datetime()
       .nullable()

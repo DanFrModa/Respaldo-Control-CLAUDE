@@ -35,6 +35,7 @@ import { ImportarCfdiPagina } from '@/modulos/cxp/ImportarCfdiPagina';
 import { CxcPagina } from '@/modulos/cxc/CxcPagina';
 import { EstadoCuentaClientePagina } from '@/modulos/cxc/EstadoCuentaClientePagina';
 import { ImportarCfdiVentaPagina } from '@/modulos/cxc/ImportarCfdiVentaPagina';
+import { ReportesFiscalesPagina } from '@/modulos/reportes-fiscales/ReportesFiscalesPagina';
 import { EdrPagina } from '@/modulos/edr/EdrPagina';
 import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
 import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
@@ -323,6 +324,9 @@ const router = createBrowserRouter([
           { path: 'cxc/estado-cuenta', element: <EstadoCuentaClientePagina /> },
           // CxC · Importar CFDI de venta (F9-E4, R12): sube el XML timbrado → concilia → cargo fiscal.
           { path: 'cxc/importar-cfdi', element: <ImportarCfdiVentaPagina /> },
+          // Reportes fiscales (Módulo 14, F9-E5, R13): la vista fiscal del libro de terceros para el
+          // contador (movimientos con CFDI de CxP + CxC) + salud fiscal + export Excel/PDF (terceros.fiscal).
+          { path: 'reportes-fiscales', element: <ReportesFiscalesPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/roles', element: <RolesPagina /> },
