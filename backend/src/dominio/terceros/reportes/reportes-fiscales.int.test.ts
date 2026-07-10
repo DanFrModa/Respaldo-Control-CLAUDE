@@ -52,6 +52,24 @@ async function alta(
   await registrarMovimientoTercero(s, args, bd());
 }
 
+/**
+ * Crea una fila `Archivo` real (el XML del CFDI en R2) y devuelve su id. `idArchivoCfdi` del movimiento
+ * es un FK a `Archivo` → hay que sembrar el archivo antes de usar su id, o Postgres rechaza el insert.
+ */
+async function archivoCfdi(key: string): Promise<string> {
+  const archivo = await cliente.archivo.create({
+    data: {
+      bucket: 'control-v2-prueba',
+      key,
+      nombreOriginal: 'cfdi.xml',
+      tipoMime: 'application/xml',
+      tamanoBytes: 1024,
+    },
+    select: { id: true },
+  });
+  return archivo.id;
+}
+
 beforeAll(() => {
   cliente = clientePruebas();
 });
@@ -85,7 +103,7 @@ describe('reporte fiscal = solo movimientos fiscales', () => {
       esFiscal: true,
       uuidCfdi: 'UUID-CARGO-1',
       rfcTercero: 'TNO900101AAA',
-      idArchivoCfdi: 'r2/cfdi-1.xml',
+      idArchivoCfdi: await archivoCfdi('r2/cfdi-1.xml'),
     });
     // Fiscal: nota de crédito 300 (abono, con UUID).
     await alta({
@@ -199,7 +217,7 @@ describe('conciliación (con/sin CFDI, con/sin XML)', () => {
       importe: 600,
       esFiscal: true,
       uuidCfdi: 'U-CONCILIADO',
-      idArchivoCfdi: 'r2/ok.xml',
+      idArchivoCfdi: await archivoCfdi('r2/ok.xml'),
     });
     // Fiscal pendiente: marcado fiscal SIN UUID ni XML.
     await alta({
