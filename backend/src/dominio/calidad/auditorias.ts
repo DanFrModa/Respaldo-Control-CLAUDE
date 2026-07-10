@@ -1047,7 +1047,9 @@ export async function resumenAuditorias(
     by: ['idDefecto'],
     where: { numFallas: { gt: 0 }, auditoria: whereAuditoria },
     _sum: { numFallas: true },
-    orderBy: { _sum: { numFallas: 'desc' } },
+    // Desempate DETERMINISTA: ante igual Σ de fallas, gana el `idDefecto` menor (sin el orden
+    // secundario, Postgres elige al azar entre los empatados con `take: 1`).
+    orderBy: [{ _sum: { numFallas: 'desc' } }, { idDefecto: 'asc' }],
     take: 1,
   });
   const top = grupos[0];

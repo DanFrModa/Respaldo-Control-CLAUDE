@@ -42,6 +42,7 @@ export const opcionesSwagger: FastifyDynamicSwaggerOptions = {
     tags: [
       { name: 'salud', description: 'Estado del servicio.' },
       { name: 'sesion', description: 'Usuario actual y permisos.' },
+      { name: 'resumen', description: 'Resumen operativo de la portada (R9, por bloque/permiso).' },
       { name: 'almacenes', description: 'Catálogo de almacenes (CRUD patrón).' },
       { name: 'usuarios', description: 'Administración de usuarios.' },
       { name: 'empresas', description: 'Administración de empresas y su configuración.' },

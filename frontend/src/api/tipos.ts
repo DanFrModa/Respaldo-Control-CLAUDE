@@ -17,6 +17,18 @@ export type Sesion = paths['/api/sesion']['get']['responses']['200']['content'][
  */
 export type ClavePermiso = Sesion['permisos'][number];
 
+// ── Resumen operativo de la portada (rediseño R9, proto vResumen) ─────────────
+
+/** Respuesta de `GET /api/resumen`: cada bloque llega null si la sesion no tiene su permiso. */
+export type ResumenOperativo =
+  paths['/api/resumen']['get']['responses']['200']['content']['application/json'];
+
+/** Una orden por vencer (fila de la tabla del Resumen). */
+export type OrdenPorVencer = NonNullable<ResumenOperativo['ordenesPorVencer']>[number];
+
+/** Un punto de la grafica "Cortes por semana". */
+export type CorteSemanaResumen = NonNullable<ResumenOperativo['cortesPorSemana']>[number];
+
 /** Pagina de almacenes (`GET /api/almacenes`). */
 export type AlmacenesPagina =
   paths['/api/almacenes']['get']['responses']['200']['content']['application/json'];

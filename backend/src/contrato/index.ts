@@ -1682,6 +1682,14 @@ export {
   type BitacoraPagina,
 } from './esquemas/bitacora.js';
 
+// ── Resumen operativo de la portada (rediseño R9, proto vResumen) ──
+export {
+  esquemaResumenOperativo,
+  type ResumenOperativo,
+  type OrdenPorVencer,
+  type CorteSemanaResumen,
+} from './esquemas/resumen.js';
+
 export { esquemaSesionActual, type SesionActual } from './esquemas/sesion.js';
 
 export { esquemaErrorApi, type ErrorApi } from './esquemas/error.js';

@@ -1,14 +1,15 @@
 import { MoonIcon, SunIcon } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { claseBotonIcono } from '@/lib/utils';
 
 import { useTema } from './useTema';
 
 /**
- * Boton para alternar entre tema claro y oscuro. Construido con el `Button` de
- * shadcn (variante fantasma, tamaño icono) para combinar con la app. Es
- * accesible: `aria-label` en español describe la accion que ocurrira al
- * pulsarlo, y el icono (sol/luna) refleja a que tema se cambiara.
+ * Boton para alternar entre tema claro y oscuro, con el look EXACTO del
+ * prototipo (`.icon-btn`, fidelidad R9): 32px, icono de 17px atenuado que al
+ * hover recupera color + borde. Es accesible: `aria-label` en español describe
+ * la accion que ocurrira al pulsarlo, y el icono (sol/luna) refleja a que tema
+ * se cambiara.
  *
  * El sistema de tema subyacente —clase `dark` en `<html>` + tokens CSS, default
  * claro, persistido en localStorage— es el de E1.1 (`tema.ts`/`useTema`), aqui
@@ -20,16 +21,19 @@ export function AlternadorTema(): React.JSX.Element {
   const etiqueta = vaAOscuro ? 'Cambiar a tema oscuro' : 'Cambiar a tema claro';
 
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="icon"
       onClick={alternar}
       aria-label={etiqueta}
       title={etiqueta}
       data-testid="alternar-tema"
+      className={claseBotonIcono}
     >
-      {vaAOscuro ? <MoonIcon aria-hidden /> : <SunIcon aria-hidden />}
-    </Button>
+      {vaAOscuro ? (
+        <MoonIcon className="size-[17px]" aria-hidden />
+      ) : (
+        <SunIcon className="size-[17px]" aria-hidden />
+      )}
+    </button>
   );
 }

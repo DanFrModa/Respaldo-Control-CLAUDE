@@ -680,6 +680,28 @@ describe('Auditorías — defecto principal + AQL por auditoría (R9, KPIs vCali
     expect(resumen.defectoPrincipal?.idDefecto).toBe(idFav25);
   });
 
+  it('resumen: empate exacto de fallas → gana el idDefecto menor (desempate determinista)', async () => {
+    // Los dos favoritos con la MISMA Σ de fallas (7 = 7): sin desempate el ganador sería aleatorio;
+    // con el orderBy secundario por idDefecto asc gana siempre el id menor.
+    const a = await crearAuditoria(sesion(), { idOrden }, bd());
+    await capturarResultado(
+      sesion(),
+      a.id,
+      {
+        resultado: 'reprobado',
+        defectos: [
+          { idDefecto: idFav1, numFallas: 7 },
+          { idDefecto: idFav25, numFallas: 7 },
+        ],
+      },
+      bd(),
+    );
+    const idMenor = Math.min(idFav1, idFav25);
+    const resumen = await resumenAuditorias(sesion(), {}, bd());
+    expect(resumen.defectoPrincipal?.totalFallas).toBe(7);
+    expect(resumen.defectoPrincipal?.idDefecto).toBe(idMenor);
+  });
+
   it('resumen: sin fallas en el conjunto → defectoPrincipal null', async () => {
     const a = await crearAuditoria(sesion(), { idOrden }, bd());
     await capturarResultado(sesion(), a.id, { resultado: 'aprobado', defectos: [] }, bd());

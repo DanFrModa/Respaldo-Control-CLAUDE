@@ -249,6 +249,401 @@
         }
       }
     },
+    "/api/resumen": {
+      "get": {
+        "summary": "Resumen operativo de la portada (cada bloque respeta el permiso de su dominio)",
+        "tags": [
+          "resumen"
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen operativo de la portada (cada bloque respeta el permiso de su dominio).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ordenesAbiertas": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "total": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Órdenes vivas con algo pendiente por etapa (criterio del tablero WIP)."
+                            }
+                          },
+                          "required": [
+                            "total"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Órdenes abiertas (permiso `produccion.wip-ver`; null sin permiso)."
+                    },
+                    "wipMaquila": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "piezas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Piezas en poder de maquila (enviado − recibido, vivos)."
+                            },
+                            "maquileros": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Maquileros con saldo ≠ 0 en su poder (enviado − recibido por tercero)."
+                            }
+                          },
+                          "required": [
+                            "piezas",
+                            "maquileros"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Piezas en producción/maquila (permiso `produccion.wip-ver`; null sin permiso)."
+                    },
+                    "cortadoSemana": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "piezas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Σ piezas de cortes vivos de la semana ISO actual."
+                            },
+                            "piezasSemanaAnterior": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Σ piezas de cortes vivos de la semana ISO anterior (base de la tendencia)."
+                            },
+                            "deltaPct": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Variación % vs la semana anterior (null si la anterior fue 0)."
+                            }
+                          },
+                          "required": [
+                            "piezas",
+                            "piezasSemanaAnterior",
+                            "deltaPct"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Cortado esta semana (permiso `produccion.wip-ver`; null sin permiso)."
+                    },
+                    "entregasATiempo": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "porcentaje": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "aTiempo ÷ medibles de los últimos 30 días (fracción 0–1; null sin medibles)."
+                            },
+                            "medibles": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Órdenes medibles en la ventana (último proceso cumplido CON fecha planeada)."
+                            },
+                            "deltaPuntos": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ],
+                              "description": "Diferencia en PUNTOS porcentuales vs los 30 días previos (null si no medible)."
+                            }
+                          },
+                          "required": [
+                            "porcentaje",
+                            "medibles",
+                            "deltaPuntos"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Entregas a tiempo · últimos 30 d (permiso `indicadores.ver`; null sin permiso)."
+                    },
+                    "existenciaPt": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "piezas": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Existencia total de producto terminado (Σ kardex, D3)."
+                            },
+                            "almacenes": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Almacenes con existencia ≠ 0."
+                            }
+                          },
+                          "required": [
+                            "piezas",
+                            "almacenes"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Existencia PT (permiso `inventario-pt.ver`; null sin permiso)."
+                    },
+                    "ordenesPorVencer": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "idOrden": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Id de la orden."
+                              },
+                              "folio": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Folio de la orden (por empresa)."
+                              },
+                              "codigoModelo": {
+                                "type": "string",
+                                "description": "Código del modelo."
+                              },
+                              "descripcionModelo": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ],
+                                "description": "Descripción del modelo (si la tiene)."
+                              },
+                              "cliente": {
+                                "type": "string",
+                                "description": "Nombre del cliente."
+                              },
+                              "piezas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Total pedido de la orden (Σ matriz color×talla)."
+                              },
+                              "avancePct": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "% de procesos de la RC ya cumplidos (0–100, redondeado)."
+                              },
+                              "compromiso": {
+                                "type": "string",
+                                "description": "Próxima fecha planeada vigente pendiente (ISO; el compromiso que apremia)."
+                              },
+                              "semaforo": {
+                                "type": "string",
+                                "enum": [
+                                  "aTiempo",
+                                  "enRiesgo",
+                                  "atrasado"
+                                ],
+                                "description": "Semáforo de la ORDEN (el peor de sus procesos, ADR-0013)."
+                              },
+                              "etapasAtrasadas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Procesos de la ruta ya vencidos (para el chip)."
+                              }
+                            },
+                            "required": [
+                              "idOrden",
+                              "folio",
+                              "codigoModelo",
+                              "descripcionModelo",
+                              "cliente",
+                              "piezas",
+                              "avancePct",
+                              "compromiso",
+                              "semaforo",
+                              "etapasAtrasadas"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Órdenes por vencer · próx. 7 días (permiso `rc.ruta-ver`; null sin permiso)."
+                    },
+                    "cortesPorSemana": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "anioSemana": {
+                                "type": "string",
+                                "description": "Semana ISO \"2026-W27\" (clave estable del bucket)."
+                              },
+                              "etiqueta": {
+                                "type": "string",
+                                "description": "Etiqueta corta de la barra (\"S27\")."
+                              },
+                              "piezas": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Σ piezas de cortes vivos de esa semana."
+                              }
+                            },
+                            "required": [
+                              "anioSemana",
+                              "etiqueta",
+                              "piezas"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Piezas cortadas por semana, últimas 7 (vieja→actual; permiso `produccion.wip-ver`)."
+                    }
+                  },
+                  "required": [
+                    "ordenesAbiertas",
+                    "wipMaquila",
+                    "cortadoSemana",
+                    "entregasATiempo",
+                    "existenciaPt",
+                    "ordenesPorVencer",
+                    "cortesPorSemana"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen operativo de la portada (cada bloque respeta el permiso de su dominio)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/almacenes": {
       "get": {
         "summary": "Listar almacenes",
@@ -178911,6 +179306,10 @@
     {
       "name": "sesion",
       "description": "Usuario actual y permisos."
+    },
+    {
+      "name": "resumen",
+      "description": "Resumen operativo de la portada (R9, por bloque/permiso)."
     },
     {
       "name": "almacenes",

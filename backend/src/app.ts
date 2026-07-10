@@ -85,6 +85,7 @@ import { rutasProcesosRc } from './api/ruta-critica/procesos.rutas.js';
 import { rutasProgramacionRc } from './api/ruta-critica/programacion.rutas.js';
 import { rutasProveedores } from './api/proveedores/proveedores.rutas.js';
 import { rutasRoles } from './api/roles/roles.rutas.js';
+import { rutasResumen } from './api/resumen/resumen.rutas.js';
 import { rutasSalud } from './api/salud/salud.rutas.js';
 import { rutasSesion } from './api/sesion/sesion.rutas.js';
 import { rutasTallas } from './api/tallas/tallas.rutas.js';
@@ -154,6 +155,10 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // 4) Routers de modulos (cada uno bajo /api).
   await app.register(rutasSalud, { prefix: '/api' });
   await app.register(rutasSesion, { prefix: '/api' });
+  // RESUMEN OPERATIVO de la portada (rediseño R9, proto vResumen): KPIs de vistazo + órdenes por
+  // vencer (semáforo RC) + cortes por semana, en una respuesta. Cada bloque respeta el permiso de
+  // su dominio dueño (A4, patrón contarAlertas): sin permiso, el bloque llega null.
+  await app.register(rutasResumen, { prefix: '/api' });
   await app.register(rutasAlmacenes, { prefix: '/api' });
   // Catálogos maestros globales (F1-E1) — patrón CRUD de Almacenes. NOTA: cortadores y
   // maquileros se fusionaron en proveedores (un tercero con sus roles de servicio, D12/R15).

@@ -9,15 +9,16 @@ export const CREDENCIALES_ADMIN = {
 
 /**
  * Inicia sesion como admin desde la pantalla de login y espera a estar dentro de
- * la app (inicio con el saludo). Lo usan las pruebas que parten de una sesion
- * valida.
+ * la app (el Resumen operativo del rediseño R9, con la sesion del admin en el
+ * menu de usuario). Lo usan las pruebas que parten de una sesion valida.
  */
 export async function entrarComoAdmin(page: Page): Promise<void> {
   await page.goto('/login');
   await page.getByLabel('Usuario').fill(CREDENCIALES_ADMIN.usuario);
   await page.getByLabel('Contraseña').fill(CREDENCIALES_ADMIN.password);
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Resumen operativo' })).toBeVisible();
+  await expect(page.getByTestId('menu-usuario')).toContainText('Administrador');
 }
 
 /**

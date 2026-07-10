@@ -1612,3 +1612,28 @@ export function buscarModuloPorClave(clave: string): EntradaMenu | undefined {
     PADRES_MENU.find((padre) => padre.clave === clave)
   );
 }
+
+/**
+ * Título de la pantalla actual para el BREADCRUMB de la topbar (proto `.crumbs`:
+ * «Control v2 › {vista}»). Gana la hoja con la ruta MÁS específica que sea
+ * prefijo del pathname (así `/produccion/notas-salida/consulta` dice "Consulta
+ * de notas" y no "Notas de salida"); las rutas de detalle (`/modelos/123`)
+ * heredan el título de su lista. `undefined` si ninguna hoja coincide.
+ */
+export function tituloPorRuta(pathname: string): string | undefined {
+  let mejor: ModuloMenu | undefined;
+  for (const modulo of MODULOS_MENU) {
+    if (modulo.ruta === '/') {
+      if (pathname === '/') {
+        return modulo.titulo;
+      }
+      continue;
+    }
+    if (pathname === modulo.ruta || pathname.startsWith(`${modulo.ruta}/`)) {
+      if (mejor === undefined || modulo.ruta.length > mejor.ruta.length) {
+        mejor = modulo;
+      }
+    }
+  }
+  return mejor?.titulo;
+}
