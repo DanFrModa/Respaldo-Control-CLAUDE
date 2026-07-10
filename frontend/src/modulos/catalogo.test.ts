@@ -470,4 +470,26 @@ describe('tituloPorRuta (breadcrumb de la topbar)', () => {
   it('devuelve undefined para rutas fuera del catálogo (la raíz "/" NO es prefijo de todo)', () => {
     expect(tituloPorRuta('/no-existe')).toBeUndefined();
   });
+
+  it('las PORTADAS-HUB (que no son hoja) pintan su título en vez de dejar el breadcrumb vacío', () => {
+    // Bug 9-jul-2026: en los hubs la topbar decía solo «Control v2».
+    expect(tituloPorRuta('/costos')).toBe('Costos');
+    expect(tituloPorRuta('/edr')).toBe('Estado de Resultados');
+    expect(tituloPorRuta('/indicadores')).toBe('Indicadores');
+    expect(tituloPorRuta('/inventarios')).toBe('Inventarios');
+    expect(tituloPorRuta('/calidad')).toBe('Calidad');
+    expect(tituloPorRuta('/esma')).toBe('EsMa');
+    expect(tituloPorRuta('/catalogos')).toBe('Catálogos');
+    // Rutas legadas de la página comodín: presentan al padre.
+    expect(tituloPorRuta('/produccion')).toBe('Producción');
+  });
+
+  it('una hoja del catálogo SIEMPRE le gana a la portada (la portada es solo fallback)', () => {
+    // `/administracion` SÍ tiene hoja propia; no cae en el mapa de portadas.
+    expect(tituloPorRuta('/administracion')).toBe('Panel de administración');
+    // `/inventarios/existencias` es hoja propia; no debe caer en "Inventarios".
+    expect(tituloPorRuta('/inventarios/existencias')).not.toBe('Inventarios');
+    // Una sub-ruta del hub SIN hoja propia hereda el título de la portada.
+    expect(tituloPorRuta('/costos/orden/123')).toBeDefined();
+  });
 });

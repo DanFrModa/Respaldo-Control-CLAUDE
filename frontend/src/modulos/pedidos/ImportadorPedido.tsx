@@ -347,6 +347,7 @@ export function ImportadorPedido({
           {paso === 1 ? (
             <PasoOrigen
               opcionesCliente={opcionesCliente}
+              cargandoClientes={clientes.isFetching}
               idCliente={idCliente}
               onIdCliente={setIdCliente}
               onTextoCliente={setTextoCliente}
@@ -371,6 +372,7 @@ export function ImportadorPedido({
               ligas={ligas}
               idDesarrolloDe={idDesarrolloDe}
               opcionesDesarrollo={opcionesDesarrollo}
+              cargandoDesarrollos={candidatos.isFetching}
               onLigar={(modeloCliente, id) =>
                 setLigas((prev) => {
                   const siguiente = { ...prev };
@@ -437,6 +439,7 @@ export function ImportadorPedido({
 /** Paso 1 · Origen: cliente + OC + archivo. */
 function PasoOrigen({
   opcionesCliente,
+  cargandoClientes,
   idCliente,
   onIdCliente,
   onTextoCliente,
@@ -446,6 +449,7 @@ function PasoOrigen({
   onArchivo,
 }: {
   opcionesCliente: { id: number; nombre: string }[];
+  cargandoClientes: boolean;
   idCliente: number | null;
   onIdCliente: (id: number | null) => void;
   onTextoCliente: (texto: string) => void;
@@ -468,6 +472,7 @@ function PasoOrigen({
               valor={idCliente}
               onChange={onIdCliente}
               alCambiarTexto={onTextoCliente}
+              cargando={cargandoClientes}
               placeholder="Elige el cliente"
               etiqueta="Cliente del pedido"
               testid="importador-cliente"
@@ -584,6 +589,7 @@ function PasoVistaPrevia({
   ligas,
   idDesarrolloDe,
   opcionesDesarrollo,
+  cargandoDesarrollos,
   onLigar,
   onBuscarDesarrollo,
   bloqueo,
@@ -593,6 +599,7 @@ function PasoVistaPrevia({
   ligas: Record<string, number>;
   idDesarrolloDe: (grupo: GrupoImportacion) => number | null;
   opcionesDesarrollo: { id: number; nombre: string }[];
+  cargandoDesarrollos: boolean;
   onLigar: (modeloCliente: string, id: number | null) => void;
   onBuscarDesarrollo: (texto: string) => void;
   bloqueo: GrupoImportacion | undefined;
@@ -657,6 +664,7 @@ function PasoVistaPrevia({
                           valor={ligado}
                           onChange={(id) => onLigar(grupo.modeloCliente, id)}
                           alCambiarTexto={onBuscarDesarrollo}
+                          cargando={cargandoDesarrollos}
                           placeholder="Ligar a un desarrollo…"
                           etiqueta={`Ligar ${grupo.modeloCliente} a un desarrollo`}
                           testid="importador-ligar"

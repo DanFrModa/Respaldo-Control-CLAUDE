@@ -225,7 +225,12 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           },
           {
             clave: 'listas-precios',
-            titulo: 'Cotizaciones / Listas de precios',
+            // «Cotizaciones» a secas: el título largo ("Cotizaciones / Listas de
+            // precios") se TRUNCABA feo en el riel (queja de Gabriel, 9-jul-2026).
+            // Bajo el padre «Desarrollo» es inequívoco; «Listas de precios» sigue
+            // existiendo bajo Clientes (misma pantalla) y la descripción conserva
+            // el nombre completo para que ⌘K lo encuentre por cualquiera de los dos.
+            titulo: 'Cotizaciones',
             descripcion:
               'Listas de precios por cliente y departamento, con factores y aprobación del dueño (PDF/Excel)',
             ruta: '/listas-precios',
@@ -1614,11 +1619,36 @@ export function buscarModuloPorClave(clave: string): EntradaMenu | undefined {
 }
 
 /**
+ * PORTADAS-HUB (y rutas comodín) que NO son hoja del catálogo — sus TARJETAS
+ * son las hojas —, con el título que el breadcrumb muestra al estar parado en
+ * ellas. Sin esto la topbar decía solo «Control v2» en `/costos`, `/edr`, etc.
+ * Los títulos son los que cada portada pinta en su `<h1>`. Fallback de
+ * `tituloPorRuta`: una hoja (más específica) siempre le gana.
+ */
+const TITULO_PORTADAS: readonly (readonly [ruta: `/${string}`, titulo: string])[] = [
+  ['/inventarios', 'Inventarios'],
+  ['/calidad', 'Calidad'],
+  ['/costos', 'Costos'],
+  ['/edr', 'Estado de Resultados'],
+  ['/indicadores', 'Indicadores'],
+  ['/esma', 'EsMa'],
+  ['/catalogos', 'Catálogos'],
+  // `/administracion` NO va aquí: SÍ tiene hoja propia en el catálogo
+  // ('administracion-panel' → "Panel de administración"), que siempre gana.
+  // Rutas legadas sin pantalla propia: caen en la página comodín, que presenta
+  // al PADRE del catálogo — el breadcrumb usa ese mismo nombre.
+  ['/produccion', 'Producción'],
+  ['/compras', 'Compras / MRP'],
+];
+
+/**
  * Título de la pantalla actual para el BREADCRUMB de la topbar (proto `.crumbs`:
  * «Control v2 › {vista}»). Gana la hoja con la ruta MÁS específica que sea
  * prefijo del pathname (así `/produccion/notas-salida/consulta` dice "Consulta
  * de notas" y no "Notas de salida"); las rutas de detalle (`/modelos/123`)
- * heredan el título de su lista. `undefined` si ninguna hoja coincide.
+ * heredan el título de su lista. Si ninguna hoja coincide, se intenta el mapa
+ * de PORTADAS-HUB (`/costos`, `/inventarios`…, que no son hoja porque sus
+ * tarjetas lo son). `undefined` si tampoco es una portada.
  */
 export function tituloPorRuta(pathname: string): string | undefined {
   let mejor: ModuloMenu | undefined;
@@ -1635,5 +1665,11 @@ export function tituloPorRuta(pathname: string): string | undefined {
       }
     }
   }
-  return mejor?.titulo;
+  if (mejor !== undefined) {
+    return mejor.titulo;
+  }
+  const portada = TITULO_PORTADAS.find(
+    ([ruta]) => pathname === ruta || pathname.startsWith(`${ruta}/`),
+  );
+  return portada?.[1];
 }

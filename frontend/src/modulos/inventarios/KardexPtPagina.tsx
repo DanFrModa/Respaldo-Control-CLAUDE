@@ -6,6 +6,14 @@ import { useCancelarMovimientoPt, useKardexPt, useMovimientoPtPorFolio } from '@
 import type { Modelo } from '@/api/modelos';
 import type { MovimientoPt } from '@/api/tipos';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -18,16 +26,9 @@ import {
 } from '@/components/ui/dialog';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
+import { PestanasSegmentadas } from './PestanasSegmentadas';
 import { SelectorModelo } from './SelectorModelo';
 
 type Modo = 'modelo' | 'folio';
@@ -43,7 +44,7 @@ export function KardexPtPagina(): React.JSX.Element {
   const [modo, setModo] = useState<Modo>('modelo');
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="flex flex-col gap-3 p-4 md:p-5">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
@@ -55,43 +56,23 @@ export function KardexPtPagina(): React.JSX.Element {
         </div>
       </header>
 
-      <div
-        className="flex w-fit overflow-hidden rounded-md border text-xs"
-        role="group"
-        aria-label="Modo del kardex"
-      >
-        <button
-          type="button"
-          onClick={() => setModo('modelo')}
-          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
-            modo === 'modelo'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-          data-testid="kardex-modo-modelo"
-        >
-          Por modelo
-        </button>
-        <button
-          type="button"
-          onClick={() => setModo('folio')}
-          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
-            modo === 'folio'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-          data-testid="kardex-modo-folio"
-        >
-          Por folio
-        </button>
-      </div>
+      <PestanasSegmentadas<Modo>
+        opciones={[
+          { valor: 'modelo', etiqueta: 'Por modelo', testid: 'kardex-modo-modelo' },
+          { valor: 'folio', etiqueta: 'Por folio', testid: 'kardex-modo-folio' },
+        ]}
+        valor={modo}
+        alCambiar={setModo}
+        etiqueta="Modo del kardex"
+        className="w-fit"
+      />
 
       {modo === 'modelo' ? <KardexPorModelo /> : <KardexPorFolio />}
     </div>
   );
 }
 
-/** Kardex por modelo: movimientos cronológicos con saldo corrido. */
+/** Kardex por modelo: movimientos cronológicos con saldo corrido (card estándar + tabla densa). */
 function KardexPorModelo(): React.JSX.Element {
   const [modelo, setModelo] = useState<Modelo | undefined>(undefined);
   const consulta = useKardexPt(
@@ -101,87 +82,90 @@ function KardexPorModelo(): React.JSX.Element {
   const renglones = consulta.data?.renglones ?? [];
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>Modelo</CardTitle>
-          <CardDescription>Elige el modelo del kardex.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SelectorModelo idSeleccionado={modelo?.id} alSeleccionar={setModelo} />
-        </CardContent>
-      </Card>
+    <div className="overflow-hidden rounded-xl border bg-card">
+      <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
+        <div className="w-64 [&_input]:h-8 [&_input]:text-sm">
+          <SelectorModelo
+            idSeleccionado={modelo?.id}
+            alSeleccionar={setModelo}
+            alLimpiar={() => setModelo(undefined)}
+          />
+        </div>
+        {modelo?.descripcion != null ? (
+          <span className="truncate text-xs text-muted-foreground">{modelo.descripcion}</span>
+        ) : null}
+        {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
+        {modelo !== undefined ? (
+          <span className="ml-auto text-xs text-faint">
+            {renglones.length.toLocaleString('es-MX')} renglones
+          </span>
+        ) : null}
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{modelo ? `Kardex de ${modelo.codigo}` : 'Kardex'}</CardTitle>
-          <CardDescription>Movimientos en orden, con el saldo tras cada uno.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {modelo === undefined ? (
-            <p className="text-sm text-muted-foreground">Selecciona un modelo.</p>
-          ) : consulta.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              {consulta.error.message}
-            </p>
-          ) : consulta.isPending ? (
-            <p className="text-sm text-muted-foreground">Cargando…</p>
-          ) : renglones.length === 0 ? (
-            <p className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Este modelo no tiene movimientos.
-            </p>
-          ) : (
-            <div className="overflow-x-auto rounded-md border" data-testid="kardex-tabla">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Folio</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Movimiento</TableHead>
-                    <TableHead>Almacén</TableHead>
-                    <TableHead>Orden</TableHead>
-                    <TableHead>Color</TableHead>
-                    <TableHead>Talla</TableHead>
-                    <TableHead className="text-right">Entrada</TableHead>
-                    <TableHead className="text-right">Salida</TableHead>
-                    <TableHead className="text-right">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {renglones.map((r, i) => (
-                    <TableRow
-                      key={`${r.idMovimiento}-${r.idColor}-${r.idTalla}-${i}`}
-                      className={r.cancelado ? 'opacity-60' : ''}
-                    >
-                      <TableCell className="font-medium tabular-nums">{r.folio}</TableCell>
-                      <TableCell>{r.fecha}</TableCell>
-                      <TableCell className="flex items-center gap-1.5">
-                        {r.tipoMov}
-                        {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
-                      </TableCell>
-                      <TableCell>{r.almacen}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {r.folioOrden === null ? 'Sin orden' : `#${String(r.folioOrden)}`}
-                      </TableCell>
-                      <TableCell>{r.color}</TableCell>
-                      <TableCell>{r.etiquetaTalla}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {r.saldo.toLocaleString('es-MX')}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {modelo === undefined ? (
+        <p className="p-6 text-sm text-muted-foreground">
+          Busca un modelo para ver su kardex (movimientos en orden, con el saldo tras cada uno).
+        </p>
+      ) : consulta.isError ? (
+        <p className="p-6 text-sm text-destructive" role="alert">
+          {consulta.error.message}
+        </p>
+      ) : consulta.isPending ? (
+        <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
+      ) : renglones.length === 0 ? (
+        <p className="p-6 text-sm text-muted-foreground">Este modelo no tiene movimientos.</p>
+      ) : (
+        <div className="overflow-x-auto" data-testid="kardex-tabla">
+          <TablaDensa>
+            <TablaDensaEncabezado>
+              <TablaDensaFila>
+                <TablaDensaHead>Folio</TablaDensaHead>
+                <TablaDensaHead>Fecha</TablaDensaHead>
+                <TablaDensaHead>Movimiento</TablaDensaHead>
+                <TablaDensaHead>Almacén</TablaDensaHead>
+                <TablaDensaHead>Orden</TablaDensaHead>
+                <TablaDensaHead>Color</TablaDensaHead>
+                <TablaDensaHead>Talla</TablaDensaHead>
+                <TablaDensaHead numerica>Entrada</TablaDensaHead>
+                <TablaDensaHead numerica>Salida</TablaDensaHead>
+                <TablaDensaHead numerica>Saldo</TablaDensaHead>
+              </TablaDensaFila>
+            </TablaDensaEncabezado>
+            <TablaDensaCuerpo>
+              {renglones.map((r, i) => (
+                <TablaDensaFila
+                  key={`${r.idMovimiento}-${r.idColor}-${r.idTalla}-${i}`}
+                  className={r.cancelado ? 'opacity-60' : ''}
+                >
+                  <TablaDensaCelda className="num font-medium">{r.folio}</TablaDensaCelda>
+                  <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                  <TablaDensaCelda>
+                    <span className="flex items-center gap-1.5">
+                      {r.tipoMov}
+                      {r.cancelado ? <ChipEstado tono="neutro">Cancelado</ChipEstado> : null}
+                    </span>
+                  </TablaDensaCelda>
+                  <TablaDensaCelda>{r.almacen}</TablaDensaCelda>
+                  <TablaDensaCelda className="text-muted-foreground">
+                    {r.folioOrden === null ? 'Sin orden' : `#${String(r.folioOrden)}`}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda>{r.color}</TablaDensaCelda>
+                  <TablaDensaCelda>{r.etiquetaTalla}</TablaDensaCelda>
+                  <TablaDensaCelda numerica>
+                    {r.entrada > 0 ? r.entrada.toLocaleString('es-MX') : '—'}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda numerica>
+                    {r.salida > 0 ? r.salida.toLocaleString('es-MX') : '—'}
+                  </TablaDensaCelda>
+                  <TablaDensaCelda numerica className="font-semibold">
+                    {r.saldo.toLocaleString('es-MX')}
+                  </TablaDensaCelda>
+                </TablaDensaFila>
+              ))}
+            </TablaDensaCuerpo>
+          </TablaDensa>
+        </div>
+      )}
     </div>
   );
 }
@@ -271,28 +255,28 @@ function KardexPorFolio(): React.JSX.Element {
               </div>
 
               <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Color</TableHead>
-                      <TableHead>Talla</TableHead>
-                      <TableHead className="text-right">Cantidad</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Color</TablaDensaHead>
+                      <TablaDensaHead>Talla</TablaDensaHead>
+                      <TablaDensaHead numerica>Cantidad</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {movimiento.lineas.flatMap((linea) =>
                       linea.tallas.map((t) => (
-                        <TableRow key={`${linea.idColor}-${t.idTalla}`}>
-                          <TableCell>{linea.color}</TableCell>
-                          <TableCell>{t.etiquetaTalla}</TableCell>
-                          <TableCell className="text-right tabular-nums">
+                        <TablaDensaFila key={`${linea.idColor}-${t.idTalla}`}>
+                          <TablaDensaCelda>{linea.color}</TablaDensaCelda>
+                          <TablaDensaCelda>{t.etiquetaTalla}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {t.cantidad.toLocaleString('es-MX')}
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
                       )),
                     )}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
 
               {movimiento.observaciones !== null ? (

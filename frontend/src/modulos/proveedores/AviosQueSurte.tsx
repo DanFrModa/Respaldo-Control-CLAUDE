@@ -172,6 +172,7 @@ export function AviosQueSurte({
                 valor={idAvioSel}
                 onChange={setIdAvioSel}
                 alCambiarTexto={setTextoAvio}
+                cargando={catalogo.isFetching}
                 placeholder="Buscar avío que ya tienes dado de alta…"
                 textoVacio={
                   catalogo.isFetching ? 'Buscando…' : 'Sin avíos disponibles para asignar.'

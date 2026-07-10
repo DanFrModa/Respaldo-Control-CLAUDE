@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
-import { moneda, porcentaje } from './comun';
+import { fechaCorta, moneda, porcentaje } from './comun';
 
 const MESES = [
   'Enero',
@@ -155,7 +155,7 @@ export function MargenesPagina(): React.JSX.Element {
               {consulta.error.message}
             </p>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground">
+            <p className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
               No hay pedidos con órdenes costeadas para los filtros elegidos.
             </p>
           ) : (
@@ -178,9 +178,9 @@ export function MargenesPagina(): React.JSX.Element {
                     <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
                     <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
                     <TablaDensaCelda className="text-muted-foreground">
-                      {f.fechaHasta ?? '—'}
+                      {fechaCorta(f.fechaHasta)}
                     </TablaDensaCelda>
-                    <TablaDensaCelda numerica>{f.cantidad}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{f.cantidad.toLocaleString('es-MX')}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{moneda(f.importe)}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{porcentaje(f.margenPromedio)}</TablaDensaCelda>
                     <TablaDensaCelda numerica>{porcentaje(f.margenPonderado)}</TablaDensaCelda>

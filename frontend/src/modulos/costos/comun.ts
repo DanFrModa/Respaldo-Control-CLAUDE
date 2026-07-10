@@ -23,6 +23,22 @@ export function porcentaje(fraccion: number | null | undefined): string {
   })}%`;
 }
 
+/** Formatea una fecha date-only `YYYY-MM-DD` como "30 jun 2026" sin desfase de zona (o "—"). */
+export function fechaCorta(valor: string | null | undefined): string {
+  if (valor === null || valor === undefined || valor === '') {
+    return '—';
+  }
+  const [a, m, d] = valor.split('-').map(Number);
+  if (a === undefined || m === undefined || d === undefined || Number.isNaN(a + m + d)) {
+    return '—';
+  }
+  return new Date(a, m - 1, d).toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 /** Etiqueta legible de una base de prorrateo. */
 export function etiquetaBase(base: 'cortado' | 'recibido' | 'vendido'): string {
   return base === 'cortado'

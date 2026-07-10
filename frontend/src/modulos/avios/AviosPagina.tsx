@@ -11,6 +11,7 @@ import {
 } from '@/api/avios';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { ChipFiltro, ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -22,7 +23,6 @@ import {
 import { Avatar, EstadoBadge } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
@@ -50,8 +50,8 @@ function formatearPrecio(valor: number | null): string {
 
 /**
  * AVÍOS — catálogo (F1-E3, R1) re-vestido R9 a TABLA-FIRST fiel al proto `vAvios`: page-head + toolbar
- * (filtro por género R4, búsqueda, inactivos) + TABLA DENSA con filas EXPANDIBLES (chevron) + barra de
- * totales al pie. Cada avío distingue Genérico·stock / Por orden (chip), lleva su cuenta de
+ * (CHIPS excluyentes por género R4 como el proto, búsqueda, chip "Incluir inactivos") + TABLA DENSA
+ * con filas EXPANDIBLES (chevron) + barra de totales al pie. Cada avío distingue Genérico·stock / Por orden (chip), lleva su cuenta de
  * PROVEEDORES (badge) y su precio de referencia; al expandir muestra los PROVEEDORES con su precio
  * (el más barato marcado) y las MEDIDAS del avío "por medida" (promedio del precosteo, R5/B11), más las
  * acciones de administración (editar/desactivar/activar). Borrado suave reversible.
@@ -180,23 +180,20 @@ export function AviosPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          {/* El select va en caja de ancho FIJO: el envoltorio interno de `SelectNativo` es
-              w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
-              queda huérfano a la derecha). */}
-          <SelectNativo
-            className="w-40 h-8 text-sm"
-            value={generoFiltro}
-            onChange={(e) => {
-              setGeneroFiltro(e.target.value);
+          {/* Fila de chips excluyentes (proto `.chip`/`.chip.active`), en lugar del select. */}
+          <ChipsFiltro
+            opciones={[
+              { valor: GENERO_TODOS, etiqueta: 'Todos', testid: 'filtro-genero-todos' },
+              { valor: 'generico', etiqueta: 'Genérico · stock', testid: 'filtro-genero-generico' },
+              { valor: 'normal', etiqueta: 'Por orden', testid: 'filtro-genero-normal' },
+            ]}
+            valor={generoFiltro}
+            alCambiar={(valor) => {
+              setGeneroFiltro(valor);
               reiniciar();
             }}
-            aria-label="Filtrar avíos por género"
-            data-testid="filtro-genero-avio"
-          >
-            <option value={GENERO_TODOS}>Todos los avíos</option>
-            <option value="generico">Solo genéricos</option>
-            <option value="normal">Solo por orden</option>
-          </SelectNativo>
+            etiqueta="Filtrar avíos por género"
+          />
           {/* Búsqueda con lupa (proto `.tool-search`). */}
           <div className="relative w-52">
             <Search
@@ -215,18 +212,16 @@ export function AviosPagina(): React.JSX.Element {
               data-testid="buscar-avio"
             />
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={incluirInactivos}
-              onChange={() => {
-                setIncluirInactivos((v) => !v);
-                reiniciar();
-              }}
-              data-testid="mostrar-desactivados"
-            />
+          <ChipFiltro
+            activo={incluirInactivos}
+            onClick={() => {
+              setIncluirInactivos((v) => !v);
+              reiniciar();
+            }}
+            data-testid="mostrar-desactivados"
+          >
             Incluir inactivos
-          </label>
+          </ChipFiltro>
           {/* Conteo a la derecha (proto `.count`: "visibles de total", texto plano atenuado). */}
           <span className="ml-auto text-xs text-faint">
             {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')}

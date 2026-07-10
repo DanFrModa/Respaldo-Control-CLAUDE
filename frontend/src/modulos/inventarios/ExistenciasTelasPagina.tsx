@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useAlmacenes } from '@/api/almacenes';
 import { urlImpresoInventarioTelas, useExistenciasTela } from '@/api/inventario-materiales';
 import { useColores } from '@/api/colores';
+import type { Tela } from '@/api/telas';
 import type { ExistenciaTelaFila } from '@/api/tipos';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
@@ -14,8 +15,11 @@ import {
   TablaDensaFila,
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
+import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
+
+import { SelectorTela } from './SelectorTela';
 
 /** Valor del filtro que significa "todos". */
 const TODOS = 'TODOS';
@@ -27,8 +31,9 @@ function claveFila(f: ExistenciaTelaFila): string {
 
 /**
  * EXISTENCIAS de TELAS (F4-E1, proto `vTelas` — re-vestido R9; D5). Tabla DENSA con la existencia por
- * tela×lote×almacén (Σ de movimientos, D3), filtros arriba (color, almacén, ceros), KPIs de vistazo,
- * barra de totales al pie e IMPRESO PDF (R9). Los COMPONENTES del lote (D5) se despliegan por fila
+ * tela×lote×almacén (Σ de movimientos, D3), filtros arriba (búsqueda de tela por combobox popover
+ * `idTela` server-side, color, almacén, ceros), KPIs de vistazo, barra de totales al pie e IMPRESO
+ * PDF (R9). Los COMPONENTES del lote (D5) se despliegan por fila
  * ("Felpa 100", "Cardigan 40"…). Consulta MÓVIL: tabla en escritorio, tarjetas apiladas en móvil.
  *
  * FIDELIDAD vs proto: el proto pinta KPIs de "Valor inventario" y "Por debajo de mínimo" y una columna
@@ -39,6 +44,7 @@ function claveFila(f: ExistenciaTelaFila): string {
  * `inventario-telas.ver` gobierna el acceso.
  */
 export function ExistenciasTelasPagina(): React.JSX.Element {
+  const [tela, setTela] = useState<Tela | undefined>(undefined);
   const [idColor, setIdColor] = useState<string>(TODOS);
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [incluirCeros, setIncluirCeros] = useState(false);
@@ -59,6 +65,7 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
   });
 
   const filtros = {
+    ...(tela !== undefined ? { idTela: tela.id } : {}),
     ...(idColor !== TODOS ? { idColor: Number(idColor) } : {}),
     ...(idAlmacen !== TODOS ? { idAlmacen: Number(idAlmacen) } : {}),
     ...(incluirCeros ? { incluirCeros: 'true' as const } : {}),
@@ -117,6 +124,15 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* Búsqueda de tela (proto `.tool-search`): combobox POPOVER que filtra por `idTela`
+              server-side (la lista no vive inline: no infla el toolbar). */}
+          <div className="w-56 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorTela
+              idSeleccionado={tela?.id}
+              alSeleccionar={setTela}
+              alLimpiar={() => setTela(undefined)}
+            />
+          </div>
           {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
               w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
               queda huérfano a la derecha). */}
@@ -340,15 +356,22 @@ function RenglonTela({
               aria-expanded={abierta}
               data-testid={`telas-fila-toggle-${clave}`}
             >
-              {abierta ? (
-                <ChevronDown className="size-4" aria-hidden />
-              ) : (
-                <ChevronRight className="size-4" aria-hidden />
-              )}
+              <ChevronRight
+                className={`size-4 transition-transform ${abierta ? 'rotate-90' : ''}`}
+                aria-hidden
+              />
             </button>
           ) : null}
         </TablaDensaCelda>
-        <TablaDensaCelda className="font-medium">{fila.tela}</TablaDensaCelda>
+        <TablaDensaCelda>
+          <div className="flex items-center gap-2">
+            {/* Proto `vTelas`: thumb de tipo con la inicial fija "T" (índigo de telas). */}
+            <Avatar nombre={fila.tela} tono="telas" tamano="sm">
+              T
+            </Avatar>
+            <span className="font-medium">{fila.tela}</span>
+          </div>
+        </TablaDensaCelda>
         <TablaDensaCelda>{fila.loteClave ?? '(sin lote)'}</TablaDensaCelda>
         <TablaDensaCelda>{fila.color ?? '—'}</TablaDensaCelda>
         <TablaDensaCelda>{fila.proveedor ?? '—'}</TablaDensaCelda>

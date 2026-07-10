@@ -36,6 +36,10 @@ vi.mock('@/api/inventario-materiales', () => ({
   useExistenciasAvio: () => ({ data: existencias, isPending: false, isError: false, error: null }),
 }));
 vi.mock('@/api/almacenes', () => ({ useAlmacenes: () => ({ data: { datos: [] } }) }));
+// El filtro de avío del toolbar (SelectorAvio, combobox popover) consulta el catálogo de avíos.
+vi.mock('@/api/avios', () => ({
+  useAvios: () => ({ data: { datos: [] }, isPending: false, isError: false }),
+}));
 
 describe('ExistenciasAviosPagina (F4-E1)', () => {
   it('muestra existencias multi-almacén con tabla (escritorio) y tarjetas (móvil)', () => {

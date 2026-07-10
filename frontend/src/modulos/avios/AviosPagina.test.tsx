@@ -203,11 +203,15 @@ describe('<AviosPagina>', () => {
     // Sin filtro, la query no lleva `esGenerico`.
     expect(ultimaQuery?.esGenerico).toBeUndefined();
 
-    await usuario.selectOptions(screen.getByTestId('filtro-genero-avio'), 'generico');
+    // Los filtros son CHIPS excluyentes (proto `.chip`), ya no un select.
+    await usuario.click(screen.getByTestId('filtro-genero-generico'));
     expect(ultimaQuery?.esGenerico).toBe('true');
 
-    await usuario.selectOptions(screen.getByTestId('filtro-genero-avio'), 'normal');
+    await usuario.click(screen.getByTestId('filtro-genero-normal'));
     expect(ultimaQuery?.esGenerico).toBe('false');
+
+    await usuario.click(screen.getByTestId('filtro-genero-todos'));
+    expect(ultimaQuery?.esGenerico).toBeUndefined();
   });
 
   it('distingue los avíos genéricos con un chip en el renglón', () => {

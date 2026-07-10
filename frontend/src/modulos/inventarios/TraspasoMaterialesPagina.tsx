@@ -12,6 +12,7 @@ import { useSesion } from '@/sesion/useSesion';
 
 import { CapturaRenglonesAvio, type RenglonAvio } from './CapturaRenglonesAvio';
 import { CapturaRenglonesTela, type RenglonTela } from './CapturaRenglonesTela';
+import { PestanasSegmentadas } from './PestanasSegmentadas';
 
 type Dimension = 'tela' | 'avio';
 
@@ -115,7 +116,7 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="flex flex-col gap-3 p-4 md:p-5">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
@@ -127,36 +128,16 @@ export function TraspasoMaterialesPagina(): React.JSX.Element {
         </div>
       </header>
 
-      <div
-        className="flex w-fit overflow-hidden rounded-md border text-xs"
-        role="group"
-        aria-label="Tipo de material"
-      >
-        <button
-          type="button"
-          onClick={() => setDimension('tela')}
-          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
-            dimension === 'tela'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-          data-testid="traspaso-dim-tela"
-        >
-          Telas
-        </button>
-        <button
-          type="button"
-          onClick={() => setDimension('avio')}
-          className={`cursor-pointer px-3 py-1 font-medium transition-colors ${
-            dimension === 'avio'
-              ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-muted'
-          }`}
-          data-testid="traspaso-dim-avio"
-        >
-          Avíos
-        </button>
-      </div>
+      <PestanasSegmentadas<Dimension>
+        opciones={[
+          { valor: 'tela', etiqueta: 'Telas', testid: 'traspaso-dim-tela' },
+          { valor: 'avio', etiqueta: 'Avíos', testid: 'traspaso-dim-avio' },
+        ]}
+        valor={dimension}
+        alCambiar={setDimension}
+        etiqueta="Tipo de material"
+        className="w-fit"
+      />
 
       <Card>
         <CardHeader>

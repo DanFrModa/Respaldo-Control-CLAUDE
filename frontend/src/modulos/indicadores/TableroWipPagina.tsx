@@ -152,7 +152,7 @@ export function TableroWipPagina(): React.JSX.Element {
                 </span>
               </div>
               {datos.datos.length === 0 ? (
-                <p className="p-6 text-sm text-muted-foreground">
+                <p className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                   No hay órdenes para el filtro elegido.
                 </p>
               ) : (
@@ -178,13 +178,13 @@ export function TableroWipPagina(): React.JSX.Element {
                           <TablaDensaCelda className="font-medium">#{o.folio}</TablaDensaCelda>
                           <TablaDensaCelda>{o.cliente}</TablaDensaCelda>
                           <TablaDensaCelda>{o.codigoModelo}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.pedido}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.cortado}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.enviado}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.recibido}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.entregado}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.porRecibir}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{o.porEntregar}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.pedido)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.cortado)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.enviado)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.recibido)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.entregado)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.porRecibir)}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{entero(o.porEntregar)}</TablaDensaCelda>
                         </TablaDensaFila>
                       ))}
                     </TablaDensaCuerpo>

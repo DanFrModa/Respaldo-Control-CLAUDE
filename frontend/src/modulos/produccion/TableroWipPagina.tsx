@@ -239,7 +239,10 @@ export function TableroWipPagina(): React.JSX.Element {
           ) : consulta.isPending ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando órdenes…</p>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground" data-testid="wip-vacio">
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="wip-vacio"
+            >
               No hay órdenes que coincidan con los filtros.
             </p>
           ) : (

@@ -53,7 +53,14 @@ export function selloDatosAl(datosAl: string | null | undefined): string {
   if (datosAl === null || datosAl === undefined) {
     return 'Datos aún no calculados — usa Refrescar';
   }
-  return `Datos al: ${new Date(datosAl).toLocaleString('es-MX')}`;
+  const legible = new Date(datosAl).toLocaleString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  return `Datos al: ${legible}`;
 }
 
 /** Formatea un número con hasta `dec` decimales (F7-E4 índices), o "—" si es null. */

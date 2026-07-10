@@ -48,11 +48,15 @@ export function avatarPorTono(tono: Tono): string {
 
 /** Toma hasta dos iniciales de un nombre (para el avatar). */
 export function iniciales(nombre: string): string {
-  const partes = nombre.trim().split(/\s+/).filter(Boolean);
-  if (partes.length === 0) {
+  // Solo palabras que empiezan con letra/dígito: nombres con puntuación colgante
+  // ("360 Equilibrium -", "FR moda -") no producen iniciales tipo "3-" o "F-".
+  const todas = nombre.trim().split(/\s+/).filter(Boolean);
+  const partes = todas.filter((p) => /^[\p{L}\p{N}]/u.test(p));
+  const base = partes.length > 0 ? partes : todas;
+  if (base.length === 0) {
     return '?';
   }
-  const primera = partes[0]?.charAt(0) ?? '';
-  const segunda = partes.length > 1 ? (partes[partes.length - 1]?.charAt(0) ?? '') : '';
+  const primera = base[0]?.charAt(0) ?? '';
+  const segunda = base.length > 1 ? (base[base.length - 1]?.charAt(0) ?? '') : '';
   return (primera + segunda).toUpperCase() || '?';
 }

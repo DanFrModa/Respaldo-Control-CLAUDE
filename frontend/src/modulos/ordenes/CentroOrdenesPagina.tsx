@@ -372,6 +372,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
               reiniciarPagina();
             }}
             alCambiarTexto={setTextoCliente}
+            cargando={clientes.isFetching}
             placeholder="Cliente"
             etiqueta="Filtrar por cliente"
             testid="centro-filtro-cliente"
@@ -386,6 +387,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
               reiniciarPagina();
             }}
             alCambiarTexto={setTextoMaquilero}
+            cargando={maquileros.isFetching}
             placeholder="Maquilero"
             etiqueta="Filtrar por maquilero"
             testid="centro-filtro-maquilero"
@@ -400,6 +402,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
               reiniciarPagina();
             }}
             alCambiarTexto={setTextoEstampador}
+            cargando={estampadores.isFetching || bordadores.isFetching}
             placeholder="Estampador"
             etiqueta="Filtrar por estampador"
             testid="centro-filtro-estampador"
@@ -490,7 +493,10 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                 </Button>
               </div>
             ) : filas.length === 0 ? (
-              <p className="p-6 text-sm text-muted-foreground" data-testid="centro-vacio">
+              <p
+                className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+                data-testid="centro-vacio"
+              >
                 No hay órdenes que coincidan con los filtros.
               </p>
             ) : (

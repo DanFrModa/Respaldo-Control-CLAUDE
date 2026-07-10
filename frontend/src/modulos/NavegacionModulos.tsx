@@ -155,17 +155,34 @@ function BadgeNavChip({ badge, testid }: { badge: BadgeNav; testid: string }): R
   );
 }
 
+/** ¿Esta ruta es la actual? (misma semántica que NavLink con `end` en «/»). */
+function esRutaActiva(ruta: string, pathname: string): boolean {
+  if (ruta === '/') {
+    return pathname === '/';
+  }
+  return pathname === ruta || pathname.startsWith(`${ruta}/`);
+}
+
 /** ¿La ruta actual vive dentro de este padre? (activa el resaltado del padre). */
 function contieneRuta(entrada: EntradaMenu, pathname: string): boolean {
   if (entrada.hijos === undefined) {
     return false;
   }
-  return entrada.hijos.some(
-    (hijo) => hijo.ruta !== '/' && (pathname === hijo.ruta || pathname.startsWith(`${hijo.ruta}/`)),
-  );
+  return entrada.hijos.some((hijo) => hijo.ruta !== '/' && esRutaActiva(hijo.ruta, pathname));
 }
 
-/** Una HOJA de primer nivel: navega. Icono quieto; el texto se desvanece al colapsar. */
+/**
+ * Una HOJA de primer nivel: navega. Icono quieto; el texto se desvanece al colapsar.
+ *
+ * ⚠️ TRAMPA (bug real en `prueba`, 9-jul-2026): el `className` de este NavLink
+ * DEBE ser un STRING, no la forma función `({ isActive }) => …` de React Router.
+ * Al pasar por `<TooltipTrigger asChild>`, el Slot de Radix fusiona los
+ * className con un `join(' ')` que COERSIONA la función a su código fuente:
+ * el <a> terminaba con clases basura (`({isActive:e})=>V(\`relative flex…`) y
+ * perdía el gap, el padding vertical y el resaltado activo (el riel se veía
+ * con los iconos PEGADOS al texto). Por eso el estado activo se calcula aquí
+ * con `useLocation` y se interpola como string.
+ */
 function HojaNav({
   hoja,
   colapsado,
@@ -178,6 +195,8 @@ function HojaNav({
   badge?: BadgeNav | undefined;
 }): React.JSX.Element {
   const Icono = ICONOS_MODULO[hoja.icono];
+  const { pathname } = useLocation();
+  const activa = esRutaActiva(hoja.ruta, pathname);
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -186,56 +205,50 @@ function HojaNav({
           end={hoja.ruta === '/'}
           onClick={alNavegar}
           aria-label={colapsado ? hoja.titulo : undefined}
-          className={({ isActive }) =>
-            cn(
-              'relative flex items-center rounded-[8px] text-sm transition-colors duration-150',
-              colapsado ? 'justify-center px-0 py-[9px]' : 'gap-[11px] px-2.5 py-[7px]',
-              isActive
-                ? 'bg-rail-active text-rail-active-fg'
-                : 'text-rail-fg hover:bg-white/5 hover:text-rail-fg-strong',
-            )
-          }
-        >
-          {({ isActive }) => (
-            <>
-              {isActive ? (
-                <span
-                  aria-hidden
-                  className="absolute top-1/2 -left-2 h-[18px] w-[3px] -translate-y-1/2 rounded-r-[3px] bg-primary-bright"
-                />
-              ) : null}
-              <Icono
-                className={cn(
-                  'size-[17px] shrink-0',
-                  isActive ? 'opacity-100' : 'opacity-90',
-                  colapsado && 'mx-auto',
-                )}
-                aria-hidden
-              />
-              {/* Riel COLAPSADO: el badge no cabe → puntito de alerta sobre el icono. */}
-              {colapsado && badge !== undefined ? (
-                <span
-                  aria-hidden
-                  data-testid={`nav-punto-${hoja.clave}`}
-                  className={cn(
-                    'absolute top-1 right-1.5 size-2 rounded-full ring-2 ring-rail',
-                    badge.critico ? 'bg-crit' : 'bg-warn',
-                  )}
-                />
-              ) : null}
-              <span
-                className={cn(
-                  'flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-in-out',
-                  colapsado ? 'max-w-0 opacity-0' : 'max-w-[12rem] opacity-100',
-                )}
-              >
-                <span className="truncate">{hoja.titulo}</span>
-                {badge === undefined ? null : (
-                  <BadgeNavChip badge={badge} testid={`nav-badge-${hoja.clave}`} />
-                )}
-              </span>
-            </>
+          className={cn(
+            'relative flex items-center rounded-[8px] text-sm transition-colors duration-150',
+            colapsado ? 'justify-center px-0 py-[9px]' : 'gap-[11px] px-2.5 py-[7px]',
+            activa
+              ? 'bg-rail-active text-rail-active-fg'
+              : 'text-rail-fg hover:bg-white/5 hover:text-rail-fg-strong',
           )}
+        >
+          {activa ? (
+            <span
+              aria-hidden
+              className="absolute top-1/2 -left-2 h-[18px] w-[3px] -translate-y-1/2 rounded-r-[3px] bg-primary-bright"
+            />
+          ) : null}
+          <Icono
+            className={cn(
+              'size-[17px] shrink-0',
+              activa ? 'opacity-100' : 'opacity-90',
+              colapsado && 'mx-auto',
+            )}
+            aria-hidden
+          />
+          {/* Riel COLAPSADO: el badge no cabe → puntito de alerta sobre el icono. */}
+          {colapsado && badge !== undefined ? (
+            <span
+              aria-hidden
+              data-testid={`nav-punto-${hoja.clave}`}
+              className={cn(
+                'absolute top-1 right-1.5 size-2 rounded-full ring-2 ring-rail',
+                badge.critico ? 'bg-crit' : 'bg-warn',
+              )}
+            />
+          ) : null}
+          <span
+            className={cn(
+              'flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ease-in-out',
+              colapsado ? 'max-w-0 opacity-0' : 'max-w-[12rem] opacity-100',
+            )}
+          >
+            <span className="truncate">{hoja.titulo}</span>
+            {badge === undefined ? null : (
+              <BadgeNavChip badge={badge} testid={`nav-badge-${hoja.clave}`} />
+            )}
+          </span>
         </NavLink>
       </TooltipTrigger>
       {colapsado ? <TooltipContent side="right">{hoja.titulo}</TooltipContent> : null}

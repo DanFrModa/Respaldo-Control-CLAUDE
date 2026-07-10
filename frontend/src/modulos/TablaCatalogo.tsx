@@ -185,7 +185,10 @@ export function TablaCatalogo<T>({
           ) : cargando ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando {unidad}…</p>
           ) : registros.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground" data-testid={`${testid}-vacio`}>
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid={`${testid}-vacio`}
+            >
               {textoVacio}
             </p>
           ) : (
