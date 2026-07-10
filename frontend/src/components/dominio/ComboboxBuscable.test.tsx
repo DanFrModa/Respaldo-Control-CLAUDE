@@ -39,7 +39,13 @@ describe('normalizarTexto / filtrarOpciones (búsqueda sin acentos ni mayúscula
 });
 
 /** Arnés controlado (el combobox es controlado por el padre). */
-function Arnes({ onChange }: { onChange?: (id: number | null) => void }): React.JSX.Element {
+function Arnes({
+  onChange,
+  alCambiarTexto,
+}: {
+  onChange?: (id: number | null) => void;
+  alCambiarTexto?: (texto: string) => void;
+}): React.JSX.Element {
   const [valor, setValor] = useState<number | null>(null);
   return (
     <ComboboxBuscable
@@ -49,6 +55,7 @@ function Arnes({ onChange }: { onChange?: (id: number | null) => void }): React.
         setValor(id);
         onChange?.(id);
       }}
+      {...(alCambiarTexto === undefined ? {} : { alCambiarTexto })}
       placeholder="Escribe el maquilero…"
       testid="combo"
     />
@@ -126,5 +133,151 @@ describe('<ComboboxBuscable>', () => {
     await usuario.click(screen.getByTestId('combo-input'));
     await usuario.click(screen.getByTestId('combo-crear'));
     expect(alCrear).toHaveBeenCalled();
+  });
+});
+
+describe('<ComboboxBuscable> — ciclo escribir → elegir → cambiar de opinión', () => {
+  it('borrar TODO el texto limpia la selección y vuelve a la lista completa', async () => {
+    const usuario = userEvent.setup();
+    const alCambiar = vi.fn();
+    const alCambiarTexto = vi.fn();
+    render(<Arnes onChange={alCambiar} alCambiarTexto={alCambiarTexto} />);
+    const input = screen.getByTestId('combo-input');
+
+    await usuario.type(input, 'her');
+    await usuario.keyboard('{Enter}');
+    expect(alCambiar).toHaveBeenLastCalledWith(2);
+    expect(input).toHaveValue('Óscar Hernández');
+
+    // Borra todo: la selección se limpia (el filtro vuelve a "Todos"), el texto QUEDA vacío y
+    // la búsqueda server-side se resetea — la lista completa vuelve a mostrarse.
+    await usuario.clear(input);
+    expect(input).toHaveValue('');
+    expect(alCambiar).toHaveBeenLastCalledWith(null);
+    expect(alCambiarTexto).toHaveBeenLastCalledWith('');
+    await usuario.click(input);
+    expect(screen.getAllByTestId('combo-opcion')).toHaveLength(4);
+  });
+
+  it('las opciones que llegan del server mientras escribo NO pisan lo tecleado (bug "borro y reaparece")', async () => {
+    const usuario = userEvent.setup();
+    const { rerender } = render(
+      <ComboboxBuscable opciones={OSCARES} valor={2} onChange={() => undefined} testid="combo" />,
+    );
+    const input = screen.getByTestId('combo-input');
+    expect(input).toHaveValue('Óscar Hernández');
+
+    await usuario.click(input);
+    await usuario.keyboard('{Control>}a{/Control}rima');
+    expect(input).toHaveValue('rima');
+
+    // Simula la respuesta del typeahead server-side: llega OTRA página de opciones (sin el id 2).
+    rerender(
+      <ComboboxBuscable
+        opciones={[{ id: 4, nombre: 'Rima Textil' }]}
+        valor={2}
+        onChange={() => undefined}
+        testid="combo"
+      />,
+    );
+    // Antes: el efecto colgado del objeto `seleccionada` pisaba el texto a media edición.
+    expect(input).toHaveValue('rima');
+  });
+
+  it('salir (blur) con texto fantasma restaura la etiqueta de la selección vigente y resetea la búsqueda', async () => {
+    const usuario = userEvent.setup();
+    const alCambiar = vi.fn();
+    const alCambiarTexto = vi.fn();
+    render(<Arnes onChange={alCambiar} alCambiarTexto={alCambiarTexto} />);
+    const input = screen.getByTestId('combo-input');
+
+    await usuario.type(input, 'her');
+    await usuario.keyboard('{Enter}');
+    await usuario.keyboard('{Control>}a{/Control}xyz'); // basura que no coincide
+    expect(input).toHaveValue('xyz');
+
+    await usuario.tab();
+    expect(input).toHaveValue('Óscar Hernández'); // repone la etiqueta real
+    expect(alCambiar).toHaveBeenLastCalledWith(2); // la selección NO cambió
+    expect(alCambiarTexto).toHaveBeenLastCalledWith(''); // la búsqueda a medias se reseteó
+  });
+
+  it('sin selección, salir con texto que no coincide deja el input vacío', async () => {
+    const usuario = userEvent.setup();
+    const alCambiar = vi.fn();
+    render(<Arnes onChange={alCambiar} />);
+    const input = screen.getByTestId('combo-input');
+
+    await usuario.type(input, 'zzz');
+    await usuario.tab();
+    expect(input).toHaveValue('');
+    expect(alCambiar).not.toHaveBeenCalled();
+  });
+
+  it('Escape con texto a medias cierra la lista y repone la etiqueta', async () => {
+    const usuario = userEvent.setup();
+    render(
+      <ComboboxBuscable opciones={OSCARES} valor={3} onChange={() => undefined} testid="combo" />,
+    );
+    const input = screen.getByTestId('combo-input');
+
+    await usuario.click(input);
+    await usuario.keyboard('{Control>}a{/Control}basura{Escape}');
+    expect(screen.queryByTestId('combo-lista')).not.toBeInTheDocument();
+    expect(input).toHaveValue('Óscar López');
+  });
+
+  it('enfocar con selección muestra el catálogo COMPLETO (no solo la opción elegida) y selecciona el texto', async () => {
+    const usuario = userEvent.setup();
+    render(
+      <ComboboxBuscable opciones={OSCARES} valor={2} onChange={() => undefined} testid="combo" />,
+    );
+
+    // Tab (foco por teclado, sin las peculiaridades del caret del mouse): texto seleccionado.
+    await usuario.tab();
+    const input = screen.getByTestId<HTMLInputElement>('combo-input');
+    expect(input).toHaveFocus();
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe('Óscar Hernández'.length);
+    // El texto es la ETIQUETA, no una búsqueda: la lista trae las 4 opciones.
+    expect(screen.getAllByTestId('combo-opcion')).toHaveLength(4);
+    // Teclear encima reemplaza de una (sin borrar letra por letra).
+    await usuario.keyboard('rim');
+    expect(input).toHaveValue('rim');
+  });
+
+  it('la etiqueta de la selección sobrevive aunque la página de opciones ya no la traiga (y el ✕ sigue)', () => {
+    const { rerender } = render(
+      <ComboboxBuscable opciones={OSCARES} valor={2} onChange={() => undefined} testid="combo" />,
+    );
+    expect(screen.getByTestId('combo-input')).toHaveValue('Óscar Hernández');
+
+    rerender(
+      <ComboboxBuscable
+        opciones={[{ id: 4, nombre: 'Rima Textil' }]}
+        valor={2}
+        onChange={() => undefined}
+        testid="combo"
+      />,
+    );
+    expect(screen.getByTestId('combo-input')).toHaveValue('Óscar Hernández');
+    expect(screen.getByTestId('combo-limpiar')).toBeInTheDocument();
+  });
+
+  it('cargando: pinta "Buscando…" en vez de "Sin coincidencias." mientras llega la página', async () => {
+    const usuario = userEvent.setup();
+    render(
+      <ComboboxBuscable
+        opciones={[]}
+        valor={null}
+        onChange={() => undefined}
+        cargando
+        testid="combo"
+      />,
+    );
+    await usuario.click(screen.getByTestId('combo-input'));
+    expect(screen.getByText('Buscando…')).toBeInTheDocument();
+    expect(screen.queryByText('Sin coincidencias.')).not.toBeInTheDocument();
+    expect(screen.getByTestId('combo-cargando')).toBeInTheDocument();
   });
 });

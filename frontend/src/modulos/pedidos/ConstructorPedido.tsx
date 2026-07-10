@@ -200,6 +200,7 @@ export function ConstructorPedido({
                   valor={idCliente}
                   onChange={setIdCliente}
                   alCambiarTexto={setTextoCliente}
+                  cargando={clientes.isFetching}
                   placeholder="Escribe para buscar…"
                   etiqueta="Cliente del pedido"
                   testid="constructor-cliente"
@@ -384,6 +385,7 @@ function RenglonConstructor({
           valor={fila.candidato?.idDesarrollo ?? null}
           onChange={elegir}
           alCambiarTexto={setTexto}
+          cargando={candidatos.isFetching}
           placeholder="Modelo de desarrollo…"
           etiqueta="Modelo de desarrollo"
           textoVacio={

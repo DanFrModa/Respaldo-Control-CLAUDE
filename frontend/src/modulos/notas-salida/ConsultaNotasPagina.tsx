@@ -178,7 +178,10 @@ export function ConsultaNotasPagina(): React.JSX.Element {
               </Button>
             </div>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground" data-testid="consulta-notas-vacio">
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="consulta-notas-vacio"
+            >
               No hay notas de salida que coincidan con la búsqueda.
             </p>
           ) : (

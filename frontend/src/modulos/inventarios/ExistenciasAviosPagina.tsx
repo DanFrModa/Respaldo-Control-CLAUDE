@@ -2,6 +2,7 @@ import { Warehouse } from 'lucide-react';
 import { useState } from 'react';
 
 import { useAlmacenes } from '@/api/almacenes';
+import type { Avio } from '@/api/avios';
 import { useExistenciasAvio } from '@/api/inventario-materiales';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
@@ -13,15 +14,19 @@ import {
   TablaDensaFila,
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
+import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
+
+import { SelectorAvio } from './SelectorAvio';
 
 /** Valor del filtro que significa "todos". */
 const TODOS = 'TODOS';
 
 /**
  * EXISTENCIAS de AVÍOS (F4-E1, proto `vAvios` — re-vestido R9; R4). Inventario MULTI-ALMACÉN: existencia
- * por avío×almacén (Σ de movimientos, D3), en tabla DENSA con filtros arriba, KPIs de vistazo y barra de
+ * por avío×almacén (Σ de movimientos, D3), en tabla DENSA con filtros arriba (búsqueda de avío por
+ * combobox popover `idAvio` server-side, almacén, genéricos, ceros), KPIs de vistazo y barra de
  * totales al pie. Distingue los DOS conceptos de genérico (aclaración de Daniel §4.7): "Genérico" =
  * genérico de STOCK (se netea en MRP) vs "Por orden" (se compra contra la orden). Consulta MÓVIL:
  * tabla en escritorio, tarjetas en móvil.
@@ -34,6 +39,7 @@ const TODOS = 'TODOS';
  * `inventario-avios.ver` gobierna el acceso.
  */
 export function ExistenciasAviosPagina(): React.JSX.Element {
+  const [avio, setAvio] = useState<Avio | undefined>(undefined);
   const [idAlmacen, setIdAlmacen] = useState<string>(TODOS);
   const [soloGenericos, setSoloGenericos] = useState(false);
   const [incluirCeros, setIncluirCeros] = useState(false);
@@ -46,6 +52,7 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
   });
 
   const consulta = useExistenciasAvio({
+    ...(avio !== undefined ? { idAvio: avio.id } : {}),
     ...(idAlmacen !== TODOS ? { idAlmacen: Number(idAlmacen) } : {}),
     ...(soloGenericos ? { soloGenericos: 'true' } : {}),
     ...(incluirCeros ? { incluirCeros: 'true' } : {}),
@@ -89,6 +96,15 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* Búsqueda de avío (proto `.tool-search`): combobox POPOVER que filtra por `idAvio`
+              server-side (la lista no vive inline: no infla el toolbar). */}
+          <div className="w-56 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorAvio
+              idSeleccionado={avio?.id}
+              alSeleccionar={setAvio}
+              alLimpiar={() => setAvio(undefined)}
+            />
+          </div>
           {/* El select va en caja de ancho FIJO: el envoltorio interno de `SelectNativo` es
               w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
               queda huérfano a la derecha). */}
@@ -203,7 +219,15 @@ export function ExistenciasAviosPagina(): React.JSX.Element {
                   <TablaDensaCuerpo>
                     {filas.map((f) => (
                       <TablaDensaFila key={`${f.idAvio}-${f.idAlmacen}`}>
-                        <TablaDensaCelda className="font-medium">{f.avio}</TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <div className="flex items-center gap-2">
+                            {/* Proto `vAvios`: thumb con la sigla FIJA "AV" (cian de avíos). */}
+                            <Avatar nombre={f.avio} tono="avios" tamano="sm">
+                              AV
+                            </Avatar>
+                            <span className="font-medium">{f.avio}</span>
+                          </div>
+                        </TablaDensaCelda>
                         <TablaDensaCelda>{f.descripcion}</TablaDensaCelda>
                         <TablaDensaCelda>
                           <ChipEstado

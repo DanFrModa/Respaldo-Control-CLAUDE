@@ -356,7 +356,10 @@ export function ProveedoresPagina(): React.JSX.Element {
           ) : consulta.isPending ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando proveedores…</p>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground" data-testid="proveedor-vacio">
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="proveedor-vacio"
+            >
               No hay proveedores que coincidan con la búsqueda.
             </p>
           ) : (

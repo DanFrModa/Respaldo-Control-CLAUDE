@@ -302,6 +302,7 @@ export function PedidosMesPagina(): React.JSX.Element {
                 reiniciar();
               }}
               alCambiarTexto={setTextoCliente}
+              cargando={clientes.isFetching}
               placeholder="Todos los clientes"
               etiqueta="Filtrar por cliente"
               testid="pedidos-filtro-cliente"
@@ -409,7 +410,10 @@ export function PedidosMesPagina(): React.JSX.Element {
               </Button>
             </div>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground" data-testid="pedidos-vacio">
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="pedidos-vacio"
+            >
               No hay pedidos que coincidan con los filtros.
             </p>
           ) : (

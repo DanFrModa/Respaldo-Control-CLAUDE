@@ -1,15 +1,16 @@
 import {
-  CalendarRange,
   ChevronLeft,
   ChevronRight,
   FileText,
+  Grid3x3,
   Image as ImageIcon,
-  Images,
   Layers,
+  Package,
   Pencil,
   Plus,
   RotateCcw,
   Ruler,
+  Scissors,
   Shirt,
   Tag,
   Trash2,
@@ -19,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
+import { useExistenciasPt } from '@/api/inventarios';
 import {
   useDescontinuarModelo,
   useFichaModelo,
@@ -28,8 +30,12 @@ import {
   type ModelosQuery,
 } from '@/api/modelos';
 import { useTemporadas } from '@/api/temporadas';
+import type { ExistenciaPtFila } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
+import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -38,11 +44,11 @@ import {
   TablaDensaFila,
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
-import { Avatar, EstadoBadge, TipoBadge } from '@/components/dominio/visuales';
+import { Avatar, EstadoBadge } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import { useDebounce } from '@/lib/useDebounce';
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
@@ -60,6 +66,12 @@ const TEMPORADA_TODAS = 'TODAS';
 /** Formatea un precio en pesos (es-MX). */
 function formatearPrecio(precio: number): string {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(precio);
+}
+
+/** Nombre "humano" del modelo para el título/avatar: la descripción, o el código si no tiene. */
+function nombreModelo(modelo: Modelo): string {
+  const descripcion = modelo.descripcion?.trim() ?? '';
+  return descripcion !== '' ? descripcion : modelo.codigo;
 }
 
 /**
@@ -96,19 +108,23 @@ function conDeepLinkInyectado(
 }
 
 /**
- * Pantalla de Modelos (Módulo 2, F1-E4) — re-vestida R9 a TABLA-FIRST fiel al proto `vModelos`:
- * page-head (atajo a Galería + «Nuevo modelo») + toolbar (búsqueda por código/nombre, filtro por
- * temporada, inactivos) + TABLA DENSA (Modelo · Temporada · Curva de tallas · Género · Estado) +
- * barra de totales al pie con paginación de SERVIDOR (volumen alto). Al hacer clic en un renglón se
- * abre un CAJÓN ancho con los datos generales, las FOTOS (galería con subida) y la RECETA/BOM (3
- * pestañas + copiar receta); ahí se edita / descontinúa / reactiva. Conserva el DEEP-LINK
- * (`state.idModelo`) que abre directo la ficha de un modelo (desde la galería u otra vista).
+ * Pantalla de Modelos (Módulo 2, F1-E4) — TABLA-FIRST fiel al proto `vModelos`:
+ * page-head con conteo vivo («… · N modelos · M mostrados») + «Nuevo modelo»; toolbar con
+ * buscador (código/nombre), chips de estado (Activos | Todos), filtro por temporada, el conteo
+ * plano «M de N» y el SEGMENTADO Tabla | Galería (proto `.seg`); TABLA DENSA con las columnas
+ * del proto que el payload alcanza (Modelo con MINIATURA de foto real + nombre/código ·
+ * Temporada como badge neutral con punto · Tallas · Estado) y paginación de SERVIDOR al pie.
+ * Al hacer clic en un renglón se abre el CAJÓN (proto `drawerModelo`): encabezado con foto
+ * hero 46px + nombre + estado + línea `código · Temporada`; secciones Ficha (tela principal,
+ * rango de tallas, maquila base, existencia PT), Receta / BOM (editor de 3 pestañas + copiar),
+ * MATRIZ color × talla · existencia (agregado real del kardex, `inventario-pt.ver`), Fotos y
+ * el historial. Conserva el DEEP-LINK (`state.idModelo`) que abre directo la ficha.
  *
- * FIDELIDAD vs proto: el proto pinta columnas «Tela principal», «Colores» (swatches), «Stock PT» y
- * «Costo», y en el cajón una «Matriz color×talla · existencia» — ninguno viene en el payload de la
- * lista de modelos (tela/colores viven en el BOM/órdenes; existencia y costo son de otros módulos y
- * no hay endpoint por-modelo cableado aquí) → se omiten (huecos reportados). También se omite el
- * botón «Exportar» (sin endpoint de exportación de modelos).
+ * FIDELIDAD vs proto — huecos que SÍ requieren backend (reportados, no inventados): columnas
+ * «Tela principal», «Colores» (swatches), «Stock PT» y «Costo» del LISTADO (pedirían agregados
+ * por fila en `GET /api/modelos`); botón «Exportar» (sin endpoint); filtro por tela; «Ficha
+ * PDF» del cajón. En el CAJÓN la tela principal/existencia/matriz sí se cierran porque su dato
+ * viene de la ficha ya cargada o de UNA consulta de existencias por modelo (sin N+1).
  *
  * `modelos.ver` gobierna el acceso; `modelos.administrar` decide las acciones de escritura (A1).
  */
@@ -225,20 +241,17 @@ export function ModelosPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
-      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      {/* ── Encabezado (proto .page-head: conteo vivo en el sub) ─────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Modelos</h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
-            Catálogo de producto · fotos y receta (BOM)
+            Catálogo de producto
+            {datos !== undefined
+              ? ` · ${total.toLocaleString('es-MX')} modelos · ${registros.length.toLocaleString('es-MX')} mostrados`
+              : ''}
           </p>
         </div>
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/modelos/galeria" data-testid="ir-a-galeria-modelos">
-            <Images aria-hidden />
-            Galería
-          </Link>
-        </Button>
         {puedeAdministrar ? (
           <Button size="sm" onClick={abrirAlta} data-testid="nuevo-modelo">
             <Plus aria-hidden />
@@ -247,47 +260,67 @@ export function ModelosPagina(): React.JSX.Element {
         ) : null}
       </header>
 
-      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      {/* ── Card: toolbar + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          <Input
-            type="search"
-            className="h-8 w-60 text-sm"
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          <BuscadorToolbar
+            valor={textoBusqueda}
+            alCambiar={alBuscar}
             placeholder="Buscar por código o nombre…"
-            value={textoBusqueda}
-            onChange={(e) => alBuscar(e.target.value)}
-            data-testid="buscar-modelo"
+            etiqueta="Buscar modelos por código o nombre"
+            testid="buscar-modelo"
           />
-          {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
-              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea). */}
-          <SelectNativo
-            className="w-48 h-8 text-sm"
-            value={temporadaFiltro}
-            onChange={(e) => alCambiarTemporada(e.target.value)}
-            aria-label="Filtrar modelos por temporada"
-            data-testid="filtro-temporada-modelo"
-          >
-            <option value={TEMPORADA_TODAS}>Todas las temporadas</option>
-            {(temporadas.data?.datos ?? []).map((t) => (
-              <option key={t.id} value={String(t.id)}>
-                {t.nombre}
-              </option>
-            ))}
-          </SelectNativo>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={incluirInactivos}
-              onChange={alAlternarInactivos}
-              data-testid="mostrar-desactivados"
-            />
-            Incluir descontinuados
-          </label>
-          <div className="ml-auto">
-            {/* Conteo del proto (`.count`): "visibles de total" ("8 de 214"). */}
+          <ChipsFiltro
+            etiqueta="Filtrar por estado"
+            opciones={[
+              { valor: 'activos', etiqueta: 'Activos' },
+              // El testid heredado vive en «Todos»: los e2e lo clickean para incluir inactivos.
+              { valor: 'todos', etiqueta: 'Todos', testid: 'mostrar-desactivados' },
+            ]}
+            valor={incluirInactivos ? 'todos' : 'activos'}
+            alCambiar={() => alAlternarInactivos()}
+          />
+          <span className="w-44">
+            <SelectNativo
+              className="h-[30px] text-xs"
+              value={temporadaFiltro}
+              onChange={(e) => alCambiarTemporada(e.target.value)}
+              aria-label="Filtrar modelos por temporada"
+              data-testid="filtro-temporada-modelo"
+            >
+              <option value={TEMPORADA_TODAS}>Todas las temporadas</option>
+              {(temporadas.data?.datos ?? []).map((t) => (
+                <option key={t.id} value={String(t.id)}>
+                  {t.nombre}
+                </option>
+              ))}
+            </SelectNativo>
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            {/* Conteo plano del proto (`.count`): "8 de 214". */}
             <span className="text-[12px] text-faint">
-              {registros.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')} modelos
+              {registros.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')}
             </span>
+            {/* Segmentado Tabla | Galería (proto `.seg`): la galería es la otra vista. */}
+            <div
+              className="inline-flex overflow-hidden rounded-[8px] border"
+              role="group"
+              aria-label="Cambiar de vista"
+            >
+              <span
+                aria-current="page"
+                className="bg-primary px-[11px] py-[5px] text-[12px] font-semibold text-primary-foreground"
+              >
+                Tabla
+              </span>
+              <Link
+                to="/modelos/galeria"
+                data-testid="ir-a-galeria-modelos"
+                className="bg-panel-2 px-[11px] py-[5px] text-[12px] text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Galería
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -314,8 +347,7 @@ export function ModelosPagina(): React.JSX.Element {
                 <TablaDensaFila>
                   <TablaDensaHead>Modelo</TablaDensaHead>
                   <TablaDensaHead>Temporada</TablaDensaHead>
-                  <TablaDensaHead>Curva de tallas</TablaDensaHead>
-                  <TablaDensaHead>Género</TablaDensaHead>
+                  <TablaDensaHead>Tallas</TablaDensaHead>
                   <TablaDensaHead>Estado</TablaDensaHead>
                 </TablaDensaFila>
               </TablaDensaEncabezado>
@@ -330,13 +362,13 @@ export function ModelosPagina(): React.JSX.Element {
                   >
                     <TablaDensaCelda>
                       <div className="flex items-center gap-2">
-                        <Avatar nombre={m.codigo} tono="pt" tamano="sm" />
+                        <MiniaturaModelo modelo={m} />
                         <div className="min-w-0">
-                          {/* Proto: título del renglón en `cell-strong` (600). */}
-                          <div className="truncate font-semibold">{m.codigo}</div>
+                          {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo. */}
+                          <div className="truncate font-semibold">{nombreModelo(m)}</div>
                           {m.descripcion !== null && m.descripcion.trim() !== '' ? (
-                            <div className="truncate text-xs text-muted-foreground">
-                              {m.descripcion}
+                            <div className="mono truncate text-xs text-muted-foreground">
+                              {m.codigo}
                             </div>
                           ) : null}
                         </div>
@@ -344,17 +376,13 @@ export function ModelosPagina(): React.JSX.Element {
                     </TablaDensaCelda>
                     <TablaDensaCelda>
                       {m.temporada !== null ? (
-                        <TipoBadge tono="neutro">{m.temporada}</TipoBadge>
+                        // Proto: badge NEUTRAL con punto (`.badge.neutral > .d`).
+                        <ChipEstado tono="neutro">{m.temporada}</ChipEstado>
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
                     </TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
-                      {m.curvaTalla ?? '—'}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
-                      {m.genero ?? '—'}
-                    </TablaDensaCelda>
+                    <TablaDensaCelda>{m.curvaTalla ?? '—'}</TablaDensaCelda>
                     <TablaDensaCelda>
                       <EstadoBadge activo={m.activo} />
                     </TablaDensaCelda>
@@ -404,18 +432,25 @@ export function ModelosPagina(): React.JSX.Element {
         }}
         titulo={
           seleccion !== null ? (
-            <span className="flex flex-wrap items-center gap-2">
-              {seleccion.codigo}
-              <EstadoBadge activo={seleccion.activo} />
+            // Proto `drawer-head`: hero 46px + nombre + estado, y abajo `código · Temporada`.
+            // Todo vive en el título del cajón para no tocar el componente compartido; el
+            // nombre accesible del heading conserva el CÓDIGO (los e2e lo buscan ahí).
+            <span className="flex items-center gap-3">
+              <MiniaturaModelo modelo={seleccion} hero />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex flex-wrap items-center gap-2 text-[15px]">
+                  {nombreModelo(seleccion)}
+                  <EstadoBadge activo={seleccion.activo} />
+                </span>
+                <span className="mono text-xs font-normal text-muted-foreground">
+                  {seleccion.codigo}
+                  {seleccion.temporada !== null ? ` · Temporada ${seleccion.temporada}` : ''}
+                </span>
+              </span>
             </span>
           ) : (
             ''
           )
-        }
-        subtitulo={
-          seleccion !== null
-            ? [seleccion.descripcion, seleccion.temporada].filter(Boolean).join(' · ') || undefined
-            : undefined
         }
         acciones={
           seleccion !== null && puedeAdministrar ? (
@@ -489,9 +524,128 @@ export function ModelosPagina(): React.JSX.Element {
 }
 
 /**
- * Panel de DETALLE de un modelo: trae la FICHA completa (datos + BOM) por id y muestra los
- * datos generales, las fotos y el editor de receta. El BOM se edita por sección con guardado
- * independiente (el backend reemplaza el set en una transacción A2).
+ * Miniatura del modelo (proto `.thumb` 30px / `.dt-hero` 46px): la FOTO principal real si el
+ * listado la trae (`urlFotoPrincipal`, ya resuelta por el backend — sin N+1), o el avatar de
+ * iniciales como respaldo. `hero` usa el tamaño grande del encabezado del cajón.
+ */
+function MiniaturaModelo({
+  modelo,
+  hero = false,
+}: {
+  modelo: Modelo;
+  hero?: boolean;
+}): React.JSX.Element {
+  if (modelo.urlFotoPrincipal !== null) {
+    return (
+      <img
+        src={modelo.urlFotoPrincipal}
+        alt=""
+        aria-hidden
+        loading="lazy"
+        data-testid="miniatura-fila-modelo"
+        className={cn(
+          'shrink-0 border object-cover',
+          hero ? 'size-[46px] rounded-[11px]' : 'size-8 rounded-lg',
+        )}
+      />
+    );
+  }
+  return (
+    <Avatar
+      nombre={nombreModelo(modelo)}
+      tono="pt"
+      tamano={hero ? 'md' : 'sm'}
+      {...(hero ? { className: 'size-[46px] rounded-[11px] text-[15px]' } : {})}
+    />
+  );
+}
+
+/** Suma de existencia por llave (color o color×talla) a partir de las filas del endpoint. */
+function sumarPor(filas: readonly ExistenciaPtFila[], llave: (f: ExistenciaPtFila) => string) {
+  const sumas = new Map<string, number>();
+  for (const f of filas) {
+    const k = llave(f);
+    sumas.set(k, (sumas.get(k) ?? 0) + f.existencia);
+  }
+  return sumas;
+}
+
+/**
+ * Matriz color × talla · existencia (proto `drawerModelo` `.matrix`): pivote de PRESENTACIÓN de
+ * las filas que YA agregó el servidor (existencia por modelo×color×talla×almacén, D3); aquí solo
+ * se suman los almacenes de cada celda. Columnas ordenadas por el orden del catálogo de tallas.
+ */
+function MatrizExistenciaModelo({
+  filas,
+}: {
+  filas: readonly ExistenciaPtFila[];
+}): React.JSX.Element {
+  // Tallas presentes (columnas), por el orden del catálogo; colores presentes (renglones).
+  const tallas = [...new Map(filas.map((f) => [f.idTalla, f])).values()].sort(
+    (a, b) => a.ordenTalla - b.ordenTalla || a.etiquetaTalla.localeCompare(b.etiquetaTalla),
+  );
+  const colores = [...new Map(filas.map((f) => [f.idColor, f])).values()].sort((a, b) =>
+    a.color.localeCompare(b.color),
+  );
+  const celdas = sumarPor(filas, (f) => `${f.idColor}:${f.idTalla}`);
+  const porColor = sumarPor(filas, (f) => String(f.idColor));
+
+  return (
+    <div className="overflow-x-auto rounded-[9px] border">
+      <table className="w-full border-collapse text-xs" data-testid="matriz-existencia-modelo">
+        <thead>
+          <tr>
+            <th className="border-b bg-secondary px-2 py-1.5 text-left text-[11px] font-semibold text-muted-foreground">
+              Color
+            </th>
+            {tallas.map((t) => (
+              <th
+                key={t.idTalla}
+                className="border-b border-l bg-secondary px-2 py-1.5 text-center text-[11px] font-semibold text-muted-foreground"
+              >
+                {t.etiquetaTalla}
+              </th>
+            ))}
+            <th className="border-b border-l bg-secondary px-2 py-1.5 text-center text-[11px] font-semibold text-muted-foreground">
+              Σ
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {colores.map((c) => (
+            <tr key={c.idColor} className="last:[&>td]:border-b-0">
+              <td className="border-b bg-secondary px-2 py-1.5 text-left">{c.color}</td>
+              {tallas.map((t) => {
+                const v = celdas.get(`${c.idColor}:${t.idTalla}`) ?? 0;
+                return (
+                  <td
+                    key={t.idTalla}
+                    className={cn(
+                      'num border-b border-l px-2 py-1.5 text-center',
+                      v === 0 ? 'text-faint' : '',
+                    )}
+                  >
+                    {v.toLocaleString('es-MX')}
+                  </td>
+                );
+              })}
+              <td className="num border-b border-l px-2 py-1.5 text-center font-bold">
+                {(porColor.get(String(c.idColor)) ?? 0).toLocaleString('es-MX')}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * Panel de DETALLE de un modelo (proto `drawerModelo`): trae la FICHA completa (datos + BOM) por
+ * id y, si el usuario puede ver inventario PT, las EXISTENCIAS del modelo (UNA consulta por
+ * cajón, no por fila). Secciones en el orden del proto: Ficha → Receta / BOM → Matriz color ×
+ * talla → Fotos → Historial. El BOM se edita por sección con guardado independiente (el backend
+ * reemplaza el set en una transacción A2).
  */
 function DetalleModelo({
   modelo,
@@ -500,28 +654,39 @@ function DetalleModelo({
   modelo: Modelo;
   puedeAdministrar: boolean;
 }): React.JSX.Element {
+  const { tienePermiso } = useSesion();
   const ficha = useFichaModelo(modelo.id);
+  // Existencia PT del modelo (suma de kardex, D3). Solo si tiene el permiso del módulo de
+  // inventarios; si no, la consulta ni se dispara y las piezas de existencia no se muestran.
+  const puedeVerInventario = tienePermiso('inventario-pt.ver');
+  const existencias = useExistenciasPt({ idModelo: modelo.id }, puedeVerInventario);
+  const filasExistencia = existencias.data?.filas ?? [];
+
+  // Tela principal (proto): el primer renglón de tela del BOM (el modelo viejo la lista primero).
+  const telaPrincipal = ficha.data?.telas[0]?.nombre ?? null;
 
   return (
     <div data-testid="detalle-modelo">
-      <SeccionDetalle titulo="Datos generales" icono={Shirt}>
+      <SeccionDetalle titulo="Ficha" icono={Shirt}>
         <RejillaCampos>
-          <CampoDetalle icono={Tag} etiqueta="Código">
-            {modelo.codigo}
-          </CampoDetalle>
+          {telaPrincipal !== null ? (
+            <CampoDetalle icono={Scissors} etiqueta="Tela principal">
+              {telaPrincipal}
+            </CampoDetalle>
+          ) : null}
+          {modelo.curvaTalla !== null ? (
+            <CampoDetalle icono={Ruler} etiqueta="Rango de tallas">
+              {modelo.curvaTalla}
+            </CampoDetalle>
+          ) : null}
           {modelo.maquilaBase !== null ? (
             <CampoDetalle icono={Tag} etiqueta="Maquila base">
               {formatearPrecio(modelo.maquilaBase)}
             </CampoDetalle>
           ) : null}
-          {modelo.temporada !== null ? (
-            <CampoDetalle icono={CalendarRange} etiqueta="Temporada">
-              {modelo.temporada}
-            </CampoDetalle>
-          ) : null}
-          {modelo.curvaTalla !== null ? (
-            <CampoDetalle icono={Ruler} etiqueta="Curva de tallas">
-              {modelo.curvaTalla}
+          {puedeVerInventario && existencias.data !== undefined ? (
+            <CampoDetalle icono={Package} etiqueta="Existencia PT">
+              {existencias.data.totalExistencia.toLocaleString('es-MX')} pzas
             </CampoDetalle>
           ) : null}
           {modelo.genero !== null ? (
@@ -537,15 +702,7 @@ function DetalleModelo({
         </RejillaCampos>
       </SeccionDetalle>
 
-      <SeccionDetalle titulo="Fotos" icono={ImageIcon}>
-        <FotosModelo
-          idModelo={modelo.id}
-          nombre={modelo.codigo}
-          puedeAdministrar={puedeAdministrar}
-        />
-      </SeccionDetalle>
-
-      <SeccionDetalle titulo="Receta (BOM)" icono={Layers}>
+      <SeccionDetalle titulo="Receta / BOM" icono={Layers}>
         {ficha.isPending ? (
           <Skeleton className="h-40 w-full" />
         ) : ficha.isError ? (
@@ -553,6 +710,20 @@ function DetalleModelo({
         ) : ficha.data ? (
           <EditorBom ficha={ficha.data} puedeAdministrar={puedeAdministrar} />
         ) : null}
+      </SeccionDetalle>
+
+      {puedeVerInventario && filasExistencia.length > 0 ? (
+        <SeccionDetalle titulo="Matriz color × talla · existencia" icono={Grid3x3}>
+          <MatrizExistenciaModelo filas={filasExistencia} />
+        </SeccionDetalle>
+      ) : null}
+
+      <SeccionDetalle titulo="Fotos" icono={ImageIcon}>
+        <FotosModelo
+          idModelo={modelo.id}
+          nombre={modelo.codigo}
+          puedeAdministrar={puedeAdministrar}
+        />
       </SeccionDetalle>
 
       <Historial creadoEn={modelo.creadoEn} modificadoEn={modelo.modificadoEn} />

@@ -55,6 +55,8 @@ vi.mock('@/api/modelos', () => ({
 const sesion = () => estadoSesionDePrueba(['inventario-pt.ver', 'inventario-pt.mover']);
 
 async function elegirModelo(usuario: ReturnType<typeof userEvent.setup>): Promise<void> {
+  // El selector es un combobox POPOVER (R9): la lista abre al enfocar el input de búsqueda.
+  await usuario.click(screen.getByTestId('selector-modelo-busqueda'));
   await usuario.click(screen.getByTestId('selector-modelo-opcion'));
 }
 

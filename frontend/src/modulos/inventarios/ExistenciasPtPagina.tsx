@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
+import { PestanasInventarioPt } from './PestanasInventarioPt';
 import { SelectorModelo } from './SelectorModelo';
 
 /**
@@ -146,43 +147,26 @@ export function ExistenciasPtPagina(): React.JSX.Element {
       {/* ── Card: pestañas + filtros + tabla + totales ──────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          {/* Pestañas del módulo (proto `.tabs`, control segmentado: Existencias / Movimientos /
-              Traspasos — la activa "flota" sobre el riel con fondo de tarjeta y sombra). */}
-          <div
-            className="inline-flex items-center gap-0.5 rounded-[9px] border bg-panel-2 p-[3px]"
-            role="tablist"
-            aria-label="Vistas de inventario PT"
-          >
-            <span
-              className="rounded-[7px] bg-card px-3 py-[3px] text-xs font-semibold shadow-(--shadow)"
-              role="tab"
-              aria-selected
-            >
-              Existencias
-            </span>
-            {puedeMover ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void navigate('/inventarios/movimientos')}
-                  className="cursor-pointer rounded-[7px] px-3 py-[3px] text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Movimientos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void navigate('/inventarios/traspasos')}
-                  className="cursor-pointer rounded-[7px] px-3 py-[3px] text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Traspasos
-                </button>
-              </>
-            ) : null}
-          </div>
+          {/* Pestañas del módulo (proto `.tabs`): riel compartido de las tres pantallas PT. */}
+          <PestanasInventarioPt activa="existencias" />
 
-          <div className="w-52 [&_input]:h-8 [&_input]:text-sm">
-            <SelectorModelo idSeleccionado={modelo?.id} alSeleccionar={setModelo} />
+          {/* Búsqueda de modelo (proto `.tool-search`): combobox POPOVER — la lista ya no vive
+              inline (inflaba el toolbar entero y descuadraba la tarjeta, feedback de Gabriel). */}
+          <div className="w-56 [&_input]:h-8 [&_input]:text-sm">
+            <SelectorModelo
+              idSeleccionado={modelo?.id}
+              alSeleccionar={setModelo}
+              alLimpiar={() => setModelo(undefined)}
+            />
           </div>
+          {/* Identidad VISIBLE del modelo consultado (el value del input no es un nodo de texto):
+              código + descripción como contexto de la consulta. */}
+          {modelo !== undefined ? (
+            <span className="truncate text-xs text-muted-foreground" data-testid="exist-modelo-sel">
+              <span className="num font-medium text-foreground">{modelo.codigo}</span>
+              {modelo.descripcion !== null ? <> — {modelo.descripcion}</> : null}
+            </span>
+          ) : null}
           {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
               w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
               queda huérfano a la derecha). */}

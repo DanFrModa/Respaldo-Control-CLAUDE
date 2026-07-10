@@ -392,6 +392,7 @@ function DialogoEditarPrecio({
               valor={idProveedor}
               onChange={setIdProveedor}
               alCambiarTexto={setTextoProveedor}
+              cargando={proveedores.isFetching}
               placeholder="Escribe el proveedor…"
               etiqueta="Proveedor con quien se negoció"
               testid="precio-proveedor"

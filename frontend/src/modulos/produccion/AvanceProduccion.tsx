@@ -721,6 +721,7 @@ function CapturaMovimiento({
             valor={idProveedor}
             onChange={setIdProveedor}
             alCambiarTexto={setTextoProveedor}
+            cargando={proveedores.isFetching}
             placeholder={`Escribe el ${etiquetaProveedor.toLowerCase()}…`}
             etiqueta={etiquetaProveedor}
             testid="avance-proveedor"

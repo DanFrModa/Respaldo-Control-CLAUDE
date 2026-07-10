@@ -349,7 +349,10 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
           ) : consulta.isPending ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando auditorías…</p>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground" data-testid="consulta-auditoria-vacio">
+            <p
+              className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground"
+              data-testid="consulta-auditoria-vacio"
+            >
               No hay auditorías que coincidan con la búsqueda.
             </p>
           ) : (

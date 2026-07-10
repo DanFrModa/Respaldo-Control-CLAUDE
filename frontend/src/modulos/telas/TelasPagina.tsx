@@ -15,6 +15,7 @@ import {
 } from '@/api/telas';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { ChipFiltro } from '@/components/dominio/ChipsFiltro';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -235,18 +236,16 @@ export function TelasPagina(): React.JSX.Element {
               data-testid="buscar-tela"
             />
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={incluirInactivos}
-              onChange={() => {
-                setIncluirInactivos((v) => !v);
-                reiniciar();
-              }}
-              data-testid="mostrar-desactivados"
-            />
+          <ChipFiltro
+            activo={incluirInactivos}
+            onClick={() => {
+              setIncluirInactivos((v) => !v);
+              reiniciar();
+            }}
+            data-testid="mostrar-desactivados"
+          >
             Incluir inactivos
-          </label>
+          </ChipFiltro>
           {/* Conteo a la derecha (proto `.count`: "visibles de total", texto plano atenuado). */}
           <span className="ml-auto text-xs text-faint">
             {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')}

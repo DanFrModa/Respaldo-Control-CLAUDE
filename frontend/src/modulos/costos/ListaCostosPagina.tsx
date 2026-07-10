@@ -102,7 +102,9 @@ export function ListaCostosPagina(): React.JSX.Element {
               </Button>
             </div>
           ) : filas.length === 0 ? (
-            <p className="p-6 text-sm text-muted-foreground">No hay órdenes costeadas.</p>
+            <p className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+              No hay órdenes costeadas.
+            </p>
           ) : (
             <TablaDensa>
               <TablaDensaEncabezado>
@@ -127,7 +129,7 @@ export function ListaCostosPagina(): React.JSX.Element {
                     <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
                     <TablaDensaCelda>{f.codigoModelo}</TablaDensaCelda>
                     <TablaDensaCelda className="text-muted-foreground">{f.cliente}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{f.cortado}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{f.cortado.toLocaleString('es-MX')}</TablaDensaCelda>
                     <TablaDensaCelda>{etiquetaBase(f.baseProrrateo)}</TablaDensaCelda>
                     <TablaDensaCelda numerica className="font-medium">
                       {moneda(f.costoTotal)}

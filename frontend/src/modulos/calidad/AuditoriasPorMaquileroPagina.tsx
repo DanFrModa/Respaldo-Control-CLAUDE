@@ -157,7 +157,7 @@ export function AuditoriasPorMaquileroPagina(): React.JSX.Element {
             </div>
             <div className="overflow-x-auto" data-testid="historial-tabla">
               {datos.auditorias.length === 0 ? (
-                <p className="p-6 text-sm text-muted-foreground">
+                <p className="m-4 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                   Sin auditorías en el rango elegido.
                 </p>
               ) : (

@@ -1,4 +1,4 @@
-import { Check, ChevronDown, X } from 'lucide-react';
+import { Check, ChevronDown, Loader2Icon, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,16 @@ import { cn } from '@/lib/utils';
  * mayúsculas ({@link normalizarTexto}).
  *
  * SOLO se elige de la lista (default del proyecto: NO texto libre — el proveedor nuevo se da de
- * alta en su catálogo; cuando exista un alta rápida se conectará vía `accionCrear`). Si el texto
- * no coincide con la opción elegida al salir, el valor se LIMPIA (no se inventa).
+ * alta en su catálogo; cuando exista un alta rápida se conectará vía `accionCrear`).
+ *
+ * El CICLO de edición (escribir → elegir → cambiar de opinión) es coherente:
+ * - Enfocar con selección SELECCIONA todo el texto (se teclea encima sin borrar letra por letra)
+ *   y muestra el catálogo completo, no solo la opción elegida.
+ * - Borrar TODO el texto borra también la selección (el filtro vuelve a "Todos").
+ * - Salir (blur/Escape) con texto que no coincide RESTAURA la etiqueta de la selección vigente
+ *   (o deja vacío si no había) y resetea la búsqueda server-side: nunca queda texto fantasma.
+ * - La etiqueta de la selección se persiste APARTE de `opciones`: con typeahead server-side la
+ *   página filtrada puede dejar fuera a la opción elegida sin que el input se rompa.
  *
  * Presentación PURA (A1): no conoce proveedores ni ninguna entidad; trabaja con `{ id, nombre }`.
  */
@@ -49,15 +57,20 @@ export interface PropsComboboxBuscable {
   /** Emite el id elegido (o null al limpiar). */
   onChange: (id: number | null) => void;
   /**
-   * Emite CADA cambio del texto tecleado (también '' al limpiar/elegir): el padre lo cablea con
-   * debounce al parámetro `busqueda` server-side de su API para que el typeahead alcance TODO el
-   * catálogo, no solo la página cargada (§4.4.1 — hay >1,700 proveedores en datos reales).
+   * Emite CADA cambio del texto tecleado (también '' al limpiar/elegir/restaurar): el padre lo
+   * cablea con debounce al parámetro `busqueda` server-side de su API para que el typeahead
+   * alcance TODO el catálogo, no solo la página cargada (§4.4.1 — hay >1,700 proveedores reales).
    */
   alCambiarTexto?: (texto: string) => void;
   /** Placeholder del input. */
   placeholder?: string;
   /** Texto cuando el filtro no encuentra nada. */
   textoVacio?: string;
+  /**
+   * Señal de carga del catálogo (típicamente `isFetching` del query del padre): pinta un spinner
+   * discreto y evita el "Sin coincidencias" en falso mientras la respuesta viene en camino.
+   */
+  cargando?: boolean;
   /**
    * Atajo opcional "crear nuevo" al final de la lista (cuando exista un alta rápida). Si no
    * viene, el combobox es SOLO de lista.
@@ -73,7 +86,7 @@ export interface PropsComboboxBuscable {
 /**
  * Combobox con búsqueda por teclado: abre al enfocar/teclear, filtra sin acentos, navega con
  * ↑/↓/Enter/Esc y solo acepta opciones de la lista. Con selección muestra el nombre y un botón ✕
- * para limpiar.
+ * para limpiar; borrar el texto a vacío también limpia.
  */
 export function ComboboxBuscable({
   opciones,
@@ -82,56 +95,92 @@ export function ComboboxBuscable({
   alCambiarTexto,
   placeholder = 'Escribe para buscar…',
   textoVacio = 'Sin coincidencias.',
+  cargando = false,
   accionCrear,
   deshabilitado = false,
   testid = 'combobox',
   etiqueta,
 }: PropsComboboxBuscable): React.JSX.Element {
   const contenedorRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const idLista = useId();
 
-  const seleccionada = useMemo(
-    () => opciones.find((o) => o.id === valor) ?? null,
+  // La opción del `valor` en la página ACTUAL (con typeahead server-side puede no venir en ella).
+  const opcionDeValor = useMemo(
+    () => (valor === null ? null : (opciones.find((o) => o.id === valor) ?? null)),
     [opciones, valor],
   );
 
-  const [texto, setTexto] = useState(seleccionada?.nombre ?? '');
+  // Etiqueta de la selección, PERSISTIDA aparte de `opciones`: si la búsqueda server-side deja a
+  // la opción elegida fuera de la página, la última etiqueta conocida sobrevive.
+  const [etiquetaValor, setEtiquetaValor] = useState(opcionDeValor?.nombre ?? '');
+  const [texto, setTexto] = useState(opcionDeValor?.nombre ?? '');
   const [abierto, setAbierto] = useState(false);
+  const [enfocado, setEnfocado] = useState(false);
   const [activo, setActivo] = useState(0);
+  // Tras enfocar con selección se selecciona todo el texto; el mouseup del mismo clic NO debe
+  // colapsar esa selección (comportamiento default del navegador).
+  const conservarSeleccionRef = useRef(false);
 
-  // Si el padre cambia la selección (o llegan las opciones), sincroniza el texto visible.
   useEffect(() => {
-    setTexto(seleccionada?.nombre ?? '');
-  }, [seleccionada]);
+    if (valor === null) {
+      setEtiquetaValor('');
+    } else if (opcionDeValor !== null) {
+      setEtiquetaValor(opcionDeValor.nombre);
+    }
+  }, [valor, opcionDeValor]);
 
-  const filtradas = useMemo(() => filtrarOpciones(opciones, texto), [opciones, texto]);
+  // Sincroniza el texto visible con la selección SOLO cuando el usuario NO está editando. (Causa
+  // raíz del "borro y reaparece": el efecto anterior colgaba del objeto derivado de `opciones`,
+  // y cada respuesta del typeahead server-side pisaba lo tecleado/borrado a media edición.)
+  useEffect(() => {
+    if (!enfocado) {
+      setTexto(etiquetaValor);
+    }
+  }, [etiquetaValor, enfocado]);
+
+  // Con selección y texto == etiqueta, el texto NO es una búsqueda (es la etiqueta): se lista el
+  // catálogo completo para poder cambiar de opción sin borrar primero.
+  const consulta = valor !== null && texto === etiquetaValor ? '' : texto;
+  const filtradas = useMemo(() => filtrarOpciones(opciones, consulta), [opciones, consulta]);
   const activoSeguro = filtradas.length === 0 ? 0 : Math.min(activo, filtradas.length - 1);
 
-  // Cierra al hacer clic fuera; si el texto quedó sin coincidir con la selección, lo repone/limpia.
+  // Clic fuera: cierra VÍA blur (una sola ruta de salida) — cubre overlays que hacen
+  // preventDefault del mousedown y no moverían el foco por sí solos.
   useEffect(() => {
     function alClicFuera(evento: MouseEvent): void {
       if (contenedorRef.current && !contenedorRef.current.contains(evento.target as Node)) {
-        setAbierto(false);
-        setTexto(seleccionada?.nombre ?? '');
+        inputRef.current?.blur();
       }
     }
     document.addEventListener('mousedown', alClicFuera);
     return () => document.removeEventListener('mousedown', alClicFuera);
-  }, [seleccionada]);
+  }, []);
 
   function elegir(opcion: OpcionCombobox): void {
     onChange(opcion.id);
+    setEtiquetaValor(opcion.nombre);
     setTexto(opcion.nombre);
-    // El padre busca por el nombre elegido: la opción seleccionada sigue en su lista filtrada.
-    alCambiarTexto?.(opcion.nombre);
+    // Resetea la búsqueda server-side: la etiqueta ya no depende de que la opción siga en la
+    // página filtrada, y la próxima apertura muestra el catálogo completo.
+    alCambiarTexto?.('');
     setAbierto(false);
   }
 
   function limpiar(): void {
     onChange(null);
+    setEtiquetaValor('');
     setTexto('');
     alCambiarTexto?.('');
     setAbierto(false);
+  }
+
+  /** Repone la etiqueta de la selección vigente (o vacío) y resetea la búsqueda a medias. */
+  function restaurarEtiqueta(): void {
+    if (texto !== etiquetaValor) {
+      setTexto(etiquetaValor);
+      alCambiarTexto?.('');
+    }
   }
 
   function alTeclado(evento: React.KeyboardEvent<HTMLInputElement>): void {
@@ -143,7 +192,7 @@ export function ComboboxBuscable({
         evento.stopPropagation();
       }
       setAbierto(false);
-      setTexto(seleccionada?.nombre ?? '');
+      restaurarEtiqueta();
       return;
     }
     if (!abierto && (evento.key === 'ArrowDown' || evento.key === 'ArrowUp')) {
@@ -171,29 +220,64 @@ export function ComboboxBuscable({
   return (
     <div ref={contenedorRef} className="relative" data-testid={testid}>
       <Input
+        ref={inputRef}
         type="text"
         role="combobox"
         value={texto}
         disabled={deshabilitado}
         onChange={(e) => {
-          setTexto(e.target.value);
-          alCambiarTexto?.(e.target.value);
+          const nuevo = e.target.value;
+          setTexto(nuevo);
+          alCambiarTexto?.(nuevo);
           setAbierto(true);
           setActivo(0);
+          // Borrar TODO el texto borra también la selección (el filtro vuelve a "Todos"): antes
+          // quedaba pegada y el texto borrado reaparecía al llegar la respuesta del server.
+          if (nuevo === '' && valor !== null) {
+            onChange(null);
+          }
         }}
-        onFocus={() => setAbierto(true)}
+        onFocus={() => {
+          setEnfocado(true);
+          setAbierto(true);
+          if (valor !== null) {
+            // Selecciona todo el texto: se teclea encima de la selección de una, sin tener que
+            // borrar letra por letra; la lista arranca posicionada en la opción elegida.
+            inputRef.current?.select();
+            conservarSeleccionRef.current = true;
+            const indice = filtradas.findIndex((o) => o.id === valor);
+            setActivo(indice === -1 ? 0 : indice);
+          }
+        }}
+        onMouseUp={(e) => {
+          if (conservarSeleccionRef.current) {
+            e.preventDefault();
+            conservarSeleccionRef.current = false;
+          }
+        }}
+        onBlur={() => {
+          setEnfocado(false);
+          setAbierto(false);
+          conservarSeleccionRef.current = false;
+          // El efecto de sincronía repone el texto; aquí solo se resetea la búsqueda a medias.
+          if (texto !== etiquetaValor) {
+            alCambiarTexto?.('');
+          }
+        }}
         onKeyDown={alTeclado}
         placeholder={placeholder}
         aria-label={etiqueta ?? placeholder}
         aria-expanded={abierto}
         aria-controls={idLista}
         autoComplete="off"
-        className={cn('pr-8', seleccionada !== null && 'font-medium')}
+        className={cn('pr-8', valor !== null && 'font-medium')}
         data-testid={`${testid}-input`}
       />
-      {seleccionada !== null && !deshabilitado ? (
+      {valor !== null && !deshabilitado ? (
         <button
           type="button"
+          // mousedown-preventDefault: no le roba el foco al input (no dispara su blur).
+          onMouseDown={(e) => e.preventDefault()}
           onClick={limpiar}
           aria-label="Limpiar selección"
           data-testid={`${testid}-limpiar`}
@@ -201,6 +285,12 @@ export function ComboboxBuscable({
         >
           <X className="size-3.5" aria-hidden />
         </button>
+      ) : cargando ? (
+        <Loader2Icon
+          className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 animate-spin text-muted-foreground"
+          aria-hidden
+          data-testid={`${testid}-cargando`}
+        />
       ) : (
         <ChevronDown
           className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -216,7 +306,9 @@ export function ComboboxBuscable({
           data-testid={`${testid}-lista`}
         >
           {filtradas.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-muted-foreground">{textoVacio}</p>
+            <p className="px-3 py-2 text-sm text-muted-foreground">
+              {cargando ? 'Buscando…' : textoVacio}
+            </p>
           ) : (
             filtradas.map((opcion, indice) => (
               <button
