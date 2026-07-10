@@ -40301,6 +40301,13 @@ export interface paths {
                 /** @description Proveedores con saldo ≠ 0. */
                 proveedoresConSaldo: number;
               };
+              /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
+              limitesAging: {
+                /** @description Fin de la 1ª cubeta vencida (días de atraso). */
+                limite1: number;
+                /** @description Fin de la 2ª cubeta vencida (días de atraso). */
+                limite2: number;
+              };
             };
           };
         };
@@ -41626,6 +41633,13 @@ export interface paths {
                 /** @description Clientes con saldo ≠ 0. */
                 clientesConSaldo: number;
               };
+              /** @description Límites de aging vigentes de la empresa (F9-E5/D15d) para las cabeceras dinámicas. */
+              limitesAging: {
+                /** @description Fin de la 1ª cubeta vencida (días de atraso). */
+                limite1: number;
+                /** @description Fin de la 2ª cubeta vencida (días de atraso). */
+                limite2: number;
+              };
             };
           };
         };
@@ -42872,6 +42886,601 @@ export interface paths {
         };
       };
     };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reportes-fiscales': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Reporte fiscal del contador: movimientos fiscales (CxP + CxC) con CFDI + totales */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Filtra a proveedores (CxP) o clientes (CxC); ambos si se omite. */
+          tipoTercero?: 'cliente' | 'proveedor';
+          /** @description Filtra a un tercero concreto (según tipoTercero). */
+          idTercero?: number;
+          /** @description cargos (monto > 0) | abonos (monto < 0); ambos si se omite. */
+          tipo?: 'cargos' | 'abonos';
+          /** @description con (tiene UUID) | sin (pendiente de CFDI); ambos si se omite. */
+          cfdi?: 'con' | 'sin';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Reporte fiscal del contador (movimientos fiscales paginados + totales). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Fecha inicial del filtro o null. */
+              desde: string | null;
+              /** @description Fecha final del filtro o null. */
+              hasta: string | null;
+              /** @description Renglones de la página (por fecha desc). */
+              filas: {
+                /** @description Id del movimiento. */
+                id: number;
+                /** @description Folio A3 del movimiento. */
+                folio: number;
+                /** @description Fecha del movimiento (YYYY-MM-DD). */
+                fecha: string;
+                /**
+                 * @description Cliente (CxC) o proveedor (CxP).
+                 * @enum {string}
+                 */
+                tipoTercero: 'cliente' | 'proveedor';
+                /** @description Id del cliente o proveedor. */
+                idTercero: number;
+                /** @description Nombre del tercero. */
+                tercero: string;
+                /** @description RFC del tercero en el CFDI, o null. */
+                rfcTercero: string | null;
+                /** @description Origen/concepto del movimiento (etiqueta estable). */
+                origen: string;
+                /** @description UUID (folio fiscal) del CFDI, o null si pendiente. */
+                uuidCfdi: string | null;
+                /** @description ¿El XML del CFDI está guardado en R2 (idArchivoCfdi)? */
+                tieneXml: boolean;
+                /** @description Total del CFDI CON SIGNO (Σ = neto), o null si se oculta. */
+                monto: number | null;
+                /** @description ¿Es un cargo (monto > 0)? false = abono/nota de crédito. */
+                esCargo: boolean;
+                /** @description ¿El movimiento fue cancelado (existe su inverso)? */
+                cancelado: boolean;
+                /** @description ¿Es un movimiento inverso de cancelación? */
+                esInverso: boolean;
+              }[];
+              /** @description Total de movimientos que cumplen el filtro. */
+              total: number;
+              /** @description Página solicitada (1-based). */
+              pagina: number;
+              /** @description Renglones por página. */
+              porPagina: number;
+              /** @description Total de páginas. */
+              totalPaginas: number;
+              /** @description Totales del periodo (todo el filtro). */
+              totales: {
+                /** @description Σ de los cargos (monto > 0) del filtro. */
+                cargos: number | null;
+                /** @description Σ de los abonos (monto < 0), en positivo, del filtro. */
+                abonos: number | null;
+                /** @description Neto = cargos − abonos (Σ monto con signo). */
+                neto: number | null;
+                /** @description Cuántos movimientos cumplen el filtro. */
+                movimientos: number;
+              };
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reportes-fiscales/salud': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Salud fiscal: % conciliado, pendientes de CFDI/XML y saldos fiscales por tercero */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Tablero de salud fiscal (conciliación consolidada + saldos por tercero). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Fecha inicial del filtro o null. */
+              desde: string | null;
+              /** @description Fecha final del filtro o null. */
+              hasta: string | null;
+              /** @description Movimientos marcados fiscales en el periodo. */
+              totalFiscales: number;
+              /** @description De ésos, cuántos tienen UUID (CFDI conciliado). */
+              conCfdi: number;
+              /** @description Marcados fiscales SIN UUID (pendientes de CFDI). */
+              sinCfdi: number;
+              /** @description Cuántos tienen el XML guardado en R2 (idArchivoCfdi). */
+              conXml: number;
+              /** @description Cuántos NO tienen el XML guardado en R2. */
+              sinXml: number;
+              /** @description % conciliado = conCfdi ÷ totalFiscales (0–100); null si no hay fiscales. */
+              pctConciliado: number | null;
+              /** @description Saldos fiscales por tercero (|saldo| desc). */
+              saldos: {
+                /**
+                 * @description Cliente (CxC) o proveedor (CxP).
+                 * @enum {string}
+                 */
+                tipoTercero: 'cliente' | 'proveedor';
+                /** @description Id del cliente o proveedor. */
+                idTercero: number;
+                /** @description Nombre del tercero. */
+                tercero: string;
+                /** @description RFC del tercero (catálogo), o null. */
+                rfc: string | null;
+                /** @description Σ monto de sus movimientos fiscales, o null. */
+                saldoFiscal: number | null;
+                /** @description Cuántos movimientos fiscales tiene en el periodo. */
+                movimientos: number;
+              }[];
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reportes-fiscales/excel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Reporte fiscal en Excel (.xlsx): mismo resultado que la pantalla */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Filtra a proveedores (CxP) o clientes (CxC); ambos si se omite. */
+          tipoTercero?: 'cliente' | 'proveedor';
+          /** @description Filtra a un tercero concreto (según tipoTercero). */
+          idTercero?: number;
+          /** @description cargos (monto > 0) | abonos (monto < 0); ambos si se omite. */
+          tipo?: 'cargos' | 'abonos';
+          /** @description con (tiene UUID) | sin (pendiente de CFDI); ambos si se omite. */
+          cfdi?: 'con' | 'sin';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/reportes-fiscales/impreso': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Reporte fiscal en PDF (R9): mismo resultado que la pantalla */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Página (1-based). */
+          pagina?: number;
+          /** @description Renglones por página (máx 100). */
+          porPagina?: number;
+          /** @description Fecha inicial (YYYY-MM-DD), inclusiva. */
+          desde?: string;
+          /** @description Fecha final (YYYY-MM-DD), inclusiva. */
+          hasta?: string;
+          /** @description Filtra a proveedores (CxP) o clientes (CxC); ambos si se omite. */
+          tipoTercero?: 'cliente' | 'proveedor';
+          /** @description Filtra a un tercero concreto (según tipoTercero). */
+          idTercero?: number;
+          /** @description cargos (monto > 0) | abonos (monto < 0); ambos si se omite. */
+          tipo?: 'cargos' | 'abonos';
+          /** @description con (tiene UUID) | sin (pendiente de CFDI); ambos si se omite. */
+          cfdi?: 'con' | 'sin';
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -80182,6 +80791,10 @@ export interface paths {
               regaliasBase: number | null;
               /** @description Días de colchón de costura, o null. */
               colchonCostura: number | null;
+              /** @description Fin de la primera cubeta de aging (días, F9-E5/D15d). Siempre presente (default 30). */
+              agingLimite1: number;
+              /** @description Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60). */
+              agingLimite2: number;
               /** @description Fecha del último inventario de telas (ISO 8601), o null. */
               fechaInventarioTelas: string | null;
               /** @description Fecha del último inventario de PT (ISO 8601), o null. */
@@ -80308,6 +80921,10 @@ export interface paths {
             regaliasBase?: number | null;
             /** @description Días de colchón que la Ruta Crítica suma a la costura. */
             colchonCostura?: number | null;
+            /** @description Fin de la primera cubeta de aging (días de atraso, F9-E5/D15d). Default 30. */
+            agingLimite1?: number;
+            /** @description Fin de la segunda cubeta de aging (días de atraso, F9-E5/D15d). Default 60. */
+            agingLimite2?: number;
             /** @description Fecha del último inventario físico de telas (ISO 8601). */
             fechaInventarioTelas?: string | null;
             /** @description Fecha del último inventario físico de PT (ISO 8601). */
@@ -80333,6 +80950,10 @@ export interface paths {
               regaliasBase: number | null;
               /** @description Días de colchón de costura, o null. */
               colchonCostura: number | null;
+              /** @description Fin de la primera cubeta de aging (días, F9-E5/D15d). Siempre presente (default 30). */
+              agingLimite1: number;
+              /** @description Fin de la segunda cubeta de aging (días, F9-E5/D15d). Siempre presente (default 60). */
+              agingLimite2: number;
               /** @description Fecha del último inventario de telas (ISO 8601), o null. */
               fechaInventarioTelas: string | null;
               /** @description Fecha del último inventario de PT (ISO 8601), o null. */

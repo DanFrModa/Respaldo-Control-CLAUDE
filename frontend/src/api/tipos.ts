@@ -1705,3 +1705,22 @@ export type CfdiVentaImportarSalida =
 /** Cuerpo de la importación de un CFDI de venta. */
 export type CfdiVentaImportarEntrada =
   paths['/api/terceros/cfdi-ventas/importar']['post']['requestBody']['content']['application/json'];
+
+// ── Reportes fiscales para el contador (Módulo 14, F9-E5; R13) ──────────────────
+
+/** Reporte fiscal: movimientos fiscales + totales (`GET /api/reportes-fiscales`). */
+export type ReporteFiscal =
+  paths['/api/reportes-fiscales']['get']['responses']['200']['content']['application/json'];
+/** Un renglón del reporte fiscal (movimiento con CFDI). */
+export type ReporteFiscalFila = ReporteFiscal['filas'][number];
+/** Totales del periodo del reporte fiscal. */
+export type ReporteFiscalTotales = ReporteFiscal['totales'];
+/** Parámetros del reporte fiscal (querystring). */
+export type ReporteFiscalQuery = NonNullable<
+  paths['/api/reportes-fiscales']['get']['parameters']['query']
+>;
+/** Tablero de salud fiscal (`GET /api/reportes-fiscales/salud`). */
+export type SaludFiscal =
+  paths['/api/reportes-fiscales/salud']['get']['responses']['200']['content']['application/json'];
+/** Un saldo fiscal por tercero del tablero de salud. */
+export type SaldoFiscalTercero = SaludFiscal['saldos'][number];

@@ -146,6 +146,15 @@ model ConfiguracionEmpresa {
   /// histórico); el backfill de la migración lo fija en las filas ya sembradas.
   jornadaBaseAlmacen Int      @default(9) @map("jornada_base_almacen")
 
+  /// Fin de la primera cubeta de antigüedad de saldos (aging, F9-E5/D15d): días de atraso ≤ este
+  /// valor caen en "1–N". Antes era la constante 30 (`LIMITES_AGING_*`); en v2 es parámetro por
+  /// empresa. Default 30 (el valor histórico); el `ADD COLUMN … DEFAULT` rellena las filas ya
+  /// sembradas. CxP y CxC (bandejas) leen los límites de aquí; `agingLimite1 < agingLimite2`.
+  agingLimite1       Int      @default(30) @map("aging_limite1")
+  /// Fin de la segunda cubeta de antigüedad de saldos (aging, F9-E5/D15d): días de atraso ≤ este
+  /// valor caen en "1er límite+1 – N"; más allá, en "+N". Antes era la constante 60. Default 60.
+  agingLimite2       Int      @default(60) @map("aging_limite2")
+
   /// Fecha del último inventario físico de telas (viejo: `InvFisico`).
   fechaInventarioTelas DateTime? @map("fecha_inventario_telas") @db.Date
   /// Fecha del último inventario físico de producto terminado (viejo: `InvFisicoPT`).

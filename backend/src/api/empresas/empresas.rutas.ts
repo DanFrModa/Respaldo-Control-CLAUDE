@@ -72,6 +72,8 @@ function aConfiguracionSalida(
     utilidadSugerida: config.utilidadSugerida === null ? null : Number(config.utilidadSugerida),
     regaliasBase: config.regaliasBase === null ? null : Number(config.regaliasBase),
     colchonCostura: config.colchonCostura,
+    agingLimite1: config.agingLimite1,
+    agingLimite2: config.agingLimite2,
     fechaInventarioTelas:
       config.fechaInventarioTelas === null ? null : config.fechaInventarioTelas.toISOString(),
     fechaInventarioPt:

@@ -611,6 +611,16 @@ export const esquemaConfiguracionEmpresa = z.object({
     mensajeNoNumero: 'El colchón de costura debe ser un número',
     mensajeMin: 'El colchón de costura no puede ser negativo',
   }).describe('Colchón de costura (vacío = sin valor).'),
+  agingLimite1: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El primer límite de antigüedad debe ser un número',
+    mensajeMin: 'El primer límite debe ser de al menos 1 día',
+  }).describe('Fin de la 1ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
+  agingLimite2: numeroOpcional({
+    min: 1,
+    mensajeNoNumero: 'El segundo límite de antigüedad debe ser un número',
+    mensajeMin: 'El segundo límite debe ser de al menos 1 día',
+  }).describe('Fin de la 2ª cubeta de antigüedad de saldos, en días (F9-E5/D15d).'),
   fechaInventarioTelas: z.string().describe('Fecha del inventario de telas (vacío = sin fecha).'),
   fechaInventarioPt: z.string().describe('Fecha del inventario de PT (vacío = sin fecha).'),
   idAlmacenPtDefault: numeroOpcional({

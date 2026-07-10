@@ -58,10 +58,10 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     ]);
   });
 
-  it('define 100 hojas y 15 padres con claves unicas (padres incluidos)', () => {
+  it('define 101 hojas y 15 padres con claves unicas (padres incluidos)', () => {
     // El catálogo completo NO cambia con la poda del riel: sigue conteniendo TODAS las pantallas
-    // (100 hojas + 15 padres). Lo que cambia es SOLO qué se ve en el riel (ver el otro describe).
-    expect(MODULOS_MENU).toHaveLength(100);
+    // (101 hojas + 15 padres, +Reportes fiscales F9-E5). Lo que cambia es SOLO qué se ve en el riel.
+    expect(MODULOS_MENU).toHaveLength(101);
     const padres = GRUPOS_MENU.flatMap((g) => g.entradas.filter((e) => e.hijos !== undefined));
     expect(padres).toHaveLength(15);
     // Un padre nunca queda vacío (no navega: solo despliega a sus hijos).
@@ -248,6 +248,7 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
       entradas: [
         { clave: 'cxc', padre: false },
         { clave: 'cxp', padre: false },
+        { clave: 'reportes-fiscales', padre: false }, // F9-E5: reporte del contador (gate terceros.fiscal)
         { clave: 'esma', padre: false }, // desviación interina (F9): hoja directa, NO desplegable
       ],
     },

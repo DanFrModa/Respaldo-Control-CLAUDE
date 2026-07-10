@@ -53,6 +53,7 @@ const conCartera: CxpBandeja = {
     alCorrientePct: 46,
     proveedoresConSaldo: 2,
   },
+  limitesAging: { limite1: 30, limite2: 60 },
 };
 
 describe('CxpPagina (F9-E2)', () => {

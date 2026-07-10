@@ -810,6 +810,15 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
         icono: 'recibo',
         permisos: ['cxp.ver'],
       },
+      {
+        clave: 'reportes-fiscales',
+        titulo: 'Reportes fiscales',
+        descripcion:
+          'Información fiscal para el contador: movimientos con CFDI de clientes y proveedores, salud fiscal y export Excel/PDF (D12, R13, F9-E5)',
+        ruta: '/reportes-fiscales',
+        icono: 'billete',
+        permisos: ['terceros.fiscal'],
+      },
       // Entrada INTERINA (decisión del lead, R1): EsMa se generaliza a Finanzas en F9; mientras
       // tanto la cuenta corriente de maquileros no puede desaparecer del menú.
       {
@@ -1404,6 +1413,7 @@ const ESPEC_RIEL: readonly { grupo: string; entradas: readonly EspecRiel[] }[] =
     entradas: [
       { tipo: 'hoja', clave: 'cxc' },
       { tipo: 'hoja', clave: 'cxp' },
+      { tipo: 'hoja', clave: 'reportes-fiscales' },
       // Desviación interina (viva hasta F9): EsMa como hoja directa a su portada-hub, que
       // auto-filtra por permiso. NUNCA un desplegable con sus 10 sub-vistas (esas van por ⌘K).
       {

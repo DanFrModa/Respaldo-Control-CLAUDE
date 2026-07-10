@@ -60,6 +60,20 @@ export const FUENTES_MOVIMIENTO_TERCERO = ['motor', 'esma'] as const;
 /** Clave de la fuente de un renglón. */
 export type FuenteMovimientoTerceroClave = (typeof FUENTES_MOVIMIENTO_TERCERO)[number];
 
+/**
+ * Límites vigentes de las cubetas de antigüedad de saldos (aging, F9-E5/D15d), configurables por
+ * empresa. Viajan en la bandeja de CxP/CxC para que la UI pinte cabeceras DINÁMICAS: "1–{limite1}",
+ * "{limite1+1}–{limite2}", "+{limite2}". Se cumple `limite1 < limite2` (default 30/60).
+ */
+export const esquemaLimitesAging = z
+  .object({
+    limite1: z.number().int().describe('Fin de la 1ª cubeta vencida (días de atraso).'),
+    limite2: z.number().int().describe('Fin de la 2ª cubeta vencida (días de atraso).'),
+  })
+  .describe('Límites vigentes de aging por empresa (para cabeceras dinámicas).');
+/** Forma de los límites de aging. */
+export type LimitesAgingSalida = z.infer<typeof esquemaLimitesAging>;
+
 // ── Alta de un movimiento ──────────────────────────────────────────────────────────────────────────
 
 /**

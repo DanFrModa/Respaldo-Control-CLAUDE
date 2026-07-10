@@ -2,7 +2,8 @@
  * ANTIGÜEDAD DE SALDOS (aging) de CxP (F9-E2; D15d) — la MECÁNICA pura vive en `../aging-comun.ts`
  * (compartida con CxC/F9-E4, SIN copiar-pegar); aquí solo se fijan los LÍMITES de las cubetas de CxP y
  * se re-exporta la mecánica con esos límites, para no romper los imports existentes (`./aging.js`).
- * E2 deja los límites fijos (30/60); E5 los hará configurables por empresa.
+ * Los límites VIVOS son configurables por empresa desde F9-E5 (`config-aging.ts`); este `LIMITES_AGING_CXP`
+ * es solo el DEFAULT (30/60) que aún usan la pieza pura re-exportada y sus tests.
  */
 import {
   LIMITES_AGING_DEFECTO,

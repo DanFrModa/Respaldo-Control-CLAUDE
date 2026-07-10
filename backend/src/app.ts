@@ -67,6 +67,7 @@ import { rutasCxp } from './api/terceros/cxp.rutas.js';
 import { rutasCfdi } from './api/terceros/cfdi.rutas.js';
 import { rutasCxc } from './api/terceros/cxc.rutas.js';
 import { rutasCfdiVentas } from './api/terceros/cfdi-ventas.rutas.js';
+import { rutasReportesFiscales } from './api/terceros/reportes-fiscales.rutas.js';
 import { rutasConsultasOrden } from './api/produccion/consultas.rutas.js';
 import { rutasEntregasCliente } from './api/produccion/entregas-cliente.rutas.js';
 import { rutasEtapasProduccion } from './api/produccion/etapas.rutas.js';
@@ -301,6 +302,11 @@ export async function construirApp(opciones: OpcionesApp = {}): Promise<FastifyI
   // (cliente por RFC + pedido por total cercano) e importación transaccional (XML en R2 + cargo FISCAL
   // de CxC por el total del CFDI). Reusa cxc.administrar.
   await app.register(rutasCfdiVentas, { prefix: '/api' });
+  // FINANZAS (Módulo 14, F9-E5) — Reportes fiscales para el contador (R13): la VISTA FISCAL del libro
+  // de terceros (movimientos esFiscal=true de CxP + CxC) con su CFDI, paginada + totales; el tablero de
+  // salud fiscal (conciliación consolidada + saldos por tercero) y los exports Excel/PDF. Todo lectura,
+  // permiso terceros.fiscal (REUSADO → deploy SIN SEED_ON_START).
+  await app.register(rutasReportesFiscales, { prefix: '/api' });
   // RUTA CRÍTICA (Módulo 8, F5-E1) — catálogo CONFIGURABLE: procesos (CRUD + borrado suave),
   // roles responsables (N:M sobre el RBAC único), dependencias (DAG con rechazo de ciclos) y
   // checklists. RBAC por ruta (rc.catalogo-ver / rc.catalogo-administrar). El MOTOR (instancias

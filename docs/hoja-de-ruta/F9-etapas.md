@@ -221,7 +221,15 @@
 
 ---
 
-## F9-E5 · Reportes fiscales para el contador (R13) + conciliaciones — ⬜ pendiente
+## F9-E5 · Reportes fiscales para el contador (R13) + conciliaciones — ✅ COMPLETA (10-jul-2026; reviewer APROBÓ — 1 DEBE del PDF truncado, corregido; pend. verificación de Gabriel en `prueba`)
+
+> **CIERRE (10-jul-2026).** La promesa de fondo del módulo: información fiscal limpia para el contador.
+> - **`ServicioReportesFiscales`** (`dominio/terceros/reportes/`): **reporte fiscal por periodo/empresa** = la vista `esFiscal=true` del libro (CxP+CxC) con folio/fecha/tercero+RFC/origen/UUID/tieneXml/monto — filtros server-side (periodo, tercero, cargos/abonos, con/sin CFDI), paginado, **totales del periodo completo** (no de la página). *Nota honesta:* el desglose base/IVA/retenciones vive en el XML (el movimiento solo persiste el TOTAL) — leerlo es iteración posterior, documentado en contrato/TSDoc. **El reporte NO incluye cargos EsMa** (decisión validada: el reporte del contador = renglones CFDI; la cara fiscal de la maquila entra cuando su CFDI se importa por E3).
+> - **Conciliación + tablero de salud fiscal**: con/sin CFDI (uuid), con/sin XML (idArchivoCfdi), % conciliado, saldos fiscales por tercero — todo agregado en servidor (A1, A9).
+> - **Aging CONFIGURABLE por empresa (cierra D15d):** `ConfiguracionEmpresa.agingLimite1/2` (migración aditiva `20260710230000`, defaults 30/60 = comportamiento previo — la trampa de la "columna con default en tabla sembrada" NO aplica: el default es el valor correcto y el seed no pisa estos campos); `leerLimitesAging` con fallback; CxP/CxC leen de config (el común `aging-comun.ts` ya recibía límites por parámetro — solo cambió la fuente); cabeceras de columnas DINÁMICAS en las bandejas; edición en Administración › Empresas › Configuración (valida l1<l2 sobre el par efectivo, `empresas.administrar`).
+> - **Exports**: **Excel** (exceljs, patrón F5 — pagina TODO el filtro) y **PDF** (@react-pdf, landscape) reusando `reporteFiscal` (A1); el PDF muestra hasta 100 renglones con **leyenda explícita de truncado** cuando hay más ("usa el Excel para el detalle completo" — DEBE del reviewer, corregido con test).
+> - **Pantalla** `/reportes-fiscales` (riel FINANZAS, gated `terceros.fiscal`): KPIs de salud + filtros + tabla + totales + saldos por tercero + botones Excel/PDF. **RBAC: SIN permisos nuevos** (todo `terceros.fiscal`; config con `empresas.administrar`) → **SIN `SEED_ON_START`** — solo la migración (auto).
+> - Tests: int con siembra MIXTA (ni un no-fiscal se cuela; totales a mano; salud 50%; aging con límites custom 15/45; deny 403 en las 4 rutas; A9) + unit (aging por parámetro, leyenda de truncado) + Excel con test de celdas + componente + e2e smoke. Reviewer: 1 DEBE (PDF truncaba sin avisar) corregido → APROBADO; backend 893, front 682, contrato sin drift.
 
 **Objetivo:** Cerrar la promesa de fondo: que CONTROL le entregue al contador **información fiscal limpia y detallada** de clientes y proveedores (solo lo fiscal), y consolidar las conciliaciones (CFDI ↔ operación) en reportes utilizables. CONTROL **no** lleva contabilidad: entrega datos, no pólizas.
 

@@ -76,6 +76,10 @@ const esquemaConfiguracion = z
     regaliasBase: z.number().min(0).max(1000).nullable().optional(),
     /** Días de colchón que la Ruta Crítica suma a la costura (viejo: `ColchonCostura`). */
     colchonCostura: z.number().int().min(0).max(365).nullable().optional(),
+    /** Fin de la 1ª cubeta de aging (días de atraso, F9-E5/D15d). NO nullable: siempre hay valor. */
+    agingLimite1: z.number().int().min(1).max(3650).optional(),
+    /** Fin de la 2ª cubeta de aging (días de atraso, F9-E5/D15d). NO nullable: siempre hay valor. */
+    agingLimite2: z.number().int().min(1).max(3650).optional(),
     /** Fecha del último inventario físico de telas (viejo: `InvFisico`). */
     fechaInventarioTelas: z.date().nullable().optional(),
     /** Fecha del último inventario físico de PT (viejo: `InvFisicoPT`). */
@@ -378,6 +382,23 @@ export async function actualizarConfiguracion(
   return enTransaccion(async (tx) => {
     await exigirEmpresa(tx, idEmpresa);
 
+    // Aging (D15d): el 1er límite debe ser MENOR que el 2º. Como la edición es parcial, se valida el
+    // par EFECTIVO (lo que llega ∪ lo ya guardado), no solo lo del cuerpo. Si el registro aún no
+    // existe (empresa del seed sin configuración), los ausentes caen al default 30/60.
+    if (datos.agingLimite1 !== undefined || datos.agingLimite2 !== undefined) {
+      const actualCfg = await tx.configuracionEmpresa.findUnique({
+        where: { idEmpresa },
+        select: { agingLimite1: true, agingLimite2: true },
+      });
+      const l1 = datos.agingLimite1 ?? actualCfg?.agingLimite1 ?? 30;
+      const l2 = datos.agingLimite2 ?? actualCfg?.agingLimite2 ?? 60;
+      if (l1 >= l2) {
+        throw new ErrorValidacion(
+          'El primer límite de antigüedad debe ser menor que el segundo (p. ej. 30 y 60).',
+        );
+      }
+    }
+
     if (datos.idAlmacenPtDefault !== undefined && datos.idAlmacenPtDefault !== null) {
       const almacen = await tx.almacen.findFirst({
         where: {
@@ -399,6 +420,8 @@ export async function actualizarConfiguracion(
       ...(datos.utilidadSugerida === undefined ? {} : { utilidadSugerida: datos.utilidadSugerida }),
       ...(datos.regaliasBase === undefined ? {} : { regaliasBase: datos.regaliasBase }),
       ...(datos.colchonCostura === undefined ? {} : { colchonCostura: datos.colchonCostura }),
+      ...(datos.agingLimite1 === undefined ? {} : { agingLimite1: datos.agingLimite1 }),
+      ...(datos.agingLimite2 === undefined ? {} : { agingLimite2: datos.agingLimite2 }),
       ...(datos.fechaInventarioTelas === undefined
         ? {}
         : { fechaInventarioTelas: datos.fechaInventarioTelas }),

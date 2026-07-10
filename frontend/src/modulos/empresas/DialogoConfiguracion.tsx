@@ -29,6 +29,8 @@ const VALORES_VACIOS: DatosConfiguracionEmpresa = {
   utilidadSugerida: '',
   regaliasBase: '',
   colchonCostura: '',
+  agingLimite1: '',
+  agingLimite2: '',
   fechaInventarioTelas: '',
   fechaInventarioPt: '',
   idAlmacenPtDefault: '',
@@ -61,6 +63,8 @@ function aFormulario(config: EmpresaConfiguracion): DatosConfiguracionEmpresa {
     utilidadSugerida: num(config.utilidadSugerida),
     regaliasBase: num(config.regaliasBase),
     colchonCostura: num(config.colchonCostura),
+    agingLimite1: num(config.agingLimite1),
+    agingLimite2: num(config.agingLimite2),
     fechaInventarioTelas: fecha(config.fechaInventarioTelas),
     fechaInventarioPt: fecha(config.fechaInventarioPt),
     idAlmacenPtDefault: num(config.idAlmacenPtDefault),
@@ -103,10 +107,16 @@ export function DialogoConfiguracion({
     if (empresa === null) {
       return;
     }
+    // Los límites de aging NO son nullable (siempre hay valor): vacío = omitir (no cambiar). Bajo
+    // `exactOptionalPropertyTypes` no se puede fijar `undefined` explícito, así que se incluyen por spread.
+    const aging1 = numeroOpcionalACuerpo(datos.agingLimite1);
+    const aging2 = numeroOpcionalACuerpo(datos.agingLimite2);
     const cuerpo: EmpresaConfiguracionEditar = {
       utilidadSugerida: numeroANull(datos.utilidadSugerida),
       regaliasBase: numeroANull(datos.regaliasBase),
       colchonCostura: numeroANull(datos.colchonCostura),
+      ...(aging1 === undefined ? {} : { agingLimite1: aging1 }),
+      ...(aging2 === undefined ? {} : { agingLimite2: aging2 }),
       fechaInventarioTelas: fechaACuerpo(datos.fechaInventarioTelas),
       fechaInventarioPt: fechaACuerpo(datos.fechaInventarioPt),
       idAlmacenPtDefault: numeroANull(datos.idAlmacenPtDefault),
@@ -203,6 +213,40 @@ export function DialogoConfiguracion({
                   {...formulario.register('colchonCostura')}
                 />
                 <FieldError errors={[errors.colchonCostura]} />
+              </Field>
+
+              <Field data-invalid={Boolean(errors.agingLimite1)}>
+                <FieldLabel htmlFor="config-aging1">
+                  Antigüedad de saldos · 1er límite (días)
+                </FieldLabel>
+                <Input
+                  id="config-aging1"
+                  type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(errors.agingLimite1)}
+                  disabled={actualizar.isPending}
+                  {...formulario.register('agingLimite1')}
+                />
+                <FieldError errors={[errors.agingLimite1]} />
+              </Field>
+
+              <Field data-invalid={Boolean(errors.agingLimite2)}>
+                <FieldLabel htmlFor="config-aging2">
+                  Antigüedad de saldos · 2do límite (días)
+                </FieldLabel>
+                <Input
+                  id="config-aging2"
+                  type="number"
+                  step="1"
+                  min="1"
+                  inputMode="numeric"
+                  aria-invalid={Boolean(errors.agingLimite2)}
+                  disabled={actualizar.isPending}
+                  {...formulario.register('agingLimite2')}
+                />
+                <FieldError errors={[errors.agingLimite2]} />
               </Field>
 
               <Field data-invalid={Boolean(errors.fechaInventarioTelas)}>

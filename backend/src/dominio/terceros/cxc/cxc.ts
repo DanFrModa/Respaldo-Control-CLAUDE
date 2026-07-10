@@ -44,12 +44,9 @@ import {
   cancelarMovimientoTercero,
   estadoDeCuentaTercero,
 } from '../cuenta-terceros.js';
-import {
-  LIMITES_AGING_CXC,
-  netearCubetas,
-  type CubetasAging,
-  type CubetasBrutas,
-} from './aging.js';
+import { leerLimitesAging } from '../config-aging.js';
+import { type LimitesAging } from '../aging-comun.js';
+import { netearCubetas, type CubetasAging, type CubetasBrutas } from './aging.js';
 
 /** Redondeo monetario a 2 decimales. */
 function redondear2(n: number): number {
@@ -179,16 +176,17 @@ interface FilaNeta extends CubetasAging {
 /**
  * Agrega, por cliente, sus movimientos del motor en las cuatro cubetas de aging (BRUTAS) + los créditos,
  * por la empresa activa (A9). Cubetas por días de atraso sobre `fecha_vencimiento` (`CURRENT_DATE −
- * fecha_vencimiento`); los límites vienen de {@link LIMITES_AGING_CXC} (un solo lugar). Filtrar por
- * `id_cliente IS NOT NULL` equivale a `tipo_tercero='cliente'` (CHECK de exclusividad D15a) y evita
- * castear el enum en crudo. Los subtotales viajan en `::numeric` (Decimal) para CERO-DRIFT contra el
- * `saldo` del detalle (que suma `monto` Decimal vía Prisma `_sum`).
+ * fecha_vencimiento`); los límites llegan como parámetro (F9-E5/D15d: configurables por empresa,
+ * `leerLimitesAging`). Filtrar por `id_cliente IS NOT NULL` equivale a `tipo_tercero='cliente'`
+ * (CHECK de exclusividad D15a) y evita castear el enum en crudo. Los subtotales viajan en `::numeric`
+ * (Decimal) para CERO-DRIFT contra el `saldo` del detalle (que suma `monto` Decimal vía Prisma `_sum`).
  */
 async function agregarPorCliente(
   cliente: ReturnType<typeof clienteLectura>,
   idEmpresa: number,
+  limites: LimitesAging,
 ): Promise<FilaAgregadoCxc[]> {
-  const { d30, d60 } = LIMITES_AGING_CXC;
+  const { d30, d60 } = limites;
   const crudas = await cliente.$queryRaw<FilaAgregadoCxcCruda[]>(Prisma.sql`
     SELECT
       m.id_cliente AS "idCliente",
@@ -290,7 +288,9 @@ export async function bandejaPorCobrar(
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const oculto = (v: number): number | null => (puedeVerImportes ? v : null);
 
-  const crudas = await agregarPorCliente(cliente, idEmpresa);
+  // Límites de aging vigentes de la empresa (F9-E5/D15d: configurables); default 30/60.
+  const limites = await leerLimitesAging(cliente, idEmpresa);
+  const crudas = await agregarPorCliente(cliente, idEmpresa, limites);
   const netas = crudas.map(netearFila);
   const conSaldo = netas.filter((f) => tieneSaldo(f.saldo));
   const resumen = calcularResumen(conSaldo, oculto);
@@ -326,5 +326,6 @@ export async function bandejaPorCobrar(
     porPagina: filtros.porPagina,
     totalPaginas: Math.max(1, Math.ceil(total / filtros.porPagina)),
     resumen,
+    limitesAging: { limite1: limites.d30, limite2: limites.d60 },
   };
 }
