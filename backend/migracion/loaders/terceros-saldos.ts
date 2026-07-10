@@ -236,7 +236,12 @@ export function parsearAperturas(
         rfc,
         nombre,
         empresaRef,
-        saldoEsperado: saldoEsperado ?? saldoNeto,
+        // SOLO el `saldoEsperado` EXPLÍCITO del corte (la cifra que declaró el contador). NO se rellena
+        // con `saldoNeto`: si un tercero tiene una factura (con su saldoEsperado) + un abono neto, el
+        // abono rellenaría y PISARÍA el esperado del tercero en el cuadre. Cuando NO hay esperado
+        // declarado, el cuadre deriva el esperado sumando los renglones con su signo (que para un neto
+        // único da el mismo saldoNeto) — así nunca se pisa el total declarado del tercero.
+        saldoEsperado,
         movimiento: {
           origen,
           fecha,

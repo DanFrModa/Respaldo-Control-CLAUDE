@@ -120,6 +120,22 @@ describe('parsearAperturas — modo SALDO NETO', () => {
     expect(filas).toHaveLength(0);
     expect(incidencias[0]!.motivo).toMatch(/nada que abrir/);
   });
+
+  it('saldo neto SIN saldoEsperado explícito → saldoEsperado null (NO se rellena con el saldo)', () => {
+    // Regresión: un abono neto NO debe rellenar el esperado del tercero; si lo hiciera, PISARÍA el
+    // saldoEsperado declarado en otro renglón del mismo tercero (bug del cuadran=2 del cuadre).
+    const { filas } = parsearAperturas([{ tipo: 'cliente', rfc: 'X', saldo: '-300' }], {
+      corte: CORTE,
+    });
+    expect(filas[0]!.saldoEsperado).toBeNull();
+  });
+
+  it('saldo neto CON saldoEsperado explícito → lo conserva', () => {
+    const { filas } = parsearAperturas([
+      { tipo: 'proveedor', rfc: 'A', saldo: '2000', saldoEsperado: '2000' },
+    ]);
+    expect(filas[0]!.saldoEsperado).toBe(2000);
+  });
 });
 
 describe('parsearAperturas — validaciones de renglón', () => {
