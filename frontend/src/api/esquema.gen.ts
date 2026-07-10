@@ -12334,6 +12334,12 @@ export interface paths {
                 cantidadFotos: number;
                 /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
                 urlFotoPrincipal: string | null;
+                /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+                telaPrincipal: string | null;
+                /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+                stockPt: number | null;
+                /** @description Costo unitario del último costeo del modelo (F7), o null. */
+                costoActual: number | null;
                 /** @description Falso si está descontinuado (borrado suave). */
                 activo: boolean;
                 /**
@@ -12523,6 +12529,12 @@ export interface paths {
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
+              /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+              telaPrincipal: string | null;
+              /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+              stockPt: number | null;
+              /** @description Costo unitario del último costeo del modelo (F7), o null. */
+              costoActual: number | null;
               /** @description Falso si está descontinuado (borrado suave). */
               activo: boolean;
               /**
@@ -12698,6 +12710,12 @@ export interface paths {
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
+              /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+              telaPrincipal: string | null;
+              /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+              stockPt: number | null;
+              /** @description Costo unitario del último costeo del modelo (F7), o null. */
+              costoActual: number | null;
               /** @description Falso si está descontinuado (borrado suave). */
               activo: boolean;
               /**
@@ -12908,6 +12926,12 @@ export interface paths {
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
+              /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+              telaPrincipal: string | null;
+              /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+              stockPt: number | null;
+              /** @description Costo unitario del último costeo del modelo (F7), o null. */
+              costoActual: number | null;
               /** @description Falso si está descontinuado (borrado suave). */
               activo: boolean;
               /**
@@ -13093,6 +13117,12 @@ export interface paths {
               cantidadFotos: number;
               /** @description URL prefirmada de la foto principal del modelo, o null si no tiene fotos. */
               urlFotoPrincipal: string | null;
+              /** @description Nombre de la tela principal (primer renglón del BOM), o null. */
+              telaPrincipal: string | null;
+              /** @description Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado. */
+              stockPt: number | null;
+              /** @description Costo unitario del último costeo del modelo (F7), o null. */
+              costoActual: number | null;
               /** @description Falso si está descontinuado (borrado suave). */
               activo: boolean;
               /**
@@ -26656,6 +26686,138 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/notas-salida/resumen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resumen de cabecera de notas de salida (conteos por estatus + órdenes surtidas) */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Texto a buscar (folio o nombre del maquilero). */
+          busqueda?: string;
+          /** @description Filtra por maquilero. */
+          idMaquilero?: number;
+          /** @description Notas que envían material a esta orden de producción. */
+          idOrden?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumen de cabecera de notas de salida (KPIs). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Total de notas del filtro (todas: borradores + confirmadas + canceladas). */
+              notas: number;
+              /** @description # de notas en borrador (sin descontar). */
+              borradores: number;
+              /** @description # de notas confirmadas (material descontado). */
+              confirmadas: number;
+              /** @description # de órdenes de producción distintas en renglones de notas CONFIRMADAS. */
+              ordenesSurtidas: number;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/notas-salida/{id}': {
     parameters: {
       query?: never;
@@ -29129,6 +29291,8 @@ export interface paths {
           idOrden?: number;
           /** @description Incluye filas con existencia 0 ("true"/"false"). Por defecto se omiten. */
           incluirCeros?: string;
+          /** @description Con "color-talla" la respuesta incluye además `porColorTalla`: la existencia del modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, para la matriz del cajón). Requiere `idModelo`. */
+          agrupar?: 'color-talla';
         };
         header?: never;
         path?: never;
@@ -29172,6 +29336,21 @@ export interface paths {
               }[];
               /** @description Suma de la existencia de todas las filas. */
               totalExistencia: number;
+              /** @description Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada en servidor a través de almacenes/órdenes. */
+              porColorTalla?: {
+                /** @description Id del color. */
+                idColor: number;
+                /** @description Nombre del color. */
+                color: string;
+                /** @description Id de la talla. */
+                idTalla: number;
+                /** @description Etiqueta visible de la talla. */
+                etiquetaTalla: string;
+                /** @description Orden del catálogo de la talla (para ordenar columnas). */
+                ordenTalla: number;
+                /** @description Existencia del color×talla sumada a través de almacenes/órdenes (Σ kardex, D3). */
+                existencia: number;
+              }[];
             };
           };
         };

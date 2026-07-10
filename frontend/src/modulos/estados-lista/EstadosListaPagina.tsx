@@ -1,4 +1,3 @@
-import { Hash, ListChecks, Lock, Tag } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,10 +9,13 @@ import {
   type EstadosListaQuery,
 } from '@/api/estados-lista';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { TipoBadge } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
+import {
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoEstadoLista } from './DialogoEstadoLista';
@@ -22,9 +24,9 @@ import { DialogoEstadoLista } from './DialogoEstadoLista';
 const POR_PAGINA = 10;
 
 /**
- * Pantalla de Estados de lista de precios (F8-E1, Administración) — CRUD del catálogo GLOBAL de
- * estados del ciclo de vida de una lista de precios, sobre el motor LISTA + DETALLE. Sigue el
- * molde de "Tipos de proceso".
+ * Pantalla de Estados de lista de precios (F8-E1, Administración) — re-vestida R9 a TABLA-FIRST
+ * (proto `vCat`, mismo molde que "Tipos de proceso"): tabla densa con el estado, su código, su
+ * orden y su ciclo (Cierre/Abierto), con acciones inline. Alta/edición por diálogo; borrado suave.
  *
  * Es ADMIN-ONLY: `estado-lista.ver` gobierna el acceso y `estado-lista.administrar` las
  * escrituras (el backend es la autoridad, A1). La bandera `esCierre` marca los estados que
@@ -99,7 +101,7 @@ export function EstadosListaPagina(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -110,26 +112,38 @@ export function EstadosListaPagina(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<EstadoLista>[] = [
+    {
+      encabezado: 'Estado',
+      render: (e) => <span className="font-semibold">{e.nombre}</span>,
+    },
+    { encabezado: 'Código', render: (e) => <span className="num text-faint">{e.codigo}</span> },
+    { encabezado: 'Orden', numerica: true, render: (e) => <span className="num">{e.orden}</span> },
+    {
+      encabezado: 'Ciclo',
+      render: (e) =>
+        e.esCierre ? (
+          <TipoBadge tono="pt">Cierre</TipoBadge>
+        ) : (
+          <TipoBadge tono="neutro">Abierto</TipoBadge>
+        ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<EstadoLista>
+      <TablaCatalogo<EstadoLista>
         testid="estado-lista"
         titulo="Estados de lista de precios"
-        descripcion="Catálogo global de estados del ciclo de vida de una lista de precios."
-        icono={ListChecks}
+        descripcion="Catálogo global de estados del ciclo de vida de una lista de precios"
+        unidad="estados"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(e) => e.id}
-        obtenerTitulo={(e) => e.nombre}
         obtenerActivo={(e) => e.activo}
-        obtenerSecundaria={(e) => e.codigo}
-        renderAvatarLista={(e) => (
-          <Avatar nombre={e.nombre} tono="servicios" tamano="sm">
-            <ListChecks className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -142,36 +156,6 @@ export function EstadosListaPagina(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarEstado}
-        renderAvatarDetalle={(e) => (
-          <Avatar nombre={e.nombre} tono="servicios" tamano="lg">
-            <ListChecks className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderMeta={(e) =>
-          e.esCierre ? (
-            <TipoBadge tono="pt">Cierre</TipoBadge>
-          ) : (
-            <TipoBadge tono="neutro">Abierto</TipoBadge>
-          )
-        }
-        renderDetalle={(e) => (
-          <>
-            <SeccionDetalle titulo="Datos del estado">
-              <RejillaCampos>
-                <CampoDetalle icono={Tag} etiqueta="Código">
-                  {e.codigo}
-                </CampoDetalle>
-                <CampoDetalle icono={Hash} etiqueta="Orden">
-                  {e.orden}
-                </CampoDetalle>
-                <CampoDetalle icono={Lock} etiqueta="¿Estado de cierre?">
-                  {e.esCierre ? 'Sí (bloquea nuevas rondas/ediciones)' : 'No'}
-                </CampoDetalle>
-              </RejillaCampos>
-            </SeccionDetalle>
-            <Historial creadoEn={e.creadoEn} modificadoEn={e.modificadoEn} />
-          </>
-        )}
       />
 
       <DialogoEstadoLista

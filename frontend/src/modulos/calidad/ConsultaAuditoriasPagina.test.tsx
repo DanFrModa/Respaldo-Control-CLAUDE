@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -99,6 +99,34 @@ describe('ConsultaAuditoriasPagina', () => {
     expect(screen.queryByText('Auditoría #2')).toBeNull();
     await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
     expect(screen.getByText('Auditoría #2')).toBeDefined();
+  });
+
+  it('KPIs con datos: la card "Defecto principal" pinta clave/descripción y la columna AQL su nivel', () => {
+    // Fixture POBLADO (antes solo se cubría el estado vacío defectoPrincipal:null / AQL null).
+    auditoriasResult = {
+      ...auditoriasResult,
+      data: pagina([fila(3, { resultado: 'reprobado', totalFallas: 7, nivelAqlPrincipal: 2.5 })]),
+    };
+    resumenResult = {
+      data: {
+        defectoPrincipal: {
+          idDefecto: 9,
+          clave: 'COS-01',
+          descripcion: 'Costura abierta',
+          totalFallas: 7,
+        },
+      },
+    };
+    render();
+
+    // La card del KPI muestra la clave como valor y descripción · total como pie.
+    const card = screen.getByTestId('kpi-defecto-principal');
+    expect(within(card).getByText('COS-01')).toBeDefined();
+    expect(within(card).getByText('Costura abierta · 7 fallas')).toBeDefined();
+
+    // La columna AQL del renglón pinta el nivel del defecto principal de ESA auditoría.
+    const renglon = screen.getByTestId('fila-consulta-auditoria');
+    expect(within(renglon).getByText('2.5')).toBeDefined();
   });
 
   it('estado de carga: el armazón (título) se muestra mientras carga', () => {

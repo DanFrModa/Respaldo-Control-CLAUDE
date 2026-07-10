@@ -68,6 +68,12 @@ export interface PropsTablaCatalogo<T> {
   alEditar?: (registro: T) => void;
   alDesactivar?: (registro: T) => void;
   alReactivar?: (registro: T) => void;
+  /**
+   * Razón por la que un registro ACTIVO no se puede desactivar (p. ej. los conceptos de costo
+   * `fijo`). Si devuelve texto, el botón Desactivar se pinta DESHABILITADO con esa razón como
+   * `title` (la restricción queda visible; el backend es la autoridad, A1).
+   */
+  razonNoDesactivar?: (registro: T) => string | undefined;
   /** Oculta la columna de estado/acciones (catálogos sin borrado suave, p. ej. tipos de proceso). */
   ocultarEstado?: boolean;
 }
@@ -111,6 +117,7 @@ export function TablaCatalogo<T>({
   alEditar,
   alDesactivar,
   alReactivar,
+  razonNoDesactivar,
   ocultarEstado = false,
 }: PropsTablaCatalogo<T>): React.JSX.Element {
   const total = paginacion?.total ?? registros.length;
@@ -208,6 +215,7 @@ export function TablaCatalogo<T>({
                 {registros.map((registro) => {
                   const id = obtenerId(registro);
                   const activo = obtenerActivo(registro);
+                  const razonBloqueo = razonNoDesactivar?.(registro);
                   return (
                     <TablaDensaFila key={id} data-testid={`fila-${testid}`}>
                       {columnas.map((col) => (
@@ -239,6 +247,8 @@ export function TablaCatalogo<T>({
                                   <Button
                                     variant="ghost"
                                     size="icon-sm"
+                                    disabled={razonBloqueo !== undefined}
+                                    title={razonBloqueo}
                                     onClick={() => alDesactivar(registro)}
                                     aria-label="Desactivar"
                                     data-testid={`desactivar-${testid}`}

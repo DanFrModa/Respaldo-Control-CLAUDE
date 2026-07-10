@@ -533,6 +533,13 @@ export type NotaSalidaEditar =
 /** Cuerpo de cancelación de nota (`POST /api/notas-salida/{id}/cancelar`). */
 export type NotaSalidaCancelar =
   paths['/api/notas-salida/{id}/cancelar']['post']['requestBody']['content']['application/json'];
+/** Resumen de cabecera de notas (conteos por estatus + órdenes surtidas; KPIs `vNotasSalida`). */
+export type ResumenNotas =
+  paths['/api/notas-salida/resumen']['get']['responses']['200']['content']['application/json'];
+/** Parámetros de consulta del resumen de notas (querystring). */
+export type ResumenNotasQuery = NonNullable<
+  paths['/api/notas-salida/resumen']['get']['parameters']['query']
+>;
 
 // ── Recepción de compras (Módulo 3 · Compras, F4-E3) ──────────────────────────
 
@@ -934,6 +941,8 @@ export type ExistenciasPt =
   paths['/api/inventarios/pt/existencias']['get']['responses']['200']['content']['application/json'];
 /** Una fila de existencia (un artículo en un almacén con su cantidad). */
 export type ExistenciaPtFila = ExistenciasPt['filas'][number];
+/** Una celda del rollup color×talla (`agrupar=color-talla`), ya sumada a través de almacenes. */
+export type ExistenciaPtCelda = NonNullable<ExistenciasPt['porColorTalla']>[number];
 /** Parámetros de la consulta de existencias (querystring). */
 export type ExistenciasPtQuery = NonNullable<
   paths['/api/inventarios/pt/existencias']['get']['parameters']['query']

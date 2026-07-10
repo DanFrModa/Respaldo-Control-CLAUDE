@@ -489,6 +489,8 @@ const esquemaConsultaExistenciasPt = z.object({
   idAlmacen: z.number().int().positive().optional(),
   idOrden: z.number().int().positive().optional(),
   incluirCeros: z.boolean().default(false),
+  /** Con 'color-talla' la respuesta incluye el rollup `porColorTalla` (exige `idModelo`). */
+  agrupar: z.enum(['color-talla']).optional(),
 });
 
 /** Forma de DOMINIO de los filtros del kardex por modelo (ya coaccionados). */
@@ -519,6 +521,11 @@ export async function consultarExistenciasPt(
   const filtros = validarEntrada(esquemaConsultaExistenciasPt, parametros);
   const cliente = clienteLectura(bd);
   const idEmpresa = sesion.idEmpresaActiva;
+
+  // El rollup color×talla es POR MODELO (la matriz del cajón); sin modelo no tiene sentido.
+  if (filtros.agrupar === 'color-talla' && filtros.idModelo === undefined) {
+    throw new ErrorValidacion('El rollup por color×talla requiere el filtro `idModelo`.');
+  }
 
   // Condiciones componibles (Prisma.sql evita inyección; cada filtro es opcional).
   const condiciones: Prisma.Sql[] = [Prisma.sql`e."id_empresa" = ${idEmpresa}`];
@@ -597,7 +604,50 @@ export async function consultarExistenciasPt(
     };
   });
 
-  return { filas: filasSalida, totalExistencia };
+  if (filtros.agrupar !== 'color-talla') {
+    return { filas: filasSalida, totalExistencia };
+  }
+
+  // Rollup color×talla (rediseño R9, matriz del cajón de Modelos): la MISMA `WHERE` del listado,
+  // agrupada en SERVIDOR (A1) — la existencia de cada celda ya viene sumada a través de
+  // almacenes/órdenes; el cliente solo pinta (no pivota).
+  const celdas = await cliente.$queryRaw<
+    {
+      idColor: number;
+      color: string;
+      idTalla: number;
+      etiquetaTalla: string;
+      ordenTalla: number;
+      existencia: bigint;
+    }[]
+  >(Prisma.sql`
+    SELECT
+      e."id_color"   AS "idColor",
+      c."nombre"     AS "color",
+      e."id_talla"   AS "idTalla",
+      t."etiqueta"   AS "etiquetaTalla",
+      t."orden"      AS "ordenTalla",
+      SUM(e."existencia")::bigint AS "existencia"
+    FROM "existencia_pt" e
+    JOIN "colores" c ON c."id" = e."id_color"
+    JOIN "tallas"  t ON t."id" = e."id_talla"
+    WHERE ${where}
+    GROUP BY e."id_color", c."nombre", e."id_talla", t."etiqueta", t."orden"
+    ORDER BY c."nombre" ASC, t."orden" ASC, e."id_talla" ASC
+  `);
+
+  return {
+    filas: filasSalida,
+    totalExistencia,
+    porColorTalla: celdas.map((c) => ({
+      idColor: c.idColor,
+      color: c.color,
+      idTalla: c.idTalla,
+      etiquetaTalla: c.etiquetaTalla,
+      ordenTalla: c.ordenTalla,
+      existencia: Number(c.existencia),
+    })),
+  };
 }
 
 /** Parámetros del kardex por modelo (forma de dominio, ya coaccionada). */

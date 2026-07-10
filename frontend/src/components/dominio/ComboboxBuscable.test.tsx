@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ComboboxBuscable,
+  OpcionRica,
   filtrarOpciones,
   normalizarTexto,
   type OpcionCombobox,
@@ -279,5 +280,125 @@ describe('<ComboboxBuscable> — ciclo escribir → elegir → cambiar de opini�
     expect(screen.getByText('Buscando…')).toBeInTheDocument();
     expect(screen.queryByText('Sin coincidencias.')).not.toBeInTheDocument();
     expect(screen.getByTestId('combo-cargando')).toBeInTheDocument();
+  });
+});
+
+/** Entidad mínima al estilo de los selectores (opción extendida con sus campos). */
+const COSAS = [
+  { id: 1, nombre: 'General A', descripcion: 'Primera' },
+  { id: 2, nombre: 'General B', descripcion: 'Segunda' },
+] as const;
+
+/** Render en modo servidor (los selectores de entidad, ex-`ComboboxEntidad`). */
+function pintarServidor({
+  cargando,
+  onChange = vi.fn(),
+  mensajeError,
+}: {
+  cargando: boolean;
+  onChange?: (id: number | null) => void;
+  mensajeError?: string;
+}) {
+  render(
+    <ComboboxBuscable
+      opciones={COSAS}
+      valor={null}
+      onChange={onChange}
+      alCambiarTexto={vi.fn()}
+      busquedaServidor
+      renderOpcion={(o) => <OpcionRica principal={o.nombre} secundario={o.descripcion} />}
+      mensajeError={mensajeError}
+      conLupa
+      permitirLimpiar={false}
+      cargando={cargando}
+      placeholder="Buscar…"
+      etiqueta="Buscar cosa"
+      testid="combo-ent"
+      testidInput="combo-ent-busqueda"
+    />,
+  );
+}
+
+describe('<ComboboxBuscable> — modo `busquedaServidor` (los selectores de entidad)', () => {
+  it('con la búsqueda SIN resolver (cargando) NO ofrece opciones: muestra "Buscando…" (anti-carrera)', async () => {
+    // La carrera real (e2e de inventario PT en CI): teclear y clickear rápido encontraba las
+    // opciones VIEJAS del catálogo general aún montadas y seleccionaba la entidad equivocada.
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    pintarServidor({ cargando: true, onChange });
+
+    await usuario.click(screen.getByTestId('combo-ent-busqueda'));
+    expect(screen.getByTestId('combo-ent-lista')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('combo-ent-opcion')).toHaveLength(0);
+    expect(screen.getByText('Buscando…')).toBeInTheDocument();
+
+    // Tampoco por teclado: Enter con la lista "cargando" no selecciona nada.
+    await usuario.keyboard('{Enter}');
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('con la búsqueda resuelta pinta las opciones RICAS y elegir una emite su id', async () => {
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    pintarServidor({ cargando: false, onChange });
+
+    await usuario.click(screen.getByTestId('combo-ent-busqueda'));
+    const opciones = screen.getAllByTestId('combo-ent-opcion');
+    expect(opciones).toHaveLength(2);
+    // Opción rica: línea principal + secundaria (el markup del ex-ComboboxEntidad).
+    expect(opciones[0]).toHaveTextContent('General A');
+    expect(opciones[0]).toHaveTextContent('Primera');
+
+    await usuario.click(opciones[0] as HTMLElement);
+    expect(onChange).toHaveBeenCalledWith(1);
+    // Al elegir, el popover cierra.
+    expect(screen.queryByTestId('combo-ent-lista')).not.toBeInTheDocument();
+  });
+
+  it('NO re-filtra en cliente: las opciones del server se ofrecen aunque el texto no coincida con el nombre', async () => {
+    // El API busca en campos que la opción ni muestra (p. ej. la descripción): el filtro local
+    // del kit las escondería en falso.
+    const usuario = userEvent.setup();
+    pintarServidor({ cargando: false });
+
+    await usuario.type(screen.getByTestId('combo-ent-busqueda'), 'zzz');
+    expect(screen.getAllByTestId('combo-ent-opcion')).toHaveLength(2);
+  });
+
+  it('`permitirLimpiar: false` (campo requerido): sin ✕, borrar NO emite null y el blur restaura', async () => {
+    const usuario = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <ComboboxBuscable
+        opciones={COSAS}
+        valor={1}
+        onChange={onChange}
+        busquedaServidor
+        permitirLimpiar={false}
+        testid="combo-ent"
+        testidInput="combo-ent-busqueda"
+      />,
+    );
+    const input = screen.getByTestId('combo-ent-busqueda');
+    expect(input).toHaveValue('General A');
+    // Con selección pero campo requerido, el ✕ no existe.
+    expect(screen.queryByTestId('combo-ent-limpiar')).not.toBeInTheDocument();
+
+    // Borrar todo el texto NO des-elige (la orden/entidad se cambia eligiendo otra).
+    await usuario.clear(input);
+    expect(onChange).not.toHaveBeenCalled();
+
+    // Y al salir, la etiqueta de la selección vigente se restaura.
+    await usuario.tab();
+    expect(input).toHaveValue('General A');
+  });
+
+  it('el error de la consulta del padre se pinta dentro del popover', async () => {
+    const usuario = userEvent.setup();
+    pintarServidor({ cargando: false, mensajeError: 'Se cayó el API' });
+
+    await usuario.click(screen.getByTestId('combo-ent-busqueda'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Se cayó el API');
+    expect(screen.queryAllByTestId('combo-ent-opcion')).toHaveLength(0);
   });
 });

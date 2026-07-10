@@ -13,12 +13,18 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useEmpresas } from '@/api/empresas';
-import { imprimirNota, useConfirmarNota, useNotasSalida } from '@/api/notas-salida';
+import {
+  imprimirNota,
+  useConfirmarNota,
+  useNotasSalida,
+  useResumenNotas,
+} from '@/api/notas-salida';
 import { useProveedores } from '@/api/proveedores';
-import type { NotaSalida, NotasSalidaQuery } from '@/api/tipos';
+import type { NotaSalida, NotasSalidaQuery, ResumenNotasQuery } from '@/api/tipos';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { ChipEstado } from '@/components/dominio/ChipEstado';
+import { KpiTiles, type Kpi } from '@/components/dominio/KpiTiles';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -106,6 +112,40 @@ export function NotasSalidaPagina(): React.JSX.Element {
   const consulta = useNotasSalida(query);
   const confirmar = useConfirmarNota();
 
+  // Resumen de cabecera (KPIs vNotasSalida): mismo universo por búsqueda/maquilero, agregado EN
+  // SERVIDOR (A1); el estatus no se manda (el resumen desglosa por estatus él mismo).
+  const resumenQuery: ResumenNotasQuery = {
+    ...(busqueda.length > 0 ? { busqueda } : {}),
+    ...(idMaquilero !== null ? { idMaquilero } : {}),
+  };
+  const resumen = useResumenNotas(resumenQuery);
+  const kpis: Kpi[] = [
+    {
+      clave: 'notas',
+      etiqueta: 'Notas de salida',
+      valor: (resumen.data?.notas ?? 0).toLocaleString('es-MX'),
+      pie: 'del filtro actual',
+    },
+    {
+      clave: 'borradores',
+      etiqueta: 'Borradores',
+      valor: (resumen.data?.borradores ?? 0).toLocaleString('es-MX'),
+      pie: 'por confirmar · sin descontar',
+    },
+    {
+      clave: 'confirmadas',
+      etiqueta: 'Confirmadas',
+      valor: (resumen.data?.confirmadas ?? 0).toLocaleString('es-MX'),
+      pie: 'material descontado',
+    },
+    {
+      clave: 'ordenes-surtidas',
+      etiqueta: 'Órdenes surtidas',
+      valor: (resumen.data?.ordenesSurtidas ?? 0).toLocaleString('es-MX'),
+      pie: 'con material enviado',
+    },
+  ];
+
   // ── Diálogos ───────────────────────────────────────────────────────────────
   const [editar, setEditar] = useState<{ nota?: NotaSalida; soloLectura: boolean } | null>(null);
   const [aCancelar, setACancelar] = useState<NotaSalida | null>(null);
@@ -169,6 +209,9 @@ export function NotasSalidaPagina(): React.JSX.Element {
           ) : null}
         </div>
       </header>
+
+      {/* ── KPIs de vistazo (resumen de cabecera, agregado en servidor) ──── */}
+      <KpiTiles kpis={kpis} className="shrink-0" />
 
       {/* ── Card: chips de estatus + búsqueda + tabla + paginación ───────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">

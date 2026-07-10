@@ -27162,6 +27162,41 @@
                             ],
                             "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
                           },
+                          "telaPrincipal": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                          },
+                          "stockPt": {
+                            "anyOf": [
+                              {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                          },
+                          "costoActual": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Costo unitario del último costeo del modelo (F7), o null."
+                          },
                           "activo": {
                             "type": "boolean",
                             "description": "Falso si está descontinuado (borrado suave)."
@@ -27221,6 +27256,9 @@
                           "secuenciaEstampado",
                           "cantidadFotos",
                           "urlFotoPrincipal",
+                          "telaPrincipal",
+                          "stockPt",
+                          "costoActual",
                           "activo",
                           "creadoEn",
                           "creadoPorId",
@@ -27708,6 +27746,41 @@
                       ],
                       "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
                     },
+                    "telaPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                    },
+                    "stockPt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                    },
+                    "costoActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario del último costeo del modelo (F7), o null."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está descontinuado (borrado suave)."
@@ -27767,6 +27840,9 @@
                     "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
+                    "telaPrincipal",
+                    "stockPt",
+                    "costoActual",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -28161,6 +28237,41 @@
                       ],
                       "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
                     },
+                    "telaPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                    },
+                    "stockPt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                    },
+                    "costoActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario del último costeo del modelo (F7), o null."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está descontinuado (borrado suave)."
@@ -28361,6 +28472,9 @@
                     "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
+                    "telaPrincipal",
+                    "stockPt",
+                    "costoActual",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -28890,6 +29004,41 @@
                       ],
                       "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
                     },
+                    "telaPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                    },
+                    "stockPt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                    },
+                    "costoActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario del último costeo del modelo (F7), o null."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está descontinuado (borrado suave)."
@@ -28949,6 +29098,9 @@
                     "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
+                    "telaPrincipal",
+                    "stockPt",
+                    "costoActual",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -29341,6 +29493,41 @@
                       ],
                       "description": "URL prefirmada de la foto principal del modelo, o null si no tiene fotos."
                     },
+                    "telaPrincipal": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Nombre de la tela principal (primer renglón del BOM), o null."
+                    },
+                    "stockPt": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Existencia total de PT del modelo (Σ kardex, D3), o null fuera del listado."
+                    },
+                    "costoActual": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Costo unitario del último costeo del modelo (F7), o null."
+                    },
                     "activo": {
                       "type": "boolean",
                       "description": "Falso si está descontinuado (borrado suave)."
@@ -29400,6 +29587,9 @@
                     "secuenciaEstampado",
                     "cantidadFotos",
                     "urlFotoPrincipal",
+                    "telaPrincipal",
+                    "stockPt",
+                    "costoActual",
                     "activo",
                     "creadoEn",
                     "creadoPorId",
@@ -64154,6 +64344,244 @@
         }
       }
     },
+    "/api/notas-salida/resumen": {
+      "get": {
+        "summary": "Resumen de cabecera de notas de salida (conteos por estatus + órdenes surtidas)",
+        "tags": [
+          "notas"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "in": "query",
+            "name": "busqueda",
+            "required": false,
+            "description": "Texto a buscar (folio o nombre del maquilero)."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idMaquilero",
+            "required": false,
+            "description": "Filtra por maquilero."
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "in": "query",
+            "name": "idOrden",
+            "required": false,
+            "description": "Notas que envían material a esta orden de producción."
+          }
+        ],
+        "security": [
+          {
+            "cookieSesion": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen de cabecera de notas de salida (KPIs).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "notas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Total de notas del filtro (todas: borradores + confirmadas + canceladas)."
+                    },
+                    "borradores": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "# de notas en borrador (sin descontar)."
+                    },
+                    "confirmadas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "# de notas confirmadas (material descontado)."
+                    },
+                    "ordenesSurtidas": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "# de órdenes de producción distintas en renglones de notas CONFIRMADAS."
+                    }
+                  },
+                  "required": [
+                    "notas",
+                    "borradores",
+                    "confirmadas",
+                    "ordenesSurtidas"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Resumen de cabecera de notas de salida (KPIs)."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Respuesta de error de la API.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "description": "Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO)."
+                    },
+                    "mensaje": {
+                      "type": "string",
+                      "description": "Mensaje en español, apto para mostrar al usuario."
+                    },
+                    "detalles": {
+                      "description": "Detalle estructurado opcional (p. ej. errores por campo)."
+                    }
+                  },
+                  "required": [
+                    "codigo",
+                    "mensaje"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Respuesta de error de la API."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/notas-salida/{id}": {
       "get": {
         "summary": "Obtener una nota de salida",
@@ -70090,6 +70518,18 @@
             "name": "incluirCeros",
             "required": false,
             "description": "Incluye filas con existencia 0 (\"true\"/\"false\"). Por defecto se omiten."
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "color-talla"
+              ]
+            },
+            "in": "query",
+            "name": "agrupar",
+            "required": false,
+            "description": "Con \"color-talla\" la respuesta incluye además `porColorTalla`: la existencia del modelo por color×talla YA sumada en servidor a través de almacenes/órdenes (A1, para la matriz del cajón). Requiere `idModelo`."
           }
         ],
         "security": [
@@ -70212,6 +70652,56 @@
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
                       "description": "Suma de la existencia de todas las filas."
+                    },
+                    "porColorTalla": {
+                      "description": "Rollup color×talla del modelo (solo con `agrupar=color-talla`): existencia sumada en servidor a través de almacenes/órdenes.",
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "idColor": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id del color."
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Nombre del color."
+                          },
+                          "idTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Id de la talla."
+                          },
+                          "etiquetaTalla": {
+                            "type": "string",
+                            "description": "Etiqueta visible de la talla."
+                          },
+                          "ordenTalla": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Orden del catálogo de la talla (para ordenar columnas)."
+                          },
+                          "existencia": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "Existencia del color×talla sumada a través de almacenes/órdenes (Σ kardex, D3)."
+                          }
+                        },
+                        "required": [
+                          "idColor",
+                          "color",
+                          "idTalla",
+                          "etiquetaTalla",
+                          "ordenTalla",
+                          "existencia"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [

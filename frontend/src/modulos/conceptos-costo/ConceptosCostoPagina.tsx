@@ -1,4 +1,3 @@
-import { Coins, Hash, Lock, PencilIcon, PowerIcon, PowerOffIcon, Tag } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,11 +9,13 @@ import {
   type ConceptosCostoQuery,
 } from '@/api/conceptos-costo';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
-import { Button } from '@/components/ui/button';
+import { TipoBadge } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
-import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
+import {
+  TablaCatalogo,
+  type ColumnaCatalogo,
+  type PaginacionCatalogo,
+} from '@/modulos/TablaCatalogo';
 import { useSesion } from '@/sesion/useSesion';
 
 import { DialogoConceptoCosto } from './DialogoConceptoCosto';
@@ -23,13 +24,13 @@ import { DialogoConceptoCosto } from './DialogoConceptoCosto';
 const POR_PAGINA = 10;
 
 /**
- * Pantalla de Conceptos de costo (F8-E1, Administración) — CRUD del catálogo GLOBAL de conceptos
- * del pre-costeo (además de los fijos tela/avíos/maquila) sobre el motor LISTA + DETALLE. Sigue el
- * molde de "Tipos de proceso": lista buscable/paginada, alta/edición por diálogo, borrado suave.
+ * Pantalla de Conceptos de costo (F8-E1, Administración) — re-vestida R9 a TABLA-FIRST (proto
+ * `vCat`, mismo molde que "Tipos de proceso"): tabla densa con el concepto, su código, su orden y
+ * su tipo (Fijo/Abierto), con acciones inline. Alta/edición por diálogo; borrado suave.
  *
  * Es ADMIN-ONLY: `concepto-costo.ver` gobierna el acceso y `concepto-costo.administrar` las
  * escrituras (el backend es la autoridad, A1). Los conceptos con bandera `fijo` NO se pueden
- * desactivar (el backend lo rechaza): la UI oculta su botón Desactivar y lo marca como "Fijo".
+ * desactivar (el backend lo rechaza): su botón Desactivar se pinta deshabilitado con la razón.
  */
 export function ConceptosCostoPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
@@ -100,7 +101,7 @@ export function ConceptosCostoPagina(): React.JSX.Element {
 
   const datos = consulta.data;
   const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
+  const paginacion: PaginacionCatalogo | undefined = datos
     ? {
         total: datos.total,
         pagina: datos.pagina,
@@ -111,26 +112,38 @@ export function ConceptosCostoPagina(): React.JSX.Element {
       }
     : undefined;
 
+  const columnas: ColumnaCatalogo<ConceptoCosto>[] = [
+    {
+      encabezado: 'Concepto',
+      render: (c) => <span className="font-semibold">{c.nombre}</span>,
+    },
+    { encabezado: 'Código', render: (c) => <span className="num text-faint">{c.codigo}</span> },
+    { encabezado: 'Orden', numerica: true, render: (c) => <span className="num">{c.orden}</span> },
+    {
+      encabezado: 'Tipo',
+      render: (c) =>
+        c.fijo ? (
+          <TipoBadge tono="pt">Fijo</TipoBadge>
+        ) : (
+          <TipoBadge tono="neutro">Abierto</TipoBadge>
+        ),
+    },
+  ];
+
   return (
     <>
-      <ListaDetalle<ConceptoCosto>
+      <TablaCatalogo<ConceptoCosto>
         testid="concepto-costo"
         titulo="Conceptos de costo"
-        descripcion="Catálogo global de conceptos del pre-costeo. Los fijos (tela, avíos, maquila) no se pueden desactivar."
-        icono={Coins}
+        descripcion="Catálogo global de conceptos del pre-costeo · los fijos (tela, avíos, maquila) no se desactivan"
+        unidad="conceptos"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
         error={consulta.isError ? consulta.error.message : null}
         alReintentar={() => void consulta.refetch()}
         obtenerId={(c) => c.id}
-        obtenerTitulo={(c) => c.nombre}
         obtenerActivo={(c) => c.activo}
-        obtenerSecundaria={(c) => c.codigo}
-        renderAvatarLista={(c) => (
-          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
-            <Coins className="size-4" aria-hidden />
-          </Avatar>
-        )}
+        columnas={columnas}
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         incluirInactivos={incluirInactivos}
@@ -140,50 +153,12 @@ export function ConceptosCostoPagina(): React.JSX.Element {
         puedeAdministrar={puedeAdministrar}
         alNuevo={abrirAlta}
         textoNuevo="Nuevo concepto"
-        // El CRUD de fijos es especial (no desactivables): se ocultan las acciones base y se
-        // arman a la medida en `accionesExtra`.
-        ocultarAccionesBase
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarConcepto}
-        accionesExtra={(c) => (
-          <AccionesConcepto
-            concepto={c}
-            alEditar={abrirEdicion}
-            alDesactivar={setADesactivar}
-            alReactivar={reactivarConcepto}
-          />
-        )}
-        renderAvatarDetalle={(c) => (
-          <Avatar nombre={c.nombre} tono="servicios" tamano="lg">
-            <Coins className="size-7" aria-hidden />
-          </Avatar>
-        )}
-        renderMeta={(c) =>
-          c.fijo ? (
-            <TipoBadge tono="pt">Fijo</TipoBadge>
-          ) : (
-            <TipoBadge tono="neutro">Abierto</TipoBadge>
-          )
+        razonNoDesactivar={(c) =>
+          c.fijo ? 'Los conceptos fijos (tela/avíos/maquila) no se pueden desactivar.' : undefined
         }
-        renderDetalle={(c) => (
-          <>
-            <SeccionDetalle titulo="Datos del concepto">
-              <RejillaCampos>
-                <CampoDetalle icono={Tag} etiqueta="Código">
-                  {c.codigo}
-                </CampoDetalle>
-                <CampoDetalle icono={Hash} etiqueta="Orden">
-                  {c.orden}
-                </CampoDetalle>
-                <CampoDetalle icono={Lock} etiqueta="¿Fijo?">
-                  {c.fijo ? 'Sí (no se puede desactivar)' : 'No'}
-                </CampoDetalle>
-              </RejillaCampos>
-            </SeccionDetalle>
-            <Historial creadoEn={c.creadoEn} modificadoEn={c.modificadoEn} />
-          </>
-        )}
       />
 
       <DialogoConceptoCosto
@@ -211,68 +186,6 @@ export function ConceptosCostoPagina(): React.JSX.Element {
         procesando={desactivar.isPending}
         alConfirmar={confirmarDesactivar}
       />
-    </>
-  );
-}
-
-/**
- * Acciones del hero de un concepto (Editar + Desactivar/Activar). Un concepto `fijo` NO se puede
- * desactivar (el backend lo rechaza): su botón Desactivar se muestra deshabilitado con la razón.
- */
-function AccionesConcepto({
-  concepto,
-  alEditar,
-  alDesactivar,
-  alReactivar,
-}: {
-  concepto: ConceptoCosto;
-  alEditar: (c: ConceptoCosto) => void;
-  alDesactivar: (c: ConceptoCosto) => void;
-  alReactivar: (c: ConceptoCosto) => void;
-}): React.JSX.Element {
-  return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => alEditar(concepto)}
-        data-testid="editar-concepto-costo"
-      >
-        <PencilIcon aria-hidden />
-        Editar
-      </Button>
-      {!concepto.activo ? (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => alReactivar(concepto)}
-          data-testid="activar-concepto-costo"
-        >
-          <PowerIcon aria-hidden />
-          Activar
-        </Button>
-      ) : concepto.fijo ? (
-        <Button
-          variant="destructive"
-          size="sm"
-          disabled
-          title="Los conceptos fijos (tela/avíos/maquila) no se pueden desactivar."
-          data-testid="desactivar-concepto-costo"
-        >
-          <PowerOffIcon aria-hidden />
-          Desactivar
-        </Button>
-      ) : (
-        <Button
-          variant="destructive"
-          size="sm"
-          onClick={() => alDesactivar(concepto)}
-          data-testid="desactivar-concepto-costo"
-        >
-          <PowerOffIcon aria-hidden />
-          Desactivar
-        </Button>
-      )}
     </>
   );
 }

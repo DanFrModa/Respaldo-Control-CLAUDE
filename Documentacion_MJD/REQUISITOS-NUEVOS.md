@@ -256,6 +256,15 @@ al sistema, de punta a punta:
 
 ---
 
+## 🧾 Calidad — flujo del auditor (R21, pendiente de diseño de Daniel)
+
+### R21 — Formato del auditor: captura con fotos de hallazgos + reporte para el maquilero
+- **Qué resuelve (Daniel, 2026-07-10 / D14):** los **usuarios auditores** necesitan un formato dentro del sistema para **capturar sus auditorías**, **registrar FOTOS de los hallazgos**, y **generar un reporte impreso para el maquilero** (dejarle una copia con los comentarios de la revisión).
+- **Estado:** **el formato NO está diseñado aún** — NO se construye hasta que Daniel lo diseñe. Cuando lo haga, se decide también cómo se liga el auditor (el catálogo `Auditor` del rediseño vs. `Usuario.esAuditor`) a la captura de auditorías (F6).
+- **Base existente:** auditorías AQL (F6), motor de archivos R2 (fotos), impresos @react-pdf (R9), catálogo de auditores (rediseño R9).
+
+---
+
 ## 🗓️ Etapa 2 (futuro)
 
 ### R8 — Importar pedidos de clientes → generar órdenes automáticamente
@@ -263,8 +272,7 @@ al sistema, de punta a punta:
 - **Quién lo usa:** Ventas / Planeación.
 - **Cómo funciona (idea):** importar el pedido del cliente (archivo/portal/EDI) → mapear a modelos y cantidades → crear el pedido y sus órdenes.
 - **Relación:** se apoya en los **campos de referencia por cliente (D7)** y en el modelo **Pedido / Pedido Real** ([02 — Pedidos](02-Pedidos.md)).
-- **Nota:** **explícitamente Etapa 2** (no en el primer desarrollo).
-- **Estado / cuándo (2026-07-04):** Daniel lo **re-confirmó** al arrancar F8 ("subir el PDF de la OC del cliente y que se traduzca solo a pedido → OP con los parámetros que dé por orden"). Sigue **para una fase futura (Etapa 2), post-F8** — no entra en el primer desarrollo. Requerirá lectura/extracción del PDF (probablemente asistida por IA) + el enganche pedido→OP que F8 deja listo.
+- **Estado (2026-07-08): ✅ CONSTRUIDO (versión Excel) en el rediseño (R8 del plan de rediseño, PR #107).** El importador vive en Pedidos → "Importar de cliente": plantilla de **mapeo de columnas por cliente** (se enseña UNA vez), parseo del **Excel** de la OC del cliente, amarre modelo-del-cliente ↔ desarrollo por `numeroCliente`, resolución manual de no reconocidos, y **alta transaccional** pedido + OPs + RC (reusa `salidaAProduccion`). La variante **PDF con extracción asistida por IA** sigue pendiente (idea original de Daniel del 2026-07-04) — queda como iteración futura del importador.
 
 ---
 

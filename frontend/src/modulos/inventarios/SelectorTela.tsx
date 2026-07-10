@@ -1,16 +1,15 @@
 import { useState } from 'react';
 
 import { useTelas, type Tela } from '@/api/telas';
+import { ComboboxBuscable, OpcionRica } from '@/components/dominio/ComboboxBuscable';
 import { useDebounce } from '@/lib/useDebounce';
-
-import { ComboboxEntidad } from './ComboboxEntidad';
 
 /**
  * SELECTOR DE TELA reutilizable (F4-E1, pulido R9): combobox con búsqueda server-side por nombre;
  * al elegir emite la tela completa. Lo usan el kardex de telas, las capturas (salida a orden,
- * traspaso, ajuste) y el filtro de existencias. La lista vive en un POPOVER
- * ({@link ComboboxEntidad}) — abre al enfocar/teclear, no infla el layout.
- * Presentación pura (A1): solo consulta y emite.
+ * traspaso, ajuste) y el filtro de existencias. La lista vive en el POPOVER del
+ * {@link ComboboxBuscable} unificado del kit (modo `busquedaServidor`: anti-carrera, no infla el
+ * layout). Presentación pura (A1): solo consulta y emite.
  */
 export function SelectorTela({
   idSeleccionado,
@@ -35,28 +34,36 @@ export function SelectorTela({
   });
 
   const telas = consulta.data?.datos ?? [];
-  const seleccionada = telas.find((t) => t.id === idSeleccionado);
   // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
   // ofrecer las opciones viejas — clickearlas seleccionaba la tela EQUIVOCADA (carrera del e2e).
   const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
   return (
-    <ComboboxEntidad
+    <ComboboxBuscable
       opciones={telas}
-      obtenerId={(t) => t.id}
-      principal={(t) => t.nombre}
-      secundario={(t) => t.descripcion}
-      idSeleccionado={idSeleccionado}
-      etiquetaSeleccion={idSeleccionado !== undefined ? (seleccionada?.nombre ?? texto) : undefined}
-      alSeleccionar={alSeleccionar}
-      alLimpiar={alLimpiar}
+      valor={idSeleccionado ?? null}
+      onChange={(id) => {
+        if (id === null) {
+          alLimpiar?.();
+          return;
+        }
+        const tela = telas.find((t) => t.id === id);
+        if (tela !== undefined) {
+          alSeleccionar(tela);
+        }
+      }}
       alCambiarTexto={setTexto}
-      cargando={resolviendo}
+      busquedaServidor
+      renderOpcion={(o) => <OpcionRica principal={o.nombre} secundario={o.descripcion} />}
       mensajeError={consulta.isError ? consulta.error.message : undefined}
+      conLupa
+      permitirLimpiar={alLimpiar !== undefined}
+      cargando={resolviendo}
       placeholder="Buscar tela por nombre…"
       etiqueta="Buscar tela"
       textoVacio="No hay telas que coincidan."
       testid={testid}
+      testidInput={`${testid}-busqueda`}
     />
   );
 }

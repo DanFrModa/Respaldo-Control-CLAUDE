@@ -91,6 +91,10 @@ interface ProcesoSeed {
  *  • `Variable=1 → tipoDuracion='porCantidad'` (el resto `fija`).
  *  • `TipoProceso → tipoEvento`: AP→autorizacionArte, T→recepcionTela, CO→corte, EP→envioEstampado,
  *    RP→reciboEstampado, CP→auditoria, EC→envioCostura, C→reciboCostura; F/M/'' → manual.
+ *  • R9 (remate, dictamen Daniel §4.9 "auto-completado por evento"): `auditoria-calidad-interna` →
+ *    `auditoria` (la AQL final de F6 la completa) y `entrega-cdis` → `entregaCliente` (F3-E5). Para
+ *    BDs YA sembradas (el upsert de abajo NO pisa filas existentes) el backfill vive en la migración
+ *    `20260710150000_r9_rc_tipo_evento_backfill`.
  *  • `AntecesorRef → antecesor` (dependencia genérica; un antecesor por proceso).
  */
 const PROCESOS_RC: ProcesoSeed[] = [
@@ -365,7 +369,9 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    // R9 (dictamen Daniel §4.9): "Calidad → auditoría AQL" — la auditoría interna ES la AQL final
+    // de F6; el evento `auditoria-calidad-resuelta` ya existe y la auto-completa (final aprobada).
+    tipoEvento: 'auditoria',
     tipoDuracion: 'fija',
     antecesor: 'recepcion-confeccion',
     roles: ['Administrador', 'Entregas'],
@@ -389,7 +395,9 @@ const PROCESOS_RC: ProcesoSeed[] = [
     ultimoProceso: false,
     esResurtido: false,
     condicionAplicabilidad: 'ninguna',
-    tipoEvento: 'manual',
+    // R9 (dictamen Daniel §4.9): "Entrega → entrega a cliente" — el evento
+    // `entrega-cliente-registrada` (F3-E5) ya existe y la auto-completa.
+    tipoEvento: 'entregaCliente',
     tipoDuracion: 'fija',
     antecesor: 'empaque',
     roles: ['Administrador', 'Gerencia'],

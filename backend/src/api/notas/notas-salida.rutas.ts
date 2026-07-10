@@ -32,6 +32,8 @@ import {
   esquemaNotaSalidaSalida,
   esquemaNotasSalidaQuery,
   esquemaNotasSalidaPagina,
+  esquemaResumenNotasQuery,
+  esquemaResumenNotasSalida,
 } from '../../contrato/index.js';
 import type { SesionUsuario } from '../../comun/permisos.js';
 import { SEGURIDAD_SESION } from '../../openapi.js';
@@ -42,6 +44,7 @@ import {
   crearNotaSalida,
   listarNotasSalida,
   obtenerNotaSalida,
+  resumenNotasSalida,
 } from '../../dominio/notas/notas-salida.js';
 import { impresoNotaSalida } from '../../dominio/notas/impresos/impreso-nota-salida.js';
 
@@ -109,6 +112,26 @@ export const rutasNotasSalida: FastifyPluginCallbackZod = (app, _opciones, done)
     handler: async (request) => {
       const sesion = await exigirSesion(() => request.obtenerSesion());
       return listarNotasSalida(sesion, request.query);
+    },
+  });
+
+  // Resumen de cabecera (KPIs vNotasSalida, R9): conteos por estatus + órdenes surtidas, sobre el
+  // mismo universo del listado. Ruta ESTÁTICA antes de la paramétrica `:id` (Fastify prioriza
+  // estáticas; se declara antes por claridad — mismo criterio que el resumen de OC). Reúsa `notas.ver`.
+  app.route({
+    method: 'GET',
+    url: '/notas-salida/resumen',
+    preHandler: app.conPermiso('notas.ver'),
+    schema: {
+      tags: ['notas'],
+      summary: 'Resumen de cabecera de notas de salida (conteos por estatus + órdenes surtidas)',
+      security: SEGURIDAD_SESION,
+      querystring: esquemaResumenNotasQuery,
+      response: { 200: esquemaResumenNotasSalida, ...respuestasError },
+    },
+    handler: async (request) => {
+      const sesion = await exigirSesion(() => request.obtenerSesion());
+      return resumenNotasSalida(sesion, request.query);
     },
   });
 
