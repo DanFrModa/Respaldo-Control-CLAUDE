@@ -50,6 +50,13 @@ export function ComboboxEntidad<T>({
   alLimpiar?: (() => void) | undefined;
   /** Cada cambio del texto tecleado (el padre lo cablea con debounce a su `busqueda`). */
   alCambiarTexto: (texto: string) => void;
+  /**
+   * Los resultados aún NO corresponden a lo tecleado (debounce en vuelo o consulta cargando):
+   * el popover muestra "Buscando…" y NO ofrece opciones — ni por clic ni por teclado. Sin esto
+   * había una CARRERA real (mismo patrón que el `cargando` de `ComboboxBuscable` del kit): al
+   * teclear y elegir rápido, la lista vieja del catálogo GENERAL seguía clickeable y se
+   * seleccionaba la entidad equivocada (lo cazó el e2e de inventario PT en CI).
+   */
   cargando?: boolean | undefined;
   /** Error de la consulta del padre (se pinta dentro del popover). */
   mensajeError?: string | undefined;
@@ -71,7 +78,11 @@ export function ComboboxEntidad<T>({
     setTexto(etiquetaSeleccion ?? '');
   }, [etiquetaSeleccion]);
 
-  const activoSeguro = opciones.length === 0 ? 0 : Math.min(activo, opciones.length - 1);
+  // Con la búsqueda sin resolver (`cargando`), las opciones viejas NO son elegibles: la lista
+  // efectiva queda vacía y el popover pinta "Buscando…" hasta que lleguen las filtradas reales.
+  const opcionesVisibles = cargando ? [] : opciones;
+  const activoSeguro =
+    opcionesVisibles.length === 0 ? 0 : Math.min(activo, opcionesVisibles.length - 1);
 
   // Cierra al hacer clic fuera; el texto se repone a la selección vigente (no se inventa).
   useEffect(() => {
@@ -115,18 +126,18 @@ export function ComboboxEntidad<T>({
       setAbierto(true);
       return;
     }
-    if (opciones.length === 0) {
+    if (opcionesVisibles.length === 0) {
       return;
     }
     if (evento.key === 'ArrowDown') {
       evento.preventDefault();
-      setActivo((i) => (i + 1) % opciones.length);
+      setActivo((i) => (i + 1) % opcionesVisibles.length);
     } else if (evento.key === 'ArrowUp') {
       evento.preventDefault();
-      setActivo((i) => (i - 1 + opciones.length) % opciones.length);
+      setActivo((i) => (i - 1 + opcionesVisibles.length) % opcionesVisibles.length);
     } else if (evento.key === 'Enter') {
       evento.preventDefault();
-      const opcion = opciones[activoSeguro];
+      const opcion = opcionesVisibles[activoSeguro];
       if (opcion !== undefined && abierto) {
         elegir(opcion);
       }
@@ -186,12 +197,12 @@ export function ComboboxEntidad<T>({
             <p className="px-3 py-2 text-sm text-destructive" role="alert">
               {mensajeError}
             </p>
-          ) : opciones.length === 0 ? (
+          ) : opcionesVisibles.length === 0 ? (
             <p className="px-3 py-2 text-sm text-muted-foreground">
               {cargando ? 'Buscando…' : textoVacio}
             </p>
           ) : (
-            opciones.map((entidad, indice) => {
+            opcionesVisibles.map((entidad, indice) => {
               const id = obtenerId(entidad);
               const sec = secundario?.(entidad) ?? null;
               return (

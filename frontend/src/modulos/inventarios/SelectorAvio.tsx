@@ -36,6 +36,9 @@ export function SelectorAvio({
 
   const avios = consulta.data?.datos ?? [];
   const seleccionado = avios.find((a) => a.id === idSeleccionado);
+  // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
+  // ofrecer las opciones viejas — clickearlas seleccionaba el avío EQUIVOCADO (carrera del e2e).
+  const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
   return (
     <ComboboxEntidad
@@ -55,7 +58,7 @@ export function SelectorAvio({
       alSeleccionar={alSeleccionar}
       alLimpiar={alLimpiar}
       alCambiarTexto={setTexto}
-      cargando={consulta.isPending}
+      cargando={resolviendo}
       mensajeError={consulta.isError ? consulta.error.message : undefined}
       placeholder="Buscar avío por clave o descripción…"
       etiqueta="Buscar avío"

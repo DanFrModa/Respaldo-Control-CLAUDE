@@ -36,6 +36,9 @@ export function SelectorModelo({
 
   const modelos = consulta.data?.datos ?? [];
   const seleccionado = modelos.find((m) => m.id === idSeleccionado);
+  // Lo TECLEADO aún no está resuelto (debounce en vuelo o consulta cargando): el combobox no debe
+  // ofrecer las opciones viejas — clickearlas seleccionaba el modelo EQUIVOCADO (carrera del e2e).
+  const resolviendo = texto.trim() !== busqueda || consulta.isPending;
 
   return (
     <ComboboxEntidad
@@ -49,7 +52,7 @@ export function SelectorModelo({
       alSeleccionar={alSeleccionar}
       alLimpiar={alLimpiar}
       alCambiarTexto={setTexto}
-      cargando={consulta.isPending}
+      cargando={resolviendo}
       mensajeError={consulta.isError ? consulta.error.message : undefined}
       placeholder="Buscar modelo por código o descripción…"
       etiqueta="Buscar modelo"
