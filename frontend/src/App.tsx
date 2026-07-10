@@ -29,6 +29,8 @@ import { ListaCostosPagina } from '@/modulos/costos/ListaCostosPagina';
 import { ListaPreciosPagina } from '@/modulos/costos/ListaPreciosPagina';
 import { MargenesPagina } from '@/modulos/costos/MargenesPagina';
 import { PreCostoPagina } from '@/modulos/costos/PreCostoPagina';
+import { CxpPagina } from '@/modulos/cxp/CxpPagina';
+import { EstadoCuentaProveedorPagina } from '@/modulos/cxp/EstadoCuentaProveedorPagina';
 import { EdrPagina } from '@/modulos/edr/EdrPagina';
 import { GestionMesPagina } from '@/modulos/edr/GestionMesPagina';
 import { ConciliacionPagina } from '@/modulos/edr/ConciliacionPagina';
@@ -303,6 +305,11 @@ const router = createBrowserRouter([
           { path: 'indicadores/ciclicos', element: <InventariosCiclicosPagina /> },
           { path: 'indicadores/ciclicos/:id/conteo', element: <ConteoCiclicoPagina /> },
           { path: 'indicadores/ciclicos/:id/exactitud', element: <ExactitudCiclicoPagina /> },
+          // CxP — Cuentas por pagar (Módulo 14, F9-E2): bandeja "por pagar" con aging (cxp.ver) +
+          // estado de cuenta del proveedor con captura/cancelación (cxp.administrar). Rutas estáticas
+          // antes del catch-all ":modulo".
+          { path: 'cxp', element: <CxpPagina /> },
+          { path: 'cxp/estado-cuenta', element: <EstadoCuentaProveedorPagina /> },
           { path: 'administracion', element: <AdministracionPagina /> },
           { path: 'administracion/usuarios', element: <UsuariosPagina /> },
           { path: 'administracion/roles', element: <RolesPagina /> },

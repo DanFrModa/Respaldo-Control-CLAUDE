@@ -173,6 +173,10 @@ function definirRoles(): {
     // NO se corta aquí: baja hasta Gerencial (se corta en Ventas, ver abajo), como EsMa.
     'terceros.administrar',
     'terceros.fiscal',
+    // F9-E2 — CxP: capturar/cancelar movimientos (`cxp.administrar`) queda solo para Administrador y
+    // AdministracionDireccion (mismo reparto que `terceros.administrar`). El `cxp.ver` NO se corta aquí:
+    // baja hasta Gerencial (se corta en Ventas, ver abajo).
+    'cxp.administrar',
   );
 
   // Nivel 40 — Gerencial: "como Directivo, pero sin menú de Costos ni ver costos". En v2 eso son el
@@ -209,6 +213,9 @@ function definirRoles(): {
     // se corta en Ventas hacia abajo (lo conservan Directivo y Gerencial, que ya ven EsMa). Mismo
     // criterio que `indicadores.ver`/`consultas.ver-importes`: de Ventas para abajo no ve saldos.
     'terceros.ver',
+    // F9-E2 — CxP: `cxp.ver` (bandeja por pagar + estado de cuenta) es información FINANCIERA; se
+    // corta en Ventas hacia abajo, igual que `terceros.ver`.
+    'cxp.ver',
   );
 
   // Nivel 47 — Logística: "sin importes; no puede crear/modificar órdenes" → fuera

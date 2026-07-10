@@ -79,7 +79,15 @@
 
 ---
 
-## F9-E2 · CxP — cuentas por pagar de proveedores — ⬜ pendiente
+## F9-E2 · CxP — cuentas por pagar de proveedores — ✅ COMPLETA (10-jul-2026; reviewer APROBÓ tras 2 rondas; pend. verificación de Gabriel en `prueba`)
+
+> **CIERRE (10-jul-2026).** Primer uso de negocio del motor E1 — todo por COMPOSICIÓN (cero duplicación):
+> - **`ServicioCxP`** (`dominio/terceros/cxp/`): registrar/cancelar/estado-de-cuenta DELEGAN en `cuenta-terceros.ts` (folio A3, signo por origen, A2/A7/D3 del motor). Orígenes capturables: `entrada_sin_factura` (+helper `registrarCargoCompraCxp` que liga la OC real), `nota_credito`, `pago`, `abono`, `descuento`. El `recibo_maquila` NO se duplica (nace en EsMa, entra por convivencia); `factura_proveedor` llega en E3.
+> - **Aging server-side (A1):** `$queryRaw` por proveedor (A9, `::numeric`) + `netearCubetas` PURA (créditos FIFO viejo→nuevo; vencido-hoy=corriente; el reparto por cubeta es convención — TSDoc; el saldo total siempre exacto). Límites en UN lugar (`LIMITES_AGING_CXP`: 30/60 — configurables en E5). `fechaVencimiento` = fecha + días de crédito del proveedor (R15).
+> - **La bandeja "por pagar" FOLDEA el saldo EsMa** (DEBE del reviewer — "su cuenta es la misma"): `saldosEsMaPorMaquilero` batched (fórmula IDÉNTICA a `calcularSaldoMaquilero`; equivalencia bandeja==detalle probada por int test; sin N+1) vía `aportesEsMaSaldoLote`. Maquila en **cubeta APARTE "Maquila (sin antigüedad)"**; maquileros solo-EsMa SÍ aparecen; `carteraTotal` veraz. **`alCorrientePct` SOLO sobre la cartera del motor** (Matiz B): `null` ("—") si no hay cartera clasificable — la maquila jamás pinta "al corriente"; `maquilaTotal` aparte. El batched no filtra por rol/activo (consistencia bandeja==detalle).
+> - **Pantallas** (proto `vCxp`, kit del rediseño): `/cxp` (4 KPIs + chips + tabla con aging + Maquila) y `/cxp/estado-cuenta` (toggle operativa/fiscal —fiscal exige `terceros.fiscal`—, captura gated `cxp.administrar`, cancelación con motivo, impreso PDF patrón EsMa). La hoja del riel dejó de ser placeholder.
+> - **RBAC:** `cxp.ver`/`cxp.administrar` nuevos (reparto = `terceros.*`; defensa en profundidad probada en int). **El deploy a `prueba` requiere `SEED_ON_START=true`.** SIN migración.
+> - Tests: unit aging (bordes+neteo) · int (cargo liga OC; pago baja saldo; informal operativa/fiscal-vacía; A9; deny A4; fold EsMa k1/k2/k3) · api int · componente · e2e `cxp.spec.ts` · PDF. Reviewer: 1 DEBE (fold EsMa) + Matiz B (% honesto) + S1/S2 — TODO corregido en 2 rondas → APROBADO; `test:unit` 860/860 aislado.
 
 **Objetivo:** Primer uso de negocio del motor: llevarles a los **proveedores** (formales e informales) su estado de cuenta, con los cargos naciendo de la **operación real** (recibo de maquila para maquileros, recepción de material/OC para proveedores de bienes), pagos, abonos, descuentos y notas de crédito. Cubre el caso de Daniel de proveedores que **no facturan** (informales): un solo libro por proveedor, marca fiscal por movimiento.
 

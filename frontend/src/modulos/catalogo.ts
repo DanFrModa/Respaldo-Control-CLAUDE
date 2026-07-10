@@ -804,11 +804,11 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
       {
         clave: 'cxp',
         titulo: 'Cuentas por pagar',
-        descripcion: 'Cuenta corriente de proveedores: facturas, pagos y saldos (D12)',
+        descripcion:
+          'Cuenta corriente de proveedores: bandeja por pagar con antigüedad de saldos, estado de cuenta y pagos (D12, F9-E2)',
         ruta: '/cxp',
         icono: 'recibo',
-        permisos: 'autenticado',
-        proximamente: 'Llega con Finanzas (F9)',
+        permisos: ['cxp.ver'],
       },
       // Entrada INTERINA (decisión del lead, R1): EsMa se generaliza a Finanzas en F9; mientras
       // tanto la cuenta corriente de maquileros no puede desaparecer del menú.
