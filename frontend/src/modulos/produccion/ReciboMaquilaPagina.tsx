@@ -1,4 +1,4 @@
-import { Ban, Loader2Icon, PackageCheck, Printer } from 'lucide-react';
+import { Ban, Loader2Icon, Printer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -274,12 +274,11 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <PackageCheck className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Recibo de maquila</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Recibo de maquila
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Recibe prenda terminada de costura o estampado. Lo de costura entra a inventario PT.
           </p>
         </div>

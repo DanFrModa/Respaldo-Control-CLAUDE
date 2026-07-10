@@ -36,8 +36,9 @@ import {
 import { Avatar, EstadoBadge, TipoBadge } from '@/components/dominio/visuales';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useDebounce } from '@/lib/useDebounce';
+import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
+import { ChipFiltro, ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import {
   CampoDetalle,
   Historial,
@@ -155,11 +156,13 @@ export function UsuariosPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
-      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      {/* ── Encabezado (proto .page-head) ────────────────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Usuarios y accesos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Usuarios y accesos
+          </h1>
+          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
             RBAC granular · usuarios, sus roles y su estado de acceso
           </p>
         </div>
@@ -179,48 +182,43 @@ export function UsuariosPagina(): React.JSX.Element {
 
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          <Input
-            type="search"
-            className="h-8 w-52 text-sm"
-            placeholder="Buscar usuario…"
-            value={textoBusqueda}
-            onChange={(e) => {
-              setTextoBusqueda(e.target.value);
+        {/* Toolbar del proto: chips Activos/Todos + Solo bloqueados, buscador y conteo. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          <ChipsFiltro
+            etiqueta="Filtrar por estado"
+            opciones={[
+              { valor: 'activos', etiqueta: 'Activos' },
+              { valor: 'todos', etiqueta: 'Todos', testid: 'mostrar-desactivados' },
+            ]}
+            valor={incluirInactivos ? 'todos' : 'activos'}
+            alCambiar={(valor) => {
+              setIncluirInactivos(valor === 'todos');
               reiniciar();
             }}
-            data-testid="buscar-usuario"
           />
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={incluirInactivos}
-              onChange={() => {
-                setIncluirInactivos((v) => !v);
-                reiniciar();
-              }}
-              data-testid="mostrar-desactivados"
-            />
-            Incluir inactivos
-          </label>
-          <Button
-            type="button"
-            variant={soloBloqueados ? 'secondary' : 'outline'}
-            size="sm"
+          <ChipFiltro
+            activo={soloBloqueados}
             onClick={() => {
               setSoloBloqueados((v) => !v);
               reiniciar();
             }}
-            aria-pressed={soloBloqueados}
             data-testid="filtro-bloqueados"
           >
-            {soloBloqueados ? 'Ver todos' : 'Solo bloqueados'}
-          </Button>
-          <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} usuarios
-            </span>
-          </div>
+            Solo bloqueados
+          </ChipFiltro>
+          <BuscadorToolbar
+            valor={textoBusqueda}
+            alCambiar={(valor) => {
+              setTextoBusqueda(valor);
+              reiniciar();
+            }}
+            placeholder="Buscar usuario…"
+            etiqueta="Buscar usuario"
+            testid="buscar-usuario"
+          />
+          <span className="ml-auto text-xs text-faint">
+            {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')}
+          </span>
         </div>
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
@@ -259,10 +257,11 @@ export function UsuariosPagina(): React.JSX.Element {
                     data-testid="fila-usuario"
                   >
                     <TablaDensaCelda>
+                      {/* Proto vUsuarios: thumb verde con iniciales + nombre en cell-strong. */}
                       <div className="flex items-center gap-2">
-                        <Avatar nombre={u.nombre} tono="neutro" tamano="sm" />
+                        <Avatar nombre={u.nombre} tono="pt" tamano="sm" />
                         <div className="min-w-0">
-                          <div className="truncate font-medium">{u.nombre}</div>
+                          <div className="truncate font-semibold">{u.nombre}</div>
                           <div className="truncate text-xs text-muted-foreground">
                             @{u.username}
                           </div>

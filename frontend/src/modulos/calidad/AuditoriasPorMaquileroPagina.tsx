@@ -1,4 +1,4 @@
-import { BarChart3, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import { imprimirAuditoria, useHistorialMaquilero } from '@/api/calidad';
@@ -82,15 +82,11 @@ export function AuditoriasPorMaquileroPagina(): React.JSX.Element {
     <div className="space-y-4 p-4 md:p-5">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <BarChart3 className="size-4.5" aria-hidden />
-        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Auditorías por maquilero</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Auditorías por maquilero
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Historial y porcentaje de aprobación operativo de un maquilero
           </p>
         </div>
@@ -155,7 +151,7 @@ export function AuditoriasPorMaquileroPagina(): React.JSX.Element {
           <div className="overflow-hidden rounded-xl border bg-card">
             <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2">
               <h2 className="text-sm font-semibold">Auditorías de {datos.maquilero}</h2>
-              <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              <span className="ml-auto text-[12px] text-faint">
                 {datos.total.toLocaleString('es-MX')} vivas
               </span>
             </div>

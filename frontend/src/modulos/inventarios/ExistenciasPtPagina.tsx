@@ -82,6 +82,9 @@ export function ExistenciasPtPagina(): React.JSX.Element {
   });
   const filas = consulta.data?.filas ?? [];
   const totalExistencia = consulta.data?.totalExistencia ?? 0;
+  // Sub-título fiel al proto ("· 3 almacenes"): la cuenta REAL sale del catálogo ya cargado
+  // para los filtros; mientras no llega, el sufijo simplemente no se pinta.
+  const numAlmacenes = (almacenes.data?.datos ?? []).length;
 
   const kpis: Kpi[] = [
     {
@@ -104,9 +107,14 @@ export function ExistenciasPtPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Inventario · Producto terminado</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            Existencias = suma de movimientos (kardex) · por modelo, color, talla y almacén
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Inventario · Producto terminado
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Existencias = suma de movimientos (kardex)
+            {numAlmacenes > 0
+              ? ` · ${String(numAlmacenes)} ${numAlmacenes === 1 ? 'almacén' : 'almacenes'}`
+              : ''}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -138,14 +146,15 @@ export function ExistenciasPtPagina(): React.JSX.Element {
       {/* ── Card: pestañas + filtros + tabla + totales ──────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          {/* Pestañas del módulo (fieles al proto: Existencias / Movimientos / Traspasos). */}
+          {/* Pestañas del módulo (proto `.tabs`, control segmentado: Existencias / Movimientos /
+              Traspasos — la activa "flota" sobre el riel con fondo de tarjeta y sombra). */}
           <div
-            className="flex items-center gap-1"
+            className="inline-flex items-center gap-0.5 rounded-[9px] border bg-panel-2 p-[3px]"
             role="tablist"
             aria-label="Vistas de inventario PT"
           >
             <span
-              className="rounded-md border border-primary bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-soft-foreground"
+              className="rounded-[7px] bg-card px-3 py-[3px] text-xs font-semibold shadow-(--shadow)"
               role="tab"
               aria-selected
             >
@@ -156,14 +165,14 @@ export function ExistenciasPtPagina(): React.JSX.Element {
                 <button
                   type="button"
                   onClick={() => void navigate('/inventarios/movimientos')}
-                  className="cursor-pointer rounded-md border bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border-strong"
+                  className="cursor-pointer rounded-[7px] px-3 py-[3px] text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Movimientos
                 </button>
                 <button
                   type="button"
                   onClick={() => void navigate('/inventarios/traspasos')}
-                  className="cursor-pointer rounded-md border bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:border-border-strong"
+                  className="cursor-pointer rounded-[7px] px-3 py-[3px] text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Traspasos
                 </button>
@@ -174,8 +183,11 @@ export function ExistenciasPtPagina(): React.JSX.Element {
           <div className="w-52 [&_input]:h-8 [&_input]:text-sm">
             <SelectorModelo idSeleccionado={modelo?.id} alSeleccionar={setModelo} />
           </div>
+          {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
+              w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
+              queda huérfano a la derecha). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-40 h-8 text-sm"
             aria-label="Filtrar por color"
             value={idColor}
             onChange={(e) => setIdColor(e.target.value)}
@@ -189,7 +201,7 @@ export function ExistenciasPtPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-40 h-8 text-sm"
             aria-label="Filtrar por talla"
             value={idTalla}
             onChange={(e) => setIdTalla(e.target.value)}
@@ -203,7 +215,7 @@ export function ExistenciasPtPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-8 text-sm"
             aria-label="Filtrar por almacén"
             value={idAlmacen}
             onChange={(e) => setIdAlmacen(e.target.value)}
@@ -225,11 +237,10 @@ export function ExistenciasPtPagina(): React.JSX.Element {
             />
             Incluir ceros
           </label>
-          <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {filas.length.toLocaleString('es-MX')} renglones
-            </span>
-          </div>
+          {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
+          <span className="ml-auto text-xs text-faint">
+            {filas.length.toLocaleString('es-MX')} renglones
+          </span>
         </div>
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}

@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 import { useBitacora } from '@/api/bitacora';
@@ -94,15 +94,9 @@ export function BitacoraPagina(): React.JSX.Element {
       <div className="mx-auto w-full max-w-7xl p-4 lg:p-5">
         {/* Encabezado */}
         <div className="flex items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-          >
-            <ClipboardList className="size-4.5" aria-hidden />
-          </span>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">Bitácora</h1>
-            <p className="text-xs text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Bitácora</h1>
+            <p className="text-[12.5px] text-muted-foreground">
               Auditoría de cambios del sistema (solo lectura, A7).
             </p>
           </div>

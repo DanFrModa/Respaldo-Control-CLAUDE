@@ -84,8 +84,10 @@ export function ComprasPorOrdenPagina(): React.JSX.Element {
     <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-3 border-b p-4 lg:px-6">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Compras por orden</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Compras por orden
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Órdenes de compra ligadas a una orden de producción
           </p>
         </div>

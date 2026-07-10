@@ -1,4 +1,3 @@
-import { Boxes } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -55,15 +54,11 @@ export function InventariosCiclicosPagina(): React.JSX.Element {
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="ciclicos">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <Boxes className="size-4.5" aria-hidden />
-        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Inventarios cíclicos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Inventarios cíclicos
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Conteo físico contra el kardex: el alta congela el teórico y el ajuste es un movimiento
           </p>
         </div>
@@ -89,7 +84,7 @@ export function InventariosCiclicosPagina(): React.JSX.Element {
             <option value="cancelado">Cancelados</option>
           </SelectNativo>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            <span className="text-[12px] text-faint">
               {filas.length.toLocaleString('es-MX')} inventarios
             </span>
           </div>

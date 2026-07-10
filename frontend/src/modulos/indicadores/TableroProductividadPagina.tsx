@@ -1,4 +1,3 @@
-import { BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 
 import { useTableroProductividad } from '@/api/productividad';
@@ -48,15 +47,11 @@ export function TableroProductividadPagina(): React.JSX.Element {
     >
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <BarChart3 className="size-4.5" aria-hidden />
-        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Productividad vs estándar</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Productividad vs estándar
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Índices agregados por periodo, actividad y persona
           </p>
         </div>
@@ -101,7 +96,7 @@ export function TableroProductividadPagina(): React.JSX.Element {
             aria-label="Hasta"
           />
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            <span className="text-[12px] text-faint">
               {filas.length.toLocaleString('es-MX')} periodos
             </span>
           </div>

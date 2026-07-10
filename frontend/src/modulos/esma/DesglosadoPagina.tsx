@@ -1,4 +1,4 @@
-import { FileSpreadsheet, FileText, Printer } from 'lucide-react';
+import { FileSpreadsheet, Printer } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
@@ -52,12 +52,11 @@ export function DesglosadoPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="desglosado-esma">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <FileText className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Estado de cuenta desglosado</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Estado de cuenta desglosado
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             El detalle por orden/modelo, exportable a Excel y como PDF del estado de cuenta.
           </p>
         </div>

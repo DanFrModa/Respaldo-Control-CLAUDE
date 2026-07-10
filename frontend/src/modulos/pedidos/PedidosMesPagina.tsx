@@ -21,8 +21,10 @@ import type { PedidoMesFila, PedidoMesRenglon, PedidosPorMesQuery } from '@/api/
 import { CadenaTrazabilidad, type NodoTraza } from '@/components/dominio/CadenaTrazabilidad';
 import { CajonDetalle } from '@/components/dominio/CajonDetalle';
 import { ChipEstado, type TonoEstado } from '@/components/dominio/ChipEstado';
+import { ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import { ComboboxBuscable } from '@/components/dominio/ComboboxBuscable';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
@@ -49,6 +51,14 @@ import { PanelGenerarOP } from './PanelGenerarOP';
 
 /** Meses de las tabs (proto `MESES_PED`). */
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** Tab de mes (proto `.mtab`): 12.5px seminegrita, radio 8; activo = RELLENO de marca + sombra. */
+const CLASE_MTAB =
+  'cursor-pointer rounded-lg border px-[15px] py-[7px] text-[12.5px] font-semibold transition-colors';
+const CLASE_MTAB_ON =
+  'border-transparent bg-primary text-primary-foreground shadow-[0_6px_14px_-6px_color-mix(in_srgb,var(--primary)_70%,transparent)]';
+const CLASE_MTAB_OFF =
+  'border-border bg-card text-muted-foreground hover:border-border-strong hover:text-foreground';
 
 /** Pedidos por página. */
 const POR_PAGINA = 50;
@@ -78,13 +88,16 @@ export function chipRenglon(
   return { tono: 'warn', texto: 'En proceso' };
 }
 
-/** Vigencia corta "ago 15 → sep 01" a partir de las fechas date-only. */
+/** Vigencia corta "07-jul → 22-jul" (formato del proto) a partir de las fechas date-only. */
 function vigencia(fila: Pick<PedidoMesFila, 'fechaDe' | 'fechaHasta'>): string {
   const corta = (valor: string | null): string | null => {
     if (valor === null) return null;
     const [a, m, d] = valor.split('-').map(Number);
     if (a === undefined || m === undefined || d === undefined) return null;
-    return new Date(a, m - 1, d).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+    const mes = new Date(a, m - 1, d)
+      .toLocaleDateString('es-MX', { month: 'short' })
+      .replace('.', '');
+    return `${String(d).padStart(2, '0')}-${mes}`;
   };
   const de = corta(fila.fechaDe);
   const hasta = corta(fila.fechaHasta);
@@ -196,8 +209,8 @@ export function PedidosMesPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Pedidos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Pedidos</h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Pedidos internos por mes · cada pedido agrupa varias órdenes de producción (van juntos
             en insumos y entrega)
           </p>
@@ -249,8 +262,8 @@ export function PedidosMesPagina(): React.JSX.Element {
         </div>
       </header>
 
-      {/* ── Tabs de mes de entrega ──────────────────────────────────────────── */}
-      <div className="flex shrink-0 flex-wrap items-center gap-1" data-testid="pedidos-meses">
+      {/* ── Tabs de mes de entrega (proto `.mtab`: activo = relleno de marca) ── */}
+      <div className="flex shrink-0 flex-wrap items-center gap-[5px]" data-testid="pedidos-meses">
         {MESES.map((nombre, indice) => (
           <button
             key={nombre}
@@ -259,12 +272,7 @@ export function PedidosMesPagina(): React.JSX.Element {
               setMes(indice + 1);
               reiniciar();
             }}
-            className={cn(
-              'cursor-pointer rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
-              mes === indice + 1
-                ? 'border-primary bg-primary-soft text-primary-soft-foreground'
-                : 'bg-card text-muted-foreground hover:border-border-strong',
-            )}
+            className={cn(CLASE_MTAB, mes === indice + 1 ? CLASE_MTAB_ON : CLASE_MTAB_OFF)}
           >
             {nombre}
           </button>
@@ -275,12 +283,7 @@ export function PedidosMesPagina(): React.JSX.Element {
             setMes(0);
             reiniciar();
           }}
-          className={cn(
-            'cursor-pointer rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
-            mes === 0
-              ? 'border-primary bg-primary-soft text-primary-soft-foreground'
-              : 'bg-card text-muted-foreground hover:border-border-strong',
-          )}
+          className={cn(CLASE_MTAB, mes === 0 ? CLASE_MTAB_ON : CLASE_MTAB_OFF)}
           data-testid="pedidos-mes-todos"
         >
           Todos
@@ -304,29 +307,26 @@ export function PedidosMesPagina(): React.JSX.Element {
               testid="pedidos-filtro-cliente"
             />
           </div>
-          <SelectNativo
-            className="h-8 w-auto text-sm"
-            aria-label="Filtrar por año"
-            value={String(anio)}
+          {/* Año LIBRE con <input type="number"> (regla del rediseño: nunca un select de años). */}
+          <Input
+            type="number"
+            className="h-8 w-24 text-sm"
+            value={anio}
             onChange={(e) => {
-              setAnio(Number(e.target.value));
-              reiniciar();
+              const valor = Number(e.target.value);
+              if (Number.isInteger(valor)) {
+                setAnio(valor);
+                reiniciar();
+              }
             }}
+            placeholder="Año"
+            aria-label="Filtrar por año"
             data-testid="pedidos-filtro-anio"
-          >
-            {[
-              hoy.getFullYear() + 1,
-              hoy.getFullYear(),
-              hoy.getFullYear() - 1,
-              hoy.getFullYear() - 2,
-            ].map((a) => (
-              <option key={a} value={String(a)}>
-                {a}
-              </option>
-            ))}
-          </SelectNativo>
+          />
+          {/* SelectNativo envuelve el <select> en un div w-full: sin ancho fijo alrededor se roba
+              un renglón completo de la barra (visto en la foto de fidelidad R9). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-8 text-sm"
             aria-label="Filtrar por empresa"
             value={idEmpresa}
             onChange={(e) => {
@@ -342,25 +342,20 @@ export function PedidosMesPagina(): React.JSX.Element {
               </option>
             ))}
           </SelectNativo>
-          {(['vigentes', 'entregados', 'cancelados'] as const).map((clave) => (
-            <button
-              key={clave}
-              type="button"
-              onClick={() => {
-                setEstatus(clave);
-                reiniciar();
-              }}
-              className={cn(
-                'cursor-pointer rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize transition-colors',
-                estatus === clave
-                  ? 'border-primary bg-primary-soft text-primary-soft-foreground'
-                  : 'bg-card text-muted-foreground hover:border-border-strong',
-              )}
-              data-testid={`pedidos-estatus-${clave}`}
-            >
-              {clave}
-            </button>
-          ))}
+          <ChipsFiltro
+            etiqueta="Filtrar por estatus"
+            opciones={(['vigentes', 'entregados', 'cancelados'] as const).map((clave) => ({
+              valor: clave,
+              // El texto visible era `capitalize` sobre la clave: misma palabra capitalizada.
+              etiqueta: clave.charAt(0).toUpperCase() + clave.slice(1),
+              testid: `pedidos-estatus-${clave}`,
+            }))}
+            valor={estatus}
+            alCambiar={(valor) => {
+              setEstatus(valor);
+              reiniciar();
+            }}
+          />
           <div className="ml-auto flex items-center gap-2">
             <div
               className="flex overflow-hidden rounded-md border text-xs"
@@ -394,7 +389,7 @@ export function PedidosMesPagina(): React.JSX.Element {
                 Pedida
               </button>
             </div>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            <span className="text-[12px] text-faint">
               {total.toLocaleString('es-MX')} pedidos · {totales?.ordenes ?? 0} órdenes
             </span>
           </div>
@@ -445,26 +440,26 @@ export function PedidosMesPagina(): React.JSX.Element {
                   <tbody key={pedido.id} data-testid="pedidos-grupo">
                     {/* Cabecera del pedido (clic = expandir/colapsar). */}
                     <tr
-                      className="cursor-pointer border-b bg-panel-2/60 hover:bg-muted/60"
+                      className="cursor-pointer border-b bg-panel-2 hover:bg-muted/60"
                       onClick={() => alternarGrupo(pedido.id)}
                       data-testid="pedidos-grupo-cabecera"
                     >
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-[9px]">
                         <span className="flex items-center gap-2">
                           <ChevronDown
                             className={cn(
-                              'size-3.5 shrink-0 text-muted-foreground transition-transform',
+                              'size-[15px] shrink-0 text-muted-foreground transition-transform',
                               colapsado && '-rotate-90',
                             )}
                             aria-hidden
                           />
-                          <b>{pedido.folio}-F</b>
-                          <span className="rounded-full bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+                          <b className="text-[13px] font-bold">{pedido.folio}-F</b>
+                          <span className="rounded-full bg-muted px-[7px] text-[11px] font-semibold text-faint">
                             {pedido.renglones.length} mod.
                           </span>
                           {pedido.ocCliente !== null ? (
                             <span
-                              className="num rounded-full border border-dashed border-primary px-1.5 text-[10px] font-medium text-primary"
+                              className="num rounded-full border border-dashed border-primary px-[7px] text-[11px] font-semibold text-primary"
                               title="OC original del cliente"
                               data-testid="pedidos-chip-oc"
                             >
@@ -473,24 +468,26 @@ export function PedidosMesPagina(): React.JSX.Element {
                           ) : null}
                         </span>
                       </td>
-                      <td className="px-3 py-1.5 font-medium">{pedido.cliente}</td>
-                      <td className="num px-3 py-1.5 text-muted-foreground">{vigencia(pedido)}</td>
-                      <td className="px-3 py-1.5" />
-                      <td className="num px-3 py-1.5 text-right font-semibold">
+                      <td className="px-3 py-[9px] font-medium">{pedido.cliente}</td>
+                      <td className="num px-3 py-[9px] text-muted-foreground">
+                        {vigencia(pedido)}
+                      </td>
+                      <td className="px-3 py-[9px]" />
+                      <td className="num px-3 py-[9px] text-right font-semibold">
                         {cantCabecera.toLocaleString('es-MX')}
                       </td>
-                      {puedeVerImportes ? <td className="px-3 py-1.5" /> : null}
+                      {puedeVerImportes ? <td className="px-3 py-[9px]" /> : null}
                       {puedeVerImportes ? (
-                        <td className="num px-3 py-1.5 text-right font-semibold">
+                        <td className="num px-3 py-[9px] text-right font-semibold">
                           {pedido.importeTotal === null
                             ? '—'
                             : FORMATO_MONEDA.format(pedido.importeTotal)}
                         </td>
                       ) : null}
-                      <td className="num px-3 py-1.5 text-right text-muted-foreground">
+                      <td className="num px-3 py-[9px] text-right text-muted-foreground">
                         {pedido.cortadoTotal.toLocaleString('es-MX')}
                       </td>
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-[9px]">
                         <ChipEstado tono={chip.tono}>{chip.texto}</ChipEstado>
                       </td>
                     </tr>
@@ -516,7 +513,31 @@ export function PedidosMesPagina(): React.JSX.Element {
                               data-testid="pedidos-renglon"
                             >
                               <td className="px-3 py-1.5 pl-9">
-                                <span className="num font-medium">{renglon.codigoModelo}</span>
+                                {/* Proto `.sub-mod`: el modelo con subrayado punteado abre su ficha
+                                    de desarrollo; los históricos sin ficha van en texto plano. */}
+                                {renglon.idDesarrollo !== null ? (
+                                  <button
+                                    type="button"
+                                    className="num cursor-pointer font-medium underline decoration-dotted underline-offset-[3px]"
+                                    title="Ver ficha de desarrollo"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      void navigate('/desarrollo', {
+                                        state: { idModelo: renglon.idModelo },
+                                      });
+                                    }}
+                                    data-testid="pedidos-liga-desarrollo"
+                                  >
+                                    {renglon.codigoModelo}
+                                  </button>
+                                ) : (
+                                  <span
+                                    className="num font-medium"
+                                    title="modelo anterior al módulo de Desarrollo"
+                                  >
+                                    {renglon.codigoModelo}
+                                  </span>
+                                )}
                                 {renglon.numeroProduccion !== null ? (
                                   <span
                                     className="num ml-2 text-[10.5px] text-faint"
@@ -611,9 +632,9 @@ export function PedidosMesPagina(): React.JSX.Element {
           )}
         </div>
 
-        {/* ── Barra de totales (del filtro COMPLETO, agregada en servidor) ── */}
+        {/* ── Barra de totales (proto `.totbar`: fondo panel-2, pares etiqueta/valor apilados) ── */}
         <div
-          className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-t bg-secondary px-3 py-1.5 text-xs"
+          className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-1 border-t bg-panel-2 px-4 py-2 text-xs"
           data-testid="pedidos-totales"
         >
           <TotalItem etiqueta="Pedidos" valor={(totales?.pedidos ?? 0).toLocaleString('es-MX')} />
@@ -728,7 +749,7 @@ export function PedidosMesPagina(): React.JSX.Element {
   );
 }
 
-/** Un total de la barra al pie (proto `.totitem`). */
+/** Un total de la barra al pie (proto `.totitem`: etiqueta 10px ARRIBA, valor 15px negrita). */
 function TotalItem({
   etiqueta,
   valor,
@@ -739,9 +760,11 @@ function TotalItem({
   destacado?: boolean;
 }): React.JSX.Element {
   return (
-    <span className="flex items-baseline gap-1.5">
-      <span className="text-[10.5px] font-medium text-faint uppercase">{etiqueta}</span>
-      <b className={cn('num', destacado && 'text-primary')}>{valor}</b>
+    <span className="flex flex-col">
+      <span className="text-[10px] font-semibold tracking-wide text-faint uppercase">
+        {etiqueta}
+      </span>
+      <b className={cn('num text-[15px] font-bold', destacado && 'text-primary')}>{valor}</b>
     </span>
   );
 }

@@ -96,8 +96,10 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Inventario de telas</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Inventario de telas
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Existencia por tela, lote y almacén (suma de movimientos) · expande para ver los
             componentes del lote (D5)
           </p>
@@ -115,8 +117,11 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* Los selects van en cajas de ancho FIJO: el envoltorio interno de `SelectNativo` es
+              w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
+              queda huérfano a la derecha). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-40 h-8 text-sm"
             aria-label="Filtrar por color"
             value={idColor}
             onChange={(e) => setIdColor(e.target.value)}
@@ -130,7 +135,7 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-8 text-sm"
             aria-label="Filtrar por almacén"
             value={idAlmacen}
             onChange={(e) => setIdAlmacen(e.target.value)}
@@ -152,11 +157,10 @@ export function ExistenciasTelasPagina(): React.JSX.Element {
             />
             Incluir ceros
           </label>
-          <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {filas.length.toLocaleString('es-MX')} renglones
-            </span>
-          </div>
+          {/* Conteo a la derecha (proto `.count`: texto plano atenuado, sin pastilla). */}
+          <span className="ml-auto text-xs text-faint">
+            {filas.length.toLocaleString('es-MX')} renglones
+          </span>
         </div>
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}

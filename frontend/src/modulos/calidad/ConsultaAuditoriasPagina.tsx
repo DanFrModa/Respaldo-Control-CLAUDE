@@ -5,8 +5,8 @@ import {
   ClipboardCheck,
   FileEdit,
   Medal,
+  Plus,
   Printer,
-  Search,
   UserRound,
   XCircle,
 } from 'lucide-react';
@@ -42,6 +42,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
+import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
+import { ChipFiltro } from '@/components/dominio/ChipsFiltro';
 import { CampoDetalle, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -82,6 +84,7 @@ export function ResultadoBadge({
 export function ConsultaAuditoriasPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   const puedeModificar = tienePermiso('calidad.modificar-auditorias');
+  const puedeGenerar = tienePermiso('calidad.generar-auditorias');
 
   const [textoFolio, setTextoFolio] = useState('');
   const folioDebounce = useDebounce(textoFolio.trim(), 300);
@@ -209,20 +212,24 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
-      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <ClipboardCheck className="size-4.5" aria-hidden />
-        </span>
+      {/* ── Encabezado (proto .page-head de vCalidad) ────────────────────────── */}
+      <header className="flex shrink-0 flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Consulta de auditorías</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            Auditorías por muestreo AQL (MIL-STD-105 / ISO 2859) con su resultado e impreso
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Control de calidad · AQL
+          </h1>
+          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
+            Auditorías por muestreo (MIL-STD-105 / ISO 2859)
           </p>
         </div>
+        {puedeGenerar ? (
+          <Button size="sm" asChild data-testid="nueva-auditoria-consulta">
+            <Link to="/calidad/auditorias/nueva">
+              <Plus aria-hidden />
+              Nueva auditoría
+            </Link>
+          </Button>
+        ) : null}
       </header>
 
       {/* ── KPIs ────────────────────────────────────────────────────────────── */}
@@ -230,24 +237,20 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
 
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          <div className="relative w-48">
-            <Search
-              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              type="search"
-              className="h-8 pl-8 text-sm"
-              placeholder="Folio de orden…"
-              value={textoFolio}
-              onChange={(e) => alBuscar(e.target.value)}
-              aria-label="Buscar por folio de orden"
-              data-testid="buscar-consulta-auditoria"
-            />
-          </div>
+        {/* Toolbar del proto (una sola franja): chip, filtros compactos, buscador y conteo. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          <ChipFiltro
+            activo={incluirCanceladas}
+            onClick={() => {
+              setIncluirCanceladas((v) => !v);
+              reiniciar();
+            }}
+            data-testid="mostrar-desactivados"
+          >
+            Incluir canceladas
+          </ChipFiltro>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-[30px] text-xs"
             aria-label="Filtrar por maquilero"
             value={idMaquilero === null ? '' : String(idMaquilero)}
             onChange={(e) => {
@@ -264,7 +267,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-36 h-[30px] text-xs"
             aria-label="Filtrar por resultado"
             value={resultado}
             onChange={(e) => {
@@ -281,7 +284,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-32 h-[30px] text-xs"
             aria-label="Filtrar por tipo"
             value={tipo}
             onChange={(e) => {
@@ -299,7 +302,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
           </SelectNativo>
           <Input
             type="date"
-            className="h-8 w-auto text-sm"
+            className="h-[30px] w-auto text-xs"
             aria-label="Desde (fecha de auditoría)"
             value={desde}
             onChange={(e) => {
@@ -310,7 +313,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
           />
           <Input
             type="date"
-            className="h-8 w-auto text-sm"
+            className="h-[30px] w-auto text-xs"
             aria-label="Hasta (fecha de auditoría)"
             value={hasta}
             onChange={(e) => {
@@ -319,23 +322,17 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
             }}
             data-testid="filtro-hasta-auditoria"
           />
-          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={incluirCanceladas}
-              onChange={() => {
-                setIncluirCanceladas((v) => !v);
-                reiniciar();
-              }}
-              data-testid="mostrar-desactivados"
-            />
-            Incluir canceladas
-          </label>
-          <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} auditorías
-            </span>
-          </div>
+          <BuscadorToolbar
+            valor={textoFolio}
+            alCambiar={alBuscar}
+            placeholder="Folio de orden…"
+            etiqueta="Buscar por folio de orden"
+            testid="buscar-consulta-auditoria"
+            className="w-40"
+          />
+          <span className="ml-auto text-xs text-faint">
+            {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')}
+          </span>
         </div>
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}

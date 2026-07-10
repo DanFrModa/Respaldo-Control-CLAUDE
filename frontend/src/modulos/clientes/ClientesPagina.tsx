@@ -167,8 +167,8 @@ export function ClientesPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Clientes</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Clientes</h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Catálogo · departamentos propios · factores de lista de precios (heredan a la lista)
           </p>
         </div>
@@ -185,8 +185,9 @@ export function ClientesPagina(): React.JSX.Element {
         <Info className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
         <span>
           Cada cliente trae sus <b className="text-foreground">factores</b> (margen · descuentos ·
-          regalías · costo de ventas), con posible override por departamento. Al generar una lista
-          de precios se copian como snapshot editable.
+          regalías · costo de ventas) — con posible{' '}
+          <b className="text-foreground">override por departamento</b>. Al generar una lista de
+          precios se copian como snapshot editable.
         </span>
       </div>
 
@@ -217,9 +218,7 @@ export function ClientesPagina(): React.JSX.Element {
             Incluir inactivos
           </label>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} clientes
-            </span>
+            <span className="text-[12px] text-faint">{total.toLocaleString('es-MX')} clientes</span>
           </div>
         </div>
 
@@ -260,8 +259,9 @@ export function ClientesPagina(): React.JSX.Element {
                   >
                     <TablaDensaCelda>
                       <div className="flex items-center gap-2">
-                        <Avatar nombre={c.nombre} tono="neutro" tamano="sm" />
-                        <span className="font-medium">{c.nombre}</span>
+                        {/* Proto: thumb teal uniforme (mismo degradado para todos los clientes). */}
+                        <Avatar nombre={c.nombre} tono="pt" tamano="sm" />
+                        <span className="font-semibold">{c.nombre}</span>
                       </div>
                     </TablaDensaCelda>
                     <TablaDensaCelda className="text-muted-foreground">

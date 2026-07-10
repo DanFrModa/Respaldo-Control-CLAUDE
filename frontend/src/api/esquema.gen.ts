@@ -224,6 +224,151 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/resumen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resumen operativo de la portada (cada bloque respeta el permiso de su dominio) */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Resumen operativo de la portada (cada bloque respeta el permiso de su dominio). */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Órdenes abiertas (permiso `produccion.wip-ver`; null sin permiso). */
+              ordenesAbiertas: {
+                /** @description Órdenes vivas con algo pendiente por etapa (criterio del tablero WIP). */
+                total: number;
+              } | null;
+              /** @description Piezas en producción/maquila (permiso `produccion.wip-ver`; null sin permiso). */
+              wipMaquila: {
+                /** @description Piezas en poder de maquila (enviado − recibido, vivos). */
+                piezas: number;
+                /** @description Maquileros con saldo ≠ 0 en su poder (enviado − recibido por tercero). */
+                maquileros: number;
+              } | null;
+              /** @description Cortado esta semana (permiso `produccion.wip-ver`; null sin permiso). */
+              cortadoSemana: {
+                /** @description Σ piezas de cortes vivos de la semana ISO actual. */
+                piezas: number;
+                /** @description Σ piezas de cortes vivos de la semana ISO anterior (base de la tendencia). */
+                piezasSemanaAnterior: number;
+                /** @description Variación % vs la semana anterior (null si la anterior fue 0). */
+                deltaPct: number | null;
+              } | null;
+              /** @description Entregas a tiempo · últimos 30 d (permiso `indicadores.ver`; null sin permiso). */
+              entregasATiempo: {
+                /** @description aTiempo ÷ medibles de los últimos 30 días (fracción 0–1; null sin medibles). */
+                porcentaje: number | null;
+                /** @description Órdenes medibles en la ventana (último proceso cumplido CON fecha planeada). */
+                medibles: number;
+                /** @description Diferencia en PUNTOS porcentuales vs los 30 días previos (null si no medible). */
+                deltaPuntos: number | null;
+              } | null;
+              /** @description Existencia PT (permiso `inventario-pt.ver`; null sin permiso). */
+              existenciaPt: {
+                /** @description Existencia total de producto terminado (Σ kardex, D3). */
+                piezas: number;
+                /** @description Almacenes con existencia ≠ 0. */
+                almacenes: number;
+              } | null;
+              /** @description Órdenes por vencer · próx. 7 días (permiso `rc.ruta-ver`; null sin permiso). */
+              ordenesPorVencer:
+                | {
+                    /** @description Id de la orden. */
+                    idOrden: number;
+                    /** @description Folio de la orden (por empresa). */
+                    folio: number;
+                    /** @description Código del modelo. */
+                    codigoModelo: string;
+                    /** @description Descripción del modelo (si la tiene). */
+                    descripcionModelo: string | null;
+                    /** @description Nombre del cliente. */
+                    cliente: string;
+                    /** @description Total pedido de la orden (Σ matriz color×talla). */
+                    piezas: number;
+                    /** @description % de procesos de la RC ya cumplidos (0–100, redondeado). */
+                    avancePct: number;
+                    /** @description Próxima fecha planeada vigente pendiente (ISO; el compromiso que apremia). */
+                    compromiso: string;
+                    /**
+                     * @description Semáforo de la ORDEN (el peor de sus procesos, ADR-0013).
+                     * @enum {string}
+                     */
+                    semaforo: 'aTiempo' | 'enRiesgo' | 'atrasado';
+                    /** @description Procesos de la ruta ya vencidos (para el chip). */
+                    etapasAtrasadas: number;
+                  }[]
+                | null;
+              /** @description Piezas cortadas por semana, últimas 7 (vieja→actual; permiso `produccion.wip-ver`). */
+              cortesPorSemana:
+                | {
+                    /** @description Semana ISO "2026-W27" (clave estable del bucket). */
+                    anioSemana: string;
+                    /** @description Etiqueta corta de la barra ("S27"). */
+                    etiqueta: string;
+                    /** @description Σ piezas de cortes vivos de esa semana. */
+                    piezas: number;
+                  }[]
+                | null;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+        /** @description Respuesta de error de la API. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': {
+              /** @description Código estable del error (p. ej. VALIDACION, PERMISO, NO_AUTENTICADO). */
+              codigo: string;
+              /** @description Mensaje en español, apto para mostrar al usuario. */
+              mensaje: string;
+              /** @description Detalle estructurado opcional (p. ej. errores por campo). */
+              detalles?: unknown;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/almacenes': {
     parameters: {
       query?: never;

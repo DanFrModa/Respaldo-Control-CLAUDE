@@ -1,4 +1,3 @@
-import { Warehouse } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -6,7 +5,7 @@ import { useAlmacenes, useDesactivarAlmacen, useReactivarAlmacen } from '@/api/a
 import { ETIQUETAS_TIPO_ALMACEN, TIPOS_ALMACEN, type TipoAlmacenClave } from '@/api/esquemas';
 import type { Almacen, AlmacenesQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { TipoBadge } from '@/components/dominio/visuales';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import type { Tono } from '@/lib/tono';
@@ -132,17 +131,11 @@ export function AlmacenesPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `vCat` almacenes: renglón plano (sin thumb) — nombre en `cell-strong` + badge de tipo.
   const columnas: ColumnaCatalogo<Almacen>[] = [
     {
       encabezado: 'Almacén',
-      render: (a) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={a.nombre} tono={TONO_POR_TIPO[a.tipo]} tamano="sm">
-            <Warehouse className="size-4" aria-hidden />
-          </Avatar>
-          <span className="font-medium">{a.nombre}</span>
-        </div>
-      ),
+      render: (a) => <span className="font-semibold">{a.nombre}</span>,
     },
     {
       encabezado: 'Tipo',
@@ -158,7 +151,6 @@ export function AlmacenesPagina(): React.JSX.Element {
         testid="almacen"
         titulo="Almacenes"
         descripcion="Catálogo base · multi-almacén (kardex D3)"
-        icono={Warehouse}
         unidad="almacenes"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
@@ -170,8 +162,9 @@ export function AlmacenesPagina(): React.JSX.Element {
         busqueda={textoBusqueda}
         alBuscar={alBuscar}
         filtros={
+          // El envoltorio acota el ancho (el wrapper interno del select es w-full).
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-[30px] text-xs"
             value={tipoFiltro}
             onChange={(e) => alCambiarTipo(e.target.value)}
             aria-label="Filtrar almacenes por tipo"

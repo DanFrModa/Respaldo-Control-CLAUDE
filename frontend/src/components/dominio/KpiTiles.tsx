@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp } from 'lucide-react';
 import * as React from 'react';
 
 import { cn } from '@/lib/utils';
@@ -7,7 +8,29 @@ import { cn } from '@/lib/utils';
  * responsive de tarjetas con etiqueta chica en MAYUSCULAS, numero grande
  * tabular y un pie opcional (delta/contexto). Las usan el Resumen y los
  * tableros para dar el "vistazo" antes de la tabla.
+ *
+ * Fidelidad R9: metricas EXACTAS del proto (padding 13/14, etiqueta 11.5px
+ * tracking .04em, valor 26px tracking -.02em, sufijo 14px) y soporte OPCIONAL
+ * de TENDENCIA (proto `.foot` + `.trend`): flecha ↑/↓ de 12px + delta en
+ * semibold coloreado (ok/crit) + contexto atenuado. Sin `tendencia`, el tile
+ * se ve como siempre (backwards-compatible; `pie`/`tonoPie` siguen igual).
  */
+
+/** Tendencia opcional de un KPI (proto `.trend` dentro de `.kpi .foot`). */
+export interface TendenciaKpi {
+  /** Direccion de la flecha (proto `.trend.up` / `.trend.down`). */
+  direccion: 'sube' | 'baja';
+  /** El delta ya formateado por el llamador (p. ej. "+6", "+14%", "−1.2"). */
+  delta: string;
+  /**
+   * Tono del delta. Por default sigue al proto: sube = `ok` (verde), baja =
+   * `crit` (rojo). Se puede invertir/neutralizar cuando "bajar" es bueno
+   * (p. ej. defectos a la baja → `ok`).
+   */
+  tono?: 'ok' | 'crit' | 'neutro';
+  /** Contexto atenuado junto al delta (p. ej. "vs. sem. pasada"). */
+  contexto?: string;
+}
 
 /** Un indicador de la rejilla. */
 export interface Kpi {
@@ -23,12 +46,48 @@ export interface Kpi {
   pie?: React.ReactNode;
   /** Tono del pie (delta positivo/negativo); sin tono = atenuado. */
   tonoPie?: 'ok' | 'crit';
+  /**
+   * Tendencia opcional con flecha (proto `.trend`). Normalmente se usa ESTA o
+   * `pie`, no ambas (si vienen las dos, se pintan las dos lineas).
+   */
+  tendencia?: TendenciaKpi;
 }
 
 const TONO_PIE: Record<NonNullable<Kpi['tonoPie']>, string> = {
   ok: 'text-ok',
   crit: 'text-crit',
 };
+
+const TONO_TENDENCIA: Record<NonNullable<TendenciaKpi['tono']>, string> = {
+  ok: 'text-ok',
+  crit: 'text-crit',
+  neutro: 'text-muted-foreground',
+};
+
+/** Tendencia de un tile (proto `.foot`: trend + contexto atenuado). */
+function TendenciaTile({ tendencia }: { tendencia: TendenciaKpi }): React.JSX.Element {
+  // Default del proto: la flecha hacia arriba es "bien" y hacia abajo "mal".
+  const tono = tendencia.tono ?? (tendencia.direccion === 'sube' ? 'ok' : 'crit');
+  return (
+    <span data-slot="kpi-tendencia" className="flex items-center gap-1.5 text-xs">
+      <span
+        className={cn('num inline-flex items-center gap-[3px] font-semibold', TONO_TENDENCIA[tono])}
+      >
+        {tendencia.direccion === 'sube' ? (
+          <ArrowUp className="size-3 shrink-0" aria-hidden />
+        ) : (
+          <ArrowDown className="size-3 shrink-0" aria-hidden />
+        )}
+        {/* El sentido no puede vivir solo en el color/flecha (a11y). */}
+        <span className="sr-only">{tendencia.direccion === 'sube' ? 'Subió' : 'Bajó'}</span>
+        <span>{tendencia.delta}</span>
+      </span>
+      {tendencia.contexto === undefined ? null : (
+        <span className="text-faint">{tendencia.contexto}</span>
+      )}
+    </span>
+  );
+}
 
 /** Rejilla de tarjetas KPI (auto-ajustable al ancho). */
 export function KpiTiles({
@@ -47,19 +106,20 @@ export function KpiTiles({
         <div
           key={kpi.clave}
           data-testid={`kpi-${kpi.clave}`}
-          className="flex flex-col gap-1.5 rounded-lg border bg-card p-3.5 text-card-foreground shadow-(--shadow)"
+          className="relative flex flex-col gap-1.5 overflow-hidden rounded-lg border bg-card px-3.5 py-[13px] text-card-foreground shadow-(--shadow)"
         >
-          <span className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+          <span className="text-xs font-semibold tracking-[0.04em] text-muted-foreground uppercase">
             {kpi.etiqueta}
           </span>
-          <span className="num text-2xl font-bold tracking-tight">
+          <span className="num text-[26px] leading-tight font-bold tracking-[-0.02em]">
             {kpi.valor}
             {kpi.sufijo === undefined ? null : (
-              <small className="ml-1 text-sm font-semibold text-muted-foreground">
+              <small className="ml-1 text-[14px] font-semibold text-muted-foreground">
                 {kpi.sufijo}
               </small>
             )}
           </span>
+          {kpi.tendencia === undefined ? null : <TendenciaTile tendencia={kpi.tendencia} />}
           {kpi.pie === undefined ? null : (
             <span
               className={cn(

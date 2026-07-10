@@ -1,8 +1,8 @@
 import {
+  BarChart3,
   Calculator,
   ChevronLeft,
   ChevronRight,
-  Factory,
   Layers,
   Package,
   Pencil,
@@ -10,6 +10,7 @@ import {
   Printer,
   RefreshCw,
   Route,
+  Scissors,
   Search,
   Send,
   Shirt,
@@ -37,7 +38,6 @@ import {
   TablaDensaFila,
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
-import { Avatar } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
@@ -68,6 +68,14 @@ import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
 
 /** Meses de las tabs de entrega (proto `MESES_PED`). */
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+/** Tab de mes (proto `.mtab`): 12.5px seminegrita, radio 8; activo = RELLENO de marca + sombra. */
+const CLASE_MTAB =
+  'cursor-pointer rounded-lg border px-[15px] py-[7px] text-[12.5px] font-semibold transition-colors';
+const CLASE_MTAB_ON =
+  'border-transparent bg-primary text-primary-foreground shadow-[0_6px_14px_-6px_color-mix(in_srgb,var(--primary)_70%,transparent)]';
+const CLASE_MTAB_OFF =
+  'border-border bg-card text-muted-foreground hover:border-border-strong hover:text-foreground';
 
 /** Renglones por página (tabla densa de operación). */
 const POR_PAGINA = 50;
@@ -210,6 +218,15 @@ export function CentroOrdenesPagina(): React.JSX.Element {
     ...(busquedaCliente === '' ? {} : { busqueda: busquedaCliente }),
   });
   const empresas = useEmpresas();
+  // La columna "Emp." pinta el IDENTIFICADOR corto de la empresa (proto: "FR"/"MF"), el mismo que
+  // usan los folios/impresos; si la empresa no lo tiene capturado se cae al nombre completo.
+  const identificadorEmpresa = useMemo(() => {
+    const porId = new Map<number, string>();
+    for (const e of empresas.data ?? []) {
+      porId.set(e.id, e.identificador ?? e.nombre);
+    }
+    return porId;
+  }, [empresas.data]);
   const roles = useRolesProveedor();
   const idRolCostura = roles.data?.find((r) => r.codigo === 'maquila-costura')?.id;
   const idRolEstampado = roles.data?.find((r) => r.codigo === 'estampado')?.id;
@@ -279,11 +296,15 @@ export function CentroOrdenesPagina(): React.JSX.Element {
       {/* ── Encabezado de página ─────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Órdenes de producción</h1>
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Órdenes de producción
+          </h1>
+          {/* Subtítulo con el conteo del proto: filas EN PANTALLA y abiertas (el total del filtro
+              vive en el contador de la barra de herramientas, como en el proto). */}
           <p className="truncate text-xs text-muted-foreground">
-            Centro de operación · {total.toLocaleString('es-MX')} órdenes ·{' '}
-            {abiertas.toLocaleString('es-MX')} abiertas en pantalla · filtra por OP, modelo, pedido
-            del cliente, maquilero…
+            Centro de operación · {filas.length.toLocaleString('es-MX')} en pantalla ·{' '}
+            {abiertas.toLocaleString('es-MX')} abiertas · filtra por OP, modelo, pedido del cliente,
+            maquilero…
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -295,6 +316,16 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           >
             <RefreshCw className={cn(consulta.isFetching && 'animate-spin')} aria-hidden />
             Actualizar
+          </Button>
+          {/* "Concentrado" (proto): la consulta general de órdenes con todos los cortes. */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void navigate('/produccion/consulta')}
+            data-testid="centro-concentrado"
+          >
+            <BarChart3 aria-hidden />
+            Concentrado
           </Button>
           {puedeAdministrar && puedeCrearPedido ? (
             // La OP no se crea suelta: nace del PEDIDO (R3, §4.1). "Nueva orden" abre el
@@ -313,7 +344,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
 
       {/* ── Filtros (server-side) ────────────────────────────────────────── */}
       <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border bg-card px-3 py-2">
-        <div className="relative w-64">
+        <div className="relative w-[280px]">
           <Search
             className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden
@@ -374,8 +405,10 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             testid="centro-filtro-estampador"
           />
         </div>
+        {/* SelectNativo envuelve el <select> en un div w-full: SIN un ancho fijo alrededor, cada
+            filtro se roba un renglón completo de la barra (visto en la foto de fidelidad R9). */}
         <SelectNativo
-          className="h-8 w-auto text-sm"
+          className="w-36 h-8 text-sm"
           aria-label="Filtrar por empresa"
           value={idEmpresa}
           onChange={(e) => {
@@ -392,7 +425,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           ))}
         </SelectNativo>
         <SelectNativo
-          className="h-8 w-auto text-sm"
+          className="w-28 h-8 text-sm"
           aria-label="Filtrar por OC de tela"
           value={ocTela}
           onChange={(e) => {
@@ -405,14 +438,14 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           <option value="con">Con OC</option>
           <option value="sin">Sin OC</option>
         </SelectNativo>
-        <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+        <span className="ml-auto text-[12px] text-faint">
           {total.toLocaleString('es-MX')} órdenes
         </span>
       </div>
 
-      {/* ── Tabs de mes de entrega ───────────────────────────────────────── */}
-      <div className="flex shrink-0 flex-wrap items-center gap-1" data-testid="centro-meses">
-        <span className="mr-1 text-[11px] font-semibold tracking-wide text-faint uppercase">
+      {/* ── Tabs de mes de entrega (proto `.mtab`: activo = relleno de marca) ── */}
+      <div className="flex shrink-0 flex-wrap items-center gap-[5px]" data-testid="centro-meses">
+        <span className="mr-0.5 text-[11px] font-semibold tracking-wide text-faint uppercase">
           Mes de entrega
         </span>
         {MESES.map((nombre, indice) => (
@@ -423,12 +456,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
               setMes(indice + 1);
               reiniciarPagina();
             }}
-            className={cn(
-              'cursor-pointer rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
-              mes === indice + 1
-                ? 'border-primary bg-primary-soft text-primary-soft-foreground'
-                : 'bg-card text-muted-foreground hover:border-border-strong',
-            )}
+            className={cn(CLASE_MTAB, mes === indice + 1 ? CLASE_MTAB_ON : CLASE_MTAB_OFF)}
           >
             {nombre}
           </button>
@@ -439,12 +467,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
             setMes(0);
             reiniciarPagina();
           }}
-          className={cn(
-            'cursor-pointer rounded-md border px-2 py-0.5 text-xs font-medium transition-colors',
-            mes === 0
-              ? 'border-primary bg-primary-soft text-primary-soft-foreground'
-              : 'bg-card text-muted-foreground hover:border-border-strong',
-          )}
+          className={cn(CLASE_MTAB, mes === 0 ? CLASE_MTAB_ON : CLASE_MTAB_OFF)}
           data-testid="centro-mes-todos"
         >
           Todos
@@ -502,7 +525,7 @@ export function CentroOrdenesPagina(): React.JSX.Element {
                         data-testid="centro-fila"
                       >
                         <TablaDensaCelda className="text-xs text-muted-foreground">
-                          {fila.empresa}
+                          {identificadorEmpresa.get(fila.idEmpresa) ?? fila.empresa}
                         </TablaDensaCelda>
                         <TablaDensaCelda className="font-semibold text-primary">
                           {fila.folio}
@@ -646,13 +669,14 @@ function Mosaico({
       disabled={deshabilitado}
       data-testid={testid}
       className={cn(
-        'flex flex-col items-center gap-1 rounded-lg border bg-panel-2 px-1 py-2 text-[11px] font-medium transition-colors',
+        // Proto `.opd-act`: 10px seminegrita, icono 17px que HEREDA el color (muted → marca al pasar).
+        'flex flex-col items-center gap-[5px] rounded-[9px] border bg-panel-2 px-1 py-[9px] text-center text-[10px] font-semibold text-muted-foreground transition-colors',
         deshabilitado
           ? 'cursor-not-allowed opacity-50'
-          : 'cursor-pointer hover:border-primary/40 hover:bg-primary-soft',
+          : 'cursor-pointer hover:border-primary hover:bg-primary-soft hover:text-primary',
       )}
     >
-      <Icono className="size-4 text-primary" aria-hidden />
+      <Icono className="size-[17px]" aria-hidden />
       <span className="truncate">{etiqueta}</span>
     </button>
   );
@@ -891,11 +915,18 @@ function DetalleCentroOrden({
     <div className="flex h-full min-h-0 flex-col" data-testid="centro-detalle">
       {/* ── FIJO arriba: encabezado + mosaicos + avance + matriz (Daniel) ── */}
       <div className="shrink-0 space-y-3 border-b p-3">
-        <div className="flex items-center gap-2.5">
-          <Avatar nombre={orden.codigoModelo} tono="pt" tamano="md" />
+        <div className="flex items-center gap-3">
+          {/* Héroe del proto `.opd-hero`: cuadro 46px con degradado de marca y los 3 primeros
+              dígitos del modelo en mono. */}
+          <span
+            aria-hidden
+            className="num flex size-[46px] shrink-0 items-center justify-center rounded-[11px] bg-linear-150 from-primary-bright to-primary text-sm font-bold text-white"
+          >
+            {orden.codigoModelo.slice(0, 3)}
+          </span>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-2">
-              <span className="text-sm font-bold">OP {orden.folio}</span>
+              <span className="text-base font-bold">OP {orden.folio}</span>
               <ChipEstado tono={estatus.tono}>{estatus.texto}</ChipEstado>
             </p>
             <p className="truncate text-xs text-muted-foreground">
@@ -990,7 +1021,7 @@ function DetalleCentroOrden({
           onClick={() => alRegistrarAvance(fila?.folioPedido ?? null)}
           data-testid="centro-registrar-avance"
         >
-          <Factory aria-hidden />
+          <Scissors aria-hidden />
           Registrar avance de producción
         </Button>
 

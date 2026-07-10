@@ -45,9 +45,8 @@ test.describe('Desarrollo (F8-E2)', () => {
 
     // ── Crea un proyecto ────────────────────────────────────────────────────────
     await page.goto('/desarrollo');
-    // `exact`: la lista+detalle auto-selecciona el primer proyecto (si la BD trae alguno) y su
-    // panel trae un <h3>"Desarrollos"</h3> → "Desarrollo" (substring) haría doble match sin exact.
-    await expect(page.getByRole('heading', { name: 'Desarrollo', exact: true })).toBeVisible();
+    // R9 fidelidad: la lista de proyectos es tabla-first con el título del proto `vPrecosteosLista`.
+    await expect(page.getByRole('heading', { name: 'Pre-costeos', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
     await expect(dialogoProyecto.getByRole('heading', { name: 'Nuevo proyecto' })).toBeVisible();
@@ -57,10 +56,10 @@ test.describe('Desarrollo (F8-E2)', () => {
     await page.getByTestId('guardar-proyecto').click();
     await expect(page.getByText(/Proyecto \d+ creado\./)).toBeVisible();
 
-    // Selecciona el proyecto nuevo en la lista.
+    // Abre el proyecto nuevo (drill-in a página completa, R9).
     const detalle = page.getByTestId('detalle-proyecto');
     await page.getByTestId('fila-proyecto').filter({ hasText: nombreProyecto }).first().click();
-    await expect(detalle.getByText('Datos del proyecto')).toBeVisible();
+    await expect(detalle.getByRole('heading', { name: nombreProyecto })).toBeVisible();
 
     // ── Agrega un desarrollo con un modelo existente ────────────────────────────
     await detalle.getByTestId('agregar-desarrollo').click();

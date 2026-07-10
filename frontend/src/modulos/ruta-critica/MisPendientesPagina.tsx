@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, ClipboardList, Loader2, Search, Users } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Loader2, Search, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -69,6 +69,15 @@ export function MisPendientesPagina(): React.JSX.Element {
   const puedeCapturar = tienePermiso('rc.capturar');
   const esSupervisor = tienePermiso('rc.programar');
 
+  // "hoy 6 jul 2026" del proto: solo presentación (ancla temporal de la guía diaria).
+  const ahora = new Date();
+  const hoyLargo = ahora.toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+  const hoyCorto = ahora.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+
   // "Viendo pendientes de:" — null = los míos. El Combobox trabaja con ids numéricos, así que se
   // mapea por índice sobre la lista de responsables (presentación, no negocio).
   const [indiceUsuario, setIndiceUsuario] = useState<number | null>(null);
@@ -105,7 +114,7 @@ export function MisPendientesPagina(): React.JSX.Element {
       pie: (r?.vencidas ?? 0) > 0 ? '⚠ requieren acción ya' : 'nada vencido',
       ...((r?.vencidas ?? 0) > 0 ? { tonoPie: 'crit' as const } : {}),
     },
-    { clave: 'hoy', etiqueta: 'Para hoy', valor: r?.paraHoy ?? '—', pie: 'el foco del día' },
+    { clave: 'hoy', etiqueta: 'Para hoy', valor: r?.paraHoy ?? '—', pie: `foco · ${hoyCorto}` },
     {
       clave: 'semana',
       etiqueta: 'Esta semana',
@@ -143,14 +152,13 @@ export function MisPendientesPagina(): React.JSX.Element {
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <ClipboardList className="size-5" aria-hidden />
-          </span>
           <div>
-            <h1 className="text-xl font-semibold">Mis pendientes</h1>
-            <p className="text-sm text-muted-foreground">
-              Tu guía diaria de Ruta Crítica — una orden pasa por varios procesos; aquí ves los que
-              te tocan a ti.
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Mis pendientes
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
+              Tu guía diaria de Ruta Crítica · hoy <b>{hoyLargo}</b> · una orden pasa por varios
+              procesos; aquí ves los que te tocan a ti
             </p>
           </div>
         </div>
@@ -189,7 +197,8 @@ export function MisPendientesPagina(): React.JSX.Element {
               />
             </div>
             <span className="text-xs text-muted-foreground">
-              — cada quien ve solo los suyos; como supervisor puedes revisar los de cualquiera.
+              — cada quien ve solo los suyos; como admin puedes revisar los de cualquiera. Una
+              persona puede ser responsable de <b>varios procesos</b>.
             </span>
           </div>
         ) : null}
@@ -361,9 +370,7 @@ function Seccion({
     >
       <header className="flex flex-wrap items-center gap-2 border-b px-4 py-2.5">
         <h2 className="text-sm font-semibold">{titulo}</h2>
-        <Badge variant="secondary" className="tabular-nums">
-          {tareas.length}
-        </Badge>
+        <span className="text-xs text-faint tabular-nums">{tareas.length}</span>
         {nota === undefined ? null : (
           <span className="ml-auto text-xs text-muted-foreground">{nota}</span>
         )}

@@ -1,4 +1,4 @@
-import { Loader2Icon, MinusCircle, PlusCircle } from 'lucide-react';
+import { Loader2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -48,7 +48,6 @@ export function CapturaMovimientoPagina({
 
   const esAbono = concepto === 'abonos';
   const etiqueta = esAbono ? 'abono' : 'descuento';
-  const Icono = esAbono ? PlusCircle : MinusCircle;
 
   // "Duplicar partida" (F6-E5): valores iniciales por router state (pre-llenan el formulario).
   const inicial = (location.state ?? null) as PartidaInicial | null;
@@ -104,12 +103,11 @@ export function CapturaMovimientoPagina({
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid={`captura-${concepto}`}>
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Icono className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">{esAbono ? 'Abonos' : 'Descuentos'}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            {esAbono ? 'Abonos' : 'Descuentos'}
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Captura un {etiqueta} a la cuenta corriente de un maquilero.
           </p>
         </div>

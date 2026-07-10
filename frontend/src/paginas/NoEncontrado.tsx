@@ -12,8 +12,10 @@ export function NoEncontrado(): React.JSX.Element {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-4 py-16 text-center">
         <p className="font-heading text-6xl font-bold tracking-tight text-primary">404</p>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight">Página no encontrada</h1>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+        <h1 className="mt-4 text-[21px] leading-tight font-semibold tracking-tight">
+          Página no encontrada
+        </h1>
+        <p className="mt-2 max-w-md text-[12.5px] text-muted-foreground">
           La página que buscas no existe o no tienes permiso para verla.
         </p>
         <Button asChild className="mt-6">

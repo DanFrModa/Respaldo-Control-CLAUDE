@@ -189,6 +189,6 @@ describe('<AnalisisRcPagina>', () => {
     renderConProveedores(<AnalisisRcPagina />, {
       sesion: estadoSesionDePrueba(['rc.ruta-ver', 'rc.programar']),
     });
-    expect(screen.getByText('Ninguna orden en riesgo ni atrasada.')).toBeInTheDocument();
+    expect(screen.getByText('Ninguna orden en riesgo ni atrasada 🎉')).toBeInTheDocument();
   });
 });

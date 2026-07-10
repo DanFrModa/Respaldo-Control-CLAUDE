@@ -12,7 +12,6 @@ import {
 } from '@/api/tallas';
 import type { Curva, CurvasQuery, Talla, TallasQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
 import { cn } from '@/lib/utils';
 import {
@@ -194,17 +193,12 @@ function PanelTallas(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `vCat` tallas: renglón plano (sin thumb). La columna «Curva» del proto no existe por
+  // talla en v2 (una talla puede vivir en varias curvas; las curvas tienen su pestaña propia).
   const columnas: ColumnaCatalogo<Talla>[] = [
     {
       encabezado: 'Talla',
-      render: (t) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={t.etiqueta} tono="neutro" tamano="sm">
-            <Ruler className="size-4" aria-hidden />
-          </Avatar>
-          <span className="font-medium">{t.etiqueta}</span>
-        </div>
-      ),
+      render: (t) => <span className="font-semibold">{t.etiqueta}</span>,
     },
     { encabezado: 'Orden', numerica: true, render: (t) => t.orden },
   ];
@@ -215,7 +209,6 @@ function PanelTallas(): React.JSX.Element {
         testid="talla"
         titulo="Tallas"
         descripcion="Catálogo base · tallas individuales (D4)"
-        icono={Ruler}
         unidad="tallas"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}
@@ -357,14 +350,7 @@ function PanelCurvas(): React.JSX.Element {
   const columnas: ColumnaCatalogo<Curva>[] = [
     {
       encabezado: 'Curva',
-      render: (c) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={c.nombre} tono="servicios" tamano="sm">
-            <LayoutGrid className="size-4" aria-hidden />
-          </Avatar>
-          <span className="font-medium">{c.nombre}</span>
-        </div>
-      ),
+      render: (c) => <span className="font-semibold">{c.nombre}</span>,
     },
     {
       encabezado: 'Tallas (en orden)',
@@ -393,7 +379,6 @@ function PanelCurvas(): React.JSX.Element {
         testid="curva"
         titulo="Curvas"
         descripcion="Catálogo base · conjuntos ordenados de tallas (D4)"
-        icono={LayoutGrid}
         unidad="curvas"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}

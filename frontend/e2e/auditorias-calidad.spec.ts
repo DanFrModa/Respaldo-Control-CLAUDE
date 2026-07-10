@@ -53,7 +53,8 @@ test.describe('Consulta de auditorías (F6-E3)', () => {
     await page.goto('/calidad');
     await page.getByTestId('calidad-consulta-auditorias').click();
 
-    await expect(page.getByRole('heading', { name: 'Consulta de auditorías' })).toBeVisible();
+    // R9 fidelidad: el título de la consulta es el del proto `vCalidad`.
+    await expect(page.getByRole('heading', { name: 'Control de calidad · AQL' })).toBeVisible();
     // Filtros de servidor presentes (maquilero + resultado).
     await expect(page.getByTestId('filtro-maquilero-auditoria')).toBeVisible();
     await expect(page.getByTestId('filtro-resultado-auditoria')).toBeVisible();

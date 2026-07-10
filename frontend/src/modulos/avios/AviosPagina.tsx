@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -163,8 +163,8 @@ export function AviosPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Avíos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Avíos</h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Catálogo · cada avío puede tener varios proveedores con su precio (R1) · el proveedor se
             amarra en la compra
           </p>
@@ -180,8 +180,11 @@ export function AviosPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* El select va en caja de ancho FIJO: el envoltorio interno de `SelectNativo` es
+              w-full y, suelto en un toolbar flex-wrap, se roba el renglón entero (y su chevron
+              queda huérfano a la derecha). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-40 h-8 text-sm"
             value={generoFiltro}
             onChange={(e) => {
               setGeneroFiltro(e.target.value);
@@ -194,17 +197,24 @@ export function AviosPagina(): React.JSX.Element {
             <option value="generico">Solo genéricos</option>
             <option value="normal">Solo por orden</option>
           </SelectNativo>
-          <Input
-            type="search"
-            className="h-8 w-52 text-sm"
-            placeholder="Buscar avío…"
-            value={textoBusqueda}
-            onChange={(e) => {
-              setTextoBusqueda(e.target.value);
-              reiniciar();
-            }}
-            data-testid="buscar-avio"
-          />
+          {/* Búsqueda con lupa (proto `.tool-search`). */}
+          <div className="relative w-52">
+            <Search
+              className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              className="h-8 pl-8 text-sm"
+              placeholder="Buscar avío…"
+              value={textoBusqueda}
+              onChange={(e) => {
+                setTextoBusqueda(e.target.value);
+                reiniciar();
+              }}
+              data-testid="buscar-avio"
+            />
+          </div>
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input
               type="checkbox"
@@ -217,11 +227,10 @@ export function AviosPagina(): React.JSX.Element {
             />
             Incluir inactivos
           </label>
-          <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} avíos
-            </span>
-          </div>
+          {/* Conteo a la derecha (proto `.count`: "visibles de total", texto plano atenuado). */}
+          <span className="ml-auto text-xs text-faint">
+            {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')}
+          </span>
         </div>
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
@@ -388,7 +397,10 @@ function RenglonAvio({
         </TablaDensaCelda>
         <TablaDensaCelda>
           <div className="flex items-center gap-2">
-            <Avatar nombre={avio.clave} tono="avios" tamano="sm" />
+            {/* Proto: el thumb del avío es la sigla FIJA "AV" (cian), no las iniciales de la clave. */}
+            <Avatar nombre={avio.clave} tono="avios" tamano="sm">
+              AV
+            </Avatar>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-1.5">
                 <span className="font-medium">{avio.descripcion}</span>
@@ -400,7 +412,7 @@ function RenglonAvio({
                       : 'Se compra contra la orden'
                   }
                 >
-                  {avio.esGenerico ? 'Genérico' : 'Por orden'}
+                  {avio.esGenerico ? 'Genérico · stock' : 'Por orden'}
                 </ChipEstado>
               </div>
               <div className="num text-xs text-faint">{avio.clave}</div>

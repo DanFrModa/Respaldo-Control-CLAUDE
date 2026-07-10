@@ -228,8 +228,8 @@ export function ModelosPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Modelos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Modelos</h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Catálogo de producto · fotos y receta (BOM)
           </p>
         </div>
@@ -258,8 +258,10 @@ export function ModelosPagina(): React.JSX.Element {
             onChange={(e) => alBuscar(e.target.value)}
             data-testid="buscar-modelo"
           />
+          {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
+              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea). */}
           <SelectNativo
-            className="h-8 text-sm"
+            className="w-48 h-8 text-sm"
             value={temporadaFiltro}
             onChange={(e) => alCambiarTemporada(e.target.value)}
             aria-label="Filtrar modelos por temporada"
@@ -282,8 +284,9 @@ export function ModelosPagina(): React.JSX.Element {
             Incluir descontinuados
           </label>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} modelos
+            {/* Conteo del proto (`.count`): "visibles de total" ("8 de 214"). */}
+            <span className="text-[12px] text-faint">
+              {registros.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')} modelos
             </span>
           </div>
         </div>
@@ -329,7 +332,8 @@ export function ModelosPagina(): React.JSX.Element {
                       <div className="flex items-center gap-2">
                         <Avatar nombre={m.codigo} tono="pt" tamano="sm" />
                         <div className="min-w-0">
-                          <div className="truncate font-medium">{m.codigo}</div>
+                          {/* Proto: título del renglón en `cell-strong` (600). */}
+                          <div className="truncate font-semibold">{m.codigo}</div>
                           {m.descripcion !== null && m.descripcion.trim() !== '' ? (
                             <div className="truncate text-xs text-muted-foreground">
                               {m.descripcion}

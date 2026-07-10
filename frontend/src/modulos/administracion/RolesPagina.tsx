@@ -100,8 +100,10 @@ export function RolesPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Roles y permisos</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Roles y permisos
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Roles del sistema y los permisos que otorga cada uno
           </p>
         </div>
@@ -125,9 +127,7 @@ export function RolesPagina(): React.JSX.Element {
             data-testid="buscar-rol"
           />
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} roles
-            </span>
+            <span className="text-[12px] text-faint">{total.toLocaleString('es-MX')} roles</span>
           </div>
         </div>
 

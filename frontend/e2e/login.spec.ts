@@ -46,9 +46,9 @@ test.describe('Inicio de sesión', () => {
   test('el admin entra y ve el riel con los grupos aprobados del rediseño', async ({ page }) => {
     await entrarComoAdmin(page);
 
-    // Entró a la app (inicio).
+    // Entró a la app (el Resumen operativo del rediseño R9).
     await expect(page).toHaveURL(/\/$|\/$/);
-    await expect(page.getByRole('heading', { name: /Hola, Administrador/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Resumen operativo' })).toBeVisible();
 
     // El admin (todos los permisos) ve el menú del rediseño R1: GRUPOS con
     // desplegables de 2 niveles (estructura aprobada por Daniel, 4-jul-2026).
@@ -75,14 +75,19 @@ test.describe('Inicio de sesión', () => {
     // (Desarrollo, Producción, Calidad, Clientes, Catálogos base), ni uno más.
     const padres = navegacion.getByRole('button');
     expect(await padres.count()).toBe(5);
-    // Al abrir "Producción" aparecen SUS DOS hijos aprobados y NADA de las 14 sub-vistas
-    // legadas (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
-    await navegacion.getByRole('button', { name: 'Producción' }).click();
+    // "Producción" arranca EXPANDIDA por default (fidelidad R9, como el prototipo):
+    // sus DOS hijos aprobados se ven SIN clic, y NADA de las 14 sub-vistas legadas
+    // (corte/envíos/recibos/WIP…), que ahora se alcanzan por ⌘K o URL directa.
     await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
     await expect(
       navegacion.getByRole('link', { name: 'Notas de salida', exact: true }),
     ).toBeVisible();
     await expect(navegacion.getByRole('link', { name: 'Tablero WIP' })).toHaveCount(0);
+    // El padre sigue siendo desplegable: un clic la cierra y otro la reabre.
+    await navegacion.getByRole('button', { name: 'Producción' }).click();
+    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toHaveCount(0);
+    await navegacion.getByRole('button', { name: 'Producción' }).click();
+    await expect(navegacion.getByRole('link', { name: 'Órdenes (OP)' })).toBeVisible();
     // "Ruta Crítica" (la entrada estrella) es HOJA DIRECTA a Mis pendientes (R4).
     await expect(navegacion.getByRole('link', { name: 'Ruta Crítica', exact: true })).toBeVisible();
     // "Procesos y responsables" y "Usuarios y accesos" son HOJAS DIRECTAS (Daniel): su

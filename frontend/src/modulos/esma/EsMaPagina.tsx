@@ -1,6 +1,5 @@
 import {
   BadgeCheck,
-  Banknote,
   CalendarClock,
   FileText,
   MinusCircle,
@@ -137,12 +136,9 @@ export function EsMaPagina(): React.JSX.Element {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
         <div className="flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-            <Banknote className="size-5" aria-hidden />
-          </span>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">EsMa</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">EsMa</h1>
+            <p className="mt-1 text-[12.5px] text-muted-foreground">
               Estados de cuenta de maquileros: cargos, conciliación, abonos, descuentos y pagos.
             </p>
           </div>

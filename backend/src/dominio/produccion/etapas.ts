@@ -1103,9 +1103,10 @@ export async function corteSemanalPorCortador(
 /**
  * Año-semana ISO 8601 ("2026-W25") y el LUNES de esa semana (YYYY-MM-DD) para una fecha. ISO: la
  * semana 1 es la que contiene el primer jueves del año; la semana empieza en lunes. Cálculo en UTC
- * (la fecha de la etapa es `@db.Date` a medianoche UTC).
+ * (la fecha de la etapa es `@db.Date` a medianoche UTC). Exportada: el Resumen operativo (R9) la
+ * reusa para "cortado esta semana" y la serie "cortes por semana" (misma definición de semana).
  */
-function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
+export function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
   const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
   // getUTCDay(): 0=domingo..6=sábado → ISO 1=lunes..7=domingo.
   const diaIso = d.getUTCDay() === 0 ? 7 : d.getUTCDay();

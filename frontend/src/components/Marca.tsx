@@ -7,13 +7,14 @@ type TamanoMarca = 'sm' | 'md' | 'lg';
 
 const CUADRO: Record<TamanoMarca, string> = {
   sm: 'size-7 rounded-lg',
-  md: 'size-8 rounded-lg',
+  // `md` es el del riel: 30px y radio 8px EXACTOS del proto (`.logo`).
+  md: 'size-7.5 rounded-[8px]',
   lg: 'size-12 rounded-2xl',
 };
 
 const ICONO: Record<TamanoMarca, string> = {
   sm: 'size-4',
-  md: 'size-4.5',
+  md: 'size-[17px]',
   lg: 'size-7',
 };
 
@@ -75,8 +76,9 @@ export function Marca({
       <span
         aria-hidden
         className={cn(
-          // Degradado del logo del proto: brand-bright → brand, texto oscuro.
-          'flex shrink-0 items-center justify-center bg-gradient-to-br from-primary-bright to-primary text-primary-foreground shadow-sm',
+          // Logo EXACTO del proto (`.logo`): degradado 150deg brand-bright → brand,
+          // icono OSCURO (#04140c, constante en ambos temas) y halo verde suave.
+          'flex shrink-0 items-center justify-center bg-linear-150 from-primary-bright to-primary text-[#04140c] shadow-[0_4px_12px_-4px_rgba(34,181,108,0.6)]',
           CUADRO[tamano],
         )}
       >
@@ -93,9 +95,13 @@ export function Marca({
         >
           <span
             className={cn(
-              'font-heading font-semibold tracking-tight',
-              WORDMARK[tamano],
-              enRiel && 'text-rail-fg-strong',
+              'font-heading',
+              // En el riel, la tipografía EXACTA del proto (`.brand-word b`): 14px,
+              // peso 700 y tracking ancho .12em. El TEXTO sigue siendo "Control v2"
+              // (regla de negocio: Marilyn/MJD NO va en la UI).
+              enRiel
+                ? 'text-[14px] font-bold tracking-[0.12em] text-rail-fg-strong'
+                : cn('font-semibold tracking-tight', WORDMARK[tamano]),
             )}
           >
             Control <span className={enRiel ? 'text-rail-active-fg' : 'text-primary'}>v2</span>
@@ -104,8 +110,11 @@ export function Marca({
             <span
               aria-hidden
               className={cn(
-                'truncate text-xs tracking-wider uppercase',
-                enRiel ? 'text-rail-fg/70' : 'text-muted-foreground',
+                'truncate uppercase',
+                // Subtítulo del proto (`.brand-word span`): 10px, tracking .16em, 70 %.
+                enRiel
+                  ? 'text-[10px] tracking-[0.16em] text-rail-fg/70'
+                  : 'text-xs tracking-wider text-muted-foreground',
               )}
             >
               FR Moda

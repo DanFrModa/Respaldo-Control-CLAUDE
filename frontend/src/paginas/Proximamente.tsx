@@ -33,22 +33,33 @@ export function Proximamente(): React.JSX.Element {
       : 'Próximamente — esta pantalla se construye en una fase posterior del plan.';
 
   return (
-    <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex w-full max-w-2xl flex-col items-center px-4 py-16 text-center">
-        <span
-          aria-hidden
-          className="flex size-14 items-center justify-center rounded-xl bg-primary-soft text-primary-soft-foreground"
-        >
-          <Icono className="size-7" aria-hidden />
-        </span>
-        <h1 className="mt-5 text-xl font-semibold tracking-tight">
+    <div className="flex h-full flex-col overflow-y-auto p-4 md:p-5">
+      {/* page-head del proto vPlaceholder: título + sub genérico del sistema. */}
+      <header className="shrink-0">
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
           {modulo.titulo}
           {modulo.destacado ? ' ⭐' : ''}
         </h1>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">{modulo.descripcion}.</p>
-        <p className="mt-5 rounded-full bg-primary-soft px-4 py-1.5 text-sm font-medium text-primary-soft-foreground">
-          {nota}
-        </p>
+        <p className="mt-0.5 text-[12.5px] text-muted-foreground">Módulo del sistema CONTROL v2</p>
+      </header>
+
+      {/* .placeholder del proto: bloque centrado (ícono 56px + título 17px + texto acotado). */}
+      <div className="grid min-h-[60vh] flex-1 place-items-center text-center">
+        <div className="flex flex-col items-center px-4">
+          <span
+            aria-hidden
+            className="grid size-14 place-items-center rounded-[14px] bg-primary-soft text-primary"
+          >
+            <Icono className="size-[26px]" aria-hidden />
+          </span>
+          <h2 className="mt-3.5 text-[17px] font-semibold">{modulo.titulo}</h2>
+          <p className="mt-1.5 max-w-[380px] text-sm text-muted-foreground">
+            {modulo.descripcion}.
+          </p>
+          <p className="mt-4 rounded-full bg-primary-soft px-4 py-1.5 text-sm font-medium text-primary-soft-foreground">
+            {nota}
+          </p>
+        </div>
       </div>
     </div>
   );

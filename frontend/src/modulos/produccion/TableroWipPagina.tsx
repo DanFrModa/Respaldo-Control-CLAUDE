@@ -1,4 +1,4 @@
-import { Factory, Layers, Scissors, Search } from 'lucide-react';
+import { Layers, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -144,19 +144,14 @@ export function TableroWipPagina(): React.JSX.Element {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="tablero-wip">
-      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
+      {/* ── Encabezado (proto `page-head`: sin mosaico de icono) ───────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <Factory className="size-4.5" aria-hidden />
-        </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Producción · WIP</h1>
-          <p className="truncate text-xs text-muted-foreground">
-            Trabajo en proceso por etapa (corte, envío, recibo y entrega) · derivado de los
-            movimientos
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Producción · WIP
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
+            Trabajo en proceso por etapa · tiempo real (derivado de los movimientos)
           </p>
         </div>
         {puedeCortar ? (
@@ -165,7 +160,7 @@ export function TableroWipPagina(): React.JSX.Element {
             onClick={() => void navigate('/produccion/corte')}
             data-testid="wip-ir-corte"
           >
-            <Scissors aria-hidden />
+            <Plus aria-hidden />
             Registrar corte
           </Button>
         ) : null}
@@ -194,8 +189,10 @@ export function TableroWipPagina(): React.JSX.Element {
               aria-label="Buscar órdenes"
             />
           </div>
+          {/* SelectNativo envuelve el <select> en un div w-full: sin ancho fijo alrededor se roba
+              un renglón completo de la barra (visto en la foto de fidelidad R9). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-44 h-8 text-sm"
             value={idCliente}
             onChange={(e) => {
               setIdCliente(e.target.value);
@@ -224,9 +221,7 @@ export function TableroWipPagina(): React.JSX.Element {
             Solo con pendientes
           </label>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {fmt(datos?.total ?? 0)} órdenes
-            </span>
+            <span className="text-[12px] text-faint">{fmt(datos?.total ?? 0)} órdenes</span>
           </div>
         </div>
 

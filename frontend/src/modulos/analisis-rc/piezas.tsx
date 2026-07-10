@@ -8,57 +8,41 @@ import { cn } from '@/lib/utils';
  */
 
 /**
- * Sparkline de línea (tendencia): dibuja `valores` como una polilínea normalizada a su min/max, con un
- * punto en el último dato. Decorativo + `aria-label` que enuncia la serie (el color no basta). Sin
- * dependencias (SVG inline). Vacío/1 punto → una línea plana.
+ * Sparkline de MINI-BARRAS (proto `spark()`): una barrita de 9px por valor (escala 0-100, altura
+ * proporcional con piso de 4px), color de marca. Decorativo + `aria-label` que enuncia la serie
+ * (el color no basta); cada barra lleva `title` con su valor. Sin dependencias.
  */
 export function Sparkline({
   valores,
   sufijo = '',
-  ancho = 96,
-  alto = 28,
+  alto = 26,
   className,
 }: {
   valores: readonly number[];
-  /** Sufijo para la etiqueta accesible (p. ej. "%"). */
+  /** Sufijo para las etiquetas (p. ej. "%"). */
   sufijo?: string;
-  ancho?: number;
   alto?: number;
   className?: string;
 }): React.JSX.Element {
-  const n = valores.length;
-  const pad = 3;
-  const min = n > 0 ? Math.min(...valores) : 0;
-  const max = n > 0 ? Math.max(...valores) : 1;
-  const rango = max - min || 1;
-  const x = (i: number): number => (n <= 1 ? pad : pad + (i * (ancho - 2 * pad)) / (n - 1));
-  const y = (v: number): number => alto - pad - ((v - min) / rango) * (alto - 2 * pad);
-  const puntos = valores.map((v, i) => `${x(i)},${y(v)}`).join(' ');
-  const ultimo = n > 0 ? (valores[n - 1] ?? 0) : 0;
   const etiqueta = `Tendencia: ${valores.join(', ')}${sufijo}`;
-
   return (
-    <svg
+    <span
       role="img"
       aria-label={etiqueta}
-      viewBox={`0 0 ${ancho} ${alto}`}
-      width={ancho}
-      height={alto}
-      className={cn('text-ok', className)}
+      className={cn('inline-flex items-end gap-[3px] text-primary', className)}
+      style={{ height: alto }}
       data-testid="sparkline"
     >
-      {n > 1 ? (
-        <polyline
-          points={puntos}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.75}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+      {valores.map((v, i) => (
+        <span
+          // La serie es posicional (semanas consecutivas): el índice es la llave natural.
+          key={i}
+          className="w-[9px] rounded-[2px] bg-current"
+          style={{ height: Math.max(4, Math.round((v / 100) * alto)) }}
+          title={`${v}${sufijo}`}
         />
-      ) : null}
-      {n > 0 ? <circle cx={x(n - 1)} cy={y(ultimo)} r={2.25} fill="currentColor" /> : null}
-    </svg>
+      ))}
+    </span>
   );
 }
 

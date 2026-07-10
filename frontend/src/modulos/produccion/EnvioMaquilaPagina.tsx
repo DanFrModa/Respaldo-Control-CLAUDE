@@ -1,4 +1,4 @@
-import { FileText, Printer, Send } from 'lucide-react';
+import { FileText, Printer } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -179,12 +179,11 @@ export function EnvioMaquilaPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <Send className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Envío a maquila</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Envío a maquila
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Costura, estampado, bordado o lavado desde una sola pantalla. No deja exceder lo
             cortado.
           </p>

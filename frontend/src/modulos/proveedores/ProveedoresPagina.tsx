@@ -55,6 +55,7 @@ import {
   TablaDensaFila,
   TablaDensaHead,
 } from '@/components/dominio/TablaDensa';
+import { ChipEstado } from '@/components/dominio/ChipEstado';
 import { Avatar, EstadoBadge, TipoBadge } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -165,7 +166,8 @@ function textoSurte(p: Proveedor): string {
  * FIDELIDAD vs proto: (1) la columna "Saldo CxP" del proto NO tiene backend (las CxP son la fase F9);
  * en su lugar el cajón muestra un placeholder "Llega con Finanzas (F9)" — no se inventa un saldo en la
  * tabla. (2) Los chips del proto (Todos/Materiales/Maquila) se implementan como selects de tipo y rol
- * (funcionales, sobre el filtro del servidor).
+ * (funcionales, sobre el filtro del servidor). (3) Como el proto, la TABLA usa thumb teal uniforme y
+ * badge NEUTRAL con punto para el tipo (el cajón conserva los tonos explicativos por tipo).
  *
  * `proveedores.ver` gobierna el acceso; `proveedores.administrar` decide las acciones de escritura
  * (el backend re-decide, A1).
@@ -256,8 +258,8 @@ export function ProveedoresPagina(): React.JSX.Element {
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Proveedores</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Proveedores</h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Catálogo enriquecido · maquileros y materiales · CxP
           </p>
         </div>
@@ -272,8 +274,10 @@ export function ProveedoresPagina(): React.JSX.Element {
       {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
+          {/* SelectNativo envuelve el <select> en un div `w-full`: se acota AQUÍ el ancho para
+              que el toolbar quede en UN renglón compacto como el proto (chips/filtros en línea). */}
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-40 h-8 text-sm"
             value={tipoFiltro}
             onChange={(e) => {
               setTipoFiltro(e.target.value as TipoProveedorClave | typeof TIPO_TODOS);
@@ -290,7 +294,7 @@ export function ProveedoresPagina(): React.JSX.Element {
             ))}
           </SelectNativo>
           <SelectNativo
-            className="h-8 w-auto text-sm"
+            className="w-40 h-8 text-sm"
             value={rolFiltro}
             onChange={(e) => {
               setRolFiltro(e.target.value);
@@ -331,8 +335,9 @@ export function ProveedoresPagina(): React.JSX.Element {
             Incluir inactivos
           </label>
           <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} proveedores
+            {/* Conteo del proto (`.count`): "visibles de total". */}
+            <span className="text-[12px] text-faint">
+              {filas.length.toLocaleString('es-MX')} de {total.toLocaleString('es-MX')} proveedores
             </span>
           </div>
         </div>
@@ -376,19 +381,19 @@ export function ProveedoresPagina(): React.JSX.Element {
                   >
                     <TablaDensaCelda>
                       <div className="flex items-center gap-2">
-                        <Avatar nombre={p.nombre} tono={TONO_POR_TIPO[p.tipo]} tamano="sm" />
-                        <span className="font-medium">{p.nombre}</span>
+                        {/* Proto: thumb ÚNICO teal para todos los proveedores (no por tipo). */}
+                        <Avatar nombre={p.nombre} tono="pt" tamano="sm" />
+                        <span className="font-semibold">{p.nombre}</span>
                       </div>
                     </TablaDensaCelda>
                     <TablaDensaCelda>
-                      <TipoBadge tono={TONO_POR_TIPO[p.tipo]}>
-                        {ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}
-                      </TipoBadge>
+                      {/* Proto: `badge neutral` con punto para el tipo (gris uniforme). */}
+                      <ChipEstado tono="neutro">{ETIQUETAS_TIPO_PROVEEDOR[p.tipo]}</ChipEstado>
                     </TablaDensaCelda>
                     <TablaDensaCelda className="text-muted-foreground">
                       {hayTexto(p.contacto) ? p.contacto : '—'}
                     </TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
+                    <TablaDensaCelda className="text-xs text-faint">
                       {textoSurte(p)}
                     </TablaDensaCelda>
                     <TablaDensaCelda>

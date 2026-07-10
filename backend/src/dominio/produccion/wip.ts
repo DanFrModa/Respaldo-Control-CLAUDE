@@ -101,8 +101,11 @@ async function totalesPorOrden(
   return totales;
 }
 
-/** Total pedido (Σ de la matriz `OrdenLineaTalla`) por orden, para un conjunto de órdenes. */
-async function pedidoPorOrden(
+/**
+ * Total pedido (Σ de la matriz `OrdenLineaTalla`) por orden, para un conjunto de órdenes.
+ * Exportada: el Resumen operativo (R9) la reusa para las piezas de "órdenes por vencer".
+ */
+export async function pedidoPorOrden(
   cliente: ClienteLectura,
   idsOrden: number[],
 ): Promise<Map<number, number>> {
@@ -224,8 +227,11 @@ export function tienePendiente(t: TotalesOrden): boolean {
  * El filtro `soloPendientes` del listado NO participa aquí: se aplica en memoria sobre las filas y una
  * orden sin nada pendiente aporta 0 a cada etapa pendiente, por lo que la Σ es idéntica. Así el
  * agregado refleja exactamente el `where` SQL (empresa/estado/modelo/cliente/búsqueda).
+ *
+ * Exportada: el Resumen operativo (R9) la reusa para "en producción (WIP)" (mismo criterio D3/D4,
+ * sin duplicar la derivación).
  */
-async function agregadoWip(
+export async function agregadoWip(
   cliente: ClienteLectura,
   where: Prisma.OrdenWhereInput,
 ): Promise<WipTotales> {

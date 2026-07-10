@@ -1,4 +1,4 @@
-import { FileText, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import { imprimirListaPrecios, useListaPrecios } from '@/api/costos';
@@ -41,12 +41,11 @@ export function ListaPreciosPagina(): React.JSX.Element {
   return (
     <div className="space-y-6 p-4 md:p-6" data-testid="lista-precios">
       <header className="flex items-center gap-3">
-        <span className="grid size-10 place-items-center rounded-lg bg-sidebar-accent/40 text-sidebar-accent-foreground">
-          <FileText className="size-5" aria-hidden />
-        </span>
         <div>
-          <h1 className="text-xl font-semibold">Lista de precios</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Lista de precios
+          </h1>
+          <p className="text-[12.5px] text-muted-foreground">
             Precio de venta sugerido por modelo (utilidad + regalías sobre la venta, redondeo al
             alza).
           </p>

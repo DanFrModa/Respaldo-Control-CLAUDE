@@ -54,9 +54,8 @@ test.describe('Pedidos (rediseño R3, §4.1)', () => {
     await expect(page.getByText(`Modelo "${codigoModelo}" creado.`)).toBeVisible();
 
     await page.goto('/desarrollo');
-    // `exact`: la lista+detalle auto-selecciona el primer proyecto (si la BD trae alguno) y su
-    // panel trae un <h3>"Desarrollos"</h3> → "Desarrollo" (substring) haría doble match sin exact.
-    await expect(page.getByRole('heading', { name: 'Desarrollo', exact: true })).toBeVisible();
+    // R9 fidelidad: la lista de proyectos es tabla-first con el título del proto `vPrecosteosLista`.
+    await expect(page.getByRole('heading', { name: 'Pre-costeos', exact: true })).toBeVisible();
     await page.getByTestId('nuevo-proyecto').click();
     const dialogoProyecto = page.getByRole('dialog');
     await dialogoProyecto.getByLabel('Cliente').selectOption({ label: cliente });

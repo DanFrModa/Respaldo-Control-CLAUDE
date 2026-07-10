@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
@@ -20,6 +20,11 @@ vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [{ id: 9, nombre: 'Costuras del Bajío' }] } }),
 }));
 
+// La columna "Empresa" resuelve el nombre con el catálogo (lookup de presentación).
+vi.mock('@/api/empresas', () => ({
+  useEmpresas: () => ({ data: [{ id: 1, nombre: 'FR Moda', identificador: 'FR' }] }),
+}));
+
 // El detalle abre estos diálogos (montados solo al usarse): se simplifican.
 vi.mock('./DialogoEditarNota', () => ({ DialogoEditarNota: () => null }));
 vi.mock('./DialogoCancelarNota', () => ({ DialogoCancelarNota: () => null }));
@@ -31,7 +36,7 @@ function paginaConUna(estatus: ReturnType<typeof notaDePrueba>['estatus'] = 'bor
       datos: [notaDePrueba({ estatus })],
       total: 1,
       pagina: 1,
-      porPagina: 10,
+      porPagina: 20,
       totalPaginas: 1,
     },
     isPending: false,
@@ -40,24 +45,31 @@ function paginaConUna(estatus: ReturnType<typeof notaDePrueba>['estatus'] = 'bor
   });
 }
 
-describe('NotasSalidaPagina (F4-E5)', () => {
+/** Abre el cajón de detalle de la única nota (la tabla es "clic en la fila"; el cajón monta en portal). */
+async function abrirDetalle(): Promise<HTMLElement> {
+  fireEvent.click(screen.getByTestId('nota-fila'));
+  return await screen.findByTestId('detalle-nota');
+}
+
+describe('NotasSalidaPagina (F4-E5, re-vestida R9)', () => {
   beforeEach(() => {
     confirmarMutate.mockReset();
     useNotasSalidaMock.mockReset();
   });
 
-  it('lista las notas y muestra su folio y maquilero', () => {
+  it('lista las notas y muestra su folio, maquilero y empresa', () => {
     paginaConUna();
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
     });
     expect(screen.getAllByText('Nota 77').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Costuras del Bajío').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('FR Moda').length).toBeGreaterThan(0);
   });
 
   it('muestra el estado VACÍO cuando no hay notas', () => {
     useNotasSalidaMock.mockReturnValue({
-      data: { datos: [], total: 0, pagina: 1, porPagina: 10, totalPaginas: 0 },
+      data: { datos: [], total: 0, pagina: 1, porPagina: 20, totalPaginas: 0 },
       isPending: false,
       isError: false,
       isFetching: false,
@@ -91,12 +103,12 @@ describe('NotasSalidaPagina (F4-E5)', () => {
     expect(screen.queryByTestId('nuevo-nota')).not.toBeInTheDocument();
   });
 
-  it('el botón Confirmar SOLO aparece con notas.administrar y estatus borrador', () => {
+  it('el botón Confirmar SOLO aparece con notas.administrar y estatus borrador', async () => {
     paginaConUna('borrador');
     const { unmount } = renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
     });
-    const detalle = screen.getByTestId('detalle-nota');
+    let detalle = await abrirDetalle();
     expect(within(detalle).getByTestId('confirmar-nota-accion')).toBeInTheDocument();
     unmount();
 
@@ -105,35 +117,37 @@ describe('NotasSalidaPagina (F4-E5)', () => {
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
     });
-    expect(screen.queryByTestId('confirmar-nota-accion')).not.toBeInTheDocument();
+    detalle = await abrirDetalle();
+    expect(within(detalle).queryByTestId('confirmar-nota-accion')).not.toBeInTheDocument();
   });
 
-  it('confirma una nota en borrador al pulsar Confirmar', () => {
+  it('confirma una nota en borrador al pulsar Confirmar', async () => {
     paginaConUna('borrador');
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
     });
-    const detalle = screen.getByTestId('detalle-nota');
-    within(detalle).getByTestId('confirmar-nota-accion').click();
+    const detalle = await abrirDetalle();
+    fireEvent.click(within(detalle).getByTestId('confirmar-nota-accion'));
     expect(confirmarMutate).toHaveBeenCalledWith(1, expect.anything());
   });
 
-  it('una nota confirmada ofrece "Ver" (solo lectura), no "Editar"', () => {
+  it('una nota confirmada NO ofrece Editar (solo Imprimir/Cancelar)', async () => {
     paginaConUna('confirmada');
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
     });
-    const detalle = screen.getByTestId('detalle-nota');
+    const detalle = await abrirDetalle();
     expect(within(detalle).queryByTestId('editar-nota')).not.toBeInTheDocument();
-    expect(within(detalle).getByTestId('ver-nota')).toBeInTheDocument();
+    expect(within(detalle).getByTestId('imprimir-nota')).toBeInTheDocument();
   });
 
-  it('el botón Cancelar aparece con notas.cancelar y la nota no cancelada', () => {
+  it('el botón Cancelar aparece con notas.cancelar y la nota no cancelada', async () => {
     paginaConUna('confirmada');
     const { unmount } = renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar', 'notas.cancelar']),
     });
-    expect(screen.getByTestId('cancelar-nota')).toBeInTheDocument();
+    let detalle = await abrirDetalle();
+    expect(within(detalle).getByTestId('cancelar-nota')).toBeInTheDocument();
     unmount();
 
     // Sin notas.cancelar, no aparece.
@@ -141,6 +155,7 @@ describe('NotasSalidaPagina (F4-E5)', () => {
     renderConProveedores(<NotasSalidaPagina />, {
       sesion: estadoSesionDePrueba(['notas.ver', 'notas.administrar']),
     });
-    expect(screen.queryByTestId('cancelar-nota')).not.toBeInTheDocument();
+    detalle = await abrirDetalle();
+    expect(within(detalle).queryByTestId('cancelar-nota')).not.toBeInTheDocument();
   });
 });

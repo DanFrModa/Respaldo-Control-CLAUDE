@@ -52,8 +52,8 @@ describe('ExistenciasAviosPagina (F4-E1)', () => {
     renderConProveedores(<ExistenciasAviosPagina />, {
       sesion: estadoSesionDePrueba(['inventario-avios.ver']),
     });
-    // El badge "Genérico" aparece (tabla + tarjeta) para el avío genérico.
-    expect(screen.getAllByText('Genérico').length).toBeGreaterThan(0);
+    // El badge "Genérico · stock" (texto del proto) aparece (tabla + tarjeta) para el avío genérico.
+    expect(screen.getAllByText('Genérico · stock').length).toBeGreaterThan(0);
   });
 
   it('tiene el filtro "solo genéricos"', () => {

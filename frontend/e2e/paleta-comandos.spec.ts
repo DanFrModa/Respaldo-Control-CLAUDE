@@ -79,7 +79,10 @@ test.describe('Paleta de comandos ⌘K', () => {
     await page.getByLabel('Usuario').fill(username);
     await page.getByLabel('Contraseña').fill(PASSWORD_PRUEBA);
     await page.getByRole('button', { name: 'Entrar' }).click();
-    await expect(page.getByRole('heading', { name: /Hola, Usuario Paleta E2E/ })).toBeVisible();
+    // Entró al Resumen operativo (R9) con la sesión del restringido (la identidad se
+    // verifica en el menú de usuario; el saludo por nombre ya no existe).
+    await expect(page.getByRole('heading', { name: 'Resumen operativo' })).toBeVisible();
+    await expect(page.getByTestId('menu-usuario')).toContainText('Usuario Paleta E2E');
 
     // ── La paleta NO lista la pantalla vetada (A4) ──────────────────────────────
     await page.getByTestId('abrir-paleta').click();

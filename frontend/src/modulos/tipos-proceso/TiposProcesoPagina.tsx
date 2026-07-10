@@ -1,4 +1,4 @@
-import { Cog, PackageCheck } from 'lucide-react';
+import { PackageCheck } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -9,7 +9,7 @@ import {
 } from '@/api/tipos-proceso';
 import type { TipoProceso, TiposProcesoQuery } from '@/api/tipos';
 import { DialogoConfirmacion } from '@/components/DialogoConfirmacion';
-import { Avatar, TipoBadge } from '@/components/dominio/visuales';
+import { TipoBadge } from '@/components/dominio/visuales';
 import { useDebounce } from '@/lib/useDebounce';
 import {
   TablaCatalogo,
@@ -116,17 +116,11 @@ export function TiposProcesoPagina(): React.JSX.Element {
       }
     : undefined;
 
+  // Proto `CAT_TIPOSPROC`: renglón plano (sin thumb) — nombre en `cell-strong`.
   const columnas: ColumnaCatalogo<TipoProceso>[] = [
     {
       encabezado: 'Proceso',
-      render: (t) => (
-        <div className="flex items-center gap-2">
-          <Avatar nombre={t.nombre} tono="servicios" tamano="sm">
-            <Cog className="size-4" aria-hidden />
-          </Avatar>
-          <span className="font-medium">{t.nombre}</span>
-        </div>
-      ),
+      render: (t) => <span className="font-semibold">{t.nombre}</span>,
     },
     { encabezado: 'Código', render: (t) => <span className="num text-faint">{t.codigo}</span> },
     {
@@ -148,7 +142,6 @@ export function TiposProcesoPagina(): React.JSX.Element {
         testid="tipo-proceso"
         titulo="Tipos de proceso"
         descripcion="Catálogo base · costura (M) y aplicación (A) — motor de producción"
-        icono={Cog}
         unidad="tipos"
         registros={datos?.datos ?? []}
         cargando={consulta.isPending}

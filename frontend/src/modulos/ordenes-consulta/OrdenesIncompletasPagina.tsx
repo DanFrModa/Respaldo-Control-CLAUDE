@@ -1,4 +1,4 @@
-import { AlertTriangle, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -46,15 +46,11 @@ export function OrdenesIncompletasPagina(): React.JSX.Element {
     <div className="h-full overflow-y-auto" data-testid="ordenes-incompletas">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6">
         <div className="flex flex-wrap items-center gap-3">
-          <span
-            aria-hidden
-            className="flex size-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"
-          >
-            <AlertTriangle className="size-5" />
-          </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold tracking-tight">Órdenes incompletas</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+              Órdenes incompletas
+            </h1>
+            <p className="text-[12.5px] text-muted-foreground">
               Órdenes capturadas a las que aún les falta la matriz color × talla.
             </p>
           </div>

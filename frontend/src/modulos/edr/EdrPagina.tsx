@@ -75,8 +75,10 @@ export function EdrPagina(): React.JSX.Element {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto w-full max-w-6xl p-4 lg:p-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Estado de Resultados</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+          Estado de Resultados
+        </h1>
+        <p className="mt-1 text-[12.5px] text-muted-foreground">
           El P&amp;L mensual consolidado, valuado a costo actual. Las ventas se proponen desde las
           entregas a cliente y se ajustan a lo facturado.
         </p>

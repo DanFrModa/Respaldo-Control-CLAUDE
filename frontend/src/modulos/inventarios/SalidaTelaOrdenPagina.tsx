@@ -82,8 +82,10 @@ export function SalidaTelaOrdenPagina(): React.JSX.Element {
     <div className="space-y-6 p-4 md:p-6">
       <header className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">Salida de tela a orden</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
+            Salida de tela a orden
+          </h1>
+          <p className="truncate text-[12.5px] text-muted-foreground">
             Descuenta tela del inventario ligándola a una orden de producción (única vía que
             descuenta tela)
           </p>

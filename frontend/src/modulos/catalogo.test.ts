@@ -14,6 +14,7 @@ import {
   type ModuloMenu,
   MODULOS_MENU,
   RIEL_GRUPOS,
+  tituloPorRuta,
 } from './catalogo';
 
 /** Construye un conjunto de permisos a partir de una lista (azucar para los tests). */
@@ -449,5 +450,24 @@ describe('EL RIEL (proyección podada — estructura EXACTA de Daniel §3.1)', (
         RIEL_ESPERADO[i]?.entradas.map((e) => e.clave),
       );
     });
+  });
+});
+
+describe('tituloPorRuta (breadcrumb de la topbar)', () => {
+  it('resuelve la raíz, rutas exactas y rutas de detalle (prefijo)', () => {
+    expect(tituloPorRuta('/')).toBe('Resumen');
+    expect(tituloPorRuta('/pedidos')).toBe('Pedidos');
+    // Una ruta de detalle hereda el título de su lista.
+    expect(tituloPorRuta('/modelos/123')).toBe('Modelos');
+  });
+
+  it('gana la hoja MÁS específica cuando hay rutas anidadas', () => {
+    // `/produccion/notas-salida/consulta` es hoja propia; no debe caer en "Notas de salida".
+    expect(tituloPorRuta('/produccion/notas-salida')).toBe('Notas de salida');
+    expect(tituloPorRuta('/produccion/notas-salida/consulta')).toBe('Consulta de notas');
+  });
+
+  it('devuelve undefined para rutas fuera del catálogo (la raíz "/" NO es prefijo de todo)', () => {
+    expect(tituloPorRuta('/no-existe')).toBeUndefined();
   });
 });

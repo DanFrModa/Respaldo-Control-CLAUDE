@@ -1,14 +1,8 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Trash2,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import * as React from 'react';
 
+import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
+import { ChipFiltro, ChipsFiltro } from '@/components/dominio/ChipsFiltro';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -19,7 +13,6 @@ import {
 } from '@/components/dominio/TablaDensa';
 import { EstadoBadge } from '@/components/dominio/visuales';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 /** Una columna de datos de la tabla del catálogo (proto `vCat.cols`). */
 export interface ColumnaCatalogo<T> {
@@ -47,8 +40,7 @@ export interface PropsTablaCatalogo<T> {
   testid: string;
   titulo: string;
   descripcion: string;
-  icono: LucideIcon;
-  /** Sustantivo plural para el conteo ("colores", "tallas"…). */
+  /** Sustantivo plural para el conteo del pie ("colores", "tallas"…). */
   unidad: string;
   registros: readonly T[];
   cargando: boolean;
@@ -82,21 +74,20 @@ export interface PropsTablaCatalogo<T> {
 
 /**
  * TABLA-FIRST de CATÁLOGO (rediseño R9, proto `vCat`): la pantalla estándar de los catálogos base
- * (colores, tallas, temporadas, almacenes…). page-head (título + "Nuevo") + card con barra de
- * herramientas (búsqueda, filtros, inactivos, conteo) + TABLA DENSA con las columnas del catálogo,
- * su Estado (borrado suave) y las acciones inline (editar / desactivar / activar) para quien
- * administra + barra de totales al pie con paginación de servidor.
+ * (colores, tallas, temporadas, almacenes…). page-head del proto (título 21px + sub, SIN icono) +
+ * card con la toolbar del proto — CHIPS «Activos / Todos» (el borrado suave), los filtros extra,
+ * el buscador `.tool-search` y el conteo `.count` a la derecha — + TABLA DENSA con las columnas del
+ * catálogo, su Estado y las acciones inline (editar / desactivar / activar) para quien administra +
+ * barra de totales al pie con paginación de servidor.
  *
- * Sustituye al motor LISTA + DETALLE en los catálogos SIN detalle rico (los que en el proto son una
- * tabla plana). Conserva los `data-testid` del motor anterior (`nuevo-*`, `buscar-*`, `fila-*`,
- * `editar-*`, `desactivar-*`, `activar-*`, `mostrar-desactivados`) para no romper los e2e. Presentación
- * PURA (A1): no sabe de negocio; cada pantalla le pasa sus columnas y handlers.
+ * Conserva los `data-testid` del motor anterior (`nuevo-*`, `buscar-*`, `fila-*`, `editar-*`,
+ * `desactivar-*`, `activar-*`, `mostrar-desactivados` — hoy el chip «Todos») para no romper los e2e.
+ * Presentación PURA (A1): no sabe de negocio; cada pantalla le pasa sus columnas y handlers.
  */
 export function TablaCatalogo<T>({
   testid,
   titulo,
   descripcion,
-  icono: Icono,
   unidad,
   registros,
   cargando,
@@ -130,17 +121,11 @@ export function TablaCatalogo<T>({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
-      {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-soft-foreground"
-        >
-          <Icono className="size-4.5" aria-hidden />
-        </span>
+      {/* ── Encabezado (proto .page-head: título + sub; acciones a la derecha) ── */}
+      <header className="flex shrink-0 flex-wrap items-end gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-semibold">{titulo}</h1>
-          <p className="truncate text-xs text-muted-foreground">{descripcion}</p>
+          <h1 className="text-[21px] leading-tight font-semibold tracking-tight">{titulo}</h1>
+          <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{descripcion}</p>
         </div>
         {puedeAdministrar ? (
           <div className="flex flex-wrap items-center gap-2">
@@ -155,35 +140,33 @@ export function TablaCatalogo<T>({
         ) : null}
       </header>
 
-      {/* ── Card: filtros + tabla + totales ─────────────────────────────────── */}
+      {/* ── Card: toolbar + tabla + totales ─────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
-          <Input
-            type="search"
-            className="h-8 w-52 text-sm"
-            placeholder="Buscar…"
-            value={busqueda}
-            onChange={(e) => alBuscar(e.target.value)}
-            aria-label={`Buscar ${titulo.toLowerCase()}`}
-            data-testid={`buscar-${testid}`}
-          />
-          {filtros}
-          {ocultarToggleInactivos ? null : (
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={incluirInactivos}
-                onChange={alAlternarInactivos}
-                data-testid="mostrar-desactivados"
-              />
-              Incluir inactivos
-            </label>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          {ocultarToggleInactivos ? (
+            <ChipFiltro activo>Todos</ChipFiltro>
+          ) : (
+            <ChipsFiltro
+              etiqueta="Filtrar por estado"
+              opciones={[
+                { valor: 'activos', etiqueta: 'Activos' },
+                // El testid heredado vive en «Todos»: los e2e lo clickean para incluir inactivos.
+                { valor: 'todos', etiqueta: 'Todos', testid: 'mostrar-desactivados' },
+              ]}
+              valor={incluirInactivos ? 'todos' : 'activos'}
+              alCambiar={() => alAlternarInactivos()}
+            />
           )}
-          <div className="ml-auto">
-            <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-              {total.toLocaleString('es-MX')} {unidad}
-            </span>
-          </div>
+          {filtros}
+          <BuscadorToolbar
+            valor={busqueda}
+            alCambiar={alBuscar}
+            etiqueta={`Buscar ${titulo.toLowerCase()}`}
+            testid={`buscar-${testid}`}
+          />
+          <span className="ml-auto text-xs text-faint">
+            {total.toLocaleString('es-MX')} registros
+          </span>
         </div>
 
         {/* ── Cuerpo scrolleable ─────────────────────────────────────────── */}
