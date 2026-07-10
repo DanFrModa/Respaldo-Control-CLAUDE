@@ -13,10 +13,12 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../src/datos/index.js';
 import { registrarMovimientoTercero } from '../src/dominio/terceros/cuenta-terceros.js';
+import { insertarAperturasMigradas } from '../src/dominio/terceros/migracion.js';
 import { clientePruebas, limpiarBaseDatos, sembrarPermisos } from '../src/pruebas/contexto.js';
 
 import { ejecutarEtlTercerosSaldos } from './etl-terceros-saldos.js';
 import { sesionEtl } from './comun/sesion-etl.js';
+import { ENTIDAD_MAPEO } from './comun/mapeo.js';
 import { calcularCuadreF9 } from './cuadre-f9.js';
 
 let cliente: PrismaClient;
@@ -153,13 +155,22 @@ describe('ETL de saldos iniciales F9-E6 (integración)', () => {
   });
 
   it('coexistencia migración↔captura: el bloque de aperturas arranca en V+1 (A3, una sola numeración)', async () => {
-    // Una CAPTURA normal (vía el motor) AVANZA la secuencia ANTES del ETL → folio V (=1). Es el
-    // escenario real de go-live (F10): la BD ya tiene movimientos capturados cuando llega el corte.
+    // Escenario go-live F10: la BD ya tiene movimientos capturados cuando llega el corte. Este caso usa
+    // una EMPRESA y un TERCERO PROPIOS (y claves de idempotencia propias), AISLADO del fixture que
+    // consumen los demás tests — así no altera el estado que ve el cuadre.
+    const empresaCoex = await cliente.empresa.create({
+      data: { nombre: 'Coexistencia SA', paraIpt: true, paraEdr: true, favorita: false },
+    });
+    const provCoex = await cliente.proveedor.create({
+      data: { nombre: 'Proveedor Coex', rfc: 'COE010101AA1', diasCredito: 30 },
+    });
+
+    // Una CAPTURA normal (vía el motor) AVANZA la secuencia de ESA empresa → folio V (=1).
     const captura = await registrarMovimientoTercero(
-      sesionEtl(idEmpresa),
+      sesionEtl(empresaCoex.id),
       {
         tipoTercero: 'proveedor',
-        idTercero: idP1,
+        idTercero: provCoex.id,
         fecha: '2026-06-01',
         origen: 'pago',
         importe: 100,
@@ -169,15 +180,43 @@ describe('ETL de saldos iniciales F9-E6 (integración)', () => {
     );
     expect(Number(captura.folio)).toBe(1);
 
-    // El ETL corre DESPUÉS: reserva su bloque sobre la MISMA serie → arranca en V+1 (=2), contiguo y
-    // sin solaparse con la captura previa (una sola numeración por empresa, A3).
-    await ejecutarEtlTercerosSaldos(cliente, FIXTURE, { corte: CORTE });
-    const folios = (await cliente.movimientoTercero.findMany({ select: { folio: true } }))
+    // El MODO MIGRACIÓN corre DESPUÉS: reserva su bloque sobre la MISMA serie de esa empresa → arranca
+    // en V+1 (=2), contiguo y sin solaparse con la captura previa (una sola numeración por empresa, A3).
+    const res = await insertarAperturasMigradas(
+      sesionEtl(empresaCoex.id),
+      empresaCoex.id,
+      { tipoTercero: 'proveedor', idTercero: provCoex.id, diasCredito: 30 },
+      ENTIDAD_MAPEO.aperturaTercero,
+      [
+        {
+          origen: 'entrada_sin_factura',
+          fecha: new Date('2026-05-01T00:00:00.000Z'),
+          importe: 500,
+          esFiscal: false,
+          claveFuente: 'coex:1',
+        },
+        {
+          origen: 'entrada_sin_factura',
+          fecha: new Date('2026-05-02T00:00:00.000Z'),
+          importe: 700,
+          esFiscal: false,
+          claveFuente: 'coex:2',
+        },
+      ],
+      { cliente },
+    );
+    expect(Number(res.folioDesde)).toBe(2); // arranca en V+1
+    expect(Number(res.folioHasta)).toBe(3);
+
+    const folios = (
+      await cliente.movimientoTercero.findMany({
+        where: { idEmpresa: empresaCoex.id },
+        select: { folio: true },
+      })
+    )
       .map((m) => Number(m.folio))
       .sort((a, b) => a - b);
-    expect(folios).toEqual([1, 2, 3, 4, 5, 6, 7]); // captura(1) + 6 aperturas contiguas
-    const foliosApertura = folios.filter((f) => f !== Number(captura.folio));
-    expect(Math.min(...foliosApertura)).toBe(Number(captura.folio) + 1); // arranca en V+1
+    expect(folios).toEqual([1, 2, 3]); // captura(1) + 2 aperturas contiguas, sin solape
   });
 
   it('CUADRE F9: el corte (saldoEsperado) cuadra contra las aperturas cargadas', async () => {
