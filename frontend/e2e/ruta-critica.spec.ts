@@ -163,7 +163,8 @@ test.describe('Ruta Crítica — catálogo configurable (F5-E1)', () => {
     await filaB.getByTestId('pyr-expandir').click();
     const deps = page.getByTestId('pyr-dependencias');
     await deps.getByTestId('pyr-antecesor-input').fill(nombreA);
-    await deps.getByTestId('pyr-antecesor-opcion').first().click();
+    // La lista del combobox se porta a `document.body` (no cuelga de `deps`): busca la opción en `page`.
+    await page.getByTestId('pyr-antecesor-opcion').first().click();
     await deps.getByTestId('pyr-agregar-antecesor').click();
     await expect(page.getByText(`Antecesor agregado: ${nombreA} → ${nombreB}.`)).toBeVisible();
     // El chip aparece en "Espera a" y el DETONA del otro lado se deriva solo; quitarlo lo regresa.
