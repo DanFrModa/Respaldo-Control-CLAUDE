@@ -46,7 +46,10 @@ test.describe('Galería de modelos (móvil)', () => {
     // Modelo CON foto: se sube mockeando SOLO el PUT a R2 (la URL prefirmada externa).
     await crearModelo(page, conFoto);
     await page.getByTestId('buscar-modelo').fill(conFoto);
-    await page.getByTestId('fila-modelo').filter({ hasText: conFoto }).click();
+    // Este spec corre en viewport MÓVIL: la tabla de modelos es `hidden lg:block` (invisible aquí);
+    // la lista en teléfono son las tarjetas (`modelo-tarjeta`), que al tocarse abren la MISMA ficha
+    // (mismo `setSeleccionId` → cajón `detalle-modelo`) que la fila de escritorio.
+    await page.getByTestId('modelo-tarjeta').filter({ hasText: conFoto }).click();
     const detalle = page.getByTestId('detalle-modelo');
     await page.route('**/*', (route) => {
       const peticion = route.request();

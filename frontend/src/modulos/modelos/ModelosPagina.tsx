@@ -241,7 +241,7 @@ export function ModelosPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado (proto .page-head: conteo vivo en el sub) ─────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Modelos</h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
@@ -341,69 +341,135 @@ export function ModelosPagina(): React.JSX.Element {
               No hay modelos que coincidan con la búsqueda.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Modelo</TablaDensaHead>
-                  <TablaDensaHead>Temporada</TablaDensaHead>
-                  <TablaDensaHead>Tela principal</TablaDensaHead>
-                  <TablaDensaHead>Tallas</TablaDensaHead>
-                  <TablaDensaHead numerica>Stock PT</TablaDensaHead>
-                  <TablaDensaHead numerica>Costo</TablaDensaHead>
-                  <TablaDensaHead>Estado</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — la tabla de 7 columnas se apachurra en teléfono.
+                  Mismo clic (selecciona → cajón) que la fila. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="modelo-tarjetas">
                 {registros.map((m) => (
-                  <TablaDensaFila
+                  <button
+                    type="button"
                     key={m.id}
-                    seleccionada={seleccion?.id === m.id}
-                    className="cursor-pointer"
                     onClick={() => setSeleccionId(m.id)}
-                    data-testid="fila-modelo"
+                    data-testid="modelo-tarjeta"
+                    className={cn(
+                      'w-full rounded-lg border bg-card p-3 text-left',
+                      seleccion?.id === m.id && 'ring-2 ring-primary',
+                    )}
                   >
-                    <TablaDensaCelda>
-                      <div className="flex items-center gap-2">
-                        <MiniaturaModelo modelo={m} />
-                        <div className="min-w-0">
-                          {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo. */}
-                          <div className="truncate font-semibold">{nombreModelo(m)}</div>
-                          {m.descripcion !== null && m.descripcion.trim() !== '' ? (
-                            <div className="mono truncate text-xs text-muted-foreground">
-                              {m.codigo}
-                            </div>
-                          ) : null}
+                    <div className="flex items-start gap-2">
+                      <MiniaturaModelo modelo={m} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold">{nombreModelo(m)}</div>
+                            {m.descripcion !== null && m.descripcion.trim() !== '' ? (
+                              <div className="mono truncate text-xs text-muted-foreground">
+                                {m.codigo}
+                              </div>
+                            ) : null}
+                          </div>
+                          <EstadoBadge activo={m.activo} />
                         </div>
                       </div>
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                       {m.temporada !== null ? (
-                        // Proto: badge NEUTRAL con punto (`.badge.neutral > .d`).
                         <ChipEstado tono="neutro">{m.temporada}</ChipEstado>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>{m.telaPrincipal ?? '—'}</TablaDensaCelda>
-                    <TablaDensaCelda>{m.curvaTalla ?? '—'}</TablaDensaCelda>
-                    {/* Proto: stock en 0 se atenúa (`.cell-sub`); el dato lo agrega el backend. */}
-                    <TablaDensaCelda
-                      numerica
-                      className={m.stockPt === 0 ? 'text-muted-foreground' : undefined}
-                    >
-                      {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
-                    </TablaDensaCelda>
-                    {/* Costo del último costeo (F7); null (sin costeo o sin permiso) → "—". */}
-                    <TablaDensaCelda numerica className="mono">
-                      {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>
-                      <EstadoBadge activo={m.activo} />
-                    </TablaDensaCelda>
-                  </TablaDensaFila>
+                      ) : null}
+                      <span className="text-muted-foreground">Tela: {m.telaPrincipal ?? '—'}</span>
+                      <span className="text-muted-foreground">Tallas: {m.curvaTalla ?? '—'}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span>
+                        Stock{' '}
+                        <span
+                          className={cn(
+                            'num font-medium',
+                            m.stockPt === 0 || m.stockPt === null
+                              ? 'text-muted-foreground'
+                              : 'text-foreground',
+                          )}
+                        >
+                          {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
+                        </span>
+                      </span>
+                      <span>
+                        Costo{' '}
+                        <span className="mono font-medium">
+                          {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+              {/* Escritorio (≥lg): tabla densa completa. */}
+              <div className="hidden lg:block" data-testid="modelos-tabla">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Modelo</TablaDensaHead>
+                      <TablaDensaHead>Temporada</TablaDensaHead>
+                      <TablaDensaHead>Tela principal</TablaDensaHead>
+                      <TablaDensaHead>Tallas</TablaDensaHead>
+                      <TablaDensaHead numerica>Stock PT</TablaDensaHead>
+                      <TablaDensaHead numerica>Costo</TablaDensaHead>
+                      <TablaDensaHead>Estado</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {registros.map((m) => (
+                      <TablaDensaFila
+                        key={m.id}
+                        seleccionada={seleccion?.id === m.id}
+                        className="cursor-pointer"
+                        onClick={() => setSeleccionId(m.id)}
+                        data-testid="fila-modelo"
+                      >
+                        <TablaDensaCelda>
+                          <div className="flex items-center gap-2">
+                            <MiniaturaModelo modelo={m} />
+                            <div className="min-w-0">
+                              {/* Proto `.cell-strong`/`.cell-code`: NOMBRE arriba, código abajo. */}
+                              <div className="truncate font-semibold">{nombreModelo(m)}</div>
+                              {m.descripcion !== null && m.descripcion.trim() !== '' ? (
+                                <div className="mono truncate text-xs text-muted-foreground">
+                                  {m.codigo}
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
+                          {m.temporada !== null ? (
+                            // Proto: badge NEUTRAL con punto (`.badge.neutral > .d`).
+                            <ChipEstado tono="neutro">{m.temporada}</ChipEstado>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>{m.telaPrincipal ?? '—'}</TablaDensaCelda>
+                        <TablaDensaCelda>{m.curvaTalla ?? '—'}</TablaDensaCelda>
+                        {/* Proto: stock en 0 se atenúa (`.cell-sub`); el dato lo agrega el backend. */}
+                        <TablaDensaCelda
+                          numerica
+                          className={m.stockPt === 0 ? 'text-muted-foreground' : undefined}
+                        >
+                          {m.stockPt === null ? '—' : m.stockPt.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        {/* Costo del último costeo (F7); null (sin costeo o sin permiso) → "—". */}
+                        <TablaDensaCelda numerica className="mono">
+                          {m.costoActual === null ? '—' : formatearPrecio(m.costoActual)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <EstadoBadge activo={m.activo} />
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

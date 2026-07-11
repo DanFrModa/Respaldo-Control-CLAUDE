@@ -274,7 +274,7 @@ export function ProyectosPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado (proto .page-head) ────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-end gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Pre-costeos</h1>
           <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">
@@ -540,7 +540,7 @@ function PaginaProyecto({
       data-testid="detalle-proyecto"
     >
       {/* ── Encabezado del proyecto (proto: regreso + título + acciones) ───── */}
-      <header className="flex shrink-0 flex-wrap items-end gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1">
           <Button
             variant="ghost"

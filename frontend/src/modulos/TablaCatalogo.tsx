@@ -76,6 +76,13 @@ export interface PropsTablaCatalogo<T> {
   razonNoDesactivar?: (registro: T) => string | undefined;
   /** Oculta la columna de estado/acciones (catálogos sin borrado suave, p. ej. tipos de proceso). */
   ocultarEstado?: boolean;
+  /**
+   * Contenido de la TARJETA MÓVIL de un registro (título, código, datos clave). Cuando se pasa, en
+   * pantallas chicas (`<lg`) la tabla densa se oculta y se pintan tarjetas apiladas con este
+   * contenido + su estado y acciones (mismos handlers); en escritorio (`≥lg`) sigue la tabla intacta.
+   * Sin este prop, el catálogo se comporta como siempre (solo tabla).
+   */
+  renderTarjeta?: (registro: T) => React.ReactNode;
 }
 
 /**
@@ -119,6 +126,7 @@ export function TablaCatalogo<T>({
   alReactivar,
   razonNoDesactivar,
   ocultarEstado = false,
+  renderTarjeta,
 }: PropsTablaCatalogo<T>): React.JSX.Element {
   const total = paginacion?.total ?? registros.length;
   const pagina = paginacion?.pagina ?? 1;
@@ -126,10 +134,59 @@ export function TablaCatalogo<T>({
   const mostrarAcciones =
     puedeAdministrar && (alEditar !== undefined || alDesactivar !== undefined);
 
+  /** Botones de acción (editar / desactivar / reactivar) de un registro — reusados por tabla y tarjeta. */
+  function accionesDe(registro: T): React.ReactNode {
+    if (!mostrarAcciones) {
+      return null;
+    }
+    const activo = obtenerActivo(registro);
+    const razonBloqueo = razonNoDesactivar?.(registro);
+    return (
+      <div className="flex justify-end gap-1">
+        {alEditar ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => alEditar(registro)}
+            aria-label="Editar"
+            data-testid={`editar-${testid}`}
+          >
+            <Pencil className="size-4" aria-hidden />
+          </Button>
+        ) : null}
+        {activo
+          ? alDesactivar !== undefined && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={razonBloqueo !== undefined}
+                title={razonBloqueo}
+                onClick={() => alDesactivar(registro)}
+                aria-label="Desactivar"
+                data-testid={`desactivar-${testid}`}
+              >
+                <Trash2 className="size-4 text-destructive" aria-hidden />
+              </Button>
+            )
+          : alReactivar !== undefined && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => alReactivar(registro)}
+                aria-label="Activar"
+                data-testid={`activar-${testid}`}
+              >
+                <RotateCcw className="size-4" aria-hidden />
+              </Button>
+            )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado (proto .page-head: título + sub; acciones a la derecha) ── */}
-      <header className="flex shrink-0 flex-wrap items-end gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">{titulo}</h1>
           <p className="mt-0.5 truncate text-[12.5px] text-muted-foreground">{descripcion}</p>
@@ -199,82 +256,81 @@ export function TablaCatalogo<T>({
               {textoVacio}
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  {columnas.map((col) => (
-                    <TablaDensaHead key={col.encabezado} numerica={col.numerica === true}>
-                      {col.encabezado}
-                    </TablaDensaHead>
-                  ))}
-                  {ocultarEstado ? null : <TablaDensaHead>Estado</TablaDensaHead>}
-                  {mostrarAcciones ? <TablaDensaHead className="w-24 text-right" /> : null}
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
-                {registros.map((registro) => {
-                  const id = obtenerId(registro);
-                  const activo = obtenerActivo(registro);
-                  const razonBloqueo = razonNoDesactivar?.(registro);
-                  return (
-                    <TablaDensaFila key={id} data-testid={`fila-${testid}`}>
-                      {columnas.map((col) => (
-                        <TablaDensaCelda key={col.encabezado} numerica={col.numerica === true}>
-                          {col.render(registro)}
-                        </TablaDensaCelda>
-                      ))}
-                      {ocultarEstado ? null : (
-                        <TablaDensaCelda>
-                          <EstadoBadge activo={activo} />
-                        </TablaDensaCelda>
-                      )}
-                      {mostrarAcciones ? (
-                        <TablaDensaCelda className="text-right">
-                          <div className="flex justify-end gap-1">
-                            {alEditar ? (
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => alEditar(registro)}
-                                aria-label="Editar"
-                                data-testid={`editar-${testid}`}
-                              >
-                                <Pencil className="size-4" aria-hidden />
-                              </Button>
-                            ) : null}
-                            {activo
-                              ? alDesactivar !== undefined && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    disabled={razonBloqueo !== undefined}
-                                    title={razonBloqueo}
-                                    onClick={() => alDesactivar(registro)}
-                                    aria-label="Desactivar"
-                                    data-testid={`desactivar-${testid}`}
-                                  >
-                                    <Trash2 className="size-4 text-destructive" aria-hidden />
-                                  </Button>
-                                )
-                              : alReactivar !== undefined && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon-sm"
-                                    onClick={() => alReactivar(registro)}
-                                    aria-label="Activar"
-                                    data-testid={`activar-${testid}`}
-                                  >
-                                    <RotateCcw className="size-4" aria-hidden />
-                                  </Button>
-                                )}
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — la tabla densa se apachurra en teléfono. Solo si
+                  la pantalla pasó `renderTarjeta`; mismos estado y acciones que la fila. */}
+              {renderTarjeta ? (
+                <div className="space-y-2 p-3 lg:hidden" data-testid={`${testid}-tarjetas`}>
+                  {registros.map((registro) => {
+                    const id = obtenerId(registro);
+                    const acciones = accionesDe(registro);
+                    return (
+                      <div
+                        key={id}
+                        className="rounded-lg border bg-card p-3"
+                        data-testid={`fila-${testid}-tarjeta`}
+                      >
+                        {renderTarjeta(registro)}
+                        {ocultarEstado && acciones === null ? null : (
+                          <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2">
+                            {ocultarEstado ? (
+                              <span />
+                            ) : (
+                              <EstadoBadge activo={obtenerActivo(registro)} />
+                            )}
+                            {acciones}
                           </div>
-                        </TablaDensaCelda>
-                      ) : null}
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {/* Escritorio (≥lg cuando hay tarjetas; siempre si no las hay): tabla densa completa. */}
+              <div
+                className={renderTarjeta ? 'hidden lg:block' : undefined}
+                {...(renderTarjeta ? { 'data-testid': `${testid}-tabla` } : {})}
+              >
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      {columnas.map((col) => (
+                        <TablaDensaHead key={col.encabezado} numerica={col.numerica === true}>
+                          {col.encabezado}
+                        </TablaDensaHead>
+                      ))}
+                      {ocultarEstado ? null : <TablaDensaHead>Estado</TablaDensaHead>}
+                      {mostrarAcciones ? <TablaDensaHead className="w-24 text-right" /> : null}
                     </TablaDensaFila>
-                  );
-                })}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {registros.map((registro) => {
+                      const id = obtenerId(registro);
+                      const activo = obtenerActivo(registro);
+                      return (
+                        <TablaDensaFila key={id} data-testid={`fila-${testid}`}>
+                          {columnas.map((col) => (
+                            <TablaDensaCelda key={col.encabezado} numerica={col.numerica === true}>
+                              {col.render(registro)}
+                            </TablaDensaCelda>
+                          ))}
+                          {ocultarEstado ? null : (
+                            <TablaDensaCelda>
+                              <EstadoBadge activo={activo} />
+                            </TablaDensaCelda>
+                          )}
+                          {mostrarAcciones ? (
+                            <TablaDensaCelda className="text-right">
+                              {accionesDe(registro)}
+                            </TablaDensaCelda>
+                          ) : null}
+                        </TablaDensaFila>
+                      );
+                    })}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

@@ -112,10 +112,11 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver', 'avios.administrar']),
     });
 
-    // Un renglón por avío (colapsados por defecto, R9: filas expandibles).
+    // Un renglón por avío (colapsados por defecto, R9: filas expandibles). La tabla y las tarjetas
+    // móviles coexisten en el DOM (jsdom ignora `lg:hidden`): se acota a la tabla de escritorio.
     expect(screen.getAllByTestId('fila-avio')).toHaveLength(2);
     expect(screen.getAllByText('BTN-01').length).toBeGreaterThan(0);
-    expect(screen.getByText('HIL-09')).toBeInTheDocument();
+    expect(within(screen.getByTestId('avio-tabla')).getByText('HIL-09')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay resultados', () => {
@@ -182,8 +183,9 @@ describe('<AviosPagina>', () => {
       sesion: estadoSesionDePrueba(['avios.ver', 'avios.administrar']),
     });
 
-    // El estado "Inactivo" se ve en el propio renglón; las acciones, al expandir.
-    expect(screen.getByText('Inactivo')).toBeInTheDocument();
+    // El estado "Inactivo" se ve en el propio renglón; las acciones, al expandir. Se acota a la
+    // tabla de escritorio (la tarjeta móvil repite el badge en el DOM de jsdom).
+    expect(within(screen.getByTestId('avio-tabla')).getByText('Inactivo')).toBeInTheDocument();
     await usuario.click(screen.getByTestId('fila-avio'));
     expect(screen.getByTestId('activar-avio')).toBeInTheDocument();
     expect(screen.queryByTestId('desactivar-avio')).not.toBeInTheDocument();

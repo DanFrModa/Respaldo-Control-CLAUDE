@@ -162,6 +162,21 @@ export function TiposProcesoPagina(): React.JSX.Element {
         alEditar={abrirEdicion}
         alDesactivar={setADesactivar}
         alReactivar={reactivarTipo}
+        renderTarjeta={(t) => (
+          <div className="min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-semibold">{t.nombre}</span>
+              {t.generaEntradaPt ? (
+                <TipoBadge tono="pt">
+                  <PackageCheck className="size-3" aria-hidden /> Genera PT
+                </TipoBadge>
+              ) : (
+                <TipoBadge tono="neutro">No genera PT</TipoBadge>
+              )}
+            </div>
+            <p className="num text-xs text-faint">{t.codigo}</p>
+          </div>
+        )}
       />
 
       <DialogoTipoProceso
