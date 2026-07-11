@@ -29,6 +29,12 @@ import {
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+} from '../../../comun/impresos-estilos.js';
 import { explosionarOrden } from '../mrp.js';
 
 // ── Datos resueltos del impreso (forma PURA: ya sin BD) ──────────────────────────────────────────
@@ -102,70 +108,11 @@ export async function armarDatosImpresoExplosion(
 
 // ── Documento PDF (react-pdf, sin JSX: `createElement`) ──────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  folioBloque: { alignItems: 'flex-end' },
-  folioEtiqueta: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  folioValor: { fontSize: 16, fontFamily: 'Helvetica-Bold' },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  campo: { width: '33%', marginBottom: 6, paddingRight: 8 },
-  etiquetaCampo: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorCampo: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
-  grupo: { marginTop: 10 },
-  tituloGrupo: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Anchos de columna PROPIOS de esta tabla (lo compartido vive en `estilosDoc`).
   celdaMaterial: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
   celdaNum: { width: 56, textAlign: 'right' },
   celdaUnidad: { width: 40, textAlign: 'center' },
-  vacio: { fontSize: 8, color: GRIS },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
 });
 
 /** Formatea una cantidad (hasta 4 decimales, sin ceros sobrantes). */
@@ -177,9 +124,9 @@ function num(valor: number): string {
 function campo(etiqueta: string, valor: string): ReactElement {
   return h(
     View,
-    { style: estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiquetaCampo }, etiqueta),
-    h(Text, { style: estilos.valorCampo }, valor),
+    { style: estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorCampo }, valor),
   );
 }
 
@@ -187,36 +134,52 @@ function campo(etiqueta: string, valor: string): ReactElement {
 function tablaGrupo(grupo: GrupoImpresoExplosion, idx: number): ReactElement {
   const filaEncabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaMaterial] }, 'Material'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'Requerido'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaUnidad] }, 'Un.'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'En stock'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'A comprar'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaMaterial] },
+      'Material',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] },
+      'Requerido',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaUnidad] }, 'Un.'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] },
+      'En stock',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] },
+      'A comprar',
+    ),
   );
   const filas = grupo.lineas.map((l, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `f-${i}` },
+      { style: estilosDoc.filaTabla, key: `f-${i}` },
       h(
         Text,
-        { style: [estilos.celda, estilos.celdaMaterial] },
+        { style: [estilosDoc.celda, estilos.celdaMaterial] },
         `${l.material}${l.esGenerico ? ' (genérico)' : ''}`,
       ),
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.requerido)),
-      h(Text, { style: [estilos.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, num(l.requerido)),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
       h(
         Text,
-        { style: [estilos.celda, estilos.celdaNum] },
+        { style: [estilosDoc.celda, estilos.celdaNum] },
         l.esGenerico ? num(l.existenciaStock) : '—',
       ),
-      h(Text, { style: [estilos.celda, estilos.celdaNum] }, num(l.aComprar)),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, num(l.aComprar)),
     ),
   );
   return h(
     View,
-    { style: estilos.grupo, key: `g-${idx}` },
-    h(Text, { style: estilos.tituloGrupo }, grupo.proveedor),
+    { style: estilosDoc.seccion, key: `g-${idx}` },
+    TituloSeccion(grupo.proveedor),
     filaEncabezado,
     ...filas,
   );
@@ -229,7 +192,7 @@ function paginaExplosion(datos: DatosImpresoExplosion): ReactElement {
       ? [
           h(
             Text,
-            { style: estilos.vacio, key: 'vacio' },
+            { style: estilosDoc.vacio, key: 'vacio' },
             'La orden no requiere materiales (BOM vacío o sin piezas).',
           ),
         ]
@@ -237,35 +200,22 @@ function paginaExplosion(datos: DatosImpresoExplosion): ReactElement {
 
   return h(
     Page,
-    { key: 'pagina-0', size: 'A4', style: estilos.pagina },
+    { key: 'pagina-0', size: 'A4', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Explosión de materiales (MRP) — CONTROL v2',
+      derecha: { etiqueta: 'Orden', valor: String(datos.folioOrden), grande: true },
+    }),
     h(
       View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(Text, { style: estilos.subtitulo }, 'Explosión de materiales (MRP) — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.folioBloque },
-        h(Text, { style: estilos.folioEtiqueta }, 'Orden'),
-        h(Text, { style: estilos.folioValor }, String(datos.folioOrden)),
-      ),
-    ),
-    h(
-      View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Modelo', datos.modelo),
       campo('Total de piezas', num(datos.totalPiezas)),
     ),
     ...cuerpo,
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Explosión de la orden ${datos.folioOrden}`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Explosión de la orden ${datos.folioOrden}`,
+    }),
   );
 }
 

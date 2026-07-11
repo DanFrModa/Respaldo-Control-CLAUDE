@@ -467,6 +467,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
         }}
         titulo={seleccion !== null ? `OC ${seleccion.numCompra}` : ''}
         subtitulo={seleccion !== null ? seleccion.proveedor : undefined}
+        ancho="amplio"
       >
         {seleccion !== null ? (
           <div className="space-y-4" data-testid="detalle-oc">

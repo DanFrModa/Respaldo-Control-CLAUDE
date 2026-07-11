@@ -29,6 +29,14 @@ import type { z } from 'zod';
 import type { SesionUsuario } from '../../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  LeyendaTruncado,
+} from '../../../../comun/impresos-estilos.js';
 
 import { reporteFiscal } from '../reportes-fiscales.js';
 
@@ -74,11 +82,6 @@ export async function armarDatosImpresoReporteFiscal(
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 /** Formatea un importe en pesos (o "—" si es null). */
 function pesos(n: number | null): string {
   if (n === null) {
@@ -93,36 +96,15 @@ function origenTexto(origen: string): string {
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 36,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 8,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  bloqueDerecha: { alignItems: 'flex-end' },
-  etiqueta: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorFuerte: { fontSize: 11, fontFamily: 'Helvetica-Bold' },
-  filaTabla: { flexDirection: 'row' },
+  // Celda DENSA propia (el reporte fiscal lleva muchas columnas en landscape) + anchos y totales.
   celda: {
     borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
+    borderColor: PALETA.borde,
     paddingVertical: 3,
     paddingHorizontal: 3,
     fontSize: 7,
+    color: PALETA.tinta,
   },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
   colFolio: { width: 34 },
   colFecha: { width: 52 },
   colCuenta: { width: 30, textAlign: 'center' },
@@ -131,35 +113,19 @@ const estilos = StyleSheet.create({
   colUuid: { width: 132 },
   colXml: { width: 24, textAlign: 'center' },
   colNum: { width: 62, textAlign: 'right' },
-  cancelado: { color: '#94a3b8', textDecoration: 'line-through' },
+  cancelado: { color: PALETA.faint, textDecoration: 'line-through' },
   totalesBloque: {
     marginTop: 14,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 24,
     borderTopWidth: 1,
-    borderTopColor: TEAL,
+    borderTopColor: PALETA.marca,
     paddingTop: 8,
   },
   totalItem: { alignItems: 'flex-end' },
-  totalValor: { fontSize: 11, fontFamily: 'Helvetica-Bold' },
-  totalNeto: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  vacio: { fontSize: 8, color: GRIS, marginTop: 2 },
-  avisoTruncado: {
-    fontSize: 8,
-    color: '#b45309',
-    fontFamily: 'Helvetica-Bold',
-    marginTop: 8,
-  },
-  pie: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  totalValor: { fontSize: 11, fontFamily: FUENTE.negrita },
+  totalNeto: { fontSize: 14, fontFamily: FUENTE.negrita, color: PALETA.marca },
 });
 
 /** Tabla de movimientos fiscales. */
@@ -169,26 +135,26 @@ function tablaMovimientos(reporte: ReporteFiscalSalida): ReactElement {
     return h(
       View,
       { key: 'tabla' },
-      h(Text, { style: estilos.vacio }, 'Sin movimientos fiscales en el periodo.'),
+      h(Text, { style: estilosDoc.vacio }, 'Sin movimientos fiscales en el periodo.'),
     );
   }
   const encabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFolio] }, 'Folio'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFecha] }, 'Fecha'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colCuenta] }, 'Cta'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colTercero] }, 'Tercero'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colRfc] }, 'RFC'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colUuid] }, 'UUID (CFDI)'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colXml] }, 'XML'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Importe'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colFolio] }, 'Folio'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colFecha] }, 'Fecha'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colCuenta] }, 'Cta'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colTercero] }, 'Tercero'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colRfc] }, 'RFC'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colUuid] }, 'UUID (CFDI)'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colXml] }, 'XML'),
+    h(Text, { style: [estilos.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Importe'),
   );
   const filas = movs.map((m, i) => {
     const estiloCelda = m.cancelado ? [estilos.celda, estilos.cancelado] : [estilos.celda];
     return h(
       View,
-      { style: estilos.filaTabla, key: `m-${i}`, wrap: false },
+      { style: estilosDoc.filaTabla, key: `m-${i}`, wrap: false },
       h(Text, { style: [...estiloCelda, estilos.colFolio] }, String(m.folio)),
       h(Text, { style: [...estiloCelda, estilos.colFecha] }, m.fecha),
       h(
@@ -219,19 +185,19 @@ function bloqueTotales(reporte: ReporteFiscalSalida): ReactElement {
     h(
       View,
       { style: estilos.totalItem, key: 'c' },
-      h(Text, { style: estilos.etiqueta }, 'Cargos'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Cargos'),
       h(Text, { style: estilos.totalValor }, pesos(t.cargos)),
     ),
     h(
       View,
       { style: estilos.totalItem, key: 'a' },
-      h(Text, { style: estilos.etiqueta }, 'Abonos'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Abonos'),
       h(Text, { style: estilos.totalValor }, pesos(t.abonos)),
     ),
     h(
       View,
       { style: estilos.totalItem, key: 'n' },
-      h(Text, { style: estilos.etiqueta }, `Neto · ${String(t.movimientos)} mov.`),
+      h(Text, { style: estilosDoc.etiquetaMenor }, `Neto · ${String(t.movimientos)} mov.`),
       h(Text, { style: estilos.totalNeto }, pesos(t.neto)),
     ),
   );
@@ -258,7 +224,7 @@ function avisoTruncado(reporte: ReporteFiscalSalida): ReactElement | null {
   if (texto === null) {
     return null;
   }
-  return h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, texto);
+  return LeyendaTruncado(texto);
 }
 
 /** Una página del reporte fiscal. */
@@ -268,35 +234,18 @@ function paginaReporte(datos: DatosImpresoReporteFiscal): ReactElement {
   const aviso = avisoTruncado(r);
   return h(
     Page,
-    { size: 'A4', orientation: 'landscape', style: estilos.pagina },
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(
-          Text,
-          { style: estilos.subtitulo },
-          'Reporte fiscal para el contador (CFDI) — CONTROL v2',
-        ),
-      ),
-      h(
-        View,
-        { style: estilos.bloqueDerecha },
-        h(Text, { style: estilos.etiqueta }, 'Periodo'),
-        h(Text, { style: estilos.valorFuerte }, periodo),
-      ),
-    ),
+    { size: 'A4', orientation: 'landscape', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Reporte fiscal para el contador (CFDI) — CONTROL v2',
+      derecha: { etiqueta: 'Periodo', valor: periodo },
+    }),
     tablaMovimientos(r),
     ...(aviso === null ? [] : [aviso]),
     bloqueTotales(r),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Reporte fiscal ${periodo} · Solo información fiscal (sin contabilidad)`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Reporte fiscal ${periodo} · Solo información fiscal (sin contabilidad)`,
+    }),
   );
 }
 

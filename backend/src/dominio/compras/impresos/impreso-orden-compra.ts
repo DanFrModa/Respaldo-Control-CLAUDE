@@ -35,6 +35,14 @@ import {
 } from '@react-pdf/renderer';
 
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+  BandaEstado,
+} from '../../../comun/impresos-estilos.js';
 
 import { verificarPermiso, type SesionUsuario } from '../../../comun/permisos.js';
 import { type ContextoBd } from '../../../comun/transaccion.js';
@@ -154,90 +162,16 @@ export async function armarDatosImpresoOC(
 
 // ── Documento PDF (react-pdf, sin JSX: `createElement`) ──────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-const ROJO = '#b91c1c';
-
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  folioBloque: { alignItems: 'flex-end' },
-  folioEtiqueta: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  folioValor: { fontSize: 16, fontFamily: 'Helvetica-Bold' },
-  bandaCancelada: {
-    backgroundColor: ROJO,
-    color: '#ffffff',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginBottom: 10,
-    borderRadius: 4,
-  },
-  bandaCanceladaTitulo: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  bandaCanceladaMotivo: { fontSize: 8, marginTop: 2 },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  campo: { width: '33%', marginBottom: 6, paddingRight: 8 },
-  campoAncho: { width: '66%', marginBottom: 6, paddingRight: 8 },
-  etiquetaCampo: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorCampo: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
-  valorCampoTexto: { fontSize: 9 },
-  seccion: { marginTop: 10 },
-  tituloSeccion: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  // Tabla de renglones.
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Anchos de columna PROPIOS de esta tabla (lo compartido vive en `estilosDoc`).
   celdaMaterial: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
-  celdaNum: { width: 52, textAlign: 'right' },
+  celdaNum: { width: 58, textAlign: 'right' },
   celdaUnidad: { width: 46, textAlign: 'center' },
   celdaOrden: { width: 50, textAlign: 'center' },
-  filaTotales: { backgroundColor: '#f8fafc' },
   // Sub-tabla de la matriz talla×color de un renglón.
   matrizContenedor: { marginTop: 2, marginBottom: 4, marginLeft: 8 },
-  matrizTitulo: { fontSize: 7, color: GRIS, marginBottom: 1 },
+  matrizTitulo: { fontSize: 7, color: PALETA.muted, marginBottom: 1 },
   celdaMatriz: { width: 70, textAlign: 'left' },
-  vacio: { fontSize: 8, color: GRIS },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
 });
 
 /** Formatea un importe en pesos (2 decimales con separador de miles). */
@@ -249,9 +183,9 @@ function pesos(valor: number): string {
 function campo(etiqueta: string, valor: string | null, ancho = false): ReactElement {
   return h(
     View,
-    { style: ancho ? estilos.campoAncho : estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiquetaCampo }, etiqueta),
-    h(Text, { style: estilos.valorCampo }, valor ?? '—'),
+    { style: ancho ? estilosDoc.campoDosTercios : estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorCampo }, valor ?? '—'),
   );
 }
 
@@ -260,16 +194,10 @@ function bandaCancelada(datos: DatosImpresoOC): ReactElement | null {
   if (!datos.cancelada) {
     return null;
   }
-  return h(
-    View,
-    { style: estilos.bandaCancelada },
-    h(Text, { style: estilos.bandaCanceladaTitulo }, 'ORDEN DE COMPRA CANCELADA'),
-    h(
-      Text,
-      { style: estilos.bandaCanceladaMotivo },
-      `Motivo: ${datos.motivoCancelacion ?? 'sin especificar'}`,
-    ),
-  );
+  return BandaEstado({
+    titulo: 'ORDEN DE COMPRA CANCELADA',
+    detalle: `Motivo: ${datos.motivoCancelacion ?? 'sin especificar'}`,
+  });
 }
 
 /** Sub-tabla de la matriz talla×color de un renglón (solo si el renglón la usa). */
@@ -284,10 +212,10 @@ function matrizLinea(linea: LineaImpresoOC, clave: string): ReactElement | null 
     ...linea.matriz.map((c, i) =>
       h(
         View,
-        { style: estilos.filaTabla, key: `m-${i}` },
-        h(Text, { style: [estilos.celda, estilos.celdaMatriz] }, c.color),
-        h(Text, { style: [estilos.celda, estilos.celdaMatriz] }, c.talla),
-        h(Text, { style: [estilos.celda, estilos.celdaNum] }, String(c.cantidad)),
+        { style: estilosDoc.filaTabla, key: `m-${i}` },
+        h(Text, { style: [estilosDoc.celda, estilos.celdaMatriz] }, c.color),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaMatriz] }, c.talla),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, String(c.cantidad)),
       ),
     ),
   );
@@ -297,13 +225,25 @@ function matrizLinea(linea: LineaImpresoOC, clave: string): ReactElement | null 
 function tablaLineas(datos: DatosImpresoOC): ReactElement {
   const filaEncabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaMaterial] }, 'Material'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'Cantidad'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaUnidad] }, 'Unidad'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'Precio'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, 'Importe'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaOrden] }, 'Orden'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaMaterial] },
+      'Material',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] },
+      'Cantidad',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaUnidad] },
+      'Unidad',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] }, 'Precio'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNum] }, 'Importe'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaOrden] }, 'Orden'),
   );
 
   const filas: ReactElement[] = [];
@@ -311,15 +251,15 @@ function tablaLineas(datos: DatosImpresoOC): ReactElement {
     filas.push(
       h(
         View,
-        { style: estilos.filaTabla, key: `fila-${i}` },
-        h(Text, { style: [estilos.celda, estilos.celdaMaterial] }, l.material),
-        h(Text, { style: [estilos.celda, estilos.celdaNum] }, String(l.cantidad)),
-        h(Text, { style: [estilos.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
-        h(Text, { style: [estilos.celda, estilos.celdaNum] }, pesos(l.precio)),
-        h(Text, { style: [estilos.celda, estilos.celdaNum] }, pesos(l.importe)),
+        { style: estilosDoc.filaTabla, key: `fila-${i}` },
+        h(Text, { style: [estilosDoc.celda, estilos.celdaMaterial] }, l.material),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, String(l.cantidad)),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaUnidad] }, l.unidad ?? '—'),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, pesos(l.precio)),
+        h(Text, { style: [estilosDoc.celda, estilos.celdaNum] }, pesos(l.importe)),
         h(
           Text,
-          { style: [estilos.celda, estilos.celdaOrden] },
+          { style: [estilosDoc.celda, estilos.celdaOrden] },
           l.folioOrden === null ? '—' : String(l.folioOrden),
         ),
       ),
@@ -332,59 +272,43 @@ function tablaLineas(datos: DatosImpresoOC): ReactElement {
 
   const filaTotal = h(
     View,
-    { style: [estilos.filaTabla, estilos.filaTotales], key: 'total' },
+    { style: [estilosDoc.filaTabla, estilosDoc.filaTotal], key: 'total' },
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaMaterial] },
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaMaterial] },
       'Total de la orden de compra',
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, ''),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaUnidad] }, ''),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaNum] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaUnidad] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaNum] }, ''),
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNum] },
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaNum] },
       pesos(datos.total),
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaOrden] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.celdaOrden] }, ''),
   );
 
   const cuerpo =
     datos.lineas.length === 0
-      ? [h(Text, { style: estilos.vacio, key: 'vacio' }, 'Sin renglones capturados.')]
+      ? [h(Text, { style: estilosDoc.vacio, key: 'vacio' }, 'Sin renglones capturados.')]
       : [filaEncabezado, ...filas, filaTotal];
 
-  return h(
-    View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, 'Renglones'),
-    ...cuerpo,
-  );
+  return h(View, { style: estilosDoc.seccion }, TituloSeccion('Renglones'), ...cuerpo);
 }
 
 /** Una página = una orden de compra. */
 function paginaOC(datos: DatosImpresoOC, clave: string): ReactElement {
   const hijos: (ReactElement | null)[] = [
-    h(
-      View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(Text, { style: estilos.subtitulo }, 'Orden de compra — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.folioBloque },
-        h(Text, { style: estilos.folioEtiqueta }, 'Folio'),
-        h(Text, { style: estilos.folioValor }, String(datos.numCompra)),
-      ),
-    ),
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Orden de compra — CONTROL v2',
+      derecha: { etiqueta: 'Folio', valor: String(datos.numCompra), grande: true },
+    }),
     bandaCancelada(datos),
     h(
       View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Proveedor', datos.proveedor, true),
       campo('Estatus', datos.estatus),
       campo('Fecha', datos.fecha),
@@ -395,30 +319,28 @@ function paginaOC(datos: DatosImpresoOC, clave: string): ReactElement {
     datos.observaciones
       ? h(
           View,
-          { style: estilos.campoAncho, key: 'obs' },
-          h(Text, { style: estilos.etiquetaCampo }, 'Observaciones'),
-          h(Text, { style: estilos.valorCampoTexto }, datos.observaciones),
+          { style: estilosDoc.campoDosTercios, key: 'obs' },
+          h(Text, { style: estilosDoc.etiquetaCampo }, 'Observaciones'),
+          h(Text, { style: estilosDoc.valorCampoTexto }, datos.observaciones),
         )
       : null,
     datos.facturasAmparadasLegacy
       ? h(
           View,
-          { style: estilos.campoAncho, key: 'facturas' },
-          h(Text, { style: estilos.etiquetaCampo }, 'Facturas amparadas (histórico)'),
-          h(Text, { style: estilos.valorCampoTexto }, datos.facturasAmparadasLegacy),
+          { style: estilosDoc.campoDosTercios, key: 'facturas' },
+          h(Text, { style: estilosDoc.etiquetaCampo }, 'Facturas amparadas (histórico)'),
+          h(Text, { style: estilosDoc.valorCampoTexto }, datos.facturasAmparadasLegacy),
         )
       : null,
     tablaLineas(datos),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Orden de compra ${datos.numCompra} · Total ${pesos(datos.total)}`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Orden de compra ${datos.numCompra} · Total ${pesos(datos.total)}`,
+    }),
   ];
 
   return h(
     Page,
-    { key: clave, size: 'A4', style: estilos.pagina },
+    { key: clave, size: 'A4', style: estilosDoc.pagina },
     ...hijos.filter((x) => x !== null),
   );
 }

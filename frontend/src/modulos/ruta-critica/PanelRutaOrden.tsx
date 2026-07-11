@@ -167,7 +167,7 @@ export function PanelRutaOrden({
           </>
         ) : undefined
       }
-      className="sm:max-w-lg"
+      ancho="amplio"
     >
       {consulta.isPending && abierto ? (
         <p className="text-sm text-muted-foreground" data-testid="panel-ruta-cargando">

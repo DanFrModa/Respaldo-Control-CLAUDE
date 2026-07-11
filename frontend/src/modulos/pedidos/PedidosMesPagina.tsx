@@ -683,6 +683,7 @@ export function PedidosMesPagina(): React.JSX.Element {
 
       {/* ── Cajón de detalle del renglón ────────────────────────────────────── */}
       <CajonDetalle
+        ancho="amplio"
         abierto={seleccion !== null && renglonSeleccionado !== undefined}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccion(null);
@@ -862,7 +863,7 @@ function DetalleRenglon({
         <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
           Orden de producción
         </h4>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+        <div className="grid grid-cols-1 gap-x-3 gap-y-2 text-xs sm:grid-cols-2">
           <Campo k="No. orden" v={renglon.folioOrden !== null ? String(renglon.folioOrden) : '—'} />
           <Campo k="OC del cliente" v={pedido.ocCliente ?? '—'} />
           <Campo

@@ -164,7 +164,7 @@ export function PanelHabilitacionOrden({
         }}
         titulo={titulo}
         subtitulo={subtitulo === '' ? undefined : subtitulo}
-        className="sm:max-w-2xl"
+        ancho="amplio"
       >
         {consulta.isPending ? (
           <p className="p-2 text-sm text-muted-foreground" data-testid="hab-cargando">

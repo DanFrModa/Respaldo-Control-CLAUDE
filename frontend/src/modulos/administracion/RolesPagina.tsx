@@ -211,9 +211,9 @@ export function RolesPagina(): React.JSX.Element {
         </div>
       </div>
 
-      {/* ── Cajón de detalle del rol (ancho: el árbol de permisos necesita espacio) ── */}
+      {/* ── Cajón de detalle del rol (máximo: el árbol de permisos necesita todo el ancho) ── */}
       <CajonDetalle
-        className="sm:max-w-2xl lg:max-w-3xl"
+        ancho="maximo"
         abierto={seleccionId !== null}
         alCambiarAbierto={(abierto) => {
           if (!abierto) setSeleccionId(null);
@@ -412,13 +412,19 @@ function EditorPermisos({
             conjunto actual).
           </p>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {/* Rejilla FLUIDA al ancho del cajón (auto-fit): 1 columna en móvil, 2-3 en
+              amplio/máximo. `min(100%,…)` evita que la columna mínima desborde cuando el
+              cajón es más angosto que 15rem — así las secciones nunca se enciman. */}
+          <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))]">
             {catalogo.map((grupo) => {
               const marcadosModulo = grupo.permisos.filter((p) => seleccion.has(p.clave)).length;
               return (
                 <fieldset
                   key={grupo.modulo}
-                  className="rounded-xl ring-1 ring-foreground/10 p-3"
+                  // `min-w-0`: un <fieldset> trae `min-inline-size: min-content` de fábrica y, sin
+                  // esto, se niega a encoger a su columna del grid y DESBORDA sobre la de al lado
+                  // (era el encimado de las secciones de Finanzas).
+                  className="min-w-0 rounded-xl ring-1 ring-foreground/10 p-3"
                   data-testid="grupo-permisos"
                 >
                   <legend className="flex items-center gap-2 px-1 text-sm font-medium">
@@ -443,7 +449,7 @@ function EditorPermisos({
                             <span className="block text-sm leading-tight">
                               {permiso.descripcion}
                             </span>
-                            <span className="block font-mono text-[11px] text-muted-foreground">
+                            <span className="block font-mono text-[11px] break-words text-muted-foreground">
                               {permiso.clave}
                             </span>
                           </span>

@@ -23,6 +23,13 @@ import {
 } from '@react-pdf/renderer';
 
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+} from '../../../comun/impresos-estilos.js';
 
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
@@ -88,12 +95,6 @@ export async function armarDatosImpresoListaPrecios(
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-const VERDE = '#15803d';
-
 /** Formatea un precio a "$1,234" (entero, MXN) o "—" si null. */
 function formatearPrecio(precio: number | null): string {
   if (precio === null) {
@@ -103,75 +104,22 @@ function formatearPrecio(precio: number | null): string {
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  folioBloque: { alignItems: 'flex-end' },
-  folioEtiqueta: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  folioValor: { fontSize: 16, fontFamily: 'Helvetica-Bold' },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  campo: { width: '33%', marginBottom: 6, paddingRight: 8 },
-  etiquetaCampo: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorCampo: { fontSize: 10, fontFamily: 'Helvetica-Bold' },
-  seccion: { marginTop: 10 },
-  tituloSeccion: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Estilos PROPIOS de la lista (lo compartido vive en `estilosDoc`).
   celdaModelo: { width: 90, textAlign: 'left' },
   celdaDescripcion: { flexGrow: 1, flexBasis: 0, textAlign: 'left' },
   celdaNumero: { width: 90, textAlign: 'left' },
   celdaPrecio: { width: 70, textAlign: 'right' },
-  aprobadoChip: { color: VERDE, fontSize: 7 },
-  notas: { fontSize: 8, color: GRIS, marginTop: 8 },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  aprobadoChip: { color: PALETA.ok, fontSize: 7 },
+  notas: { fontSize: 8, color: PALETA.muted, marginTop: 8 },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
 function campo(etiqueta: string, valor: string): ReactElement {
   return h(
     View,
-    { style: estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiquetaCampo }, etiqueta),
-    h(Text, { style: estilos.valorCampo }, valor === '' ? '—' : valor),
+    { style: estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorCampo }, valor === '' ? '—' : valor),
   );
 }
 
@@ -179,27 +127,39 @@ function campo(etiqueta: string, valor: string): ReactElement {
 function tablaRenglones(datos: DatosImpresoListaPrecios): ReactElement {
   const filaEncabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaModelo] }, 'Modelo'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaDescripcion] },
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaModelo] },
+      'Modelo',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaDescripcion] },
       'Descripción',
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaNumero] }, 'Nº cliente'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.celdaPrecio] }, 'Precio'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaNumero] },
+      'Nº cliente',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.celdaPrecio] },
+      'Precio',
+    ),
   );
 
   const filas = datos.renglones.map((r, i) =>
     h(
       View,
-      { style: estilos.filaTabla, key: `fila-${i}`, wrap: false },
-      h(Text, { style: [estilos.celda, estilos.celdaModelo] }, r.codigoModelo),
-      h(Text, { style: [estilos.celda, estilos.celdaDescripcion] }, r.descripcionModelo ?? '—'),
-      h(Text, { style: [estilos.celda, estilos.celdaNumero] }, r.numeroCliente ?? '—'),
+      { style: estilosDoc.filaTabla, key: `fila-${i}`, wrap: false },
+      h(Text, { style: [estilosDoc.celda, estilos.celdaModelo] }, r.codigoModelo),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaDescripcion] }, r.descripcionModelo ?? '—'),
+      h(Text, { style: [estilosDoc.celda, estilos.celdaNumero] }, r.numeroCliente ?? '—'),
       h(
         Text,
-        { style: [estilos.celda, estilos.celdaPrecio] },
+        { style: [estilosDoc.celda, estilos.celdaPrecio] },
         `${formatearPrecio(r.precio)}${r.aprobado ? '' : ' *'}`,
       ),
     ),
@@ -207,8 +167,8 @@ function tablaRenglones(datos: DatosImpresoListaPrecios): ReactElement {
 
   return h(
     View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, `Renglones (${datos.renglones.length})`),
+    { style: estilosDoc.seccion },
+    TituloSeccion(`Renglones (${datos.renglones.length})`),
     filaEncabezado,
     ...filas,
     h(
@@ -222,25 +182,14 @@ function tablaRenglones(datos: DatosImpresoListaPrecios): ReactElement {
 /** Una página de la lista de precios. */
 function paginaLista(datos: DatosImpresoListaPrecios, clave: string): ReactElement {
   const hijos: ReactElement[] = [
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Lista de precios por cliente — CONTROL v2',
+      derecha: { etiqueta: 'Lista', valor: String(datos.folio), grande: true },
+    }),
     h(
       View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(Text, { style: estilos.subtitulo }, 'Lista de precios por cliente — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.folioBloque },
-        h(Text, { style: estilos.folioEtiqueta }, 'Lista'),
-        h(Text, { style: estilos.folioValor }, String(datos.folio)),
-      ),
-    ),
-    h(
-      View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Cliente', datos.cliente),
       campo('Departamento', datos.departamento),
       campo('Fecha', datos.fecha),
@@ -250,13 +199,11 @@ function paginaLista(datos: DatosImpresoListaPrecios, clave: string): ReactEleme
     ...(datos.notas !== null && datos.notas !== ''
       ? [h(Text, { style: estilos.notas, key: 'notas' }, `Notas: ${datos.notas}`)]
       : []),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Lista ${datos.folio} · ${datos.renglones.length} renglones`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Lista ${datos.folio} · ${datos.renglones.length} renglones`,
+    }),
   ];
-  return h(Page, { key: clave, size: 'A4', style: estilos.pagina }, ...hijos);
+  return h(Page, { key: clave, size: 'A4', style: estilosDoc.pagina }, ...hijos);
 }
 
 /** Documento de la LISTA de precios. */

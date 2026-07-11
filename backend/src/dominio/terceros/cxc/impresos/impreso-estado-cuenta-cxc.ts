@@ -29,6 +29,15 @@ import {
 import type { SesionUsuario } from '../../../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../../comun/pdf-worker.js';
+import {
+  estilosDoc,
+  FUENTE,
+  PALETA,
+  EncabezadoDocumento,
+  PieDocumento,
+  TituloSeccion,
+  LeyendaTruncado,
+} from '../../../../comun/impresos-estilos.js';
 import { leyendaTruncado } from '../../../../comun/impreso-topes.js';
 import { estadoCuentaClienteCxc } from '../cxc.js';
 
@@ -72,11 +81,6 @@ export async function armarDatosImpresoCxc(
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 /** Formatea un importe en pesos (o "—" si es null). */
 function pesos(n: number | null): string {
   if (n === null) {
@@ -91,87 +95,34 @@ function origenTexto(origen: string): string {
 }
 
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 36,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 14, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  bloqueDerecha: { alignItems: 'flex-end' },
-  etiqueta: { fontSize: 7, color: GRIS, textTransform: 'uppercase' },
-  valorFuerte: { fontSize: 11, fontFamily: 'Helvetica-Bold' },
-  filaCampos: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
-  campo: { width: '33%', marginBottom: 4, paddingRight: 8 },
-  seccion: { marginTop: 4 },
-  tituloSeccion: {
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    color: TEAL,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-    borderBottomWidth: 0.5,
-    borderBottomColor: GRIS_BORDE,
-    paddingBottom: 2,
-  },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Estilos PROPIOS del estado de cuenta (lo compartido vive en `estilosDoc`).
   colFecha: { width: 60 },
   colConcepto: { width: 96 },
   colFlex: { flexGrow: 1, flexBasis: 0 },
   colMarca: { width: 40, textAlign: 'center' },
   colNum: { width: 70, textAlign: 'right' },
-  cancelado: { color: '#94a3b8', textDecoration: 'line-through' },
+  cancelado: { color: PALETA.faint, textDecoration: 'line-through' },
   saldoBloque: {
     marginTop: 14,
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: 24,
     borderTopWidth: 1,
-    borderTopColor: TEAL,
+    borderTopColor: PALETA.marca,
     paddingTop: 8,
   },
   saldoItem: { alignItems: 'flex-end' },
-  saldoValor: { fontSize: 12, fontFamily: 'Helvetica-Bold' },
-  saldoTotal: { fontSize: 15, fontFamily: 'Helvetica-Bold', color: TEAL },
-  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 10 },
-  vacio: { fontSize: 8, color: GRIS, marginTop: 2 },
-  pie: {
-    position: 'absolute',
-    bottom: 24,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  saldoValor: { fontSize: 12, fontFamily: FUENTE.negrita },
+  saldoTotal: { fontSize: 15, fontFamily: FUENTE.negrita, color: PALETA.marca },
 });
 
 /** Un campo etiqueta/valor del encabezado. */
 function campo(etiqueta: string, valor: string): ReactElement {
   return h(
     View,
-    { style: estilos.campo, key: etiqueta },
-    h(Text, { style: estilos.etiqueta }, etiqueta),
-    h(Text, { style: estilos.valorFuerte }, valor),
+    { style: estilosDoc.campoTercio, key: etiqueta },
+    h(Text, { style: estilosDoc.etiquetaCampo }, etiqueta),
+    h(Text, { style: estilosDoc.valorFuerte }, valor),
   );
 }
 
@@ -181,26 +132,34 @@ function tablaMovimientos(datos: DatosImpresoCxc): ReactElement {
   if (movs.length === 0) {
     return h(
       View,
-      { style: estilos.seccion },
-      h(Text, { style: estilos.tituloSeccion }, 'Movimientos'),
-      h(Text, { style: estilos.vacio }, 'Sin movimientos en el periodo.'),
+      { style: estilosDoc.seccion },
+      TituloSeccion('Movimientos'),
+      h(Text, { style: estilosDoc.vacio }, 'Sin movimientos en el periodo.'),
     );
   }
   const encabezado = h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFecha] }, 'Fecha'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colConcepto] }, 'Concepto'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFlex] }, 'Observaciones'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colFecha] }, 'Vence'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colMarca] }, 'Fiscal'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.colNum] }, 'Importe'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFecha] }, 'Fecha'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colConcepto] },
+      'Concepto',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFlex] },
+      'Observaciones',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colFecha] }, 'Vence'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colMarca] }, 'Fiscal'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.colNum] }, 'Importe'),
   );
   const filas = movs.map((m, i) => {
-    const estiloCelda = m.cancelado ? [estilos.celda, estilos.cancelado] : [estilos.celda];
+    const estiloCelda = m.cancelado ? [estilosDoc.celda, estilos.cancelado] : [estilosDoc.celda];
     return h(
       View,
-      { style: estilos.filaTabla, key: `m-${i}` },
+      { style: estilosDoc.filaTabla, key: `m-${i}` },
       h(Text, { style: [...estiloCelda, estilos.colFecha] }, m.fecha),
       h(Text, { style: [...estiloCelda, estilos.colConcepto] }, origenTexto(m.origen)),
       h(Text, { style: [...estiloCelda, estilos.colFlex] }, m.observaciones ?? '—'),
@@ -209,13 +168,7 @@ function tablaMovimientos(datos: DatosImpresoCxc): ReactElement {
       h(Text, { style: [...estiloCelda, estilos.colNum] }, pesos(m.monto)),
     );
   });
-  return h(
-    View,
-    { style: estilos.seccion },
-    h(Text, { style: estilos.tituloSeccion }, 'Movimientos'),
-    encabezado,
-    ...filas,
-  );
+  return h(View, { style: estilosDoc.seccion }, TituloSeccion('Movimientos'), encabezado, ...filas);
 }
 
 /** Bloque final con el saldo derivado (operativo + fiscal). */
@@ -225,13 +178,13 @@ function bloqueSaldo(datos: DatosImpresoCxc): ReactElement {
     h(
       View,
       { style: estilos.saldoItem, key: 'f' },
-      h(Text, { style: estilos.etiqueta }, 'Saldo fiscal'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Saldo fiscal'),
       h(Text, { style: estilos.saldoValor }, pesos(s.saldoFiscal)),
     ),
     h(
       View,
       { style: estilos.saldoItem, key: 's' },
-      h(Text, { style: estilos.etiqueta }, 'Saldo por cobrar'),
+      h(Text, { style: estilosDoc.etiquetaMenor }, 'Saldo por cobrar'),
       h(Text, { style: estilos.saldoTotal }, pesos(s.saldo)),
     ),
   ];
@@ -244,32 +197,18 @@ function paginaCxc(datos: DatosImpresoCxc): ReactElement {
   const periodo = `${c.desde ?? '—'} a ${c.hasta ?? '—'}`;
   const vista = c.vista === 'fiscal' ? 'Fiscal (solo CFDI)' : 'Operativa (todo)';
   const textoTruncado = leyendaTruncado(c.movimientos.length, c.total);
-  const aviso =
-    textoTruncado === null
-      ? []
-      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
+  const aviso = textoTruncado === null ? [] : [LeyendaTruncado(textoTruncado)];
   return h(
     Page,
-    { size: 'A4', style: estilos.pagina },
+    { size: 'A4', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.acreedor,
+      titulo: 'Estado de cuenta de cliente (CxC) — CONTROL v2',
+      derecha: { etiqueta: 'Cliente', valor: c.tercero },
+    }),
     h(
       View,
-      { style: estilos.encabezado, key: 'enc' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.acreedor),
-        h(Text, { style: estilos.subtitulo }, 'Estado de cuenta de cliente (CxC) — CONTROL v2'),
-      ),
-      h(
-        View,
-        { style: estilos.bloqueDerecha },
-        h(Text, { style: estilos.etiqueta }, 'Cliente'),
-        h(Text, { style: estilos.valorFuerte }, c.tercero),
-      ),
-    ),
-    h(
-      View,
-      { style: estilos.filaCampos, key: 'campos' },
+      { style: estilosDoc.filaCampos, key: 'campos' },
       campo('Periodo', periodo),
       campo('Vista', vista),
       campo('Cliente', c.tercero),
@@ -277,11 +216,9 @@ function paginaCxc(datos: DatosImpresoCxc): ReactElement {
     tablaMovimientos(datos),
     ...aviso,
     bloqueSaldo(datos),
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.acreedor} · Estado de cuenta de ${c.tercero} · Saldo ${pesos(c.saldo.saldo)}`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.acreedor} · Estado de cuenta de ${c.tercero} · Saldo ${pesos(c.saldo.saldo)}`,
+    }),
   );
 }
 

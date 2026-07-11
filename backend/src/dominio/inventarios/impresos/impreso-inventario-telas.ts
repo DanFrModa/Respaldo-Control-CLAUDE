@@ -25,6 +25,12 @@ import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
 import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
+import {
+  estilosDoc,
+  EncabezadoDocumento,
+  PieDocumento,
+  LeyendaTruncado,
+} from '../../../comun/impresos-estilos.js';
 import { consultarExistenciasTela, type ParametrosExistenciasTela } from '../telas.js';
 import type { ExistenciasTelaLista } from '../../../contrato/index.js';
 
@@ -94,42 +100,8 @@ export async function armarDatosImpresoInventarioTelas(
 
 // ── Documento PDF (react-pdf, sin JSX) ──────────────────────────────────────────────────────────
 
-const TEAL = '#0d9488';
-const GRIS = '#64748b';
-const GRIS_BORDE = '#e2e8f0';
-const TINTA = '#0f172a';
-
 const estilos = StyleSheet.create({
-  pagina: {
-    paddingVertical: 32,
-    paddingHorizontal: 40,
-    fontFamily: 'Helvetica',
-    fontSize: 9,
-    color: TINTA,
-  },
-  encabezado: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: TEAL,
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  empresa: { fontSize: 13, fontFamily: 'Helvetica-Bold', color: TEAL },
-  subtitulo: { fontSize: 8, color: GRIS, marginTop: 2 },
-  bloqueFecha: { alignItems: 'flex-end' },
-  etiquetaFecha: { fontSize: 8, color: GRIS, textTransform: 'uppercase' },
-  valorFecha: { fontSize: 11, fontFamily: 'Helvetica-Bold' },
-  filaTabla: { flexDirection: 'row' },
-  celda: {
-    borderWidth: 0.5,
-    borderColor: GRIS_BORDE,
-    paddingVertical: 3,
-    paddingHorizontal: 4,
-    fontSize: 8,
-  },
-  celdaEncabezado: { backgroundColor: '#f1f5f9', fontFamily: 'Helvetica-Bold' },
+  // Anchos de columna PROPIOS de esta tabla (lo compartido vive en `estilosDoc`).
   cTela: { width: '16%' },
   cLote: { width: '14%' },
   cColor: { width: '11%' },
@@ -138,35 +110,32 @@ const estilos = StyleSheet.create({
   cAlmacen: { width: '12%' },
   cExistencia: { width: '10%', textAlign: 'right' },
   cComponentes: { width: '10%' },
-  filaTotales: { backgroundColor: '#f8fafc' },
-  avisoTruncado: { fontSize: 8, color: '#b45309', fontFamily: 'Helvetica-Bold', marginTop: 8 },
-  vacio: { fontSize: 9, color: GRIS, marginTop: 12 },
-  pie: {
-    position: 'absolute',
-    bottom: 20,
-    left: 40,
-    right: 40,
-    fontSize: 7,
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
+  cTotalEtiqueta: { width: '80%' },
 });
 
 /** Encabezado de la tabla de existencias. */
 function filaEncabezado(): ReactElement {
   return h(
     View,
-    { style: estilos.filaTabla, key: 'enc' },
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cTela] }, 'Tela'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cLote] }, 'Lote'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cColor] }, 'Color'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cProveedor] }, 'Proveedor'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cFactura] }, 'Factura'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cAlmacen] }, 'Almacén'),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cExistencia] }, 'Existencia'),
+    { style: estilosDoc.filaTabla, key: 'enc' },
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cTela] }, 'Tela'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cLote] }, 'Lote'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cColor] }, 'Color'),
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.cComponentes] },
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cProveedor] },
+      'Proveedor',
+    ),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cFactura] }, 'Factura'),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cAlmacen] }, 'Almacén'),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cExistencia] },
+      'Existencia',
+    ),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilosDoc.celdaEncabezado, estilos.cComponentes] },
       'Componentes',
     ),
   );
@@ -176,15 +145,19 @@ function filaEncabezado(): ReactElement {
 function filaTela(f: FilaImpresoTela, i: number): ReactElement {
   return h(
     View,
-    { style: estilos.filaTabla, key: `fila-${i}`, wrap: false },
-    h(Text, { style: [estilos.celda, estilos.cTela] }, f.tela),
-    h(Text, { style: [estilos.celda, estilos.cLote] }, f.loteClave),
-    h(Text, { style: [estilos.celda, estilos.cColor] }, f.color),
-    h(Text, { style: [estilos.celda, estilos.cProveedor] }, f.proveedor),
-    h(Text, { style: [estilos.celda, estilos.cFactura] }, f.factura),
-    h(Text, { style: [estilos.celda, estilos.cAlmacen] }, f.almacen),
-    h(Text, { style: [estilos.celda, estilos.cExistencia] }, f.existencia.toLocaleString('es-MX')),
-    h(Text, { style: [estilos.celda, estilos.cComponentes] }, f.componentes.join(', ') || '—'),
+    { style: estilosDoc.filaTabla, key: `fila-${i}`, wrap: false },
+    h(Text, { style: [estilosDoc.celda, estilos.cTela] }, f.tela),
+    h(Text, { style: [estilosDoc.celda, estilos.cLote] }, f.loteClave),
+    h(Text, { style: [estilosDoc.celda, estilos.cColor] }, f.color),
+    h(Text, { style: [estilosDoc.celda, estilos.cProveedor] }, f.proveedor),
+    h(Text, { style: [estilosDoc.celda, estilos.cFactura] }, f.factura),
+    h(Text, { style: [estilosDoc.celda, estilos.cAlmacen] }, f.almacen),
+    h(
+      Text,
+      { style: [estilosDoc.celda, estilos.cExistencia] },
+      f.existencia.toLocaleString('es-MX'),
+    ),
+    h(Text, { style: [estilosDoc.celda, estilos.cComponentes] }, f.componentes.join(', ') || '—'),
   );
 }
 
@@ -192,18 +165,18 @@ function filaTela(f: FilaImpresoTela, i: number): ReactElement {
 function filaTotal(datos: DatosImpresoInventarioTelas): ReactElement {
   return h(
     View,
-    { style: [estilos.filaTabla, estilos.filaTotales], key: 'total' },
+    { style: [estilosDoc.filaTabla, estilosDoc.filaTotal], key: 'total' },
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, { width: '80%' }] },
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cTotalEtiqueta] },
       `Total — ${datos.totalRenglones} renglón(es)`,
     ),
     h(
       Text,
-      { style: [estilos.celda, estilos.celdaEncabezado, estilos.cExistencia] },
+      { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cExistencia] },
       datos.totalExistencia.toLocaleString('es-MX'),
     ),
-    h(Text, { style: [estilos.celda, estilos.celdaEncabezado, estilos.cComponentes] }, ''),
+    h(Text, { style: [estilosDoc.celda, estilosDoc.celdaTotal, estilos.cComponentes] }, ''),
   );
 }
 
@@ -211,45 +184,31 @@ function filaTotal(datos: DatosImpresoInventarioTelas): ReactElement {
 function paginaInventario(datos: DatosImpresoInventarioTelas): ReactElement {
   const cuerpo =
     datos.filas.length === 0
-      ? [h(Text, { style: estilos.vacio, key: 'vacio' }, 'Sin existencias de tela para mostrar.')]
+      ? [
+          h(
+            Text,
+            { style: estilosDoc.vacio, key: 'vacio' },
+            'Sin existencias de tela para mostrar.',
+          ),
+        ]
       : [filaEncabezado(), ...datos.filas.map((f, i) => filaTela(f, i)), filaTotal(datos)];
 
   const textoTruncado = leyendaTruncado(datos.filas.length, datos.totalRenglones);
-  const aviso =
-    textoTruncado === null
-      ? []
-      : [h(Text, { style: estilos.avisoTruncado, key: 'aviso' }, textoTruncado)];
+  const aviso = textoTruncado === null ? [] : [LeyendaTruncado(textoTruncado)];
 
   return h(
     Page,
-    { key: 'pagina', size: 'A4', orientation: 'landscape', style: estilos.pagina },
-    h(
-      View,
-      { style: estilos.encabezado, key: 'cab' },
-      h(
-        View,
-        {},
-        h(Text, { style: estilos.empresa }, datos.empresa),
-        h(
-          Text,
-          { style: estilos.subtitulo },
-          'Inventario de telas (existencias por tela × lote × almacén) — CONTROL v2',
-        ),
-      ),
-      h(
-        View,
-        { style: estilos.bloqueFecha },
-        h(Text, { style: estilos.etiquetaFecha }, 'Fecha de corte'),
-        h(Text, { style: estilos.valorFecha }, datos.fecha),
-      ),
-    ),
+    { key: 'pagina', size: 'A4', orientation: 'landscape', style: estilosDoc.pagina },
+    EncabezadoDocumento({
+      empresa: datos.empresa,
+      titulo: 'Inventario de telas (existencias por tela × lote × almacén) — CONTROL v2',
+      derecha: { etiqueta: 'Fecha de corte', valor: datos.fecha },
+    }),
     ...cuerpo,
     ...aviso,
-    h(
-      Text,
-      { style: estilos.pie, key: 'pie', fixed: true },
-      `CONTROL v2 · ${datos.empresa} · Inventario de telas · ${datos.totalRenglones} renglones · ${datos.totalExistencia.toLocaleString('es-MX')} en existencia`,
-    ),
+    PieDocumento({
+      contexto: `CONTROL v2 · ${datos.empresa} · Inventario de telas · ${datos.totalRenglones} renglones · ${datos.totalExistencia.toLocaleString('es-MX')} en existencia`,
+    }),
   );
 }
 
