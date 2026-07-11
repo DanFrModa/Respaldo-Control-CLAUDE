@@ -25,6 +25,18 @@ describe('esquemaClienteCrear', () => {
     expect(datos.nombre).toBe('Pumas');
     expect(datos.contacto).toBeUndefined();
     expect(datos.email).toBeUndefined();
+    expect(datos.razonSocial).toBeUndefined();
+  });
+
+  it('acepta la razón social opcional y la recorta', () => {
+    const datos = esquemaClienteCrear.parse({
+      nombre: 'Liverpool',
+      razonSocial: '  El Puerto de Liverpool, S.A.B. de C.V.  ',
+    });
+    expect(datos.razonSocial).toBe('El Puerto de Liverpool, S.A.B. de C.V.');
+    expect(
+      esquemaClienteCrear.safeParse({ nombre: 'X', razonSocial: 'a'.repeat(201) }).success,
+    ).toBe(false);
   });
 
   it('rechaza nombre vacío y demasiado largo', () => {
@@ -58,11 +70,13 @@ describe('esquemaClienteEditar (semántica del PATCH parcial, M1)', () => {
   it('acepta null en los datos de contacto para vaciarlos (M1)', () => {
     const datos = esquemaClienteEditar.parse({
       id: 1,
+      razonSocial: null,
       contacto: null,
       telefono: null,
       email: null,
       direccion: null,
     });
+    expect(datos.razonSocial).toBeNull();
     expect(datos.contacto).toBeNull();
     expect(datos.telefono).toBeNull();
     expect(datos.email).toBeNull();

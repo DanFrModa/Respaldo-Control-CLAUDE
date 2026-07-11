@@ -108,6 +108,7 @@ export function EditorRenglones({
                     inputMode="numeric"
                     min={1}
                     step="1"
+                    placeholder="Ej. 500"
                     disabled={deshabilitado}
                     aria-invalid={Boolean(errorFila?.cantidadPedida)}
                     aria-label="Cantidad del renglón"

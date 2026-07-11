@@ -134,7 +134,14 @@ async function exigirClienteActivo(tx: Tx, id: number): Promise<Cliente> {
 
 /** Campos de texto editables del cliente (clave del payload === clave del modelo). Incluye el `rfc`
  * fiscal (F9-E4). El `diasCredito` (numérico) se maneja aparte en {@link aplicarContactoEditar}. */
-const CAMPOS_CONTACTO_EDITABLES = ['contacto', 'telefono', 'email', 'direccion', 'rfc'] as const;
+const CAMPOS_CONTACTO_EDITABLES = [
+  'razonSocial',
+  'contacto',
+  'telefono',
+  'email',
+  'direccion',
+  'rfc',
+] as const;
 
 /**
  * Aplica los campos de contacto que VENGAN en la edición al `update` y registra qué
@@ -180,6 +187,9 @@ function datosContactoCrear(
   datos: z.output<typeof esquemaClienteCrear>,
 ): Partial<Prisma.ClienteCreateInput> {
   const data: Partial<Prisma.ClienteCreateInput> = {};
+  // Razón social (nombre legal): vacío ('') se omite (queda null); con valor, tal cual.
+  if (datos.razonSocial !== undefined && datos.razonSocial !== '')
+    data.razonSocial = datos.razonSocial;
   if (datos.contacto !== undefined) data.contacto = datos.contacto;
   if (datos.telefono !== undefined) data.telefono = datos.telefono;
   if (datos.email !== undefined) data.email = datos.email;

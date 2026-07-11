@@ -22,6 +22,7 @@ function clienteEjemplo(sobre: Partial<Cliente> = {}): Cliente {
   return {
     id: 10,
     nombre: 'Liverpool',
+    razonSocial: null,
     contacto: null,
     telefono: null,
     email: null,
@@ -48,7 +49,7 @@ describe('<DialogoCliente>', () => {
     renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
 
     expect(screen.getByRole('heading', { name: 'Nuevo cliente' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Nombre')).toHaveValue('');
+    expect(screen.getByLabelText(/^Nombre/)).toHaveValue('');
     expect(screen.getByLabelText('Email')).toHaveValue('');
   });
 
@@ -66,7 +67,7 @@ describe('<DialogoCliente>', () => {
     const usuario = userEvent.setup();
     renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Liverpool');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Liverpool');
     await usuario.type(screen.getByLabelText('Email'), 'no-es-email');
     await usuario.click(screen.getByTestId('guardar-cliente'));
 
@@ -86,7 +87,7 @@ describe('<DialogoCliente>', () => {
       <DialogoCliente abierto alCambiarAbierto={alCambiarAbierto} cliente={undefined} />,
     );
 
-    await usuario.type(screen.getByLabelText('Nombre'), 'Nuevo Cliente');
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Nuevo Cliente');
     await usuario.type(screen.getByLabelText('Contacto'), 'Ana');
     await usuario.click(screen.getByTestId('guardar-cliente'));
 
@@ -98,7 +99,29 @@ describe('<DialogoCliente>', () => {
     expect('telefono' in cuerpo).toBe(false);
     expect('email' in cuerpo).toBe(false);
     expect('direccion' in cuerpo).toBe(false);
+    expect('razonSocial' in cuerpo).toBe(false);
     expect(alCambiarAbierto).toHaveBeenCalledWith(false);
+  });
+
+  it('captura la razón social (opcional) y la envía en el alta', async () => {
+    const usuario = userEvent.setup();
+    crearMutate.mockImplementation(
+      (_cuerpo: ClienteCrear, opciones?: { onSuccess?: (r: Cliente) => void }) => {
+        opciones?.onSuccess?.(clienteEjemplo({ nombre: 'Con Razón' }));
+      },
+    );
+    renderConProveedores(<DialogoCliente abierto alCambiarAbierto={vi.fn()} cliente={undefined} />);
+
+    await usuario.type(screen.getByLabelText(/^Nombre/), 'Con Razón');
+    await usuario.type(
+      screen.getByLabelText('Razón social'),
+      'El Puerto de Liverpool, S.A.B. de C.V.',
+    );
+    await usuario.click(screen.getByTestId('guardar-cliente'));
+
+    await waitFor(() => expect(crearMutate).toHaveBeenCalledTimes(1));
+    const cuerpo = crearMutate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(cuerpo.razonSocial).toBe('El Puerto de Liverpool, S.A.B. de C.V.');
   });
 
   it('en edición pre-carga los datos y vaciar un opcional manda null para borrarlo', async () => {
