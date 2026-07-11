@@ -2,17 +2,17 @@ import { useState } from 'react';
 
 import { useRecibosSemanalesEsMa } from '@/api/esma';
 import type { EsMaRecibosSemanalesQuery } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 import { SelectorMaquilero, type TipoMaquilero } from './SelectorMaquilero';
 import { moneda } from './comun';
@@ -113,34 +113,34 @@ export function RecibosSemanalesEsMaPagina(): React.JSX.Element {
             <strong>{moneda(consulta.data?.totalImporte ?? null)}</strong>.
           </p>
           <div className="overflow-x-auto rounded-md border">
-            <Table data-testid="recsem-tabla">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Recibo</TableHead>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Maquilero</TableHead>
-                  <TableHead>Orden</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Proceso</TableHead>
-                  <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead className="text-right">Importe</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <TablaDensa data-testid="recsem-tabla">
+              <TablaDensaEncabezado>
+                <TablaDensaFila>
+                  <TablaDensaHead>Recibo</TablaDensaHead>
+                  <TablaDensaHead>Fecha</TablaDensaHead>
+                  <TablaDensaHead>Maquilero</TablaDensaHead>
+                  <TablaDensaHead>Orden</TablaDensaHead>
+                  <TablaDensaHead>Modelo</TablaDensaHead>
+                  <TablaDensaHead>Proceso</TablaDensaHead>
+                  <TablaDensaHead numerica>Cantidad</TablaDensaHead>
+                  <TablaDensaHead numerica>Importe</TablaDensaHead>
+                </TablaDensaFila>
+              </TablaDensaEncabezado>
+              <TablaDensaCuerpo>
                 {filas.map((r) => (
-                  <TableRow key={r.idRecibo} data-testid="recsem-fila">
-                    <TableCell>#{r.folioRecibo}</TableCell>
-                    <TableCell>{r.fecha}</TableCell>
-                    <TableCell className="font-medium">{r.maquilero}</TableCell>
-                    <TableCell>#{r.folioOrden}</TableCell>
-                    <TableCell>{r.codigoModelo}</TableCell>
-                    <TableCell>{r.tipoProceso}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmt(r.cantidad)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{moneda(r.importe)}</TableCell>
-                  </TableRow>
+                  <TablaDensaFila key={r.idRecibo} data-testid="recsem-fila">
+                    <TablaDensaCelda>#{r.folioRecibo}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.fecha}</TablaDensaCelda>
+                    <TablaDensaCelda className="font-medium">{r.maquilero}</TablaDensaCelda>
+                    <TablaDensaCelda>#{r.folioOrden}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.codigoModelo}</TablaDensaCelda>
+                    <TablaDensaCelda>{r.tipoProceso}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{fmt(r.cantidad)}</TablaDensaCelda>
+                    <TablaDensaCelda numerica>{moneda(r.importe)}</TablaDensaCelda>
+                  </TablaDensaFila>
                 ))}
-              </TableBody>
-            </Table>
+              </TablaDensaCuerpo>
+            </TablaDensa>
           </div>
         </>
       )}

@@ -9,19 +9,19 @@ import {
   useDescuentosMaquilero,
   useMaquilerosEsMa,
 } from '@/api/esma';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
@@ -215,30 +215,28 @@ export function CapturaMovimientoPagina({
                 <p className="text-sm text-muted-foreground">Sin movimientos.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Fecha</TableHead>
-                        <TableHead>Facturación</TableHead>
-                        <TableHead>Observaciones</TableHead>
-                        <TableHead className="text-right">Importe</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <TablaDensa>
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Fecha</TablaDensaHead>
+                        <TablaDensaHead>Facturación</TablaDensaHead>
+                        <TablaDensaHead>Observaciones</TablaDensaHead>
+                        <TablaDensaHead numerica>Importe</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
                       {(lista.data?.filas ?? []).map((m) => (
-                        <TableRow key={m.id} data-testid="mov-fila">
-                          <TableCell>{m.fecha}</TableCell>
-                          <TableCell>
+                        <TablaDensaFila key={m.id} data-testid="mov-fila">
+                          <TablaDensaCelda>{m.fecha}</TablaDensaCelda>
+                          <TablaDensaCelda>
                             {m.conFactura === null ? '—' : m.conFactura ? 'Con' : 'Sin'}
-                          </TableCell>
-                          <TableCell>{m.observaciones ?? '—'}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {moneda(m.monto)}
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>{m.observaciones ?? '—'}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>{moneda(m.monto)}</TablaDensaCelda>
+                        </TablaDensaFila>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
                 </div>
               )}
             </CardContent>

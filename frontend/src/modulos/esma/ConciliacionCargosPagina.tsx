@@ -3,19 +3,19 @@ import { useState } from 'react';
 import { useConciliacionEsMa } from '@/api/esma';
 import { useProveedores } from '@/api/proveedores';
 import type { EsMaConciliacionQuery } from '@/api/tipos';
+import {
+  TablaDensa,
+  TablaDensaCelda,
+  TablaDensaCuerpo,
+  TablaDensaEncabezado,
+  TablaDensaFila,
+  TablaDensaHead,
+} from '@/components/dominio/TablaDensa';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 
 /** Valor del filtro de maquilero que significa "todos". */
 const TODOS = 'TODOS';
@@ -196,35 +196,33 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                 className="hidden overflow-x-auto rounded-md border md:block"
                 data-testid="conc-tabla"
               >
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Orden</TableHead>
-                      <TableHead>Maquilero</TableHead>
-                      <TableHead>Proceso</TableHead>
-                      <TableHead className="text-right">Cortado</TableHead>
-                      <TableHead className="text-right">Recibido</TableHead>
-                      <TableHead className="text-right">Entregado</TableHead>
-                      <TableHead className="text-right">Ya cargado</TableHead>
-                      <TableHead className="text-right">Falta por cargar</TableHead>
-                      <TableHead>Pago</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Orden</TablaDensaHead>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead>Proceso</TablaDensaHead>
+                      <TablaDensaHead numerica>Cortado</TablaDensaHead>
+                      <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                      <TablaDensaHead numerica>Entregado</TablaDensaHead>
+                      <TablaDensaHead numerica>Ya cargado</TablaDensaHead>
+                      <TablaDensaHead numerica>Falta por cargar</TablaDensaHead>
+                      <TablaDensaHead>Pago</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
                     {filas.map((f) => (
-                      <TableRow
+                      <TablaDensaFila
                         key={`${f.idOrden}-${f.idMaquilero ?? 'sin'}-${f.idTipoProceso ?? 'sin'}`}
                       >
-                        <TableCell>#{f.folioOrden}</TableCell>
-                        <TableCell className="font-medium">{f.maquilero}</TableCell>
-                        <TableCell>{f.tipoProceso}</TableCell>
-                        <TableCell className="text-right tabular-nums">{fmt(f.cortado)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{fmt(f.recibido)}</TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {fmt(f.entregado)}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{fmt(f.cargado)}</TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        <TablaDensaCelda>#{f.folioOrden}</TablaDensaCelda>
+                        <TablaDensaCelda className="font-medium">{f.maquilero}</TablaDensaCelda>
+                        <TablaDensaCelda>{f.tipoProceso}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{fmt(f.cortado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{fmt(f.recibido)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{fmt(f.entregado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{fmt(f.cargado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>
                           {f.faltantePorCargar > 0 ? (
                             <span className="font-semibold text-destructive">
                               {fmt(f.faltantePorCargar)}
@@ -232,18 +230,18 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
                           ) : (
                             fmt(f.faltantePorCargar)
                           )}
-                        </TableCell>
-                        <TableCell>
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
                           {f.pagada ? (
                             <Badge variant="secondary">Pagada</Badge>
                           ) : (
                             <Badge variant="outline">Pendiente</Badge>
                           )}
-                        </TableCell>
-                      </TableRow>
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
                     ))}
-                  </TableBody>
-                </Table>
+                  </TablaDensaCuerpo>
+                </TablaDensa>
               </div>
             </>
           )}
@@ -258,30 +256,30 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Cargo</TableHead>
-                        <TableHead>Orden</TableHead>
-                        <TableHead>Maquilero</TableHead>
-                        <TableHead>Proceso</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <TablaDensa>
+                    <TablaDensaEncabezado>
+                      <TablaDensaFila>
+                        <TablaDensaHead>Cargo</TablaDensaHead>
+                        <TablaDensaHead>Orden</TablaDensaHead>
+                        <TablaDensaHead>Maquilero</TablaDensaHead>
+                        <TablaDensaHead>Proceso</TablaDensaHead>
+                        <TablaDensaHead numerica>Cantidad</TablaDensaHead>
+                      </TablaDensaFila>
+                    </TablaDensaEncabezado>
+                    <TablaDensaCuerpo>
                       {cargosSinRecibo.map((c) => (
-                        <TableRow key={c.idCargo}>
-                          <TableCell>#{c.idCargo}</TableCell>
-                          <TableCell>#{c.folioOrden}</TableCell>
-                          <TableCell className="font-medium">{c.maquilero}</TableCell>
-                          <TableCell>{c.tipoProceso}</TableCell>
-                          <TableCell className="text-right tabular-nums">
+                        <TablaDensaFila key={c.idCargo}>
+                          <TablaDensaCelda>#{c.idCargo}</TablaDensaCelda>
+                          <TablaDensaCelda>#{c.folioOrden}</TablaDensaCelda>
+                          <TablaDensaCelda className="font-medium">{c.maquilero}</TablaDensaCelda>
+                          <TablaDensaCelda>{c.tipoProceso}</TablaDensaCelda>
+                          <TablaDensaCelda numerica>
                             {c.cantidad === null ? '—' : fmt(c.cantidad)}
-                          </TableCell>
-                        </TableRow>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </TablaDensaCuerpo>
+                  </TablaDensa>
                 </div>
               </CardContent>
             </Card>
