@@ -106,39 +106,89 @@ export function ListaCostosPagina(): React.JSX.Element {
               No hay órdenes costeadas.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Orden</TablaDensaHead>
-                  <TablaDensaHead>Modelo</TablaDensaHead>
-                  <TablaDensaHead>Cliente</TablaDensaHead>
-                  <TablaDensaHead numerica>Cortado</TablaDensaHead>
-                  <TablaDensaHead>Base</TablaDensaHead>
-                  <TablaDensaHead numerica>Costo total</TablaDensaHead>
-                  <TablaDensaHead numerica>Costo unitario</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas compactas — la tabla de 7 columnas deja el COSTO (la métrica
+                  que da nombre a la pantalla) fuera de la vista en teléfono. Toca para ir al costeo. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="lc-tarjetas">
                 {filas.map((f) => (
-                  <TablaDensaFila
+                  <button
                     key={f.idOrden}
-                    className="cursor-pointer"
+                    type="button"
                     onClick={() => void navigate(`/costos/costeo?idOrden=${String(f.idOrden)}`)}
-                    data-testid={`lc-fila-${f.idOrden}`}
+                    className="w-full rounded-lg border bg-card p-3 text-left"
+                    data-testid={`lc-tarjeta-${f.idOrden}`}
                   >
-                    <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
-                    <TablaDensaCelda>{f.codigoModelo}</TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">{f.cliente}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{f.cortado.toLocaleString('es-MX')}</TablaDensaCelda>
-                    <TablaDensaCelda>{etiquetaBase(f.baseProrrateo)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica className="font-medium">
-                      {moneda(f.costoTotal)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>{moneda(f.costoUnitario)}</TablaDensaCelda>
-                  </TablaDensaFila>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium">#{f.folio}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {f.codigoModelo} · {f.cliente}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="num text-base leading-tight font-bold">
+                          {moneda(f.costoTotal)}
+                        </div>
+                        <div className="text-[10.5px] text-faint uppercase">costo total</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Unitario <b className="num text-foreground">{moneda(f.costoUnitario)}</b>
+                      </span>
+                      <span>
+                        Cortado{' '}
+                        <b className="num text-foreground">{f.cortado.toLocaleString('es-MX')}</b>
+                      </span>
+                      <span>
+                        Base <b className="text-foreground">{etiquetaBase(f.baseProrrateo)}</b>
+                      </span>
+                    </div>
+                  </button>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+
+              {/* Escritorio (≥lg): tabla densa intacta. */}
+              <div className="hidden lg:block">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Orden</TablaDensaHead>
+                      <TablaDensaHead>Modelo</TablaDensaHead>
+                      <TablaDensaHead>Cliente</TablaDensaHead>
+                      <TablaDensaHead numerica>Cortado</TablaDensaHead>
+                      <TablaDensaHead>Base</TablaDensaHead>
+                      <TablaDensaHead numerica>Costo total</TablaDensaHead>
+                      <TablaDensaHead numerica>Costo unitario</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((f) => (
+                      <TablaDensaFila
+                        key={f.idOrden}
+                        className="cursor-pointer"
+                        onClick={() => void navigate(`/costos/costeo?idOrden=${String(f.idOrden)}`)}
+                        data-testid={`lc-fila-${f.idOrden}`}
+                      >
+                        <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
+                        <TablaDensaCelda>{f.codigoModelo}</TablaDensaCelda>
+                        <TablaDensaCelda className="text-muted-foreground">
+                          {f.cliente}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {f.cortado.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>{etiquetaBase(f.baseProrrateo)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-medium">
+                          {moneda(f.costoTotal)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.costoUnitario)}</TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

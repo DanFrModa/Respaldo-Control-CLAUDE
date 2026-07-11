@@ -40,7 +40,8 @@ describe('MargenesPagina', () => {
       sesion: estadoSesionDePrueba(['costos.ver', 'consultas.ver-importes']),
     });
     expect(screen.getByTestId('mg-fila-1')).toBeInTheDocument();
-    expect(screen.getByText('Tienda X')).toBeInTheDocument();
+    // "Tienda X" aparece en la tabla (≥lg) y en la tarjeta móvil (<lg); se afirma sobre la fila.
+    expect(screen.getByTestId('mg-fila-1')).toHaveTextContent('Tienda X');
     // El 47.0% aparece dos veces (margen promedio y ponderado).
     expect(screen.getAllByText('47.0%').length).toBeGreaterThan(0);
     expect(screen.getByTestId('mg-fila-1')).toHaveTextContent('$3,500.00');

@@ -324,8 +324,8 @@ function Festivos({
         <TableBody>
           {(consulta.data ?? []).map((f) => (
             <TableRow key={f.id} className={f.activo ? '' : 'opacity-50'}>
-              <TableCell>{f.fecha}</TableCell>
-              <TableCell>{f.descripcion}</TableCell>
+              <TableCell className="num whitespace-nowrap">{f.fecha}</TableCell>
+              <TableCell className="max-w-[38vw] truncate lg:max-w-none">{f.descripcion}</TableCell>
               <TableCell>{f.activo ? 'Activo' : 'Inactivo'}</TableCell>
               <TableCell>
                 {puedeAdministrar ? (

@@ -160,40 +160,92 @@ export function TableroWipPagina(): React.JSX.Element {
                   No hay órdenes para el filtro elegido.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <TablaDensa>
-                    <TablaDensaEncabezado>
-                      <TablaDensaFila>
-                        <TablaDensaHead>Folio</TablaDensaHead>
-                        <TablaDensaHead>Cliente</TablaDensaHead>
-                        <TablaDensaHead>Modelo</TablaDensaHead>
-                        <TablaDensaHead numerica>Pedido</TablaDensaHead>
-                        <TablaDensaHead numerica>Cortado</TablaDensaHead>
-                        <TablaDensaHead numerica>Enviado</TablaDensaHead>
-                        <TablaDensaHead numerica>Recibido</TablaDensaHead>
-                        <TablaDensaHead numerica>Entregado</TablaDensaHead>
-                        <TablaDensaHead numerica>Por recibir</TablaDensaHead>
-                        <TablaDensaHead numerica>Por entregar</TablaDensaHead>
-                      </TablaDensaFila>
-                    </TablaDensaEncabezado>
-                    <TablaDensaCuerpo>
-                      {datos.datos.map((o) => (
-                        <TablaDensaFila key={o.idOrden} data-testid={`wip-fila-${o.idOrden}`}>
-                          <TablaDensaCelda className="font-medium">#{o.folio}</TablaDensaCelda>
-                          <TablaDensaCelda>{o.cliente}</TablaDensaCelda>
-                          <TablaDensaCelda>{o.codigoModelo}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.pedido)}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.cortado)}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.enviado)}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.recibido)}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.entregado)}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.porRecibir)}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{entero(o.porEntregar)}</TablaDensaCelda>
+                <>
+                  {/* Móvil (<lg): tarjeta por orden con las etapas como mini-grid — la tabla de 10
+                      columnas deja el WIP (por recibir / por entregar) fuera de la vista. */}
+                  <div className="space-y-2 p-3 lg:hidden" data-testid="wip-tarjetas">
+                    {datos.datos.map((o) => (
+                      <div
+                        key={o.idOrden}
+                        className="rounded-lg border bg-card p-3"
+                        data-testid={`wip-fila-${o.idOrden}-tarjeta`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium">#{o.folio}</div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {o.cliente} · {o.codigoModelo}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 gap-3 text-right">
+                            <div>
+                              <div className="num text-base leading-tight font-bold">
+                                {entero(o.porRecibir)}
+                              </div>
+                              <div className="text-[10px] text-faint uppercase">x recibir</div>
+                            </div>
+                            <div>
+                              <div className="num text-base leading-tight font-bold">
+                                {entero(o.porEntregar)}
+                              </div>
+                              <div className="text-[10px] text-faint uppercase">x entregar</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 grid grid-cols-5 gap-1 border-t pt-2 text-center text-xs">
+                          {[
+                            ['Pedido', o.pedido],
+                            ['Cortado', o.cortado],
+                            ['Enviado', o.enviado],
+                            ['Recibido', o.recibido],
+                            ['Entreg.', o.entregado],
+                          ].map(([etiqueta, valor]) => (
+                            <div key={etiqueta as string}>
+                              <div className="num font-semibold">{entero(valor as number)}</div>
+                              <div className="text-[9.5px] text-faint">{etiqueta}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Escritorio (≥lg): tabla densa intacta. */}
+                  <div className="hidden overflow-x-auto lg:block">
+                    <TablaDensa>
+                      <TablaDensaEncabezado>
+                        <TablaDensaFila>
+                          <TablaDensaHead>Folio</TablaDensaHead>
+                          <TablaDensaHead>Cliente</TablaDensaHead>
+                          <TablaDensaHead>Modelo</TablaDensaHead>
+                          <TablaDensaHead numerica>Pedido</TablaDensaHead>
+                          <TablaDensaHead numerica>Cortado</TablaDensaHead>
+                          <TablaDensaHead numerica>Enviado</TablaDensaHead>
+                          <TablaDensaHead numerica>Recibido</TablaDensaHead>
+                          <TablaDensaHead numerica>Entregado</TablaDensaHead>
+                          <TablaDensaHead numerica>Por recibir</TablaDensaHead>
+                          <TablaDensaHead numerica>Por entregar</TablaDensaHead>
                         </TablaDensaFila>
-                      ))}
-                    </TablaDensaCuerpo>
-                  </TablaDensa>
-                </div>
+                      </TablaDensaEncabezado>
+                      <TablaDensaCuerpo>
+                        {datos.datos.map((o) => (
+                          <TablaDensaFila key={o.idOrden} data-testid={`wip-fila-${o.idOrden}`}>
+                            <TablaDensaCelda className="font-medium">#{o.folio}</TablaDensaCelda>
+                            <TablaDensaCelda>{o.cliente}</TablaDensaCelda>
+                            <TablaDensaCelda>{o.codigoModelo}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.pedido)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.cortado)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.enviado)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.recibido)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.entregado)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.porRecibir)}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{entero(o.porEntregar)}</TablaDensaCelda>
+                          </TablaDensaFila>
+                        ))}
+                      </TablaDensaCuerpo>
+                    </TablaDensa>
+                  </div>
+                </>
               )}
 
               {datos.totalPaginas > 1 && (

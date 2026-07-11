@@ -114,33 +114,75 @@ export function ListaPreciosPagina(): React.JSX.Element {
               No hay modelos para los filtros elegidos.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Descripción</TableHead>
-                  <TableHead>Género</TableHead>
-                  <TableHead className="text-right">Costo</TableHead>
-                  <TableHead className="text-right">Precio sugerido</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+            <>
+              {/* Móvil (<lg): tarjetas — la tabla de 5 columnas deja el PRECIO SUGERIDO (la métrica
+                  que da nombre a la pantalla) fuera de la vista en teléfono. */}
+              <div className="space-y-2 lg:hidden" data-testid="lp-tarjetas">
                 {filas.map((f) => (
-                  <TableRow key={f.idModelo} className={f.activo ? '' : 'text-muted-foreground'}>
-                    <TableCell className="font-medium">
-                      {f.codigo}
-                      {f.activo ? '' : ' (inactivo)'}
-                    </TableCell>
-                    <TableCell>{f.descripcion ?? ''}</TableCell>
-                    <TableCell>{f.genero ?? '—'}</TableCell>
-                    <TableCell className="text-right">{moneda(f.costo)}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      {moneda(f.precioSugerido)}
-                    </TableCell>
-                  </TableRow>
+                  <div
+                    key={f.idModelo}
+                    className={`rounded-lg border bg-card p-3 ${f.activo ? '' : 'text-muted-foreground'}`}
+                    data-testid={`lp-tarjeta-${f.idModelo}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium">
+                          {f.codigo}
+                          {f.activo ? '' : ' (inactivo)'}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {f.descripcion ?? ''}
+                          {f.genero ? ` · ${f.genero}` : ''}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="num text-base leading-tight font-bold text-foreground">
+                          {moneda(f.precioSugerido)}
+                        </div>
+                        <div className="text-[10.5px] text-faint uppercase">precio sug.</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
+                      Costo <b className="num text-foreground">{moneda(f.costo)}</b>
+                    </div>
+                  </div>
                 ))}
-              </TableBody>
-            </Table>
+              </div>
+
+              {/* Escritorio (≥lg): tabla intacta. */}
+              <div className="hidden lg:block">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Modelo</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Género</TableHead>
+                      <TableHead className="text-right">Costo</TableHead>
+                      <TableHead className="text-right">Precio sugerido</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filas.map((f) => (
+                      <TableRow
+                        key={f.idModelo}
+                        className={f.activo ? '' : 'text-muted-foreground'}
+                      >
+                        <TableCell className="font-medium">
+                          {f.codigo}
+                          {f.activo ? '' : ' (inactivo)'}
+                        </TableCell>
+                        <TableCell>{f.descripcion ?? ''}</TableCell>
+                        <TableCell>{f.genero ?? '—'}</TableCell>
+                        <TableCell className="text-right">{moneda(f.costo)}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {moneda(f.precioSugerido)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

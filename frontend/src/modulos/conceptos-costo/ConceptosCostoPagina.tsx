@@ -159,6 +159,26 @@ export function ConceptosCostoPagina(): React.JSX.Element {
         razonNoDesactivar={(c) =>
           c.fijo ? 'Los conceptos fijos (tela/avíos/maquila) no se pueden desactivar.' : undefined
         }
+        renderTarjeta={(c) => (
+          <>
+            <div className="flex items-start justify-between gap-2">
+              <span className="min-w-0 truncate font-semibold">{c.nombre}</span>
+              {c.fijo ? (
+                <TipoBadge tono="pt">Fijo</TipoBadge>
+              ) : (
+                <TipoBadge tono="neutro">Abierto</TipoBadge>
+              )}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+              <span>
+                Código <b className="num text-foreground">{c.codigo}</b>
+              </span>
+              <span>
+                Orden <b className="num text-foreground">{c.orden}</b>
+              </span>
+            </div>
+          </>
+        )}
       />
 
       <DialogoConceptoCosto
