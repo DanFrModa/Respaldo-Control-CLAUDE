@@ -61,17 +61,6 @@ async function resumenOc(query: ResumenComprasQuery): Promise<ResumenCompras> {
   return data;
 }
 
-/** Obtiene una OC por id (encabezado + líneas + matriz + órdenes ligadas + total). */
-async function obtenerOc(id: number): Promise<OrdenCompra> {
-  const { data, error } = await api.GET('/api/ordenes-compra/{id}', {
-    params: { path: { id } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 // ── Escrituras ──────────────────────────────────────────────────────────────────
 
 /** Crea una OC en borrador (`POST /api/ordenes-compra`). */
@@ -150,15 +139,6 @@ export function useResumenOc(
     queryKey: [...CLAVE_OC, 'resumen', query],
     queryFn: () => resumenOc(query),
     placeholderData: keepPreviousData,
-  });
-}
-
-/** Obtiene el detalle de una OC (deshabilitada si no hay id). */
-export function useOrdenCompra(id: number | undefined): UseQueryResult<OrdenCompra, ErrorDeApi> {
-  return useQuery({
-    queryKey: claveOc(id ?? 0),
-    queryFn: () => obtenerOc(id as number),
-    enabled: id !== undefined,
   });
 }
 

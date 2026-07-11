@@ -261,8 +261,9 @@ export async function obtenerRutaOrden(
 ): Promise<RutaOrdenDto> {
   verificarPermiso(sesion, 'rc.ruta-ver');
   const cliente = clienteLectura(bd);
-  const orden = await cliente.orden.findUnique({
-    where: { id: idOrden },
+  // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se lee su ruta).
+  const orden = await cliente.orden.findFirst({
+    where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
     select: SELECT_ORDEN_RC,
   });
   if (orden === null) {
@@ -294,8 +295,11 @@ export async function generarRutaOrden(
   verificarPermiso(sesion, 'rc.programar');
 
   const resultado = await enTransaccion(async (tx) => {
-    const orden = await tx.orden.findUnique({
-      where: { id: datos.idOrden },
+    // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se le
+    // genera/re-genera ruta). El consumidor automático de R3 usa una sesión de sistema cuya empresa
+    // activa ES la de la orden, así que este scope no lo afecta.
+    const orden = await tx.orden.findFirst({
+      where: { id: datos.idOrden, idEmpresa: sesion.idEmpresaActiva },
       select: {
         id: true,
         idEmpresa: true,
@@ -696,8 +700,9 @@ export async function ajustarRutaOrden(
   verificarPermiso(sesion, 'rc.programar');
 
   const resultado = await enTransaccion(async (tx) => {
-    const orden = await tx.orden.findUnique({
-      where: { id: datos.idOrden },
+    // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (nunca se ajusta).
+    const orden = await tx.orden.findFirst({
+      where: { id: datos.idOrden, idEmpresa: sesion.idEmpresaActiva },
       select: { id: true, idEmpresa: true, rcActiva: true },
     });
     if (orden === null) {

@@ -4,7 +4,7 @@
  * el avance en tres estados:
  *
  *  • `aTiempo`  — el proceso ya se cumplió (tiene `fechaReal`), o su fecha planeada aún no apremia.
- *  • `enRiesgo` — sin cumplir y su fecha planeada está CERCA (dentro del umbral de días hábiles), o
+ *  • `enRiesgo` — sin cumplir y su fecha planeada está CERCA (dentro del umbral de días naturales), o
  *                 la orden todavía no se programó pero su inicio requerido ya pasó / está por pasar.
  *  • `atrasado` — sin cumplir y su fecha planeada vigente YA venció (HOY > planeada).
  *

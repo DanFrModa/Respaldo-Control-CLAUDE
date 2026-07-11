@@ -10,7 +10,6 @@ import {
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -31,13 +30,6 @@ interface SeccionLista {
   icono: LucideIcon;
   /** Permiso que hace visible la seccion (la administracion no tiene `.ver`). */
   permiso: ClavePermiso;
-}
-
-/** Una seccion aun por construir (placeholder "Próximamente"). */
-interface SeccionPendiente {
-  clave: string;
-  titulo: string;
-  descripcion: string;
 }
 
 /** Secciones construidas (pantallas reales). */
@@ -92,9 +84,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
   },
 ];
 
-/** Secciones aun por construir (se muestran como "Próximamente"). Ya no queda ninguna. */
-const SECCIONES_PENDIENTES: readonly SeccionPendiente[] = [];
-
 export function AdministracionPagina(): React.JSX.Element {
   const { tienePermiso } = useSesion();
   // Solo las secciones construidas que el usuario puede administrar.
@@ -130,25 +119,6 @@ export function AdministracionPagina(): React.JSX.Element {
                 <p className="mt-1 text-sm text-muted-foreground">{sub.descripcion}</p>
               </div>
             </Link>
-          ))}
-
-          {SECCIONES_PENDIENTES.map((sub) => (
-            <div
-              key={sub.clave}
-              className="flex items-start gap-3 rounded-xl bg-card p-4 text-card-foreground ring-1 ring-foreground/10 opacity-70"
-            >
-              <span
-                aria-hidden
-                className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h2 className="font-heading text-base font-medium">{sub.titulo}</h2>
-                  <Badge variant="outline">Próximamente</Badge>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{sub.descripcion}</p>
-              </div>
-            </div>
           ))}
         </div>
       </div>

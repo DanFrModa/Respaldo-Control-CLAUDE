@@ -97,14 +97,22 @@ async function reactivarProveedor(id: number): Promise<Proveedor> {
 
 // ── Hooks ───────────────────────────────────────────────────────────────────
 
-/** Lista proveedores con los filtros dados (mantiene la pagina previa al paginar/buscar). */
+/**
+ * Lista proveedores con los filtros dados (mantiene la pagina previa al paginar/buscar).
+ *
+ * `opciones.enabled` deshabilita la consulta cuando aun no se puede filtrar por rol: las pantallas
+ * de captura que listan un rol concreto (cortadores, maquileros) la apagan mientras el rol no esta
+ * resuelto, para NUNCA listar TODOS los proveedores sin filtro.
+ */
 export function useProveedores(
   query: ProveedoresQuery,
+  opciones?: { enabled?: boolean },
 ): UseQueryResult<ProveedoresPagina, ErrorDeApi> {
   return useQuery({
     queryKey: claveListaProveedores(query),
     queryFn: () => listarProveedores(query),
     placeholderData: keepPreviousData,
+    enabled: opciones?.enabled ?? true,
   });
 }
 

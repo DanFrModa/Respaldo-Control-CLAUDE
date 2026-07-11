@@ -15,7 +15,7 @@
  */
 
 /** Error tal como lo entrega el cliente de better-auth. */
-export interface ErrorAuth {
+interface ErrorAuth {
   code?: string | undefined;
   message?: string | undefined;
   status?: number | undefined;

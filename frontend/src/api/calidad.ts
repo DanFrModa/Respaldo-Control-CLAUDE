@@ -284,16 +284,6 @@ async function listarPlanesAql(query: PlanesAqlQuery): Promise<PlanesAqlPagina> 
   return data;
 }
 
-async function obtenerPlanAql(id: number): Promise<PlanAql> {
-  const { data, error } = await api.GET('/api/calidad/planes-aql/{id}', {
-    params: { path: { id } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 async function crearPlanAql(cuerpo: PlanAqlCrear): Promise<PlanAql> {
   const { data, error } = await api.POST('/api/calidad/planes-aql', { body: cuerpo });
   if (!data) {
@@ -349,13 +339,6 @@ export function usePlanesAql(query: PlanesAqlQuery): UseQueryResult<PlanesAqlPag
     queryKey: [...CLAVE_PLANES_AQL, 'lista', query],
     queryFn: () => listarPlanesAql(query),
     placeholderData: keepPreviousData,
-  });
-}
-
-export function usePlanAql(id: number): UseQueryResult<PlanAql, ErrorDeApi> {
-  return useQuery({
-    queryKey: [...CLAVE_PLANES_AQL, 'detalle', id],
-    queryFn: () => obtenerPlanAql(id),
   });
 }
 

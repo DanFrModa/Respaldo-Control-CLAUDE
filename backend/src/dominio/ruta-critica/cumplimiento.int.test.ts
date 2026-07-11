@@ -13,7 +13,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { PrismaClient } from '../../datos/index.js';
-import { ErrorPermiso } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorPermiso } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { COLAS_JOBS, claveSerializacion } from '../../comun/jobs/index.js';
@@ -218,6 +218,30 @@ describe('completarProceso + roles N:M (ProcesoDefRol)', () => {
     await expect(completarProceso(sin, idRuta, undefined, bd())).rejects.toBeInstanceOf(
       ErrorPermiso,
     );
+  });
+
+  it('capturar/revertir un proceso de una orden de OTRA empresa da 404 (scope A9, B1)', async () => {
+    const idOrden = await crearOrdenConRc('2026-06-29'); // orden en la empresa por defecto (id 1)
+    const proc = await crearProcesoDef('corte');
+    const idRuta = await crearRenglon(idOrden, proc, {
+      duracionDias: 2,
+      secuencia: 0,
+      estado: 'activo',
+    });
+    // Sesión ADMIN (captura cualquier proceso) pero con empresa activa AJENA a la orden.
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ajena = sesionDePrueba({
+      permisos: ['rc.capturar', 'roles.administrar'],
+      idEmpresaActiva: otra.id,
+    });
+    await expect(completarProceso(ajena, idRuta, undefined, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+    await expect(revertirProceso(ajena, idRuta, bd())).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    // El renglón siguió intacto (activo, sin captura).
+    const fila = await cliente.rutaOrden.findUniqueOrThrow({ where: { id: idRuta } });
+    expect(fila.estado).toBe('activo');
+    expect(fila.fechaReal).toBeNull();
   });
 
   it('activa los sucesores cuando TODOS sus antecesores quedan completados; cierra/reabre la RC', async () => {

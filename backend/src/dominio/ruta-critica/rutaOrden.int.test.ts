@@ -16,7 +16,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import type { Prisma, PrismaClient } from '../../datos/index.js';
-import { ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
+import { ErrorNoEncontrado, ErrorPermiso, ErrorValidacion } from '../../comun/errores.js';
 import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../pruebas/contexto.js';
 import { sesionDePrueba } from '../../pruebas/sesiones.js';
 import { ajustarRutaOrden, generarRutaOrden, obtenerRutaOrden } from './rutaOrden.js';
@@ -807,5 +807,45 @@ describe('ajustarRutaOrden (F5-E3, sin tocar la plantilla)', () => {
         bd(),
       ),
     ).rejects.toBeInstanceOf(ErrorValidacion);
+  });
+});
+
+describe('scope por empresa activa (A9, B1)', () => {
+  it('una orden de OTRA empresa "no existe" (404) para get/generar/ajustar', async () => {
+    // Orden + catálogos en la empresa por defecto (id 1); su ruta se genera con la sesión correcta.
+    const { idArticulo } = await crearArticulo();
+    const { idTela, idConAplic } = await crearReglas();
+    const a = await crearProceso('a', { tipoDuracion: 'fija' });
+    const b = await crearProceso('b', { tipoDuracion: 'fija' });
+    await crearPlantilla({ idArticulo }, [
+      { idProcesoDef: a, tiempoEstandar: 2 },
+      { idProcesoDef: b, tiempoEstandar: 3, antecesores: [a] },
+    ]);
+    const idOrden = await crearOrden(1200);
+    const datos = {
+      idOrden,
+      idArticuloRC: idArticulo,
+      fechaEntregaRC: new Date('2026-07-01T00:00:00Z'),
+      idTipoTela: idTela,
+      idAplicacion: idConAplic,
+    };
+    await generarRutaOrden(sesionProg(), datos, bd());
+
+    // Un usuario cuya empresa activa es OTRA (id distinto al de la orden) ve la orden como inexistente.
+    const otra = await crearEmpresaPrueba(cliente, 'Otra SA');
+    const ajena = sesionDePrueba({
+      permisos: ['rc.programar', 'rc.ruta-ver'],
+      idEmpresaActiva: otra.id,
+    });
+
+    await expect(obtenerRutaOrden(ajena, idOrden, bd())).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    await expect(generarRutaOrden(ajena, datos, bd())).rejects.toBeInstanceOf(ErrorNoEncontrado);
+    await expect(ajustarRutaOrden(ajena, { idOrden, quitar: [b] }, bd())).rejects.toBeInstanceOf(
+      ErrorNoEncontrado,
+    );
+
+    // La ruta original quedó intacta (el intento ajeno no la tocó).
+    const filas = await cliente.rutaOrden.count({ where: { idOrden } });
+    expect(filas).toBe(2);
   });
 });

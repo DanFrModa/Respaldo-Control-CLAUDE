@@ -75,6 +75,14 @@ interface Ranura {
 let pool: Ranura[] | null = null;
 const cola: Trabajo[] = [];
 
+/**
+ * ¿Se está cerrando el pool? `cerrarPoolPdf` termina los workers, y su `terminate()` dispara el evento
+ * `exit` (código ≠ 0) → `alCaer` → `repartir`, que sin esta bandera RE-CREARÍA el pool que se acaba de
+ * cerrar (auto-resurrección). Mientras está activa, `repartir` no despacha ni recrea; un trabajo nuevo
+ * (`encolar`) la baja para reabrir el pool de forma perezosa.
+ */
+let cerrando = false;
+
 /** Resuelve la entrada del worker según se corra bajo tsx (dev/tests) o compilado (prod). */
 function entradaWorker(): { url: URL; execArgv: string[] } {
   // `pathname` (no la URL cruda) para ignorar posibles `?query` que agregue el runner de dev/tests.
@@ -112,6 +120,11 @@ function asegurarPool(): Ranura[] {
 
 /** Reparte los trabajos en cola a los workers ociosos. */
 function repartir(): void {
+  // Durante el cierre no se despacha ni se recrea el pool: los `exit` de `terminate()` llegan aquí
+  // vía `alCaer` y sin este corte resucitarían el pool recién cerrado.
+  if (cerrando) {
+    return;
+  }
   const ranuras = asegurarPool();
   for (const ranura of ranuras) {
     if (ranura.trabajo !== null || cola.length === 0) {
@@ -205,6 +218,9 @@ function encolar(
 ): Promise<Buffer> {
   return new Promise<Buffer>((resolver, rechazar) => {
     cola.push({ id: randomUUID(), clave, tipo, datos, resolver, rechazar });
+    // Un trabajo nuevo reabre el pool si venía de un cierre (reset de `cerrando` ANTES de repartir,
+    // que crea el pool nuevo perezosamente).
+    cerrando = false;
     repartir();
   });
 }
@@ -230,6 +246,9 @@ export function renderizarExcelEnWorker(clave: ClaveExcel, datos: unknown): Prom
 
 /** Termina el pool (para apagado ordenado o limpieza de tests). Se re-crea perezosamente si se vuelve a usar. */
 export async function cerrarPoolPdf(): Promise<void> {
+  // Marca el cierre ANTES de terminar: los `exit` de `terminate()` (código ≠ 0) pasan por `alCaer` →
+  // `repartir`, que ahora corta en vez de recrear el pool. Un render posterior lo reabre (`encolar`).
+  cerrando = true;
   const ranuras = pool;
   pool = null;
   if (ranuras !== null) {

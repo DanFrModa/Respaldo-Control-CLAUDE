@@ -40,7 +40,7 @@ import {
   type PendientesRecibir,
   type RecibosSemanalesLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -53,7 +53,6 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
   registrarMovimientoPt as registrarMovimientoPtMotor,
@@ -70,7 +69,7 @@ import {
 } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-import { CLAVE_SECUENCIA_ETAPA } from './etapas.js';
+import { CLAVE_SECUENCIA_ETAPA, semanaIso } from './etapas.js';
 
 /** Tipo de movimiento de kardex para la entrada a PT del recibo de costura (seed, dirección entrada). */
 const COD_ENTRADA_MAQUILA = 'entrada-maquila';
@@ -397,17 +396,6 @@ async function aReciboSalida(
   };
 }
 
-/** Emite un evento de recibo post-commit, best-effort (gancho RC F5). */
-async function emitirRecibo(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
-}
-
 /**
  * Escribe en el OUTBOX DURABLE el evento de etapa que consume el auto-avance de la RC (F5-E6), en la
  * MISMA transacción del recibo (atómico). Es el gancho REAL de F5 para el recibo de maquila — el
@@ -670,7 +658,6 @@ export async function registrarReciboMaquila(
   }, bd);
 
   const salida = await obtenerRecibo(sesion, idRecibo, bd);
-  await emitirReciboPorId(idRecibo, EVENTOS_PRODUCCION.reciboRegistrado, bd);
   dispararPublicacion();
   return salida;
 }
@@ -851,18 +838,6 @@ export async function obtenerRecibo(
     throw new ErrorNoEncontrado('EtapaMovimiento', idRecibo);
   }
   return aReciboSalida(recibo, bd, opciones.ocultarPrecio ?? false);
-}
-
-/** Re-lee el recibo para emitir su evento post-commit (best-effort). */
-async function emitirReciboPorId(
-  idRecibo: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idRecibo } });
-  if (etapa !== null) {
-    await emitirRecibo(evento, etapa);
-  }
 }
 
 /**
@@ -1067,23 +1042,4 @@ export async function recibosSemanalesPorMaquilero(
       b.anioSemana.localeCompare(a.anioSemana) || a.maquilero.localeCompare(b.maquilero, 'es'),
   );
   return { filas };
-}
-
-/**
- * Año-semana ISO 8601 ("2026-W25") y el LUNES de esa semana (YYYY-MM-DD). Copia del de `etapas.ts`
- * (cálculo en UTC porque la fecha de la etapa es `@db.Date` a medianoche UTC).
- */
-function semanaIso(fecha: Date): { anioSemana: string; inicioSemana: string } {
-  const d = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-  const diaIso = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-  const lunes = new Date(d);
-  lunes.setUTCDate(d.getUTCDate() - (diaIso - 1));
-  const jueves = new Date(d);
-  jueves.setUTCDate(d.getUTCDate() + (4 - diaIso));
-  const anioIso = jueves.getUTCFullYear();
-  const primerEnero = new Date(Date.UTC(anioIso, 0, 1));
-  const numSemana = Math.ceil(((jueves.getTime() - primerEnero.getTime()) / 86_400_000 + 1) / 7);
-  const anioSemana = `${anioIso}-W${String(numSemana).padStart(2, '0')}`;
-  const inicioSemana = lunes.toISOString().slice(0, 10);
-  return { anioSemana, inicioSemana };
 }

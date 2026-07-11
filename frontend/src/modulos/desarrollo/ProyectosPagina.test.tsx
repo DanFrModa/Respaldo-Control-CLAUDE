@@ -42,7 +42,6 @@ vi.mock('@/api/proyectos', () => ({
 vi.mock('@/api/desarrollos', () => ({
   useReactivarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
   useCrearDesarrollo: () => ({ mutateAsync: vi.fn(), isPending: false }),
-  useActualizarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
   useApagarDesarrollo: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 

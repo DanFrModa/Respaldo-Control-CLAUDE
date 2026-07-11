@@ -46,7 +46,7 @@ import {
   type EntregasOrdenLista,
   type SeguimientoEntregaOrden,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { exigirAlmacen } from '../../comun/almacenes.js';
@@ -59,7 +59,6 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import {
   bloquearArticuloPt,
   cancelarMovimientoPt as cancelarMovimientoPtMotor,
@@ -346,17 +345,6 @@ async function aEntregaSalida(
   };
 }
 
-/** Emite un evento de entrega post-commit, best-effort (gancho RC F5). */
-async function emitirEntrega(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
-}
-
 /**
  * Escribe en el OUTBOX DURABLE el evento de entrega que consume el auto-avance de la RC (F5-E6), en
  * la MISMA transacción del hecho (atómico). Gancho REAL de F5: la RC re-evalúa `entregaCliente`
@@ -480,7 +468,6 @@ export async function registrarEntregaCliente(
   }, bd);
 
   const salida = await obtenerEntrega(sesion, idEntrega, bd);
-  await emitirEntregaPorId(idEntrega, EVENTOS_PRODUCCION.entregaRegistrado, bd);
   dispararPublicacion();
   return salida;
 }
@@ -590,18 +577,6 @@ export async function obtenerEntrega(
     throw new ErrorNoEncontrado('EtapaMovimiento', idEntrega);
   }
   return aEntregaSalida(entrega, bd);
-}
-
-/** Re-lee la entrega para emitir su evento post-commit (best-effort). */
-async function emitirEntregaPorId(
-  idEntrega: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idEntrega } });
-  if (etapa !== null) {
-    await emitirEntrega(evento, etapa);
-  }
 }
 
 /**

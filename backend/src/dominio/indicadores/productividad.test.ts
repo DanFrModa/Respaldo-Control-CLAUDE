@@ -7,11 +7,23 @@ import { describe, expect, it } from 'vitest';
 
 import { ErrorValidacion } from '../../comun/errores.js';
 
-import {
-  agregarIndicesDiarios,
-  indiceProductividadAlmacen,
-  indiceProductividadIp,
-} from './productividad.js';
+import { indiceProductividadAlmacen, indiceProductividadIp } from './productividad.js';
+
+/**
+ * Regla de agregación del tablero semanal/mensual (F7-E4), como FIXTURE de spec: el tablero la
+ * implementa en SQL (`SUM` + `SUM/COUNT`); esta versión pura la documenta y la deja unit-testeable
+ * sin BD. `indiceTotal` = Σ (aditivo en IP); `indicePromedio` = media (razón de eficiencia del almacén).
+ */
+function agregarIndicesDiarios(indices: readonly number[]): {
+  indiceTotal: number;
+  indicePromedio: number;
+} {
+  const indiceTotal = indices.reduce((suma, i) => suma + i, 0);
+  return {
+    indiceTotal,
+    indicePromedio: indices.length > 0 ? indiceTotal / indices.length : 0,
+  };
+}
 
 describe('indiceProductividadIp — RealDiario = (horasBase/horasTrabajadas)·porcentajeD·cantidad', () => {
   it('rinde el estándar cuando trabaja su jornada base', () => {

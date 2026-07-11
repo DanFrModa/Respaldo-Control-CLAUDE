@@ -38,27 +38,32 @@ vi.mock('@/api/ordenes', () => ({
   }),
 }));
 
+// Configurable: se re-programa por test para probar el aviso de error de catálogo.
+const useTiposProcesoMock = vi.fn<() => Record<string, unknown>>();
 vi.mock('@/api/tipos-proceso', () => ({
-  useTiposProceso: () => ({
-    data: {
-      datos: [
-        {
-          id: 6,
-          codigo: 'estampado',
-          nombre: 'Estampado',
-          generaEntradaPt: false,
-          activo: true,
-          creadoEn: '',
-          creadoPorId: null,
-          modificadoEn: '',
-          modificadoPorId: null,
-        },
-      ],
-    },
-    isPending: false,
-    isError: false,
-  }),
+  useTiposProceso: () => useTiposProcesoMock(),
 }));
+
+const PROCESOS_OK = {
+  data: {
+    datos: [
+      {
+        id: 6,
+        codigo: 'estampado',
+        nombre: 'Estampado',
+        generaEntradaPt: false,
+        activo: true,
+        creadoEn: '',
+        creadoPorId: null,
+        modificadoEn: '',
+        modificadoPorId: null,
+      },
+    ],
+  },
+  isPending: false,
+  isError: false,
+  refetch: vi.fn(),
+};
 
 vi.mock('@/api/proveedores', () => ({
   useProveedores: () => ({ data: { datos: [{ id: 30, nombre: 'Estampados SA' }] } }),
@@ -152,6 +157,21 @@ async function elegirOrden(usuario: ReturnType<typeof userEvent.setup>): Promise
 describe('ReciboMaquilaPagina (F3-E4)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
+    useTiposProcesoMock.mockReset();
+    useTiposProcesoMock.mockReturnValue(PROCESOS_OK);
+  });
+
+  it('avisa (reintentable) si falla un catálogo de la captura', () => {
+    useTiposProcesoMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+      refetch: vi.fn(),
+    });
+    renderConProveedores(<ReciboMaquilaPagina />, { sesion: sesion() });
+
+    expect(screen.getByTestId('recibo-error-catalogo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
   });
 
   it('no deja exceder lo enviado: avisa y deshabilita guardar', async () => {

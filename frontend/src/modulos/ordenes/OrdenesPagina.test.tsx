@@ -26,7 +26,6 @@ vi.mock('@/api/ordenes', () => ({
     return useOrdenes(query);
   },
   useOrden: () => ({ data: undefined, isPending: false, isError: false, error: null }),
-  useCrearOrden: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarOrden: () => ({ mutate: vi.fn(), isPending: false }),
   useGuardarMatriz: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarMatriz: () => ({ mutate: vi.fn(), isPending: false }),
@@ -68,7 +67,6 @@ vi.mock('@/api/clientes', () => ({
 // Pedidos (selector del diálogo de alta): inerte.
 vi.mock('@/api/pedidos', () => ({
   usePedidos: () => ({ data: { datos: [] }, isPending: false, isError: false, error: null }),
-  usePedido: () => ({ data: undefined, isPending: false, isError: false, error: null }),
 }));
 // Sección "Adjuntos" del detalle (F8-E6): se renderiza siempre; se mockea para no tocar la red.
 vi.mock('@/api/adjuntos-orden', () => ({

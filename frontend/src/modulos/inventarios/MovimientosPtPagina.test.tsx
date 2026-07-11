@@ -9,23 +9,29 @@ import { MovimientosPtPagina } from './MovimientosPtPagina';
 
 // ── Mocks de la capa de datos (sin red) ──────────────────────────────────────
 const crearMutate = vi.fn();
+// Configurable: se re-programa por test para probar el aviso de error de catálogo.
+const useTiposMovimientoMock = vi.fn<() => Record<string, unknown>>();
 vi.mock('@/api/inventarios', () => ({
   useCrearMovimientoPt: () => ({ mutate: crearMutate, isPending: false }),
-  useTiposMovimiento: () => ({
-    data: {
-      datos: [
-        { id: 1, codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
-        { id: 5, codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
-        {
-          id: 9,
-          codigo: 'transferencia-almacenes',
-          nombre: 'Transferencia entre almacenes',
-          direccion: 'traspaso',
-        },
-      ],
-    },
-  }),
+  useTiposMovimiento: () => useTiposMovimientoMock(),
 }));
+
+const TIPOS_MOV_OK = {
+  data: {
+    datos: [
+      { id: 1, codigo: 'inventario-inicial', nombre: 'Inventario Inicial', direccion: 'entrada' },
+      { id: 5, codigo: 'entrega-cliente', nombre: 'Entrega a Cliente', direccion: 'salida' },
+      {
+        id: 9,
+        codigo: 'transferencia-almacenes',
+        nombre: 'Transferencia entre almacenes',
+        direccion: 'traspaso',
+      },
+    ],
+  },
+  isError: false,
+  refetch: vi.fn(),
+};
 
 vi.mock('@/api/almacenes', () => ({
   useAlmacenes: () => ({ data: { datos: [{ id: 3, nombre: 'Primeras' }] } }),
@@ -63,6 +69,16 @@ async function elegirModelo(usuario: ReturnType<typeof userEvent.setup>): Promis
 describe('MovimientosPtPagina (F3-E3)', () => {
   beforeEach(() => {
     crearMutate.mockReset();
+    useTiposMovimientoMock.mockReset();
+    useTiposMovimientoMock.mockReturnValue(TIPOS_MOV_OK);
+  });
+
+  it('avisa (reintentable) si falla un catálogo de la captura', () => {
+    useTiposMovimientoMock.mockReturnValue({ data: undefined, isError: true, refetch: vi.fn() });
+    renderConProveedores(<MovimientosPtPagina />, { sesion: sesion() });
+
+    expect(screen.getByTestId('mov-error-catalogo')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
   });
 
   it('el dropdown de tipo EXCLUYE las direcciones "traspaso"', async () => {

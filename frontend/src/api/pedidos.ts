@@ -39,11 +39,6 @@ function claveListaPedidos(query: PedidosQuery): readonly unknown[] {
   return [...CLAVE_PEDIDOS, 'lista', query];
 }
 
-/** Clave de cache de UN pedido (su detalle). */
-function clavePedido(id: number): readonly unknown[] {
-  return [...CLAVE_PEDIDOS, 'detalle', id];
-}
-
 /** Clave de cache de los pedidos reales de UN pedido. */
 function claveReales(idPedido: number): readonly unknown[] {
   return [...CLAVE_PEDIDOS, 'reales', idPedido];
@@ -54,13 +49,6 @@ function claveReales(idPedido: number): readonly unknown[] {
 /** Pide una página del listado de pedidos (búsqueda + filtro + orden + paginación en servidor). */
 async function listarPedidos(query: PedidosQuery): Promise<PedidosPagina> {
   const { data, error } = await api.GET('/api/pedidos', { params: { query } });
-  if (!data) throw new ErrorDeApi(error);
-  return data;
-}
-
-/** Obtiene un pedido por id (con renglones). */
-async function obtenerPedido(id: number): Promise<Pedido> {
-  const { data, error } = await api.GET('/api/pedidos/{id}', { params: { path: { id } } });
   if (!data) throw new ErrorDeApi(error);
   return data;
 }
@@ -107,15 +95,6 @@ export function usePedidos(query: PedidosQuery): UseQueryResult<PedidosPagina, E
     queryKey: claveListaPedidos(query),
     queryFn: () => listarPedidos(query),
     placeholderData: keepPreviousData,
-  });
-}
-
-/** Obtiene el detalle de un pedido (deshabilitada si no hay id). */
-export function usePedido(id: number | undefined): UseQueryResult<Pedido, ErrorDeApi> {
-  return useQuery({
-    queryKey: clavePedido(id ?? 0),
-    queryFn: () => obtenerPedido(id as number),
-    enabled: id !== undefined,
   });
 }
 

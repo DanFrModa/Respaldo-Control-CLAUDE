@@ -58,9 +58,6 @@ export type TelasCategoriasQuery = NonNullable<
 /** Cuerpo de alta de categoria de tela (`POST /api/telas-categorias`). */
 export type TelaCategoriaCrear =
   paths['/api/telas-categorias']['post']['requestBody']['content']['application/json'];
-/** Cuerpo de edicion de categoria de tela (`PATCH /api/telas-categorias/{id}`). */
-export type TelaCategoriaEditar =
-  paths['/api/telas-categorias/{id}']['patch']['requestBody']['content']['application/json'];
 
 // ════════════════════════════════════════════════════════════════════════════════
 //  Telas
@@ -206,44 +203,6 @@ async function crearCategoria(cuerpo: TelaCategoriaCrear): Promise<TelaCategoria
   return data;
 }
 
-/** Actualiza una categoria de tela (`PATCH /api/telas-categorias/{id}`). */
-async function actualizarCategoria(
-  id: number,
-  cuerpo: TelaCategoriaEditar,
-): Promise<TelaCategoria> {
-  const { data, error } = await api.PATCH('/api/telas-categorias/{id}', {
-    params: { path: { id } },
-    body: cuerpo,
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
-/** Desactiva una categoria de tela (borrado SUAVE). */
-async function desactivarCategoria(id: number): Promise<TelaCategoria> {
-  const { data, error } = await api.DELETE('/api/telas-categorias/{id}', {
-    params: { path: { id } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
-/** Reactiva una categoria de tela desactivada con `{ activo: true }`. */
-async function reactivarCategoria(id: number): Promise<TelaCategoria> {
-  const { data, error } = await api.PATCH('/api/telas-categorias/{id}', {
-    params: { path: { id } },
-    body: { activo: true },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 /**
  * Lista las categorias de tela (paginadas). Por defecto la primera pagina de activas, que
  * alimenta el selector del formulario de tela y el filtro del listado. Para administracion
@@ -268,46 +227,6 @@ export function useCrearTelaCategoria(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: crearCategoria,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_TELAS_CATEGORIAS }),
-  });
-}
-
-/** Argumentos de la mutacion de edicion de categoria. */
-export interface ArgsActualizarCategoria {
-  id: number;
-  cuerpo: TelaCategoriaEditar;
-}
-
-/** Edita una categoria de tela e invalida su lista (y la de telas, por el nombre embebido). */
-export function useActualizarTelaCategoria(): UseMutationResult<
-  TelaCategoria,
-  ErrorDeApi,
-  ArgsActualizarCategoria
-> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, cuerpo }: ArgsActualizarCategoria) => actualizarCategoria(id, cuerpo),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: CLAVE_TELAS_CATEGORIAS });
-      void queryClient.invalidateQueries({ queryKey: CLAVE_TELAS });
-    },
-  });
-}
-
-/** Desactiva una categoria de tela e invalida su lista. */
-export function useDesactivarTelaCategoria(): UseMutationResult<TelaCategoria, ErrorDeApi, number> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: desactivarCategoria,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_TELAS_CATEGORIAS }),
-  });
-}
-
-/** Reactiva una categoria de tela e invalida su lista. */
-export function useReactivarTelaCategoria(): UseMutationResult<TelaCategoria, ErrorDeApi, number> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: reactivarCategoria,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_TELAS_CATEGORIAS }),
   });
 }

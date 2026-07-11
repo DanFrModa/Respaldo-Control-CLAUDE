@@ -33,10 +33,9 @@ import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-/** Redondeo a 2 decimales (importes); los márgenes (fracciones) se redondean a 4. */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+import { redondear2 } from './decimales.js';
+
+/** Redondeo a 4 decimales para los márgenes (fracciones); los importes usan `redondear2`. */
 function redondear4(n: number): number {
   return Math.round(n * 10000) / 10000;
 }

@@ -239,8 +239,10 @@ export interface DepsExcelWip {
 }
 
 /**
- * Resuelve el tablero WIP analítico (A9 + permiso en el dominio). En el HILO PRINCIPAL. Fuerza
- * `porPagina: 100` (el export trae el detalle completo del tablero, igual que la pantalla).
+ * Resuelve el tablero WIP analítico COMPLETO (A9 + permiso en el dominio). En el HILO PRINCIPAL. Trae
+ * TODAS las órdenes con avance del filtro PAGINANDO internamente con el tope del backend (100) — no
+ * solo las primeras 100 (antes topaba en silencio). `totales`/`datosAl`/`total` son del universo (no
+ * dependen de la página), así que se conservan de la primera lectura. Mismo patrón que `excel-ventas.ts`.
  */
 export async function armarDatosExcelKpisWip(
   sesion: SesionUsuario,
@@ -249,7 +251,16 @@ export async function armarDatosExcelKpisWip(
   deps: DepsExcelWip = {},
 ): Promise<DatosExcelKpisWip> {
   const obtener = deps.kpisWip ?? kpisWip;
-  return obtener(sesion, { ...parametros, porPagina: 100 }, bd);
+  const TOPE = 100;
+  const primera = await obtener(sesion, { ...parametros, pagina: 1, porPagina: TOPE }, bd);
+  const datos = [...primera.datos];
+  let totalPaginas = primera.totalPaginas;
+  for (let pagina = 2; pagina <= totalPaginas; pagina += 1) {
+    const siguiente = await obtener(sesion, { ...parametros, pagina, porPagina: TOPE }, bd);
+    datos.push(...siguiente.datos);
+    totalPaginas = siguiente.totalPaginas; // se re-lee por si el universo cambió (igual que ventas)
+  }
+  return { ...primera, datos };
 }
 
 /** Construye el `.xlsx` del tablero WIP analítico. PURO: corre en el WORKER. */

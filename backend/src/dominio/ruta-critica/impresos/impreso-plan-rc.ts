@@ -114,8 +114,8 @@ export async function armarDatosImpresoPlanRc(
   const cliente = clienteLectura(bd);
 
   // Encabezado de la orden (folio + nombres de cliente/modelo), SCOPEADO por la empresa activa (A9):
-  // una orden de otra empresa "no existe" → 404. (`obtenerRutaOrden` no filtra por empresa, así que el
-  // scope se IMPONE aquí, en el impreso, para no filtrar el plan de otra empresa.)
+  // una orden de otra empresa "no existe" → 404. (`obtenerRutaOrden` ya filtra por empresa activa —B1—;
+  // este lookup del encabezado se mantiene scopeado como defensa en profundidad.)
   const orden = await cliente.orden.findFirst({
     where: { id: idOrden, idEmpresa: sesion.idEmpresaActiva },
     select: {

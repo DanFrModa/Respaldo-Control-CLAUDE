@@ -27,7 +27,6 @@ import type {
   EsMaMovimientosLista,
   EsMaPago,
   EsMaPagoCrear,
-  EsMaPagosLista,
   EsMaPagosSemanales,
   EsMaPagosSemanalesQuery,
   EsMaRecibosSemanales,
@@ -141,16 +140,6 @@ async function listarDescuentos(idMaquilero: number): Promise<EsMaMovimientosLis
   return data;
 }
 
-async function listarPagos(idMaquilero: number): Promise<EsMaPagosLista> {
-  const { data, error } = await api.GET('/api/esma/maquileros/{id}/pagos', {
-    params: { path: { id: idMaquilero } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 async function crearPago(cuerpo: EsMaPagoCrear): Promise<EsMaPago> {
   const { data, error } = await api.POST('/api/esma/pagos', { body: cuerpo });
   if (!data) {
@@ -215,18 +204,6 @@ export function useDescuentosMaquilero(
   return useQuery({
     queryKey: [...CLAVE_CUENTA_ESMA, 'descuentos', idMaquilero],
     queryFn: () => listarDescuentos(idMaquilero as number),
-    enabled: idMaquilero !== undefined,
-    placeholderData: keepPreviousData,
-  });
-}
-
-/** Lista los pagos de un maquilero (deshabilitada sin maquilero). */
-export function usePagosMaquilero(
-  idMaquilero: number | undefined,
-): UseQueryResult<EsMaPagosLista, ErrorDeApi> {
-  return useQuery({
-    queryKey: [...CLAVE_CUENTA_ESMA, 'pagos', idMaquilero],
-    queryFn: () => listarPagos(idMaquilero as number),
     enabled: idMaquilero !== undefined,
     placeholderData: keepPreviousData,
   });

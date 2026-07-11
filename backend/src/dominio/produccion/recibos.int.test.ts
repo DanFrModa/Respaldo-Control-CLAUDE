@@ -33,7 +33,7 @@ import {
   recibosSemanalesPorMaquilero,
   registrarReciboMaquila,
 } from './recibos.js';
-import { registrarCorte, registrarEnvioMaquila } from './etapas.js';
+import { cancelarEtapaMovimiento, registrarCorte, registrarEnvioMaquila } from './etapas.js';
 import { consultarExistenciasPt, registrarMovimientoPt } from '../inventarios/movimientos-pt.js';
 import { listarCargosEsMa, validarCargoEsMa } from '../esma/cargos.js';
 
@@ -594,6 +594,57 @@ describe('Cancelación de recibos (F3-E4)', () => {
       bd(),
     );
     expect(canceladoConPermiso.precioPactado).toBe(8);
+  });
+});
+
+describe('Cancelación de ENVÍO con recibos vivos (D1)', () => {
+  it('bloquea (409) cancelar un envío con recibos vivos; cancelado el recibo, el envío sí se cancela', async () => {
+    await cortarBase();
+    const envio = await registrarEnvioMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-19',
+        precioPactado: 8,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+    const recibo = await registrarReciboMaquila(
+      sesion(),
+      {
+        idOrden,
+        idTipoProceso: procesoCostura.id,
+        idMaquilero: maquileroCostura.id,
+        fecha: '2026-06-20',
+        idAlmacenPrimeras: almPrimeras.id,
+        idEtapaEnvio: envio.id,
+        lineas: [{ idColor: colorRojo.id, tallas: [{ idTalla: tallaCH.id, cantidad: 10 }] }],
+      },
+      bd(),
+    );
+
+    // Con el recibo VIVO, cancelar el envío se bloquea (el recibido quedaría sin envío que lo sostenga).
+    await expect(
+      cancelarEtapaMovimiento(sesion(), envio.id, { motivo: 'maquilero equivocado' }, bd()),
+    ).rejects.toBeInstanceOf(ErrorConflicto);
+    // El envío siguió VIVO (el intento fallido no lo tocó — D3).
+    const envioTrasIntento = await cliente.etapaMovimiento.findUniqueOrThrow({
+      where: { id: envio.id },
+    });
+    expect(envioTrasIntento.canceladoEn).toBeNull();
+
+    // Cancelado el recibo primero, el envío ya se puede cancelar.
+    await cancelarReciboMaquila(sesion(), recibo.id, { motivo: 'reproceso' }, bd());
+    const cancelado = await cancelarEtapaMovimiento(
+      sesion(),
+      envio.id,
+      { motivo: 'maquilero equivocado' },
+      bd(),
+    );
+    expect(cancelado.cancelado).toBe(true);
   });
 });
 

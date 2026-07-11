@@ -44,19 +44,10 @@ import {
   cantidadesDeOrdenes,
   type CantidadesOrden,
 } from './cantidades.js';
+import { num, redondear2 } from './decimales.js';
 
 /** Cliente de LECTURA. */
 type ClienteLectura = ReturnType<typeof clienteLectura>;
-
-/** Redondeo monetario a 2 decimales. */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/** Nº de un `Decimal` opcional (null → 0). */
-function num(d: Prisma.Decimal | null | undefined): number {
-  return d == null ? 0 : d.toNumber();
-}
 
 /** `select` de la orden con su receta paraCosto (precios vigentes) y su costo guardado. */
 const seleccionOrdenCosto = {

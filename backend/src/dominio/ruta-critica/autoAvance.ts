@@ -624,8 +624,9 @@ async function esProcesoCostura(tx: Tx, idTipoProceso: number | null): Promise<b
  * proceso(s) afectado(s) en UNA transacción (A2) bajo el lock de la orden, y —si hubo cambio— ENCOLA
  * el recálculo del CPM (fire-and-forget tras el commit, §11). IDEMPOTENTE.
  *
- * Eventos que IGNORA (silencioso): `material-recibido` original (el alta de recepción la cubre el
- * propio recibo de tela vía re-evaluación al recibir… —ver nota abajo) y cualquier tipo desconocido.
+ * Maneja: etapas de producción (alta/cancelación), recepción de tela (alta y cancelación), auditoría
+ * de calidad y las OC de tela/avíos resueltas (ver los bloques abajo). Cualquier tipo DESCONOCIDO se
+ * ignora en silencio (idempotencia ante versiones nuevas o reintentos).
  *
  * Separado del wiring de pg-boss para invocarlo directo desde tests (sin cola viva), igual que el CPM.
  */
