@@ -22,7 +22,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 import { SelectorRoles } from './SelectorRoles';
@@ -151,108 +158,131 @@ export function DialogoUsuario({
             </DialogDescription>
           </DialogHeader>
 
-          <FieldGroup className="py-4">
-            {esEdicion ? (
-              <Field>
-                <FieldLabel htmlFor="usuario-username">Usuario</FieldLabel>
-                <Input id="usuario-username" value={usuario.username} disabled readOnly />
-              </Field>
-            ) : (
-              <Field data-invalid={Boolean(erroresAlta.username)}>
-                <FieldLabel htmlFor="usuario-username">Usuario</FieldLabel>
-                <Input
-                  id="usuario-username"
-                  autoFocus
-                  aria-invalid={Boolean(erroresAlta.username)}
-                  disabled={guardando}
-                  {...formularioAlta.register('username')}
-                />
-                <FieldError errors={[erroresAlta.username]} />
-              </Field>
-            )}
-
-            <Field data-invalid={Boolean(esEdicion ? erroresEdicion.nombre : erroresAlta.nombre)}>
-              <FieldLabel htmlFor="usuario-nombre">Nombre</FieldLabel>
+          <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
+            <FieldGroup>
+              <LeyendaObligatorios />
               {esEdicion ? (
-                <Input
-                  id="usuario-nombre"
-                  autoFocus
-                  aria-invalid={Boolean(erroresEdicion.nombre)}
-                  disabled={guardando}
-                  {...formularioEdicion.register('nombre')}
-                />
+                <Field>
+                  <FieldLabel htmlFor="usuario-username">Usuario</FieldLabel>
+                  <Input id="usuario-username" value={usuario.username} disabled readOnly />
+                </Field>
               ) : (
-                <Input
-                  id="usuario-nombre"
-                  aria-invalid={Boolean(erroresAlta.nombre)}
-                  disabled={guardando}
-                  {...formularioAlta.register('nombre')}
-                />
+                <Field data-invalid={Boolean(erroresAlta.username)}>
+                  <FieldLabel htmlFor="usuario-username" required>
+                    Usuario
+                  </FieldLabel>
+                  <Input
+                    id="usuario-username"
+                    autoFocus
+                    placeholder="Ej. lmendez"
+                    aria-invalid={Boolean(erroresAlta.username)}
+                    disabled={guardando}
+                    {...formularioAlta.register('username')}
+                  />
+                  <FieldDescription>
+                    Con el que inicia sesión. No se puede cambiar después.
+                  </FieldDescription>
+                  <FieldError errors={[erroresAlta.username]} />
+                </Field>
               )}
-              <FieldError errors={[esEdicion ? erroresEdicion.nombre : erroresAlta.nombre]} />
-            </Field>
 
-            <Field data-invalid={Boolean(esEdicion ? erroresEdicion.email : erroresAlta.email)}>
-              <FieldLabel htmlFor="usuario-email">Correo (opcional)</FieldLabel>
-              {esEdicion ? (
-                <Input
-                  id="usuario-email"
-                  type="email"
-                  aria-invalid={Boolean(erroresEdicion.email)}
-                  disabled={guardando}
-                  {...formularioEdicion.register('email')}
-                />
-              ) : (
-                <Input
-                  id="usuario-email"
-                  type="email"
-                  aria-invalid={Boolean(erroresAlta.email)}
-                  disabled={guardando}
-                  {...formularioAlta.register('email')}
-                />
-              )}
-              <FieldError errors={[esEdicion ? erroresEdicion.email : erroresAlta.email]} />
-            </Field>
-
-            {!esEdicion ? (
-              <Field data-invalid={Boolean(erroresAlta.password)}>
-                <FieldLabel htmlFor="usuario-password">Contraseña</FieldLabel>
-                <Input
-                  id="usuario-password"
-                  type="password"
-                  autoComplete="new-password"
-                  aria-invalid={Boolean(erroresAlta.password)}
-                  disabled={guardando}
-                  {...formularioAlta.register('password')}
-                />
-                <FieldError errors={[erroresAlta.password]} />
+              <Field data-invalid={Boolean(esEdicion ? erroresEdicion.nombre : erroresAlta.nombre)}>
+                <FieldLabel htmlFor="usuario-nombre" required>
+                  Nombre
+                </FieldLabel>
+                {esEdicion ? (
+                  <Input
+                    id="usuario-nombre"
+                    autoFocus
+                    placeholder="Ej. Laura Méndez"
+                    aria-invalid={Boolean(erroresEdicion.nombre)}
+                    disabled={guardando}
+                    {...formularioEdicion.register('nombre')}
+                  />
+                ) : (
+                  <Input
+                    id="usuario-nombre"
+                    placeholder="Ej. Laura Méndez"
+                    aria-invalid={Boolean(erroresAlta.nombre)}
+                    disabled={guardando}
+                    {...formularioAlta.register('nombre')}
+                  />
+                )}
+                <FieldError errors={[esEdicion ? erroresEdicion.nombre : erroresAlta.nombre]} />
               </Field>
-            ) : null}
 
-            <SelectorRoles
-              roles={roles.data ?? []}
-              cargando={roles.isPending}
-              error={roles.isError ? roles.error.message : null}
-              seleccionados={idsRoles}
-              alCambiar={setIdsRoles}
-              deshabilitado={guardando}
-            />
+              <Field data-invalid={Boolean(esEdicion ? erroresEdicion.email : erroresAlta.email)}>
+                <FieldLabel htmlFor="usuario-email">Correo</FieldLabel>
+                {esEdicion ? (
+                  <Input
+                    id="usuario-email"
+                    type="email"
+                    placeholder="Ej. laura@frmoda.com.mx"
+                    aria-invalid={Boolean(erroresEdicion.email)}
+                    disabled={guardando}
+                    {...formularioEdicion.register('email')}
+                  />
+                ) : (
+                  <Input
+                    id="usuario-email"
+                    type="email"
+                    placeholder="Ej. laura@frmoda.com.mx"
+                    aria-invalid={Boolean(erroresAlta.email)}
+                    disabled={guardando}
+                    {...formularioAlta.register('email')}
+                  />
+                )}
+                <FieldError errors={[esEdicion ? erroresEdicion.email : erroresAlta.email]} />
+              </Field>
 
-            <Field orientation="horizontal">
-              <input
-                id="usuario-auditor"
-                type="checkbox"
-                className="size-4 rounded border-input accent-primary"
-                checked={esAuditor}
-                disabled={guardando}
-                onChange={(e) => setEsAuditor(e.target.checked)}
-                data-testid="usuario-auditor"
+              {!esEdicion ? (
+                <Field data-invalid={Boolean(erroresAlta.password)}>
+                  <FieldLabel htmlFor="usuario-password" required>
+                    Contraseña
+                  </FieldLabel>
+                  <Input
+                    id="usuario-password"
+                    type="password"
+                    autoComplete="new-password"
+                    aria-invalid={Boolean(erroresAlta.password)}
+                    disabled={guardando}
+                    {...formularioAlta.register('password')}
+                  />
+                  <FieldDescription>
+                    Mínimo 8 caracteres. Combina letras, números y símbolos, o usa una frase larga.
+                  </FieldDescription>
+                  <FieldError errors={[erroresAlta.password]} />
+                </Field>
+              ) : null}
+
+              <SelectorRoles
+                roles={roles.data ?? []}
+                cargando={roles.isPending}
+                error={roles.isError ? roles.error.message : null}
+                seleccionados={idsRoles}
+                alCambiar={setIdsRoles}
+                deshabilitado={guardando}
               />
-              <FieldLabel htmlFor="usuario-auditor" className="font-normal">
-                Es auditor de calidad
-              </FieldLabel>
-            </Field>
-          </FieldGroup>
+
+              <Field orientation="horizontal">
+                <input
+                  id="usuario-auditor"
+                  type="checkbox"
+                  className="size-4 rounded border-input accent-primary"
+                  checked={esAuditor}
+                  disabled={guardando}
+                  onChange={(e) => setEsAuditor(e.target.checked)}
+                  data-testid="usuario-auditor"
+                />
+                <FieldLabel htmlFor="usuario-auditor" className="font-normal">
+                  Es auditor de calidad
+                </FieldLabel>
+              </Field>
+              <FieldDescription className="-mt-2">
+                Podrá firmar auditorías de calidad.
+              </FieldDescription>
+            </FieldGroup>
+          </div>
 
           <DialogFooter>
             <Button
@@ -263,7 +293,12 @@ export function DialogoUsuario({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-usuario">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-usuario"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear usuario'}
             </Button>

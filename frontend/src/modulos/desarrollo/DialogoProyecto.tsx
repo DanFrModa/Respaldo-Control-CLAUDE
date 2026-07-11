@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel, LeyendaObligatorios } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -154,8 +154,11 @@ export function DialogoProyecto({
           </DialogHeader>
 
           <div className="max-h-[60vh] space-y-4 overflow-y-auto py-4 pr-1">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.idCliente)}>
-              <FieldLabel htmlFor="proyecto-cliente">Cliente</FieldLabel>
+              <FieldLabel htmlFor="proyecto-cliente" required>
+                Cliente
+              </FieldLabel>
               <SelectNativo
                 id="proyecto-cliente"
                 disabled={guardando || esEdicion}
@@ -175,7 +178,9 @@ export function DialogoProyecto({
             </Field>
 
             <Field data-invalid={Boolean(errors.idClienteDepartamento)}>
-              <FieldLabel htmlFor="proyecto-departamento">Departamento</FieldLabel>
+              <FieldLabel htmlFor="proyecto-departamento" required>
+                Departamento
+              </FieldLabel>
               <SelectNativo
                 id="proyecto-departamento"
                 disabled={guardando || idClienteNum === undefined}
@@ -198,10 +203,12 @@ export function DialogoProyecto({
             </Field>
 
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="proyecto-nombre">Nombre / tema</FieldLabel>
+              <FieldLabel htmlFor="proyecto-nombre" required>
+                Nombre / tema
+              </FieldLabel>
               <Input
                 id="proyecto-nombre"
-                placeholder="Joggers, Disney, básicos…"
+                placeholder="Ej. Joggers, Disney, básicos…"
                 disabled={guardando}
                 aria-invalid={Boolean(errors.nombre)}
                 {...registrar('nombre')}
@@ -210,7 +217,7 @@ export function DialogoProyecto({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="proyecto-temporada">Temporada (opcional)</FieldLabel>
+              <FieldLabel htmlFor="proyecto-temporada">Temporada</FieldLabel>
               <SelectNativo
                 id="proyecto-temporada"
                 disabled={guardando}
@@ -226,7 +233,7 @@ export function DialogoProyecto({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="proyecto-notas">Notas (opcional)</FieldLabel>
+              <FieldLabel htmlFor="proyecto-notas">Notas</FieldLabel>
               <textarea
                 id="proyecto-notas"
                 rows={3}
@@ -246,7 +253,12 @@ export function DialogoProyecto({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-proyecto">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-proyecto"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear proyecto'}
             </Button>

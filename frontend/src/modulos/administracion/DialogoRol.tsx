@@ -16,7 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 
 /** Esquema de captura de un rol (solo UX; el backend re-valida, A1). */
@@ -120,8 +127,11 @@ export function DialogoRol({
           </DialogHeader>
 
           <FieldGroup className="py-4">
+            <LeyendaObligatorios />
             <Field data-invalid={Boolean(errors.nombre)}>
-              <FieldLabel htmlFor="rol-nombre">Nombre</FieldLabel>
+              <FieldLabel htmlFor="rol-nombre" required>
+                Nombre
+              </FieldLabel>
               <Input
                 id="rol-nombre"
                 autoFocus
@@ -161,7 +171,12 @@ export function DialogoRol({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-rol">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-rol"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear rol'}
             </Button>

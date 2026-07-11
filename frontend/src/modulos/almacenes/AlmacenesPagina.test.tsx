@@ -102,7 +102,7 @@ describe('<AlmacenesPagina>', () => {
 
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Nuevo almacén')).toBeInTheDocument();
-    expect(within(dialogo).getByLabelText('Nombre')).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText(/^Nombre/)).toBeInTheDocument();
   });
 
   it('oculta las acciones de escritura para quien solo puede ver', () => {

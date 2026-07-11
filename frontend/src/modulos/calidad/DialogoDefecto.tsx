@@ -21,7 +21,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -166,11 +173,15 @@ export function DialogoDefecto({
 
           <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
             <FieldGroup>
+              <LeyendaObligatorios />
               <Field data-invalid={Boolean(errors.clave)}>
-                <FieldLabel htmlFor="defecto-clave">Clave</FieldLabel>
+                <FieldLabel htmlFor="defecto-clave" required>
+                  Clave
+                </FieldLabel>
                 <Input
                   id="defecto-clave"
                   autoFocus
+                  placeholder="Ej. COS-03"
                   aria-invalid={Boolean(errors.clave)}
                   disabled={guardando}
                   {...formulario.register('clave')}
@@ -179,9 +190,12 @@ export function DialogoDefecto({
               </Field>
 
               <Field data-invalid={Boolean(errors.descripcion)}>
-                <FieldLabel htmlFor="defecto-descripcion">Descripción</FieldLabel>
+                <FieldLabel htmlFor="defecto-descripcion" required>
+                  Descripción
+                </FieldLabel>
                 <Input
                   id="defecto-descripcion"
+                  placeholder="Ej. Costura abierta en entrepierna"
                   aria-invalid={Boolean(errors.descripcion)}
                   disabled={guardando}
                   {...formulario.register('descripcion')}
@@ -200,6 +214,9 @@ export function DialogoDefecto({
                   <option value="2.5">2.5</option>
                   <option value="10">10</option>
                 </SelectNativo>
+                <FieldDescription>
+                  Qué tan tolerante es el muestreo: 1.0 estricto · 2.5 estándar · 10 laxo.
+                </FieldDescription>
                 <FieldError errors={[errors.nivelAQL]} />
               </Field>
 
@@ -216,6 +233,9 @@ export function DialogoDefecto({
                     </option>
                   ))}
                 </SelectNativo>
+                <FieldDescription>
+                  Mayor y Crítico afectan el resultado de la auditoría; Menor no.
+                </FieldDescription>
                 <FieldError errors={[errors.severidad]} />
               </Field>
 
@@ -317,7 +337,12 @@ export function DialogoDefecto({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-defecto">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-defecto"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear defecto'}
             </Button>

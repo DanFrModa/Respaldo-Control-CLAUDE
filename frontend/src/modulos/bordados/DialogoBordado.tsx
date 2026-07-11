@@ -15,7 +15,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  LeyendaObligatorios,
+} from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
@@ -158,11 +165,15 @@ export function DialogoBordado({
 
           <div className="max-h-[60vh] overflow-y-auto py-4 pr-1">
             <FieldGroup>
+              <LeyendaObligatorios />
               <Field data-invalid={Boolean(errors.nombre)}>
-                <FieldLabel htmlFor="bordado-nombre">Nombre</FieldLabel>
+                <FieldLabel htmlFor="bordado-nombre" required>
+                  Nombre
+                </FieldLabel>
                 <Input
                   id="bordado-nombre"
                   autoFocus
+                  placeholder="Ej. Logo Marilyn pecho izq."
                   aria-invalid={Boolean(errors.nombre)}
                   disabled={guardando}
                   {...registrar('nombre')}
@@ -194,7 +205,7 @@ export function DialogoBordado({
                   type="number"
                   inputMode="numeric"
                   min={0}
-                  placeholder="Opcional"
+                  placeholder="Ej. 8500"
                   aria-invalid={Boolean(errors.puntadas)}
                   disabled={guardando}
                   {...registrar('puntadas')}
@@ -211,7 +222,7 @@ export function DialogoBordado({
                   inputMode="decimal"
                   min={0}
                   step="0.01"
-                  placeholder="Opcional"
+                  placeholder="Ej. 12.00"
                   aria-invalid={Boolean(errors.precio)}
                   disabled={guardando}
                   {...registrar('precio')}
@@ -223,6 +234,7 @@ export function DialogoBordado({
                 <FieldLabel htmlFor="bordado-descripcion">Descripción</FieldLabel>
                 <Input
                   id="bordado-descripcion"
+                  placeholder="Ej. 3 tintas, frente izquierdo"
                   aria-invalid={Boolean(errors.descripcion)}
                   disabled={guardando}
                   {...registrar('descripcion')}
@@ -253,7 +265,12 @@ export function DialogoBordado({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={guardando} data-testid="guardar-bordado">
+            <Button
+              type="submit"
+              disabled={guardando}
+              data-testid="guardar-bordado"
+              className="w-full sm:w-auto"
+            >
               {guardando ? <Loader2Icon className="animate-spin" aria-hidden /> : null}
               {esEdicion ? 'Guardar cambios' : 'Crear bordado'}
             </Button>
