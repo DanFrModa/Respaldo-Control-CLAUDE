@@ -1347,6 +1347,18 @@ export {
   type EdrPorAnioSalida,
 } from './esquemas/edr.js';
 
+// ── Ventas: vista comercial de la facturación por modelo sobre el EDR (proto vVentas; F7-E2) ──
+export {
+  esquemaVentasQuery,
+  esquemaVentaLinea,
+  esquemaVentasResumen,
+  esquemaVentasSalida,
+  type VentasQuery,
+  type VentaLinea,
+  type VentasResumen,
+  type VentasSalida,
+} from './esquemas/ventas.js';
+
 // ── Indicadores: tableros directivos calculados en segundo plano (Módulo Indicadores, F7-E3; plan §11) ──
 export {
   esquemaKpisRcQuery,

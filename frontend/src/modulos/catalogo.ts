@@ -769,11 +769,10 @@ export const GRUPOS_MENU: readonly GrupoMenu[] = [
           {
             clave: 'ventas',
             titulo: 'Ventas',
-            descripcion: 'Ventas por cliente (facturación y entregas)',
+            descripcion: 'Facturación por modelo del cliente (base del EDR)',
             ruta: '/ventas',
             icono: 'grafica',
-            permisos: 'autenticado',
-            proximamente: 'Llega con Finanzas (F9)',
+            permisos: ['edr.ver'],
           },
         ],
       },

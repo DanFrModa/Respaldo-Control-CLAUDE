@@ -228,8 +228,8 @@ test.describe('Órdenes — centro de comando + avance de producción (R2)', () 
     // ── Centro de comando: buscar por folio (filtro de servidor) ────────────────
     await page.goto('/produccion/ordenes');
     await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
-    // Las tabs de mes y los filtros están presentes.
-    await expect(page.getByTestId('centro-meses')).toBeVisible();
+    // El filtro de mes (ahora un select más en la barra) y los demás filtros están presentes.
+    await expect(page.getByTestId('centro-filtro-mes')).toBeVisible();
     await expect(page.getByTestId('centro-filtro-oc')).toBeVisible();
 
     await page.getByTestId('centro-busqueda').fill(folio);
