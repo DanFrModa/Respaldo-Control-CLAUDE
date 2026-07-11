@@ -13,7 +13,6 @@ import {
 import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
-import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -30,7 +29,6 @@ interface SubvistaEsMa {
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
-  tono: Tono;
   permiso: ClavePermiso;
 }
 
@@ -42,7 +40,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
       'La cuenta corriente de un maquilero: cargos, abonos, descuentos y pagos por fecha.',
     ruta: '/esma/estado-cuenta',
     icono: Wallet,
-    tono: 'pt',
     permiso: 'esma.ver-pagos',
   },
   {
@@ -51,7 +48,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Los maquileros activos con saldo distinto de cero (con drill-down).',
     ruta: '/esma/saldos',
     icono: Users,
-    tono: 'servicios',
     permiso: 'esma.ver-pagos',
   },
   {
@@ -60,7 +56,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'El detalle por orden/modelo, exportable a Excel y como PDF del estado de cuenta.',
     ruta: '/esma/desglosado',
     icono: FileText,
-    tono: 'avios',
     permiso: 'esma.ver-pagos',
   },
   {
@@ -69,7 +64,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Los pagos a maquileros de la semana, con su total.',
     ruta: '/esma/pagos-semanales',
     icono: CalendarClock,
-    tono: 'neutro',
     permiso: 'esma.ver-pagos',
   },
   {
@@ -78,7 +72,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Los recibos de maquila del periodo por maquilero y modelo (con importes).',
     ruta: '/esma/recibos-semanales',
     icono: PackageCheck,
-    tono: 'telas',
     permiso: 'esma.ver-pagos',
   },
   {
@@ -87,7 +80,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Revisa y valida los cargos de maquila propuestos por los recibos.',
     ruta: '/esma/validacion-cargos',
     icono: BadgeCheck,
-    tono: 'pt',
     permiso: 'esma.cargo-validar',
   },
   {
@@ -96,7 +88,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Cuadra lo recibido vs lo cargado a EsMa y detecta lo que falta por cargar.',
     ruta: '/esma/conciliacion',
     icono: Scale,
-    tono: 'servicios',
     permiso: 'esma.ver-pagos',
   },
   {
@@ -105,7 +96,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Captura abonos a la cuenta de un maquilero (a favor del maquilero).',
     ruta: '/esma/abonos',
     icono: PlusCircle,
-    tono: 'avios',
     permiso: 'esma.modificar',
   },
   {
@@ -114,7 +104,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Captura descuentos a la cuenta de un maquilero (a cargo del maquilero).',
     ruta: '/esma/descuentos',
     icono: MinusCircle,
-    tono: 'telas',
     permiso: 'esma.modificar',
   },
   {
@@ -123,7 +112,6 @@ const SUB_VISTAS: readonly SubvistaEsMa[] = [
     descripcion: 'Paga cargos validados (prendas por pagar) e imprime el recibo de pago.',
     ruta: '/esma/pagos',
     icono: Wallet,
-    tono: 'neutro',
     permiso: 'esma.ver-pagos',
   },
 ];
@@ -161,7 +149,7 @@ export function EsMaPagina(): React.JSX.Element {
                   aria-hidden
                   className={cn(
                     'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                    avatarPorTono(sub.tono),
+                    'bg-primary-soft text-primary-soft-foreground',
                   )}
                 >
                   <sub.icono className="size-5" aria-hidden />

@@ -11,7 +11,6 @@ import { Link } from 'react-router-dom';
 
 import type { ClavePermiso } from '@/api/tipos';
 import { Badge } from '@/components/ui/badge';
-import { avatarPorTono, type Tono } from '@/lib/tono';
 import { cn } from '@/lib/utils';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -23,14 +22,13 @@ import { useSesion } from '@/sesion/useSesion';
  * el backend en cada ruta (A1). Ya no queda ninguna sección "Próximamente".
  */
 
-/** Una seccion ya construida (pantalla real), con su ruta, icono, tono y permiso. */
+/** Una seccion ya construida (pantalla real), con su ruta, icono y permiso. */
 interface SeccionLista {
   clave: string;
   titulo: string;
   descripcion: string;
   ruta: string;
   icono: LucideIcon;
-  tono: Tono;
   /** Permiso que hace visible la seccion (la administracion no tiene `.ver`). */
   permiso: ClavePermiso;
 }
@@ -50,7 +48,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Usuarios del sistema, sus roles y su estado de acceso.',
     ruta: '/administracion/usuarios',
     icono: Users,
-    tono: 'pt',
     permiso: 'usuarios.administrar',
   },
   {
@@ -59,7 +56,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Roles del sistema y los permisos que otorga cada uno.',
     ruta: '/administracion/roles',
     icono: ShieldCheck,
-    tono: 'servicios',
     permiso: 'roles.administrar',
   },
   {
@@ -68,7 +64,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Empresas del grupo y su configuración de costeo e inventario.',
     ruta: '/administracion/empresas',
     icono: Building2,
-    tono: 'avios',
     permiso: 'empresas.administrar',
   },
   {
@@ -77,7 +72,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Auditoría de cambios del sistema: quién, qué, cuándo y sobre qué registro.',
     ruta: '/administracion/bitacora',
     icono: ClipboardList,
-    tono: 'servicios',
     permiso: 'admin.ver-bitacora',
   },
   {
@@ -86,7 +80,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Catálogo global de conceptos del pre-costeo (además de tela, avíos y maquila).',
     ruta: '/administracion/conceptos-costo',
     icono: Coins,
-    tono: 'servicios',
     permiso: 'concepto-costo.administrar',
   },
   {
@@ -95,7 +88,6 @@ const SECCIONES_LISTAS: readonly SeccionLista[] = [
     descripcion: 'Catálogo global de estados del ciclo de vida de una lista de precios.',
     ruta: '/administracion/estados-lista',
     icono: ListChecks,
-    tono: 'avios',
     permiso: 'estado-lista.administrar',
   },
 ];
@@ -128,7 +120,7 @@ export function AdministracionPagina(): React.JSX.Element {
                 aria-hidden
                 className={cn(
                   'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                  avatarPorTono(sub.tono),
+                  'bg-primary-soft text-primary-soft-foreground',
                 )}
               >
                 <sub.icono className="size-5" aria-hidden />
