@@ -100,21 +100,27 @@ export function KpiTiles({
   return (
     <div
       data-slot="kpi-tiles"
-      className={cn('grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-3', className)}
+      className={cn(
+        // Móvil (<sm): rejilla FIJA de 2 columnas compactas — el auto-fit de 11rem cae a 1 sola
+        // columna en teléfono y apila los tiles a lo alto (comían ~3 pantallas, feedback de Gabriel).
+        // Desde sm se restaura el auto-fit EXACTO del proto (escritorio intacto).
+        'grid grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] sm:gap-3',
+        className,
+      )}
     >
       {kpis.map((kpi) => (
         <div
           key={kpi.clave}
           data-testid={`kpi-${kpi.clave}`}
-          className="relative flex flex-col gap-1.5 overflow-hidden rounded-lg border bg-card px-3.5 py-[13px] text-card-foreground shadow-(--shadow)"
+          className="relative flex flex-col gap-1 overflow-hidden rounded-lg border bg-card px-3 py-2.5 text-card-foreground shadow-(--shadow) sm:gap-1.5 sm:px-3.5 sm:py-[13px]"
         >
-          <span className="text-xs font-semibold tracking-[0.04em] text-muted-foreground uppercase">
+          <span className="text-[10.5px] font-semibold tracking-[0.04em] text-muted-foreground uppercase sm:text-xs">
             {kpi.etiqueta}
           </span>
-          <span className="num text-[26px] leading-tight font-bold tracking-[-0.02em]">
+          <span className="num text-[19px] leading-tight font-bold tracking-[-0.02em] sm:text-[26px]">
             {kpi.valor}
             {kpi.sufijo === undefined ? null : (
-              <small className="ml-1 text-[14px] font-semibold text-muted-foreground">
+              <small className="ml-1 text-[12px] font-semibold text-muted-foreground sm:text-[14px]">
                 {kpi.sufijo}
               </small>
             )}

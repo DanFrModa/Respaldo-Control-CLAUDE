@@ -149,7 +149,7 @@ export function MisPendientesPagina(): React.JSX.Element {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-y-auto lg:overflow-hidden">
       <div className="shrink-0 border-b bg-background px-4 py-4 md:px-6">
         <div className="flex items-center gap-3">
           <div>
@@ -204,7 +204,7 @@ export function MisPendientesPagina(): React.JSX.Element {
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="p-4 md:p-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
         <KpiTiles kpis={kpis} className="mb-4" />
 
         {bandeja.isPending ? (

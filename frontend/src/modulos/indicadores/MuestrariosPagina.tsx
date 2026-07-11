@@ -80,7 +80,10 @@ export function MuestrariosPagina(): React.JSX.Element {
   ];
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="muestrarios">
+    <div
+      className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-5 lg:overflow-visible"
+      data-testid="muestrarios"
+    >
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
       <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
@@ -103,7 +106,7 @@ export function MuestrariosPagina(): React.JSX.Element {
       <KpiTiles kpis={kpis} className="shrink-0" />
 
       {/* ── Card: filtros + tabla ───────────────────────────────────────────── */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+      <div className="flex shrink-0 flex-col overflow-hidden rounded-xl border bg-card lg:min-h-0 lg:flex-1 lg:shrink">
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2">
           <SelectNativo
             className="h-8 w-auto text-sm"
@@ -124,7 +127,7 @@ export function MuestrariosPagina(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="overflow-auto lg:min-h-0 lg:flex-1">
           {consulta.isPending ? (
             <p className="p-6 text-sm text-muted-foreground">Cargando…</p>
           ) : filas.length === 0 ? (
