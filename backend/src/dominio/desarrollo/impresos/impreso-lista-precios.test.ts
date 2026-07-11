@@ -4,10 +4,11 @@
  * = `precioAprobado ?? precioCalculado`, verificado al re-leer el libro).
  */
 import ExcelJS from 'exceljs';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 
 import type { ListaPreciosDetalle } from '../../../contrato/esquemas/lista-precios.js';
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
+import { cerrarPoolPdf } from '../../../comun/pdf-worker.js';
 
 import { impresoListaPrecios } from './impreso-lista-precios.js';
 import { excelListaPrecios } from './excel-lista-precios.js';
@@ -72,6 +73,10 @@ function listaEjemplo(): ListaPreciosDetalle {
 const sesion = sesionDePrueba({ permisos: ['listas.ver', 'consultas.ver-importes'] });
 const fakeObtener = () => Promise.resolve(listaEjemplo());
 
+afterAll(async () => {
+  await cerrarPoolPdf();
+});
+
 describe('impresoListaPrecios (PDF)', () => {
   it('genera un PDF no vacío con la firma %PDF y el folio en el nombre', async () => {
     const { buffer, folio } = await impresoListaPrecios(sesion, 1, undefined, {
@@ -100,5 +105,5 @@ describe('excelListaPrecios (Excel)', () => {
     expect(hoja.getCell('A3').value).toBe('MOD-B');
     expect(Number(hoja.getCell('D3').value)).toBe(100);
     expect(hoja.getCell('E3').value).toBe('Calculado');
-  });
+  }, 20_000); // orquestador → construcción en worker (arranque en frío del pool bajo carga de tests).
 });

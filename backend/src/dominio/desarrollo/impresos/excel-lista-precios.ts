@@ -9,11 +9,12 @@
  */
 import ExcelJS from 'exceljs';
 
+import type { ListaPreciosDetalle } from '../../../contrato/index.js';
 import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
+import { ARGB_MARCA } from '../../../comun/impresos-estilos.js';
+import { renderizarExcelEnWorker } from '../../../comun/pdf-worker.js';
 import { obtenerLista } from '../listas-precios.js';
-
-const TEAL = 'FF0D9488';
 
 /** Dependencias inyectables (los tests inyectan un `obtenerLista` fake para no tocar BD). */
 export interface DepsExcelListaPrecios {
@@ -27,18 +28,21 @@ export interface ExcelListaPrecios {
 }
 
 /**
- * Genera el `.xlsx` de una lista de precios (A9: scope por empresa activa, lo impone `obtenerLista`).
- * MISMO resultado que el PDF; los precios vienen resueltos (la ruta exige `consultas.ver-importes`).
+ * Resuelve la lista de precios (A9: scope por empresa activa, lo impone `obtenerLista`; la ruta exige
+ * `consultas.ver-importes`). Corre en el HILO PRINCIPAL.
  */
-export async function excelListaPrecios(
+export async function armarDatosExcelListaPrecios(
   sesion: SesionUsuario,
   idLista: number,
   bd?: ContextoBd,
   deps: DepsExcelListaPrecios = {},
-): Promise<ExcelListaPrecios> {
+): Promise<ListaPreciosDetalle> {
   const obtener = deps.obtenerLista ?? obtenerLista;
-  const lista = await obtener(sesion, idLista, bd);
+  return obtener(sesion, idLista, bd);
+}
 
+/** Construye el `.xlsx` de una lista de precios a partir de datos ya resueltos. PURO: en el WORKER. */
+export async function construirExcelListaPrecios(lista: ListaPreciosDetalle): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'CONTROL v2';
   libro.created = new Date();
@@ -56,7 +60,7 @@ export async function excelListaPrecios(
 
   const encabezado = hoja.getRow(1);
   encabezado.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: TEAL } };
+  encabezado.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ARGB_MARCA } };
   encabezado.alignment = { vertical: 'middle' };
 
   for (const linea of lista.lineas) {
@@ -71,6 +75,21 @@ export async function excelListaPrecios(
     renglon.getCell('precio').numFmt = '$#,##0.00';
   }
 
-  const datos = await libro.xlsx.writeBuffer();
-  return { buffer: Buffer.from(datos), folio: lista.folio };
+  const buffer = await libro.xlsx.writeBuffer();
+  return Buffer.from(buffer);
+}
+
+/**
+ * Genera el `.xlsx` de una lista de precios. MISMO resultado que el PDF. Datos en el hilo principal,
+ * libro en un worker (blindaje del event loop); el folio (para el filename) sale del hilo principal.
+ */
+export async function excelListaPrecios(
+  sesion: SesionUsuario,
+  idLista: number,
+  bd?: ContextoBd,
+  deps: DepsExcelListaPrecios = {},
+): Promise<ExcelListaPrecios> {
+  const lista = await armarDatosExcelListaPrecios(sesion, idLista, bd, deps);
+  const buffer = await renderizarExcelEnWorker('excel-lista-precios', lista);
+  return { buffer, folio: lista.folio };
 }

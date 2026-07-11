@@ -6,10 +6,11 @@
  *  • el contenido incluye folio, tercero, RFC, UUID e importe (validado al re-leer el libro).
  */
 import ExcelJS from 'exceljs';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import type { ReporteFiscalFila, ReporteFiscalSalida } from '../../../../contrato/index.js';
 import { sesionDePrueba } from '../../../../pruebas/sesiones.js';
+import { cerrarPoolPdf } from '../../../../comun/pdf-worker.js';
 
 import { excelReporteFiscal } from './excel-reporte-fiscal.js';
 
@@ -62,6 +63,10 @@ function fakeReporte(
 
 const sesion = sesionDePrueba({ permisos: ['terceros.fiscal', 'consultas.ver-importes'] });
 
+afterAll(async () => {
+  await cerrarPoolPdf();
+});
+
 describe('excelReporteFiscal', () => {
   it('genera un .xlsx (buffer con firma OOXML/ZIP)', async () => {
     const consultar = vi.fn(fakeReporte([fila(1), fila(2)]));
@@ -70,15 +75,15 @@ describe('excelReporteFiscal', () => {
     });
     expect(buffer.length).toBeGreaterThan(0);
     expect(buffer.subarray(0, 2).toString('latin1')).toBe('PK');
-  });
+  }, 20_000); // orquestador → construcción en worker (arranque en frío del pool bajo carga de tests).
 
   it('pagina internamente y trae TODAS las filas (no solo la primera página)', async () => {
     const filas = Array.from({ length: 250 }, (_, i) => fila(i + 1));
     const consultar = vi.fn(fakeReporte(filas));
     await excelReporteFiscal(sesion, {}, undefined, { reporteFiscal: consultar });
-    // 250 filas, tope interno 100 → 3 páginas.
+    // 250 filas, tope interno 100 → 3 páginas (la paginación corre en el hilo principal).
     expect(consultar).toHaveBeenCalledTimes(3);
-  });
+  }, 20_000);
 
   it('vuelca folio, tercero, RFC, UUID e importe a las celdas', async () => {
     const consultar = vi.fn(
@@ -101,5 +106,5 @@ describe('excelReporteFiscal', () => {
     expect(renglon?.getCell(5).value).toBe('TNO900101AAA');
     expect(renglon?.getCell(7).value).toBe('UUID-XYZ');
     expect(renglon?.getCell(10).value).toBe(1234.5);
-  });
+  }, 20_000);
 });

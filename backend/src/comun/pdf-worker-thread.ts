@@ -1,31 +1,36 @@
 /**
- * Hilo TRABAJADOR de render de PDFs (`node:worker_threads`) — la mitad que corre FUERA del event loop
- * principal (blindaje general de PDFs). El hilo principal resuelve los datos contra la BD (`armarDatos*`)
- * y le manda a ESTE worker SOLO los datos ya resueltos (serializables); el worker importa el módulo del
- * impreso pedido y llama a su función de RENDER pura (`generarPdf*`), devolviendo el Buffer. Así, aunque
- * un impreso tenga miles de renglones, el costoso `renderToBuffer` de `@react-pdf/renderer` NO bloquea la
- * atención de peticiones (incidente 11-jul: el impreso de Telas congeló 82 s toda la app).
+ * Hilo TRABAJADOR de generación de DOCUMENTOS (`node:worker_threads`) — la mitad que corre FUERA del
+ * event loop principal (blindaje general de impresos). El hilo principal resuelve los datos contra la
+ * BD (`armarDatos*`) y le manda a ESTE worker SOLO los datos ya resueltos (serializables); el worker
+ * importa el módulo del documento pedido y llama a su función de CONSTRUCCIÓN pura, devolviendo el
+ * Buffer. Cubre dos familias con el MISMO mecanismo:
+ *  • PDFs (`@react-pdf/renderer`) — `generarPdf*` (incidente 11-jul: el impreso de Telas congeló 82 s
+ *    toda la app al renderizar miles de renglones en el event loop).
+ *  • Excel (`exceljs`) — `construirExcel*`, que ACUMULA el workbook completo en memoria (decenas de
+ *    miles de filas en rangos amplios), con el mismo riesgo de bloqueo que el PDF.
  *
  * Convenciones:
  *  • El registro mapea `clave` → thunk PEREZOSO (`() => import(...)`) que carga SOLO el módulo del
- *    impreso solicitado (no los ~25) y devuelve su `generarPdf*` (datos resueltos → Buffer).
+ *    documento solicitado (no los ~35) y devuelve su constructor puro (datos resueltos → Buffer).
  *  • Los especificadores usan sufijo `.js` (convención NodeNext del repo): resuelven igual en dev (tsx
  *    mapea `.js`→`.ts`) y en prod (dist/*.js).
- *  • El `parentPort` puede ser `null` si el módulo se importa desde el hilo principal (solo para el tipo
- *    {@link ClavePdf}); por eso el bucle de mensajes se monta bajo guarda.
+ *  • El `parentPort` puede ser `null` si el módulo se importa desde el hilo principal (solo para los
+ *    tipos {@link ClavePdf} / {@link ClaveExcel}); por eso el bucle de mensajes se monta bajo guarda.
  *
- * La orquestación (pool, cola FIFO, timeout, reciclaje) vive en `pdf-worker.ts` (hilo principal).
+ * La orquestación (pool, cola FIFO, timeouts por tipo, reciclaje) vive en `pdf-worker.ts` (hilo
+ * principal).
  */
 import { parentPort } from 'node:worker_threads';
 
-/** Una función de RENDER pura: datos YA resueltos (serializables) → Buffer del PDF. */
-type GeneradorPdf = (datos: never) => Promise<Buffer>;
+/** Una función de CONSTRUCCIÓN pura: datos YA resueltos (serializables) → Buffer del documento. */
+type GeneradorDocumento = (datos: never) => Promise<Buffer>;
 
 /**
- * Registro de impresos: `clave` → thunk que importa el módulo y devuelve su render puro. Cada impreso
- * ya separa `armarDatos*` (BD, hilo principal) de su `generarPdf*` (puro): aquí solo se usa el segundo.
+ * Registro de impresos PDF: `clave` → thunk que importa el módulo y devuelve su render puro. Cada
+ * impreso ya separa `armarDatos*` (BD, hilo principal) de su `generarPdf*` (puro): aquí solo se usa el
+ * segundo.
  */
-const REGISTRO = {
+const REGISTRO_PDF = {
   // ── Inventarios ──────────────────────────────────────────────────────────────
   'inventario-telas': async () =>
     (await import('../dominio/inventarios/impresos/impreso-inventario-telas.js'))
@@ -105,28 +110,79 @@ const REGISTRO = {
   'reporte-fiscal': async () =>
     (await import('../dominio/terceros/reportes/impresos/impreso-reporte-fiscal.js'))
       .generarPdfReporteFiscal,
-} satisfies Record<string, () => Promise<GeneradorPdf>>;
+} satisfies Record<string, () => Promise<GeneradorDocumento>>;
 
-/** Clave de un impreso registrado (la comparte el hilo principal como tipo). */
-export type ClavePdf = keyof typeof REGISTRO;
+/**
+ * Registro de exports a EXCEL: `clave` → thunk que importa el módulo y devuelve su `construirExcel*`
+ * puro. Cada export separa `armarDatos*` (BD + paginación, hilo principal) de su constructor (puro):
+ * aquí solo se usa el segundo. Se atienden en el MISMO pool que los PDF pero con timeout propio (los
+ * libros grandes tardan más que un render de PDF) — ver `pdf-worker.ts`.
+ */
+const REGISTRO_EXCEL = {
+  // ── Ruta Crítica ─────────────────────────────────────────────────────────────
+  'excel-concentrado': async () =>
+    (await import('../dominio/ruta-critica/impresos/excel-concentrado.js'))
+      .construirExcelConcentrado,
+  'excel-desempeno-rc': async () =>
+    (await import('../dominio/ruta-critica/impresos/excel-desempeno-rc.js'))
+      .construirExcelDesempeno,
+
+  // ── Costos / EDR ─────────────────────────────────────────────────────────────
+  'excel-margenes': async () =>
+    (await import('../dominio/costos/impresos/excel-margenes.js')).construirExcelMargenes,
+  'excel-ventas': async () =>
+    (await import('../dominio/edr/impresos/excel-ventas.js')).construirExcelVentas,
+  'excel-edr': async () => (await import('../dominio/edr/impresos/excel-edr.js')).construirExcelEdr,
+
+  // ── EsMa (estados de cuenta de maquileros) ───────────────────────────────────
+  'excel-esma-estado-cuenta': async () =>
+    (await import('../dominio/esma/impresos/excel-estado-cuenta.js')).construirExcelEstadoCuenta,
+
+  // ── Indicadores (tableros directivos) ────────────────────────────────────────
+  'excel-kpis-rc': async () =>
+    (await import('../dominio/indicadores/impresos/excel.js')).construirExcelKpisRc,
+  'excel-kpis-calidad': async () =>
+    (await import('../dominio/indicadores/impresos/excel.js')).construirExcelKpisCalidad,
+  'excel-kpis-wip': async () =>
+    (await import('../dominio/indicadores/impresos/excel.js')).construirExcelKpisWip,
+
+  // ── Desarrollo y cotización ──────────────────────────────────────────────────
+  'excel-lista-precios': async () =>
+    (await import('../dominio/desarrollo/impresos/excel-lista-precios.js'))
+      .construirExcelListaPrecios,
+
+  // ── Finanzas (terceros: reporte fiscal del contador) ─────────────────────────
+  'excel-reporte-fiscal': async () =>
+    (await import('../dominio/terceros/reportes/impresos/excel-reporte-fiscal.js'))
+      .construirExcelReporteFiscal,
+} satisfies Record<string, () => Promise<GeneradorDocumento>>;
+
+/** Registro unificado: los dos tipos comparten el mismo pool y protocolo de mensajes. */
+const REGISTRO = { ...REGISTRO_PDF, ...REGISTRO_EXCEL };
+
+/** Clave de un impreso PDF registrado (la comparte el hilo principal como tipo). */
+export type ClavePdf = keyof typeof REGISTRO_PDF;
+
+/** Clave de un export a Excel registrado (la comparte el hilo principal como tipo). */
+export type ClaveExcel = keyof typeof REGISTRO_EXCEL;
 
 // ── Protocolo de mensajes (hilo principal ↔ worker) ──────────────────────────────────────────────
 
-/** Petición del hilo principal: qué impreso renderizar y con qué datos (ya resueltos). */
+/** Petición del hilo principal: qué documento generar y con qué datos (ya resueltos). */
 export interface PeticionRenderPdf {
   id: string;
   clave: string;
   datos: unknown;
 }
 
-/** Respuesta del worker: el Buffer del PDF, o un error legible. */
+/** Respuesta del worker: el Buffer del documento, o un error legible. */
 export type RespuestaRenderPdf =
   | { id: string; ok: true; buffer: Uint8Array }
   | { id: string; ok: false; error: string };
 
 /** Resuelve el thunk de una clave (o `undefined` si no está registrada). */
-export function generadorDe(clave: string): (() => Promise<GeneradorPdf>) | undefined {
-  return (REGISTRO as Record<string, () => Promise<GeneradorPdf>>)[clave];
+export function generadorDe(clave: string): (() => Promise<GeneradorDocumento>) | undefined {
+  return (REGISTRO as Record<string, () => Promise<GeneradorDocumento>>)[clave];
 }
 
 /** Procesa una petición y responde por el puerto padre. */

@@ -63,6 +63,13 @@ export const PALETA = {
   blanco: '#ffffff',
 } as const;
 
+/**
+ * Verde de marca en formato ARGB para `exceljs` (los exports a Excel comparten la identidad de los
+ * PDFs). Se DERIVA de {@link PALETA.marca} para no mantener dos hex del mismo verde: una sola fuente de
+ * verdad (`#0e7c47` → `FF0E7C47`). Los builders de Excel importan SOLO esta constante.
+ */
+export const ARGB_MARCA = `FF${PALETA.marca.slice(1).toUpperCase()}`;
+
 // ── Tipografía ────────────────────────────────────────────────────────────────────────────────────
 
 /** Las dos únicas fuentes disponibles sin registrar TTF externas (core de PDF). */
