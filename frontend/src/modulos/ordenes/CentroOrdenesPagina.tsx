@@ -49,6 +49,7 @@ import { PanelHabilitacionOrden } from '@/modulos/notas-salida/PanelHabilitacion
 import { PanelRutaOrden } from '@/modulos/ruta-critica/PanelRutaOrden';
 import { useSesion } from '@/sesion/useSesion';
 
+import { DialogoOrden } from './DialogoOrden';
 import { FotosModeloOrden } from './FotosModeloOrden';
 import { PanelPreciosOrden } from './PanelPreciosOrden';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
@@ -62,8 +63,9 @@ import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
  * scroll (precios con rastro §4.4.3, tela y compra, foto, desarrollo 360).
  *
  * Doble clic en una fila (o el botón "Registrar avance") abre el AVANCE DE PRODUCCIÓN (§4.3). La
- * captura/edición completa de la orden (F2-E3) vive en `/produccion/ordenes/captura` y se llega
- * con el mosaico "Modificar". En móvil el panel colapsa a un cajón deslizante.
+ * captura/edición completa de la orden (F2-E3) se abre con el mosaico "Modificar" en el diálogo
+ * `DialogoOrden` (antes vivía en la página `/produccion/ordenes/captura`, ya retirada). En móvil el
+ * panel colapsa a un cajón deslizante.
  */
 
 /** Meses de entrega para el selector y la columna (proto `MESES_PED`). */
@@ -190,6 +192,8 @@ export function CentroOrdenesPagina(): React.JSX.Element {
 
   // ── Avance de producción (doble clic / botón) ──────────────────────────────
   const [avanceDe, setAvanceDe] = useState<{ id: number; folioPedido: number | null } | null>(null);
+  // ── Editar la orden (mosaico "Modificar" → diálogo, antes página `/captura`) ─
+  const [idAModificar, setIdAModificar] = useState<number | null>(null);
 
   function abrirAvance(fila: { id: number; folioPedido: number | null }): void {
     setAvanceDe({ id: fila.id, folioPedido: fila.folioPedido });
@@ -278,6 +282,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
         alRegistrarAvance={(folioPedido) =>
           abrirAvance({ id: (filaSeleccionada?.id ?? idSeleccionada) as number, folioPedido })
         }
+        alModificar={(id) => {
+          setIdAModificar(id);
+          // En móvil el detalle vive en el cajón (Sheet portalizado, sobre el diálogo inline): se
+          // cierra para que el diálogo de edición a pantalla completa quede al frente.
+          setCajonAbierto(false);
+        }}
       />
     ) : (
       <p className="p-4 text-sm text-muted-foreground">Selecciona una orden para ver su detalle.</p>
@@ -705,6 +715,12 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           alCerrar={() => setAvanceDe(null)}
         />
       ) : null}
+
+      {/* Edición completa de la orden (mosaico "Modificar"): un solo diálogo para toda la página
+          (el panel de detalle se renderiza dos veces —escritorio + cajón—, por eso se hospeda aquí). */}
+      {idAModificar !== null ? (
+        <DialogoOrden abierto idOrden={idAModificar} alCerrar={() => setIdAModificar(null)} />
+      ) : null}
     </div>
   );
 }
@@ -929,6 +945,7 @@ function DetalleCentroOrden({
   puedeVerHabilitacion,
   verImportes,
   alRegistrarAvance,
+  alModificar,
 }: {
   idOrden: number;
   fila: OrdenCentro | undefined;
@@ -937,6 +954,7 @@ function DetalleCentroOrden({
   puedeVerHabilitacion: boolean;
   verImportes: boolean;
   alRegistrarAvance: (folioPedido: number | null) => void;
+  alModificar: (idOrden: number) => void;
 }): React.JSX.Element {
   const navigate = useNavigate();
   const consulta = useOrden(idOrden);
@@ -1051,9 +1069,7 @@ function DetalleCentroOrden({
           <Mosaico
             icono={Pencil}
             etiqueta="Modificar"
-            onClick={() =>
-              void navigate('/produccion/ordenes/captura', { state: { idOrden: orden.id } })
-            }
+            onClick={() => alModificar(orden.id)}
             testid="mosaico-modificar"
           />
         </div>

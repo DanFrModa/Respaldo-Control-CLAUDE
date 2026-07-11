@@ -10,18 +10,17 @@ import {
   Tags,
   UserRound,
   Workflow,
+  X,
   XCircle,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
-import { useOrden, useOrdenes } from '@/api/ordenes';
-import type { EstadoOrden, Orden, OrdenesQuery } from '@/api/tipos';
+import { useOrden } from '@/api/ordenes';
+import type { EstadoOrden, Orden } from '@/api/tipos';
 import { Avatar } from '@/components/dominio/visuales';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useDebounce } from '@/lib/useDebounce';
-import { ListaDetalle, type PaginacionListaDetalle } from '@/modulos/ListaDetalle';
 import { CampoDetalle, Historial, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
 import { useSesion } from '@/sesion/useSesion';
 
@@ -35,21 +34,6 @@ import { PanelHitosOrden } from './PanelHitosOrden';
 import { PanelMatriz } from './PanelMatriz';
 import { PanelReferencias } from './PanelReferencias';
 import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
-
-/** Renglones por página del listado. */
-const POR_PAGINA = 10;
-
-/**
- * Lee `state.idOrden` del deep-link (mosaico "Modificar" del centro de comando, R2). Devuelve el
- * id si viene un entero positivo válido; si no, `null` (comportamiento por defecto intacto).
- */
-function leerIdOrdenDeepLink(state: unknown): number | null {
-  if (typeof state !== 'object' || state === null || !('idOrden' in state)) {
-    return null;
-  }
-  const id = state.idOrden;
-  return typeof id === 'number' && Number.isInteger(id) && id > 0 ? id : null;
-}
 
 /** Formatea una fecha date-only `YYYY-MM-DD` como "13 jun 2026" sin desfase de zona. */
 function fechaCorta(valor: string | null): string {
@@ -91,22 +75,34 @@ function EstadoOrdenBadge({ estado }: { estado: EstadoOrden }): React.JSX.Elemen
   );
 }
 
+/** Props del diálogo de edición de una orden. */
+export interface PropsDialogoOrden {
+  abierto: boolean;
+  /** Orden a editar (la OP nace del pedido; este diálogo solo edita una existente). */
+  idOrden: number | null;
+  alCerrar: () => void;
+}
+
 /**
- * Pantalla de ÓRDENES de producción (F2-E3) sobre el motor LISTA + DETALLE. La lista busca (folio /
- * modelo / cliente / referencia) con paginación de servidor y toggle de canceladas; el detalle
- * muestra el encabezado (estado DERIVADO, sin "marcar completa"), el editor del encabezado, la
- * matriz color × talla, las referencias D7 del cliente y los comentarios. Crear sale de un renglón
- * de pedido; cancelar exige motivo. Las acciones de escritura se ocultan sin `ordenes.administrar`
- * (cancelar exige `ordenes.cancelar`); la decisión real la toma el backend (A1).
+ * DIÁLOGO DE EDICIÓN de una orden de producción (rediseño: retiro del panel viejo de Órdenes) — la
+ * CAPTURA/edición completa F2-E3 que antes vivía en la página `/produccion/ordenes/captura`
+ * (plantilla de catálogo), ahora a pantalla completa y accesible con el mosaico "Modificar" del
+ * centro de comando. Su valor real es el cuerpo `DetalleOrden`: encabezado, MATRIZ color × talla
+ * (D4), referencias del cliente (D7), comentarios, adjuntos, hitos y el enganche con Desarrollo.
+ *
+ * La OP NO se crea aquí: nace del PEDIDO (R3, §4.1); "Nueva orden" abre el constructor de pedido.
+ * Se cierra con Esc, el botón ✕ o el clic en el fondo (mismo patrón que el Avance de producción).
+ * Las acciones de escritura se ocultan sin `ordenes.administrar` (cancelar exige `ordenes.cancelar`);
+ * la decisión real la toma el backend (A1).
  */
-export function OrdenesPagina(): React.JSX.Element {
+export function DialogoOrden({
+  abierto,
+  idOrden,
+  alCerrar,
+}: PropsDialogoOrden): React.JSX.Element | null {
   const { tienePermiso } = useSesion();
   const navigate = useNavigate();
-  const location = useLocation();
   const puedeAdministrar = tienePermiso('ordenes.administrar');
-  // "Nueva orden" abre el CONSTRUCTOR DE PEDIDO (R3: la OP nace del pedido) → exige TAMBIÉN
-  // `pedidos.administrar` (hallazgo del reviewer); `puedeAdministrar` sigue gobernando la edición.
-  const puedeCrearPedido = tienePermiso('pedidos.administrar');
   const puedeCancelar = tienePermiso('ordenes.cancelar');
   const puedeRutaVer = tienePermiso('rc.ruta-ver');
   const puedeProgramar = tienePermiso('rc.programar');
@@ -118,155 +114,123 @@ export function OrdenesPagina(): React.JSX.Element {
   const puedeAdministrarDesarrollo = tienePermiso('desarrollo.administrar');
   const verImportes = tienePermiso('consultas.ver-importes');
 
-  // ── Estado de la vista ─────────────────────────────────────────────────────
-  const [textoBusqueda, setTextoBusqueda] = useState('');
-  const busqueda = useDebounce(textoBusqueda.trim(), 300);
-  const [incluirCanceladas, setIncluirCanceladas] = useState(false);
-  const [pagina, setPagina] = useState(1);
+  const consulta = useOrden(abierto && idOrden !== null ? idOrden : undefined);
+  const orden = consulta.data;
 
-  const query: OrdenesQuery = {
-    pagina,
-    porPagina: POR_PAGINA,
-    ordenarPor: 'folio',
-    direccion: 'desc',
-    incluirCanceladas: incluirCanceladas ? 'true' : 'false',
-    ...(busqueda.length > 0 ? { busqueda } : {}),
-  };
-
-  const consulta = useOrdenes(query);
-
-  // ── Diálogos ───────────────────────────────────────────────────────────────
+  // Diálogos hijos (Radix): se montan SOLO al abrirse, así no consultan el API mientras cerrados.
   const [aCancelar, setACancelar] = useState<Orden | null>(null);
   const [aCopiarMatriz, setACopiarMatriz] = useState<Orden | null>(null);
-  // Id a enfocar en la lista (deep-link): tras crear, la orden nueva; o el `state.idOrden` del
-  // mosaico "Modificar" del centro de comando (R2). El state se consume (replace) para que un
-  // refresh no lo re-aplique — mismo patrón que ModelosPagina.
-  const [idAEnfocar, setIdAEnfocar] = useState<number | null>(leerIdOrdenDeepLink(location.state));
-  const idDeepLink = leerIdOrdenDeepLink(location.state);
+
+  // Esc cierra el diálogo — pero NO mientras un diálogo hijo (cancelar/copiar) está abierto: su
+  // propio Esc lo cierra (Radix) y si este listener también corriera, tiraría el panel entero.
   useEffect(() => {
-    if (idDeepLink !== null) {
-      setIdAEnfocar(idDeepLink);
-      void navigate(location.pathname, { replace: true, state: null });
+    if (!abierto || aCancelar !== null || aCopiarMatriz !== null) {
+      return;
     }
-  }, [idDeepLink, location.pathname, navigate]);
-  // Si la orden del deep-link no está en la página visible, se inyecta al frente para que
-  // ListaDetalle pueda seleccionarla (mismo truco que ModelosPagina).
-  const fichaDeepLink = useOrden(idAEnfocar ?? undefined);
-
-  function alBuscar(valor: string): void {
-    setTextoBusqueda(valor);
-    setPagina(1);
-  }
-  function alAlternarCanceladas(): void {
-    setIncluirCanceladas((v) => !v);
-    setPagina(1);
-  }
-
-  const datos = consulta.data;
-  const visibles = datos?.datos ?? [];
-  const registros =
-    idAEnfocar !== null &&
-    fichaDeepLink.data !== undefined &&
-    fichaDeepLink.data.id === idAEnfocar &&
-    !visibles.some((o) => o.id === idAEnfocar)
-      ? [fichaDeepLink.data, ...visibles]
-      : visibles;
-  const totalPaginas = datos?.totalPaginas ?? 0;
-  const paginacion: PaginacionListaDetalle | undefined = datos
-    ? {
-        total: datos.total,
-        pagina: datos.pagina,
-        totalPaginas,
-        ocupado: consulta.isFetching,
-        alAnterior: () => setPagina((p) => Math.max(1, p - 1)),
-        alSiguiente: () => setPagina((p) => Math.min(totalPaginas, p + 1)),
+    function alTeclear(evento: KeyboardEvent): void {
+      if (evento.key === 'Escape') {
+        alCerrar();
       }
-    : undefined;
+    }
+    window.addEventListener('keydown', alTeclear);
+    return () => window.removeEventListener('keydown', alTeclear);
+  }, [abierto, alCerrar, aCancelar, aCopiarMatriz]);
+
+  if (!abierto || idOrden === null) {
+    return null;
+  }
 
   return (
-    <>
-      <ListaDetalle<Orden>
-        testid="orden"
-        titulo="Órdenes"
-        descripcion="Órdenes de producción con su matriz color × talla."
-        icono={Factory}
-        registros={registros}
-        cargando={consulta.isPending}
-        error={consulta.isError ? consulta.error.message : null}
-        alReintentar={() => void consulta.refetch()}
-        obtenerId={(o) => o.id}
-        obtenerTitulo={(o) => `Orden ${o.folio}`}
-        // "activo" = no cancelada (la cancelación suave es el "borrado" de la orden).
-        obtenerActivo={(o) => o.estado !== 'cancelada'}
-        obtenerSecundaria={(o) => `${o.codigoModelo} · ${o.cliente}`}
-        renderAvatarLista={(o) => <Avatar nombre={o.codigoModelo} tono="neutro" tamano="sm" />}
-        busqueda={textoBusqueda}
-        alBuscar={alBuscar}
-        incluirInactivos={incluirCanceladas}
-        alAlternarInactivos={alAlternarCanceladas}
-        textoVacio="No hay órdenes que coincidan con la búsqueda."
-        paginacion={paginacion}
-        seleccionInicialId={idAEnfocar}
-        puedeAdministrar={puedeAdministrar}
-        // La OP no se crea suelta: nace del PEDIDO (R3, §4.1) — "Nueva orden" abre el
-        // constructor de pedido interno; esta captura queda para editar matrices existentes.
-        // El botón exige ADEMÁS `pedidos.administrar` (capturar pedidos); sin él se oculta.
-        alNuevo={() => void navigate('/pedidos', { state: { abrirConstructor: true } })}
-        textoNuevo="Nueva orden"
-        mostrarNuevo={puedeCrearPedido}
-        // El editor del encabezado va en el cuerpo del detalle (no en el diálogo de "Editar").
-        alEditar={() => undefined}
-        // Cancelar = desactivar (suave). Reactivar no aplica: una orden cancelada no se reactiva.
-        alDesactivar={setACancelar}
-        alReactivar={() => undefined}
-        renderAvatarDetalle={(o) => <Avatar nombre={o.codigoModelo} tono="neutro" tamano="lg" />}
-        renderMeta={(o) => (
-          <span className="flex flex-wrap items-center gap-2">
-            <EstadoOrdenBadge estado={o.estado} />
-            <span className="text-sm text-muted-foreground">
-              {o.totalPiezas.toLocaleString('es-MX')} pz
-            </span>
-          </span>
-        )}
-        // El hero solo ofrece "Cancelar" (cuando aplica). Editar/Desactivar genéricos no encajan.
-        ocultarAccionesBase
-        accionesExtra={(o) =>
-          puedeCancelar && o.estado !== 'cancelada' ? (
+    <div
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/45 p-0 sm:p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Orden ${String(orden?.folio ?? idOrden)}`}
+      data-testid="dialogo-orden"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) alCerrar();
+      }}
+    >
+      <div className="flex w-full max-w-4xl flex-col overflow-hidden bg-background shadow-xl sm:rounded-xl">
+        {/* ── Encabezado (hero + acciones) ───────────────────────────────── */}
+        <header className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
+          <Avatar nombre={orden?.codigoModelo ?? '·'} tono="neutro" tamano="md" />
+          <div className="min-w-0 flex-1">
+            <h2 className="flex items-center gap-2 truncate text-base font-semibold">
+              Orden {orden?.folio ?? '…'}
+              {orden ? <EstadoOrdenBadge estado={orden.estado} /> : null}
+            </h2>
+            <p className="truncate text-xs text-muted-foreground">
+              {orden ? (
+                <>
+                  Modelo <b>{orden.codigoModelo}</b> · {orden.cliente} ·{' '}
+                  {orden.totalPiezas.toLocaleString('es-MX')} pz
+                </>
+              ) : (
+                'Cargando…'
+              )}
+            </p>
+          </div>
+          {/* Cancelar = desactivar (suave) de la orden; exige `ordenes.cancelar`. */}
+          {orden !== undefined && puedeCancelar && orden.estado !== 'cancelada' ? (
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => setACancelar(o)}
+              onClick={() => setACancelar(orden)}
               data-testid="cancelar-orden"
             >
               <XCircle aria-hidden />
               Cancelar
             </Button>
-          ) : null
-        }
-        renderDetalle={(o) => (
-          <DetalleOrden
-            orden={o}
-            puedeAdministrar={puedeAdministrar}
-            puedeRutaVer={puedeRutaVer}
-            puedeProgramar={puedeProgramar}
-            puedeCapturarRc={puedeCapturarRc}
-            puedeVerDesarrollo={puedeVerDesarrollo}
-            puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
-            verImportes={verImportes}
-            alCopiarMatriz={() => setACopiarMatriz(o)}
-            alVerRuta={() => void navigate(`/ruta-critica/ordenes/${o.id}`)}
-            alProgramarRuta={() => void navigate(`/ruta-critica/ordenes/${o.id}/programar`)}
-          />
-        )}
-      />
+          ) : null}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={alCerrar}
+            aria-label="Cerrar (Esc)"
+            data-testid="dialogo-orden-cerrar"
+          >
+            <X className="size-5" aria-hidden />
+          </Button>
+        </header>
 
-      {/* Los diálogos con búsqueda interna se montan SOLO al abrirse: así no consultan el API
-          mientras están cerrados. */}
+        {/* ── Cuerpo con scroll (el cuerpo del detalle es el mismo F2-E3) ── */}
+        <div
+          data-testid="detalle-orden"
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 lg:p-5"
+        >
+          {consulta.isPending ? (
+            <p className="text-sm text-muted-foreground">Cargando detalle…</p>
+          ) : consulta.isError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {consulta.error.message}
+            </p>
+          ) : orden === undefined ? (
+            <p className="text-sm text-muted-foreground">Sin detalle.</p>
+          ) : (
+            <DetalleOrden
+              orden={orden}
+              puedeAdministrar={puedeAdministrar}
+              puedeRutaVer={puedeRutaVer}
+              puedeProgramar={puedeProgramar}
+              puedeCapturarRc={puedeCapturarRc}
+              puedeVerDesarrollo={puedeVerDesarrollo}
+              puedeAdministrarDesarrollo={puedeAdministrarDesarrollo}
+              verImportes={verImportes}
+              alCopiarMatriz={() => setACopiarMatriz(orden)}
+              alVerRuta={() => void navigate(`/ruta-critica/ordenes/${orden.id}`)}
+              alProgramarRuta={() => void navigate(`/ruta-critica/ordenes/${orden.id}/programar`)}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Los diálogos con búsqueda interna se montan SOLO al abrirse. */}
       {aCopiarMatriz !== null ? (
         <DialogoCopiarMatriz
           abierto
-          alCambiarAbierto={(abierto) => {
-            if (!abierto) {
+          alCambiarAbierto={(abiertoNuevo) => {
+            if (!abiertoNuevo) {
               setACopiarMatriz(null);
             }
           }}
@@ -275,14 +239,14 @@ export function OrdenesPagina(): React.JSX.Element {
       ) : null}
       <DialogoCancelarOrden
         abierto={aCancelar !== null}
-        alCambiarAbierto={(abierto) => {
-          if (!abierto) {
+        alCambiarAbierto={(abiertoNuevo) => {
+          if (!abiertoNuevo) {
             setACancelar(null);
           }
         }}
         orden={aCancelar ?? undefined}
       />
-    </>
+    </div>
   );
 }
 

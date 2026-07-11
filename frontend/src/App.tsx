@@ -76,7 +76,6 @@ import { ConsultaNotasPagina } from '@/modulos/notas-salida/ConsultaNotasPagina'
 import { NotasPorOrdenPagina } from '@/modulos/notas-salida/NotasPorOrdenPagina';
 import { NotasSalidaPagina } from '@/modulos/notas-salida/NotasSalidaPagina';
 import { CentroOrdenesPagina } from '@/modulos/ordenes/CentroOrdenesPagina';
-import { OrdenesPagina } from '@/modulos/ordenes/OrdenesPagina';
 import { ConsultaOrdenesPagina } from '@/modulos/ordenes-consulta/ConsultaOrdenesPagina';
 import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesIncompletasPagina';
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
@@ -183,9 +182,9 @@ const router = createBrowserRouter([
           { path: 'listas-precios', element: <ListasPreciosPagina /> },
           { path: 'produccion/tipos-proceso', element: <TiposProcesoPagina /> },
           // Rediseño R2: el CENTRO DE COMANDO es la pantalla principal de órdenes; la captura/
-          // edición completa (F2-E3) se conserva en /captura (se llega con el mosaico "Modificar").
+          // edición completa (F2-E3) se abre en el diálogo `DialogoOrden` con el mosaico "Modificar"
+          // (antes era la página `/produccion/ordenes/captura`, ya retirada).
           { path: 'produccion/ordenes', element: <CentroOrdenesPagina /> },
-          { path: 'produccion/ordenes/captura', element: <OrdenesPagina /> },
           { path: 'produccion/corte', element: <CapturaCortePagina /> },
           { path: 'produccion/envios', element: <EnvioMaquilaPagina /> },
           { path: 'produccion/recibos', element: <ReciboMaquilaPagina /> },

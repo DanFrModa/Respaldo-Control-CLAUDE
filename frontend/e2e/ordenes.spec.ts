@@ -6,8 +6,8 @@ import { crearColorYTalla, entrarComoAdmin } from './ayudas';
  * E2E del módulo ÓRDENES (rediseño R2/R3) contra el stack real:
  *
  *  1. La OP ya NO se crea suelta (R3, §4.1): nace del PEDIDO con "Generar OP" (la matriz nace ahí).
- *     La CAPTURA/edición completa (F2-E3) sigue viva en `/produccion/ordenes/captura` para EDITAR:
- *     re-guardar la matriz, copiarla de otra orden, capturar la referencia D7 y cancelar.
+ *     La CAPTURA/edición completa (F2-E3) se abre en el DIÁLOGO del mosaico "Modificar" del centro
+ *     de comando para EDITAR: re-guardar la matriz, copiarla de otra orden, la referencia D7 y cancelar.
  *  2. El CENTRO DE COMANDO (`/produccion/ordenes`, §4.2) + AVANCE de producción (§4.3): la tabla
  *     de 13 columnas con filtros de servidor, el panel persistente con la matriz siempre visible,
  *     doble clic → avance, y el registro REAL de un corte. También la paleta ⌘K por folio (B4).
@@ -71,16 +71,20 @@ async function generarOp(
   return folio;
 }
 
-/** Selecciona una orden por folio en la CAPTURA (`/produccion/ordenes/captura`). */
+/**
+ * Abre la edición de una orden por folio en el DIÁLOGO del mosaico "Modificar" (centro de comando):
+ * el panel viejo `/produccion/ordenes/captura` fue retirado. Deja visible el detalle editable.
+ */
 async function abrirOrdenEnCaptura(page: Page, folio: string): Promise<void> {
-  await page.goto('/produccion/ordenes/captura');
-  await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
-  await page.getByTestId('buscar-orden').fill(folio);
-  await page
-    .getByTestId('fila-orden')
-    .filter({ hasText: `Orden ${folio}` })
-    .first()
-    .click();
+  await page.goto('/produccion/ordenes');
+  await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
+  await page.getByTestId('centro-busqueda').fill(folio);
+  await page.getByTestId('centro-fila').filter({ hasText: folio }).first().click();
+  // El panel persistente (escritorio) hospeda los mosaicos; se espera a que cargue la orden.
+  const panel = page.getByTestId('centro-panel');
+  await expect(panel.getByText(`OP ${folio}`)).toBeVisible();
+  await panel.getByTestId('mosaico-modificar').click();
+  await expect(page.getByTestId('detalle-orden')).toBeVisible();
 }
 
 /** Crea cliente + modelo + pedido (F2) y una OP de 20 pzas vía "Generar OP". Devuelve el folio. */
@@ -109,7 +113,7 @@ async function crearOrdenConMatriz(
   return generarOp(page, nombres, '20');
 }
 
-test.describe('Órdenes — captura completa (F2-E3, en /captura)', () => {
+test.describe('Órdenes — captura completa (F2-E3, diálogo "Modificar")', () => {
   test('Generar OP (nace completa) → re-guardar matriz → copiar matriz → referencia D7 → cancelar', async ({
     page,
   }) => {
@@ -170,7 +174,8 @@ test.describe('Órdenes — captura completa (F2-E3, en /captura)', () => {
     // ── Copiar la matriz de la OP 1 sobre la OP 2 ───────────────────────────────
     await abrirOrdenEnCaptura(page, folio2);
     await detalle.getByTestId('abrir-copiar-matriz').click();
-    const dialogoCopiar = page.getByRole('dialog');
+    // El panel de edición también es un `dialog`: se acota el de copiar por su nombre accesible.
+    const dialogoCopiar = page.getByRole('dialog', { name: /Copiar matriz/ });
     await expect(dialogoCopiar.getByRole('heading', { name: /Copiar matriz/ })).toBeVisible();
     await dialogoCopiar.getByTestId('copiar-matriz-buscar').fill(folio1);
     await dialogoCopiar.getByTestId('copiar-matriz-opcion').first().click();
@@ -187,7 +192,8 @@ test.describe('Órdenes — captura completa (F2-E3, en /captura)', () => {
 
     // ── Cancelar con motivo ─────────────────────────────────────────────────────
     await page.getByTestId('cancelar-orden').click();
-    const dialogoCancelar = page.getByRole('dialog');
+    // El panel de edición también es un `dialog`: se acota el de cancelar por su nombre accesible.
+    const dialogoCancelar = page.getByRole('dialog', { name: /Cancelar orden/ });
     await expect(dialogoCancelar.getByRole('heading', { name: /Cancelar orden/ })).toBeVisible();
     await expect(page.getByTestId('confirmar-cancelar-orden')).toBeDisabled();
     await page.getByTestId('orden-motivo-cancelar').fill('Cancelada en la prueba E2E');

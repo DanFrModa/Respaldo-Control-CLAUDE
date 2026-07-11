@@ -2,30 +2,22 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Orden, OrdenesPagina as TipoPagina } from '@/api/tipos';
-import { ErrorDeApi } from '@/api/errores';
+import type { Orden } from '@/api/tipos';
 import { estadoSesionDePrueba, renderConProveedores } from '@/pruebas/utilidades';
 
-import { OrdenesPagina } from './OrdenesPagina';
+import { DialogoOrden } from './DialogoOrden';
 
-// Capa de datos controlada: las pruebas no tocan la red. `useOrdenes` captura la query.
-type EstadoConsulta = {
-  data: TipoPagina | undefined;
+// Capa de datos controlada: las pruebas no tocan la red. `useOrden` alimenta el diálogo.
+type EstadoOrden = {
+  data: Orden | undefined;
   isPending: boolean;
   isError: boolean;
-  isFetching: boolean;
-  error: ErrorDeApi | null;
-  refetch: () => void;
+  error: { message: string } | null;
 };
-const useOrdenes = vi.fn<(query: unknown) => EstadoConsulta>();
-let ultimaQuery: Record<string, unknown> | undefined;
+const useOrden = vi.fn<() => EstadoOrden>();
 
 vi.mock('@/api/ordenes', () => ({
-  useOrdenes: (query: Record<string, unknown>) => {
-    ultimaQuery = query;
-    return useOrdenes(query);
-  },
-  useOrden: () => ({ data: undefined, isPending: false, isError: false, error: null }),
+  useOrden: () => useOrden(),
   useActualizarOrden: () => ({ mutate: vi.fn(), isPending: false }),
   useGuardarMatriz: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarMatriz: () => ({ mutate: vi.fn(), isPending: false }),
@@ -63,10 +55,6 @@ const useCamposCliente = vi.fn<(id: number | undefined) => unknown>(() => ({
 }));
 vi.mock('@/api/clientes', () => ({
   useCamposCliente: (id: number | undefined) => useCamposCliente(id),
-}));
-// Pedidos (selector del diálogo de alta): inerte.
-vi.mock('@/api/pedidos', () => ({
-  usePedidos: () => ({ data: { datos: [] }, isPending: false, isError: false, error: null }),
 }));
 // Sección "Adjuntos" del detalle (F8-E6): se renderiza siempre; se mockea para no tocar la red.
 vi.mock('@/api/adjuntos-orden', () => ({
@@ -126,33 +114,24 @@ function orden(
   };
 }
 
-function pagina(datos: Orden[]): TipoPagina {
-  return { datos, total: datos.length, pagina: 1, porPagina: 10, totalPaginas: 1 };
+function consultaConOrden(datos: Orden): EstadoOrden {
+  return { data: datos, isPending: false, isError: false, error: null };
 }
 
-function consultaConDatos(datos: Orden[]): EstadoConsulta {
-  return {
-    data: pagina(datos),
-    isPending: false,
-    isError: false,
-    isFetching: false,
-    error: null,
-    refetch: vi.fn(),
-  };
+// La edición completa exige `ordenes.administrar`; cancelar exige `ordenes.cancelar`.
+const PERM_TODOS = ['ordenes.ver', 'ordenes.administrar', 'ordenes.cancelar'] as const;
+
+/** Renderiza el diálogo abierto para la orden dada, con la sesión indicada. */
+function renderDialogo(o: Orden, permisos: Parameters<typeof estadoSesionDePrueba>[0]): void {
+  useOrden.mockReturnValue(consultaConOrden(o));
+  renderConProveedores(<DialogoOrden abierto idOrden={o.id} alCerrar={vi.fn()} />, {
+    sesion: estadoSesionDePrueba(permisos),
+  });
 }
 
-// "Nueva orden" abre el constructor de PEDIDO (R3): exige tambien pedidos.administrar.
-const PERM_TODOS = [
-  'ordenes.ver',
-  'ordenes.administrar',
-  'ordenes.cancelar',
-  'pedidos.administrar',
-] as const;
-
-describe('<OrdenesPagina>', () => {
+describe('<DialogoOrden>', () => {
   beforeEach(() => {
-    useOrdenes.mockReset();
-    ultimaQuery = undefined;
+    useOrden.mockReset();
     useCamposCliente.mockReturnValue({
       data: [],
       isPending: false,
@@ -161,67 +140,24 @@ describe('<OrdenesPagina>', () => {
     });
   });
 
-  it('lista las órdenes que devuelve el API', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101), orden(2, 102)]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+  it('muestra el detalle de la orden (encabezado + matriz)', () => {
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
 
-    expect(screen.getAllByTestId('fila-orden')).toHaveLength(2);
-    expect(screen.getByText('Orden 102')).toBeInTheDocument();
-  });
-
-  it('muestra el estado vacío cuando no hay resultados', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba(['ordenes.ver']) });
-
-    expect(screen.getByText('No hay órdenes que coincidan con la búsqueda.')).toBeInTheDocument();
-  });
-
-  it('muestra el mensaje de error y un botón de reintento cuando falla', () => {
-    useOrdenes.mockReturnValue({
-      data: undefined,
-      isPending: false,
-      isError: true,
-      isFetching: false,
-      error: new ErrorDeApi({ codigo: 'SERVIDOR', mensaje: 'No se pudo cargar.' }),
-      refetch: vi.fn(),
-    });
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba(['ordenes.ver']) });
-
-    expect(screen.getByText('No se pudo cargar.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+    expect(screen.getByTestId('dialogo-orden')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Orden 101/ })).toBeInTheDocument();
+    expect(screen.getByTestId('detalle-orden')).toBeInTheDocument();
   });
 
   it('oculta las acciones de escritura para quien solo puede ver', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba(['ordenes.ver']) });
+    renderDialogo(orden(1, 101), ['ordenes.ver']);
 
-    expect(screen.queryByTestId('nuevo-orden')).not.toBeInTheDocument();
     expect(screen.queryByTestId('cancelar-orden')).not.toBeInTheDocument();
     expect(screen.queryByTestId('guardar-encabezado')).not.toBeInTheDocument();
     expect(screen.queryByTestId('guardar-matriz')).not.toBeInTheDocument();
   });
 
-  it('muestra el botón "Nueva orden" con ordenes.administrar + pedidos.administrar', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
-
-    expect(screen.getByTestId('nuevo-orden')).toBeInTheDocument();
-  });
-
-  it('sin pedidos.administrar NO ofrece "Nueva orden" (abre el constructor de pedido, R3)', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
-    renderConProveedores(<OrdenesPagina />, {
-      sesion: estadoSesionDePrueba(['ordenes.ver', 'ordenes.administrar', 'ordenes.cancelar']),
-    });
-
-    expect(screen.queryByTestId('nuevo-orden')).not.toBeInTheDocument();
-    // La edición de la orden (matriz/encabezado) sigue disponible con ordenes.administrar.
-    expect(screen.getByTestId('cancelar-orden')).toBeInTheDocument();
-  });
-
   it('muestra el badge de estado DERIVADO (sin botón "marcar completa")', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101, { estado: 'completa' })]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    renderDialogo(orden(1, 101, { estado: 'completa' }), [...PERM_TODOS]);
 
     const detalle = screen.getByTestId('detalle-orden');
     expect(within(detalle).getAllByTestId('estado-orden')[0]).toHaveTextContent('Completa');
@@ -231,8 +167,7 @@ describe('<OrdenesPagina>', () => {
   });
 
   it('una orden cancelada muestra su motivo y no ofrece cancelar', () => {
-    useOrdenes.mockReturnValue(consultaConDatos([orden(3, 103, { estado: 'cancelada' })]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    renderDialogo(orden(3, 103, { estado: 'cancelada' }), [...PERM_TODOS]);
 
     const detalle = screen.getByTestId('detalle-orden');
     expect(within(detalle).getByText(/Cliente canceló/)).toBeInTheDocument();
@@ -241,12 +176,12 @@ describe('<OrdenesPagina>', () => {
 
   it('cancelar exige un motivo: el botón de confirmar arranca deshabilitado', async () => {
     const usuario = userEvent.setup();
-    useOrdenes.mockReturnValue(consultaConDatos([orden(7, 107)]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    renderDialogo(orden(7, 107), [...PERM_TODOS]);
 
     await usuario.click(screen.getByTestId('cancelar-orden'));
-    const dialogo = await screen.findByRole('dialog');
-    expect(within(dialogo).getByRole('heading', { name: /Cancelar orden/ })).toBeInTheDocument();
+    // El diálogo de cancelación (Radix) se identifica por su encabezado, no por rol genérico:
+    // el propio panel de edición también es un `dialog`.
+    expect(await screen.findByRole('heading', { name: /Cancelar orden/ })).toBeInTheDocument();
     // Sin motivo, confirmar está deshabilitado.
     expect(screen.getByTestId('confirmar-cancelar-orden')).toBeDisabled();
     // Con motivo, se habilita.
@@ -264,22 +199,11 @@ describe('<OrdenesPagina>', () => {
       isError: false,
       error: null,
     });
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba([...PERM_TODOS]) });
+    renderDialogo(orden(1, 101), [...PERM_TODOS]);
 
     const detalle = screen.getByTestId('detalle-orden');
     // El campo activo aparece; el inactivo NO.
     expect(within(detalle).getByLabelText('Orden de compra')).toBeInTheDocument();
     expect(within(detalle).queryByLabelText('Temporada')).not.toBeInTheDocument();
-  });
-
-  it('la búsqueda se refleja en la consulta del API', async () => {
-    const usuario = userEvent.setup();
-    useOrdenes.mockReturnValue(consultaConDatos([orden(1, 101)]));
-    renderConProveedores(<OrdenesPagina />, { sesion: estadoSesionDePrueba(['ordenes.ver']) });
-
-    expect(ultimaQuery?.busqueda).toBeUndefined();
-    await usuario.type(screen.getByTestId('buscar-orden'), '101');
-    await vi.waitFor(() => expect(ultimaQuery?.busqueda).toBe('101'));
   });
 });

@@ -124,16 +124,17 @@ test.describe('Ruta Crítica — motor por orden (F5-E5)', () => {
     const folioOrden = /OP (\d+) creada/.exec((await toastOp.textContent()) ?? '')?.[1] ?? '';
     expect(folioOrden).not.toBe('');
 
-    // La captura completa (edición) vive en /captura: ahí está el botón de programar la RC.
-    await page.goto('/produccion/ordenes/captura');
-    await expect(page.getByRole('heading', { name: 'Órdenes' })).toBeVisible();
-    await page.getByTestId('buscar-orden').fill(folioOrden);
-    await page
-      .getByTestId('fila-orden')
-      .filter({ hasText: `Orden ${folioOrden}` })
-      .first()
-      .click();
+    // La edición completa (con el botón de programar la RC) se abre con el mosaico "Modificar"
+    // del centro de comando (el panel viejo `/produccion/ordenes/captura` fue retirado).
+    await page.goto('/produccion/ordenes');
+    await expect(page.getByRole('heading', { name: 'Órdenes de producción' })).toBeVisible();
+    await page.getByTestId('centro-busqueda').fill(folioOrden);
+    await page.getByTestId('centro-fila').filter({ hasText: folioOrden }).first().click();
+    const panelCentro = page.getByTestId('centro-panel');
+    await expect(panelCentro.getByText(`OP ${folioOrden}`)).toBeVisible();
+    await panelCentro.getByTestId('mosaico-modificar').click();
     const detalle = page.getByTestId('detalle-orden');
+    await expect(detalle).toBeVisible();
 
     // ── 5) Programar la RC desde el detalle de la orden ─────────────────────────
     await detalle.getByTestId('orden-programar-rc').click();
