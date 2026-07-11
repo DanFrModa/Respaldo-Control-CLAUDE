@@ -129,33 +129,69 @@ export function TableroCalidadPagina(): React.JSX.Element {
               {datos.maquileros.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">Sin auditorías registradas.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <TablaDensa>
-                    <TablaDensaEncabezado>
-                      <TablaDensaFila>
-                        <TablaDensaHead>Maquilero</TablaDensaHead>
-                        <TablaDensaHead numerica>Auditorías</TablaDensaHead>
-                        <TablaDensaHead numerica>Aprobadas</TablaDensaHead>
-                        <TablaDensaHead numerica>Calificadas</TablaDensaHead>
-                        <TablaDensaHead numerica>% aprob.</TablaDensaHead>
-                      </TablaDensaFila>
-                    </TablaDensaEncabezado>
-                    <TablaDensaCuerpo>
-                      {datos.maquileros.map((m) => (
-                        <TablaDensaFila
-                          key={m.idMaquilero}
-                          data-testid={`cal-maq-${m.idMaquilero}`}
-                        >
-                          <TablaDensaCelda>{m.maquilero}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{m.numAuditorias}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{m.aprobadas}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{m.calificadas}</TablaDensaCelda>
-                          <TablaDensaCelda numerica>{porcentaje(m.porcentaje)}</TablaDensaCelda>
+                <>
+                  {/* Móvil (<lg): tarjetas — la tabla deja el % de aprobación (la métrica del tablero)
+                      fuera de la vista en teléfono. */}
+                  <div className="space-y-2 p-3 lg:hidden" data-testid="cal-maq-tarjetas">
+                    {datos.maquileros.map((m) => (
+                      <div
+                        key={m.idMaquilero}
+                        className="rounded-lg border bg-card p-3"
+                        data-testid={`cal-maq-${m.idMaquilero}-tarjeta`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 truncate font-medium">{m.maquilero}</div>
+                          <div className="shrink-0 text-right">
+                            <div className="num text-lg leading-tight font-bold">
+                              {porcentaje(m.porcentaje)}
+                            </div>
+                            <div className="text-[10.5px] text-faint uppercase">aprob.</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                          <span>
+                            Auditorías <b className="num text-foreground">{m.numAuditorias}</b>
+                          </span>
+                          <span>
+                            Aprobadas <b className="num text-foreground">{m.aprobadas}</b>
+                          </span>
+                          <span>
+                            Calificadas <b className="num text-foreground">{m.calificadas}</b>
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Escritorio (≥lg): tabla densa intacta. */}
+                  <div className="hidden overflow-x-auto lg:block">
+                    <TablaDensa>
+                      <TablaDensaEncabezado>
+                        <TablaDensaFila>
+                          <TablaDensaHead>Maquilero</TablaDensaHead>
+                          <TablaDensaHead numerica>Auditorías</TablaDensaHead>
+                          <TablaDensaHead numerica>Aprobadas</TablaDensaHead>
+                          <TablaDensaHead numerica>Calificadas</TablaDensaHead>
+                          <TablaDensaHead numerica>% aprob.</TablaDensaHead>
                         </TablaDensaFila>
-                      ))}
-                    </TablaDensaCuerpo>
-                  </TablaDensa>
-                </div>
+                      </TablaDensaEncabezado>
+                      <TablaDensaCuerpo>
+                        {datos.maquileros.map((m) => (
+                          <TablaDensaFila
+                            key={m.idMaquilero}
+                            data-testid={`cal-maq-${m.idMaquilero}`}
+                          >
+                            <TablaDensaCelda>{m.maquilero}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{m.numAuditorias}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{m.aprobadas}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{m.calificadas}</TablaDensaCelda>
+                            <TablaDensaCelda numerica>{porcentaje(m.porcentaje)}</TablaDensaCelda>
+                          </TablaDensaFila>
+                        ))}
+                      </TablaDensaCuerpo>
+                    </TablaDensa>
+                  </div>
+                </>
               )}
             </div>
 

@@ -172,8 +172,62 @@ export function BitacoraPagina(): React.JSX.Element {
           />
         </div>
 
-        {/* Tabla densa (R1) */}
-        <div className="mt-4 overflow-hidden rounded-lg border">
+        {/* Móvil (<lg): tarjetas — la tabla de 6 columnas deja al USUARIO y la FECHA (lo que de
+            verdad importa de una auditoría) fuera de la vista en teléfono. */}
+        <div className="mt-4 space-y-2 lg:hidden" data-testid="bitacora-tarjetas">
+          {consulta.isPending ? (
+            <p className="p-2 text-sm text-muted-foreground">Cargando…</p>
+          ) : consulta.isError ? (
+            <p className="p-2 text-sm text-destructive" role="alert">
+              {consulta.error.message}
+            </p>
+          ) : datos?.datos.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No hay registros en la bitácora con los filtros actuales.
+            </p>
+          ) : (
+            (datos?.datos ?? []).map((registro) => (
+              <div
+                key={registro.id}
+                className="rounded-lg border bg-card p-3"
+                data-testid="bitacora-fila-tarjeta"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="mono min-w-0 text-sm font-medium break-all">
+                    {registro.entidad}
+                  </span>
+                  <ChipEstado tono={TONO_ACCION[registro.accion] ?? 'neutro'}>
+                    {ETIQUETAS_ACCION_BITACORA[registro.accion] ?? registro.accion}
+                  </ChipEstado>
+                </div>
+                <div className="mono mt-0.5 truncate text-[11px] text-faint">
+                  {registro.idEntidad}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {registro.nombreUsuario ?? registro.idUsuario ?? '(sistema)'}
+                  </span>
+                  <span className="num">{formatearFecha(registro.fecha)}</span>
+                  {registro.datos !== null ? (
+                    <button
+                      type="button"
+                      className="ml-auto cursor-pointer font-medium text-primary underline-offset-2 hover:underline"
+                      onClick={() => setDetalle(registro)}
+                    >
+                      Ver datos
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Tabla densa (R1) — escritorio (≥lg) */}
+        <div
+          className="mt-4 hidden overflow-hidden rounded-lg border lg:block"
+          data-testid="bitacora-tabla"
+        >
           <TablaDensa>
             <TablaDensaEncabezado>
               <tr>

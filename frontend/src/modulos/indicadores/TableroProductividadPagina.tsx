@@ -112,43 +112,96 @@ export function TableroProductividadPagina(): React.JSX.Element {
           ) : filas.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">Sin registros en el periodo.</p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Periodo</TablaDensaHead>
-                  <TablaDensaHead>Actividad</TablaDensaHead>
-                  {area === 'ip' && <TablaDensaHead>Persona</TablaDensaHead>}
-                  <TablaDensaHead numerica>Reg.</TablaDensaHead>
-                  <TablaDensaHead numerica>Cantidad</TablaDensaHead>
-                  <TablaDensaHead numerica>Horas</TablaDensaHead>
-                  <TablaDensaHead numerica>Índice total</TablaDensaHead>
-                  <TablaDensaHead numerica>Índice prom.</TablaDensaHead>
-                  <TablaDensaHead numerica>% trab.</TablaDensaHead>
-                  <TablaDensaHead numerica>{etiquetaEstandar}</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas compactas — la tabla de 10 columnas deja el ÍNDICE (la métrica
+                  que da nombre a la pantalla) fuera de la vista en teléfono. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="tp-tarjetas">
                 {filas.map((f, i) => (
-                  <TablaDensaFila
+                  <div
                     key={`${f.periodo}-${f.idActividad}-${f.idPersona ?? 0}-${i}`}
-                    data-testid="tp-fila"
+                    className="rounded-lg border bg-card p-3"
+                    data-testid="tp-fila-tarjeta"
                   >
-                    <TablaDensaCelda>{f.periodo}</TablaDensaCelda>
-                    <TablaDensaCelda>{f.actividad}</TablaDensaCelda>
-                    {area === 'ip' && <TablaDensaCelda>{f.persona ?? '—'}</TablaDensaCelda>}
-                    <TablaDensaCelda numerica>{f.numRegistros}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{numero(f.cantidad)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{numero(f.horasTrabajadas)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica className="font-medium">
-                      {numero(f.indiceTotal)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>{numero(f.indicePromedio)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{porcentaje(f.porcentajeTrabajado)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{numero(f.estandar)}</TablaDensaCelda>
-                  </TablaDensaFila>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="num text-[11px] font-medium text-faint">{f.periodo}</div>
+                        <div className="truncate font-medium">{f.actividad}</div>
+                        {area === 'ip' ? (
+                          <div className="truncate text-xs text-muted-foreground">
+                            {f.persona ?? '—'}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="num text-lg leading-tight font-bold">
+                          {numero(f.indiceTotal)}
+                        </div>
+                        <div className="text-[10.5px] text-faint uppercase">índice</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Prom <b className="num text-foreground">{numero(f.indicePromedio)}</b>
+                      </span>
+                      <span>
+                        % trab{' '}
+                        <b className="num text-foreground">{porcentaje(f.porcentajeTrabajado)}</b>
+                      </span>
+                      <span>
+                        {etiquetaEstandar}{' '}
+                        <b className="num text-foreground">{numero(f.estandar)}</b>
+                      </span>
+                      <span>
+                        Cant <b className="num text-foreground">{numero(f.cantidad)}</b>
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+
+              {/* Escritorio (≥lg): tabla densa intacta. */}
+              <div className="hidden lg:block">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Periodo</TablaDensaHead>
+                      <TablaDensaHead>Actividad</TablaDensaHead>
+                      {area === 'ip' && <TablaDensaHead>Persona</TablaDensaHead>}
+                      <TablaDensaHead numerica>Reg.</TablaDensaHead>
+                      <TablaDensaHead numerica>Cantidad</TablaDensaHead>
+                      <TablaDensaHead numerica>Horas</TablaDensaHead>
+                      <TablaDensaHead numerica>Índice total</TablaDensaHead>
+                      <TablaDensaHead numerica>Índice prom.</TablaDensaHead>
+                      <TablaDensaHead numerica>% trab.</TablaDensaHead>
+                      <TablaDensaHead numerica>{etiquetaEstandar}</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((f, i) => (
+                      <TablaDensaFila
+                        key={`${f.periodo}-${f.idActividad}-${f.idPersona ?? 0}-${i}`}
+                        data-testid="tp-fila"
+                      >
+                        <TablaDensaCelda>{f.periodo}</TablaDensaCelda>
+                        <TablaDensaCelda>{f.actividad}</TablaDensaCelda>
+                        {area === 'ip' && <TablaDensaCelda>{f.persona ?? '—'}</TablaDensaCelda>}
+                        <TablaDensaCelda numerica>{f.numRegistros}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{numero(f.cantidad)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{numero(f.horasTrabajadas)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-medium">
+                          {numero(f.indiceTotal)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{numero(f.indicePromedio)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {porcentaje(f.porcentajeTrabajado)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{numero(f.estandar)}</TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
       </div>

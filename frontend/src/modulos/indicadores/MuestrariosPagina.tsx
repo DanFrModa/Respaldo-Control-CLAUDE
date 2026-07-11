@@ -130,73 +130,152 @@ export function MuestrariosPagina(): React.JSX.Element {
           ) : filas.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">Sin muestrarios.</p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Cliente</TablaDensaHead>
-                  <TablaDensaHead>Categoría</TablaDensaHead>
-                  <TablaDensaHead numerica>Boards</TablaDensaHead>
-                  <TablaDensaHead numerica>Muestras</TablaDensaHead>
-                  <TablaDensaHead>Requerida</TablaDensaHead>
-                  <TablaDensaHead>Entregado</TablaDensaHead>
-                  <TablaDensaHead>Estado</TablaDensaHead>
-                  <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas — la tabla de 8 columnas deja el avance (boards/muestras) y el
+                  estado fuera de la vista en teléfono. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="mu-tarjetas">
                 {filas.map((m) => (
-                  <TablaDensaFila key={m.id} data-testid={`mu-fila-${m.id}`}>
-                    <TablaDensaCelda>{m.cliente}</TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
-                      {m.categoria ?? '—'}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>
-                      {m.boardsOK}/{m.cantBoards}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>
-                      {m.muestrasOK}/{m.cantMuestras}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>{m.fechaRequerida}</TablaDensaCelda>
-                    <TablaDensaCelda>{m.fechaEntregado ?? '—'}</TablaDensaCelda>
-                    <TablaDensaCelda>
+                  <div
+                    key={m.id}
+                    className="rounded-lg border bg-card p-3"
+                    data-testid={`mu-fila-${m.id}-tarjeta`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{m.cliente}</div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {m.categoria ?? '—'}
+                        </div>
+                      </div>
                       <EstadoBadge muestrario={m} />
-                    </TablaDensaCelda>
-                    <TablaDensaCelda className="text-right">
-                      {m.estado === 'pendiente' && (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEntregar(m)}
-                          >
-                            Entregar
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              const motivo = window.prompt('Motivo de la cancelación:');
-                              if (motivo === null || motivo.trim().length < 3) return;
-                              cancelar.mutate(
-                                { id: m.id, motivo: motivo.trim() },
-                                {
-                                  onSuccess: () => toast.success('Muestrario cancelado.'),
-                                  onError: (err) => toast.error(err.message),
-                                },
-                              );
-                            }}
-                          >
-                            Cancelar
-                          </Button>
-                        </>
-                      )}
-                    </TablaDensaCelda>
-                  </TablaDensaFila>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Boards{' '}
+                        <b className="num text-foreground">
+                          {m.boardsOK}/{m.cantBoards}
+                        </b>
+                      </span>
+                      <span>
+                        Muestras{' '}
+                        <b className="num text-foreground">
+                          {m.muestrasOK}/{m.cantMuestras}
+                        </b>
+                      </span>
+                      <span>
+                        Requerida <b className="num text-foreground">{m.fechaRequerida}</b>
+                      </span>
+                      {m.fechaEntregado !== null ? (
+                        <span>
+                          Entregado <b className="num text-foreground">{m.fechaEntregado}</b>
+                        </span>
+                      ) : null}
+                    </div>
+                    {m.estado === 'pendiente' ? (
+                      <div className="mt-2 flex justify-end gap-1 border-t pt-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEntregar(m)}
+                        >
+                          Entregar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const motivo = window.prompt('Motivo de la cancelación:');
+                            if (motivo === null || motivo.trim().length < 3) return;
+                            cancelar.mutate(
+                              { id: m.id, motivo: motivo.trim() },
+                              {
+                                onSuccess: () => toast.success('Muestrario cancelado.'),
+                                onError: (err) => toast.error(err.message),
+                              },
+                            );
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+
+              {/* Escritorio (≥lg): tabla densa intacta. */}
+              <div className="hidden lg:block">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Cliente</TablaDensaHead>
+                      <TablaDensaHead>Categoría</TablaDensaHead>
+                      <TablaDensaHead numerica>Boards</TablaDensaHead>
+                      <TablaDensaHead numerica>Muestras</TablaDensaHead>
+                      <TablaDensaHead>Requerida</TablaDensaHead>
+                      <TablaDensaHead>Entregado</TablaDensaHead>
+                      <TablaDensaHead>Estado</TablaDensaHead>
+                      <TablaDensaHead className="text-right">Acciones</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((m) => (
+                      <TablaDensaFila key={m.id} data-testid={`mu-fila-${m.id}`}>
+                        <TablaDensaCelda>{m.cliente}</TablaDensaCelda>
+                        <TablaDensaCelda className="text-muted-foreground">
+                          {m.categoria ?? '—'}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {m.boardsOK}/{m.cantBoards}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {m.muestrasOK}/{m.cantMuestras}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>{m.fechaRequerida}</TablaDensaCelda>
+                        <TablaDensaCelda>{m.fechaEntregado ?? '—'}</TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <EstadoBadge muestrario={m} />
+                        </TablaDensaCelda>
+                        <TablaDensaCelda className="text-right">
+                          {m.estado === 'pendiente' && (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEntregar(m)}
+                              >
+                                Entregar
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const motivo = window.prompt('Motivo de la cancelación:');
+                                  if (motivo === null || motivo.trim().length < 3) return;
+                                  cancelar.mutate(
+                                    { id: m.id, motivo: motivo.trim() },
+                                    {
+                                      onSuccess: () => toast.success('Muestrario cancelado.'),
+                                      onError: (err) => toast.error(err.message),
+                                    },
+                                  );
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                            </>
+                          )}
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
       </div>

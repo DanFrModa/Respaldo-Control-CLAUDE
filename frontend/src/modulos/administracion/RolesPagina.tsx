@@ -170,7 +170,7 @@ export function RolesPagina(): React.JSX.Element {
                     data-testid="fila-rol"
                   >
                     <TablaDensaCelda>
-                      <div className="flex items-center gap-2">
+                      <div className="flex max-w-[58vw] items-center gap-2 lg:max-w-none">
                         <Avatar nombre={r.nombre} tono="pt" tamano="sm">
                           <ShieldCheck className="size-4" aria-hidden />
                         </Avatar>

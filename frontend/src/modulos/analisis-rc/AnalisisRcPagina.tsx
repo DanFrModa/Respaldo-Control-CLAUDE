@@ -201,6 +201,15 @@ function TablaScroll({ children }: { children: React.ReactNode }): React.JSX.Ele
   return <div className="overflow-x-auto">{children}</div>;
 }
 
+/**
+ * Primera columna CONGELADA en el scroll-x de móvil (patrón `MatrizColorTalla`): en teléfono estos
+ * tableros de gestión tienen hasta 9 columnas y hay que barrer a la derecha para ver la métrica; con
+ * la columna identificadora fija (orden / cliente / persona / proceso) el barrido no pierde el
+ * contexto. En `≥lg` la columna vuelve a fluir normal (`lg:static`) — la tabla ya cabe entera.
+ */
+const STICKY_HEAD = 'sticky left-0 z-20 lg:left-auto lg:z-auto';
+const STICKY_CELDA = 'sticky left-0 z-10 bg-card lg:static lg:bg-transparent';
+
 /** Fila de "sin datos" para una tabla. */
 function FilaVacia({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
   return (
@@ -227,7 +236,7 @@ function EntregaCicloCard({ entrega }: { entrega: EntregaCiclo }): React.JSX.Ele
       titulo="Entrega al cliente y tiempo de ciclo"
       meta="el resultado que de verdad importa"
     >
-      <div className="flex flex-wrap gap-8 p-4">
+      <div className="flex flex-wrap gap-6 p-4 sm:gap-8">
         <div>
           <div className="text-xs text-muted-foreground">Entregas a tiempo (on-time delivery)</div>
           <div className="flex items-baseline gap-2">
@@ -247,7 +256,7 @@ function EntregaCicloCard({ entrega }: { entrega: EntregaCiclo }): React.JSX.Ele
           </div>
           <Sparkline valores={entrega.tendenciaSemanas} sufijo="%" />
         </div>
-        <div className="border-l pl-8">
+        <div className="sm:border-l sm:pl-8">
           <div className="text-xs text-muted-foreground">
             Tiempo de ciclo promedio (OP → entrega)
           </div>
@@ -307,7 +316,7 @@ function AtencionCard({
         <TablaDensa>
           <TablaDensaEncabezado>
             <TablaDensaFila>
-              <TablaDensaHead>Orden</TablaDensaHead>
+              <TablaDensaHead className={STICKY_HEAD}>Orden</TablaDensaHead>
               <TablaDensaHead>Modelo</TablaDensaHead>
               <TablaDensaHead>Cliente</TablaDensaHead>
               <TablaDensaHead>Etapa atorada</TablaDensaHead>
@@ -328,7 +337,9 @@ function AtencionCard({
                   onClick={() => alAbrir(f.idOrden)}
                   data-testid="atencion-fila"
                 >
-                  <TablaDensaCelda className="num font-medium">{f.folioOrden}</TablaDensaCelda>
+                  <TablaDensaCelda className={`num font-medium ${STICKY_CELDA}`}>
+                    {f.folioOrden}
+                  </TablaDensaCelda>
                   <TablaDensaCelda className="font-medium">{f.codigoModelo}</TablaDensaCelda>
                   <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
                   <TablaDensaCelda>{f.etapaAtorada ?? '—'}</TablaDensaCelda>
@@ -371,7 +382,7 @@ function AlertasCard({
         <TablaDensa>
           <TablaDensaEncabezado>
             <TablaDensaFila>
-              <TablaDensaHead>Orden</TablaDensaHead>
+              <TablaDensaHead className={STICKY_HEAD}>Orden</TablaDensaHead>
               <TablaDensaHead>Modelo</TablaDensaHead>
               <TablaDensaHead>Cliente</TablaDensaHead>
               <TablaDensaHead numerica>Procesos restantes</TablaDensaHead>
@@ -392,7 +403,9 @@ function AlertasCard({
                   onClick={() => alAbrir(f.idOrden)}
                   data-testid="alerta-fila"
                 >
-                  <TablaDensaCelda className="num font-medium">{f.folioOrden}</TablaDensaCelda>
+                  <TablaDensaCelda className={`num font-medium ${STICKY_CELDA}`}>
+                    {f.folioOrden}
+                  </TablaDensaCelda>
                   <TablaDensaCelda className="font-medium">{f.codigoModelo}</TablaDensaCelda>
                   <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
                   <TablaDensaCelda numerica>{f.procesosRestantes}</TablaDensaCelda>
@@ -430,7 +443,7 @@ function RiesgoClienteCard({ filas }: { filas: RiesgoCliente[] }): React.JSX.Ele
         <TablaDensa>
           <TablaDensaEncabezado>
             <TablaDensaFila>
-              <TablaDensaHead>Cliente</TablaDensaHead>
+              <TablaDensaHead className={STICKY_HEAD}>Cliente</TablaDensaHead>
               <TablaDensaHead numerica>Órdenes activas</TablaDensaHead>
               <TablaDensaHead numerica>En riesgo</TablaDensaHead>
               <TablaDensaHead numerica>Atrasadas</TablaDensaHead>
@@ -443,7 +456,9 @@ function RiesgoClienteCard({ filas }: { filas: RiesgoCliente[] }): React.JSX.Ele
             ) : (
               filas.map((c) => (
                 <TablaDensaFila key={c.idCliente} data-testid="riesgo-cliente-fila">
-                  <TablaDensaCelda className="font-medium">{c.cliente}</TablaDensaCelda>
+                  <TablaDensaCelda className={`font-medium ${STICKY_CELDA}`}>
+                    {c.cliente}
+                  </TablaDensaCelda>
                   <TablaDensaCelda numerica>{c.activas}</TablaDensaCelda>
                   <TablaDensaCelda numerica className={c.enRiesgo > 0 ? 'text-warn' : ''}>
                     {c.enRiesgo}
@@ -515,7 +530,7 @@ function DesempenoCard({
         <TablaDensa>
           <TablaDensaEncabezado>
             <TablaDensaFila>
-              <TablaDensaHead>Persona</TablaDensaHead>
+              <TablaDensaHead className={STICKY_HEAD}>Persona</TablaDensaHead>
               <TablaDensaHead>Área</TablaDensaHead>
               <TablaDensaHead numerica>A cargo</TablaDensaHead>
               <TablaDensaHead numerica>Vencidos</TablaDensaHead>
@@ -534,7 +549,7 @@ function DesempenoCard({
             ) : (
               personas.map((p) => (
                 <TablaDensaFila key={p.idUsuario} data-testid="desempeno-fila">
-                  <TablaDensaCelda className="font-medium">
+                  <TablaDensaCelda className={`font-medium ${STICKY_CELDA}`}>
                     <span className="flex items-center gap-1.5">
                       {p.nombre}
                       {p.sobrecarga ? (
@@ -612,7 +627,7 @@ function CuellosCard({ filas }: { filas: CuelloProceso[] }): React.JSX.Element {
         <TablaDensa>
           <TablaDensaEncabezado>
             <TablaDensaFila>
-              <TablaDensaHead>Proceso</TablaDensaHead>
+              <TablaDensaHead className={STICKY_HEAD}>Proceso</TablaDensaHead>
               <TablaDensaHead numerica>Vencidos</TablaDensaHead>
               <TablaDensaHead numerica>Para hoy</TablaDensaHead>
               <TablaDensaHead numerica>Total atorado</TablaDensaHead>
@@ -625,7 +640,9 @@ function CuellosCard({ filas }: { filas: CuelloProceso[] }): React.JSX.Element {
             ) : (
               filas.map((c) => (
                 <TablaDensaFila key={c.idProcesoDef} data-testid="cuello-fila">
-                  <TablaDensaCelda className="font-medium">{c.nombreProceso}</TablaDensaCelda>
+                  <TablaDensaCelda className={`font-medium ${STICKY_CELDA}`}>
+                    {c.nombreProceso}
+                  </TablaDensaCelda>
                   <TablaDensaCelda numerica className={c.vencidos > 0 ? 'text-crit' : ''}>
                     {c.vencidos}
                   </TablaDensaCelda>

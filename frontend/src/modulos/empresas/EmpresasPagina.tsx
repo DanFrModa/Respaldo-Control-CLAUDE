@@ -220,7 +220,7 @@ export function EmpresasPagina(): React.JSX.Element {
                     data-testid="fila-empresa"
                   >
                     <TablaDensaCelda>
-                      <div className="flex items-center gap-2">
+                      <div className="flex max-w-[52vw] items-center gap-2 lg:max-w-none">
                         <Avatar nombre={e.nombre} tono="pt" tamano="sm">
                           <Building2 className="size-4" aria-hidden />
                         </Avatar>

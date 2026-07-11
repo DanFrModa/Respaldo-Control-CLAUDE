@@ -159,36 +159,84 @@ export function MargenesPagina(): React.JSX.Element {
               No hay pedidos con órdenes costeadas para los filtros elegidos.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Pedido</TablaDensaHead>
-                  <TablaDensaHead>Cliente</TablaDensaHead>
-                  <TablaDensaHead>Fecha</TablaDensaHead>
-                  <TablaDensaHead numerica>Piezas</TablaDensaHead>
-                  <TablaDensaHead numerica>Importe</TablaDensaHead>
-                  <TablaDensaHead numerica>Margen prom.</TablaDensaHead>
-                  <TablaDensaHead numerica>Margen pond.</TablaDensaHead>
-                  <TablaDensaHead numerica>Margen $/pza</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas compactas — la tabla de 8 columnas deja el MARGEN (la métrica
+                  que da nombre a la pantalla) fuera de la vista en teléfono. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="mg-tarjetas">
                 {filas.map((f) => (
-                  <TablaDensaFila key={f.idPedido} data-testid={`mg-fila-${f.idPedido}`}>
-                    <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
-                    <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
-                      {fechaCorta(f.fechaHasta)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>{f.cantidad.toLocaleString('es-MX')}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{moneda(f.importe)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{porcentaje(f.margenPromedio)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{porcentaje(f.margenPonderado)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica>{moneda(f.margenPesosPorPieza)}</TablaDensaCelda>
-                  </TablaDensaFila>
+                  <div
+                    key={f.idPedido}
+                    className="rounded-lg border bg-card p-3"
+                    data-testid={`mg-tarjeta-${f.idPedido}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-medium">#{f.folio}</div>
+                        <div className="truncate text-xs text-muted-foreground">{f.cliente}</div>
+                        <div className="num text-[11px] text-faint">{fechaCorta(f.fechaHasta)}</div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="num text-lg leading-tight font-bold">
+                          {porcentaje(f.margenPromedio)}
+                        </div>
+                        <div className="text-[10.5px] text-faint uppercase">margen prom.</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs text-muted-foreground">
+                      <span>
+                        Pond <b className="num text-foreground">{porcentaje(f.margenPonderado)}</b>
+                      </span>
+                      <span>
+                        $/pza <b className="num text-foreground">{moneda(f.margenPesosPorPieza)}</b>
+                      </span>
+                      <span>
+                        Piezas{' '}
+                        <b className="num text-foreground">{f.cantidad.toLocaleString('es-MX')}</b>
+                      </span>
+                      <span>
+                        Importe <b className="num text-foreground">{moneda(f.importe)}</b>
+                      </span>
+                    </div>
+                  </div>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+
+              {/* Escritorio (≥lg): tabla densa intacta. */}
+              <div className="hidden lg:block">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Pedido</TablaDensaHead>
+                      <TablaDensaHead>Cliente</TablaDensaHead>
+                      <TablaDensaHead>Fecha</TablaDensaHead>
+                      <TablaDensaHead numerica>Piezas</TablaDensaHead>
+                      <TablaDensaHead numerica>Importe</TablaDensaHead>
+                      <TablaDensaHead numerica>Margen prom.</TablaDensaHead>
+                      <TablaDensaHead numerica>Margen pond.</TablaDensaHead>
+                      <TablaDensaHead numerica>Margen $/pza</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((f) => (
+                      <TablaDensaFila key={f.idPedido} data-testid={`mg-fila-${f.idPedido}`}>
+                        <TablaDensaCelda className="font-medium">#{f.folio}</TablaDensaCelda>
+                        <TablaDensaCelda>{f.cliente}</TablaDensaCelda>
+                        <TablaDensaCelda className="text-muted-foreground">
+                          {fechaCorta(f.fechaHasta)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {f.cantidad.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.importe)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{porcentaje(f.margenPromedio)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{porcentaje(f.margenPonderado)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica>{moneda(f.margenPesosPorPieza)}</TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 
