@@ -164,7 +164,7 @@ export function ListasPreciosPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado (proto .page-head) ────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-end gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Cotizaciones / Listas de precios
@@ -411,7 +411,7 @@ function PaginaLista({
       data-testid="detalle-lista-precios"
     >
       {/* ── Encabezado (proto: regreso + título con estado + acciones) ──────── */}
-      <header className="flex shrink-0 flex-wrap items-end gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1">
           {regreso}
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">

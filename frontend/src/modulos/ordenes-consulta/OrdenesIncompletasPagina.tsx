@@ -69,77 +69,139 @@ export function OrdenesIncompletasPagina(): React.JSX.Element {
             </Button>
           </div>
         ) : (
-          <div className="rounded-lg ring-1 ring-foreground/10">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Folio</TableHead>
-                  <TableHead>Modelo</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Antigüedad</TableHead>
-                  <TableHead>Semáforo</TableHead>
-                  <TableHead>Entrega</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filas.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                      {consulta.isPending
-                        ? 'Cargando…'
-                        : 'No hay órdenes incompletas. ¡Todo capturado!'}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filas.map((orden) => (
-                    <TableRow key={orden.id} data-testid="fila-incompleta">
-                      <TableCell className="font-medium">
-                        <Link
-                          to="/produccion/ordenes"
-                          state={{ idOrden: orden.id }}
-                          className="text-primary hover:underline"
-                          data-testid="enlace-detalle"
+          <>
+            {/* Móvil (<lg): tarjetas apiladas — la tabla se apachurra en teléfono. Mismo enlace al
+                detalle e impresión que la fila. */}
+            <div className="space-y-2 lg:hidden" data-testid="incompletas-tarjetas">
+              {filas.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+                  {consulta.isPending
+                    ? 'Cargando…'
+                    : 'No hay órdenes incompletas. ¡Todo capturado!'}
+                </p>
+              ) : (
+                filas.map((orden) => (
+                  <div
+                    key={orden.id}
+                    data-testid="incompleta-tarjeta"
+                    className="rounded-lg border bg-card p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        to="/produccion/ordenes"
+                        state={{ idOrden: orden.id }}
+                        className="font-semibold text-primary hover:underline"
+                        data-testid="enlace-detalle-tarjeta"
+                      >
+                        {orden.folio}
+                      </Link>
+                      <SemaforoBadge semaforo={orden.semaforo} />
+                    </div>
+                    <p className="truncate text-sm font-medium">{orden.codigoModelo}</p>
+                    {orden.descripcionModelo ? (
+                      <p className="truncate text-xs text-muted-foreground">
+                        {orden.descripcionModelo}
+                      </p>
+                    ) : null}
+                    <p className="truncate text-sm">{orden.cliente}</p>
+                    <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="tabular-nums">
+                        {orden.diasAntiguedad} {orden.diasAntiguedad === 1 ? 'día' : 'días'} ·
+                        Entrega {fechaCorta(orden.fechaEntrega)}
+                      </span>
+                      {puedeImprimir ? (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => imprimirOrden(orden.id)}
+                          aria-label={`Imprimir orden ${orden.folio}`}
+                          title="Imprimir esta orden"
+                          data-testid="imprimir-individual-tarjeta"
                         >
-                          {orden.folio}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{orden.codigoModelo}</span>
-                        {orden.descripcionModelo ? (
-                          <span className="block text-xs text-muted-foreground">
-                            {orden.descripcionModelo}
-                          </span>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>{orden.cliente}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {orden.diasAntiguedad} {orden.diasAntiguedad === 1 ? 'día' : 'días'}
-                      </TableCell>
-                      <TableCell>
-                        <SemaforoBadge semaforo={orden.semaforo} />
-                      </TableCell>
-                      <TableCell>{fechaCorta(orden.fechaEntrega)}</TableCell>
-                      <TableCell className="text-right">
-                        {puedeImprimir ? (
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => imprimirOrden(orden.id)}
-                            aria-label={`Imprimir orden ${orden.folio}`}
-                            title="Imprimir esta orden"
-                            data-testid="imprimir-individual"
-                          >
-                            <Printer className="size-4" aria-hidden />
-                          </Button>
-                        ) : null}
+                          <Printer className="size-4" aria-hidden />
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            {/* Escritorio (≥lg): tabla completa. */}
+            <div
+              className="hidden rounded-lg ring-1 ring-foreground/10 lg:block"
+              data-testid="incompletas-tabla"
+            >
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Folio</TableHead>
+                    <TableHead>Modelo</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Antigüedad</TableHead>
+                    <TableHead>Semáforo</TableHead>
+                    <TableHead>Entrega</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filas.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
+                        {consulta.isPending
+                          ? 'Cargando…'
+                          : 'No hay órdenes incompletas. ¡Todo capturado!'}
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : (
+                    filas.map((orden) => (
+                      <TableRow key={orden.id} data-testid="fila-incompleta">
+                        <TableCell className="font-medium">
+                          <Link
+                            to="/produccion/ordenes"
+                            state={{ idOrden: orden.id }}
+                            className="text-primary hover:underline"
+                            data-testid="enlace-detalle"
+                          >
+                            {orden.folio}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{orden.codigoModelo}</span>
+                          {orden.descripcionModelo ? (
+                            <span className="block text-xs text-muted-foreground">
+                              {orden.descripcionModelo}
+                            </span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>{orden.cliente}</TableCell>
+                        <TableCell className="tabular-nums">
+                          {orden.diasAntiguedad} {orden.diasAntiguedad === 1 ? 'día' : 'días'}
+                        </TableCell>
+                        <TableCell>
+                          <SemaforoBadge semaforo={orden.semaforo} />
+                        </TableCell>
+                        <TableCell>{fechaCorta(orden.fechaEntrega)}</TableCell>
+                        <TableCell className="text-right">
+                          {puedeImprimir ? (
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              onClick={() => imprimirOrden(orden.id)}
+                              aria-label={`Imprimir orden ${orden.folio}`}
+                              title="Imprimir esta orden"
+                              data-testid="imprimir-individual"
+                            >
+                              <Printer className="size-4" aria-hidden />
+                            </Button>
+                          ) : null}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
 
         {datos && datos.total > 0 ? (

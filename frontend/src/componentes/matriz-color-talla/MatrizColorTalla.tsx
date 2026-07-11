@@ -295,7 +295,12 @@ function MatrizColorTallaBase({
           <table className="w-full border-collapse text-sm" data-testid={`${testid}-tabla`}>
             <thead>
               <tr className="border-b">
-                <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">Color</th>
+                {/* Primera columna CONGELADA en el scroll-x: `left-0` + bg opaco (bg-card, el
+                    color de la superficie que la contiene) para que las tallas no se transparenten
+                    debajo del color al desplazar. */}
+                <th className="sticky left-0 z-10 bg-card px-2 py-1.5 text-left font-medium text-muted-foreground">
+                  Color
+                </th>
                 {tallas.map((talla) => (
                   <th
                     key={talla.idTalla}
@@ -324,7 +329,9 @@ function MatrizColorTallaBase({
             <tbody>
               {lineas.map((linea, indiceFila) => (
                 <tr key={linea.idColor} className="border-b" data-testid={`${testid}-fila`}>
-                  <td className="px-2 py-1 font-medium whitespace-nowrap">{linea.color}</td>
+                  <td className="sticky left-0 z-10 bg-card px-2 py-1 font-medium whitespace-nowrap">
+                    {linea.color}
+                  </td>
                   {tallas.map((talla, indiceColumna) => {
                     const cantidad = linea.cantidades[talla.idTalla] ?? 0;
                     return (
@@ -379,7 +386,9 @@ function MatrizColorTallaBase({
             </tbody>
             <tfoot>
               <tr className="font-medium">
-                <td className="px-2 py-1.5 text-muted-foreground">Total</td>
+                <td className="sticky left-0 z-10 bg-card px-2 py-1.5 text-muted-foreground">
+                  Total
+                </td>
                 {tallas.map((talla) => (
                   <td
                     key={talla.idTalla}

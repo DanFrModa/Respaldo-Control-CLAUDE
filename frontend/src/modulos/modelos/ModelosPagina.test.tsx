@@ -181,10 +181,13 @@ describe('<ModelosPagina>', () => {
     renderConProveedores(<ModelosPagina />, {
       sesion: estadoSesionDePrueba(['modelos.ver', 'modelos.administrar']),
     });
-    // Tabla-first: el detalle NO se auto-abre; cada modelo sale en su renglón.
+    // Tabla-first: el detalle NO se auto-abre; cada modelo sale en su renglón. La tabla y las
+    // tarjetas móviles coexisten en el DOM (jsdom ignora `lg:hidden`): se acota a la tabla de
+    // escritorio para no chocar con el duplicado de la tarjeta.
     expect(screen.getAllByTestId('fila-modelo')).toHaveLength(2);
-    expect(screen.getByText('501')).toBeInTheDocument();
-    expect(screen.getByText('777')).toBeInTheDocument();
+    const tabla = within(screen.getByTestId('modelos-tabla'));
+    expect(tabla.getByText('501')).toBeInTheDocument();
+    expect(tabla.getByText('777')).toBeInTheDocument();
   });
 
   it('muestra en el detalle los datos generales y la galería NoFoto', () => {
@@ -238,9 +241,11 @@ describe('<ModelosPagina>', () => {
     );
     renderConProveedores(<ModelosPagina />, { sesion: estadoSesionDePrueba(['modelos.ver']) });
 
-    expect(screen.getByText('Felpa premium')).toBeInTheDocument();
-    expect(screen.getByText('1,240')).toBeInTheDocument();
-    expect(screen.getByText('$118.00')).toBeInTheDocument();
+    // Acotado a la tabla de escritorio: las tarjetas móviles repiten estos datos en el DOM de jsdom.
+    const tabla = within(screen.getByTestId('modelos-tabla'));
+    expect(tabla.getByText('Felpa premium')).toBeInTheDocument();
+    expect(tabla.getByText('1,240')).toBeInTheDocument();
+    expect(tabla.getByText('$118.00')).toBeInTheDocument();
     // El segundo renglón trae el stock en 0 y los guiones de tela/costo.
     const filas = screen.getAllByTestId('fila-modelo');
     expect(within(filas[1] as HTMLElement).getByText('0')).toBeInTheDocument();

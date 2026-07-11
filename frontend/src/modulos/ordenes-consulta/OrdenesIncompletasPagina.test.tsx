@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ErrorDeApi } from '@/api/errores';
@@ -67,10 +67,13 @@ describe('<OrdenesIncompletasPagina>', () => {
       sesion: estadoSesionDePrueba(['ordenes.ver']),
     });
 
-    const semaforo = screen.getByTestId('semaforo');
+    // La tabla y las tarjetas móviles coexisten en el DOM (jsdom ignora `lg:hidden`): se acota a la
+    // tabla de escritorio para no chocar con el duplicado de la tarjeta.
+    const tabla = within(screen.getByTestId('incompletas-tabla'));
+    const semaforo = tabla.getByTestId('semaforo');
     expect(semaforo).toHaveAttribute('data-semaforo', 'urgente');
     expect(semaforo).toHaveTextContent('Urgente');
-    expect(screen.getByText('10 días')).toBeInTheDocument();
+    expect(tabla.getByText('10 días')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay incompletas', () => {
@@ -85,7 +88,9 @@ describe('<OrdenesIncompletasPagina>', () => {
     renderConProveedores(<OrdenesIncompletasPagina />, {
       sesion: estadoSesionDePrueba(['ordenes.ver']),
     });
-    expect(screen.getByText(/Todo capturado/)).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('incompletas-tabla')).getByText(/Todo capturado/),
+    ).toBeInTheDocument();
   });
 
   it('distingue verde/amarillo/urgente por su data-semaforo', () => {
@@ -104,7 +109,7 @@ describe('<OrdenesIncompletasPagina>', () => {
     renderConProveedores(<OrdenesIncompletasPagina />, {
       sesion: estadoSesionDePrueba(['ordenes.ver']),
     });
-    const semaforos = screen.getAllByTestId('semaforo');
+    const semaforos = within(screen.getByTestId('incompletas-tabla')).getAllByTestId('semaforo');
     expect(semaforos.map((s) => s.getAttribute('data-semaforo'))).toEqual([
       'verde',
       'amarillo',

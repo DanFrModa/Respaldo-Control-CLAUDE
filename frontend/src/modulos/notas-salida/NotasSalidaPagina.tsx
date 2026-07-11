@@ -39,6 +39,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
 import { useSesion } from '@/sesion/useSesion';
 
+import { TarjetaNota } from './TarjetaNota';
 import { DialogoCancelarNota } from './DialogoCancelarNota';
 import { DialogoEditarNota } from './DialogoEditarNota';
 import { DialogoNotaTela } from './DialogoNotaTela';
@@ -175,7 +176,7 @@ export function NotasSalidaPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado de página (proto `page-head`) ─────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Notas de salida
@@ -290,80 +291,101 @@ export function NotasSalidaPagina(): React.JSX.Element {
               No hay notas de salida que coincidan con la búsqueda.
             </p>
           ) : (
-            <TablaDensa data-testid="notas-tabla">
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Nota</TablaDensaHead>
-                  <TablaDensaHead>Maquilero</TablaDensaHead>
-                  <TablaDensaHead>Empresa</TablaDensaHead>
-                  <TablaDensaHead>Órdenes surtidas</TablaDensaHead>
-                  <TablaDensaHead numerica>Renglones</TablaDensaHead>
-                  <TablaDensaHead>Estatus</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
-                {filas.map((nota) => {
-                  const chip = TONO_NOTA[nota.estatus];
-                  const ordenes = ordenesDeNota(nota);
-                  return (
-                    <TablaDensaFila
-                      key={nota.id}
-                      seleccionada={nota.id === idSeleccion}
-                      onClick={() => setIdSeleccion(nota.id)}
-                      className="cursor-pointer"
-                      data-testid="nota-fila"
-                    >
-                      <TablaDensaCelda>
-                        <span className="flex items-center gap-[9px]">
-                          {/* Proto `.thumb`: cuadro 30px verde con "NS". */}
-                          <span
-                            aria-hidden
-                            className="flex size-[30px] shrink-0 items-center justify-center rounded-[7px] bg-linear-150 from-[#7bd6a6] to-[#2f9c66] text-[11px] font-bold text-[#04140c]"
-                          >
-                            NS
-                          </span>
-                          <span className="min-w-0">
-                            <span className="block font-medium">Nota {nota.numNota}</span>
-                            <span className="num block text-[11px] text-faint">
-                              {fechaCortaNota(nota.fechaElaboracion)}
-                            </span>
-                          </span>
-                        </span>
-                      </TablaDensaCelda>
-                      <TablaDensaCelda className="font-medium">{nota.maquilero}</TablaDensaCelda>
-                      <TablaDensaCelda>
-                        <ChipEstado tono="neutro">
-                          {nombreEmpresa.get(nota.idEmpresa) ?? `Empresa ${nota.idEmpresa}`}
-                        </ChipEstado>
-                      </TablaDensaCelda>
-                      <TablaDensaCelda>
-                        {/* Proto `opChips`: máx 3 folios + "+N". */}
-                        <span className="inline-flex flex-wrap gap-1">
-                          {ordenes.slice(0, 3).map((folio) => (
-                            <span
-                              key={folio}
-                              className="num inline-flex h-5 items-center rounded-md bg-primary-soft px-[7px] text-[11.5px] font-semibold text-primary-soft-foreground"
-                            >
-                              {folio}
-                            </span>
-                          ))}
-                          {ordenes.length > 3 ? (
-                            <span className="num inline-flex h-5 items-center rounded-md bg-muted px-[7px] text-[11.5px] font-semibold text-muted-foreground">
-                              +{ordenes.length - 3}
-                            </span>
-                          ) : null}
-                          {ordenes.length === 0 ? <span className="text-faint">—</span> : null}
-                        </span>
-                      </TablaDensaCelda>
-                      <TablaDensaCelda numerica>{nota.lineas.length}</TablaDensaCelda>
-                      <TablaDensaCelda>
-                        <ChipEstado tono={chip.tono}>{chip.texto}</ChipEstado>
-                      </TablaDensaCelda>
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — la tabla densa se apachurra en teléfono. Mismo
+                  clic (selecciona → cajón) que la fila. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="notas-tarjetas">
+                {filas.map((nota) => (
+                  <TarjetaNota
+                    key={nota.id}
+                    nota={nota}
+                    nombreEmpresa={nombreEmpresa.get(nota.idEmpresa) ?? `Empresa ${nota.idEmpresa}`}
+                    seleccionada={nota.id === idSeleccion}
+                    onClick={() => setIdSeleccion(nota.id)}
+                    testid="nota"
+                  />
+                ))}
+              </div>
+              {/* Escritorio (≥lg): tabla densa completa. */}
+              <div className="hidden lg:block">
+                <TablaDensa data-testid="notas-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Nota</TablaDensaHead>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead>Empresa</TablaDensaHead>
+                      <TablaDensaHead>Órdenes surtidas</TablaDensaHead>
+                      <TablaDensaHead numerica>Renglones</TablaDensaHead>
+                      <TablaDensaHead>Estatus</TablaDensaHead>
                     </TablaDensaFila>
-                  );
-                })}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((nota) => {
+                      const chip = TONO_NOTA[nota.estatus];
+                      const ordenes = ordenesDeNota(nota);
+                      return (
+                        <TablaDensaFila
+                          key={nota.id}
+                          seleccionada={nota.id === idSeleccion}
+                          onClick={() => setIdSeleccion(nota.id)}
+                          className="cursor-pointer"
+                          data-testid="nota-fila"
+                        >
+                          <TablaDensaCelda>
+                            <span className="flex items-center gap-[9px]">
+                              {/* Proto `.thumb`: cuadro 30px verde con "NS". */}
+                              <span
+                                aria-hidden
+                                className="flex size-[30px] shrink-0 items-center justify-center rounded-[7px] bg-linear-150 from-[#7bd6a6] to-[#2f9c66] text-[11px] font-bold text-[#04140c]"
+                              >
+                                NS
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block font-medium">Nota {nota.numNota}</span>
+                                <span className="num block text-[11px] text-faint">
+                                  {fechaCortaNota(nota.fechaElaboracion)}
+                                </span>
+                              </span>
+                            </span>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda className="font-medium">
+                            {nota.maquilero}
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>
+                            <ChipEstado tono="neutro">
+                              {nombreEmpresa.get(nota.idEmpresa) ?? `Empresa ${nota.idEmpresa}`}
+                            </ChipEstado>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda>
+                            {/* Proto `opChips`: máx 3 folios + "+N". */}
+                            <span className="inline-flex flex-wrap gap-1">
+                              {ordenes.slice(0, 3).map((folio) => (
+                                <span
+                                  key={folio}
+                                  className="num inline-flex h-5 items-center rounded-md bg-primary-soft px-[7px] text-[11.5px] font-semibold text-primary-soft-foreground"
+                                >
+                                  {folio}
+                                </span>
+                              ))}
+                              {ordenes.length > 3 ? (
+                                <span className="num inline-flex h-5 items-center rounded-md bg-muted px-[7px] text-[11.5px] font-semibold text-muted-foreground">
+                                  +{ordenes.length - 3}
+                                </span>
+                              ) : null}
+                              {ordenes.length === 0 ? <span className="text-faint">—</span> : null}
+                            </span>
+                          </TablaDensaCelda>
+                          <TablaDensaCelda numerica>{nota.lineas.length}</TablaDensaCelda>
+                          <TablaDensaCelda>
+                            <ChipEstado tono={chip.tono}>{chip.texto}</ChipEstado>
+                          </TablaDensaCelda>
+                        </TablaDensaFila>
+                      );
+                    })}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

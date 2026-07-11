@@ -41,7 +41,7 @@ export function FichasConfiablesPagina(): React.JSX.Element {
     <div className="h-full overflow-y-auto" data-testid="fichas-confiables">
       <div className="flex flex-col gap-3 p-4 md:p-5">
         {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-        <header className="flex shrink-0 flex-wrap items-center gap-3">
+        <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <div className="min-w-0 flex-1">
             <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
               Fichas confiables

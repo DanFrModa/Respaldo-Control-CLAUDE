@@ -115,10 +115,11 @@ describe('<TelasPagina>', () => {
       sesion: estadoSesionDePrueba(['telas.ver', 'telas.administrar']),
     });
 
-    // Un renglón por tela (colapsados por defecto, R9: filas expandibles).
+    // Un renglón por tela (colapsados por defecto, R9: filas expandibles). La tabla y las tarjetas
+    // móviles coexisten en el DOM (jsdom ignora `lg:hidden`): se acota a la tabla de escritorio.
     expect(screen.getAllByTestId('fila-tela')).toHaveLength(2);
     expect(screen.getAllByText('Felpa A').length).toBeGreaterThan(0);
-    expect(screen.getByText('Jersey B')).toBeInTheDocument();
+    expect(within(screen.getByTestId('tela-tabla')).getByText('Jersey B')).toBeInTheDocument();
   });
 
   it('muestra el estado vacío cuando no hay resultados', () => {
@@ -210,8 +211,9 @@ describe('<TelasPagina>', () => {
       sesion: estadoSesionDePrueba(['telas.ver', 'telas.administrar']),
     });
 
-    // El estado "Inactivo" se ve en el propio renglón; las acciones, al expandir.
-    expect(screen.getByText('Inactivo')).toBeInTheDocument();
+    // El estado "Inactivo" se ve en el propio renglón; las acciones, al expandir. Se acota a la
+    // tabla de escritorio (la tarjeta móvil repite el badge en el DOM de jsdom).
+    expect(within(screen.getByTestId('tela-tabla')).getByText('Inactivo')).toBeInTheDocument();
     await usuario.click(screen.getByTestId('fila-tela'));
     expect(screen.getByTestId('activar-tela')).toBeInTheDocument();
     await usuario.click(screen.getByTestId('activar-tela'));

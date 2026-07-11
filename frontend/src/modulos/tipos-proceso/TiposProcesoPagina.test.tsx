@@ -158,7 +158,11 @@ describe('<TiposProcesoPagina>', () => {
       sesion: estadoSesionDePrueba(['tipos-proceso.ver', 'tipos-proceso.administrar']),
     });
 
-    await usuario.click(screen.getByTestId('desactivar-tipo-proceso'));
+    // La tabla y las tarjetas móviles coexisten en el DOM (jsdom ignora `lg:hidden`): la acción se
+    // dispara desde la tabla de escritorio para no chocar con el botón duplicado de la tarjeta.
+    await usuario.click(
+      within(screen.getByTestId('tipo-proceso-tabla')).getByTestId('desactivar-tipo-proceso'),
+    );
     const dialogo = await screen.findByRole('dialog');
     expect(within(dialogo).getByText('Desactivar tipo de proceso')).toBeInTheDocument();
     await usuario.click(screen.getByTestId('confirmar-accion'));

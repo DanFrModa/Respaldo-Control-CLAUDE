@@ -95,10 +95,12 @@ describe('ConsultaAuditoriasPagina', () => {
   it('al hacer clic en un renglón abre el cajón con el título de la auditoría', async () => {
     const user = userEvent.setup();
     render();
-    // El cajón está cerrado hasta que se elige un renglón (patrón tabla-first + cajón por ID).
-    expect(screen.queryByText('Auditoría #2')).toBeNull();
+    // El cajón está cerrado hasta que se elige un renglón (patrón tabla-first + cajón por ID). El
+    // título del cajón se busca DENTRO del diálogo (role=dialog): la tarjeta móvil también muestra
+    // "Auditoría #N" en el DOM de jsdom (que ignora `lg:hidden`), así que no se puede buscar suelto.
+    expect(screen.queryByRole('dialog')).toBeNull();
     await user.click(screen.getAllByTestId('fila-consulta-auditoria')[0] as HTMLElement);
-    expect(screen.getByText('Auditoría #2')).toBeDefined();
+    expect(within(screen.getByRole('dialog')).getByText('Auditoría #2')).toBeDefined();
   });
 
   it('KPIs con datos: la card "Defecto principal" pinta clave/descripción y la columna AQL su nivel', () => {

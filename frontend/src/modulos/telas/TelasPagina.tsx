@@ -178,7 +178,7 @@ export function TelasPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Telas</h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
@@ -270,34 +270,87 @@ export function TelasPagina(): React.JSX.Element {
               No hay telas que coincidan con la búsqueda.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead className="w-8" />
-                  <TablaDensaHead>Tela</TablaDensaHead>
-                  <TablaDensaHead>Componente</TablaDensaHead>
-                  <TablaDensaHead>Colores</TablaDensaHead>
-                  <TablaDensaHead numerica>Precio sug.</TablaDensaHead>
-                  <TablaDensaHead>Estado</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
-                {filas.map((tela) => (
-                  <RenglonTela
-                    key={tela.id}
-                    tela={tela}
-                    abierta={expandidas.has(tela.id)}
-                    puedeAdministrar={puedeAdministrar}
-                    puedeVerImportes={puedeVerImportes}
-                    onToggle={() => alternarExpandida(tela.id)}
-                    onExpandir={() => expandir(tela.id)}
-                    onEditar={() => abrirEdicion(tela)}
-                    onDesactivar={() => setADesactivar(tela)}
-                    onReactivar={() => reactivarTela(tela)}
-                  />
-                ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+            <>
+              {/* Móvil (<lg): tarjetas resumen de solo lectura — la tabla se apachurra en teléfono.
+                  El detalle expandible (colores, proveedores, edición) vive en la tabla de
+                  escritorio; en móvil la tarjeta muestra lo clave sin abrir editores pesados. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="tela-tarjetas">
+                {filas.map((tela) => {
+                  const numColores = tela.colores.length;
+                  return (
+                    <div
+                      key={tela.id}
+                      data-testid="fila-tela-tarjeta"
+                      className="rounded-lg border bg-card p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Avatar nombre={tela.nombre} tono="telas" tamano="sm">
+                            T
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-medium">{tela.nombre}</span>
+                              {tela.categoria !== null ? (
+                                <TipoBadge tono="telas">{tela.categoria}</TipoBadge>
+                              ) : null}
+                              {tela.favorito ? <TipoBadge tono="pt">Favorita</TipoBadge> : null}
+                            </div>
+                            <div className="text-xs text-faint">
+                              {ETIQUETA_TIPO_COMPONENTE[tela.tipoComponente]}
+                            </div>
+                          </div>
+                        </div>
+                        <EstadoBadge activo={tela.activo} />
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                        {numColores > 0 ? (
+                          <ChipEstado tono="info">
+                            {numColores} color{numColores > 1 ? 'es' : ''}
+                          </ChipEstado>
+                        ) : (
+                          <ChipEstado tono="neutro">Sin colores</ChipEstado>
+                        )}
+                        <span className="num text-muted-foreground">
+                          Precio sug. {formatearPrecio(tela.precioSugerido)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Escritorio (≥lg): tabla densa con filas expandibles completa. */}
+              <div className="hidden lg:block" data-testid="tela-tabla">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead className="w-8" />
+                      <TablaDensaHead>Tela</TablaDensaHead>
+                      <TablaDensaHead>Componente</TablaDensaHead>
+                      <TablaDensaHead>Colores</TablaDensaHead>
+                      <TablaDensaHead numerica>Precio sug.</TablaDensaHead>
+                      <TablaDensaHead>Estado</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((tela) => (
+                      <RenglonTela
+                        key={tela.id}
+                        tela={tela}
+                        abierta={expandidas.has(tela.id)}
+                        puedeAdministrar={puedeAdministrar}
+                        puedeVerImportes={puedeVerImportes}
+                        onToggle={() => alternarExpandida(tela.id)}
+                        onExpandir={() => expandir(tela.id)}
+                        onEditar={() => abrirEdicion(tela)}
+                        onDesactivar={() => setADesactivar(tela)}
+                        onReactivar={() => reactivarTela(tela)}
+                      />
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

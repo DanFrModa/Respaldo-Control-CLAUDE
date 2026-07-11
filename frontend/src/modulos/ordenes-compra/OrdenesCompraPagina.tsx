@@ -223,7 +223,7 @@ export function OrdenesCompraPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Órdenes de compra
@@ -371,39 +371,39 @@ export function OrdenesCompraPagina(): React.JSX.Element {
               No hay órdenes de compra que coincidan con la búsqueda.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>OC</TablaDensaHead>
-                  <TablaDensaHead>Proveedor</TablaDensaHead>
-                  <TablaDensaHead>Emisión</TablaDensaHead>
-                  <TablaDensaHead>Entrega</TablaDensaHead>
-                  <TablaDensaHead>Contra orden</TablaDensaHead>
-                  <TablaDensaHead>Estado</TablaDensaHead>
-                  <TablaDensaHead numerica>Total</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — la tabla densa se apachurra en teléfono. Mismo
+                  clic (selecciona → cajón) que la fila. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="oc-tarjetas">
                 {filas.map((oc) => (
-                  <TablaDensaFila
+                  <button
+                    type="button"
                     key={oc.id}
-                    seleccionada={seleccion?.id === oc.id}
-                    className="cursor-pointer"
                     onClick={() => setSeleccion(oc)}
-                    data-testid="fila-oc"
+                    data-testid="oc-tarjeta"
+                    className={cn(
+                      'w-full rounded-lg border bg-card p-3 text-left',
+                      seleccion?.id === oc.id && 'ring-2 ring-primary',
+                    )}
                   >
-                    {/* Proto: folio en `cell-code` (mono atenuado); proveedor en `cell-strong`. */}
-                    <TablaDensaCelda className="font-mono text-xs text-muted-foreground">
-                      OC {oc.numCompra}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda className="font-semibold">{oc.proveedor}</TablaDensaCelda>
-                    <TablaDensaCelda className="num text-muted-foreground">
-                      {fechaCortaOc(oc.fecha)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda className="num text-muted-foreground">
-                      {fechaCortaOc(oc.fechaEntrega)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda className="font-mono text-xs text-muted-foreground">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono text-xs text-muted-foreground">OC {oc.numCompra}</p>
+                        <p className="truncate font-semibold">{oc.proveedor}</p>
+                      </div>
+                      <EstatusOcBadge estatus={oc.estatus} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                      <span className="text-muted-foreground">
+                        Emisión <span className="num">{fechaCortaOc(oc.fecha)}</span> · Entrega{' '}
+                        <span className="num">{fechaCortaOc(oc.fechaEntrega)}</span>
+                      </span>
+                      <span className="num font-semibold text-foreground">
+                        {formatearMoneda(oc.total)}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                      Contra orden:{' '}
                       {oc.ordenesLigadas.length === 0
                         ? '—'
                         : `${oc.ordenesLigadas[0]?.folio ?? ''}${
@@ -411,17 +411,65 @@ export function OrdenesCompraPagina(): React.JSX.Element {
                               ? ` (+${oc.ordenesLigadas.length - 1})`
                               : ''
                           }`}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>
-                      <EstatusOcBadge estatus={oc.estatus} />
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="font-semibold">
-                      {formatearMoneda(oc.total)}
-                    </TablaDensaCelda>
-                  </TablaDensaFila>
+                    </p>
+                  </button>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+              {/* Escritorio (≥lg): tabla densa completa. */}
+              <div className="hidden lg:block">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>OC</TablaDensaHead>
+                      <TablaDensaHead>Proveedor</TablaDensaHead>
+                      <TablaDensaHead>Emisión</TablaDensaHead>
+                      <TablaDensaHead>Entrega</TablaDensaHead>
+                      <TablaDensaHead>Contra orden</TablaDensaHead>
+                      <TablaDensaHead>Estado</TablaDensaHead>
+                      <TablaDensaHead numerica>Total</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((oc) => (
+                      <TablaDensaFila
+                        key={oc.id}
+                        seleccionada={seleccion?.id === oc.id}
+                        className="cursor-pointer"
+                        onClick={() => setSeleccion(oc)}
+                        data-testid="fila-oc"
+                      >
+                        {/* Proto: folio en `cell-code` (mono atenuado); proveedor en `cell-strong`. */}
+                        <TablaDensaCelda className="font-mono text-xs text-muted-foreground">
+                          OC {oc.numCompra}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda className="font-semibold">{oc.proveedor}</TablaDensaCelda>
+                        <TablaDensaCelda className="num text-muted-foreground">
+                          {fechaCortaOc(oc.fecha)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda className="num text-muted-foreground">
+                          {fechaCortaOc(oc.fechaEntrega)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda className="font-mono text-xs text-muted-foreground">
+                          {oc.ordenesLigadas.length === 0
+                            ? '—'
+                            : `${oc.ordenesLigadas[0]?.folio ?? ''}${
+                                oc.ordenesLigadas.length > 1
+                                  ? ` (+${oc.ordenesLigadas.length - 1})`
+                                  : ''
+                              }`}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
+                          <EstatusOcBadge estatus={oc.estatus} />
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-semibold">
+                          {formatearMoneda(oc.total)}
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

@@ -100,7 +100,7 @@ export function CxpPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5" data-testid="cxp">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Cuentas por pagar
@@ -174,56 +174,108 @@ export function CxpPagina(): React.JSX.Element {
               No hay proveedores para los filtros elegidos.
             </p>
           ) : (
-            <TablaDensa data-testid="cxp-tabla">
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Proveedor</TablaDensaHead>
-                  <TablaDensaHead numerica>Saldo</TablaDensaHead>
-                  <TablaDensaHead numerica>Corriente</TablaDensaHead>
-                  <TablaDensaHead numerica>1–{l1} d</TablaDensaHead>
-                  <TablaDensaHead numerica>
-                    {l1 + 1}–{l2} d
-                  </TablaDensaHead>
-                  <TablaDensaHead numerica>+{l2} d</TablaDensaHead>
-                  <TablaDensaHead numerica title="Saldo de maquila (EsMa), sin antigüedad">
-                    Maquila
-                  </TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — el aging de 7 columnas corta los montos en
+                  teléfono. Mismo clic (→ estado de cuenta) que la fila. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="cxp-tarjetas">
                 {filas.map((f) => (
-                  <TablaDensaFila
+                  <button
+                    type="button"
                     key={f.idProveedor}
-                    className="cursor-pointer"
                     onClick={() => verEstadoCuenta(f.idProveedor)}
-                    data-testid={`cxp-fila-${f.idProveedor}`}
+                    data-testid={`cxp-tarjeta-${f.idProveedor}`}
+                    className="w-full rounded-lg border bg-card p-3 text-left"
                   >
-                    <TablaDensaCelda className="font-medium">
-                      {f.proveedor}
-                      {f.corto ? (
-                        <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
-                      ) : null}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="font-semibold">
-                      {moneda(f.saldo)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>{celdaAging(f.corriente)}</TablaDensaCelda>
-                    <TablaDensaCelda numerica className="text-warn">
-                      {celdaAging(f.d1a30)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="text-warn">
-                      {celdaAging(f.d31a60)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="text-crit">
-                      {celdaAging(f.mas60)}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="text-muted-foreground">
-                      {celdaAging(f.maquila)}
-                    </TablaDensaCelda>
-                  </TablaDensaFila>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="min-w-0 truncate font-medium">
+                        {f.proveedor}
+                        {f.corto ? (
+                          <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
+                        ) : null}
+                      </p>
+                      <span className="num shrink-0 font-semibold">{moneda(f.saldo)}</span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Corriente</span>
+                        <span className="num">{celdaAging(f.corriente)}</span>
+                      </span>
+                      <span className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">1–{l1} d</span>
+                        <span className="num text-warn">{celdaAging(f.d1a30)}</span>
+                      </span>
+                      <span className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">
+                          {l1 + 1}–{l2} d
+                        </span>
+                        <span className="num text-warn">{celdaAging(f.d31a60)}</span>
+                      </span>
+                      <span className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">+{l2} d</span>
+                        <span className="num text-crit">{celdaAging(f.mas60)}</span>
+                      </span>
+                      <span className="flex justify-between gap-2">
+                        <span className="text-muted-foreground">Maquila</span>
+                        <span className="num text-muted-foreground">{celdaAging(f.maquila)}</span>
+                      </span>
+                    </div>
+                  </button>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+              {/* Escritorio (≥lg): tabla densa completa. */}
+              <div className="hidden lg:block">
+                <TablaDensa data-testid="cxp-tabla">
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Proveedor</TablaDensaHead>
+                      <TablaDensaHead numerica>Saldo</TablaDensaHead>
+                      <TablaDensaHead numerica>Corriente</TablaDensaHead>
+                      <TablaDensaHead numerica>1–{l1} d</TablaDensaHead>
+                      <TablaDensaHead numerica>
+                        {l1 + 1}–{l2} d
+                      </TablaDensaHead>
+                      <TablaDensaHead numerica>+{l2} d</TablaDensaHead>
+                      <TablaDensaHead numerica title="Saldo de maquila (EsMa), sin antigüedad">
+                        Maquila
+                      </TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((f) => (
+                      <TablaDensaFila
+                        key={f.idProveedor}
+                        className="cursor-pointer"
+                        onClick={() => verEstadoCuenta(f.idProveedor)}
+                        data-testid={`cxp-fila-${f.idProveedor}`}
+                      >
+                        <TablaDensaCelda className="font-medium">
+                          {f.proveedor}
+                          {f.corto ? (
+                            <span className="ml-1 text-xs text-muted-foreground">({f.corto})</span>
+                          ) : null}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="font-semibold">
+                          {moneda(f.saldo)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>{celdaAging(f.corriente)}</TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-warn">
+                          {celdaAging(f.d1a30)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-warn">
+                          {celdaAging(f.d31a60)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-crit">
+                          {celdaAging(f.mas60)}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-muted-foreground">
+                          {celdaAging(f.maquila)}
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

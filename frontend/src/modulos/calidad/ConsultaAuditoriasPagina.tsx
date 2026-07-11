@@ -42,6 +42,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 import { useDebounce } from '@/lib/useDebounce';
+import { cn } from '@/lib/utils';
 import { BuscadorToolbar } from '@/components/dominio/BuscadorToolbar';
 import { ChipFiltro } from '@/components/dominio/ChipsFiltro';
 import { CampoDetalle, RejillaCampos, SeccionDetalle } from '@/modulos/detalle';
@@ -213,7 +214,7 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado (proto .page-head de vCalidad) ────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-end gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">
             Control de calidad · AQL
@@ -356,61 +357,128 @@ export function ConsultaAuditoriasPagina(): React.JSX.Element {
               No hay auditorías que coincidan con la búsqueda.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead>Auditoría</TablaDensaHead>
-                  <TablaDensaHead>Orden</TablaDensaHead>
-                  <TablaDensaHead>Modelo</TablaDensaHead>
-                  <TablaDensaHead>Maquilero</TablaDensaHead>
-                  <TablaDensaHead numerica>Muestra</TablaDensaHead>
-                  <TablaDensaHead numerica>Defectos</TablaDensaHead>
-                  <TablaDensaHead numerica>AQL</TablaDensaHead>
-                  <TablaDensaHead>Resultado</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
+            <>
+              {/* Móvil (<lg): tarjetas apiladas — la tabla densa de 8 columnas se apachurra en
+                  teléfono. Mismo clic (selecciona → cajón) que la fila. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="consulta-auditoria-tarjetas">
                 {filas.map((a) => (
-                  <TablaDensaFila
+                  <button
+                    type="button"
                     key={a.id}
-                    seleccionada={seleccion?.id === a.id}
-                    className={`cursor-pointer ${a.cancelada ? 'opacity-60' : ''}`}
                     onClick={() => setSeleccionId(a.id)}
-                    data-testid="fila-consulta-auditoria"
+                    data-testid="consulta-auditoria-tarjeta"
+                    className={cn(
+                      'w-full rounded-lg border bg-card p-3 text-left',
+                      seleccion?.id === a.id && 'ring-2 ring-primary',
+                      a.cancelada && 'opacity-60',
+                    )}
                   >
-                    <TablaDensaCelda className="font-medium">#{a.numAuditoria}</TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
-                      {a.folioOrden === null ? '—' : `#${a.folioOrden}`}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>{a.codigoModelo ?? '—'}</TablaDensaCelda>
-                    <TablaDensaCelda className="text-muted-foreground">
-                      {a.maquilero ?? '—'}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica>
-                      {a.tamanoMuestra.toLocaleString('es-MX')}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda
-                      numerica
-                      className={a.totalFallas > 0 ? 'font-semibold text-warn' : ''}
-                    >
-                      {a.totalFallas.toLocaleString('es-MX')}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda numerica className="text-muted-foreground">
-                      {a.nivelAqlPrincipal === null
-                        ? '—'
-                        : a.nivelAqlPrincipal.toLocaleString('es-MX')}
-                    </TablaDensaCelda>
-                    <TablaDensaCelda>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium">Auditoría #{a.numAuditoria}</p>
+                        <p className="truncate text-sm">
+                          Orden {a.folioOrden === null ? '—' : `#${a.folioOrden}`} ·{' '}
+                          {a.codigoModelo ?? '—'}
+                        </p>
+                      </div>
                       {a.cancelada ? (
                         <ChipEstado tono="neutro">Cancelada</ChipEstado>
                       ) : (
                         <ResultadoBadge resultado={a.resultado} />
                       )}
-                    </TablaDensaCelda>
-                  </TablaDensaFila>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {a.maquilero ?? 'sin maquilero'}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>
+                        Muestra{' '}
+                        <span className="num font-medium text-foreground">
+                          {a.tamanoMuestra.toLocaleString('es-MX')}
+                        </span>
+                      </span>
+                      <span>
+                        Defectos{' '}
+                        <span
+                          className={cn(
+                            'num font-medium',
+                            a.totalFallas > 0 ? 'text-warn' : 'text-foreground',
+                          )}
+                        >
+                          {a.totalFallas.toLocaleString('es-MX')}
+                        </span>
+                      </span>
+                      <span>
+                        AQL{' '}
+                        <span className="num font-medium text-foreground">
+                          {a.nivelAqlPrincipal === null
+                            ? '—'
+                            : a.nivelAqlPrincipal.toLocaleString('es-MX')}
+                        </span>
+                      </span>
+                    </div>
+                  </button>
                 ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+              </div>
+              {/* Escritorio (≥lg): tabla densa completa. */}
+              <div className="hidden lg:block" data-testid="consulta-auditoria-tabla">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead>Auditoría</TablaDensaHead>
+                      <TablaDensaHead>Orden</TablaDensaHead>
+                      <TablaDensaHead>Modelo</TablaDensaHead>
+                      <TablaDensaHead>Maquilero</TablaDensaHead>
+                      <TablaDensaHead numerica>Muestra</TablaDensaHead>
+                      <TablaDensaHead numerica>Defectos</TablaDensaHead>
+                      <TablaDensaHead numerica>AQL</TablaDensaHead>
+                      <TablaDensaHead>Resultado</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((a) => (
+                      <TablaDensaFila
+                        key={a.id}
+                        seleccionada={seleccion?.id === a.id}
+                        className={`cursor-pointer ${a.cancelada ? 'opacity-60' : ''}`}
+                        onClick={() => setSeleccionId(a.id)}
+                        data-testid="fila-consulta-auditoria"
+                      >
+                        <TablaDensaCelda className="font-medium">#{a.numAuditoria}</TablaDensaCelda>
+                        <TablaDensaCelda className="text-muted-foreground">
+                          {a.folioOrden === null ? '—' : `#${a.folioOrden}`}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>{a.codigoModelo ?? '—'}</TablaDensaCelda>
+                        <TablaDensaCelda className="text-muted-foreground">
+                          {a.maquilero ?? '—'}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica>
+                          {a.tamanoMuestra.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda
+                          numerica
+                          className={a.totalFallas > 0 ? 'font-semibold text-warn' : ''}
+                        >
+                          {a.totalFallas.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda numerica className="text-muted-foreground">
+                          {a.nivelAqlPrincipal === null
+                            ? '—'
+                            : a.nivelAqlPrincipal.toLocaleString('es-MX')}
+                        </TablaDensaCelda>
+                        <TablaDensaCelda>
+                          {a.cancelada ? (
+                            <ChipEstado tono="neutro">Cancelada</ChipEstado>
+                          ) : (
+                            <ResultadoBadge resultado={a.resultado} />
+                          )}
+                        </TablaDensaCelda>
+                      </TablaDensaFila>
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 

@@ -161,7 +161,7 @@ export function AviosPagina(): React.JSX.Element {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 p-4 md:p-5">
       {/* ── Encabezado ─────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 flex-wrap items-center gap-3">
+      <header className="flex shrink-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="min-w-0 flex-1">
           <h1 className="text-[21px] leading-tight font-semibold tracking-tight">Avíos</h1>
           <p className="truncate text-[12.5px] text-muted-foreground">
@@ -246,32 +246,82 @@ export function AviosPagina(): React.JSX.Element {
               No hay avíos que coincidan con la búsqueda.
             </p>
           ) : (
-            <TablaDensa>
-              <TablaDensaEncabezado>
-                <TablaDensaFila>
-                  <TablaDensaHead className="w-8" />
-                  <TablaDensaHead>Avío</TablaDensaHead>
-                  <TablaDensaHead>Proveedores</TablaDensaHead>
-                  <TablaDensaHead numerica>Precio ref.</TablaDensaHead>
-                  <TablaDensaHead>Estado</TablaDensaHead>
-                </TablaDensaFila>
-              </TablaDensaEncabezado>
-              <TablaDensaCuerpo>
-                {filas.map((avio) => (
-                  <RenglonAvio
-                    key={avio.id}
-                    avio={avio}
-                    abierta={expandidas.has(avio.id)}
-                    puedeAdministrar={puedeAdministrar}
-                    onToggle={() => alternarExpandida(avio.id)}
-                    onExpandir={() => expandir(avio.id)}
-                    onEditar={() => abrirEdicion(avio)}
-                    onDesactivar={() => setADesactivar(avio)}
-                    onReactivar={() => reactivarAvio(avio)}
-                  />
-                ))}
-              </TablaDensaCuerpo>
-            </TablaDensa>
+            <>
+              {/* Móvil (<lg): tarjetas resumen de solo lectura — la tabla se apachurra en teléfono.
+                  El detalle expandible (proveedores, medidas, edición) vive en la tabla de
+                  escritorio; en móvil la tarjeta muestra lo clave sin abrir editores pesados. */}
+              <div className="space-y-2 p-3 lg:hidden" data-testid="avio-tarjetas">
+                {filas.map((avio) => {
+                  const provs = avio.proveedores;
+                  return (
+                    <div
+                      key={avio.id}
+                      data-testid="fila-avio-tarjeta"
+                      className="rounded-lg border bg-card p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Avatar nombre={avio.clave} tono="avios" tamano="sm">
+                            AV
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-medium">{avio.descripcion}</span>
+                              <ChipEstado tono={avio.esGenerico ? 'info' : 'neutro'}>
+                                {avio.esGenerico ? 'Genérico · stock' : 'Por orden'}
+                              </ChipEstado>
+                            </div>
+                            <div className="num text-xs text-faint">{avio.clave}</div>
+                          </div>
+                        </div>
+                        <EstadoBadge activo={avio.activo} />
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
+                        {provs.length > 0 ? (
+                          <ChipEstado tono="info">
+                            {provs.length} proveedor{provs.length > 1 ? 'es' : ''}
+                          </ChipEstado>
+                        ) : (
+                          <ChipEstado tono="warn">Sin proveedor</ChipEstado>
+                        )}
+                        <span className="num text-muted-foreground">
+                          Precio ref. {formatearPrecio(avio.precioReferencia)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Escritorio (≥lg): tabla densa con filas expandibles completa. */}
+              <div className="hidden lg:block" data-testid="avio-tabla">
+                <TablaDensa>
+                  <TablaDensaEncabezado>
+                    <TablaDensaFila>
+                      <TablaDensaHead className="w-8" />
+                      <TablaDensaHead>Avío</TablaDensaHead>
+                      <TablaDensaHead>Proveedores</TablaDensaHead>
+                      <TablaDensaHead numerica>Precio ref.</TablaDensaHead>
+                      <TablaDensaHead>Estado</TablaDensaHead>
+                    </TablaDensaFila>
+                  </TablaDensaEncabezado>
+                  <TablaDensaCuerpo>
+                    {filas.map((avio) => (
+                      <RenglonAvio
+                        key={avio.id}
+                        avio={avio}
+                        abierta={expandidas.has(avio.id)}
+                        puedeAdministrar={puedeAdministrar}
+                        onToggle={() => alternarExpandida(avio.id)}
+                        onExpandir={() => expandir(avio.id)}
+                        onEditar={() => abrirEdicion(avio)}
+                        onDesactivar={() => setADesactivar(avio)}
+                        onReactivar={() => reactivarAvio(avio)}
+                      />
+                    ))}
+                  </TablaDensaCuerpo>
+                </TablaDensa>
+              </div>
+            </>
           )}
         </div>
 
