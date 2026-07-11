@@ -1,7 +1,6 @@
 import { useState } from 'react';
 
 import { useConciliacionEsMa } from '@/api/esma';
-import { useProveedores } from '@/api/proveedores';
 import type { EsMaConciliacionQuery } from '@/api/tipos';
 import {
   TablaDensa,
@@ -17,8 +16,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SelectNativo } from '@/components/ui/native-select';
 
-/** Valor del filtro de maquilero que significa "todos". */
-const TODOS = 'TODOS';
+import { ComboboxMaquilero } from './SelectorMaquilero';
 
 /** Formatea un entero con separadores de miles (es-MX). */
 function fmt(n: number): string {
@@ -35,23 +33,16 @@ function fmt(n: number): string {
  * (no importes), así que no aplica el ocultamiento por `consultas.ver-importes`.
  */
 export function ConciliacionCargosPagina(): React.JSX.Element {
-  const [idMaquilero, setIdMaquilero] = useState<string>(TODOS);
+  const [idMaquilero, setIdMaquilero] = useState<string>('');
   const [desde, setDesde] = useState('');
   const [hasta, setHasta] = useState('');
   const [soloFaltantes, setSoloFaltantes] = useState(false);
   const [pagadas, setPagadas] = useState<'todas' | 'pagadas' | 'no-pagadas'>('todas');
 
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-  });
-
   const query: EsMaConciliacionQuery = {
     ...(desde !== '' ? { desde } : {}),
     ...(hasta !== '' ? { hasta } : {}),
-    ...(idMaquilero !== TODOS ? { idMaquilero: Number(idMaquilero) } : {}),
+    ...(idMaquilero !== '' ? { idMaquilero: Number(idMaquilero) } : {}),
     ...(pagadas !== 'todas' ? { pagadas } : {}),
   };
   const consulta = useConciliacionEsMa(query);
@@ -82,19 +73,12 @@ export function ConciliacionCargosPagina(): React.JSX.Element {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field>
               <FieldLabel htmlFor="conc-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="conc-maquilero"
-                value={idMaquilero}
-                onChange={(e) => setIdMaquilero(e.target.value)}
-                data-testid="conc-maquilero"
-              >
-                <option value={TODOS}>Todos</option>
-                {(maquileros.data?.datos ?? []).map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              <ComboboxMaquilero
+                idMaquilero={idMaquilero}
+                onCambioMaquilero={setIdMaquilero}
+                testid="conc-maquilero"
+                placeholder="Todos los maquileros…"
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="conc-desde">Desde</FieldLabel>

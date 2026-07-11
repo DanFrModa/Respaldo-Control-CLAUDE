@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa, useMaquilerosEsMa } from '@/api/esma';
+import { imprimirPagoEsMa, useCargosEsMa, useCrearPagoEsMa } from '@/api/esma';
 import type { CargosEsMaQuery } from '@/api/tipos';
 import {
   TablaDensa,
@@ -21,6 +21,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
+import { ComboboxMaquilero } from './SelectorMaquilero';
 import { hoyISO, moneda, type PartidaInicial } from './comun';
 
 /**
@@ -48,8 +49,6 @@ export function CapturaPagosPagina(): React.JSX.Element {
   // Cargos seleccionados: idCargo → cantidad (texto). La presencia de la clave = incluido.
   const [seleccion, setSeleccion] = useState<Record<number, string>>({});
   const [pagoImpreso, setPagoImpreso] = useState<number | null>(null);
-
-  const maquileros = useMaquilerosEsMa({});
 
   const idNum = idMaquilero === '' ? undefined : Number(idMaquilero);
 
@@ -142,23 +141,15 @@ export function CapturaPagosPagina(): React.JSX.Element {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Field>
               <FieldLabel htmlFor="pago-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="pago-maquilero"
-                value={idMaquilero}
-                onChange={(e) => {
-                  setIdMaquilero(e.target.value);
+              <ComboboxMaquilero
+                idMaquilero={idMaquilero}
+                onCambioMaquilero={(id) => {
+                  setIdMaquilero(id);
                   setSeleccion({});
                   setPagoImpreso(null);
                 }}
-                data-testid="pago-maquilero"
-              >
-                <option value="">Elige un maquilero…</option>
-                {(maquileros.data?.filas ?? []).map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.corto ? `${m.nombre} (${m.corto})` : m.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+                testid="pago-maquilero"
+              />
             </Field>
             <Field>
               <FieldLabel htmlFor="pago-fecha">Fecha</FieldLabel>

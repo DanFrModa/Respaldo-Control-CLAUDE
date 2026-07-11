@@ -3,12 +3,7 @@ import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
-import {
-  useAbonosMaquilero,
-  useCrearMovimientoEsMa,
-  useDescuentosMaquilero,
-  useMaquilerosEsMa,
-} from '@/api/esma';
+import { useAbonosMaquilero, useCrearMovimientoEsMa, useDescuentosMaquilero } from '@/api/esma';
 import {
   TablaDensa,
   TablaDensaCelda,
@@ -25,6 +20,7 @@ import { SelectNativo } from '@/components/ui/native-select';
 import { useSesion } from '@/sesion/useSesion';
 
 import { SaldoMaquilero } from './SaldoMaquilero';
+import { ComboboxMaquilero } from './SelectorMaquilero';
 import { hoyISO, moneda, type PartidaInicial } from './comun';
 
 /**
@@ -58,8 +54,6 @@ export function CapturaMovimientoPagina({
   const [fecha, setFecha] = useState(hoyISO());
   const [conFactura, setConFactura] = useState<'' | 'con' | 'sin'>(inicial?.conFactura ?? '');
   const [observaciones, setObservaciones] = useState(inicial?.observaciones ?? '');
-
-  const maquileros = useMaquilerosEsMa({});
 
   const idNum = idMaquilero === '' ? undefined : Number(idMaquilero);
   // Las listas de cuenta solo se piden si el usuario puede leerlas (`esma.ver-pagos`).
@@ -125,19 +119,11 @@ export function CapturaMovimientoPagina({
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="mov-maquilero">Maquilero</FieldLabel>
-              <SelectNativo
-                id="mov-maquilero"
-                value={idMaquilero}
-                onChange={(e) => setIdMaquilero(e.target.value)}
-                data-testid="mov-maquilero"
-              >
-                <option value="">Elige un maquilero…</option>
-                {(maquileros.data?.filas ?? []).map((m) => (
-                  <option key={m.id} value={String(m.id)}>
-                    {m.corto ? `${m.nombre} (${m.corto})` : m.nombre}
-                  </option>
-                ))}
-              </SelectNativo>
+              <ComboboxMaquilero
+                idMaquilero={idMaquilero}
+                onCambioMaquilero={setIdMaquilero}
+                testid="mov-maquilero"
+              />
             </Field>
             <Field data-invalid={monto !== '' && montoInvalido}>
               <FieldLabel htmlFor="mov-monto">Importe</FieldLabel>
