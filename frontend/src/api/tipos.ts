@@ -1449,6 +1449,17 @@ export type EdrLineaAjustar =
 /** Origen de una línea del EDR. */
 export type EdrOrigenLinea = EdrLinea['origen'];
 
+// ── Ventas: vista comercial de la facturación por modelo (proto vVentas; F7-E2) ─
+/** Ventas por período: resumen + página de líneas (`GET /api/edr/ventas`). */
+export type Ventas =
+  paths['/api/edr/ventas']['get']['responses']['200']['content']['application/json'];
+/** Una línea de venta (facturación por modelo). */
+export type VentaLinea = Ventas['lineas'][number];
+/** Resumen agregado de ventas del período. */
+export type VentasResumen = Ventas['resumen'];
+/** Filtros de la consulta de ventas (querystring). */
+export type VentasQuery = NonNullable<paths['/api/edr/ventas']['get']['parameters']['query']>;
+
 // ── Indicadores: tableros directivos (Módulo Indicadores, F7-E3) ──────────────
 /** Tablero de KPIs de Ruta Crítica (`GET /api/indicadores/rc`). */
 export type KpisRc =

@@ -66,16 +66,8 @@ import { SeccionDesarrolloOrden } from './SeccionDesarrolloOrden';
  * con el mosaico "Modificar". En móvil el panel colapsa a un cajón deslizante.
  */
 
-/** Meses de las tabs de entrega (proto `MESES_PED`). */
+/** Meses de entrega para el selector y la columna (proto `MESES_PED`). */
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-/** Tab de mes (proto `.mtab`): 12.5px seminegrita, radio 8; activo = RELLENO de marca + sombra. */
-const CLASE_MTAB =
-  'cursor-pointer rounded-lg border px-[15px] py-[7px] text-[12.5px] font-semibold transition-colors';
-const CLASE_MTAB_ON =
-  'border-transparent bg-primary text-primary-foreground shadow-[0_6px_14px_-6px_color-mix(in_srgb,var(--primary)_70%,transparent)]';
-const CLASE_MTAB_OFF =
-  'border-border bg-card text-muted-foreground hover:border-border-strong hover:text-foreground';
 
 /** Renglones por página (tabla densa de operación). */
 const POR_PAGINA = 50;
@@ -441,40 +433,30 @@ export function CentroOrdenesPagina(): React.JSX.Element {
           <option value="con">Con OC</option>
           <option value="sin">Sin OC</option>
         </SelectNativo>
-        <span className="ml-auto text-[12px] text-faint">
-          {total.toLocaleString('es-MX')} órdenes
-        </span>
-      </div>
-
-      {/* ── Tabs de mes de entrega (proto `.mtab`: activo = relleno de marca) ── */}
-      <div className="flex shrink-0 flex-wrap items-center gap-[5px]" data-testid="centro-meses">
-        <span className="mr-0.5 text-[11px] font-semibold tracking-wide text-faint uppercase">
-          Mes de entrega
-        </span>
-        {MESES.map((nombre, indice) => (
-          <button
-            key={nombre}
-            type="button"
-            onClick={() => {
-              setMes(indice + 1);
-              reiniciarPagina();
-            }}
-            className={cn(CLASE_MTAB, mes === indice + 1 ? CLASE_MTAB_ON : CLASE_MTAB_OFF)}
-          >
-            {nombre}
-          </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => {
-            setMes(0);
+        {/* Mes de entrega: antes era una fila de tabs (`.mtab`); ahora es UN filtro más en esta
+            misma línea (petición de Gabriel: todo sube y queda una sola barra de filtros). */}
+        <SelectNativo
+          className="w-36 h-8 text-sm"
+          aria-label="Filtrar por mes de entrega"
+          value={mes === 0 ? '' : String(mes)}
+          onChange={(e) => {
+            setMes(e.target.value === '' ? 0 : Number(e.target.value));
             reiniciarPagina();
           }}
-          className={cn(CLASE_MTAB, mes === 0 ? CLASE_MTAB_ON : CLASE_MTAB_OFF)}
-          data-testid="centro-mes-todos"
+          data-testid="centro-filtro-mes"
         >
-          Todos
-        </button>
+          <option value="">Mes de entrega</option>
+          {MESES.map((nombre, indice) => (
+            <option key={nombre} value={String(indice + 1)}>
+              {nombre}
+            </option>
+          ))}
+        </SelectNativo>
+        {/* `shrink-0 whitespace-nowrap`: con muchas órdenes ("2,907 órdenes") el conteo no debe
+            brincar de renglón ni empujar la barra (feedback de Gabriel). */}
+        <span className="ml-auto shrink-0 whitespace-nowrap text-[12px] text-faint">
+          {total.toLocaleString('es-MX')} órdenes
+        </span>
       </div>
 
       {/* ── Split: tabla (izq) + panel persistente (der) ─────────────────── */}

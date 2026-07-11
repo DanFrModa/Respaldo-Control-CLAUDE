@@ -92,8 +92,9 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
   });
 
   it('las hojas sin pantalla llevan su nota de "Proximamente" y ruta de un segmento', () => {
-    // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta.
-    for (const [clave, nota] of [['ventas', 'Llega con Finanzas (F9)']] as const) {
+    // Van a la página comodín (`:modulo`), que solo captura UN segmento de ruta. (Ventas ya es una
+    // pantalla real gateada por `edr.ver`, F9; Documental sigue "Próximamente".)
+    for (const [clave, nota] of [['documental', 'Llega en una fase posterior del plan']] as const) {
       const hoja = MODULOS_MENU.find((m) => m.clave === clave);
       expect(hoja, clave).toBeDefined();
       expect(hoja?.proximamente).toBe(nota);
@@ -105,8 +106,9 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
     const visibles = filtrarModulosVisibles(permisos());
     // Sin permisos solo quedan las hojas de uso general: el resumen, los catálogos que heredaron
     // el gate del hub Catálogos (bordados + galería, telas, avíos, clientes, proveedores, colores,
-    // tallas, temporadas, almacenes, etiquetas de marca), Documental y las «Próximamente» (ventas).
-    // (CxC ya NO: es pantalla real gateada por `cxc.ver`, F9-E4. Auditores tampoco: `calidad.ver`, R9.)
+    // tallas, temporadas, almacenes, etiquetas de marca) y la «Próximamente» Documental.
+    // (CxC ya NO: es pantalla real gateada por `cxc.ver`, F9-E4. Auditores tampoco: `calidad.ver`, R9.
+    // Ventas tampoco: es pantalla real gateada por `edr.ver`, F9.)
     expect(visibles.map((m) => m.clave).sort()).toEqual(
       [
         'almacenes',
@@ -122,7 +124,6 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
         'resumen',
         'tallas',
         'temporadas',
-        'ventas',
       ].sort(),
     );
   });
@@ -150,6 +151,8 @@ describe('catálogo COMPLETO (registro exhaustivo de pantallas)', () => {
       ['inventario-existencias', ['inventario-pt.ver']],
       ['inventario-movimientos', ['inventario-pt.mover']],
       ['edr-por-mes', ['edr.ver']],
+      // Ventas comparte el gate del EDR (es su misma data, F9).
+      ['ventas', ['edr.ver']],
       // Los catálogos que vivían bajo el hub Catálogos conservan su gate "autenticado".
       ['clientes-catalogo', 'autenticado'],
       ['proveedores', 'autenticado'],

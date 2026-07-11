@@ -82,6 +82,7 @@ import { OrdenesIncompletasPagina } from '@/modulos/ordenes-consulta/OrdenesInco
 import { TableroPedidosMesPagina } from '@/modulos/ordenes-consulta/TableroPedidosMesPagina';
 import { PedidosMesPagina } from '@/modulos/pedidos/PedidosMesPagina';
 import { PedidosPagina } from '@/modulos/pedidos/PedidosPagina';
+import { VentasPagina } from '@/modulos/ventas/VentasPagina';
 import { DesarrolloPagina } from '@/modulos/desarrollo/DesarrolloPagina';
 import { ListasPreciosPagina } from '@/modulos/listas-precios/ListasPreciosPagina';
 import { CapturaCortePagina } from '@/modulos/produccion/CapturaCortePagina';
@@ -338,6 +339,9 @@ const router = createBrowserRouter([
           // Catálogos globales de Desarrollo (F8-E1), admin-only.
           { path: 'administracion/conceptos-costo', element: <ConceptosCostoPagina /> },
           { path: 'administracion/estados-lista', element: <EstadosListaPagina /> },
+          // Ventas (Comercial › Clientes › Ventas): facturación por modelo sobre el EDR (F9 ya existe).
+          // Ruta estática ANTES del catch-all ":modulo".
+          { path: 'ventas', element: <VentasPagina /> },
           { path: ':modulo', element: <Proximamente /> },
           { path: '*', element: <NoEncontrado /> },
         ],
