@@ -137,10 +137,12 @@ export function Inicio(): React.JSX.Element {
             </p>
           </div>
           <div className="ml-auto flex gap-2">
-            {tienePermiso('ordenes.administrar') ? (
+            {tienePermiso('ordenes.administrar') && tienePermiso('pedidos.administrar') ? (
+              // La OP no se crea suelta: nace del PEDIDO (R3, §4.1). "Nueva orden" abre el
+              // constructor de pedido interno (mismo destino que el botón del centro de comando).
               <Button
                 size="sm"
-                onClick={() => void navigate('/produccion/ordenes/captura')}
+                onClick={() => void navigate('/pedidos', { state: { abrirConstructor: true } })}
                 data-testid="inicio-nueva-orden"
               >
                 <Plus aria-hidden />
