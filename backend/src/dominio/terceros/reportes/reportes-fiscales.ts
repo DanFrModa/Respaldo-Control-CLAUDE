@@ -33,9 +33,12 @@ import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma } from '../../../datos/index.js';
 
-/** Redondeo monetario a 2 decimales. */
+/** Redondeo monetario a 2 decimales; normaliza el cero negativo (-0 → 0). */
 function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
+  const r = Math.round(n * 100) / 100;
+  // `redondear2(-abonosNeg)` con la suma de abonos VACÍA (tras excluir cancelaciones) da -0: un
+  // artefacto que rompe el `toBe(0)` estricto y no debe salir del dominio. `r === 0` cubre ±0.
+  return r === 0 ? 0 : r;
 }
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
