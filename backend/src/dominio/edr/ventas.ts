@@ -27,10 +27,7 @@ import { verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { clienteLectura, type ContextoBd } from '../../comun/transaccion.js';
 import { validarEntrada } from '../../comun/validacion.js';
 
-/** Redondeo monetario a 2 decimales. */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
+import { redondear2 } from '../costos/decimales.js';
 
 /** Filtros ya validados. */
 type FiltrosVentas = z.output<typeof esquemaVentasQuery>;

@@ -11,7 +11,6 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
   Usuario,
-  UsuarioAsignarRoles,
   UsuarioContrasena,
   UsuarioCrear,
   UsuarioEditar,
@@ -85,18 +84,6 @@ async function reactivarUsuario(id: string): Promise<Usuario> {
   const { data, error } = await api.PATCH('/api/usuarios/{id}', {
     params: { path: { id } },
     body: { activo: true },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
-/** Reemplaza los roles de un usuario (`POST /api/usuarios/{id}/roles`). */
-async function asignarRoles(id: string, cuerpo: UsuarioAsignarRoles): Promise<Usuario> {
-  const { data, error } = await api.POST('/api/usuarios/{id}/roles', {
-    params: { path: { id } },
-    body: cuerpo,
   });
   if (!data) {
     throw new ErrorDeApi(error);
@@ -179,21 +166,6 @@ export function useReactivarUsuario(): UseMutationResult<Usuario, ErrorDeApi, st
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: reactivarUsuario,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_USUARIOS }),
-  });
-}
-
-/** Argumentos de la mutacion de asignacion de roles. */
-export interface ArgsAsignarRoles {
-  id: string;
-  idsRoles: number[];
-}
-
-/** Reemplaza los roles de un usuario e invalida la lista. */
-export function useAsignarRoles(): UseMutationResult<Usuario, ErrorDeApi, ArgsAsignarRoles> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, idsRoles }: ArgsAsignarRoles) => asignarRoles(id, { idsRoles }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_USUARIOS }),
   });
 }

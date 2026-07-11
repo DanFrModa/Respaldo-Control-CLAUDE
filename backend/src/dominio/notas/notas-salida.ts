@@ -198,11 +198,6 @@ async function exigirMaquileroExiste(tx: Tx, idMaquilero: number): Promise<void>
   }
 }
 
-/** ¿El renglón es de avío? (XOR — un renglón de avío trae `idAvio` y NO trae tela.) */
-function esRenglonAvio(linea: DatosNotaSalidaLineaEntrada): boolean {
-  return linea.idAvio != null;
-}
-
 /**
  * Valida el SET de renglones de la nota (reglas de negocio, A1). Para cada renglón:
  *  • XOR: es de AVÍO (`idAvio`, sin tela/lote/movimiento de tela) o de TELA (`idTela` + `idLote` +
@@ -989,6 +984,3 @@ export async function resumenNotasSalida(
 
   return { notas, borradores, confirmadas, ordenesSurtidas: ordenesDistintas.length };
 }
-
-// Re-export para que el reviewer/tests vean el helper de tipo de renglón sin re-implementarlo.
-export { esRenglonAvio };

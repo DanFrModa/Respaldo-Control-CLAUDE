@@ -24,6 +24,7 @@ import type { SesionUsuario } from '../../../comun/permisos.js';
 import type { ContextoBd } from '../../../comun/transaccion.js';
 
 import { renderizarPdfEnWorker } from '../../../comun/pdf-worker.js';
+import { MAX_FILAS_PDF, leyendaTruncado } from '../../../comun/impreso-topes.js';
 import {
   estilosDoc,
   FUENTE,
@@ -317,8 +318,20 @@ export async function impresoKpisWip(
   deps: DepsPdfWip = {},
 ): Promise<{ buffer: Buffer }> {
   const obtener = deps.kpisWip ?? kpisWip;
-  // `porPagina: 100` topa la lista de órdenes con avance (el tablero es un concentrado directivo).
-  const datos: KpisWip = await obtener(sesion, { ...parametros, porPagina: 100 }, bd);
+  // Blindaje del render (impreso-topes): se DIBUJAN a lo más `MAX_FILAS_PDF` órdenes con avance —el
+  // tablero es un concentrado directivo—, paginando el universo con el tope del backend (100) hasta
+  // juntarlas. `totales`/`total` siguen siendo del universo COMPLETO; el aviso de truncado lo pinta el
+  // render. Antes topaba en 100 EN SILENCIO (sin avisar que había más).
+  const TOPE_PAGINA = 100;
+  const primera = await obtener(sesion, { ...parametros, pagina: 1, porPagina: TOPE_PAGINA }, bd);
+  const filas = [...primera.datos];
+  let totalPaginas = primera.totalPaginas;
+  for (let pagina = 2; pagina <= totalPaginas && filas.length < MAX_FILAS_PDF; pagina += 1) {
+    const siguiente = await obtener(sesion, { ...parametros, pagina, porPagina: TOPE_PAGINA }, bd);
+    filas.push(...siguiente.datos);
+    totalPaginas = siguiente.totalPaginas;
+  }
+  const datos: KpisWip = { ...primera, datos: filas.slice(0, MAX_FILAS_PDF) };
   const pagador = await razonSocialEmpresa(sesion, bd);
   return { buffer: await renderizarPdfEnWorker('kpis-wip', { pagador, datos }) };
 }
@@ -384,5 +397,12 @@ export async function generarPdfKpisWip(payload: PayloadPdfKpisWip): Promise<Buf
       ]),
     ),
   ];
+
+  // Aviso de truncado: se dibujaron `datos.datos.length` de `datos.total` (universo); null si caben todas.
+  const textoTruncado = leyendaTruncado(datos.datos.length, datos.total);
+  if (textoTruncado !== null) {
+    contenido.push(h(Text, { key: 'trunc', style: estilosDoc.subtitulo }, textoTruncado));
+  }
+
   return renderToBuffer(documento(pagador, titulo, contenido));
 }

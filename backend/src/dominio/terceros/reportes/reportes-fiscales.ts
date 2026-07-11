@@ -33,9 +33,12 @@ import { clienteLectura, type ContextoBd } from '../../../comun/transaccion.js';
 import { validarEntrada } from '../../../comun/validacion.js';
 import { Prisma } from '../../../datos/index.js';
 
-/** Redondeo monetario a 2 decimales. */
+/** Redondeo monetario a 2 decimales; normaliza el cero negativo (-0 → 0). */
 function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
+  const r = Math.round(n * 100) / 100;
+  // `redondear2(-abonosNeg)` con la suma de abonos VACÍA (tras excluir cancelaciones) da -0: un
+  // artefacto que rompe el `toBe(0)` estricto y no debe salir del dominio. `r === 0` cubre ±0.
+  return r === 0 ? 0 : r;
 }
 
 /** Convierte un `YYYY-MM-DD` al `Date` UTC que Prisma guarda en `@db.Date`. */
@@ -114,8 +117,15 @@ export async function reporteFiscal(
   };
 
   const inicio = (filtros.pagina - 1) * filtros.porPagina;
-  // Totales: cargos (Σ monto>0) y abonos (Σ monto<0) sobre TODO el filtro. Se combinan por `AND` para
-  // NO pisar un posible filtro de `tipo` (que ya fija `monto`): si `tipo=cargos`, la suma de abonos da 0.
+  // Las CANCELACIONES (el INVERSO —sin UUID/XML— y su ORIGINAL marcado `cancelado`) se anulan entre sí:
+  // el neto no cambia si se quitan, pero SÍ inflan los brutos, porque el inverso es un cargo/abono
+  // espejo (fantasma). Los EXCLUYO de las AGREGACIONES de importes (cargos/abonos/neto) para que
+  // reflejen solo el CFDI VIVO. Excluir SOLO el inverso rompería el neto (dejaría el original colgando),
+  // por eso salen AMBOS. La LISTA (filas/total/movimientos) SÍ los muestra: es el rastro de auditoría
+  // (D3) y cada renglón trae sus banderas `cancelado`/`esInverso`.
+  const soloVivos = { idMovimientoInverso: null, cancelado: false } as const;
+  // Totales: cargos (Σ monto>0) y abonos (Σ monto<0) sobre el filtro, ya sin cancelaciones. Se combinan
+  // por `AND` para NO pisar un posible filtro de `tipo` (que ya fija `monto`): si `tipo=cargos`, abonos=0.
   const [total, filasBd, aggCargos, aggAbonos] = await Promise.all([
     cliente.movimientoTercero.count({ where }),
     cliente.movimientoTercero.findMany({
@@ -126,11 +136,11 @@ export async function reporteFiscal(
       take: filtros.porPagina,
     }),
     cliente.movimientoTercero.aggregate({
-      where: { AND: [where, { monto: { gt: 0 } }] },
+      where: { AND: [where, { ...soloVivos, monto: { gt: 0 } }] },
       _sum: { monto: true },
     }),
     cliente.movimientoTercero.aggregate({
-      where: { AND: [where, { monto: { lt: 0 } }] },
+      where: { AND: [where, { ...soloVivos, monto: { lt: 0 } }] },
       _sum: { monto: true },
     }),
   ]);
@@ -218,9 +228,15 @@ export async function saludFiscal(
   const puedeVerImportes = tienePermiso(sesion, 'consultas.ver-importes');
   const oculto = (v: number): number | null => (puedeVerImportes ? v : null);
 
+  // Conciliación y saldos cuentan solo el CFDI VIVO: se EXCLUYEN los movimientos de cancelación —el
+  // INVERSO (fiscal pero sin UUID/XML → contaría como "sin CFDI/sin XML" fantasma y hundiría el
+  // pctConciliado) y su ORIGINAL cancelado (su CFDI ya no vale)—. Ambos se anulan en el saldo, así que
+  // sacarlos deja los saldos correctos y limpia los conteos.
   const baseFiscal: Prisma.MovimientoTerceroWhereInput = {
     idEmpresa,
     esFiscal: true,
+    idMovimientoInverso: null,
+    cancelado: false,
     ...rangoFecha(filtros.desde, filtros.hasta),
   };
 
@@ -234,6 +250,9 @@ export async function saludFiscal(
   const condiciones = [
     Prisma.sql`m.id_empresa = ${idEmpresa}`,
     Prisma.sql`m.es_fiscal = true`,
+    // Mismo filtro que los conteos: fuera inversos de cancelación y originales cancelados.
+    Prisma.sql`m.id_movimiento_inverso IS NULL`,
+    Prisma.sql`m.cancelado = false`,
     ...condicionesFecha(filtros.desde, filtros.hasta),
   ];
   const whereSql = Prisma.join(condiciones, ' AND ');

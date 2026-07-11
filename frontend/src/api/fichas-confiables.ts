@@ -13,7 +13,6 @@ import type {
   FichaOrden,
   FichasConfiables,
   FichasConfiablesQuery,
-  ReactivosFichaLista,
   VerificarFichaOrden,
 } from './tipos';
 
@@ -22,18 +21,6 @@ import type {
  * lógica de negocio (A1): el backend guarda el checklist por filas (A6) y agrega el % en SQL.
  */
 export const CLAVE_FICHAS = ['fichas-confiables'] as const;
-
-async function listarReactivos(): Promise<ReactivosFichaLista> {
-  const { data, error } = await api.GET('/api/indicadores/fichas/reactivos', {
-    params: { query: {} },
-  });
-  if (!data) throw new ErrorDeApi(error);
-  return data;
-}
-
-export function useReactivosFicha(): UseQueryResult<ReactivosFichaLista, ErrorDeApi> {
-  return useQuery({ queryKey: [...CLAVE_FICHAS, 'reactivos'], queryFn: listarReactivos });
-}
 
 async function obtenerFichaOrden(idOrden: number): Promise<FichaOrden> {
   const { data, error } = await api.GET('/api/indicadores/fichas/ordenes/{idOrden}', {

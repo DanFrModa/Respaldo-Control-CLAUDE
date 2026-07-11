@@ -27,9 +27,6 @@ export type EstadoDesarrollo = Desarrollo['estado'];
 /** Cuerpo de alta de un desarrollo (`POST /api/proyectos/{idProyecto}/desarrollos`). */
 export type DesarrolloCrear =
   paths['/api/proyectos/{idProyecto}/desarrollos']['post']['requestBody']['content']['application/json'];
-/** Cuerpo de edición de un desarrollo (`PATCH /api/desarrollos/{id}`). */
-export type DesarrolloEditar =
-  paths['/api/desarrollos/{id}']['patch']['requestBody']['content']['application/json'];
 /** Cuerpo de apagar un desarrollo (`POST /api/desarrollos/{id}/apagar`). */
 export type DesarrolloApagar =
   paths['/api/desarrollos/{id}/apagar']['post']['requestBody']['content']['application/json'];
@@ -57,15 +54,6 @@ export function useDesarrollo(id: number | null): UseQueryResult<Desarrollo, Err
 async function crear(idProyecto: number, cuerpo: DesarrolloCrear): Promise<Desarrollo> {
   const { data, error } = await api.POST('/api/proyectos/{idProyecto}/desarrollos', {
     params: { path: { idProyecto } },
-    body: cuerpo,
-  });
-  if (!data) throw new ErrorDeApi(error);
-  return data;
-}
-
-async function actualizar(id: number, cuerpo: DesarrolloEditar): Promise<Desarrollo> {
-  const { data, error } = await api.PATCH('/api/desarrollos/{id}', {
-    params: { path: { id } },
     body: cuerpo,
   });
   if (!data) throw new ErrorDeApi(error);
@@ -106,25 +94,6 @@ export function useCrearDesarrollo(): UseMutationResult<
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ idProyecto, cuerpo }: ArgsCrearDesarrollo) => crear(idProyecto, cuerpo),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS }),
-  });
-}
-
-/** Argumentos de la mutación de edición de desarrollo. */
-export interface ArgsActualizarDesarrollo {
-  id: number;
-  cuerpo: DesarrolloEditar;
-}
-
-/** Edita un desarrollo e invalida los proyectos. */
-export function useActualizarDesarrollo(): UseMutationResult<
-  Desarrollo,
-  ErrorDeApi,
-  ArgsActualizarDesarrollo
-> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, cuerpo }: ArgsActualizarDesarrollo) => actualizar(id, cuerpo),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: CLAVE_PROYECTOS }),
   });
 }

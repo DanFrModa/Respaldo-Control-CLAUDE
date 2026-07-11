@@ -14,7 +14,6 @@ import type {
   OrdenCancelar,
   OrdenComentarioCrear,
   OrdenCopiarMatriz,
-  OrdenCrear,
   OrdenEditar,
   OrdenesPagina,
   OrdenesQuery,
@@ -65,15 +64,6 @@ async function obtenerOrden(id: number): Promise<Orden> {
 }
 
 // ── Escrituras ──────────────────────────────────────────────────────────────────
-
-/** Crea una orden desde un renglón de pedido (`POST /api/ordenes`). */
-async function crearOrden(cuerpo: OrdenCrear): Promise<Orden> {
-  const { data, error } = await api.POST('/api/ordenes', { body: cuerpo });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
 
 /** Actualiza el encabezado de una orden (`PATCH /api/ordenes/{id}`). */
 async function actualizarOrden(id: number, cuerpo: OrdenEditar): Promise<Orden> {
@@ -175,15 +165,6 @@ function invalidar(queryClient: ReturnType<typeof useQueryClient>, id?: number):
   if (id !== undefined) {
     void queryClient.invalidateQueries({ queryKey: claveOrden(id) });
   }
-}
-
-/** Crea una orden e invalida la lista. */
-export function useCrearOrden(): UseMutationResult<Orden, ErrorDeApi, OrdenCrear> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: crearOrden,
-    onSuccess: () => invalidar(queryClient),
-  });
 }
 
 /** Argumentos de la mutación de edición del encabezado. */

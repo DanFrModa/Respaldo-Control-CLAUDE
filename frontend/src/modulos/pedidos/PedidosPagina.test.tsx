@@ -28,7 +28,6 @@ vi.mock('@/api/pedidos', () => ({
     ultimaQuery = query;
     return usePedidos(query);
   },
-  usePedido: () => ({ data: undefined, isPending: false, isError: false, error: null }),
   useCrearPedido: () => ({ mutate: vi.fn(), isPending: false }),
   useActualizarPedido: () => ({ mutate: vi.fn(), isPending: false }),
   useCopiarPedido: () => ({ mutate: vi.fn(), isPending: false }),

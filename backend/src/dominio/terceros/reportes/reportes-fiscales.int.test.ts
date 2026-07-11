@@ -17,7 +17,7 @@ import { clientePruebas, crearEmpresaPrueba, limpiarBaseDatos } from '../../../p
 import { sesionDePrueba } from '../../../pruebas/sesiones.js';
 import type { ClavePermiso } from '../../../contrato/index.js';
 
-import { registrarMovimientoTercero } from '../cuenta-terceros.js';
+import { cancelarMovimientoTercero, registrarMovimientoTercero } from '../cuenta-terceros.js';
 import { reporteFiscal, saludFiscal } from './reportes-fiscales.js';
 
 let cliente: PrismaClient;
@@ -257,6 +257,104 @@ describe('conciliación (con/sin CFDI, con/sin XML)', () => {
     expect(fila?.saldoFiscal).toBe(800);
     expect(fila?.rfc).toBe('TNO900101AAA');
     expect(fila?.movimientos).toBe(2);
+  });
+});
+
+// ── (h) cancelaciones no fantasmean la conciliación ni inflan los brutos (D2) ────────────────────
+describe('cancelaciones (inverso + original) fuera de conteos y agregaciones', () => {
+  /** Id del movimiento del uuid dado (para cancelarlo por el motor). */
+  async function idPorUuid(uuid: string): Promise<number> {
+    const m = await cliente.movimientoTercero.findFirstOrThrow({
+      where: { uuidCfdi: uuid },
+      select: { id: true },
+    });
+    return m.id;
+  }
+
+  it('un CFDI importado y CANCELADO no deja pendientes fantasma ni falsea el pctConciliado', async () => {
+    // Un CFDI conciliado (UUID + XML) y otro que se CANCELA (crea su inverso fiscal sin UUID/XML).
+    await alta({
+      tipoTercero: 'proveedor',
+      idTercero: proveedor.id,
+      fecha: hace(5),
+      origen: 'factura_proveedor',
+      importe: 1000,
+      esFiscal: true,
+      uuidCfdi: 'U-VIVO',
+      idArchivoCfdi: await archivoCfdi('r2/vivo.xml'),
+    });
+    await alta({
+      tipoTercero: 'proveedor',
+      idTercero: proveedor.id,
+      fecha: hace(4),
+      origen: 'factura_proveedor',
+      importe: 500,
+      esFiscal: true,
+      uuidCfdi: 'U-CANCELADO',
+      idArchivoCfdi: await archivoCfdi('r2/cancelado.xml'),
+    });
+    await cancelarMovimientoTercero(
+      sesion(),
+      await idPorUuid('U-CANCELADO'),
+      { motivo: 'error' },
+      bd(),
+    );
+
+    // SALUD: solo cuenta el CFDI VIVO. Sin el fix, el inverso (sin UUID/XML) sumaba a sinCfdi/sinXml y
+    // el original cancelado inflaba el total → pctConciliado 33% fantasma en vez de 100%.
+    const salud = await saludFiscal(sesion(), {}, bd());
+    expect(salud.totalFiscales).toBe(1);
+    expect(salud.conCfdi).toBe(1);
+    expect(salud.sinCfdi).toBe(0);
+    expect(salud.conXml).toBe(1);
+    expect(salud.sinXml).toBe(0);
+    expect(salud.pctConciliado).toBe(100);
+    // El saldo del proveedor refleja solo el vivo (1000); el par cancelado (500 − 500) se neutraliza.
+    const saldoProv = salud.saldos.find((s) => s.idTercero === proveedor.id);
+    expect(saldoProv?.saldoFiscal).toBe(1000);
+    expect(saldoProv?.movimientos).toBe(1);
+
+    // REPORTE: la LISTA conserva el rastro (vivo + original cancelado + inverso = 3), pero los brutos
+    // solo cuentan el CFDI vivo (cargos 1000, abonos 0, neto 1000) — nada del par cancelado.
+    const rep = await reporteFiscal(sesion(), {}, bd());
+    expect(rep.total).toBe(3);
+    expect(rep.totales.cargos).toBe(1000);
+    expect(rep.totales.abonos).toBe(0);
+    expect(rep.totales.neto).toBe(1000);
+    expect(rep.filas.some((f) => f.esInverso)).toBe(true);
+    expect(rep.filas.some((f) => f.cancelado)).toBe(true);
+  });
+
+  it('un ÚNICO CFDI cancelado deja la salud en cero limpio (sin pendientes fantasma)', async () => {
+    await alta({
+      tipoTercero: 'proveedor',
+      idTercero: proveedor.id,
+      fecha: hace(3),
+      origen: 'factura_proveedor',
+      importe: 700,
+      esFiscal: true,
+      uuidCfdi: 'U-SOLO',
+      idArchivoCfdi: await archivoCfdi('r2/solo.xml'),
+    });
+    await cancelarMovimientoTercero(
+      sesion(),
+      await idPorUuid('U-SOLO'),
+      { motivo: 'duplicado' },
+      bd(),
+    );
+
+    const salud = await saludFiscal(sesion(), {}, bd());
+    expect(salud.totalFiscales).toBe(0);
+    expect(salud.sinCfdi).toBe(0);
+    expect(salud.sinXml).toBe(0);
+    expect(salud.pctConciliado).toBeNull();
+    expect(salud.saldos).toHaveLength(0);
+
+    // El neto del reporte ya era correcto (par se anula); los brutos ahora también.
+    const rep = await reporteFiscal(sesion(), {}, bd());
+    expect(rep.totales.cargos).toBe(0);
+    expect(rep.totales.abonos).toBe(0);
+    expect(rep.totales.neto).toBe(0);
   });
 });
 

@@ -51,16 +51,7 @@ import {
 import { validarEntrada } from '../../comun/validacion.js';
 
 import { cantidadDeBase, cantidadesDeOrdenes, cantidadesVacias } from '../costos/cantidades.js';
-
-/** Redondeo monetario a 2 decimales. */
-function redondear2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
-/** Nº de un `Decimal` (null → 0). */
-function num(d: Prisma.Decimal | null | undefined): number {
-  return d == null ? 0 : d.toNumber();
-}
+import { num, redondear2 } from '../costos/decimales.js';
 
 /** Totales que alimentan la fórmula del resultado. */
 export interface TotalesEdr {

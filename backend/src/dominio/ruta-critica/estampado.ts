@@ -58,8 +58,9 @@ export async function elegirSecuenciaEstampado(
   verificarPermiso(sesion, 'rc.programar');
 
   const idEmpresa = await enTransaccion(async (tx) => {
-    const orden = await tx.orden.findUnique({
-      where: { id: datos.idOrden },
+    // Scope por empresa activa (A9): una orden de otra empresa "no existe" → 404 (no se reprograma).
+    const orden = await tx.orden.findFirst({
+      where: { id: datos.idOrden, idEmpresa: sesion.idEmpresaActiva },
       select: {
         id: true,
         idEmpresa: true,

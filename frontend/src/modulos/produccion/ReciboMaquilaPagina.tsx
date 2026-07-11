@@ -100,19 +100,24 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
   const codigoProceso = procesoSel?.codigo;
   const generaEntradaPt = procesoSel?.generaEntradaPt ?? false;
 
-  // Maquilero filtrado por el rol que mapea al proceso elegido.
+  // Maquilero filtrado por el rol que mapea al proceso elegido. La consulta queda DESHABILITADA
+  // hasta resolver el rol (idRolMaquilero definido): así nunca lista TODOS los proveedores sin
+  // filtro (mismo criterio que los cortadores en la captura de corte).
   const roles = useRolesProveedor();
   const idRolMaquilero =
     codigoProceso === undefined
       ? undefined
       : roles.data?.find((r) => r.codigo === rolDelProceso(codigoProceso))?.id;
-  const maquileros = useProveedores({
-    pagina: 1,
-    porPagina: 100,
-    ordenarPor: 'nombre',
-    direccion: 'asc',
-    ...(idRolMaquilero === undefined ? {} : { rol: idRolMaquilero }),
-  });
+  const maquileros = useProveedores(
+    {
+      pagina: 1,
+      porPagina: 100,
+      ordenarPor: 'nombre',
+      direccion: 'asc',
+      ...(idRolMaquilero === undefined ? {} : { rol: idRolMaquilero }),
+    },
+    { enabled: idRolMaquilero !== undefined },
+  );
 
   // Almacenes destino (solo se usan cuando el proceso mete a PT).
   const almacenes = useAlmacenes({
@@ -121,6 +126,16 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
     ordenarPor: 'nombre',
     direccion: 'asc',
   });
+
+  // Aviso reintentable si falla algún catálogo de la captura.
+  const catalogoError =
+    procesos.isError || roles.isError || maquileros.isError || almacenes.isError;
+  function reintentarCatalogos(): void {
+    void procesos.refetch();
+    void roles.refetch();
+    void maquileros.refetch();
+    void almacenes.refetch();
+  }
 
   // Al cambiar de proceso, limpia el maquilero elegido (su rol pudo dejar de aplicar).
   useEffect(() => {
@@ -283,6 +298,21 @@ export function ReciboMaquilaPagina(): React.JSX.Element {
           </p>
         </div>
       </header>
+
+      {catalogoError ? (
+        <div
+          className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+          role="alert"
+          data-testid="recibo-error-catalogo"
+        >
+          <p className="text-sm text-destructive">
+            No se pudieron cargar los catálogos de la captura (procesos, maquileros o almacenes).
+          </p>
+          <Button variant="outline" size="sm" onClick={reintentarCatalogos}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[20rem_1fr]">
         <Card>

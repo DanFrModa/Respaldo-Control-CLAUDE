@@ -317,34 +317,6 @@ export function useCapturarCumplimientoRc(): UseMutationResult<
   });
 }
 
-/** Argumentos de marcar/desmarcar un ítem de checklist. */
-export interface ArgsChecklist {
-  /** Id del ítem de checklist de la ruta viva. */
-  idItem: number;
-  /** Nuevo valor del ítem. */
-  hecho: boolean;
-}
-
-/** Marca o desmarca un ítem de checklist de un proceso e invalida ruta + bandeja + alertas. */
-export function useMarcarChecklistRc(): UseMutationResult<RutaOrden, ErrorDeApi, ArgsChecklist> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ idItem, hecho }: ArgsChecklist) => {
-      const { data, error } = await api.PUT('/api/ruta-critica/checklist/{idItem}', {
-        params: { path: { idItem } },
-        body: { hecho },
-      });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => {
-      for (const clave of clavesACapturar()) {
-        void qc.invalidateQueries({ queryKey: clave });
-      }
-    },
-  });
-}
-
 // ── Impreso del plan de la RC por orden (PDF binario) ────────────────────────
 
 /**

@@ -10,8 +10,6 @@ import { api } from './cliente';
 import { ErrorDeApi } from './errores';
 import type {
   ArticuloRc,
-  ArticuloRcCrear,
-  ArticuloRcEditar,
   CalendarioRc,
   CalendarioRcActualizar,
   DuracionAplicacionRc,
@@ -24,8 +22,6 @@ import type {
   FactorCantidadRcCrear,
   FactorCantidadRcEditar,
   FamiliaRc,
-  FamiliaRcCrear,
-  FamiliaRcEditar,
   FestivoRc,
   FestivoRcCrear,
   FestivoRcEditar,
@@ -67,54 +63,6 @@ export function useFamiliasRc(incluirInactivos = false): UseQueryResult<FamiliaR
   });
 }
 
-export function useCrearFamiliaRc(): UseMutationResult<FamiliaRc, ErrorDeApi, FamiliaRcCrear> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (cuerpo: FamiliaRcCrear) => {
-      const { data, error } = await api.POST('/api/ruta-critica/familias', { body: cuerpo });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_FAMILIAS_RC }),
-  });
-}
-
-export function useActualizarFamiliaRc(): UseMutationResult<
-  FamiliaRc,
-  ErrorDeApi,
-  { id: number; cuerpo: FamiliaRcEditar }
-> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, cuerpo }: { id: number; cuerpo: FamiliaRcEditar }) => {
-      const { data, error } = await api.PATCH('/api/ruta-critica/familias/{id}', {
-        params: { path: { id } },
-        body: cuerpo,
-      });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: CLAVE_FAMILIAS_RC });
-      void qc.invalidateQueries({ queryKey: CLAVE_ARTICULOS_RC });
-    },
-  });
-}
-
-export function useDesactivarFamiliaRc(): UseMutationResult<FamiliaRc, ErrorDeApi, number> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const { data, error } = await api.DELETE('/api/ruta-critica/familias/{id}', {
-        params: { path: { id } },
-      });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_FAMILIAS_RC }),
-  });
-}
-
 // ── Artículos ────────────────────────────────────────────────────────────────
 
 async function listarArticulos(incluirInactivos: boolean): Promise<ArticuloRc[]> {
@@ -129,51 +77,6 @@ export function useArticulosRc(incluirInactivos = false): UseQueryResult<Articul
   return useQuery({
     queryKey: [...CLAVE_ARTICULOS_RC, { incluirInactivos }],
     queryFn: () => listarArticulos(incluirInactivos),
-  });
-}
-
-export function useCrearArticuloRc(): UseMutationResult<ArticuloRc, ErrorDeApi, ArticuloRcCrear> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (cuerpo: ArticuloRcCrear) => {
-      const { data, error } = await api.POST('/api/ruta-critica/articulos', { body: cuerpo });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_ARTICULOS_RC }),
-  });
-}
-
-export function useActualizarArticuloRc(): UseMutationResult<
-  ArticuloRc,
-  ErrorDeApi,
-  { id: number; cuerpo: ArticuloRcEditar }
-> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, cuerpo }: { id: number; cuerpo: ArticuloRcEditar }) => {
-      const { data, error } = await api.PATCH('/api/ruta-critica/articulos/{id}', {
-        params: { path: { id } },
-        body: cuerpo,
-      });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_ARTICULOS_RC }),
-  });
-}
-
-export function useDesactivarArticuloRc(): UseMutationResult<ArticuloRc, ErrorDeApi, number> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: number) => {
-      const { data, error } = await api.DELETE('/api/ruta-critica/articulos/{id}', {
-        params: { path: { id } },
-      });
-      if (!data) throw new ErrorDeApi(error);
-      return data;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: CLAVE_ARTICULOS_RC }),
   });
 }
 

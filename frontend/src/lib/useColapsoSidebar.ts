@@ -10,7 +10,7 @@ import { useCallback, useState } from 'react';
  */
 
 /** Clave de localStorage donde se persiste el colapso del sidebar. */
-export const CLAVE_COLAPSO_SIDEBAR = 'control-v2-sidebar';
+const CLAVE_COLAPSO_SIDEBAR = 'control-v2-sidebar';
 
 /** Lee el colapso persistido; `false` (expandido) si no hay nada guardado. */
 function leerColapso(): boolean {
@@ -31,7 +31,7 @@ function guardarColapso(colapsado: boolean): void {
 }
 
 /** Resultado de {@link useColapsoSidebar}. */
-export interface UsoColapsoSidebar {
+interface UsoColapsoSidebar {
   /** ¿El sidebar esta colapsado (solo iconos)? */
   colapsado: boolean;
   /** Alterna entre expandido y colapsado, persistiendo el cambio. */

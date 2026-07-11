@@ -47,7 +47,7 @@ import {
   type PendientesOrden,
   type CorteSemanalLista,
 } from '../../contrato/index.js';
-import { TipoEtapaMovimiento, type EtapaMovimiento, type Prisma } from '../../datos/index.js';
+import { TipoEtapaMovimiento, type Prisma } from '../../datos/index.js';
 import type { z } from 'zod';
 
 import { datosCreacion, datosModificacion, registrarBitacora } from '../../comun/auditoria.js';
@@ -59,7 +59,6 @@ import {
   registrarEventoOutbox,
   type EventoEtapaRc,
 } from '../../comun/eventos-dominio.js';
-import { EVENTOS_PRODUCCION, emitir, type NombreEvento } from '../../comun/eventos.js';
 import { tienePermiso, verificarPermiso, type SesionUsuario } from '../../comun/permisos.js';
 import { siguienteFolio } from '../../comun/secuencias.js';
 import {
@@ -405,23 +404,11 @@ function aDateColumna(valor: string): Date {
   return new Date(`${valor}T00:00:00.000Z`);
 }
 
-/** Emite un evento de etapa post-commit, best-effort (no revierte el negocio si un manejador falla). */
-async function emitirEtapa(evento: NombreEvento, etapa: EtapaMovimiento): Promise<void> {
-  await emitir(evento, {
-    idEtapaMovimiento: etapa.id,
-    idOrden: etapa.idOrden,
-    idEmpresa: etapa.idEmpresa,
-    tipo: etapa.tipo,
-    idTipoProceso: etapa.idTipoProceso,
-  });
-}
-
 /**
  * Escribe en el OUTBOX DURABLE el evento de etapa que consume el auto-avance de la RC (F5-E6), en la
  * MISMA transacción del hecho (atómico: si el corte/envío hace rollback, el evento no existe). Es el
- * gancho REAL de F5: el `emitir(...)` in-process de arriba se conserva (inofensivo, nadie escucha en
- * prod) pero quien dispara el auto-avance es esta fila del outbox. La RELEE el consumidor (no manda
- * cantidades): la completitud se re-evalúa sobre el estado físico actual.
+ * gancho REAL de F5 que dispara el auto-avance. La RELEE el consumidor (no manda cantidades): la
+ * completitud se re-evalúa sobre el estado físico actual.
  */
 async function registrarEventoEtapaRc(
   tx: Tx,
@@ -511,7 +498,6 @@ export async function registrarCorte(
 
   // Quien capturo ve SU captura completa (el corte no lleva precio, pero el criterio es uniforme).
   const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
-  await emitirEtapaPorId(sesion, idEtapa, EVENTOS_PRODUCCION.corteRegistrado, bd);
   dispararPublicacion(); // publica la fila del outbox tras el commit (best-effort; el barrido recupera).
   return salida;
 }
@@ -640,7 +626,6 @@ export async function registrarEnvioMaquila(
 
   // Quien capturo el envio TECLEO el precio pactado: su respuesta lo devuelve (no es fuga).
   const salida = await obtenerEtapa(sesion, idEtapa, bd, { ocultarPrecio: false });
-  await emitirEtapaPorId(sesion, idEtapa, EVENTOS_PRODUCCION.envioRegistrado, bd);
   dispararPublicacion();
   return salida;
 }
@@ -651,7 +636,9 @@ export async function registrarEnvioMaquila(
  *  • solo etapas de la EMPRESA ACTIVA (A9);
  *  • no se puede re-cancelar una etapa ya cancelada;
  *  • no se puede cancelar un CORTE que tenga ENVÍOS VIVOS (no cancelados): primero se cancelan los
- *    envíos (si no, los pendientes quedarían incoherentes — enviar sin cortado).
+ *    envíos (si no, los pendientes quedarían incoherentes — enviar sin cortado);
+ *  • espejo del anterior: no se puede cancelar un ENVÍO que tenga RECIBOS VIVOS de su orden+proceso
+ *    (si no, quedaría recibido sin envío que lo sostenga — `recibido ≤ enviado` se rompe).
  * Las etapas canceladas NO cuentan en ninguna suma de pendientes ({@link sumarCeldas} filtra
  * `canceladoEn: null`).
  */
@@ -706,6 +693,29 @@ export async function cancelarEtapaMovimiento(
       if (enviosVivos > 0) {
         throw new ErrorConflicto(
           'No se puede cancelar el corte: la orden tiene envíos a maquila vigentes. Cancélalos primero.',
+        );
+      }
+    }
+
+    if (etapa.tipo === TipoEtapaMovimiento.envio_maquila) {
+      // Espejo del guard del corte: el ENVÍO sostiene los recibos. `recibos.ts` valida `recibido ≤
+      // enviado` al AGREGADO orden+proceso (y un recibo ligado por `idEtapaEnvio` es del mismo
+      // orden+proceso), así que cancelar el envío bajaría el enviado y dejaría recibos "colgando".
+      // Se bloquea la orden para que un recibo concurrente no se cuele entre la verificación y la
+      // cancelación (mismo lock que el recibo usa al validar).
+      await bloquearEtapasDeOrden(tx, sesion.idEmpresaActiva, etapa.idOrden);
+      const recibosVivos = await tx.etapaMovimiento.count({
+        where: {
+          idOrden: etapa.idOrden,
+          idTipoProceso: etapa.idTipoProceso,
+          tipo: TipoEtapaMovimiento.recibo_maquila,
+          canceladoEn: null,
+        },
+      });
+      if (recibosVivos > 0) {
+        throw new ErrorConflicto(
+          'No se puede cancelar el envío a maquila: la orden tiene recibos de este proceso vigentes. ' +
+            'Cancélalos primero.',
         );
       }
     }
@@ -824,19 +834,6 @@ export async function listarEtapasOrden(
     folioOrden: Number(orden.folio),
     etapas: etapas.map((e) => aEtapaSalida(e, nombres, ocultarPrecio)),
   };
-}
-
-/** Re-lee la etapa con un cliente de lectura para emitir su evento post-commit (best-effort). */
-async function emitirEtapaPorId(
-  _sesion: SesionUsuario,
-  idEtapa: number,
-  evento: NombreEvento,
-  bd?: ContextoBd,
-): Promise<void> {
-  const etapa = await clienteLectura(bd).etapaMovimiento.findUnique({ where: { id: idEtapa } });
-  if (etapa !== null) {
-    await emitirEtapa(evento, etapa);
-  }
 }
 
 /**

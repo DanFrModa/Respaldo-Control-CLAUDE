@@ -136,25 +136,6 @@ export function indiceProductividadAlmacen(p: {
   return (((j / p.pzPersDia / j) * p.piezas) / p.personas) * (j / p.horasTrabajadas);
 }
 
-/**
- * Agregación de los índices diarios de un grupo (periodo × actividad × persona) — la VARIANTE LIMPIA
- * del tablero semanal/mensual (a confirmar con Daniel): en vez de las heurísticas `RealDiario/5` y
- * `RealDiario/30` del viejo, se AGREGAN los índices reales. `indiceTotal` = Σ (unidades logradas,
- * aditivo en IP); `indicePromedio` = media (más significativo para la razón de eficiencia del
- * almacén). El tablero replica esta regla en SQL (`SUM` + `SUM/COUNT`); este helper puro la
- * documenta y la deja unit-testeable sin BD.
- */
-export function agregarIndicesDiarios(indices: readonly number[]): {
-  indiceTotal: number;
-  indicePromedio: number;
-} {
-  const indiceTotal = indices.reduce((suma, i) => suma + i, 0);
-  return {
-    indiceTotal,
-    indicePromedio: indices.length > 0 ? indiceTotal / indices.length : 0,
-  };
-}
-
 // ── Utilidades comunes ────────────────────────────────────────────────────────────────────────────
 
 /** Permiso de CAPTURA por área. */

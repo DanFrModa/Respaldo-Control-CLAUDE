@@ -63,17 +63,6 @@ async function resumenNotas(query: ResumenNotasQuery): Promise<ResumenNotas> {
   return data;
 }
 
-/** Obtiene una nota por id (encabezado + renglones + trazas a kardex). */
-async function obtenerNota(id: number): Promise<NotaSalida> {
-  const { data, error } = await api.GET('/api/notas-salida/{id}', {
-    params: { path: { id } },
-  });
-  if (!data) {
-    throw new ErrorDeApi(error);
-  }
-  return data;
-}
-
 // ── Escrituras ──────────────────────────────────────────────────────────────────
 
 /** Crea una nota en borrador (`POST /api/notas-salida`). */
@@ -141,15 +130,6 @@ export function useResumenNotas(
     queryKey: [...CLAVE_NOTAS, 'resumen', query],
     queryFn: () => resumenNotas(query),
     placeholderData: keepPreviousData,
-  });
-}
-
-/** Obtiene el detalle de una nota (deshabilitada si no hay id). */
-export function useNotaSalida(id: number | undefined): UseQueryResult<NotaSalida, ErrorDeApi> {
-  return useQuery({
-    queryKey: claveNota(id ?? 0),
-    queryFn: () => obtenerNota(id as number),
-    enabled: id !== undefined,
   });
 }
 

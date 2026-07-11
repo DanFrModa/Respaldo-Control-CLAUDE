@@ -78,6 +78,16 @@ export function MovimientosPtPagina(): React.JSX.Element {
     [tallasCat.data],
   );
 
+  // Aviso reintentable si falla algún catálogo de la captura.
+  const catalogoError =
+    tiposMov.isError || almacenes.isError || colores.isError || tallasCat.isError;
+  function reintentarCatalogos(): void {
+    void tiposMov.refetch();
+    void almacenes.refetch();
+    void colores.refetch();
+    void tallasCat.refetch();
+  }
+
   const total = totalMatriz(lineas);
   const puedeGuardar =
     puedeMover &&
@@ -127,6 +137,21 @@ export function MovimientosPtPagina(): React.JSX.Element {
           </p>
         </div>
       </header>
+
+      {catalogoError ? (
+        <div
+          className="space-y-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2"
+          role="alert"
+          data-testid="mov-error-catalogo"
+        >
+          <p className="text-sm text-destructive">
+            No se pudieron cargar los catálogos de la captura (tipos, almacenes, colores o tallas).
+          </p>
+          <Button size="sm" variant="outline" onClick={reintentarCatalogos}>
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
 
       {/* ── Card única: riel del módulo + captura (estándar del grupo, proto `vInventarios`) ── */}
       <div className="overflow-hidden rounded-xl border bg-card">
